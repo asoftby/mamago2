@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 
-import {
-  buildPreviewHumanReport,
-  buildPreviewJsonReport,
-  computeWarningsByCode,
-  parseArgs,
-} from "./migration-preview-wordpress-db";
+import { buildPreviewHumanReport, buildPreviewJsonReport, parseArgs } from "./migration-preview-wordpress-db";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import {
   ARTICLE_ENTITY_TYPE,
@@ -129,13 +124,21 @@ async function testEntityFilterAppliesThroughAdapterAndEngine() {
   assert.equal(placeOnly.items.length, 2);
 }
 
-async function testWarningsGroupedByCode() {
+async function testStatsPresentAndUsedByReport() {
   const plan = await buildTestPlan();
-  const warningsByCode = computeWarningsByCode(plan);
-  assert.deepEqual(warningsByCode, {
+  assert.ok(plan.stats);
+
+  assert.equal(plan.stats!.discoveredCount, 4);
+  assert.equal(plan.stats!.normalizedCount, 4);
+  assert.equal(plan.stats!.failedCount, 0);
+  assert.deepEqual(plan.stats!.warningCounts, {
     ARTICLE_ELEMENTOR_CONTENT: 1,
     ARTICLE_MISSING_FEATURED_IMAGE: 1,
     PLACE_MISSING_COORDINATES: 1,
+  });
+  assert.deepEqual(plan.stats!.sourceEntityTypeCounts, {
+    [ARTICLE_ENTITY_TYPE]: 2,
+    [PLACE_ENTITY_TYPE]: 2,
   });
 }
 
@@ -146,31 +149,45 @@ async function testHumanReportContent() {
   assert.match(report, /Migration Preview/);
   assert.match(report, /source: wordpress-db/);
   assert.match(report, /entity: all/);
-  assert.match(report, /Articles:\n2 discovered\n2 normalized\n0 failed/);
-  assert.match(report, /Places:\n2 discovered\n2 normalized\n0 failed/);
+  assert.match(report, /Discovered: 4/);
+  assert.match(report, /Normalized: 4/);
+  assert.match(report, /Failed: 0/);
+  assert.match(report, /Skipped: 0/);
+  assert.match(report, /Success rate: 100\.0%/);
+  assert.match(report, /Action counts/);
+  assert.match(report, /CREATE: 4/);
+  assert.match(report, /Target type counts/);
+  assert.match(report, /ARTICLE: 2/);
+  assert.match(report, /PLACE: 2/);
+  assert.match(report, /Source entity type counts/);
   assert.match(report, /• 1 Elementor articles/);
   assert.match(report, /• 1 articles without a featured image/);
   assert.match(report, /• 1 places without coordinates/);
+  assert.match(report, /Durations \(ms\)/);
+  assert.match(report, /discover:/);
+  assert.match(report, /normalize:/);
+  assert.match(report, /total:/);
   assert.match(report, /Sample candidates \(first 3\)/);
   assert.match(report, /wordpress-db:post:201/);
   assert.match(report, /Plain Article/);
 }
 
-async function testHumanReportOmitsUnrequestedEntitySection() {
+async function testHumanReportEntityFilterNarrowsBreakdown() {
   const plan = await buildTestPlan([ARTICLE_ENTITY_TYPE]);
   const report = buildPreviewHumanReport(plan, { entity: "article", limit: null });
 
-  assert.match(report, /Articles:/);
-  assert.ok(!report.includes("Places:"), "Places section must be omitted when entity=article");
+  assert.match(report, /Discovered: 2/);
+  assert.deepEqual(plan.stats!.sourceEntityTypeCounts, { [ARTICLE_ENTITY_TYPE]: 2 });
+  assert.ok(!report.includes(PLACE_ENTITY_TYPE));
 }
 
 async function testJsonReportExcludesRawContent() {
   const plan = await buildTestPlan();
   const jsonReport = buildPreviewJsonReport(plan, { entity: "all", limit: null });
 
-  assert.equal(jsonReport.summary.articles?.discovered, 2);
-  assert.equal(jsonReport.summary.places?.discovered, 2);
-  assert.deepEqual(jsonReport.warningsByCode, {
+  assert.ok(jsonReport.stats);
+  assert.equal(jsonReport.stats!.discoveredCount, 4);
+  assert.deepEqual(jsonReport.stats!.warningCounts, {
     ARTICLE_ELEMENTOR_CONTENT: 1,
     ARTICLE_MISSING_FEATURED_IMAGE: 1,
     PLACE_MISSING_COORDINATES: 1,
@@ -253,9 +270,9 @@ function testParseArgs() {
 async function main() {
   await testEngineProducesCreateItemsForAll();
   await testEntityFilterAppliesThroughAdapterAndEngine();
-  await testWarningsGroupedByCode();
+  await testStatsPresentAndUsedByReport();
   await testHumanReportContent();
-  await testHumanReportOmitsUnrequestedEntitySection();
+  await testHumanReportEntityFilterNarrowsBreakdown();
   await testJsonReportExcludesRawContent();
   await testNormalizeFailureSurfacesAsFailAction();
   testParseArgs();

@@ -156,6 +156,34 @@ export interface MigrationPlanItem {
   errors?: readonly MigrationError[];
 }
 
+/**
+ * Diagnostics computed once by the engine (`createMigrationRunPlan`) so
+ * every caller (CLI, future review UI, etc.) reads the same numbers instead
+ * of recomputing them ad hoc. Optional so a hand-built `MigrationPlan`
+ * (e.g. in older tests) remains valid without it.
+ */
+export interface MigrationPlanStats {
+  discoveredCount: number;
+  plannedCount: number;
+  normalizedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  /** `normalizedCount / discoveredCount`, or 0 when `discoveredCount` is 0. */
+  successRate: number;
+  actionCounts: Record<string, number>;
+  statusCounts: Record<string, number>;
+  targetTypeCounts: Record<string, number>;
+  sourceEntityTypeCounts: Record<string, number>;
+  warningCounts: Record<string, number>;
+  durationsMs: {
+    discover: number;
+    filter: number;
+    normalize: number;
+    plan: number;
+    total: number;
+  };
+}
+
 export interface MigrationPlan {
   adapterKey: string;
   adapterVersion: string;
@@ -166,6 +194,7 @@ export interface MigrationPlan {
   items: readonly MigrationPlanItem[];
   warnings: readonly MigrationWarning[];
   errors: readonly MigrationError[];
+  stats?: MigrationPlanStats;
 }
 
 export interface MigrationReportSummary {

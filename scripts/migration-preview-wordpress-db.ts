@@ -10,8 +10,9 @@
  * see what an import would produce before any of it happens for real.
  *
  * The CLI is a thin shell around the engine: it only reads args/env, wires
- * an executor, and renders `MigrationPlan.items` — `MigrationPlan` is the
- * single source of truth for what got discovered/normalized/skipped/failed.
+ * an executor, and renders `MigrationPlan.items`/`MigrationPlan.stats` —
+ * both computed once by the engine (`createMigrationRunPlan`), never
+ * recomputed here.
  *
  * Run:
  *   pnpm migration:preview:wordpress-db --entity place --limit 20
@@ -38,19 +39,13 @@ import {
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import { runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
-import type { MigrationPlan, MigrationPlanItem, MigrationWarning } from "../src/lib/migration/types";
+import type { MigrationPlan, MigrationPlanItem, MigrationPlanStats, MigrationWarning } from "../src/lib/migration/types";
 
 export type PreviewEntity = "article" | "place" | "all";
 
 export interface PreviewReportOptions {
   entity: PreviewEntity;
   limit: number | null;
-}
-
-export interface PreviewEntityCounts {
-  discovered: number;
-  normalized: number;
-  failed: number;
 }
 
 export interface PreviewCandidateSummary {
@@ -71,17 +66,15 @@ export interface PreviewJsonReport {
   generatedAt: string;
   entity: PreviewEntity;
   limit: number | null;
-  summary: {
-    articles: PreviewEntityCounts | null;
-    places: PreviewEntityCounts | null;
-  };
-  warningsByCode: Record<string, number>;
+  stats?: MigrationPlanStats;
   candidates: readonly PreviewCandidateSummary[];
 }
 
 // ---------------------------------------------------------------------------
 // Report building — pure functions of a `MigrationPlan`, no DB/network
-// access, unit-testable without SSH/DB.
+// access, unit-testable without SSH/DB. Every breakdown (action/entity/
+// warning counts) is read straight from `plan.stats` — nothing here
+// recomputes it.
 // ---------------------------------------------------------------------------
 
 const WARNING_LABELS: Record<string, string> = {
@@ -94,25 +87,6 @@ const WARNING_LABELS: Record<string, string> = {
 
 function warningLabel(code: string): string {
   return WARNING_LABELS[code] ?? code;
-}
-
-export function computeWarningsByCode(plan: MigrationPlan): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const item of plan.items) {
-    for (const warning of item.warnings ?? []) {
-      counts[warning.code] = (counts[warning.code] ?? 0) + 1;
-    }
-  }
-  return counts;
-}
-
-function countByEntityType(items: readonly MigrationPlanItem[], entityType: string): PreviewEntityCounts {
-  const entityItems = items.filter((item) => item.sourceEntityType === entityType);
-  return {
-    discovered: entityItems.length,
-    normalized: entityItems.filter((item) => item.action === "CREATE").length,
-    failed: entityItems.filter((item) => item.action === "FAIL").length,
-  };
 }
 
 /** Reads only `summary.title`/`summary.slug`/ref counts — never the full normalizedPayload, so content/rawMeta can't leak here. */
@@ -137,6 +111,18 @@ function toCandidateSummary(item: MigrationPlanItem): PreviewCandidateSummary {
   };
 }
 
+function pushRecordBreakdown(push: (line?: string) => void, title: string, counts: Record<string, number>): void {
+  push(title);
+  const keys = Object.keys(counts).sort();
+  if (keys.length === 0) {
+    push("  (none)");
+    return;
+  }
+  for (const key of keys) {
+    push(`  ${key}: ${counts[key]}`);
+  }
+}
+
 export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewReportOptions): string {
   const lines: string[] = [];
   const push = (line = "") => lines.push(line);
@@ -148,34 +134,41 @@ export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewRep
   push(`limit: ${options.limit ?? "(default)"}`);
   push();
 
-  if (options.entity !== "place") {
-    const counts = countByEntityType(plan.items, ARTICLE_ENTITY_TYPE);
-    push("Articles:");
-    push(`${counts.discovered} discovered`);
-    push(`${counts.normalized} normalized`);
-    push(`${counts.failed} failed`);
-    push();
+  const stats = plan.stats;
+  if (!stats) {
+    push("(no stats available on this plan)");
+    return lines.join("\n");
   }
 
-  if (options.entity !== "article") {
-    const counts = countByEntityType(plan.items, PLACE_ENTITY_TYPE);
-    push("Places:");
-    push(`${counts.discovered} discovered`);
-    push(`${counts.normalized} normalized`);
-    push(`${counts.failed} failed`);
-    push();
-  }
+  push(`Discovered: ${stats.discoveredCount}`);
+  push(`Normalized: ${stats.normalizedCount}`);
+  push(`Failed: ${stats.failedCount}`);
+  push(`Skipped: ${stats.skippedCount}`);
+  push(`Success rate: ${(stats.successRate * 100).toFixed(1)}%`);
+  push();
 
-  const warningsByCode = computeWarningsByCode(plan);
-  const warningCodes = Object.keys(warningsByCode).sort();
-  push("Warnings");
+  pushRecordBreakdown(push, "Action counts", stats.actionCounts);
+  push();
+  pushRecordBreakdown(push, "Target type counts", stats.targetTypeCounts);
+  push();
+  pushRecordBreakdown(push, "Source entity type counts", stats.sourceEntityTypeCounts);
+  push();
+
+  push("Warning counts");
+  const warningCodes = Object.keys(stats.warningCounts).sort();
   if (warningCodes.length === 0) {
-    push("(none)");
+    push("  (none)");
   } else {
     for (const code of warningCodes) {
-      push(`• ${warningsByCode[code]} ${warningLabel(code)}`);
+      push(`  • ${stats.warningCounts[code]} ${warningLabel(code)}`);
     }
   }
+  push();
+
+  push("Durations (ms)");
+  push(`  discover: ${stats.durationsMs.discover.toFixed(1)}`);
+  push(`  normalize: ${stats.durationsMs.normalize.toFixed(1)}`);
+  push(`  total: ${stats.durationsMs.total.toFixed(1)}`);
   push();
 
   const candidates = plan.items.map(toCandidateSummary);
@@ -195,10 +188,10 @@ export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewRep
 }
 
 /**
- * JSON report shape. `candidates[].mediaRefCount`/`.relationRefCount` are
- * counts, not the full ref arrays — `MigrationPlanItem.summary` only ever
- * carries counts (see wordpressDbAdapter/orchestrator), so there is
- * structurally no way for `content`/`rawMeta` to reach this report.
+ * JSON report shape. `stats` is `plan.stats` verbatim. `candidates` remain
+ * summary-only (`title`/`slug`/ref counts) — `MigrationPlanItem.summary`
+ * never carries the full normalizedPayload, so there is structurally no way
+ * for `content`/`rawMeta` to reach this report.
  */
 export function buildPreviewJsonReport(plan: MigrationPlan, options: PreviewReportOptions): PreviewJsonReport {
   return {
@@ -206,11 +199,7 @@ export function buildPreviewJsonReport(plan: MigrationPlan, options: PreviewRepo
     generatedAt: plan.createdAt,
     entity: options.entity,
     limit: options.limit,
-    summary: {
-      articles: options.entity !== "place" ? countByEntityType(plan.items, ARTICLE_ENTITY_TYPE) : null,
-      places: options.entity !== "article" ? countByEntityType(plan.items, PLACE_ENTITY_TYPE) : null,
-    },
-    warningsByCode: computeWarningsByCode(plan),
+    stats: plan.stats,
     candidates: plan.items.map(toCandidateSummary),
   };
 }

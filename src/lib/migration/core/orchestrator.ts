@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+
 import { getMigrationAdapter } from "../adapters/registry";
 import { buildHumanReport, buildMachineReport } from "../reporters/buildReports";
 import { PHOENIX_V1_PAST_EVENTS_EXCLUSION_POLICY, shouldExcludePastEvent } from "../validators/policies";
@@ -7,6 +9,7 @@ import type {
   MigrationError,
   MigrationPlan,
   MigrationPlanItem,
+  MigrationPlanStats,
   MigrationReport,
   NormalizedRecord,
   SourceRecordEnvelope,
@@ -120,6 +123,51 @@ function toFailItem(record: SourceRecordEnvelope): MigrationPlanItem {
   };
 }
 
+function tally(items: readonly MigrationPlanItem[], key: (item: MigrationPlanItem) => string | undefined): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const value = key(item);
+    if (value === undefined) continue;
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function computeWarningCounts(items: readonly MigrationPlanItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    for (const warning of item.warnings ?? []) {
+      counts[warning.code] = (counts[warning.code] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/** Computed once per run so every caller (CLI, future review UI) reads the same numbers instead of recomputing them. */
+function computeStats(
+  discoveredCount: number,
+  items: readonly MigrationPlanItem[],
+): Omit<MigrationPlanStats, "durationsMs"> {
+  const actionCounts = tally(items, (item) => item.action);
+  const normalizedCount = actionCounts["CREATE"] ?? 0;
+  const failedCount = actionCounts["FAIL"] ?? 0;
+  const skippedCount = actionCounts["SKIP_POLICY"] ?? 0;
+
+  return {
+    discoveredCount,
+    plannedCount: items.length,
+    normalizedCount,
+    failedCount,
+    skippedCount,
+    successRate: discoveredCount === 0 ? 0 : normalizedCount / discoveredCount,
+    actionCounts,
+    statusCounts: tally(items, (item) => item.status),
+    targetTypeCounts: tally(items, (item) => item.targetType),
+    sourceEntityTypeCounts: tally(items, (item) => item.sourceEntityType),
+    warningCounts: computeWarningCounts(items),
+  };
+}
+
 /**
  * The real discover -> normalize -> plan loop. No lineage/ledger yet (see
  * Phase 4 / PR5 scope), so every successfully normalized record is planned
@@ -131,6 +179,8 @@ function toFailItem(record: SourceRecordEnvelope): MigrationPlanItem {
 export async function createMigrationRunPlan(
   input: MigrationRunPlanInput,
 ): Promise<MigrationPlan> {
+  const runStartedAt = performance.now();
+
   const adapter = getMigrationAdapter(input.adapterKey);
 
   if (!adapter) {
@@ -144,6 +194,7 @@ export async function createMigrationRunPlan(
     now: input.now,
   };
 
+  const discoverStartedAt = performance.now();
   let records: readonly SourceRecordEnvelope[];
   if (input.records) {
     records = input.records;
@@ -155,13 +206,18 @@ export async function createMigrationRunPlan(
     }
     records = await adapter.discoverRecords(context);
   }
+  const discoverDurationMs = performance.now() - discoverStartedAt;
 
+  const filterStartedAt = performance.now();
   records = filterByEntityTypes(records, input.filters?.entityTypes);
   records = filterByLimitPerEntityType(records, input.filters?.limit);
+  const discoveredCount = records.length;
+  const filterDurationMs = performance.now() - filterStartedAt;
 
   const items: MigrationPlanItem[] = [];
   const errors: MigrationError[] = [];
 
+  const normalizeStartedAt = performance.now();
   for (const record of records) {
     if (input.filters?.excludePastEvents && isExcludedPastEvent(record, input.now)) {
       items.push(toSkipPolicyItem(record));
@@ -187,6 +243,22 @@ export async function createMigrationRunPlan(
       items.push(toFailItem(record));
     }
   }
+  const normalizeDurationMs = performance.now() - normalizeStartedAt;
+
+  const planStartedAt = performance.now();
+  const statsWithoutDurations = computeStats(discoveredCount, items);
+  const planDurationMs = performance.now() - planStartedAt;
+
+  const stats: MigrationPlanStats = {
+    ...statsWithoutDurations,
+    durationsMs: {
+      discover: discoverDurationMs,
+      filter: filterDurationMs,
+      normalize: normalizeDurationMs,
+      plan: planDurationMs,
+      total: performance.now() - runStartedAt,
+    },
+  };
 
   return {
     adapterKey: adapter.metadata.key,
@@ -198,6 +270,7 @@ export async function createMigrationRunPlan(
     items,
     warnings: [],
     errors,
+    stats,
   };
 }
 

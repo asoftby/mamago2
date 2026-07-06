@@ -260,6 +260,93 @@ async function testExcludePastEventsProducesSkipPolicyItem() {
   assert.equal(futureItem?.action, "CREATE");
 }
 
+async function testStatsPresentAndCorrect() {
+  registerMockAdapter("mock-stats", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "article:1", sourceEntityType: "type-article" }),
+        envelope({ sourceRecordKey: "article:2", sourceEntityType: "type-article" }),
+        envelope({ sourceRecordKey: "place:1", sourceEntityType: "type-place" }),
+        envelope({ sourceRecordKey: "bad:1", sourceEntityType: "type-place" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      if (record.sourceRecordKey === "bad:1") {
+        throw new Error("boom");
+      }
+      const targetTypeHint = record.sourceEntityType === "type-article" ? "ARTICLE" : "PLACE";
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint,
+        normalizedPayload: {},
+        warnings:
+          record.sourceRecordKey === "article:2"
+            ? [{ code: "SOME_WARNING", message: "hi", severity: "WARNING" }]
+            : [],
+      };
+    },
+  });
+
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-stats",
+    sourceNamespace: "test",
+  });
+
+  assert.ok(plan.stats);
+  const stats = plan.stats!;
+
+  assert.equal(stats.discoveredCount, 4);
+  assert.equal(stats.plannedCount, 4);
+  assert.equal(stats.normalizedCount, 3);
+  assert.equal(stats.failedCount, 1);
+  assert.equal(stats.skippedCount, 0);
+  assert.equal(stats.successRate, 3 / 4);
+
+  assert.deepEqual(stats.actionCounts, { CREATE: 3, FAIL: 1 });
+  assert.deepEqual(stats.statusCounts, { PLANNED: 3, FAILED: 1 });
+  assert.deepEqual(stats.targetTypeCounts, { ARTICLE: 2, PLACE: 1 });
+  assert.deepEqual(stats.sourceEntityTypeCounts, { "type-article": 2, "type-place": 2 });
+  assert.deepEqual(stats.warningCounts, { SOME_WARNING: 1 });
+
+  for (const value of Object.values(stats.durationsMs)) {
+    assert.ok(value >= 0, `duration must be non-negative, got ${value}`);
+  }
+  assert.ok(stats.durationsMs.total >= stats.durationsMs.normalize);
+}
+
+async function testZeroRecordPlanDoesNotThrow() {
+  registerMockAdapter("mock-empty", {
+    async discoverRecords() {
+      return [];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-empty",
+    sourceNamespace: "test",
+  });
+
+  assert.ok(plan.stats);
+  const stats = plan.stats!;
+  assert.equal(stats.discoveredCount, 0);
+  assert.equal(stats.plannedCount, 0);
+  assert.equal(stats.normalizedCount, 0);
+  assert.equal(stats.successRate, 0);
+  assert.deepEqual(stats.actionCounts, {});
+  assert.deepEqual(stats.warningCounts, {});
+  for (const value of Object.values(stats.durationsMs)) {
+    assert.ok(value >= 0);
+  }
+}
+
 async function testCommitModeStillThrows() {
   await assert.rejects(
     () => runMigrationCommit(),
@@ -276,6 +363,8 @@ async function main() {
   await testNormalizeErrorDoesNotCrashRun();
   await testWarningsPreservedOnItem();
   await testExcludePastEventsProducesSkipPolicyItem();
+  await testStatsPresentAndCorrect();
+  await testZeroRecordPlanDoesNotThrow();
   await testCommitModeStillThrows();
 }
 

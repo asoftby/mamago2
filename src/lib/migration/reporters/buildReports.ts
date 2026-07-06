@@ -1,9 +1,16 @@
 import type { MigrationPlan, MigrationReport, MigrationReportSummary } from "../types";
 
+/**
+ * `plan.stats` (added in Phase 4 / PR5.5) already carries `discoveredCount`/
+ * `plannedCount` computed once by the engine — reuse them here instead of
+ * recomputing from `plan.records`/`plan.items` directly. Falls back to the
+ * original computation for a hand-built `MigrationPlan` that predates
+ * `stats` (e.g. older tests), so this stays backward-compatible.
+ */
 function summarizePlan(plan: MigrationPlan): MigrationReportSummary {
   return {
-    totalRecords: plan.records.length,
-    plannedItems: plan.items.length,
+    totalRecords: plan.stats?.discoveredCount ?? plan.records.length,
+    plannedItems: plan.stats?.plannedCount ?? plan.items.length,
     warningCount:
       plan.warnings.length +
       plan.items.reduce((count, item) => count + (item.warnings?.length ?? 0), 0),
