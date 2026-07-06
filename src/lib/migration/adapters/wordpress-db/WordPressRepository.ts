@@ -3,6 +3,7 @@ import {
   buildPlaceIndexQuery,
   buildPostMetaQuery,
   buildPublishedArticlesQuery,
+  buildPublishedEventsQuery,
   buildPublishedPlacesQuery,
   buildRankMathRedirectsQuery,
   buildTermsQuery,
@@ -12,6 +13,7 @@ import {
 import type {
   WordPressArticleBundle,
   WordPressAttachmentRow,
+  WordPressEventBundle,
   WordPressPlaceBundle,
   WordPressPlaceIndexRow,
   WordPressPostMetaByKey,
@@ -87,6 +89,17 @@ export class WordPressRepository {
       terms: termsByPost.get(post.ID) ?? [],
       placeIndex: placeIndexByPost.get(post.ID) ?? null,
     }));
+  }
+
+  /**
+   * `post_status = 'publish'` only (enforced in `buildPublishedEventsQuery`
+   * itself) — WP's `draft`/`expired`/`auto-draft` event rows never reach
+   * this repository at all, per the Phoenix v1 eligibility decision.
+   */
+  async getPublishedEvents(limit?: number): Promise<WordPressEventBundle[]> {
+    const { sql, params } = buildPublishedEventsQuery(clampLimit(limit));
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    return this.assemblePostBundles(posts);
   }
 
   private async assemblePostBundles(

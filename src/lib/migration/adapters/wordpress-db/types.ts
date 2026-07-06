@@ -104,6 +104,13 @@ export interface WordPressPostBundle {
 
 export type WordPressArticleBundle = WordPressPostBundle;
 
+/**
+ * No index-table equivalent to `WordPressPlaceIndexRow` — WP events have
+ * no geospatial index; venue location stays raw postmeta text (see
+ * `normalizeEvent.ts`).
+ */
+export type WordPressEventBundle = WordPressPostBundle;
+
 export interface WordPressPlaceBundle extends WordPressPostBundle {
   placeIndex: WordPressPlaceIndexRow | null;
 }

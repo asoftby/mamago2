@@ -4,6 +4,12 @@ export { normalizePlace } from "./normalizePlace";
 export type { NormalizedPlaceCandidate, NormalizedPlaceSourceTerm } from "./normalizePlace";
 export { normalizeArticle } from "./normalizeArticle";
 export type { NormalizedArticleCandidate, NormalizedArticleSourceTerm } from "./normalizeArticle";
+export { normalizeEvent } from "./normalizeEvent";
+export type {
+  NormalizedEventCandidate,
+  NormalizedEventScheduleDraft,
+  NormalizedEventSourceTerm,
+} from "./normalizeEvent";
 export {
   ARTICLE_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
@@ -29,6 +35,7 @@ export type {
   WordPressArticleBundle,
   WordPressAttachmentRow,
   WordPressDbConfig,
+  WordPressEventBundle,
   WordPressPlaceBundle,
   WordPressPlaceIndexRow,
   WordPressPostBundle,

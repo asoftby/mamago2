@@ -75,6 +75,31 @@ const placeIndexRows: WordPressPlaceIndexRow[] = [
   { post_id: 301, post_status: "publish", priority: 5, lat: 53.9, lng: 27.5667 },
 ];
 
+const eventPost: WordPressPostRow = {
+  ID: 401,
+  post_author: 5,
+  post_date: "2026-01-01 00:00:00",
+  post_content: "<p>Event desc</p>",
+  post_title: "Kids Fest",
+  post_excerpt: "",
+  post_status: "publish",
+  post_name: "kids-fest",
+  post_modified: "2026-01-02 00:00:00",
+  post_parent: 0,
+  guid: "https://example.com/?p=401",
+  post_type: "events",
+  post_mime_type: "",
+};
+
+const eventPostMeta: WordPressPostMetaRow[] = [
+  { meta_id: 21, post_id: 401, meta_key: "event_date", meta_value: "2026-08-15 10:00:00" },
+  { meta_id: 22, post_id: 401, meta_key: "event-place-name", meta_value: "Central Park" },
+];
+
+const eventTerms: WordPressTermRow[] = [
+  { post_id: 401, term_id: 30, name: "Festival", slug: "festival", taxonomy: "events-category" },
+];
+
 const attachmentRows: WordPressAttachmentRow[] = [
   { ID: 555, post_title: "cover.jpg", post_name: "cover", post_mime_type: "image/jpeg", guid: "https://example.com/cover.jpg", post_parent: 201 },
 ];
@@ -106,17 +131,18 @@ function createFakeExecutor() {
       const [postType] = params;
       if (postType === "post") return articlePost as never;
       if (postType === "places") return placePost as never;
+      if (postType === "events") return eventPost as never;
       return [] as never;
     }
     if (sql.includes("FROM wp_postmeta")) {
       const ids = params as readonly number[];
-      return [...articlePostMeta, ...placePostMeta].filter((row) =>
+      return [...articlePostMeta, ...placePostMeta, ...eventPostMeta].filter((row) =>
         ids.includes(row.post_id),
       ) as never;
     }
     if (sql.includes("FROM wp_term_relationships")) {
       const ids = params as readonly number[];
-      return [...articleTerms, ...placeTerms].filter((row) => ids.includes(row.post_id)) as never;
+      return [...articleTerms, ...placeTerms, ...eventTerms].filter((row) => ids.includes(row.post_id)) as never;
     }
     if (sql.includes("FROM wp_voxel_index_places")) {
       const ids = params as readonly number[];
@@ -194,6 +220,26 @@ async function testPlaceBundle() {
   assert.deepEqual(bundle.placeIndex, placeIndexRows[0]);
 }
 
+async function testEventBundle() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedEvents();
+
+  assert.equal(bundles.length, 1);
+  const [bundle] = bundles;
+  assert.deepEqual(bundle.post, eventPost);
+  assert.deepEqual(bundle.postMeta, {
+    event_date: ["2026-08-15 10:00:00"],
+    "event-place-name": ["Central Park"],
+  });
+  assert.deepEqual(bundle.terms, eventTerms);
+
+  const postsCall = calls.find((call) => call.sql.includes("post_type = ?") && call.params[0] === "events");
+  assert.ok(postsCall);
+  assert.deepEqual(postsCall!.params, ["events", "publish", DEFAULT_LIMIT]);
+}
+
 async function testMissingPlaceIndexDoesNotFailBundle() {
   const { executor } = createFakeExecutor();
   const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
@@ -263,6 +309,7 @@ async function testLimitClamping() {
 async function main() {
   await testArticleBundle();
   await testPlaceBundle();
+  await testEventBundle();
   await testMissingPlaceIndexDoesNotFailBundle();
   await testEmptyIdListsSkipExecutor();
   await testAttachmentsById();

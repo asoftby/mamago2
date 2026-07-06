@@ -48,6 +48,23 @@ export function buildPublishedPlacesQuery(limit: number): SqlQuery {
   };
 }
 
+/**
+ * `post_status = 'publish'` only — WP's `events` post type also has
+ * `draft`/`expired`/`auto-draft` rows (2,857 `expired`, 538 `draft` per
+ * docs/migration/wordpress-to-mamago.md), all explicitly excluded from
+ * Phoenix v1 by this WHERE clause, not by later filtering.
+ */
+export function buildPublishedEventsQuery(limit: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type = ? AND post_status = ?
+      ORDER BY ID
+      LIMIT ?`,
+    params: ["events", "publish", limit],
+  };
+}
+
 export function buildPostMetaQuery(postIds: readonly number[]): SqlQuery {
   return {
     sql: `SELECT meta_id, post_id, meta_key, meta_value
