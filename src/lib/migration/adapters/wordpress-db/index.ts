@@ -5,6 +5,13 @@ export type { NormalizedPlaceCandidate, NormalizedPlaceSourceTerm } from "./norm
 export { normalizeArticle } from "./normalizeArticle";
 export type { NormalizedArticleCandidate, NormalizedArticleSourceTerm } from "./normalizeArticle";
 export {
+  ARTICLE_ENTITY_TYPE,
+  PLACE_ENTITY_TYPE,
+  WORDPRESS_DB_ADAPTER_KEY,
+  registerWordPressDbAdapter,
+  wordpressDbAdapter,
+} from "./wordpressDbAdapter";
+export {
   assertRemoteAccessAllowed,
   buildManualFallbackMessage,
   buildMysqlClientConfig,

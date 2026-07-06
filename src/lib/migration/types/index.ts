@@ -81,9 +81,22 @@ export interface MigrationAdapterMetadata {
   deletionPolicy: string;
 }
 
+/**
+ * Discovery-time scoping shared between `MigrationRunPlanInput` (the
+ * caller's request) and `MigrationAdapterContext` (what the adapter sees) —
+ * an adapter may push these down into its own queries for efficiency, and
+ * the engine re-applies them afterwards as a safety net regardless.
+ */
+export interface MigrationDiscoveryFilters {
+  entityTypes?: readonly string[];
+  limit?: number;
+  excludePastEvents?: boolean;
+}
+
 export interface MigrationAdapterContext {
   sourceNamespace: string;
   config?: Record<string, unknown>;
+  filters?: MigrationDiscoveryFilters;
   now?: Date;
   signal?: AbortSignal;
 }

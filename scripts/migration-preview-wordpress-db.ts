@@ -1,12 +1,17 @@
 /**
  * Read-only WordPress -> Phoenix preview pipeline.
  *
- * WordPress DB -> WordPressRepository -> normalizePlace()/normalizeArticle()
- * -> human report (stdout) + optional JSON report (--out). Nothing is
- * written to any database, no MigrationRun/MigrationRecord rows are
- * created, and there is no commit path here — this is purely a dry-run
- * preview so an editor can see what an import would produce before any of
- * it happens for real.
+ * WordPress DB -> WordPressRepository -> wordpress-db MigrationAdapter
+ * (normalizePlace()/normalizeArticle()) -> Phoenix Engine
+ * (core/orchestrator.ts, discover -> normalize -> plan) -> human report
+ * (stdout) + optional JSON report (--out). Nothing is written to any
+ * database, no MigrationRun/MigrationRecord rows are created, and there is
+ * no commit path here — this is purely a dry-run preview so an editor can
+ * see what an import would produce before any of it happens for real.
+ *
+ * The CLI is a thin shell around the engine: it only reads args/env, wires
+ * an executor, and renders `MigrationPlan.items` — `MigrationPlan` is the
+ * single source of truth for what got discovered/normalized/skipped/failed.
  *
  * Run:
  *   pnpm migration:preview:wordpress-db --entity place --limit 20
@@ -25,129 +30,58 @@ import {
   createWordPressSshMysqlExecutor,
   readWordPressDbConfigFromEnv,
 } from "../src/lib/migration/adapters/wordpress-db/connectExecutor";
-import { normalizeArticle } from "../src/lib/migration/adapters/wordpress-db/normalizeArticle";
-import { normalizePlace } from "../src/lib/migration/adapters/wordpress-db/normalizePlace";
-import { WordPressRepository } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
-import type { MigrationWarning, NormalizedRecord } from "../src/lib/migration/types";
+import {
+  ARTICLE_ENTITY_TYPE,
+  PLACE_ENTITY_TYPE,
+  WORDPRESS_DB_ADAPTER_KEY,
+  registerWordPressDbAdapter,
+} from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
+import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
+import { runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
+import type { MigrationPlan, MigrationPlanItem, MigrationWarning } from "../src/lib/migration/types";
 
 export type PreviewEntity = "article" | "place" | "all";
 
-export interface PreviewFailure {
-  sourceKey: string;
-  message: string;
+export interface PreviewReportOptions {
+  entity: PreviewEntity;
+  limit: number | null;
 }
 
-export interface EntityPreviewResult {
+export interface PreviewEntityCounts {
   discovered: number;
   normalized: number;
   failed: number;
-  records: readonly NormalizedRecord[];
-  failures: readonly PreviewFailure[];
-}
-
-export interface PreviewResult {
-  source: "wordpress-db";
-  entity: PreviewEntity;
-  limit: number | null;
-  generatedAt: string;
-  articles: EntityPreviewResult | null;
-  places: EntityPreviewResult | null;
 }
 
 export interface PreviewCandidateSummary {
   sourceRecordKey: string;
+  sourceEntityType: string;
   targetTypeHint?: string;
   title: string | null;
   slug: string | null;
+  action: string;
+  status: string;
   warnings: readonly MigrationWarning[];
-  mediaRefs: readonly string[];
-  relationRefs: readonly string[];
+  mediaRefCount: number;
+  relationRefCount: number;
 }
 
 export interface PreviewJsonReport {
-  source: "wordpress-db";
+  source: string;
   generatedAt: string;
   entity: PreviewEntity;
   limit: number | null;
   summary: {
-    articles: { discovered: number; normalized: number; failed: number } | null;
-    places: { discovered: number; normalized: number; failed: number } | null;
+    articles: PreviewEntityCounts | null;
+    places: PreviewEntityCounts | null;
   };
   warningsByCode: Record<string, number>;
   candidates: readonly PreviewCandidateSummary[];
 }
 
 // ---------------------------------------------------------------------------
-// Fetch + normalize — the only impure part. Everything below this section is
-// a pure function of a `PreviewResult` and is unit-testable without SSH/DB.
-// ---------------------------------------------------------------------------
-
-function collectEntityPreview<TBundle extends { post: { ID: number } }>(
-  bundles: readonly TBundle[],
-  normalize: (bundle: TBundle) => NormalizedRecord,
-  sourceKeyPrefix: string,
-): EntityPreviewResult {
-  const records: NormalizedRecord[] = [];
-  const failures: PreviewFailure[] = [];
-
-  for (const bundle of bundles) {
-    try {
-      records.push(normalize(bundle));
-    } catch (error) {
-      failures.push({
-        sourceKey: `${sourceKeyPrefix}:${bundle.post.ID}`,
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  return {
-    discovered: bundles.length,
-    normalized: records.length,
-    failed: failures.length,
-    records,
-    failures,
-  };
-}
-
-export async function collectArticlePreview(
-  repository: WordPressRepository,
-  limit: number | undefined,
-): Promise<EntityPreviewResult> {
-  const bundles = await repository.getPublishedArticles(limit);
-  return collectEntityPreview(bundles, normalizeArticle, "wordpress-db:post");
-}
-
-export async function collectPlacePreview(
-  repository: WordPressRepository,
-  limit: number | undefined,
-): Promise<EntityPreviewResult> {
-  const bundles = await repository.getPublishedPlaces(limit);
-  return collectEntityPreview(bundles, normalizePlace, "wordpress-db:places");
-}
-
-export async function collectPreview(
-  repository: WordPressRepository,
-  entity: PreviewEntity,
-  limit: number | undefined,
-): Promise<PreviewResult> {
-  const [articles, places] = await Promise.all([
-    entity === "place" ? Promise.resolve(null) : collectArticlePreview(repository, limit),
-    entity === "article" ? Promise.resolve(null) : collectPlacePreview(repository, limit),
-  ]);
-
-  return {
-    source: "wordpress-db",
-    entity,
-    limit: limit ?? null,
-    generatedAt: new Date().toISOString(),
-    articles,
-    places,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Report building — pure, no DB/network access.
+// Report building — pure functions of a `MigrationPlan`, no DB/network
+// access, unit-testable without SSH/DB.
 // ---------------------------------------------------------------------------
 
 const WARNING_LABELS: Record<string, string> = {
@@ -162,70 +96,77 @@ function warningLabel(code: string): string {
   return WARNING_LABELS[code] ?? code;
 }
 
-export function computeWarningsByCode(result: PreviewResult): Record<string, number> {
+export function computeWarningsByCode(plan: MigrationPlan): Record<string, number> {
   const counts: Record<string, number> = {};
-  const allRecords = [...(result.articles?.records ?? []), ...(result.places?.records ?? [])];
-  for (const record of allRecords) {
-    for (const warning of record.warnings ?? []) {
+  for (const item of plan.items) {
+    for (const warning of item.warnings ?? []) {
       counts[warning.code] = (counts[warning.code] ?? 0) + 1;
     }
   }
   return counts;
 }
 
-/** Never reads `record.normalizedPayload` wholesale — only lifts `title`/`slug`, nothing else. */
-function extractTitleSlug(payload: unknown): { title: string | null; slug: string | null } {
-  if (typeof payload !== "object" || payload === null) {
-    return { title: null, slug: null };
-  }
-  const candidate = payload as { title?: unknown; slug?: unknown };
+function countByEntityType(items: readonly MigrationPlanItem[], entityType: string): PreviewEntityCounts {
+  const entityItems = items.filter((item) => item.sourceEntityType === entityType);
   return {
-    title: typeof candidate.title === "string" ? candidate.title : null,
-    slug: typeof candidate.slug === "string" ? candidate.slug : null,
+    discovered: entityItems.length,
+    normalized: entityItems.filter((item) => item.action === "CREATE").length,
+    failed: entityItems.filter((item) => item.action === "FAIL").length,
   };
 }
 
-function toCandidateSummary(record: NormalizedRecord): PreviewCandidateSummary {
-  const { title, slug } = extractTitleSlug(record.normalizedPayload);
+/** Reads only `summary.title`/`summary.slug`/ref counts — never the full normalizedPayload, so content/rawMeta can't leak here. */
+function toCandidateSummary(item: MigrationPlanItem): PreviewCandidateSummary {
+  const summary = (item.summary ?? {}) as {
+    title?: unknown;
+    slug?: unknown;
+    mediaRefCount?: unknown;
+    relationRefCount?: unknown;
+  };
   return {
-    sourceRecordKey: record.sourceRecordKey,
-    targetTypeHint: record.targetTypeHint,
-    title,
-    slug,
-    warnings: record.warnings ?? [],
-    mediaRefs: record.mediaRefs ?? [],
-    relationRefs: record.relationRefs ?? [],
+    sourceRecordKey: item.sourceRecordKey,
+    sourceEntityType: item.sourceEntityType,
+    targetTypeHint: item.targetType,
+    title: typeof summary.title === "string" ? summary.title : null,
+    slug: typeof summary.slug === "string" ? summary.slug : null,
+    action: item.action,
+    status: item.status,
+    warnings: item.warnings ?? [],
+    mediaRefCount: typeof summary.mediaRefCount === "number" ? summary.mediaRefCount : 0,
+    relationRefCount: typeof summary.relationRefCount === "number" ? summary.relationRefCount : 0,
   };
 }
 
-export function buildPreviewHumanReport(result: PreviewResult): string {
+export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewReportOptions): string {
   const lines: string[] = [];
   const push = (line = "") => lines.push(line);
 
   push("Migration Preview");
   push();
-  push(`source: ${result.source}`);
-  push(`entity: ${result.entity}`);
-  push(`limit: ${result.limit ?? "(default)"}`);
+  push(`source: ${plan.adapterKey}`);
+  push(`entity: ${options.entity}`);
+  push(`limit: ${options.limit ?? "(default)"}`);
   push();
 
-  if (result.articles) {
+  if (options.entity !== "place") {
+    const counts = countByEntityType(plan.items, ARTICLE_ENTITY_TYPE);
     push("Articles:");
-    push(`${result.articles.discovered} discovered`);
-    push(`${result.articles.normalized} normalized`);
-    push(`${result.articles.failed} failed`);
+    push(`${counts.discovered} discovered`);
+    push(`${counts.normalized} normalized`);
+    push(`${counts.failed} failed`);
     push();
   }
 
-  if (result.places) {
+  if (options.entity !== "article") {
+    const counts = countByEntityType(plan.items, PLACE_ENTITY_TYPE);
     push("Places:");
-    push(`${result.places.discovered} discovered`);
-    push(`${result.places.normalized} normalized`);
-    push(`${result.places.failed} failed`);
+    push(`${counts.discovered} discovered`);
+    push(`${counts.normalized} normalized`);
+    push(`${counts.failed} failed`);
     push();
   }
 
-  const warningsByCode = computeWarningsByCode(result);
+  const warningsByCode = computeWarningsByCode(plan);
   const warningCodes = Object.keys(warningsByCode).sort();
   push("Warnings");
   if (warningCodes.length === 0) {
@@ -237,16 +178,15 @@ export function buildPreviewHumanReport(result: PreviewResult): string {
   }
   push();
 
-  const allRecords = [...(result.articles?.records ?? []), ...(result.places?.records ?? [])];
+  const candidates = plan.items.map(toCandidateSummary);
   push("Sample candidates (first 3)");
-  if (allRecords.length === 0) {
+  if (candidates.length === 0) {
     push("(none)");
   } else {
-    for (const record of allRecords.slice(0, 3)) {
-      const summary = toCandidateSummary(record);
+    for (const candidate of candidates.slice(0, 3)) {
       push(
-        `- ${summary.sourceRecordKey} | ${summary.title ?? "(no title)"} | ${summary.slug ?? "(no slug)"} ` +
-          `| warnings: ${summary.warnings.length} | mediaRefs: ${summary.mediaRefs.length} | relationRefs: ${summary.relationRefs.length}`,
+        `- ${candidate.sourceRecordKey} | ${candidate.title ?? "(no title)"} | ${candidate.slug ?? "(no slug)"} ` +
+          `| warnings: ${candidate.warnings.length} | mediaRefs: ${candidate.mediaRefCount} | relationRefs: ${candidate.relationRefCount}`,
       );
     }
   }
@@ -254,33 +194,24 @@ export function buildPreviewHumanReport(result: PreviewResult): string {
   return lines.join("\n");
 }
 
-function summaryOf(entityResult: EntityPreviewResult | null) {
-  if (!entityResult) return null;
-  return {
-    discovered: entityResult.discovered,
-    normalized: entityResult.normalized,
-    failed: entityResult.failed,
-  };
-}
-
 /**
- * JSON report shape. Deliberately excludes `normalizedPayload.content` and
- * `.rawMeta` — only `title`/`slug` are lifted out of the payload — so this
- * never becomes a local dump of WordPress content/postmeta.
+ * JSON report shape. `candidates[].mediaRefCount`/`.relationRefCount` are
+ * counts, not the full ref arrays — `MigrationPlanItem.summary` only ever
+ * carries counts (see wordpressDbAdapter/orchestrator), so there is
+ * structurally no way for `content`/`rawMeta` to reach this report.
  */
-export function buildPreviewJsonReport(result: PreviewResult): PreviewJsonReport {
-  const allRecords = [...(result.articles?.records ?? []), ...(result.places?.records ?? [])];
+export function buildPreviewJsonReport(plan: MigrationPlan, options: PreviewReportOptions): PreviewJsonReport {
   return {
-    source: result.source,
-    generatedAt: result.generatedAt,
-    entity: result.entity,
-    limit: result.limit,
+    source: plan.adapterKey,
+    generatedAt: plan.createdAt,
+    entity: options.entity,
+    limit: options.limit,
     summary: {
-      articles: summaryOf(result.articles),
-      places: summaryOf(result.places),
+      articles: options.entity !== "place" ? countByEntityType(plan.items, ARTICLE_ENTITY_TYPE) : null,
+      places: options.entity !== "article" ? countByEntityType(plan.items, PLACE_ENTITY_TYPE) : null,
     },
-    warningsByCode: computeWarningsByCode(result),
-    candidates: allRecords.map(toCandidateSummary),
+    warningsByCode: computeWarningsByCode(plan),
+    candidates: plan.items.map(toCandidateSummary),
   };
 }
 
@@ -319,21 +250,37 @@ export function parseArgs(argv: readonly string[]): {
   return { entity, limit, out, allowRemoteReadonly };
 }
 
+function entityTypesFor(entity: PreviewEntity): readonly string[] | undefined {
+  if (entity === "article") return [ARTICLE_ENTITY_TYPE];
+  if (entity === "place") return [PLACE_ENTITY_TYPE];
+  return undefined;
+}
+
 async function main(): Promise<void> {
   const { entity, limit, out, allowRemoteReadonly } = parseArgs(process.argv.slice(2));
 
   const config = readWordPressDbConfigFromEnv(process.env);
   assertRemoteAccessAllowed(config, allowRemoteReadonly);
 
+  if (!getMigrationAdapter(WORDPRESS_DB_ADAPTER_KEY)) {
+    registerWordPressDbAdapter();
+  }
+
   const executor = createWordPressSshMysqlExecutor(config);
-  const repository = new WordPressRepository(executor);
 
-  const result = await collectPreview(repository, entity, limit);
+  const { plan } = await runMigrationDryRun({
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    sourceNamespace: "wordpress-db",
+    sourceConfig: { executor },
+    filters: { entityTypes: entityTypesFor(entity), limit },
+  });
 
-  console.log(buildPreviewHumanReport(result));
+  const options: PreviewReportOptions = { entity, limit: limit ?? null };
+
+  console.log(buildPreviewHumanReport(plan, options));
 
   if (out) {
-    writeFileSync(out, JSON.stringify(buildPreviewJsonReport(result), null, 2));
+    writeFileSync(out, JSON.stringify(buildPreviewJsonReport(plan, options), null, 2));
     console.log(`\nJSON report written to ${out}`);
   }
 }

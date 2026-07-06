@@ -3,11 +3,17 @@ import assert from "node:assert/strict";
 import {
   buildPreviewHumanReport,
   buildPreviewJsonReport,
-  collectPreview,
   computeWarningsByCode,
   parseArgs,
 } from "./migration-preview-wordpress-db";
-import { WordPressRepository } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
+import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
+import {
+  ARTICLE_ENTITY_TYPE,
+  PLACE_ENTITY_TYPE,
+  WORDPRESS_DB_ADAPTER_KEY,
+  registerWordPressDbAdapter,
+} from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
+import { createMigrationRunPlan, runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
 import type {
   WordPressPlaceIndexRow,
   WordPressPostMetaRow,
@@ -19,6 +25,7 @@ import type { WordPressQueryExecutor } from "../src/lib/migration/adapters/wordp
 // ---------------------------------------------------------------------------
 // Fixtures: 2 articles (one plain, one with Elementor + no featured image)
 // and 2 places (one with coordinates, one without) — no live DB involved.
+// Same shape as WordPressRepository.test.ts / wordpressDbAdapter.test.ts.
 // ---------------------------------------------------------------------------
 
 function post(overrides: Partial<WordPressPostRow>): WordPressPostRow {
@@ -85,36 +92,46 @@ function createFakeExecutor(): WordPressQueryExecutor {
   };
 }
 
-async function testCollectPreviewAll() {
-  const repository = new WordPressRepository(createFakeExecutor());
-  const result = await collectPreview(repository, "all", undefined);
-
-  assert.equal(result.articles?.discovered, 2);
-  assert.equal(result.articles?.normalized, 2);
-  assert.equal(result.articles?.failed, 0);
-
-  assert.equal(result.places?.discovered, 2);
-  assert.equal(result.places?.normalized, 2);
-  assert.equal(result.places?.failed, 0);
+if (!getMigrationAdapter(WORDPRESS_DB_ADAPTER_KEY)) {
+  registerWordPressDbAdapter();
 }
 
-async function testCollectPreviewSingleEntity() {
-  const repository = new WordPressRepository(createFakeExecutor());
+async function buildTestPlan(entityTypes?: readonly string[], limit?: number) {
+  const { plan } = await runMigrationDryRun({
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    sourceNamespace: "test",
+    sourceConfig: { executor: createFakeExecutor() },
+    filters: { entityTypes, limit },
+  });
+  return plan;
+}
 
-  const articleOnly = await collectPreview(repository, "article", undefined);
-  assert.ok(articleOnly.articles);
-  assert.equal(articleOnly.places, null);
+async function testEngineProducesCreateItemsForAll() {
+  const plan = await buildTestPlan();
 
-  const placeOnly = await collectPreview(repository, "place", undefined);
-  assert.equal(placeOnly.articles, null);
-  assert.ok(placeOnly.places);
+  const articleItems = plan.items.filter((item) => item.sourceEntityType === ARTICLE_ENTITY_TYPE);
+  const placeItems = plan.items.filter((item) => item.sourceEntityType === PLACE_ENTITY_TYPE);
+
+  assert.equal(articleItems.length, 2);
+  assert.ok(articleItems.every((item) => item.action === "CREATE"));
+  assert.equal(placeItems.length, 2);
+  assert.ok(placeItems.every((item) => item.action === "CREATE"));
+  assert.equal(plan.errors.length, 0);
+}
+
+async function testEntityFilterAppliesThroughAdapterAndEngine() {
+  const articleOnly = await buildTestPlan([ARTICLE_ENTITY_TYPE]);
+  assert.ok(articleOnly.items.every((item) => item.sourceEntityType === ARTICLE_ENTITY_TYPE));
+  assert.equal(articleOnly.items.length, 2);
+
+  const placeOnly = await buildTestPlan([PLACE_ENTITY_TYPE]);
+  assert.ok(placeOnly.items.every((item) => item.sourceEntityType === PLACE_ENTITY_TYPE));
+  assert.equal(placeOnly.items.length, 2);
 }
 
 async function testWarningsGroupedByCode() {
-  const repository = new WordPressRepository(createFakeExecutor());
-  const result = await collectPreview(repository, "all", undefined);
-
-  const warningsByCode = computeWarningsByCode(result);
+  const plan = await buildTestPlan();
+  const warningsByCode = computeWarningsByCode(plan);
   assert.deepEqual(warningsByCode, {
     ARTICLE_ELEMENTOR_CONTENT: 1,
     ARTICLE_MISSING_FEATURED_IMAGE: 1,
@@ -123,9 +140,8 @@ async function testWarningsGroupedByCode() {
 }
 
 async function testHumanReportContent() {
-  const repository = new WordPressRepository(createFakeExecutor());
-  const result = await collectPreview(repository, "all", undefined);
-  const report = buildPreviewHumanReport(result);
+  const plan = await buildTestPlan();
+  const report = buildPreviewHumanReport(plan, { entity: "all", limit: null });
 
   assert.match(report, /Migration Preview/);
   assert.match(report, /source: wordpress-db/);
@@ -140,10 +156,17 @@ async function testHumanReportContent() {
   assert.match(report, /Plain Article/);
 }
 
+async function testHumanReportOmitsUnrequestedEntitySection() {
+  const plan = await buildTestPlan([ARTICLE_ENTITY_TYPE]);
+  const report = buildPreviewHumanReport(plan, { entity: "article", limit: null });
+
+  assert.match(report, /Articles:/);
+  assert.ok(!report.includes("Places:"), "Places section must be omitted when entity=article");
+}
+
 async function testJsonReportExcludesRawContent() {
-  const repository = new WordPressRepository(createFakeExecutor());
-  const result = await collectPreview(repository, "all", undefined);
-  const jsonReport = buildPreviewJsonReport(result);
+  const plan = await buildTestPlan();
+  const jsonReport = buildPreviewJsonReport(plan, { entity: "all", limit: null });
 
   assert.equal(jsonReport.summary.articles?.discovered, 2);
   assert.equal(jsonReport.summary.places?.discovered, 2);
@@ -158,6 +181,8 @@ async function testJsonReportExcludesRawContent() {
     assert.ok(!("content" in candidate));
     assert.ok(!("rawMeta" in candidate));
     assert.ok(!("postMeta" in candidate));
+    assert.equal(typeof candidate.mediaRefCount, "number");
+    assert.equal(typeof candidate.relationRefCount, "number");
   }
 
   const serialized = JSON.stringify(jsonReport);
@@ -168,10 +193,34 @@ async function testJsonReportExcludesRawContent() {
   assert.equal(plainArticle?.title, "Plain Article");
   assert.equal(plainArticle?.slug, "plain-article");
   assert.equal(plainArticle?.targetTypeHint, "ARTICLE");
+  assert.equal(plainArticle?.action, "CREATE");
 
   const locatedPlace = jsonReport.candidates.find((c) => c.sourceRecordKey === "wordpress-db:places:301");
   assert.equal(locatedPlace?.title, "Located Place");
   assert.equal(locatedPlace?.targetTypeHint, "PLACE");
+}
+
+async function testNormalizeFailureSurfacesAsFailAction() {
+  // A record whose rawPayload doesn't look like a bundle at all still must
+  // not crash the whole plan — the engine catches per-record errors.
+  const plan = await createMigrationRunPlan({
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    sourceNamespace: "test",
+    records: [
+      {
+        sourceEntityType: ARTICLE_ENTITY_TYPE,
+        sourceStableKey: "broken:1",
+        sourceRecordKey: "broken:1",
+        rawPayload: null,
+      },
+    ],
+  });
+
+  assert.equal(plan.items.length, 1);
+  assert.equal(plan.items[0].action, "FAIL");
+  assert.equal(plan.items[0].status, "FAILED");
+  assert.equal(plan.errors.length, 1);
+  assert.equal(plan.errors[0].sourceRecordKey, "broken:1");
 }
 
 function testParseArgs() {
@@ -202,11 +251,13 @@ function testParseArgs() {
 }
 
 async function main() {
-  await testCollectPreviewAll();
-  await testCollectPreviewSingleEntity();
+  await testEngineProducesCreateItemsForAll();
+  await testEntityFilterAppliesThroughAdapterAndEngine();
   await testWarningsGroupedByCode();
   await testHumanReportContent();
+  await testHumanReportOmitsUnrequestedEntitySection();
   await testJsonReportExcludesRawContent();
+  await testNormalizeFailureSurfacesAsFailAction();
   testParseArgs();
 }
 
