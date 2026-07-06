@@ -1,8 +1,10 @@
 import { performance } from "node:perf_hooks";
 
 import { getMigrationAdapter } from "../adapters/registry";
+import { getLineageActionForRecord } from "../ledger";
 import { buildHumanReport, buildMachineReport } from "../reporters/buildReports";
 import { PHOENIX_V1_PAST_EVENTS_EXCLUSION_POLICY, shouldExcludePastEvent } from "../validators/policies";
+import type { FindLineageBySourceRecordKeysInput, LineageAction, LineageMap } from "../ledger";
 import type {
   MigrationAdapterContext,
   MigrationDiscoveryFilters,
@@ -18,12 +20,24 @@ import type {
 export const PHASE_7_COMMIT_MODE_ERROR =
   "Commit mode is not implemented in Phase 7";
 
+/**
+ * The narrowest slice of `MigrationLedgerRepository` this engine needs — a
+ * plain structural interface, not the concrete class, so `core/` never
+ * hard-depends on the ledger's Prisma-backed implementation (a fake object
+ * satisfying this shape is enough for tests).
+ */
+export interface MigrationLineageLookup {
+  findLineageBySourceRecordKeys(input: FindLineageBySourceRecordKeysInput): Promise<LineageMap>;
+}
+
 export interface MigrationRunPlanInput {
   adapterKey: string;
   sourceNamespace: string;
   records?: readonly SourceRecordEnvelope[];
   sourceConfig?: Record<string, unknown>;
   filters?: MigrationDiscoveryFilters;
+  /** Optional read-only lineage lookup. Omitted (or a source with no prior history) → every successful normalize plans as CREATE, same as before PR6.5. */
+  ledger?: MigrationLineageLookup;
   now?: Date;
 }
 
@@ -84,12 +98,16 @@ function extractStringField(payload: unknown, key: "title" | "slug"): string | n
   return typeof value === "string" ? value : null;
 }
 
-function toCreateItem(record: SourceRecordEnvelope, normalized: NormalizedRecord): MigrationPlanItem {
+function toNormalizedItem(
+  record: SourceRecordEnvelope,
+  normalized: NormalizedRecord,
+  action: LineageAction,
+): MigrationPlanItem {
   return {
     sourceRecordKey: record.sourceRecordKey,
     sourceEntityType: record.sourceEntityType,
-    action: "CREATE",
-    status: "PLANNED",
+    action,
+    status: action === "SKIP_UNCHANGED" ? "SKIPPED" : "PLANNED",
     targetType: normalized.targetTypeHint,
     summary: {
       title: extractStringField(normalized.normalizedPayload, "title"),
@@ -99,6 +117,29 @@ function toCreateItem(record: SourceRecordEnvelope, normalized: NormalizedRecord
     },
     warnings: normalized.warnings,
   };
+}
+
+/**
+ * CREATE unless a batch lineage lookup found an active lineage row for this
+ * record's `sourceRecordKey` with a matching `targetType` — in which case
+ * `getLineageActionForRecord` (pure, from the ledger module) decides
+ * UPDATE vs SKIP_UNCHANGED by comparing `lastSourceHash`. No ledger, no
+ * `targetTypeHint`, or no `sourceHash` to compare against → CREATE, same as
+ * before PR6.5.
+ */
+function resolveLineageAction(
+  record: SourceRecordEnvelope,
+  normalized: NormalizedRecord,
+  lineageByKey: LineageMap,
+): LineageAction {
+  if (normalized.targetTypeHint === undefined || record.sourceHash === undefined) {
+    return "CREATE";
+  }
+  return getLineageActionForRecord({
+    lineage: lineageByKey.get(record.sourceRecordKey),
+    targetType: normalized.targetTypeHint,
+    sourceHash: record.sourceHash,
+  });
 }
 
 function toSkipPolicyItem(record: SourceRecordEnvelope): MigrationPlanItem {
@@ -149,7 +190,15 @@ function computeStats(
   items: readonly MigrationPlanItem[],
 ): Omit<MigrationPlanStats, "durationsMs"> {
   const actionCounts = tally(items, (item) => item.action);
-  const normalizedCount = actionCounts["CREATE"] ?? 0;
+  // Every one of these three actions comes from a normalizeRecord() call
+  // that succeeded — CREATE/UPDATE/SKIP_UNCHANGED only differ in what the
+  // lineage lookup decided to do with that result, not in whether
+  // normalization itself worked. `skippedCount` intentionally stays
+  // SKIP_POLICY-only (business-rule exclusions like past events) — a
+  // distinct concept from SKIP_UNCHANGED (nothing to do, already imported),
+  // which is still visible separately via `actionCounts.SKIP_UNCHANGED`.
+  const normalizedCount =
+    (actionCounts["CREATE"] ?? 0) + (actionCounts["UPDATE"] ?? 0) + (actionCounts["SKIP_UNCHANGED"] ?? 0);
   const failedCount = actionCounts["FAIL"] ?? 0;
   const skippedCount = actionCounts["SKIP_POLICY"] ?? 0;
 
@@ -169,12 +218,15 @@ function computeStats(
 }
 
 /**
- * The real discover -> normalize -> plan loop. No lineage/ledger yet (see
- * Phase 4 / PR5 scope), so every successfully normalized record is planned
- * as CREATE — there is nothing yet to compare it against to decide
- * UPDATE/SKIP_UNCHANGED. `adapter.createPlan` is intentionally not wired in
- * here: this default engine loop is meant to work without it, and no
- * registered adapter defines it yet.
+ * The real discover -> normalize -> plan loop. If `input.ledger` is
+ * provided, a single batch lookup (see PR6's `findLineageBySourceRecordKeys`)
+ * fetches existing lineage for every filtered record up front, and each
+ * successful normalize is planned as CREATE/UPDATE/SKIP_UNCHANGED based on
+ * that lineage (see `resolveLineageAction`). Without a ledger — or for a
+ * record with no matching lineage — everything is CREATE, same as before
+ * PR6.5. `adapter.createPlan` is intentionally not wired in here: this
+ * default engine loop is meant to work without it, and no registered
+ * adapter defines it yet.
  */
 export async function createMigrationRunPlan(
   input: MigrationRunPlanInput,
@@ -212,6 +264,18 @@ export async function createMigrationRunPlan(
   records = filterByEntityTypes(records, input.filters?.entityTypes);
   records = filterByLimitPerEntityType(records, input.filters?.limit);
   const discoveredCount = records.length;
+
+  // Batch lineage lookup — one call for every filtered record, never one
+  // per record inside the loop below. Timed as part of "filter" (this is
+  // prep work before normalize, same window PR5.5 already measured here).
+  const lineageByKey: LineageMap =
+    records.length > 0 && input.ledger
+      ? await input.ledger.findLineageBySourceRecordKeys({
+          adapterKey: input.adapterKey,
+          sourceNamespace: input.sourceNamespace,
+          keys: records.map((record) => record.sourceRecordKey),
+        })
+      : new Map();
   const filterDurationMs = performance.now() - filterStartedAt;
 
   const items: MigrationPlanItem[] = [];
@@ -230,7 +294,8 @@ export async function createMigrationRunPlan(
 
     try {
       const normalized = await adapter.normalizeRecord(record, context);
-      items.push(toCreateItem(record, normalized));
+      const action = resolveLineageAction(record, normalized, lineageByKey);
+      items.push(toNormalizedItem(record, normalized, action));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push({

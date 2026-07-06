@@ -1,22 +1,69 @@
 import assert from "node:assert/strict";
 
+import type { MigrationLineage } from "@prisma/client";
+
 import { registerMigrationAdapter } from "../adapters/registry";
 import {
   PHASE_7_COMMIT_MODE_ERROR,
   createMigrationRunPlan,
   runMigrationCommit,
 } from "./orchestrator";
+import type { MigrationLineageLookup } from "./orchestrator";
 import type { MigrationAdapter, NormalizedRecord, SourceRecordEnvelope } from "../types";
 
 function envelope(fields: {
   sourceRecordKey: string;
   sourceEntityType: string;
+  sourceHash?: string;
 }): SourceRecordEnvelope {
   return {
     sourceEntityType: fields.sourceEntityType,
     sourceStableKey: fields.sourceRecordKey,
     sourceRecordKey: fields.sourceRecordKey,
+    sourceHash: fields.sourceHash,
   };
+}
+
+function lineageRow(overrides: Partial<MigrationLineage> = {}): MigrationLineage {
+  return {
+    id: "lineage-1",
+    sourceId: "source-1",
+    recordId: null,
+    runId: null,
+    sourceEntityType: "mock:entity",
+    sourceExternalId: null,
+    sourceStableKey: "mock:1",
+    sourceRecordKey: "mock:1",
+    targetType: "ARTICLE",
+    targetId: "target-1",
+    targetRole: "primary",
+    targetNaturalKey: null,
+    lastSourceHash: "hash-a",
+    lastPlanAction: "CREATE",
+    isActive: true,
+    firstSeenAt: new Date("2026-01-01T00:00:00.000Z"),
+    lastSeenAt: null,
+    lastImportedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+function createFakeLedger(lineageByKey: ReadonlyMap<string, MigrationLineage[]>) {
+  const calls: { adapterKey: string; sourceNamespace: string; keys: readonly string[] }[] = [];
+  const ledger: MigrationLineageLookup = {
+    async findLineageBySourceRecordKeys(input) {
+      calls.push(input);
+      const result = new Map<string, MigrationLineage[]>();
+      for (const key of input.keys) {
+        const rows = lineageByKey.get(key);
+        if (rows) result.set(key, rows);
+      }
+      return result;
+    },
+  };
+  return { ledger, calls };
 }
 
 function registerMockAdapter(key: string, overrides: Partial<MigrationAdapter>): void {
@@ -347,6 +394,241 @@ async function testZeroRecordPlanDoesNotThrow() {
   }
 }
 
+async function testLedgerNoLineageIsCreate() {
+  registerMockAdapter("mock-ledger-no-lineage", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "rec:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger } = createFakeLedger(new Map());
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-ledger-no-lineage",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.equal(plan.items[0].action, "CREATE");
+  assert.equal(plan.items[0].status, "PLANNED");
+}
+
+async function testLedgerSameHashIsSkipUnchanged() {
+  registerMockAdapter("mock-ledger-same-hash", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "rec:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger } = createFakeLedger(
+    new Map([["rec:1", [lineageRow({ targetType: "ARTICLE", lastSourceHash: "hash-a" })]]]),
+  );
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-ledger-same-hash",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.equal(plan.items[0].action, "SKIP_UNCHANGED");
+  assert.equal(plan.items[0].status, "SKIPPED");
+}
+
+async function testLedgerDifferentHashIsUpdate() {
+  registerMockAdapter("mock-ledger-diff-hash", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "rec:1", sourceEntityType: "mock:entity", sourceHash: "hash-b" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger } = createFakeLedger(
+    new Map([["rec:1", [lineageRow({ targetType: "ARTICLE", lastSourceHash: "hash-a" })]]]),
+  );
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-ledger-diff-hash",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.equal(plan.items[0].action, "UPDATE");
+  assert.equal(plan.items[0].status, "PLANNED");
+}
+
+async function testLedgerWrongTargetTypeIsCreate() {
+  registerMockAdapter("mock-ledger-wrong-type", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "rec:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger } = createFakeLedger(
+    new Map([["rec:1", [lineageRow({ targetType: "PLACE", lastSourceHash: "hash-a" })]]]),
+  );
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-ledger-wrong-type",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.equal(plan.items[0].action, "CREATE");
+}
+
+async function testLedgerBatchLookupCalledOnce() {
+  registerMockAdapter("mock-ledger-batch", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "rec:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+        envelope({ sourceRecordKey: "rec:2", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+        envelope({ sourceRecordKey: "rec:3", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger, calls } = createFakeLedger(new Map());
+  await createMigrationRunPlan({
+    adapterKey: "mock-ledger-batch",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.equal(calls.length, 1, "lineage lookup must be a single batch call, never N+1");
+  assert.deepEqual([...calls[0].keys].sort(), ["rec:1", "rec:2", "rec:3"]);
+}
+
+async function testLedgerEmptyRecordsSkipsLookup() {
+  registerMockAdapter("mock-ledger-empty", {
+    async discoverRecords() {
+      return [];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return { sourceRecordKey: record.sourceRecordKey, sourceEntityType: record.sourceEntityType, normalizedPayload: {} };
+    },
+  });
+
+  const { ledger, calls } = createFakeLedger(new Map());
+  await createMigrationRunPlan({
+    adapterKey: "mock-ledger-empty",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.equal(calls.length, 0, "an empty record set must never call the ledger");
+}
+
+async function testLedgerNormalizeFailureDoesNotBreakLineageLogic() {
+  registerMockAdapter("mock-ledger-partial-failure", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "ok:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+        envelope({ sourceRecordKey: "bad:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      if (record.sourceRecordKey === "bad:1") {
+        throw new Error("boom");
+      }
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger } = createFakeLedger(
+    new Map([["ok:1", [lineageRow({ targetType: "ARTICLE", lastSourceHash: "hash-a" })]]]),
+  );
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-ledger-partial-failure",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  const okItem = plan.items.find((item) => item.sourceRecordKey === "ok:1");
+  const badItem = plan.items.find((item) => item.sourceRecordKey === "bad:1");
+  assert.equal(okItem?.action, "SKIP_UNCHANGED");
+  assert.equal(badItem?.action, "FAIL");
+  assert.equal(plan.errors.length, 1);
+}
+
+async function testLedgerStatsReflectCreateUpdateSkipUnchanged() {
+  registerMockAdapter("mock-ledger-stats", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "create:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+        envelope({ sourceRecordKey: "update:1", sourceEntityType: "mock:entity", sourceHash: "hash-b" }),
+        envelope({ sourceRecordKey: "skip:1", sourceEntityType: "mock:entity", sourceHash: "hash-a" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ARTICLE",
+        normalizedPayload: {},
+      };
+    },
+  });
+
+  const { ledger } = createFakeLedger(
+    new Map([
+      ["update:1", [lineageRow({ targetType: "ARTICLE", lastSourceHash: "hash-a" })]],
+      ["skip:1", [lineageRow({ targetType: "ARTICLE", lastSourceHash: "hash-a" })]],
+    ]),
+  );
+
+  const plan = await createMigrationRunPlan({
+    adapterKey: "mock-ledger-stats",
+    sourceNamespace: "test",
+    ledger,
+  });
+
+  assert.deepEqual(plan.stats!.actionCounts, { CREATE: 1, UPDATE: 1, SKIP_UNCHANGED: 1 });
+  assert.deepEqual(plan.stats!.statusCounts, { PLANNED: 2, SKIPPED: 1 });
+  assert.equal(plan.stats!.normalizedCount, 3);
+  assert.equal(plan.stats!.failedCount, 0);
+  assert.equal(plan.stats!.successRate, 1);
+}
+
 async function testCommitModeStillThrows() {
   await assert.rejects(
     () => runMigrationCommit(),
@@ -365,6 +647,14 @@ async function main() {
   await testExcludePastEventsProducesSkipPolicyItem();
   await testStatsPresentAndCorrect();
   await testZeroRecordPlanDoesNotThrow();
+  await testLedgerNoLineageIsCreate();
+  await testLedgerSameHashIsSkipUnchanged();
+  await testLedgerDifferentHashIsUpdate();
+  await testLedgerWrongTargetTypeIsCreate();
+  await testLedgerBatchLookupCalledOnce();
+  await testLedgerEmptyRecordsSkipsLookup();
+  await testLedgerNormalizeFailureDoesNotBreakLineageLogic();
+  await testLedgerStatsReflectCreateUpdateSkipUnchanged();
   await testCommitModeStillThrows();
 }
 
