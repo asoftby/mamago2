@@ -25,11 +25,19 @@
  * 0600 from the instant it exists, no chmod race window), consumed via
  * `mysql --defaults-extra-file=...`, and removed via a shell `trap` on exit.
  */
-import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const LOCALHOST_NAMES = new Set(["localhost", "127.0.0.1"]);
+import {
+  assertRemoteAccessAllowed,
+  buildManualFallbackMessage,
+  buildMysqlClientConfig,
+  buildRemoteScript,
+  maskHost,
+  readWordPressDbConfigFromEnv,
+  runSshMysqlCommand,
+} from "../src/lib/migration/adapters/wordpress-db/connectExecutor";
+import type { WordPressDbConfig } from "../src/lib/migration/adapters/wordpress-db/types";
 
 // ---------------------------------------------------------------------------
 // SQL — hardcoded, read-only, never accepts arbitrary SQL from the caller.
@@ -151,141 +159,16 @@ function findSection(sections: ParsedSection[], label: string): ParsedSection | 
 }
 
 // ---------------------------------------------------------------------------
-// Credentials / config — never logged, never passed as argv.
+// Credentials / config — never logged, never passed as argv. SSH/mysql
+// wiring itself (env parsing, client config, remote script, masking,
+// manual fallback) now lives in the shared connectExecutor module so the
+// preview CLI can reuse the exact same, already-proven plumbing instead of
+// a second copy. Re-exported here so this script's own public surface
+// (and its test) doesn't change.
 // ---------------------------------------------------------------------------
 
-export interface WpDbEnv {
-  sshHost: string;
-  sshUser: string;
-  dbName: string;
-  dbUser: string;
-  dbPassword: string;
-}
-
-function readEnv(): WpDbEnv {
-  const required = ["WP_SSH_HOST", "WP_SSH_USER", "WP_DB_NAME", "WP_DB_USER", "WP_DB_PASSWORD"];
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    throw new Error(`Missing required env vars: ${missing.join(", ")}`);
-  }
-
-  return {
-    sshHost: process.env.WP_SSH_HOST!,
-    sshUser: process.env.WP_SSH_USER!,
-    dbName: process.env.WP_DB_NAME!,
-    dbUser: process.env.WP_DB_USER!,
-    dbPassword: process.env.WP_DB_PASSWORD!,
-  };
-}
-
-/** `[client]` config file content for `mysql --defaults-extra-file`. */
-export function buildMysqlClientConfig(env: Pick<WpDbEnv, "dbUser" | "dbPassword" | "dbName">): string {
-  const escape = (value: string) => value.replace(/"/g, '\\"');
-  return [
-    "[client]",
-    `user="${escape(env.dbUser)}"`,
-    `password="${escape(env.dbPassword)}"`,
-    `database="${escape(env.dbName)}"`,
-    "host=127.0.0.1",
-    "port=3306",
-    "protocol=TCP",
-    "",
-  ].join("\n");
-}
-
-export function maskHost(host: string): string {
-  const parts = host.split(".");
-  if (parts.length === 4) {
-    return `${parts[0]}.${parts[1]}.***.**`;
-  }
-  return host.length <= 4 ? "***" : `${host.slice(0, 2)}***${host.slice(-2)}`;
-}
-
-/** The remote shell script text — contains no secrets, safe to log/show. */
-function buildRemoteScript(sql: string): string {
-  return [
-    "set -euo pipefail",
-    "umask 177",
-    'CNF="$(mktemp)"',
-    'trap \'rm -f "$CNF"\' EXIT',
-    'cat > "$CNF"',
-    `mysql --defaults-extra-file="$CNF" -e "${sql.replace(/"/g, '\\"')}"`,
-  ].join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// SSH execution (automatic path) + manual fallback
-// ---------------------------------------------------------------------------
-
-function printManualFallback(env: WpDbEnv, remoteScript: string): void {
-  console.error(
-    "\nAutomatic run failed: SSH batch-mode (key/agent) auth did not succeed.\n" +
-      "This script never falls back to a password prompt on purpose. Run it yourself " +
-      "in your own terminal, where an interactive SSH password prompt (if needed) works normally.\n" +
-      "The remote script below is safe to read/copy — it contains no secrets, only the " +
-      "hardcoded read-only SQL and the mktemp/umask/trap plumbing.\n",
-  );
-  console.error("Remote script (pass as the ssh command argument, not via stdin):\n");
-  console.error(remoteScript);
-  console.error(
-    "\nPipe the mysql client config via stdin (values from your own shell env, never printed " +
-      "here), keeping the script itself as the ssh command argument — do not combine both " +
-      "through the same stdin stream:\n\n" +
-      '  printf \'[client]\\nuser="%s"\\npassword="%s"\\ndatabase="%s"\\nhost=127.0.0.1\\nport=3306\\nprotocol=TCP\\n\' \\\n' +
-      '    "$WP_DB_USER" "$WP_DB_PASSWORD" "$WP_DB_NAME" \\\n' +
-      `    | ssh ${env.sshUser}@${env.sshHost} "$(cat <<'REMOTE_SCRIPT'\n` +
-      `${remoteScript}\n` +
-      "REMOTE_SCRIPT\n)\"\n",
-  );
-}
-
-async function runOverSsh(env: WpDbEnv): Promise<string> {
-  // The remote script is passed as a single ssh command-line argument (it
-  // contains no secrets, so this is safe) — NOT via `bash -s` fed from the
-  // same stdin stream that also has to carry the mysql client config.
-  // Mixing both through one stdin stream is unreliable: bash's own
-  // consumption of stdin as its script source races with the script's own
-  // `cat > "$CNF"` reading further from that same stream. Keeping the
-  // script out of stdin entirely removes the race — stdin is then used for
-  // exactly one thing: the mysql client config.
-  const remoteScript = buildRemoteScript(buildSqlScript());
-  const cnfContent = buildMysqlClientConfig(env);
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      "ssh",
-      [
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=15",
-        `${env.sshUser}@${env.sshHost}`,
-        remoteScript,
-      ],
-      { stdio: ["pipe", "pipe", "pipe"] },
-    );
-
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => (stdout += chunk.toString()));
-    child.stderr.on("data", (chunk) => (stderr += chunk.toString()));
-    child.on("error", (error) => reject(error));
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(`ssh exited with code ${code}: ${stderr.trim()}`));
-      }
-    });
-
-    // stdin carries only the mysql client config, read remotely by `cat > "$CNF"`.
-    child.stdin.on("error", () => {
-      /* EPIPE if ssh already failed — surfaced via the close handler instead */
-    });
-    child.stdin.write(cnfContent);
-    child.stdin.end();
-  });
-}
+export type WpDbEnv = WordPressDbConfig;
+export { buildMysqlClientConfig, maskHost };
 
 // ---------------------------------------------------------------------------
 // Report
@@ -427,20 +310,17 @@ function parseArgs(argv: readonly string[]): { allowRemoteReadonly: boolean; out
 async function main(): Promise<void> {
   assertReadOnlySql(SQL_STEPS.map((step) => step.sql));
 
-  const env = readEnv();
+  const env = readWordPressDbConfigFromEnv(process.env);
   const { allowRemoteReadonly, out } = parseArgs(process.argv.slice(2));
 
-  if (!LOCALHOST_NAMES.has(env.sshHost) && !allowRemoteReadonly) {
-    throw new Error(
-      `WP_SSH_HOST (${maskHost(env.sshHost)}) is not localhost. Pass --allow-remote-readonly to confirm you intend to run read-only SELECT/SHOW queries against a remote host.`,
-    );
-  }
+  assertRemoteAccessAllowed(env, allowRemoteReadonly);
 
+  const remoteScript = buildRemoteScript(buildSqlScript());
   let stdout: string;
   try {
-    stdout = await runOverSsh(env);
+    stdout = await runSshMysqlCommand(env, remoteScript);
   } catch (error) {
-    printManualFallback(env, buildRemoteScript(buildSqlScript()));
+    console.error(buildManualFallbackMessage(env, remoteScript));
     throw error;
   }
 
