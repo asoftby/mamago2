@@ -8,6 +8,14 @@ export type {
   ExecutePlaceCommitResult,
   PlaceCommitWriterLike,
 } from "./PlaceCommitOrchestrator";
+export { PlaceCommitRunner } from "./PlaceCommitRunner";
+export type {
+  ExecutePlaceCommitRunInput,
+  ExecutePlaceCommitRunResult,
+  MigrationLineageWriterLike,
+  PlaceCommitOrchestratorLike,
+  PlaceCommitRunnerPrismaClient,
+} from "./PlaceCommitRunner";
 export type {
   PlaceCommitBlockReason,
   PlaceCommitBlockReasonCode,
