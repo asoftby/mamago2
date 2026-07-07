@@ -21,9 +21,10 @@ import {
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import {
-  assertCanHardDeleteContent,
-  isContentHardDeleteError,
-} from "@/server/services/contentHardDelete.service";
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 /**
  * GET - Get activity details
@@ -268,9 +269,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await assertCanHardDeleteContent({
+    await assertContentLifecycleOperationAllowed({
       contentType: "ACTIVITY",
       contentId: id,
+      operation: "deleteDraft",
       status: activity.status,
       prisma,
     });
@@ -282,13 +284,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (isContentHardDeleteError(error)) {
+    if (isContentLifecycleOperationError(error)) {
       return NextResponse.json(
-        {
-          error: error.code,
-          message: error.message,
-          reasons: error.reasons,
-        },
+        lifecycleErrorResponsePayload(error),
         { status: error.statusCode },
       );
     }

@@ -8,6 +8,11 @@
 import type { Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import {
+  assertContentLifecycleOperationAllowed,
+  ContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 type OfferArchiveActor = {
   id: string;
@@ -34,6 +39,18 @@ export class OfferArchiveError extends Error {
     this.statusCode = params.statusCode;
     this.code = params.code;
   }
+}
+
+function rethrowLifecycleAsOfferArchiveError(error: unknown): never {
+  if (error instanceof ContentLifecycleOperationError) {
+    const payload = lifecycleErrorResponsePayload(error);
+    throw new OfferArchiveError({
+      code: payload.code,
+      message: payload.message,
+      statusCode: error.statusCode,
+    });
+  }
+  throw error;
 }
 
 async function loadOfferForArchive(offerId: string) {
@@ -91,20 +108,17 @@ export async function archiveOffer({
 }: ArchiveOfferParams) {
   const offer = await assertOfferArchiveAccess(offerId, actor);
 
-  if (offer.status === "DRAFT") {
-    throw new OfferArchiveError({
-      code: "OFFER_ARCHIVE_NOT_ALLOWED",
-      message: "Черновик предложения нельзя архивировать. Для него доступно только удаление.",
-      statusCode: 409,
+  try {
+    await assertContentLifecycleOperationAllowed({
+      contentType: "OFFER",
+      contentId: offerId,
+      operation: "archiveContent",
+      status: offer.status,
+      archivedAt: offer.archivedAt,
+      prisma,
     });
-  }
-
-  if (offer.archivedAt) {
-    throw new OfferArchiveError({
-      code: "OFFER_ALREADY_ARCHIVED",
-      message: "Предложение уже в архиве",
-      statusCode: 409,
-    });
+  } catch (error) {
+    rethrowLifecycleAsOfferArchiveError(error);
   }
 
   return prisma.offer.update({
@@ -123,12 +137,17 @@ export async function unarchiveOffer(
 ) {
   const offer = await assertOfferArchiveAccess(offerId, actor);
 
-  if (!offer.archivedAt) {
-    throw new OfferArchiveError({
-      code: "OFFER_NOT_ARCHIVED",
-      message: "Предложение не находится в архиве",
-      statusCode: 409,
+  try {
+    await assertContentLifecycleOperationAllowed({
+      contentType: "OFFER",
+      contentId: offerId,
+      operation: "restoreArchived",
+      status: offer.status,
+      archivedAt: offer.archivedAt,
+      prisma,
     });
+  } catch (error) {
+    rethrowLifecycleAsOfferArchiveError(error);
   }
 
   return prisma.offer.update({

@@ -15,13 +15,13 @@ import {
 function responseFromArchiveError(error: unknown) {
   if (error instanceof PlaceArchiveError) {
     return NextResponse.json(
-      { error: error.code, message: error.message },
+      { code: error.code, message: error.message },
       { status: error.statusCode },
     );
   }
 
   return NextResponse.json(
-    { error: "PLACE_ARCHIVE_FAILED", message: "Failed to archive place" },
+    { code: "PLACE_ARCHIVE_FAILED", message: "Failed to archive place" },
     { status: 400 },
   );
 }
