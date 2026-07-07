@@ -101,12 +101,12 @@ export interface RunCommitExecutionPlanSummary {
  * failure and propagates raw, aborting the whole run rather than being
  * silently absorbed.
  *
- * `persistPlan()`'s own `PersistPlanInput.mode` is typed
- * `Extract<MigrationRunMode, "DRY_RUN">` — the persisted `MigrationRun`
- * row is always recorded as `mode: "DRY_RUN"` even though this harness
- * may go on to perform real writes via dispatch. That's a pre-existing
- * constraint on `MigrationRunWriter.persistPlan()` (PR7), not something
- * this harness invents or works around.
+ * `persistPlan()` is called with `mode: "COMMIT"` — this harness is the
+ * thing that actually dispatches Runners capable of real writes, so the
+ * persisted `MigrationRun` row should say so (PR29 widened
+ * `PersistPlanInput.mode` from a `"DRY_RUN"`-only restriction to the full
+ * `MigrationRunMode`; `MigrationRun.mode`/`CreateRunInput.mode` already
+ * accepted `"COMMIT"` all along).
  */
 export async function runCommitExecutionPlan(
   input: RunCommitExecutionPlanInput,
@@ -119,6 +119,7 @@ export async function runCommitExecutionPlan(
     sourceNamespace: plan.sourceNamespace,
     adapterVersion: plan.adapterVersion,
     plan,
+    mode: "COMMIT",
   });
 
   const recordBySourceRecordKey = new Map<string, MigrationRecord>(

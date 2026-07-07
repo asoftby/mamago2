@@ -65,7 +65,17 @@ export interface PersistPlanInput {
   sourceLabel?: string;
   adapterVersion?: string;
   plan: MigrationPlan;
-  mode?: Extract<MigrationRunMode, "DRY_RUN">;
+  /**
+   * Full `MigrationRunMode` — previously restricted to
+   * `Extract<MigrationRunMode, "DRY_RUN">`, even though `MigrationRun.mode`
+   * (schema) and `CreateRunInput.mode` both already accept `"COMMIT"`. That
+   * restriction was never a schema limitation, just a type this writer
+   * itself added; `persistPlan()` already forwarded whatever `mode` it was
+   * given straight to `createRun()`, so widening this type is the whole
+   * fix — no behavior change. Defaults to `"DRY_RUN"` when omitted, same
+   * as before.
+   */
+  mode?: MigrationRunMode;
 }
 
 export interface PersistPlanResult {

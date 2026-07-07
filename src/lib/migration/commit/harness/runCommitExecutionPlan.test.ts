@@ -165,6 +165,16 @@ async function testPersistPlanCalledBeforeDispatch() {
   assert.deepEqual(callOrder, ["persistPlan", "dispatch"]);
 }
 
+async function testPersistPlanCalledWithCommitMode() {
+  const { runWriter, calls } = createFakeRunWriter([migrationRecordFixture()]);
+  const { runner: place } = createFakePlaceRunner(true);
+
+  await runCommitExecutionPlan(baseInput({ runWriter, runners: { place } }));
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].mode, "COMMIT", "runCommitExecutionPlan must persist the plan as a COMMIT run, not DRY_RUN");
+}
+
 async function testRecordsMatchedBySourceRecordKey() {
   const { runWriter } = createFakeRunWriter([
     migrationRecordFixture({ id: "record-a", sourceRecordKey: "wordpress-db:places:301" }),
@@ -319,6 +329,7 @@ async function testMultipleCandidatesMixedResultOrderPreserved() {
 
 async function main() {
   await testPersistPlanCalledBeforeDispatch();
+  await testPersistPlanCalledWithCommitMode();
   await testRecordsMatchedBySourceRecordKey();
   await testContextResolverFailureMarksRecordFailedAndSkipsDispatch();
   await testDispatchSuccessCountedLinked();

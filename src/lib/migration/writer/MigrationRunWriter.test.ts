@@ -320,6 +320,36 @@ async function testPersistPlanCallsInOrderAndFinishesCompleted() {
   assert.equal(result.source.adapterKey, "wordpress-db");
 }
 
+async function testPersistPlanWithCommitModeCreatesRunWithCommitMode() {
+  const { client, calls } = createFakeClient();
+  const writer = new MigrationRunWriter(client);
+
+  const result = await writer.persistPlan({
+    adapterKey: "wordpress-db",
+    sourceNamespace: "wordpress-db",
+    plan: planFixture(),
+    mode: "COMMIT",
+  });
+
+  const createRunCall = calls.createRun[0] as { data: Record<string, unknown> };
+  assert.equal(createRunCall.data.mode, "COMMIT");
+  assert.equal(result.run.mode, "COMMIT");
+}
+
+async function testPersistPlanDefaultsToDryRunWhenModeOmitted() {
+  const { client, calls } = createFakeClient();
+  const writer = new MigrationRunWriter(client);
+
+  await writer.persistPlan({
+    adapterKey: "wordpress-db",
+    sourceNamespace: "wordpress-db",
+    plan: planFixture(),
+  });
+
+  const createRunCall = calls.createRun[0] as { data: Record<string, unknown> };
+  assert.equal(createRunCall.data.mode, "DRY_RUN");
+}
+
 async function testPersistPlanFinishesFailedOnRecordCreationError() {
   const { client, calls } = createFakeClient({ failCreate: true });
   const writer = new MigrationRunWriter(client);
@@ -346,6 +376,8 @@ async function main() {
   await testCreateRecordsFromPlanUsesTransactionWhenAvailable();
   await testCreateRecordsFromPlanWorksWithoutTransaction();
   await testPersistPlanCallsInOrderAndFinishesCompleted();
+  await testPersistPlanWithCommitModeCreatesRunWithCommitMode();
+  await testPersistPlanDefaultsToDryRunWhenModeOmitted();
   await testPersistPlanFinishesFailedOnRecordCreationError();
 }
 
