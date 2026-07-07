@@ -7,6 +7,16 @@ import { RoutesHeader } from "./components/RoutesHeader";
 import { RoutesTabs, type RoutesFilter } from "./components/RoutesTabs";
 import { RoutesGrid } from "./components/RoutesGrid";
 import { RoutesEmptyState } from "./components/RoutesEmptyState";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 export type UserRoute = {
   id: string;
@@ -37,6 +47,7 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
   const [routes, setRoutes] = useState<UserRoute[]>(initialRoutes);
   const [filter, setFilter] = useState<RoutesFilter>("ALL");
   const [deletingRouteId, setDeletingRouteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRoute | null>(null);
 
   const counts = useMemo(
     () => ({
@@ -63,8 +74,6 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
   );
 
   async function handleDelete(route: UserRoute) {
-    if (!confirm(`Удалить маршрут «${route.title}»?`)) return;
-
     const previousRoutes = routes;
     setDeletingRouteId(route.id);
     setRoutes((prev) => prev.filter((r) => r.id !== route.id));
@@ -73,13 +82,16 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
       const res = await fetch(`/api/routes/${route.id}`, { method: "DELETE" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "delete_failed");
+        throw new Error(body.message ?? body.error ?? body.code ?? "delete_failed");
       }
       toast.success("Маршрут удалён");
+      setDeleteTarget(null);
       router.refresh();
-    } catch {
+    } catch (error) {
       setRoutes(previousRoutes);
-      toast.error("Не удалось удалить маршрут", { description: "Попробуйте ещё раз" });
+      toast.error("Не удалось удалить маршрут", {
+        description: error instanceof Error ? error.message : "Попробуйте ещё раз",
+      });
     } finally {
       setDeletingRouteId(null);
     }
@@ -90,6 +102,27 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить черновик?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Это действие нельзя отменить.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingRouteId !== null}>Отмена</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deletingRouteId !== null}
+              onClick={() => deleteTarget && void handleDelete(deleteTarget)}
+            >
+              {deletingRouteId ? "Удаление..." : "Удалить"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <RoutesHeader totalCount={routes.length} />
 
       {routes.length > 0 ? (
@@ -100,7 +133,7 @@ export function RoutesClient({ initialRoutes }: RoutesClientProps) {
         <RoutesGrid
           routes={filtered}
           deletingRouteId={deletingRouteId}
-          onDelete={handleDelete}
+          onDelete={setDeleteTarget}
         />
       ) : (
         <RoutesEmptyState variant={emptyVariant} />
