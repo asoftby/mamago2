@@ -88,9 +88,7 @@ interface PlaceCardHorizontalProps {
 }
 
 export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }: PlaceCardHorizontalProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
 
@@ -172,22 +170,6 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
   // Обложка: лого по logoImageId / kind LOGO, иначе первое фото
   const logoResolved = resolvePlaceLogoImage(place.images, place.logoImageId);
   const coverImage = logoResolved ?? place.images[0];
-
-  const handleDelete = async () => {
-    if (!onDelete) return;
-    
-    setIsDeleting(true);
-    try {
-      await onDelete(place.id);
-      toast.success("Место удалено");
-      setShowDeleteDialog(false);
-    } catch (error) {
-      console.error("Delete error:", error);
-      toast.error("Ошибка удаления");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const handleArchive = async () => {
     if (!onArchive) return;
@@ -384,10 +366,10 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
             {place.status === "DRAFT" && onDelete && !place.archivedAt ? (
               <Button
                 variant="ghost"
-                onClick={() => setShowDeleteDialog(true)}
+                onClick={() => onDelete(place.id)}
                 className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
-                title="Удалить"
-                aria-label="Удалить"
+                title="Удалить черновик"
+                aria-label="Удалить черновик"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -403,28 +385,6 @@ export function PlaceCardHorizontal({ place, onDelete, onArchive, onUnarchive }:
         entityLabel="места"
         metrics={placeMetrics}
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Удалить место?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Вы уверены, что хотите удалить &quot;{displayTitle}&quot;? Это действие нельзя отменить.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Отмена</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isDeleting ? "Удаление..." : "Удалить"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Archive Confirmation Dialog */}
       <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>

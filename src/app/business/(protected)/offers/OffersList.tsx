@@ -53,7 +53,7 @@ export function OffersList({ offers, currentView }: OffersListProps) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "Failed to delete");
+      throw new Error(error.message || error.error || error.code || "Failed to delete");
     }
   };
 
@@ -64,7 +64,7 @@ export function OffersList({ offers, currentView }: OffersListProps) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "Failed to archive");
+      throw new Error(error.message || error.error || error.code || "Failed to archive");
     }
   };
 
@@ -75,7 +75,7 @@ export function OffersList({ offers, currentView }: OffersListProps) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || "Failed to unarchive");
+      throw new Error(error.message || error.error || error.code || "Failed to unarchive");
     }
   };
 

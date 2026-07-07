@@ -100,25 +100,10 @@ export function OfferCardHorizontal({
   onArchive,
   onUnarchive,
 }: OfferCardHorizontalProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
-
-  const handleDelete = async () => {
-    if (!confirm("Вы уверены, что хотите удалить это предложение?")) {
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      await onDelete(offer.id);
-    } catch (error: unknown) {
-      alert(getErrorMessage(error, "Не удалось удалить предложение"));
-      setIsDeleting(false);
-    }
-  };
 
   const handleArchive = async () => {
     if (!onArchive) return;
@@ -246,7 +231,7 @@ export function OfferCardHorizontal({
               Продвигать
             </Link>
 
-            {onArchive ? (
+            {onArchive && offer.status !== "DRAFT" ? (
               <button
                 type="button"
                 onClick={handleArchive}
@@ -276,11 +261,10 @@ export function OfferCardHorizontal({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={handleDelete}
-                disabled={isDeleting}
+                onClick={() => void onDelete(offer.id)}
                 className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
-                title="Удалить"
-                aria-label="Удалить"
+                title="Удалить черновик"
+                aria-label="Удалить черновик"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
