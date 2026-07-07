@@ -6,6 +6,12 @@ export type {
   ArticleCommitSuccess,
   ArticleCommitWriterPrismaClient,
 } from "./ArticleCommitWriter";
+export { ArticleCommitOrchestrator } from "./ArticleCommitOrchestrator";
+export type {
+  ArticleCommitWriterLike,
+  ExecuteArticleCommitInput,
+  ExecuteArticleCommitResult,
+} from "./ArticleCommitOrchestrator";
 export type {
   ArticleCommitBlockReason,
   ArticleCommitBlockReasonCode,
