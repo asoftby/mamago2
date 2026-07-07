@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseArgs, parseCommitContextConfig } from "./migration-commit-wordpress-db";
+import type { MigrationLineageLookup } from "../src/lib/migration/core/orchestrator";
+import { buildExecutionPlanInput, parseArgs, parseCommitContextConfig } from "./migration-commit-wordpress-db";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -140,6 +141,50 @@ function testPackageScriptExists() {
   );
 }
 
+// A fake `MigrationLineageLookup` — never a real `MigrationLedgerRepository`/
+// `PrismaClient` — proving `buildExecutionPlanInput()` wires whatever ledger
+// it's given straight through, without needing a real DB connection to test it.
+function createFakeLedger(): MigrationLineageLookup {
+  return {
+    async findLineageBySourceRecordKeys() {
+      return new Map();
+    },
+  };
+}
+
+function testBuildExecutionPlanInputPassesLedgerThrough() {
+  const ledger = createFakeLedger();
+  const executor = async () => [];
+
+  const input = buildExecutionPlanInput({ entity: "place", executor, ledger });
+
+  assert.equal(input.ledger, ledger, "the ledger passed in must land on the built input unchanged, not be dropped or replaced");
+}
+
+function testBuildExecutionPlanInputMapsEntityToEntityTypes() {
+  const ledger = createFakeLedger();
+  const executor = async () => [];
+
+  assert.deepEqual(buildExecutionPlanInput({ entity: "place", executor, ledger }).filters?.entityTypes, [
+    "wordpress-db:places",
+  ]);
+  assert.deepEqual(buildExecutionPlanInput({ entity: "article", executor, ledger }).filters?.entityTypes, [
+    "wordpress-db:post",
+  ]);
+  assert.deepEqual(buildExecutionPlanInput({ entity: "event", executor, ledger }).filters?.entityTypes, [
+    "wordpress-db:events",
+  ]);
+  assert.equal(buildExecutionPlanInput({ entity: "all", executor, ledger }).filters?.entityTypes, undefined);
+}
+
+function testBuildExecutionPlanInputPassesLimitThrough() {
+  const ledger = createFakeLedger();
+  const executor = async () => [];
+
+  const input = buildExecutionPlanInput({ entity: "all", limit: 5, executor, ledger });
+  assert.equal(input.filters?.limit, 5);
+}
+
 function main() {
   testParsesValidFlags();
   testDefaultsWhenOptionalFlagsOmitted();
@@ -154,10 +199,16 @@ function main() {
   testConfigNonObjectShapeFails();
   testConfigDefaultsMustBeObjectIfPresent();
   testPackageScriptExists();
+  testBuildExecutionPlanInputPassesLedgerThrough();
+  testBuildExecutionPlanInputMapsEntityToEntityTypes();
+  testBuildExecutionPlanInputPassesLimitThrough();
 }
 
 // No real DB/SSH anywhere in this file — only `parseArgs()`/
-// `parseCommitContextConfig()` (pure) and a read of package.json are
-// exercised. `main()` (the actual WP/Prisma wiring) is never called.
+// `parseCommitContextConfig()`/`buildExecutionPlanInput()` (all pure) and a
+// read of package.json are exercised. `main()` (the actual WP/Prisma
+// wiring) is never called. `buildExecutionPlanInput()`'s ledger tests use a
+// fake `MigrationLineageLookup`, never a real `MigrationLedgerRepository`
+// or `PrismaClient`.
 main();
 console.log("migration-commit-wordpress-db tests: OK");

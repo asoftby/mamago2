@@ -3,7 +3,9 @@
  *
  * WordPress DB (read-only, same SSH + `mysql --defaults-extra-file`
  * plumbing as `migration-preview-wordpress-db.ts`) -> Phoenix Engine
- * (`createMigrationRunExecutionPlan`) -> `runCommitExecutionPlan()`
+ * (`createMigrationRunExecutionPlan`, with a real `MigrationLedgerRepository`
+ * wired in — PR31 — so a record already linked in a prior run plans as
+ * UPDATE/SKIP_UNCHANGED, not another CREATE) -> `runCommitExecutionPlan()`
  * (`MigrationRunWriter.persistPlan` + `resolveCommitContextForExecutionCandidate`
  * + `dispatchCommitRunner` -> real `PlaceCommitRunner`/`EventCommitRunner`/
  * `ArticleCommitRunner` -> real `Place`/`Activity`/`Article` +
@@ -60,6 +62,7 @@ import {
   WORDPRESS_DB_ADAPTER_KEY,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
+import type { WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
 import { ArticleCommitOrchestrator } from "../src/lib/migration/commit/article/ArticleCommitOrchestrator";
 import { ArticleCommitRunner } from "../src/lib/migration/commit/article/ArticleCommitRunner";
 import { ArticleCommitWriter } from "../src/lib/migration/commit/article/ArticleCommitWriter";
@@ -73,6 +76,8 @@ import { PlaceCommitOrchestrator } from "../src/lib/migration/commit/place/Place
 import { PlaceCommitRunner } from "../src/lib/migration/commit/place/PlaceCommitRunner";
 import { PlaceCommitWriter } from "../src/lib/migration/commit/place/PlaceCommitWriter";
 import { createMigrationRunExecutionPlan } from "../src/lib/migration/core/orchestrator";
+import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/migration/core/orchestrator";
+import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
 import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLineageWriter";
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
 
@@ -153,6 +158,28 @@ function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
 }
 
 /**
+ * Pure assembly of `createMigrationRunExecutionPlan()`'s input — pulled
+ * out of `main()` specifically so PR31's ledger wiring is testable
+ * without a real DB/SSH connection: a test can pass a fake `ledger` and
+ * assert it lands on the built input unchanged, without ever
+ * constructing a real `MigrationLedgerRepository`/`PrismaClient`.
+ */
+export function buildExecutionPlanInput(input: {
+  entity: CommitEntity;
+  limit?: number;
+  executor: WordPressQueryExecutor;
+  ledger: MigrationLineageLookup;
+}): MigrationRunPlanInput {
+  return {
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    sourceNamespace: "wordpress-db",
+    sourceConfig: { executor: input.executor },
+    filters: { entityTypes: entityTypesFor(input.entity), limit: input.limit },
+    ledger: input.ledger,
+  };
+}
+
+/**
  * Deliberately only a basic shape check (object, `defaults`/
  * `overridesBySourceRecordKey` are objects if present) — not full schema
  * validation of every `place`/`event`/`article` field. Per-target-type
@@ -226,15 +253,19 @@ async function main(): Promise<void> {
 
   const executor = createWordPressSshMysqlExecutor(wpConfig);
 
-  const executionPlan = await createMigrationRunExecutionPlan({
-    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
-    sourceNamespace: "wordpress-db",
-    sourceConfig: { executor },
-    filters: { entityTypes: entityTypesFor(args.entity), limit: args.limit },
-  });
-
   const prisma = new PrismaClient();
   try {
+    // Same `MigrationLedgerRepository` real lineage lookup used by every
+    // other Phoenix entrypoint (PR6) — without it, `createMigrationRunPlan`/
+    // `createMigrationRunExecutionPlan` treat every record as CREATE on
+    // every run, regardless of what was already imported. Wiring it here is
+    // what makes a repeated commit run safe from duplicate creates.
+    const ledger = new MigrationLedgerRepository(prisma);
+
+    const executionPlan = await createMigrationRunExecutionPlan(
+      buildExecutionPlanInput({ entity: args.entity, limit: args.limit, executor, ledger }),
+    );
+
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);
 
