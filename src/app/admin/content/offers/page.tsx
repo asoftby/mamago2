@@ -1,15 +1,18 @@
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
-import { Badge } from "@/components/ui/badge";
 import { OfferStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ModerationListFilters } from "@/components/admin/moderation/ModerationListFilters";
-import { MODERATION_OFFER_STATUS_CONFIG } from "@/lib/admin/moderationOfferStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
-import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
+import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
+import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import {
+  buildAdminLifecycleViewModel,
+  buildAdminOfferLifecycleInput,
+} from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,6 +27,7 @@ function parseOfferStatusFilter(raw: string | undefined): OfferStatus | undefine
 interface SearchParams {
   status?: string;
   cityId?: string;
+  placeId?: string;
   [key: string]: string | undefined;
 }
 
@@ -43,12 +47,17 @@ function buildReturnTo(params: SearchParams): string {
 async function getOffers(params: SearchParams) {
   const where: {
     status?: OfferStatus;
+    placeId?: string;
     place?: { cityId: string };
   } = {};
 
   const status = parseOfferStatusFilter(params.status);
   if (status) {
     where.status = status;
+  }
+
+  if (params.placeId) {
+    where.placeId = params.placeId;
   }
 
   if (params.cityId) {
@@ -108,10 +117,18 @@ function OffersTable({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {offers.map((offer) => {
-            const statusConfig =
-              MODERATION_OFFER_STATUS_CONFIG[offer.status] ||
-              MODERATION_OFFER_STATUS_CONFIG.DRAFT;
             const isArchived = Boolean(offer.archivedAt);
+            const lifecycleViewModel = buildAdminLifecycleViewModel({
+              ...buildAdminOfferLifecycleInput({
+                status: offer.status,
+                archivedAt: offer.archivedAt,
+              }),
+              navigationLinks: {
+                edit: true,
+                preview: true,
+                review: offer.status === "PENDING",
+              },
+            });
             const publicOfferHref =
               !isArchived &&
               !offer.place.archivedAt &&
@@ -132,75 +149,30 @@ function OffersTable({
                     "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                      {statusConfig.label}
-                    </Badge>
-                    {isArchived ? (
-                      <Badge
-                        variant="outline"
-                        className="border-stone-300 bg-stone-100 text-stone-700"
-                      >
-                        В архиве
-                      </Badge>
-                    ) : null}
-                  </div>
+                  <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
                 </td>
                 <td className="px-4 py-3">
-                  <AdminContentRowActions
-                    editAction={{
-                      icon: "edit",
-                      href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
-                      label: "Открыть в редакторе",
-                      title: "Открыть в редакторе",
+                  <ContentLifecycleActionsMenu
+                    viewModel={lifecycleViewModel}
+                    contentId={offer.id}
+                    contentType="offer"
+                    surface="admin"
+                    links={{
+                      edit: {
+                        href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
+                        label: "Открыть в редакторе",
+                      },
+                      preview: {
+                        href: viewOfferHref,
+                        newTab: true,
+                        label: publicOfferHref
+                          ? "Открыть публичную страницу"
+                          : "Открыть предпросмотр",
+                      },
                     }}
-                    viewAction={{
-                      icon: "view",
-                      href: viewOfferHref,
-                      newTab: true,
-                      label: publicOfferHref
-                        ? "Открыть публичную страницу"
-                        : "Открыть предпросмотр",
-                      title: publicOfferHref
-                        ? "Открыть публичную страницу"
-                        : "Открыть предпросмотр",
-                    }}
-                    destructiveAction={
-                      offer.status !== "DRAFT"
-                        ? isArchived
-                          ? {
-                              kind: "restore",
-                              label: "Восстановить",
-                              title: "Восстановить предложение из архива?",
-                              description:
-                                "Предложение снова станет доступно в рабочих списках. Если оно опубликовано и место не находится в архиве, публичная страница снова откроется пользователям.",
-                              request: {
-                                url: `/api/admin/offers/${offer.id}/archive`,
-                                method: "DELETE",
-                              },
-                              confirmLabel: "Восстановить",
-                              successMessage: "Предложение восстановлено из архива",
-                              errorMessage: "Не удалось восстановить предложение",
-                            }
-                          : {
-                              kind: "archive",
-                              label: "Архивировать",
-                              title: "Архивировать предложение?",
-                              description:
-                                "Предложение будет скрыто с публичной страницы и из связанных блоков места. Действие можно отменить позже.",
-                              request: {
-                                url: `/api/admin/offers/${offer.id}/archive`,
-                                method: "POST",
-                              },
-                              confirmLabel: "Архивировать",
-                              successMessage: "Предложение перемещено в архив",
-                              errorMessage: "Не удалось архивировать предложение",
-                            }
-                        : null
-                    }
                   />
                 </td>
               </tr>

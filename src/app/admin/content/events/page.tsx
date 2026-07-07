@@ -1,18 +1,21 @@
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { Badge } from "@/components/ui/badge";
 import { ActivityType, ContentStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ModerationListFilters } from "@/components/admin/moderation/ModerationListFilters";
-import { AdminEventRowActions } from "@/components/admin/moderation/AdminEventRowActions";
-import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
 import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { cn } from "@/lib/utils";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
+import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
+import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import {
+  buildAdminEventLifecycleInput,
+  buildAdminLifecycleViewModel,
+} from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 
 /** Список после DELETE из API должен перечитываться; иначе RSC может отдавать закэшированный снимок. */
 export const dynamic = "force-dynamic";
@@ -130,9 +133,14 @@ function ActivitiesTable({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {activities.map((activity) => {
-            const statusConfig =
-              MODERATION_CONTENT_STATUS_CONFIG[activity.status] ||
-              MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
+            const lifecycleViewModel = buildAdminLifecycleViewModel({
+              ...buildAdminEventLifecycleInput({ status: activity.status }),
+              navigationLinks: {
+                edit: true,
+                preview: true,
+                review: activity.status === ContentStatus.PENDING,
+              },
+            });
             const temporalState = getEventTemporalState({
               scheduleMode: activity.scheduleMode,
               nextOccurrenceAt: activity.nextOccurrenceAt,
@@ -170,40 +178,49 @@ function ActivitiesTable({
                   {activity.owner?.business?.name || activity.owner?.email || "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-col items-start gap-1 text-left">
-                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                      {statusConfig.label}
-                    </Badge>
-                    {temporalLabel ? (
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 text-[12px] leading-none",
-                          temporalState === "PAST"
-                            ? "text-muted-foreground"
-                            : "text-emerald-600",
-                        )}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "h-1.5 w-1.5 rounded-full",
-                            temporalState === "PAST" ? "bg-gray-400" : "bg-emerald-500",
-                          )}
-                        />
-                        {temporalLabel}
-                      </span>
-                    ) : null}
-                  </div>
+                  <ContentLifecycleStatusBadge
+                    viewModel={lifecycleViewModel}
+                    secondary={
+                      temporalLabel
+                        ? [
+                            {
+                              label: temporalLabel,
+                              className: cn(
+                                temporalState === "PAST"
+                                  ? "text-muted-foreground"
+                                  : "text-emerald-600",
+                              ),
+                            },
+                          ]
+                        : undefined
+                    }
+                  />
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
                 </td>
                 <td className="px-4 py-3">
-                  <AdminEventRowActions
-                    eventId={activity.id}
-                    status={activity.status}
-                    returnTo="/admin/content/events"
-                    publicHref={publicHref}
+                  <ContentLifecycleActionsMenu
+                    viewModel={lifecycleViewModel}
+                    contentId={activity.id}
+                    contentType="event"
+                    surface="admin"
+                    links={{
+                      edit: {
+                        href: `/editor/event/${activity.id}/edit?returnTo=${encodeURIComponent("/admin/content/events")}`,
+                        label: "Редактировать",
+                      },
+                      preview: publicHref
+                        ? {
+                            href: publicHref,
+                            newTab: true,
+                            label: "Открыть публичную страницу",
+                          }
+                        : {
+                            href: `/me/events/${activity.id}/preview`,
+                            label: "Открыть предпросмотр",
+                          },
+                    }}
                   />
                 </td>
               </tr>

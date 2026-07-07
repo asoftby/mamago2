@@ -34,9 +34,10 @@ import {
   shouldBlockPublishedOfferEdit,
 } from "@/lib/offers/offerPublishedEditGate";
 import {
-  assertCanHardDeleteContent,
-  isContentHardDeleteError,
-} from "@/server/services/contentHardDelete.service";
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -634,10 +635,22 @@ export async function DELETE(
       );
     }
 
-    await assertCanHardDeleteContent({
+    const deleteOperation = offer.archivedAt ? "deleteArchived" : "deleteDraft";
+
+    if (deleteOperation === "deleteArchived" && user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Удаление из архива доступно только администратору" },
+        { status: 403 },
+      );
+    }
+
+    await assertContentLifecycleOperationAllowed({
       contentType: "OFFER",
       contentId: id,
+      operation: deleteOperation,
       status: offer.status,
+      archivedAt: offer.archivedAt,
+      actorRole: user.role,
       prisma,
     });
 
@@ -648,13 +661,9 @@ export async function DELETE(
     return NextResponse.json({ success: true });
 
   } catch (error) {
-    if (isContentHardDeleteError(error)) {
+    if (isContentLifecycleOperationError(error)) {
       return NextResponse.json(
-        {
-          error: error.code,
-          message: error.message,
-          reasons: error.reasons,
-        },
+        lifecycleErrorResponsePayload(error),
         { status: error.statusCode },
       );
     }

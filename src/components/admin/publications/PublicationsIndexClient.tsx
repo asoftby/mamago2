@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { BarChart2, ChevronRight, Eye, Loader2, MoreHorizontal, Pencil } from "lucide-react";
-import { toast } from "@/lib/toast";
+import { BarChart2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,23 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
@@ -46,6 +28,12 @@ import { PUBLICATION_STATUS_LABEL, PUBLICATION_TYPE_LABEL } from "@/lib/publicat
 import { PublicationStatsDrawer } from "./PublicationStatsDrawer";
 import type { PublicationStatsDrawerProps } from "./PublicationStatsDrawer";
 import { resolveContentLinks } from "@/lib/content-success/resolver";
+import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
+import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import {
+  buildAdminArticleLifecycleInput,
+  buildAdminLifecycleViewModel,
+} from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 
 function matchesTab(row: PublicationListRow, tab: PublicationTabFilter): boolean {
   if (tab === PublicationTabFilter.ALL) return true;
@@ -131,17 +119,6 @@ export function PublicationsIndexClient({
   const [quickNoSlug, setQuickNoSlug] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
-  const [archiveTarget, setArchiveTarget] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    title: string;
-    isDraft: boolean;
-  } | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Drawer статистики
   const [statsDrawer, setStatsDrawer] = useState<PublicationStatsDrawerProps["publication"] | null>(null);
@@ -283,57 +260,6 @@ export function PublicationsIndexClient({
     });
   };
 
-  const confirmDeleteArticle = async () => {
-    if (!deleteTarget) return;
-    setDeletingId(deleteTarget.id);
-    try {
-      const res = await fetch(`/api/admin/articles/${deleteTarget.id}`, { method: "DELETE" });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-      };
-      if (!res.ok) {
-        const msg =
-          typeof data.message === "string"
-            ? data.message
-            : typeof data.error === "string"
-              ? data.error
-              : "Не удалось удалить статью";
-        toast.error(msg);
-        return;
-      }
-      toast.success("Статья удалена");
-      setDeleteTarget(null);
-      router.refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ошибка удаления");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const confirmArchivePublication = async () => {
-    if (!archiveTarget) return;
-
-    setArchivingId(archiveTarget.id);
-    try {
-      const res = await fetch(`/api/admin/articles/${archiveTarget.id}/archive`, { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const msg = typeof data.error === "string" ? data.error : "Не удалось архивировать";
-        toast.error(msg);
-        return;
-      }
-      toast.success("Публикация перенесена в архив");
-      setArchiveTarget(null);
-      router.refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setArchivingId(null);
-    }
-  };
-
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const [tableScrollHint, setTableScrollHint] = useState<"none" | "right" | "left" | "both">("none");
 
@@ -391,85 +317,6 @@ export function PublicationsIndexClient({
           publication={statsDrawer}
         />
       )}
-
-      <AlertDialog
-        open={archiveTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setArchiveTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Архивировать публикацию?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Публикация будет убрана из публичной выдачи и перемещена в архив.</p>
-                {archiveTarget?.title ? (
-                  <p className="font-medium text-foreground">«{archiveTarget.title}»</p>
-                ) : null}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel type="button">Отмена</AlertDialogCancel>
-            <AlertDialogAction
-              type="button"
-              className="bg-destructive text-white hover:bg-destructive/90"
-              disabled={archivingId !== null}
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmArchivePublication();
-              }}
-            >
-              {archivingId ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              Архивировать
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deleteTarget?.isDraft ? "Удалить черновик?" : "Удаление статьи"}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  {deleteTarget?.isDraft
-                    ? "Черновик будет удалён из базы. Это не затрагивает уже опубликованные материалы."
-                    : "Вы уверены, что хотите удалить статью?"}
-                </p>
-                {!deleteTarget?.isDraft ? <p>Это действие нельзя отменить.</p> : null}
-                {deleteTarget?.title ? (
-                  <p className="font-medium text-foreground">«{deleteTarget.title}»</p>
-                ) : null}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel type="button">Отмена</AlertDialogCancel>
-            <AlertDialogAction
-              type="button"
-              className="bg-destructive text-white hover:bg-destructive/90"
-              disabled={deletingId !== null}
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmDeleteArticle();
-              }}
-            >
-              {deletingId ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              Удалить
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Tabs
         value={tab}
@@ -724,6 +571,14 @@ export function PublicationsIndexClient({
                     row.status === PublicationStatus.PUBLISHED
                       ? links.publicUrl
                       : links.previewUrl;
+                  const lifecycleViewModel = buildAdminLifecycleViewModel({
+                    ...buildAdminArticleLifecycleInput({ status: row.status }),
+                    navigationLinks: {
+                      edit: Boolean(editHref),
+                      preview: Boolean(viewHref),
+                    },
+                    actorRoles: ["ADMIN", "MODERATOR"],
+                  });
                   return (
                   <tr key={row.id} className="hover:bg-gray-50/80 group">
                     <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50/80 px-2 py-2 sm:px-3 sm:py-2.5 font-medium text-gray-900 max-w-[min(200px,40vw)] sm:max-w-[220px] truncate shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
@@ -742,15 +597,7 @@ export function PublicationsIndexClient({
                       {PUBLICATION_TYPE_LABEL[row.type]}
                     </td>
                     <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "font-normal border text-[10px] sm:text-xs px-1.5 py-0 h-auto whitespace-normal leading-tight",
-                          statusBadgeClass(row.status),
-                        )}
-                      >
-                        {PUBLICATION_STATUS_LABEL[row.status]}
-                      </Badge>
+                      <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
                     </td>
                     <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 max-w-[140px] truncate align-top">
                       {row.authorLabel}
@@ -769,102 +616,40 @@ export function PublicationsIndexClient({
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-gray-50/80 px-1.5 sm:px-3 py-1.5 sm:py-2 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
                       {hasArticleLikeActions(row) ? (
                         <div className="flex items-center justify-end gap-1">
-                          {editHref ? (
-                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" asChild>
-                              <Link href={editHref} aria-label="Редактировать" title="Редактировать">
-                                <Pencil className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          ) : null}
-                          {viewHref ? (
-                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" asChild>
-                              <Link
-                                href={viewHref}
-                                target="_blank"
-                                aria-label={row.status === PublicationStatus.PUBLISHED ? "Открыть публичную страницу" : "Открыть предпросмотр"}
-                                title={row.status === PublicationStatus.PUBLISHED ? "Открыть публичную страницу" : "Открыть предпросмотр"}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          ) : null}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                aria-label="Действия"
-                                disabled={archivingId === row.id || deletingId === row.id}
-                              >
-                                {archivingId === row.id || deletingId === row.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <MoreHorizontal className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem asChild>
-                              <Link href={editHref!}>Редактировать</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={links.previewUrl ?? `/preview/articles/${row.id}`} target="_blank">
-                                Открыть предпросмотр
-                              </Link>
-                            </DropdownMenuItem>
-                            {row.status === PublicationStatus.PUBLISHED && links.publicUrl ? (
-                              <DropdownMenuItem asChild>
-                                <Link href={links.publicUrl} target="_blank">
-                                  Открыть публикацию
-                                </Link>
-                              </DropdownMenuItem>
-                            ) : null}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => openStatsDrawer(row)}
-                              className="gap-2"
-                            >
-                              <BarChart2 className="h-4 w-4 text-muted-foreground" />
-                              Статистика
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={
-                                archivingId === row.id || row.status === PublicationStatus.ARCHIVED
-                              }
-                              onClick={() => {
-                                setArchiveTarget({
-                                  id: row.id,
-                                  title: row.title.trim() || "Без названия",
-                                });
-                              }}
-                            >
-                              {row.status === PublicationStatus.ARCHIVED
-                                ? "Уже в архиве"
-                                : "Архивировать"}
-                            </DropdownMenuItem>
-                            {row.status === PublicationStatus.DRAFT ? (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  disabled={deletingId === row.id}
-                                  onClick={() =>
-                                    setDeleteTarget({
-                                      id: row.id,
-                                      title: row.title.trim() || "Без названия",
-                                      isDraft: true,
-                                    })
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="Статистика"
+                            title="Статистика"
+                            onClick={() => openStatsDrawer(row)}
+                          >
+                            <BarChart2 className="h-4 w-4" />
+                          </Button>
+                          <ContentLifecycleActionsMenu
+                            viewModel={lifecycleViewModel}
+                            contentId={row.id}
+                            contentType="article"
+                            surface="admin"
+                            align="end"
+                            shortcutIcons={false}
+                            links={{
+                              edit: editHref
+                                ? { href: editHref, label: "Редактировать" }
+                                : undefined,
+                              preview: viewHref
+                                ? {
+                                    href: viewHref,
+                                    newTab: true,
+                                    label:
+                                      row.status === PublicationStatus.PUBLISHED
+                                        ? "Открыть публичную страницу"
+                                        : "Открыть предпросмотр",
                                   }
-                                >
-                                  Удалить черновик
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                          </DropdownMenu>
+                                : undefined,
+                            }}
+                          />
                         </div>
                       ) : null}
                     </td>

@@ -8,9 +8,10 @@ import { getArticleForEditor, saveArticleDraft } from "@/lib/article/articleAdmi
 import prisma from "@/lib/prisma";
 import { createRequestPerf } from "@/server/utils/requestPerf";
 import {
-  assertCanHardDeleteContent,
-  isContentHardDeleteError,
-} from "@/server/services/contentHardDelete.service";
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 export async function GET(
   _req: NextRequest,
@@ -98,24 +99,32 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const deleteOperation =
+    row.status === "ARCHIVED" ? "deleteArchived" : "deleteDraft";
+
+  if (deleteOperation === "deleteArchived" && user.role !== "ADMIN") {
+    return NextResponse.json(
+      { error: "Удаление из архива доступно только администратору" },
+      { status: 403 },
+    );
+  }
+
   try {
-    await assertCanHardDeleteContent({
+    await assertContentLifecycleOperationAllowed({
       contentType: "ARTICLE",
       contentId: id,
+      operation: deleteOperation,
       status: row.status,
+      actorRole: user.role,
       prisma,
     });
 
     await prisma.article.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (isContentHardDeleteError(e)) {
+    if (isContentLifecycleOperationError(e)) {
       return NextResponse.json(
-        {
-          error: e.code,
-          message: e.message,
-          reasons: e.reasons,
-        },
+        lifecycleErrorResponsePayload(e),
         { status: e.statusCode },
       );
     }

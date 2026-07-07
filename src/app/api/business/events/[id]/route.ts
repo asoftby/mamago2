@@ -16,7 +16,11 @@ import {
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { mergeEventScheduleJson } from "@/lib/business/eventScheduleJsonMerge";
-import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
+import { deleteActivity } from "@/server/services/activity.service";
+import {
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
@@ -881,7 +885,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/business/events/[id]
- * Мягкое удаление события (status = DELETED).
+ * Hard-delete only an isolated draft event through the unified lifecycle contract.
  */
 export async function DELETE(
   _request: NextRequest,
@@ -904,7 +908,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    await softDeleteActivityById(id);
+    await deleteActivity(id, user.role);
 
     revalidatePath("/admin/moderation/events");
     revalidatePath("/admin/content/events");
@@ -912,6 +916,12 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete event error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
