@@ -402,3 +402,414 @@ export function derivePlaceArchivedDeletePreflight(params: {
     dependencySummary: params.dependencySummary,
   };
 }
+
+export type OfferRelationCounts = {
+  bookingRequests: number;
+  boosts: number;
+  packageComponents: number;
+};
+
+export type ActivityRelationCounts = {
+  bookingRequests: number;
+  planItems: number;
+};
+
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
+
+export function buildOfferDependencyItems(
+  counts: OfferRelationCounts,
+): ContentDependencyItem[] {
+  return [
+    {
+      type: "bookingRequests",
+      label: "Заявки на бронирование",
+      count: counts.bookingRequests,
+      blocking: counts.bookingRequests > 0,
+    },
+    {
+      type: "boosts",
+      label: "Бусты",
+      count: counts.boosts,
+      blocking: counts.boosts > 0,
+    },
+    {
+      type: "packageComponents",
+      label: "Компоненты пакета",
+      count: counts.packageComponents,
+      blocking: counts.packageComponents > 0,
+    },
+  ];
+}
+
+export function buildActivityDependencyItems(
+  counts: ActivityRelationCounts,
+): ContentDependencyItem[] {
+  return [
+    {
+      type: "bookingRequests",
+      label: "Заявки на бронирование",
+      count: counts.bookingRequests,
+      blocking: counts.bookingRequests > 0,
+    },
+    {
+      type: "planItems",
+      label: "Планы",
+      count: counts.planItems,
+      blocking: counts.planItems > 0,
+    },
+  ];
+}
+
+async function loadOfferPackageComponentCounts(
+  offerIds: string[],
+  prisma: DbClient,
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (offerIds.length === 0) {
+    return result;
+  }
+
+  const [asPackage, asRef] = await Promise.all([
+    prisma.packageComponent.groupBy({
+      by: ["packageId"],
+      where: { packageId: { in: offerIds } },
+      _count: { _all: true },
+    }),
+    prisma.packageComponent.groupBy({
+      by: ["refOfferId"],
+      where: { refOfferId: { in: offerIds } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  for (const row of asPackage) {
+    result.set(row.packageId, (result.get(row.packageId) ?? 0) + row._count._all);
+  }
+  for (const row of asRef) {
+    if (!row.refOfferId) continue;
+    result.set(
+      row.refOfferId,
+      (result.get(row.refOfferId) ?? 0) + row._count._all,
+    );
+  }
+
+  return result;
+}
+
+export async function loadOfferRelationCounts(
+  offerId: string,
+  prisma: DbClient,
+): Promise<OfferRelationCounts> {
+  const batch = await loadOffersRelationCountsBatch([offerId], prisma);
+  return (
+    batch.get(offerId) ?? {
+      bookingRequests: 0,
+      boosts: 0,
+      packageComponents: 0,
+    }
+  );
+}
+
+export async function loadOffersRelationCountsBatch(
+  offerIds: string[],
+  prisma: DbClient,
+): Promise<Map<string, OfferRelationCounts>> {
+  const result = new Map<string, OfferRelationCounts>();
+  if (offerIds.length === 0) {
+    return result;
+  }
+
+  const [bookingRequests, boosts, packageComponents] = await Promise.all([
+    prisma.bookingRequest.groupBy({
+      by: ["offerId"],
+      where: { offerId: { in: offerIds } },
+      _count: { _all: true },
+    }),
+    prisma.boost.groupBy({
+      by: ["offerId"],
+      where: { offerId: { in: offerIds } },
+      _count: { _all: true },
+    }),
+    loadOfferPackageComponentCounts(offerIds, prisma),
+  ]);
+
+  const bookingByOffer = new Map(
+    bookingRequests
+      .filter((row): row is typeof row & { offerId: string } => row.offerId != null)
+      .map((row) => [row.offerId, row._count._all]),
+  );
+  const boostsByOffer = new Map(
+    boosts.map((row) => [row.offerId, row._count._all]),
+  );
+
+  for (const offerId of offerIds) {
+    result.set(offerId, {
+      bookingRequests: bookingByOffer.get(offerId) ?? 0,
+      boosts: boostsByOffer.get(offerId) ?? 0,
+      packageComponents: packageComponents.get(offerId) ?? 0,
+    });
+  }
+
+  return result;
+}
+
+export async function getOffersDependencySummariesBatch(
+  offerIds: string[],
+  prisma: DbClient,
+): Promise<Map<string, ContentDependencySummary>> {
+  const countsByOffer = await loadOffersRelationCountsBatch(offerIds, prisma);
+  const summaries = new Map<string, ContentDependencySummary>();
+
+  for (const [offerId, counts] of countsByOffer) {
+    summaries.set(
+      offerId,
+      buildContentDependencySummary(buildOfferDependencyItems(counts)),
+    );
+  }
+
+  return summaries;
+}
+
+export async function loadActivityRelationCounts(
+  activityId: string,
+  prisma: DbClient,
+): Promise<ActivityRelationCounts> {
+  const batch = await loadActivitiesRelationCountsBatch([activityId], prisma);
+  return (
+    batch.get(activityId) ?? {
+      bookingRequests: 0,
+      planItems: 0,
+    }
+  );
+}
+
+export async function loadActivitiesRelationCountsBatch(
+  activityIds: string[],
+  prisma: DbClient,
+): Promise<Map<string, ActivityRelationCounts>> {
+  const result = new Map<string, ActivityRelationCounts>();
+  if (activityIds.length === 0) {
+    return result;
+  }
+
+  const [bookingRequests, planItems] = await Promise.all([
+    prisma.bookingRequest.groupBy({
+      by: ["activityId"],
+      where: { activityId: { in: activityIds } },
+      _count: { _all: true },
+    }),
+    prisma.planItem.groupBy({
+      by: ["activityId"],
+      where: { activityId: { in: activityIds } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const bookingByActivity = new Map(
+    bookingRequests
+      .filter(
+        (row): row is typeof row & { activityId: string } =>
+          row.activityId != null,
+      )
+      .map((row) => [row.activityId, row._count._all]),
+  );
+  const planItemsByActivity = new Map(
+    planItems
+      .filter(
+        (row): row is typeof row & { activityId: string } =>
+          row.activityId != null,
+      )
+      .map((row) => [row.activityId, row._count._all]),
+  );
+
+  for (const activityId of activityIds) {
+    result.set(activityId, {
+      bookingRequests: bookingByActivity.get(activityId) ?? 0,
+      planItems: planItemsByActivity.get(activityId) ?? 0,
+    });
+  }
+
+  return result;
+}
+
+export async function getActivitiesDependencySummariesBatch(
+  activityIds: string[],
+  prisma: DbClient,
+): Promise<Map<string, ContentDependencySummary>> {
+  const countsByActivity = await loadActivitiesRelationCountsBatch(
+    activityIds,
+    prisma,
+  );
+  const summaries = new Map<string, ContentDependencySummary>();
+
+  for (const [activityId, counts] of countsByActivity) {
+    summaries.set(
+      activityId,
+      buildContentDependencySummary(buildActivityDependencyItems(counts)),
+    );
+  }
+
+  return summaries;
+}
+
+export function deriveOfferDeletePreflight(params: {
+  status: OfferStatus;
+  archivedAt: Date | null;
+  publishedAt?: Date | null;
+  dependencySummary: ContentDependencySummary;
+}) {
+  const reasons: string[] = [];
+
+  if (params.status !== OfferStatus.DRAFT) {
+    reasons.push("statusNotDraft");
+  }
+  if (params.archivedAt) {
+    reasons.push("archived");
+  }
+  if (params.publishedAt) {
+    reasons.push("publishedHistory");
+  }
+  for (const item of blockingDependencyItems(params.dependencySummary)) {
+    reasons.push(item.type);
+  }
+
+  const allowed = reasons.length === 0;
+
+  return {
+    allowed,
+    reasons,
+    message: allowed ? undefined : hardDeleteBlockMessage(reasons),
+    dependencySummary: params.dependencySummary,
+  };
+}
+
+export function deriveOfferArchivedDeletePreflight(params: {
+  archivedAt: Date | null;
+  dependencySummary: ContentDependencySummary;
+}) {
+  const reasons: string[] = [];
+
+  if (!params.archivedAt) {
+    reasons.push("notArchived");
+  }
+  for (const item of blockingDependencyItems(params.dependencySummary)) {
+    reasons.push(item.type);
+  }
+
+  const allowed = reasons.length === 0;
+
+  return {
+    allowed,
+    reasons,
+    message: allowed ? undefined : hardDeleteBlockMessage(reasons),
+    dependencySummary: params.dependencySummary,
+  };
+}
+
+export function deriveActivityDeletePreflight(params: {
+  status: ContentStatus;
+  dependencySummary: ContentDependencySummary;
+}) {
+  const reasons: string[] = [];
+
+  if (params.status !== ContentStatus.DRAFT) {
+    reasons.push("statusNotDraft");
+  }
+  if (params.status === ContentStatus.ARCHIVED) {
+    reasons.push("archived");
+  }
+  for (const item of blockingDependencyItems(params.dependencySummary)) {
+    reasons.push(item.type);
+  }
+
+  const allowed = reasons.length === 0;
+
+  return {
+    allowed,
+    reasons,
+    message: allowed ? undefined : hardDeleteBlockMessage(reasons),
+    dependencySummary: params.dependencySummary,
+  };
+}
+
+export function deriveActivityArchivedDeletePreflight(params: {
+  status: ContentStatus;
+  dependencySummary: ContentDependencySummary;
+}) {
+  const reasons: string[] = [];
+
+  if (params.status !== ContentStatus.ARCHIVED) {
+    reasons.push("notArchived");
+  }
+  for (const item of blockingDependencyItems(params.dependencySummary)) {
+    reasons.push(item.type);
+  }
+
+  const allowed = reasons.length === 0;
+
+  return {
+    allowed,
+    reasons,
+    message: allowed ? undefined : hardDeleteBlockMessage(reasons),
+    dependencySummary: params.dependencySummary,
+  };
+}
+
+export function deriveArticleDeletePreflight(params: {
+  status: ContentStatus;
+  publishedAt?: Date | null;
+  dependencySummary?: ContentDependencySummary;
+}) {
+  const dependencySummary = params.dependencySummary ?? EMPTY_DEPENDENCY_SUMMARY;
+  const reasons: string[] = [];
+
+  if (params.status !== ContentStatus.DRAFT) {
+    reasons.push("statusNotDraft");
+  }
+  if (params.status === ContentStatus.ARCHIVED) {
+    reasons.push("archived");
+  }
+  if (params.publishedAt) {
+    reasons.push("publishedHistory");
+  }
+  for (const item of blockingDependencyItems(dependencySummary)) {
+    reasons.push(item.type);
+  }
+
+  const allowed = reasons.length === 0;
+
+  return {
+    allowed,
+    reasons,
+    message: allowed ? undefined : hardDeleteBlockMessage(reasons),
+    dependencySummary,
+  };
+}
+
+export function deriveArticleArchivedDeletePreflight(params: {
+  status: ContentStatus;
+  dependencySummary?: ContentDependencySummary;
+}) {
+  const dependencySummary = params.dependencySummary ?? EMPTY_DEPENDENCY_SUMMARY;
+  const reasons: string[] = [];
+
+  if (params.status !== ContentStatus.ARCHIVED) {
+    reasons.push("notArchived");
+  }
+  for (const item of blockingDependencyItems(dependencySummary)) {
+    reasons.push(item.type);
+  }
+
+  const allowed = reasons.length === 0;
+
+  return {
+    allowed,
+    reasons,
+    message: allowed ? undefined : hardDeleteBlockMessage(reasons),
+    dependencySummary,
+  };
+}

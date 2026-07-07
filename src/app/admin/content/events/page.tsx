@@ -10,6 +10,15 @@ import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere"
 import { getEventTemporalState } from "@/lib/events/eventTemporalState";
 import { cn } from "@/lib/utils";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
+import {
+  blockingDependencyItems,
+  type ContentDependencySummary,
+} from "@/lib/admin/contentDependencySummary";
+import {
+  deriveActivityArchivedDeletePreflight,
+  deriveActivityDeletePreflight,
+  getActivitiesDependencySummariesBatch,
+} from "@/server/services/contentDependencySummary.service";
 import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
 import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
 import {
@@ -103,12 +112,26 @@ async function getActivities(params: SearchParams) {
   });
 }
 
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
+
+type ActivityRowMeta = {
+  dependencySummary: ContentDependencySummary;
+  deletePreflight: ReturnType<typeof deriveActivityDeletePreflight>;
+  archivedDeletePreflight: ReturnType<typeof deriveActivityArchivedDeletePreflight>;
+};
+
 function ActivitiesTable({
   activities,
   cityNameById,
+  activityMetaById,
 }: {
   activities: Awaited<ReturnType<typeof getActivities>>;
   cityNameById: Map<string, string>;
+  activityMetaById: Map<string, ActivityRowMeta>;
 }) {
   if (activities.length === 0) {
     return (
@@ -133,8 +156,28 @@ function ActivitiesTable({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {activities.map((activity) => {
+            const rowMeta = activityMetaById.get(activity.id) ?? {
+              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              deletePreflight: {
+                allowed: activity.status === ContentStatus.DRAFT,
+                reasons: [],
+                message: undefined,
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+              archivedDeletePreflight: {
+                allowed: false,
+                reasons: ["notArchived"],
+                message: undefined,
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+            };
+            const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
             const lifecycleViewModel = buildAdminLifecycleViewModel({
-              ...buildAdminEventLifecycleInput({ status: activity.status }),
+              ...buildAdminEventLifecycleInput({
+                status: activity.status,
+                deletePreflight: rowMeta.deletePreflight,
+                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+              }),
               navigationLinks: {
                 edit: true,
                 preview: true,
@@ -221,6 +264,26 @@ function ActivitiesTable({
                             label: "Открыть предпросмотр",
                           },
                     }}
+                    deletePreflight={{
+                      deleteDraft: {
+                        blockedDialog: !rowMeta.deletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить черновик",
+                              description: rowMeta.deletePreflight.message,
+                              items: blockingItems,
+                            }
+                          : null,
+                      },
+                      deleteArchived: {
+                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить из архива",
+                              description: rowMeta.archivedDeletePreflight.message,
+                              items: blockingItems,
+                            }
+                          : null,
+                      },
+                    }}
                   />
                 </td>
               </tr>
@@ -244,6 +307,31 @@ export default async function ModerationEventsPage({
     getModerationFilterCities(),
   ]);
 
+  const dependencySummaries = await getActivitiesDependencySummariesBatch(
+    activities.map((activity) => activity.id),
+    prisma,
+  );
+  const activityMetaById = new Map<string, ActivityRowMeta>(
+    activities.map((activity) => {
+      const dependencySummary =
+        dependencySummaries.get(activity.id) ?? EMPTY_DEPENDENCY_SUMMARY;
+      return [
+        activity.id,
+        {
+          dependencySummary,
+          deletePreflight: deriveActivityDeletePreflight({
+            status: activity.status,
+            dependencySummary,
+          }),
+          archivedDeletePreflight: deriveActivityArchivedDeletePreflight({
+            status: activity.status,
+            dependencySummary,
+          }),
+        },
+      ];
+    }),
+  );
+
   const cityNameById = new Map(cities.map((c) => [c.id, c.name]));
 
   return (
@@ -265,7 +353,11 @@ export default async function ModerationEventsPage({
       />
 
       <Suspense fallback={<div>Загрузка…</div>}>
-        <ActivitiesTable activities={activities} cityNameById={cityNameById} />
+        <ActivitiesTable
+          activities={activities}
+          cityNameById={cityNameById}
+          activityMetaById={activityMetaById}
+        />
       </Suspense>
     </div>
   );

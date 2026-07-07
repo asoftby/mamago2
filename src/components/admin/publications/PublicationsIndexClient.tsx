@@ -34,6 +34,25 @@ import {
   buildAdminArticleLifecycleInput,
   buildAdminLifecycleViewModel,
 } from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
+import {
+  blockingDependencyItems,
+  type ContentDependencySummary,
+} from "@/lib/admin/contentDependencySummary";
+import type {
+  deriveArticleArchivedDeletePreflight,
+  deriveArticleDeletePreflight,
+} from "@/server/services/contentDependencySummary.service";
+
+type ArticleLifecycleMeta = {
+  deletePreflight: ReturnType<typeof deriveArticleDeletePreflight>;
+  archivedDeletePreflight: ReturnType<typeof deriveArticleArchivedDeletePreflight>;
+};
+
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
 
 function matchesTab(row: PublicationListRow, tab: PublicationTabFilter): boolean {
   if (tab === PublicationTabFilter.ALL) return true;
@@ -97,9 +116,11 @@ const SORT_LABEL: Record<SortKey, string> = {
 export function PublicationsIndexClient({
   initialRows,
   cities,
+  articleLifecycleMeta = {},
 }: {
   initialRows: PublicationListRow[];
   cities: { id: string; name: string; slug: string }[];
+  articleLifecycleMeta?: Record<string, ArticleLifecycleMeta>;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<PublicationTabFilter>(PublicationTabFilter.ALL);
@@ -571,8 +592,29 @@ export function PublicationsIndexClient({
                     row.status === PublicationStatus.PUBLISHED
                       ? links.publicUrl
                       : links.previewUrl;
+                  const rowMeta = articleLifecycleMeta[row.id] ?? {
+                    deletePreflight: {
+                      allowed: row.status === PublicationStatus.DRAFT,
+                      reasons: [],
+                      message: undefined,
+                      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+                    },
+                    archivedDeletePreflight: {
+                      allowed: row.status === PublicationStatus.ARCHIVED,
+                      reasons: [],
+                      message: undefined,
+                      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+                    },
+                  };
+                  const blockingItems = blockingDependencyItems(
+                    rowMeta.deletePreflight.dependencySummary,
+                  );
                   const lifecycleViewModel = buildAdminLifecycleViewModel({
-                    ...buildAdminArticleLifecycleInput({ status: row.status }),
+                    ...buildAdminArticleLifecycleInput({
+                      status: row.status,
+                      deletePreflight: rowMeta.deletePreflight,
+                      archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+                    }),
                     navigationLinks: {
                       edit: Boolean(editHref),
                       preview: Boolean(viewHref),
@@ -648,6 +690,27 @@ export function PublicationsIndexClient({
                                         : "Открыть предпросмотр",
                                   }
                                 : undefined,
+                            }}
+                            deletePreflight={{
+                              deleteDraft: {
+                                blockedDialog: !rowMeta.deletePreflight.allowed
+                                  ? {
+                                      title: "Нельзя удалить черновик",
+                                      description: rowMeta.deletePreflight.message,
+                                      items: blockingItems,
+                                    }
+                                  : null,
+                              },
+                              deleteArchived: {
+                                blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                                  ? {
+                                      title: "Нельзя удалить из архива",
+                                      description:
+                                        rowMeta.archivedDeletePreflight.message,
+                                      items: blockingItems,
+                                    }
+                                  : null,
+                              },
                             }}
                           />
                         </div>

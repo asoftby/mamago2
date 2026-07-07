@@ -13,6 +13,10 @@ import {
 import {
   buildPlaceDependencyItems,
   loadPlaceRelationCounts,
+  buildOfferDependencyItems,
+  loadOfferRelationCounts,
+  buildActivityDependencyItems,
+  loadActivityRelationCounts,
 } from "@/server/services/contentDependencySummary.service";
 
 export type HardDeleteContentType = "PLACE" | "OFFER" | "ACTIVITY" | "ARTICLE";
@@ -219,21 +223,14 @@ async function evaluateHardDeleteOffer({
     };
   }
 
-  const relationCounts = await Promise.all([
-    countRelation(
-      prisma.bookingRequest.count({ where: { offerId: contentId } }),
-      "bookingRequests",
-    ),
-    countRelation(prisma.boost.count({ where: { offerId: contentId } }), "boosts"),
-    countRelation(
-      prisma.packageComponent.count({
-        where: {
-          OR: [{ packageId: contentId }, { refOfferId: contentId }],
-        },
-      }),
-      "packageComponents",
-    ),
-  ]);
+  const counts = await loadOfferRelationCounts(contentId, prisma);
+  const dependencySummary = buildContentDependencySummary(
+    buildOfferDependencyItems(counts),
+  );
+
+  const relationCounts: RelationCount[] = dependencySummary.items
+    .filter((item) => item.blocking)
+    .map((item) => ({ key: item.type, count: item.count }));
 
   const reasons = [
     ...buildDraftLifecycleReasons({
@@ -251,10 +248,11 @@ async function evaluateHardDeleteOffer({
       code: "CONTENT_HARD_DELETE_BLOCKED",
       message: hardDeleteBlockMessage(reasons),
       reasons,
+      dependencySummary,
     };
   }
 
-  return { allowed: true, reasons: [] };
+  return { allowed: true, reasons: [], dependencySummary };
 }
 
 async function evaluateHardDeleteActivity({
@@ -278,16 +276,14 @@ async function evaluateHardDeleteActivity({
     };
   }
 
-  const relationCounts = await Promise.all([
-    countRelation(
-      prisma.bookingRequest.count({ where: { activityId: contentId } }),
-      "bookingRequests",
-    ),
-    countRelation(
-      prisma.planItem.count({ where: { activityId: contentId } }),
-      "planItems",
-    ),
-  ]);
+  const counts = await loadActivityRelationCounts(contentId, prisma);
+  const dependencySummary = buildContentDependencySummary(
+    buildActivityDependencyItems(counts),
+  );
+
+  const relationCounts: RelationCount[] = dependencySummary.items
+    .filter((item) => item.blocking)
+    .map((item) => ({ key: item.type, count: item.count }));
 
   const reasons = [
     ...buildDraftLifecycleReasons({
@@ -303,10 +299,11 @@ async function evaluateHardDeleteActivity({
       code: "CONTENT_HARD_DELETE_BLOCKED",
       message: hardDeleteBlockMessage(reasons),
       reasons,
+      dependencySummary,
     };
   }
 
-  return { allowed: true, reasons: [] };
+  return { allowed: true, reasons: [], dependencySummary };
 }
 
 async function evaluateHardDeleteArticle({
@@ -424,21 +421,14 @@ async function evaluateArchivedDeleteOffer({
     };
   }
 
-  const relationCounts = await Promise.all([
-    countRelation(
-      prisma.bookingRequest.count({ where: { offerId: contentId } }),
-      "bookingRequests",
-    ),
-    countRelation(prisma.boost.count({ where: { offerId: contentId } }), "boosts"),
-    countRelation(
-      prisma.packageComponent.count({
-        where: {
-          OR: [{ packageId: contentId }, { refOfferId: contentId }],
-        },
-      }),
-      "packageComponents",
-    ),
-  ]);
+  const counts = await loadOfferRelationCounts(contentId, prisma);
+  const dependencySummary = buildContentDependencySummary(
+    buildOfferDependencyItems(counts),
+  );
+
+  const relationCounts: RelationCount[] = dependencySummary.items
+    .filter((item) => item.blocking)
+    .map((item) => ({ key: item.type, count: item.count }));
 
   const reasons = [
     ...buildArchivedDeleteReasons({ archivedAt: offer.archivedAt, status: offer.status }),
@@ -451,10 +441,11 @@ async function evaluateArchivedDeleteOffer({
       code: "CONTENT_HARD_DELETE_BLOCKED",
       message: hardDeleteBlockMessage(reasons),
       reasons,
+      dependencySummary,
     };
   }
 
-  return { allowed: true, reasons: [] };
+  return { allowed: true, reasons: [], dependencySummary };
 }
 
 async function evaluateArchivedDeleteActivity({
@@ -477,16 +468,14 @@ async function evaluateArchivedDeleteActivity({
     };
   }
 
-  const relationCounts = await Promise.all([
-    countRelation(
-      prisma.bookingRequest.count({ where: { activityId: contentId } }),
-      "bookingRequests",
-    ),
-    countRelation(
-      prisma.planItem.count({ where: { activityId: contentId } }),
-      "planItems",
-    ),
-  ]);
+  const counts = await loadActivityRelationCounts(contentId, prisma);
+  const dependencySummary = buildContentDependencySummary(
+    buildActivityDependencyItems(counts),
+  );
+
+  const relationCounts: RelationCount[] = dependencySummary.items
+    .filter((item) => item.blocking)
+    .map((item) => ({ key: item.type, count: item.count }));
 
   const reasons = [
     ...buildArchivedDeleteReasons({ status: activity.status }),
@@ -499,10 +488,11 @@ async function evaluateArchivedDeleteActivity({
       code: "CONTENT_HARD_DELETE_BLOCKED",
       message: hardDeleteBlockMessage(reasons),
       reasons,
+      dependencySummary,
     };
   }
 
-  return { allowed: true, reasons: [] };
+  return { allowed: true, reasons: [], dependencySummary };
 }
 
 async function evaluateArchivedDeleteArticle({
@@ -576,8 +566,4 @@ function buildArchivedDeleteReasons(params: {
 
 function collectRelationReasons(relationCounts: RelationCount[]): string[] {
   return relationCounts.filter((entry) => entry.count > 0).map((entry) => entry.key);
-}
-
-function countRelation(promise: Promise<number>, key: string): Promise<RelationCount> {
-  return promise.then((count) => ({ key, count }));
 }

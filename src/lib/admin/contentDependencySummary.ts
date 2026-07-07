@@ -60,6 +60,15 @@ export function hardDeleteBlockMessage(reasons: string[]): string {
   if (reasons.includes("bookingRequests")) {
     return "Нельзя удалить: есть связанные заявки на бронирование.";
   }
+  if (reasons.includes("boosts")) {
+    return "Нельзя удалить: у предложения есть активные бусты.";
+  }
+  if (reasons.includes("packageComponents")) {
+    return "Нельзя удалить: предложение входит в пакет или содержит компоненты пакета.";
+  }
+  if (reasons.includes("planItems")) {
+    return "Нельзя удалить: событие добавлено в планы пользователей.";
+  }
   if (reasons.includes("reviews")) {
     return "Нельзя удалить: у места есть отзывы пользователей.";
   }

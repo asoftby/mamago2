@@ -42,7 +42,16 @@ export function buildAdminPlaceLifecycleInput(params: {
 export function buildAdminOfferLifecycleInput(params: {
   status: string;
   archivedAt: Date | null;
-  canDeleteArchived?: boolean;
+  deletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
+  archivedDeletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
 }): ContentLifecycleInput {
   return {
     type: "offer",
@@ -50,16 +59,31 @@ export function buildAdminOfferLifecycleInput(params: {
     status: params.status,
     archivedAt: params.archivedAt,
     lifecyclePreflight: {
+      canDeleteDraft: params.deletePreflight?.allowed,
+      canDeleteArchived: params.archivedDeletePreflight?.allowed,
       canArchive: params.archivedAt == null,
       canRestore: params.archivedAt != null,
-      canDeleteArchived:
-        params.canDeleteArchived ?? Boolean(params.archivedAt),
+      deleteBlockedReason: params.deletePreflight?.message,
+      deleteArchivedBlockedReason: params.archivedDeletePreflight?.message,
+      dependencySummary:
+        params.archivedDeletePreflight?.dependencySummary ??
+        params.deletePreflight?.dependencySummary,
     },
   };
 }
 
 export function buildAdminEventLifecycleInput(params: {
   status: string;
+  deletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
+  archivedDeletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
 }): ContentLifecycleInput {
   const isArchived = params.status === "ARCHIVED";
   return {
@@ -69,14 +93,29 @@ export function buildAdminEventLifecycleInput(params: {
     lifecyclePreflight: {
       canArchive: params.status !== "DRAFT" && !isArchived,
       canRestore: isArchived,
-      canDeleteDraft: params.status === "DRAFT",
-      canDeleteArchived: isArchived,
+      canDeleteDraft: params.deletePreflight?.allowed,
+      canDeleteArchived: params.archivedDeletePreflight?.allowed,
+      deleteBlockedReason: params.deletePreflight?.message,
+      deleteArchivedBlockedReason: params.archivedDeletePreflight?.message,
+      dependencySummary:
+        params.archivedDeletePreflight?.dependencySummary ??
+        params.deletePreflight?.dependencySummary,
     },
   };
 }
 
 export function buildAdminArticleLifecycleInput(params: {
   status: string;
+  deletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
+  archivedDeletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
 }): ContentLifecycleInput {
   const isArchived = params.status === "ARCHIVED";
   return {
@@ -86,8 +125,13 @@ export function buildAdminArticleLifecycleInput(params: {
     lifecyclePreflight: {
       canArchive: params.status !== "DRAFT" && !isArchived,
       canRestore: isArchived,
-      canDeleteDraft: params.status === "DRAFT",
-      canDeleteArchived: isArchived,
+      canDeleteDraft: params.deletePreflight?.allowed,
+      canDeleteArchived: params.archivedDeletePreflight?.allowed,
+      deleteBlockedReason: params.deletePreflight?.message,
+      deleteArchivedBlockedReason: params.archivedDeletePreflight?.message,
+      dependencySummary:
+        params.archivedDeletePreflight?.dependencySummary ??
+        params.deletePreflight?.dependencySummary,
     },
   };
 }

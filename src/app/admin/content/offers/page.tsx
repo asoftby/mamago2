@@ -7,6 +7,15 @@ import { ModerationListFilters } from "@/components/admin/moderation/ModerationL
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
+import {
+  blockingDependencyItems,
+  type ContentDependencySummary,
+} from "@/lib/admin/contentDependencySummary";
+import {
+  deriveOfferArchivedDeletePreflight,
+  deriveOfferDeletePreflight,
+  getOffersDependencySummariesBatch,
+} from "@/server/services/contentDependencySummary.service";
 import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
 import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
 import {
@@ -86,12 +95,26 @@ async function getOffers(params: SearchParams) {
   });
 }
 
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
+
+type OfferRowMeta = {
+  dependencySummary: ContentDependencySummary;
+  deletePreflight: ReturnType<typeof deriveOfferDeletePreflight>;
+  archivedDeletePreflight: ReturnType<typeof deriveOfferArchivedDeletePreflight>;
+};
+
 function OffersTable({
   offers,
   returnTo,
+  offerMetaById,
 }: {
   offers: Awaited<ReturnType<typeof getOffers>>;
   returnTo: string;
+  offerMetaById: Map<string, OfferRowMeta>;
 }) {
   if (offers.length === 0) {
     return (
@@ -118,10 +141,28 @@ function OffersTable({
         <tbody className="divide-y divide-gray-200">
           {offers.map((offer) => {
             const isArchived = Boolean(offer.archivedAt);
+            const rowMeta = offerMetaById.get(offer.id) ?? {
+              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              deletePreflight: {
+                allowed: offer.status === OfferStatus.DRAFT && !isArchived,
+                reasons: [],
+                message: undefined,
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+              archivedDeletePreflight: {
+                allowed: false,
+                reasons: ["notArchived"],
+                message: undefined,
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+            };
+            const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
             const lifecycleViewModel = buildAdminLifecycleViewModel({
               ...buildAdminOfferLifecycleInput({
                 status: offer.status,
                 archivedAt: offer.archivedAt,
+                deletePreflight: rowMeta.deletePreflight,
+                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
               }),
               navigationLinks: {
                 edit: true,
@@ -173,6 +214,26 @@ function OffersTable({
                           : "Открыть предпросмотр",
                       },
                     }}
+                    deletePreflight={{
+                      deleteDraft: {
+                        blockedDialog: !rowMeta.deletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить черновик",
+                              description: rowMeta.deletePreflight.message,
+                              items: blockingItems,
+                            }
+                          : null,
+                      },
+                      deleteArchived: {
+                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить из архива",
+                              description: rowMeta.archivedDeletePreflight.message,
+                              items: blockingItems,
+                            }
+                          : null,
+                      },
+                    }}
                   />
                 </td>
               </tr>
@@ -195,6 +256,32 @@ export default async function ModerationOffersPage({
     getOffers(params),
     getModerationFilterCities(),
   ]);
+  const dependencySummaries = await getOffersDependencySummariesBatch(
+    offers.map((offer) => offer.id),
+    prisma,
+  );
+  const offerMetaById = new Map<string, OfferRowMeta>(
+    offers.map((offer) => {
+      const dependencySummary =
+        dependencySummaries.get(offer.id) ?? EMPTY_DEPENDENCY_SUMMARY;
+      return [
+        offer.id,
+        {
+          dependencySummary,
+          deletePreflight: deriveOfferDeletePreflight({
+            status: offer.status,
+            archivedAt: offer.archivedAt,
+            publishedAt: offer.publishedAt,
+            dependencySummary,
+          }),
+          archivedDeletePreflight: deriveOfferArchivedDeletePreflight({
+            archivedAt: offer.archivedAt,
+            dependencySummary,
+          }),
+        },
+      ];
+    }),
+  );
   const returnTo = buildReturnTo(params);
 
   return (
@@ -215,7 +302,7 @@ export default async function ModerationOffersPage({
       />
 
       <Suspense fallback={<div>Загрузка…</div>}>
-        <OffersTable offers={offers} returnTo={returnTo} />
+        <OffersTable offers={offers} returnTo={returnTo} offerMetaById={offerMetaById} />
       </Suspense>
     </div>
   );
