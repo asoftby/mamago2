@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import type { ContentDependencyItem } from "@/lib/admin/contentDependencySummary";
 
 type ActionIcon = "edit" | "view" | "review";
 type MutationKind = "archive" | "restore" | "softDelete" | "hardDelete";
@@ -41,6 +42,12 @@ type LinkAction = BaseAction & {
   newTab?: boolean;
 };
 
+type BlockedDialog = {
+  title: string;
+  description?: string;
+  items: ContentDependencyItem[];
+};
+
 type MutationAction = {
   kind: MutationKind;
   label: string;
@@ -55,6 +62,8 @@ type MutationAction = {
   successMessage: string;
   errorMessage?: string;
   disabled?: boolean;
+  blockedDialog?: BlockedDialog | null;
+  cascadeNote?: string | null;
 };
 
 type Props = {
@@ -111,6 +120,7 @@ export function AdminContentRowActions({
 }: Props) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [blockedOpen, setBlockedOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const iconButtonClass = cn(
@@ -210,15 +220,28 @@ export function AdminContentRowActions({
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => ({}))) as {
+          code?: string;
           error?: string;
           message?: string;
+          dependencySummary?: {
+            items?: ContentDependencyItem[];
+          };
         };
-        throw new Error(
+        const dependencyHint =
+          payload.dependencySummary?.items
+            ?.filter((item) => item.blocking && item.count > 0)
+            .map((item) => `${item.label}: ${item.count}`)
+            .join(" · ") ?? "";
+        const baseMessage =
           typeof payload.message === "string"
             ? payload.message
             : typeof payload.error === "string"
               ? payload.error
-              : destructiveAction.errorMessage || "Не удалось выполнить действие",
+              : typeof payload.code === "string"
+                ? payload.code
+                : destructiveAction.errorMessage || "Не удалось выполнить действие";
+        throw new Error(
+          dependencyHint ? `${baseMessage}\n${dependencyHint}` : baseMessage,
         );
       }
 
@@ -258,7 +281,13 @@ export function AdminContentRowActions({
           <button
             type="button"
             disabled={isSubmitting || destructiveAction.disabled}
-            onClick={() => setConfirmOpen(true)}
+            onClick={() => {
+              if (destructiveAction.blockedDialog) {
+                setBlockedOpen(true);
+                return;
+              }
+              setConfirmOpen(true);
+            }}
             className={cn(
               iconButtonClass,
               restoreAction
@@ -277,13 +306,75 @@ export function AdminContentRowActions({
         ) : null}
       </div>
 
-      {destructiveAction ? (
+      {destructiveAction?.blockedDialog ? (
+        <AlertDialog open={blockedOpen} onOpenChange={setBlockedOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {destructiveAction.blockedDialog.title}
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3 text-sm text-muted-foreground">
+                  {destructiveAction.blockedDialog.description ? (
+                    <p>{destructiveAction.blockedDialog.description}</p>
+                  ) : null}
+                  {destructiveAction.blockedDialog.items.length > 0 ? (
+                    <div>
+                      <p className="font-medium text-foreground">
+                        Связанные данные
+                      </p>
+                      <ul className="mt-2 space-y-1.5">
+                        {destructiveAction.blockedDialog.items.map((item) => (
+                          <li key={item.type} className="flex items-center gap-2">
+                            <span aria-hidden="true">•</span>
+                            <span>
+                              {item.href ? (
+                                <Link
+                                  href={item.href}
+                                  className="underline underline-offset-2"
+                                >
+                                  {item.label}
+                                </Link>
+                              ) : (
+                                item.label
+                              )}
+                              : {item.count}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-wide text-amber-700">
+                              блокирует удаление
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-3">
+                        Сначала удалите или отвяжите связанные записи.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <Button type="button" onClick={() => setBlockedOpen(false)}>
+                Понятно
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
+
+      {destructiveAction && !destructiveAction.blockedDialog ? (
         <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{destructiveAction.title}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {destructiveAction.description}
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>{destructiveAction.description}</p>
+                  {destructiveAction.cascadeNote ? (
+                    <p>{destructiveAction.cascadeNote}</p>
+                  ) : null}
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
