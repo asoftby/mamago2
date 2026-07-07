@@ -8,6 +8,14 @@ export type {
   ExecuteEventCommitInput,
   ExecuteEventCommitResult,
 } from "./EventCommitOrchestrator";
+export { EventCommitRunner } from "./EventCommitRunner";
+export type {
+  EventCommitOrchestratorLike,
+  EventCommitRunnerPrismaClient,
+  ExecuteEventCommitRunInput,
+  ExecuteEventCommitRunResult,
+  MigrationLineageWriterLike,
+} from "./EventCommitRunner";
 export type {
   EventCommitBlockReason,
   EventCommitBlockReasonCode,
