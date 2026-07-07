@@ -20,6 +20,8 @@
  *   the manual command a human can run themselves is surfaced instead.
  */
 import { spawn } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
 
 import type { WordPressQueryExecutor } from "./WordPressRepository";
 import type { WordPressDbConfig } from "./types";
@@ -103,6 +105,29 @@ export function buildRemoteScript(sql: string): string {
   ].join("\n");
 }
 
+/**
+ * OpenSSH connection multiplexing — the first call in a run pays for one
+ * real TCP+KEX+banner+auth handshake and opens a background control
+ * socket; every subsequent call (this adapter makes several per
+ * discovery — posts, postmeta, terms, place index, each its own
+ * `runSshMysqlCommand` today) reuses that already-authenticated
+ * connection as a lightweight multiplexed channel instead of repeating
+ * the full handshake. This is what actually fixes repeated
+ * "Connection timed out during banner exchange" failures under frequent
+ * new connections — it isn't a workaround layered on top, it removes the
+ * repeated-handshake load that was straining the remote sshd.
+ *
+ * `%C` is OpenSSH's own hash token (local host + remote host + port +
+ * user) — used instead of hand-building a path from `config` so the
+ * socket path is guaranteed unique per real connection target, safely
+ * short (OpenSSH computes and truncates the hash itself, avoiding the
+ * classic "control path too long" failure a manually interpolated path
+ * risks), and — since it's derived only from host/user, never from
+ * `dbPassword` — never contains anything secret.
+ */
+const SSH_CONTROL_PATH = path.join(os.tmpdir(), "phoenix-wp-ssh-%C.sock");
+const SSH_CONTROL_PERSIST = "60s";
+
 /** Full `ssh` argv, for tests to assert the password never appears there. */
 export function buildSshArgs(config: WordPressDbConfig, remoteScript: string): string[] {
   return [
@@ -110,6 +135,12 @@ export function buildSshArgs(config: WordPressDbConfig, remoteScript: string): s
     "BatchMode=yes",
     "-o",
     "ConnectTimeout=15",
+    "-o",
+    "ControlMaster=auto",
+    "-o",
+    `ControlPath=${SSH_CONTROL_PATH}`,
+    "-o",
+    `ControlPersist=${SSH_CONTROL_PERSIST}`,
     `${config.sshUser}@${config.sshHost}`,
     remoteScript,
   ];
@@ -287,11 +318,73 @@ export function parseTabularRows<T>(raw: string): T[] {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Bounded retry — read-only WP queries only, and only for the specific SSH
+// banner-exchange/connection-timeout signature that motivated this (see
+// PR33). An auth failure or a mysql/SQL error is not transient — retrying
+// either would just repeat the same failure slower, so both still fail on
+// the first attempt, same as before. mamaGo write-side (Prisma) calls are
+// never wrapped in this — this module has no idea they exist.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_MAX_SSH_ATTEMPTS = 3;
+const DEFAULT_SSH_RETRY_DELAY_MS = 500;
+
+export interface SshRetryOptions {
+  maxAttempts?: number;
+  /** Base delay; attempt N waits `delayMs * N`. Tests pass `0` to stay fast. */
+  delayMs?: number;
+}
+
+/** Matches only the specific failure `runSshMysqlCommand` surfaces for a stalled/rejected handshake — not auth failures, not mysql/SQL errors. */
+function isBannerExchangeTimeout(message: string): boolean {
+  return /banner exchange/i.test(message) || /connection timed out/i.test(message);
+}
+
+/**
+ * Retries `attempt()` up to `maxAttempts` times, but only when the thrown
+ * error's message matches `isBannerExchangeTimeout` — every other failure
+ * (wrong key, rejected auth, a real SQL error) propagates immediately on
+ * the first attempt, exactly as before this PR. Exported standalone (not
+ * baked into `runSshMysqlCommand`) specifically so it's unit-testable with
+ * a fake `attempt()` — no real SSH process needed to prove the retry
+ * boundary is correct.
+ */
+export async function withSshBannerTimeoutRetry<T>(
+  attempt: () => Promise<T>,
+  options: SshRetryOptions = {},
+): Promise<T> {
+  const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_SSH_ATTEMPTS;
+  const delayMs = options.delayMs ?? DEFAULT_SSH_RETRY_DELAY_MS;
+
+  let lastError = new Error("withSshBannerTimeoutRetry: attempt() was never called");
+  for (let attemptNumber = 1; attemptNumber <= maxAttempts; attemptNumber++) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isLastAttempt = attemptNumber === maxAttempts;
+      if (!isBannerExchangeTimeout(lastError.message) || isLastAttempt) {
+        throw lastError;
+      }
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attemptNumber));
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Builds a `WordPressQueryExecutor` backed by SSH + `mysql
- * --defaults-extra-file`. One query, one SSH round trip. On failure, the
- * rejection message includes the manual-fallback instructions (no secrets)
- * so a human can re-run the exact query by hand.
+ * --defaults-extra-file`. One query, one SSH round trip (now multiplexed —
+ * see `buildSshArgs`'s `ControlMaster`/`ControlPersist` — so "one round
+ * trip" no longer means "one full handshake" after the first call). On
+ * failure, the rejection message includes the manual-fallback instructions
+ * (no secrets) so a human can re-run the exact query by hand. A banner-
+ * exchange/connection-timeout failure specifically gets a bounded retry
+ * first (`withSshBannerTimeoutRetry`) before that fallback message is ever
+ * shown.
  */
 export function createWordPressSshMysqlExecutor(config: WordPressDbConfig): WordPressQueryExecutor {
   return async <T>(query: string, params: readonly unknown[] = []): Promise<T[]> => {
@@ -300,7 +393,7 @@ export function createWordPressSshMysqlExecutor(config: WordPressDbConfig): Word
 
     let stdout: string;
     try {
-      stdout = await runSshMysqlCommand(config, remoteScript);
+      stdout = await withSshBannerTimeoutRetry(() => runSshMysqlCommand(config, remoteScript));
     } catch (error) {
       const original = error instanceof Error ? error.message : String(error);
       throw new Error(`${original}\n${buildManualFallbackMessage(config, remoteScript)}`);

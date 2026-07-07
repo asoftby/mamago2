@@ -11,6 +11,7 @@ import {
   maskHost,
   parseTabularRows,
   readWordPressDbConfigFromEnv,
+  withSshBannerTimeoutRetry,
 } from "./connectExecutor";
 import type { WordPressDbConfig } from "./types";
 
@@ -120,6 +121,26 @@ function testBuildSshArgsNeverContainsPassword() {
   assert.ok(args.includes(`${TEST_CONFIG.sshUser}@${TEST_CONFIG.sshHost}`));
 }
 
+function testBuildSshArgsIncludesMultiplexingOptions() {
+  const remoteScript = buildRemoteScript("SELECT 1");
+  const args = buildSshArgs(TEST_CONFIG, remoteScript);
+
+  assert.ok(args.includes("ControlMaster=auto"));
+  assert.ok(args.some((arg) => /^ControlPersist=/.test(arg)));
+  const controlPathArg = args.find((arg) => arg.startsWith("ControlPath="));
+  assert.ok(controlPathArg, "ControlPath must be present in the ssh args");
+}
+
+function testControlPathNeverContainsPassword() {
+  const remoteScript = buildRemoteScript("SELECT 1");
+  const args = buildSshArgs(TEST_CONFIG, remoteScript);
+  const controlPathArg = args.find((arg) => arg.startsWith("ControlPath="))!;
+
+  assert.ok(!controlPathArg.includes(TEST_CONFIG.dbPassword));
+  // Also never the ssh user/host verbatim — it's OpenSSH's own %C hash token, not a hand-built path.
+  assert.ok(controlPathArg.includes("%C"));
+}
+
 function testBuildManualFallbackMessageNeverContainsPassword() {
   const remoteScript = buildRemoteScript("SELECT 1");
   const message = buildManualFallbackMessage(TEST_CONFIG, remoteScript);
@@ -168,17 +189,114 @@ function testParseTabularRows() {
   ]);
 }
 
-function main() {
+async function testRetryHappensForBannerExchangeTimeout() {
+  let calls = 0;
+  const result = await withSshBannerTimeoutRetry(
+    async () => {
+      calls += 1;
+      if (calls < 2) {
+        throw new Error("ssh exited with code 255: Connection timed out during banner exchange");
+      }
+      return "ok";
+    },
+    { delayMs: 0 },
+  );
+
+  assert.equal(result, "ok");
+  assert.equal(calls, 2, "must retry once after a single banner-exchange timeout, then succeed");
+}
+
+async function testRetryBoundedMaxAttempts() {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      withSshBannerTimeoutRetry(
+        async () => {
+          calls += 1;
+          throw new Error("Connection timed out during banner exchange");
+        },
+        { maxAttempts: 3, delayMs: 0 },
+      ),
+    /banner exchange/,
+  );
+
+  assert.equal(calls, 3, "must stop after exactly maxAttempts, never retry indefinitely");
+}
+
+async function testNoRetryOnAuthFailure() {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      withSshBannerTimeoutRetry(
+        async () => {
+          calls += 1;
+          throw new Error("Permission denied (publickey).");
+        },
+        { delayMs: 0 },
+      ),
+    /Permission denied/,
+  );
+
+  assert.equal(calls, 1, "an auth failure is not transient — must fail on the first attempt, no retry");
+}
+
+async function testNoRetryOnMysqlSqlFailure() {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      withSshBannerTimeoutRetry(
+        async () => {
+          calls += 1;
+          throw new Error("ERROR 1146 (42S02) at line 1: Table 'mamago.wp_posts' doesn't exist");
+        },
+        { delayMs: 0 },
+      ),
+    /doesn't exist/,
+  );
+
+  assert.equal(calls, 1, "a real SQL/mysql error is not transient — must fail on the first attempt, no retry");
+}
+
+async function testSuccessAfterTransientRetryReturnsResult() {
+  let calls = 0;
+  const result = await withSshBannerTimeoutRetry(
+    async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("Connection timed out during banner exchange");
+      }
+      return { rows: ["a", "b"] };
+    },
+    { delayMs: 0 },
+  );
+
+  assert.deepEqual(result, { rows: ["a", "b"] });
+}
+
+async function main() {
   testReadWordPressDbConfigFromEnv();
   testMaskHost();
   testRemoteAccessGate();
   testBuildMysqlClientConfig();
   testBindQueryParams();
   testBuildSshArgsNeverContainsPassword();
+  testBuildSshArgsIncludesMultiplexingOptions();
+  testControlPathNeverContainsPassword();
   testBuildManualFallbackMessageNeverContainsPassword();
   testBuildRemoteScriptEscapesEmbeddedQuotes();
   testParseTabularRows();
+  await testRetryHappensForBannerExchangeTimeout();
+  await testRetryBoundedMaxAttempts();
+  await testNoRetryOnAuthFailure();
+  await testNoRetryOnMysqlSqlFailure();
+  await testSuccessAfterTransientRetryReturnsResult();
 }
 
-main();
-console.log("connectExecutor tests: OK");
+main()
+  .then(() => {
+    console.log("connectExecutor tests: OK");
+  })
+  .catch((error) => {
+    console.error("connectExecutor tests: FAILED", error);
+    process.exitCode = 1;
+  });
