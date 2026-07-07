@@ -72,6 +72,10 @@ import { EventCommitRunner } from "../src/lib/migration/commit/event/EventCommit
 import { EventCommitWriter } from "../src/lib/migration/commit/event/EventCommitWriter";
 import { runCommitExecutionPlan } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import type { RunCommitExecutionPlanSummary } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
+import {
+  formatCommitResultLine,
+  printCommitExecutionCounters,
+} from "./migration-commit-summary";
 import { PlaceCommitOrchestrator } from "../src/lib/migration/commit/place/PlaceCommitOrchestrator";
 import { PlaceCommitRunner } from "../src/lib/migration/commit/place/PlaceCommitRunner";
 import { PlaceCommitWriter } from "../src/lib/migration/commit/place/PlaceCommitWriter";
@@ -230,13 +234,10 @@ function printSummary(summary: RunCommitExecutionPlanSummary, args: CommitCliArg
   console.log(`entity: ${args.entity}`);
   console.log(`limit: ${args.limit ?? "(default)"}`);
   console.log();
-  console.log(`Total: ${summary.total}`);
-  console.log(`Linked: ${summary.linked}`);
-  console.log(`Failed: ${summary.failed}`);
+  printCommitExecutionCounters(summary);
   console.log();
   for (const result of summary.results) {
-    const detail = result.errorMessage ? ` — ${result.errorCode}: ${result.errorMessage}` : "";
-    console.log(`- ${result.sourceRecordKey}: ${result.outcome}${detail}`);
+    console.log(formatCommitResultLine(result));
   }
 }
 

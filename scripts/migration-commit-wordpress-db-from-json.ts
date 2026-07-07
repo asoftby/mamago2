@@ -39,6 +39,10 @@ import { EventCommitRunner } from "../src/lib/migration/commit/event/EventCommit
 import { EventCommitWriter } from "../src/lib/migration/commit/event/EventCommitWriter";
 import { runCommitExecutionPlan } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import type { RunCommitExecutionPlanSummary } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
+import {
+  formatCommitResultLine,
+  printCommitExecutionCounters,
+} from "./migration-commit-summary";
 import { PlaceCommitOrchestrator } from "../src/lib/migration/commit/place/PlaceCommitOrchestrator";
 import { PlaceCommitRunner } from "../src/lib/migration/commit/place/PlaceCommitRunner";
 import { PlaceCommitWriter } from "../src/lib/migration/commit/place/PlaceCommitWriter";
@@ -188,16 +192,10 @@ function printSummary(summary: RunCommitExecutionPlanSummary, fixturePath: strin
   console.log("entity: place");
   console.log(`fixture: ${fixturePath}`);
   console.log();
-  console.log(`Total: ${summary.total}`);
-  console.log(`Linked: ${summary.linked}`);
-  console.log(`Failed: ${summary.failed}`);
-  console.log(`Skipped: ${summary.skipped}`);
+  printCommitExecutionCounters(summary);
   console.log();
   for (const result of summary.results) {
-    const target = result.targetId ? ` targetId=${result.targetId}` : "";
-    const lineage = result.lineageId ? ` lineageId=${result.lineageId}` : "";
-    const detail = result.errorMessage ? ` — ${result.errorCode}: ${result.errorMessage}` : "";
-    console.log(`- ${result.sourceRecordKey}: ${result.outcome}${target}${lineage}${detail}`);
+    console.log(formatCommitResultLine(result, { targetId: true, lineageId: true }));
   }
 }
 
