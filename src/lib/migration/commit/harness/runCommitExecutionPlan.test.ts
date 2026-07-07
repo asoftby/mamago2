@@ -226,6 +226,172 @@ async function testDispatchFailureCountedFailed() {
   assert.equal(result.results[0].errorCode, "PLACE_CREATE_FAILED");
 }
 
+async function testSkipUnchangedSkipsDispatch() {
+  const { runner: place, calls } = createFakePlaceRunner(true);
+
+  const result = await runCommitExecutionPlan(
+    baseInput({
+      executionPlan: executionPlanFixture({
+        executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "SKIP_UNCHANGED" }) })],
+      }),
+      runners: { place },
+    }),
+  );
+
+  assert.equal(calls.length, 0, "dispatchCommitRunner must never be reached for a SKIP_UNCHANGED candidate");
+  assert.equal(result.results[0].outcome, "SKIPPED");
+}
+
+async function testSkipUnchangedSkipsContextResolver() {
+  // A context config with no place defaults at all would normally fail
+  // resolution (MISSING_REQUIRED_CONTEXT_FIELD) — if the harness still
+  // called the resolver for a SKIP_UNCHANGED candidate, this would show up
+  // as a FAILED result instead of SKIPPED.
+  const { runner: place, calls } = createFakePlaceRunner(true);
+
+  const result = await runCommitExecutionPlan(
+    baseInput({
+      contextConfig: {},
+      executionPlan: executionPlanFixture({
+        executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "SKIP_UNCHANGED" }) })],
+      }),
+      runners: { place },
+    }),
+  );
+
+  assert.equal(calls.length, 0);
+  assert.equal(result.results[0].outcome, "SKIPPED");
+  assert.equal(result.failed, 0, "an empty contextConfig must never fail a SKIP_UNCHANGED candidate — the resolver is never consulted");
+}
+
+async function testSkipUnchangedMarksRecordLinked() {
+  const { prisma, calls: prismaCalls } = createFakePrisma();
+
+  await runCommitExecutionPlan(
+    baseInput({
+      prisma,
+      executionPlan: executionPlanFixture({
+        executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "SKIP_UNCHANGED" }) })],
+      }),
+      runners: {},
+    }),
+  );
+
+  assert.equal(prismaCalls.length, 1);
+  const updateCall = prismaCalls[0] as { where: { id: string }; data: Record<string, unknown> };
+  assert.equal(updateCall.where.id, "record-1");
+  assert.deepEqual(updateCall.data, { status: "LINKED", lastErrorCode: null, lastErrorMessage: null });
+}
+
+async function testSkippedCountIncrementsInSummary() {
+  const result = await runCommitExecutionPlan(
+    baseInput({
+      executionPlan: executionPlanFixture({
+        executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "SKIP_UNCHANGED" }) })],
+      }),
+      runners: {},
+    }),
+  );
+
+  assert.equal(result.total, 1);
+  assert.equal(result.skipped, 1);
+  assert.equal(result.linked, 0);
+  assert.equal(result.failed, 0);
+}
+
+async function testCreateStillDispatches() {
+  const { runner: place, calls } = createFakePlaceRunner(true);
+
+  await runCommitExecutionPlan(
+    baseInput({
+      executionPlan: executionPlanFixture({
+        executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "CREATE" }) })],
+      }),
+      runners: { place },
+    }),
+  );
+
+  assert.equal(calls.length, 1, "a CREATE candidate must still reach dispatchCommitRunner exactly as before PR32");
+}
+
+async function testUpdateStillDispatchesNotSkipped() {
+  const { calls } = createFakePlaceRunner(true);
+  const unsupportedActionRunner: PlaceCommitRunnerLike = {
+    execute: async (input) => {
+      calls.push(input);
+      // Mirrors what the real PlaceCommitOrchestrator's existing
+      // `action !== "CREATE"` guard actually returns — UPDATE is honestly
+      // unsupported, not silently treated as a no-op.
+      return { ok: false, status: "FAILED", recordId: "record-1", reasonCode: "UNSUPPORTED_OPERATION_ACTION" };
+    },
+  };
+
+  const result = await runCommitExecutionPlan(
+    baseInput({
+      executionPlan: executionPlanFixture({
+        executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "UPDATE" }) })],
+      }),
+      runners: { place: unsupportedActionRunner },
+    }),
+  );
+
+  assert.equal(calls.length, 1, "UPDATE must still be dispatched, not intercepted the way SKIP_UNCHANGED is");
+  assert.equal(result.results[0].outcome, "FAILED");
+  assert.equal(result.results[0].errorCode, "UNSUPPORTED_OPERATION_ACTION");
+  assert.equal(result.skipped, 0);
+}
+
+async function testExactResultOrderPreservedWithMixedActions() {
+  const { runWriter } = createFakeRunWriter([
+    migrationRecordFixture({ id: "record-a", sourceRecordKey: "a" }),
+    migrationRecordFixture({ id: "record-b", sourceRecordKey: "b" }),
+    migrationRecordFixture({ id: "record-c", sourceRecordKey: "c" }),
+  ]);
+  const { runner: place } = createFakePlaceRunner(true);
+
+  const executionPlan = executionPlanFixture({
+    executionCandidates: [
+      executionCandidateFixture({ planItem: planItemFixture({ sourceRecordKey: "a", action: "CREATE" }) }),
+      executionCandidateFixture({ planItem: planItemFixture({ sourceRecordKey: "b", action: "SKIP_UNCHANGED" }) }),
+      executionCandidateFixture({ planItem: planItemFixture({ sourceRecordKey: "c", action: "CREATE" }) }),
+    ],
+  });
+
+  const result = await runCommitExecutionPlan(
+    baseInput({ executionPlan, runWriter, runners: { place } }),
+  );
+
+  assert.deepEqual(
+    result.results.map((r) => [r.sourceRecordKey, r.outcome]),
+    [
+      ["a", "LINKED"],
+      ["b", "SKIPPED"],
+      ["c", "LINKED"],
+    ],
+  );
+}
+
+async function testMigrationRecordUpdateThrowOnSkipPropagatesRaw() {
+  const { prisma } = createFakePrisma();
+  prisma.migrationRecord.update = (async () => {
+    throw new Error("update failed on skip");
+  }) as unknown as RunCommitExecutionPlanPrismaClient["migrationRecord"]["update"];
+
+  await assert.rejects(
+    () =>
+      runCommitExecutionPlan(
+        baseInput({
+          prisma,
+          executionPlan: executionPlanFixture({
+            executionCandidates: [executionCandidateFixture({ planItem: planItemFixture({ action: "SKIP_UNCHANGED" }) })],
+          }),
+          runners: {},
+        }),
+      ),
+    /update failed on skip/,
+  );
+}
+
 async function testMissingMigrationRecordReturnsFailedResultSafely() {
   const { runWriter } = createFakeRunWriter([]); // persistPlan returns no records at all
   const { runner: place, calls } = createFakePlaceRunner(true);
@@ -334,6 +500,14 @@ async function main() {
   await testContextResolverFailureMarksRecordFailedAndSkipsDispatch();
   await testDispatchSuccessCountedLinked();
   await testDispatchFailureCountedFailed();
+  await testSkipUnchangedSkipsDispatch();
+  await testSkipUnchangedSkipsContextResolver();
+  await testSkipUnchangedMarksRecordLinked();
+  await testSkippedCountIncrementsInSummary();
+  await testCreateStillDispatches();
+  await testUpdateStillDispatchesNotSkipped();
+  await testExactResultOrderPreservedWithMixedActions();
+  await testMigrationRecordUpdateThrowOnSkipPropagatesRaw();
   await testMissingMigrationRecordReturnsFailedResultSafely();
   await testExactSummaryCounts();
   await testNoMutationOfExecutionPlanOrContextConfig();

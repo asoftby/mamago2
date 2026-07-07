@@ -48,12 +48,14 @@ export interface RunCommitExecutionPlanInput {
   };
 }
 
-export type RunCommitExecutionPlanOutcome = "LINKED" | "FAILED";
+export type RunCommitExecutionPlanOutcome = "LINKED" | "FAILED" | "SKIPPED";
 
 export interface RunCommitExecutionPlanCandidateResult {
   sourceRecordKey: string;
   recordId?: string;
   outcome: RunCommitExecutionPlanOutcome;
+  /** `executionCandidate.planItem.targetType`, carried through on every outcome — cheap, and PR32 needs it on `SKIPPED` results specifically. */
+  targetType?: string;
   targetId?: string;
   lineageId?: string;
   errorCode?: string;
@@ -64,6 +66,7 @@ export interface RunCommitExecutionPlanSummary {
   total: number;
   linked: number;
   failed: number;
+  skipped: number;
   results: readonly RunCommitExecutionPlanCandidateResult[];
 }
 
@@ -83,23 +86,41 @@ export interface RunCommitExecutionPlanSummary {
  *    `PersistPlanResult` in `writer/types.ts` — nothing is re-fetched).
  *    No match -> `FAILED` with `MISSING_MIGRATION_RECORD`, no update
  *    attempted (there's no `id` to update).
- * 3. `resolveCommitContextForExecutionCandidate()`. Failure -> this
+ * 3. `SKIP_UNCHANGED` (PR32, now that PR31 wired a real ledger lookup so
+ *    this action can actually occur): a repeated run finding a record
+ *    already correctly linked from a prior run, with an unchanged
+ *    `sourceHash`. This is a genuine no-op, not a failure — dispatched to
+ *    a Runner it would come back `UNSUPPORTED_OPERATION_ACTION` (only
+ *    `CREATE` is supported end to end so far) and look like a broken
+ *    record, which would be dishonest. Neither `dispatchCommitRunner()`
+ *    nor `resolveCommitContextForExecutionCandidate()` are called at all
+ *    for this outcome — there's no draft to build a context for. The
+ *    harness itself marks the record `LINKED` (it already is, this just
+ *    keeps the DB row from sitting in `PLANNED` forever) and reports
+ *    `SKIPPED`, not `LINKED`, in its own summary — the DB status and the
+ *    run-report outcome answer two different questions ("is this entity
+ *    correctly linked" vs. "did this run do anything for it").
+ * 4. `resolveCommitContextForExecutionCandidate()` (every other action,
+ *    i.e. `CREATE` today, `UPDATE` once implemented). Failure -> this
  *    harness itself marks the record `FAILED` (dispatch is never
  *    reached — no Runner is ever invoked for this candidate, so nothing
  *    else would mark it). Success -> `dispatchCommitRunner()`, whose
  *    result (`ok:true`/`ok:false`) already reflects whatever the
  *    underlying Runner did to the record (Runners update their own
  *    record's status themselves — this harness never double-updates
- *    after a dispatch).
- *
- * No `"SKIPPED"` outcome exists in this PR: nothing in this flow
- * produces one — every path is either `LINKED` or `FAILED`. Adding one
- * now would be speculative.
+ *    after a dispatch). `UPDATE` is deliberately *not* intercepted here
+ *    the way `SKIP_UNCHANGED` is — it still reaches `dispatchCommitRunner()`
+ *    and comes back `FAILED`/`UNSUPPORTED_OPERATION_ACTION` via the
+ *    existing, already-tested guard in `PlaceCommitOrchestrator`/
+ *    `EventCommitOrchestrator` — an honest failure (it really isn't
+ *    implemented yet), not something to hide, and already safe (rejected
+ *    before any write, so no duplicate `Place`/`Activity`/`Article` row
+ *    is ever created).
  *
  * `migrationRecord.update()` is never wrapped in a defensive try/catch —
  * same as every Runner before it, a throw there is a real infrastructure
  * failure and propagates raw, aborting the whole run rather than being
- * silently absorbed.
+ * silently absorbed. This applies to the `SKIP_UNCHANGED` update too.
  *
  * `persistPlan()` is called with `mode: "COMMIT"` — this harness is the
  * thing that actually dispatches Runners capable of real writes, so the
@@ -138,6 +159,20 @@ export async function runCommitExecutionPlan(
         outcome: "FAILED",
         errorCode: "MISSING_MIGRATION_RECORD",
         errorMessage: `persistPlan() did not return a MigrationRecord for sourceRecordKey "${sourceRecordKey}".`,
+      });
+      continue;
+    }
+
+    if (executionCandidate.planItem.action === "SKIP_UNCHANGED") {
+      await prisma.migrationRecord.update({
+        where: { id: migrationRecord.id },
+        data: { status: "LINKED", lastErrorCode: null, lastErrorMessage: null },
+      });
+      results.push({
+        sourceRecordKey,
+        recordId: migrationRecord.id,
+        outcome: "SKIPPED",
+        targetType: executionCandidate.planItem.targetType,
       });
       continue;
     }
@@ -196,6 +231,7 @@ export async function runCommitExecutionPlan(
     total: results.length,
     linked: results.filter((result) => result.outcome === "LINKED").length,
     failed: results.filter((result) => result.outcome === "FAILED").length,
+    skipped: results.filter((result) => result.outcome === "SKIPPED").length,
     results,
   };
 }
