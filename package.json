@@ -58,6 +58,7 @@
     "backfill:place-slugs": "tsx scripts/data-migrations/backfill-place-slugs.ts",
     "import:preview": "tsx scripts/import-preview.ts",
     "migration:commit:wordpress-db": "tsx scripts/migration-commit-wordpress-db.ts",
+    "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",
     "notifications:plan-reminders": "tsx src/server/notifications/jobs/run-plan-event-reminders.ts",
