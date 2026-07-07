@@ -3,6 +3,7 @@ import type { CommitOperation } from "../types";
 import type {
   NormalizedPlaceCandidate,
   PlaceCommitBlockReason,
+  PlaceCommitWarning,
   PlaceCommitContext,
   PlaceCreateDraft,
 } from "./types";
@@ -27,6 +28,7 @@ export interface ExecutePlaceCommitResult {
   ok: boolean;
   placeId?: string;
   draft?: PlaceCreateDraft;
+  warnings?: readonly PlaceCommitWarning[];
   reasonCode?:
     | "UNSUPPORTED_TARGET_TYPE"
     | "UNSUPPORTED_OPERATION_ACTION"
@@ -40,8 +42,9 @@ export interface ExecutePlaceCommitResult {
  * Wires the already-existing pure/build/write pieces into one execution
  * flow for a single Place CREATE operation:
  * `buildPlaceCreateDraft()` -> `PlaceCommitWriter.createPlaceFromDraft()`.
- * No new decisions are made here — category/createdByUserId validation
- * already happened in `buildPlaceCreateDraft` (PR8.5), the actual write
+ * No new decisions are made here — createdByUserId validation and
+ * category-review warnings already happened in `buildPlaceCreateDraft`
+ * (PR8.5), the actual write
  * already happened in `PlaceCommitWriter` (PR9). This class only sequences
  * them and turns every outcome (including a thrown error) into a typed
  * result, never a thrown exception — this is commit orchestration, not a
@@ -80,7 +83,7 @@ export class PlaceCommitOrchestrator {
 
     try {
       const writeResult = await this.writer.createPlaceFromDraft(draftResult.draft);
-      return { ok: true, placeId: writeResult.placeId, draft: draftResult.draft };
+      return { ok: true, placeId: writeResult.placeId, draft: draftResult.draft, warnings: draftResult.warnings };
     } catch (error) {
       return {
         ok: false,

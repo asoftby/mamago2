@@ -42,6 +42,7 @@ function testHappyPath() {
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
+  assert.deepEqual(result.warnings, []);
 
   assert.equal(result.draft.title, "Cool Place");
   assert.equal(result.draft.shortDesc, "A great place for kids");
@@ -126,10 +127,10 @@ function testAllShortDescSourcesEmptyBlocks() {
   assert.ok(result.reasons.some((r) => r.code === "MISSING_SHORT_DESC"));
 }
 
-function testMissingCategoryBlocksEvenWithSourceTermsPresent() {
+function testMissingCategoryCreatesDraftWithWarningEvenWithSourceTermsPresent() {
   // sourceTerms carry a places_category term that *looks* mappable — this
   // must not matter at all: category is a manual editor choice, and with
-  // no context.category, the record is blocked regardless of sourceTerms.
+  // no context.category, the draft omits category regardless of sourceTerms.
   const result = buildPlaceCreateDraft({
     candidate: candidateFixture({
       sourceTerms: [{ termId: 20, taxonomy: "places_category", name: "Cafe", slug: "kids-cafe" }],
@@ -137,20 +138,22 @@ function testMissingCategoryBlocksEvenWithSourceTermsPresent() {
     context: contextFixture({ category: null }),
   });
 
-  assert.equal(result.ok, false);
-  if (result.ok) return;
-  assert.ok(result.reasons.some((r) => r.code === "MISSING_CATEGORY"));
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(!("category" in result.draft));
+  assert.ok(result.warnings.some((w) => w.code === "CATEGORY_MISSING_REQUIRES_REVIEW"));
 }
 
-function testEmptyContextCategoryBlocks() {
+function testEmptyContextCategoryCreatesDraftWithWarning() {
   const result = buildPlaceCreateDraft({
     candidate: candidateFixture(),
     context: contextFixture({ category: "   " }),
   });
 
-  assert.equal(result.ok, false);
-  if (result.ok) return;
-  assert.ok(result.reasons.some((r) => r.code === "MISSING_CATEGORY"));
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(!("category" in result.draft));
+  assert.ok(result.warnings.some((w) => w.code === "CATEGORY_MISSING_REQUIRES_REVIEW"));
 }
 
 function testSourceTermsDoNotInfluenceCategory() {
@@ -224,8 +227,8 @@ function main() {
   testShortDescFallsBackToExcerpt();
   testShortDescFallsBackToContentWithHtmlStrippedAndTruncated();
   testAllShortDescSourcesEmptyBlocks();
-  testMissingCategoryBlocksEvenWithSourceTermsPresent();
-  testEmptyContextCategoryBlocks();
+  testMissingCategoryCreatesDraftWithWarningEvenWithSourceTermsPresent();
+  testEmptyContextCategoryCreatesDraftWithWarning();
   testSourceTermsDoNotInfluenceCategory();
   testSlugAlwaysNull();
   testStatusPendingAndLocationSourceManual();

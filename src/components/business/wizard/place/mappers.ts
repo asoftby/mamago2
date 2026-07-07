@@ -35,7 +35,7 @@ export function mapPlaceToFormData(
     
     // Step 1: Profile
     title: place.title,
-    category: place.category,
+    category: place.category ?? "",
     shortDesc: place.shortDesc,
     description: place.description,
     ageTags: place.ageTags || [],

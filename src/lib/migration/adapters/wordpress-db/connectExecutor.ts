@@ -20,8 +20,6 @@
  *   the manual command a human can run themselves is surfaced instead.
  */
 import { spawn } from "node:child_process";
-import os from "node:os";
-import path from "node:path";
 
 import type { WordPressQueryExecutor } from "./WordPressRepository";
 import type { WordPressDbConfig } from "./types";
@@ -119,13 +117,20 @@ export function buildRemoteScript(sql: string): string {
  *
  * `%C` is OpenSSH's own hash token (local host + remote host + port +
  * user) — used instead of hand-building a path from `config` so the
- * socket path is guaranteed unique per real connection target, safely
- * short (OpenSSH computes and truncates the hash itself, avoiding the
- * classic "control path too long" failure a manually interpolated path
- * risks), and — since it's derived only from host/user, never from
- * `dbPassword` — never contains anything secret.
+ * socket path is guaranteed unique per real connection target, and —
+ * since it's derived only from host/user, never from `dbPassword` — never
+ * contains anything secret. `%C` is a full 40-char SHA1 hex digest, *not*
+ * truncated by OpenSSH, so the surrounding path still has to stay short:
+ * Unix domain socket paths are capped at 104 bytes (macOS) / 108 (Linux).
+ * `os.tmpdir()` was tried first and hit this exact limit on macOS — its
+ * per-user temp dir (`/var/folders/<xx>/<random>/T/`) alone is already
+ * ~45+ bytes, leaving no room for a 40-char hash plus a filename. `/tmp`
+ * directly is short, stable, and available on both platforms this project
+ * targets (macOS dev, Linux CI/deploy), which is why real-world OpenSSH
+ * `ControlPath` examples almost always hardcode it rather than compute a
+ * tmpdir.
  */
-const SSH_CONTROL_PATH = path.join(os.tmpdir(), "phoenix-wp-ssh-%C.sock");
+const SSH_CONTROL_PATH = "/tmp/phx-wp-%C";
 const SSH_CONTROL_PERSIST = "60s";
 
 /** Full `ssh` argv, for tests to assert the password never appears there. */

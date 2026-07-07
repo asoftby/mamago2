@@ -95,6 +95,7 @@ async function testHappyPathCreatesPlace() {
   assert.equal(result.placeId, "place-42");
   assert.ok(result.draft, "draft must be returned on success");
   assert.equal(result.draft?.title, "Cool Place");
+  assert.deepEqual(result.warnings, []);
   assert.equal(calls.length, 1, "writer must be called exactly once");
 }
 
@@ -163,7 +164,7 @@ async function testUnsupportedActionFail() {
   assert.equal(calls.length, 0);
 }
 
-async function testBlockedDraftNeverCallsWriter() {
+async function testMissingCategoryCreatesPlaceWithWarning() {
   const { writer, calls } = createFakeWriter();
   const orchestrator = new PlaceCommitOrchestrator(writer);
 
@@ -171,10 +172,25 @@ async function testBlockedDraftNeverCallsWriter() {
     inputFixture({ context: contextFixture({ category: null }) }),
   );
 
+  assert.equal(result.ok, true);
+  assert.ok(result.draft);
+  assert.ok(!("category" in result.draft));
+  assert.ok(result.warnings?.some((warning) => warning.code === "CATEGORY_MISSING_REQUIRES_REVIEW"));
+  assert.equal(calls.length, 1, "writer must still be called when only category is missing");
+}
+
+async function testBlockedDraftNeverCallsWriter() {
+  const { writer, calls } = createFakeWriter();
+  const orchestrator = new PlaceCommitOrchestrator(writer);
+
+  const result = await orchestrator.execute(
+    inputFixture({ context: contextFixture({ createdByUserId: "" }) }),
+  );
+
   assert.equal(result.ok, false);
   assert.equal(result.reasonCode, "PLACE_CREATE_BLOCKED");
   assert.ok(result.blockReasons && result.blockReasons.length > 0);
-  assert.ok(result.blockReasons?.some((reason) => reason.code === "MISSING_CATEGORY"));
+  assert.ok(result.blockReasons?.some((reason) => reason.code === "MISSING_CREATED_BY"));
   assert.equal(calls.length, 0, "writer must never be called when the draft is blocked");
 }
 
@@ -196,6 +212,7 @@ async function main() {
   await testUnsupportedActionSkipUnchanged();
   await testUnsupportedActionSkipPolicy();
   await testUnsupportedActionFail();
+  await testMissingCategoryCreatesPlaceWithWarning();
   await testBlockedDraftNeverCallsWriter();
   await testWriterThrowsBecomesTypedFailureNotThrow();
 }

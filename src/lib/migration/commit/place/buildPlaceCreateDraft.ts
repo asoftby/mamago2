@@ -1,6 +1,7 @@
 import type {
   NormalizedPlaceCandidate,
   PlaceCommitBlockReason,
+  PlaceCommitWarning,
   PlaceCommitContext,
   PlaceCreateDraftResult,
 } from "./types";
@@ -86,10 +87,11 @@ export function buildPlaceCreateDraft(input: BuildPlaceCreateDraftInput): PlaceC
   // `candidate.sourceTerms` is intentionally not consulted here. It stays
   // available on the candidate for review UI to show as a hint later.
   const category = input.context.category?.trim();
+  const warnings: PlaceCommitWarning[] = [];
   if (!category) {
-    reasons.push({
-      code: "MISSING_CATEGORY",
-      message: "PlaceCommitContext has no category — this is a manual editor choice, never derived from WordPress taxonomies.",
+    warnings.push({
+      code: "CATEGORY_MISSING_REQUIRES_REVIEW",
+      message: "Place has no category. Import is allowed, but an editor must assign category manually later.",
     });
   }
 
@@ -105,7 +107,7 @@ export function buildPlaceCreateDraft(input: BuildPlaceCreateDraftInput): PlaceC
       title: title!,
       shortDesc: shortDesc!,
       description: description.length > 0 ? description : null,
-      category: category!,
+      ...(category ? { category } : {}),
       status: "PENDING",
       locationSource: "MANUAL",
       createdByUserId: input.context.createdByUserId,
@@ -116,5 +118,6 @@ export function buildPlaceCreateDraft(input: BuildPlaceCreateDraftInput): PlaceC
       website: null,
       slug: null,
     },
+    warnings,
   };
 }

@@ -1083,7 +1083,7 @@ model Place {
   activityTypes                String[]
   addressJson                  Json?
   ageTags                      String[]
-  category                     String
+  category                     String?
   countryCode                  String?
   customAddress                String?
   displayAddress               String?

@@ -160,6 +160,15 @@ async function testDataContainsOnlyAllowedFields() {
   ]));
 }
 
+async function testMissingCategoryIsNotWritten() {
+  const { client, calls } = createFakeClient();
+  const writer = new PlaceCommitWriter(client);
+  await writer.createPlaceFromDraft(draftFixture({ category: undefined }));
+
+  const call = calls[0] as { data: Record<string, unknown> };
+  assert.ok(!("category" in call.data));
+}
+
 async function testSlugAlwaysNull() {
   const { client, calls } = createFakeClient();
   const writer = new PlaceCommitWriter(client);
@@ -220,10 +229,10 @@ async function testNeverPassesMediaLogoOwnerBusinessOrRevisions() {
   }
 }
 
-async function testEmptyCategoryThrows() {
+async function testEmptyCategoryIsNotWritten() {
   const { client } = createFakeClient();
   const writer = new PlaceCommitWriter(client);
-  await assert.rejects(() => writer.createPlaceFromDraft(draftFixture({ category: "" })));
+  await writer.createPlaceFromDraft(draftFixture({ category: "" }));
 }
 
 async function testEmptyCreatedByUserIdThrows() {
@@ -255,12 +264,13 @@ async function testReturnsPlaceIdAndCreatedStatus() {
 async function main() {
   await testHappyPathCallsCreateOnce();
   await testDataContainsOnlyAllowedFields();
+  await testMissingCategoryIsNotWritten();
   await testSlugAlwaysNull();
   await testStatusPendingAndLocationSourceManual();
   await testCityIdIsNullable();
   await testLatLngAreNullable();
   await testNeverPassesMediaLogoOwnerBusinessOrRevisions();
-  await testEmptyCategoryThrows();
+  await testEmptyCategoryIsNotWritten();
   await testEmptyCreatedByUserIdThrows();
   await testEmptyTitleThrows();
   await testEmptyShortDescThrows();

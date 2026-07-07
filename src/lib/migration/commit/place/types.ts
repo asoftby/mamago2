@@ -10,11 +10,9 @@ export type { NormalizedPlaceCandidate };
  * same city-name lookup the old import module uses) — this mapper never
  * guesses a city from `cityRaw`.
  *
- * `category` is a manual editor choice, not derived from WordPress data —
- * WP taxonomies don't map onto mamaGo's category set automatically (the
- * two projects' categories were set up independently), so `sourceTerms`
- * from the candidate is only ever a hint for a human to look at during
- * review, never a `Place.category` source.
+ * `category` is a manual editor choice, not derived from WordPress data.
+ * Missing category is allowed for Phoenix imports and flagged for later
+ * editorial review; `sourceTerms` remains only a human hint.
  */
 export interface PlaceCommitContext {
   createdByUserId: string;
@@ -32,7 +30,7 @@ export interface PlaceCreateDraft {
   title: string;
   shortDesc: string;
   description: string | null;
-  category: string;
+  category?: string;
   status: "PENDING";
   locationSource: "MANUAL";
   createdByUserId: string;
@@ -57,6 +55,14 @@ export interface PlaceCommitBlockReason {
   details?: Record<string, unknown>;
 }
 
+export type PlaceCommitWarningCode = "CATEGORY_MISSING_REQUIRES_REVIEW";
+
+export interface PlaceCommitWarning {
+  code: PlaceCommitWarningCode;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 export type PlaceCreateDraftResult =
-  | { ok: true; draft: PlaceCreateDraft }
+  | { ok: true; draft: PlaceCreateDraft; warnings: readonly PlaceCommitWarning[] }
   | { ok: false; reasons: readonly PlaceCommitBlockReason[] };

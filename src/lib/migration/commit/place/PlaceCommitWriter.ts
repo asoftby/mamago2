@@ -1,4 +1,4 @@
-import type { Place, PrismaClient } from "@prisma/client";
+import type { Place, Prisma, PrismaClient } from "@prisma/client";
 
 import type { PlaceCreateDraft } from "./types";
 
@@ -32,14 +32,11 @@ function assertDraftIsUsable(draft: PlaceCreateDraft): void {
   if (!draft.shortDesc?.trim()) {
     throw new Error("PlaceCreateDraft.shortDesc is required.");
   }
-  if (!draft.category?.trim()) {
-    throw new Error("PlaceCreateDraft.category is required.");
-  }
 }
 
 /**
  * The first real entity writer: `PlaceCreateDraft` -> one `Place` row via
- * one `prisma.place.create()` call. It makes no decisions — category,
+ * one `prisma.place.create()` call. It makes no decisions — category review,
  * createdByUserId, and everything else already went through
  * `buildPlaceCreateDraft` (PR8.5) before reaching here. No lineage, no
  * review task, no media, no rollback, no batching — that's later PRs.
@@ -50,22 +47,24 @@ export class PlaceCommitWriter {
   async createPlaceFromDraft(draft: PlaceCreateDraft): Promise<PlaceCommitResult> {
     assertDraftIsUsable(draft);
 
+    const data = {
+      title: draft.title,
+      shortDesc: draft.shortDesc,
+      description: draft.description,
+      ...(draft.category?.trim() ? { category: draft.category } : {}),
+      status: draft.status,
+      locationSource: draft.locationSource,
+      createdByUserId: draft.createdByUserId,
+      cityId: draft.cityId,
+      lat: draft.lat,
+      lng: draft.lng,
+      phone: draft.phone,
+      website: draft.website,
+      slug: draft.slug,
+    } as Prisma.PlaceUncheckedCreateInput;
+
     const place: Place = await this.prisma.place.create({
-      data: {
-        title: draft.title,
-        shortDesc: draft.shortDesc,
-        description: draft.description,
-        category: draft.category,
-        status: draft.status,
-        locationSource: draft.locationSource,
-        createdByUserId: draft.createdByUserId,
-        cityId: draft.cityId,
-        lat: draft.lat,
-        lng: draft.lng,
-        phone: draft.phone,
-        website: draft.website,
-        slug: draft.slug,
-      },
+      data,
     });
 
     return { placeId: place.id, status: "CREATED" };
