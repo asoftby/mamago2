@@ -12,6 +12,14 @@ export type {
   ExecuteArticleCommitInput,
   ExecuteArticleCommitResult,
 } from "./ArticleCommitOrchestrator";
+export { ArticleCommitRunner } from "./ArticleCommitRunner";
+export type {
+  ArticleCommitOrchestratorLike,
+  ArticleCommitRunnerPrismaClient,
+  ExecuteArticleCommitRunInput,
+  ExecuteArticleCommitRunResult,
+  MigrationLineageWriterLike,
+} from "./ArticleCommitRunner";
 export type {
   ArticleCommitBlockReason,
   ArticleCommitBlockReasonCode,
