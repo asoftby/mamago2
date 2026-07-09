@@ -1,4 +1,5 @@
 import path from "path";
+import type { PrismaClient } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 type MediaAssetRef = {
@@ -7,6 +8,10 @@ type MediaAssetRef = {
   filename: string;
   originalName: string;
   storageKey: string;
+};
+
+export type MediaAssetReferencePrisma = {
+  mediaAsset: Pick<PrismaClient["mediaAsset"], "findFirst">;
 };
 
 function normalizeRef(value: string | null | undefined): string | null {
@@ -30,8 +35,11 @@ function basenameFromRef(value: string): string | null {
   return base && base !== "." && base !== "/" ? base : null;
 }
 
-async function findByExactRef(ref: string): Promise<MediaAssetRef | null> {
-  return prisma.mediaAsset.findFirst({
+async function findByExactRef(
+  db: MediaAssetReferencePrisma,
+  ref: string,
+): Promise<MediaAssetRef | null> {
+  return db.mediaAsset.findFirst({
     where: {
       deletedAt: null,
       OR: [
@@ -52,8 +60,11 @@ async function findByExactRef(ref: string): Promise<MediaAssetRef | null> {
   });
 }
 
-async function findByBasename(base: string): Promise<MediaAssetRef | null> {
-  return prisma.mediaAsset.findFirst({
+async function findByBasename(
+  db: MediaAssetReferencePrisma,
+  base: string,
+): Promise<MediaAssetRef | null> {
+  return db.mediaAsset.findFirst({
     where: {
       deletedAt: null,
       OR: [
@@ -76,21 +87,23 @@ async function findByBasename(base: string): Promise<MediaAssetRef | null> {
 
 export async function findMediaAssetByReference(
   value: string | null | undefined,
+  db: MediaAssetReferencePrisma = prisma,
 ): Promise<MediaAssetRef | null> {
   const ref = normalizeRef(value);
   if (!ref) return null;
 
-  const exact = await findByExactRef(ref);
+  const exact = await findByExactRef(db, ref);
   if (exact) return exact;
 
   const base = basenameFromRef(ref);
   if (!base || base === ref) return null;
 
-  return findByBasename(base);
+  return findByBasename(db, base);
 }
 
 export async function resolveMediaAssetReferences(
   refs: Array<string | null | undefined>,
+  db: MediaAssetReferencePrisma = prisma,
 ): Promise<
   Array<{
     ref: string;
@@ -102,7 +115,7 @@ export async function resolveMediaAssetReferences(
   const resolved = await Promise.all(
     unique.map(async (ref) => ({
       ref,
-      asset: await findMediaAssetByReference(ref),
+      asset: await findMediaAssetByReference(ref, db),
     })),
   );
 

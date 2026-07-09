@@ -45,13 +45,10 @@ export interface NormalizedEventScheduleDraft {
 
 /**
  * Everything this normalizer is confident about extracting verbatim from a
- * `WordPressEventBundle`. Deliberately excluded, per the PR16 scope
- * decisions: event images (no thumbnail/gallery attachment ids are read at
- * all — this candidate has no `media` field), category/occasion mapping,
- * organizer resolution, and Place linking. Venue/location/city stay raw
- * text for a later PR to resolve manually or via lookup, exactly like
- * `NormalizedPlaceCandidate.locationRaw`/`cityRaw`. Nothing here is
- * downloaded, resolved, or committed.
+ * `WordPressEventBundle`. Media is source evidence only: attachment ids are
+ * extracted from postmeta, but files are never downloaded and attachment
+ * rows are never resolved here. Category/occasion mapping, organizer
+ * resolution, and Place linking stay downstream responsibilities.
  */
 export interface NormalizedEventCandidate {
   title: string;
@@ -110,6 +107,10 @@ export interface NormalizedEventCandidate {
    * silently dropped just because its exact key wasn't confirmed yet.
    */
   rawMeta: Readonly<Record<string, readonly string[]>>;
+  media?: {
+    featuredAttachmentId: number | null;
+    galleryAttachmentIds: readonly number[];
+  };
 }
 
 function firstMetaValue(postMeta: WordPressEventBundle["postMeta"], key: string): string | null {
@@ -122,8 +123,24 @@ function parseIntOrNull(raw: string | null): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-function hasMeta(postMeta: WordPressEventBundle["postMeta"], key: string): boolean {
-  return (postMeta[key]?.length ?? 0) > 0;
+function parseAttachmentId(raw: string | null): { id: number | null; invalidRaw?: string } {
+  if (raw === null || raw.trim() === "") return { id: null };
+  const n = Number(raw.trim());
+  if (!Number.isInteger(n) || n <= 0) return { id: null, invalidRaw: raw };
+  return { id: n };
+}
+
+function parseAttachmentIds(
+  values: readonly string[] | undefined,
+): { ids: number[]; invalidRaw: string[]; hadValues: boolean } {
+  const ids: number[] = [];
+  const invalidRaw: string[] = [];
+  for (const value of values ?? []) {
+    const parsed = parseAttachmentId(value);
+    if (parsed.id !== null) ids.push(parsed.id);
+    else if (parsed.invalidRaw !== undefined) invalidRaw.push(parsed.invalidRaw);
+  }
+  return { ids: [...new Set(ids)], invalidRaw, hadValues: (values?.length ?? 0) > 0 };
 }
 
 function stripHtml(html: string): string {
@@ -438,16 +455,48 @@ export function normalizeEvent(bundle: WordPressEventBundle): NormalizedRecord {
     });
   }
 
-  const hasExcludedMedia = hasMeta(postMeta, "_thumbnail_id") || hasMeta(postMeta, "gallery");
-  if (hasExcludedMedia) {
+  const featured = parseAttachmentId(firstMetaValue(postMeta, "_thumbnail_id"));
+  if (postMeta["_thumbnail_id"] && featured.id === null && featured.invalidRaw === undefined) {
     warnings.push({
-      code: "EVENT_MEDIA_EXCLUDED",
-      message:
-        "Source has thumbnail/gallery references; event images are never imported in Phoenix v1 (see wordpress-to-mamago.md). Not included in media refs.",
+      code: "EVENT_FEATURED_IMAGE_MISSING",
+      message: "Source has an empty _thumbnail_id value; no featured event image can be imported.",
       severity: "INFO",
       sourceRecordKey,
     });
   }
+  if (featured.invalidRaw !== undefined) {
+    warnings.push({
+      code: "EVENT_MEDIA_SOURCE_INVALID",
+      message: "Source _thumbnail_id value is not a valid positive attachment id.",
+      severity: "WARNING",
+      sourceRecordKey,
+      details: { field: "_thumbnail_id", value: featured.invalidRaw },
+    });
+  }
+
+  const gallery = parseAttachmentIds(postMeta["gallery"]);
+  if (gallery.hadValues && gallery.ids.length === 0 && gallery.invalidRaw.length === 0) {
+    warnings.push({
+      code: "EVENT_GALLERY_EMPTY",
+      message: "Source gallery meta is present but contains no attachment ids.",
+      severity: "INFO",
+      sourceRecordKey,
+    });
+  }
+  for (const invalid of gallery.invalidRaw) {
+    warnings.push({
+      code: "EVENT_MEDIA_SOURCE_INVALID",
+      message: "Source gallery value is not a valid positive attachment id.",
+      severity: "WARNING",
+      sourceRecordKey,
+      details: { field: "gallery", value: invalid },
+    });
+  }
+
+  const mediaRefs = [
+    ...(featured.id !== null ? [String(featured.id)] : []),
+    ...gallery.ids.map((id) => String(id)),
+  ].filter((ref, index, all) => all.indexOf(ref) === index);
 
   const relationRefs = terms.map((term) => `term:${term.taxonomy}:${term.slug}`);
 
@@ -484,6 +533,10 @@ export function normalizeEvent(bundle: WordPressEventBundle): NormalizedRecord {
       focusKeyword: firstMetaValue(postMeta, "rank_math_focus_keyword"),
     },
     sourceTerms: terms.map(toSourceTerm),
+    media: {
+      featuredAttachmentId: featured.id,
+      galleryAttachmentIds: gallery.ids,
+    },
     rawMeta: postMeta,
   };
 
@@ -520,7 +573,7 @@ export function normalizeEvent(bundle: WordPressEventBundle): NormalizedRecord {
     sourceEntityType: SOURCE_ENTITY_TYPE,
     targetTypeHint: "ACTIVITY",
     normalizedPayload,
-    mediaRefs: [],
+    mediaRefs,
     relationRefs,
     warnings,
   };

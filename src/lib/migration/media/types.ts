@@ -47,6 +47,7 @@ export interface ImportWordPressAttachmentInput {
   /** e.g. "attachment:123" */
   sourceStableKey: string;
   sourceHash: string;
+  targetRole?: string;
   runId?: string | null;
   recordId?: string | null;
 }

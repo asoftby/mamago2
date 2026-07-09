@@ -76,7 +76,8 @@ function testFullEvent() {
   assert.equal(payload.trailerUrlRaw, "https://video.example.com/trailer.mp4");
   assert.deepEqual(payload.seo, { title: "SEO Title", focusKeyword: "kids fest" });
 
-  assert.deepEqual(record.mediaRefs, [], "event images are never referenced, even when present in source");
+  assert.deepEqual(payload.media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
+  assert.deepEqual(record.mediaRefs, []);
   assert.deepEqual(record.relationRefs, ["term:events-category:festival", "term:occasion:summer"]);
 
   // Warning documenting known visibility gap (sessions/nextOccurrenceAt not synced in Phoenix commit yet).
@@ -220,23 +221,69 @@ function testScheduleDraftVoxelJsonMultiDate() {
   assert.deepEqual(payload.scheduleDraft?.dates, ["2026-06-28", "2026-07-19"]);
 }
 
-function testMediaExcludedWarningWhenPresent() {
+function testMediaEvidenceExtractedWhenPresent() {
   const withThumbnail = normalizeEvent(
     buildBundle({ postMeta: { ...buildBundle().postMeta, _thumbnail_id: ["999"] } }),
   );
-  const thumbnailWarning = withThumbnail.warnings?.find((w) => w.code === "EVENT_MEDIA_EXCLUDED");
-  assert.ok(thumbnailWarning);
-  assert.equal(thumbnailWarning?.severity, "INFO");
-  assert.deepEqual(withThumbnail.mediaRefs, []);
+  assert.deepEqual(payloadOf(withThumbnail).media, { featuredAttachmentId: 999, galleryAttachmentIds: [] });
+  assert.deepEqual(withThumbnail.mediaRefs, ["999"]);
 
   const withGallery = normalizeEvent(
     buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111", "222"] } }),
   );
-  assert.ok(withGallery.warnings?.some((w) => w.code === "EVENT_MEDIA_EXCLUDED"));
-  assert.deepEqual(withGallery.mediaRefs, []);
+  assert.deepEqual(payloadOf(withGallery).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222] });
+  assert.deepEqual(withGallery.mediaRefs, ["111", "222"]);
 
   const withoutMedia = normalizeEvent(buildBundle());
-  assert.ok(!withoutMedia.warnings?.some((w) => w.code === "EVENT_MEDIA_EXCLUDED"));
+  assert.ok(!withoutMedia.warnings?.some((w) => w.code.startsWith("EVENT_MEDIA")));
+}
+
+function testMediaEvidenceDedupesDuplicateIds() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: ["111"],
+        gallery: ["111", "222", "222"],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: 111, galleryAttachmentIds: [111, 222] });
+  assert.deepEqual(record.mediaRefs, ["111", "222"]);
+}
+
+function testInvalidMediaSourceWarnsWithoutFailingCandidate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: ["not-an-id"],
+        gallery: ["333", "0", "-1"],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [333] });
+  assert.deepEqual(record.mediaRefs, ["333"]);
+  const warnings = record.warnings?.filter((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID") ?? [];
+  assert.equal(warnings.length, 3);
+}
+
+function testEmptyMediaSourceWarnsWithoutFailingCandidate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: [""],
+        gallery: [""],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_FEATURED_IMAGE_MISSING"));
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_GALLERY_EMPTY"));
 }
 
 function testCategoryOccasionTermsNotMapped() {
@@ -343,7 +390,10 @@ function main() {
   testScheduleDraftVoxelEndBeforeStartNormalizesAndWarns();
   testScheduleDraftMalformedEventDateWarnsAmbiguous();
   testScheduleDraftVoxelJsonMultiDate();
-  testMediaExcludedWarningWhenPresent();
+  testMediaEvidenceExtractedWhenPresent();
+  testMediaEvidenceDedupesDuplicateIds();
+  testInvalidMediaSourceWarnsWithoutFailingCandidate();
+  testEmptyMediaSourceWarnsWithoutFailingCandidate();
   testCategoryOccasionTermsNotMapped();
   testPriceStrippedToPlainText();
   testEmptyOrBrokenMetaDoesNotThrow();

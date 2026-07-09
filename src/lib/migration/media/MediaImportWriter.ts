@@ -73,7 +73,7 @@ export class MediaImportWriter {
       sourceStableKey: input.sourceStableKey,
       sourceRecordKey: input.sourceRecordKey,
       targetType: "MEDIA_ASSET",
-      targetRole: DEFAULT_TARGET_ROLE,
+      targetRole: input.targetRole ?? DEFAULT_TARGET_ROLE,
       targetId: imported.mediaId,
       targetStableKey: imported.storageKey,
       lastSourceHash: input.sourceHash,

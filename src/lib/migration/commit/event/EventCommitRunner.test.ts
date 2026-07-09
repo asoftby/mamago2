@@ -5,6 +5,7 @@ import type { MigrationLineage, MigrationRecord } from "@prisma/client";
 import { EventCommitRunner } from "./EventCommitRunner";
 import type {
   EventCommitOrchestratorLike,
+  EventMediaSyncerLike,
   EventCommitRunnerPrismaClient,
   ExecuteEventCommitRunInput,
   MigrationLineageWriterLike,
@@ -167,6 +168,23 @@ function createFakePrisma(options: { throwError?: Error; existingLineage?: Migra
   return { prisma, calls };
 }
 
+function createFakeMediaSyncer(warnings: Array<{ code: string; message: string }> = []) {
+  const calls: unknown[] = [];
+  const syncer: EventMediaSyncerLike = {
+    sync: async (input) => {
+      calls.push(input);
+      return {
+        warnings: warnings.map((warning) => ({
+          ...warning,
+          severity: "WARNING",
+          sourceRecordKey: input.sourceRecordKey,
+        })),
+      };
+    },
+  };
+  return { syncer, calls };
+}
+
 async function testHappyPath() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
   const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
@@ -327,6 +345,34 @@ async function testActivityIdNeverWrittenToMigrationRecord() {
   assert.ok(!("targetId" in updateCall.data));
 }
 
+async function testMediaWarningsMergedIntoValidationSummary() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { syncer, calls: mediaCalls } = createFakeMediaSyncer([
+    { code: "EVENT_MEDIA_DOWNLOAD_FAILED", message: "download failed" },
+  ]);
+  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer: syncer });
+
+  await runner.execute(
+    inputFixture({
+      record: recordFixture({
+        validationSummary: [
+          { code: "EVENT_CITY_UNMATCHED", message: "city missing", severity: "WARNING" },
+        ],
+      }),
+    }),
+  );
+
+  assert.equal(mediaCalls.length, 1);
+  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  const validationSummary = updateCall.data.validationSummary as Array<{ code: string }>;
+  assert.deepEqual(validationSummary.map((warning) => warning.code), [
+    "EVENT_CITY_UNMATCHED",
+    "EVENT_MEDIA_DOWNLOAD_FAILED",
+  ]);
+}
+
 async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
   const { writer: lineageWriter } = createFakeLineageWriter();
@@ -366,6 +412,7 @@ async function main() {
   await testMigrationRecordUpdateThrowPropagatesRaw();
   await testSourceHashPassedUnchangedToLineageWriter();
   await testActivityIdNeverWrittenToMigrationRecord();
+  await testMediaWarningsMergedIntoValidationSummary();
   await testPlanSummaryNormalizedAndRawPayloadNeverTouched();
   await testNoActivitySessionEventVenueOrMediaDelegateExists();
 }

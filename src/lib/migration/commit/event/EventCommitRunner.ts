@@ -1,5 +1,6 @@
 import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/client";
 
+import type { MigrationWarning } from "../../types";
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
 import type { ExecuteEventCommitResult } from "./EventCommitOrchestrator";
@@ -34,6 +35,19 @@ export interface MigrationLineageWriterLike {
     runId?: string | null;
     recordId?: string | null;
   }): Promise<CreateLineageResult>;
+}
+
+export interface EventMediaSyncerLike {
+  sync(input: {
+    activityId: string;
+    candidate: NormalizedEventCandidate;
+    ownerUserId: string | null | undefined;
+    sourceId: string;
+    sourceHash: string | null;
+    runId?: string | null;
+    recordId?: string | null;
+    sourceRecordKey: string;
+  }): Promise<{ warnings: MigrationWarning[] }>;
 }
 
 /**
@@ -126,6 +140,7 @@ export class EventCommitRunner {
       orchestrator: EventCommitOrchestratorLike;
       lineageWriter: MigrationLineageWriterLike;
       prisma: EventCommitRunnerPrismaClient;
+      mediaSyncer?: EventMediaSyncerLike;
     },
   ) {}
 
@@ -180,6 +195,31 @@ export class EventCommitRunner {
         reasonCode: commitResult.reasonCode,
         error: commitResult.error,
       };
+    }
+
+    const mediaWarnings: MigrationWarning[] = [];
+    if (this.deps.mediaSyncer && commitResult.activityId) {
+      try {
+        const mediaResult = await this.deps.mediaSyncer.sync({
+          activityId: commitResult.activityId,
+          candidate: input.candidate,
+          ownerUserId: input.context.ownerUserId,
+          sourceId: input.record.sourceId,
+          sourceHash: input.record.sourceHash,
+          runId: input.record.runId,
+          recordId: input.record.id,
+          sourceRecordKey: input.record.sourceRecordKey,
+        });
+        mediaWarnings.push(...mediaResult.warnings);
+      } catch (error) {
+        mediaWarnings.push({
+          code: "EVENT_MEDIA_IMPORT_SKIPPED",
+          message: "Event media sync failed unexpectedly; Activity commit remains linked.",
+          severity: "WARNING",
+          sourceRecordKey: input.record.sourceRecordKey,
+          details: { error: error instanceof Error ? error.message : String(error) },
+        });
+      }
     }
 
     let lineageResult: CreateLineageResult;
@@ -238,13 +278,20 @@ export class EventCommitRunner {
       };
     }
 
+    const linkUpdateData: Record<string, unknown> = {
+      status: "LINKED",
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    };
+    if (mediaWarnings.length > 0) {
+      const existing = (input.record.validationSummary as unknown) ?? null;
+      const existingArr = Array.isArray(existing) ? (existing as MigrationWarning[]) : [];
+      linkUpdateData.validationSummary = mergeWarnings(existingArr, mediaWarnings) as unknown as object;
+    }
+
     await this.deps.prisma.migrationRecord.update({
       where: { id: input.record.id },
-      data: {
-        status: "LINKED",
-        lastErrorCode: null,
-        lastErrorMessage: null,
-      },
+      data: linkUpdateData,
     });
 
     return {
@@ -255,4 +302,16 @@ export class EventCommitRunner {
       status: "LINKED",
     };
   }
+}
+
+function mergeWarnings(existing: readonly MigrationWarning[], extra: readonly MigrationWarning[]): MigrationWarning[] {
+  const out: MigrationWarning[] = [...existing];
+  const seen = new Set(existing.map((w) => `${w.code}::${w.message}`));
+  for (const w of extra) {
+    const key = `${w.code}::${w.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(w);
+  }
+  return out;
 }

@@ -65,7 +65,7 @@ import {
   fetchPublishedEventEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
-import type { WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
+import { WordPressRepository, type WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
 import type { SourceRecordEnvelope } from "../src/lib/migration/types";
 import { ArticleCommitOrchestrator } from "../src/lib/migration/commit/article/ArticleCommitOrchestrator";
 import { ArticleCommitRunner } from "../src/lib/migration/commit/article/ArticleCommitRunner";
@@ -74,6 +74,7 @@ import type { MigrationCommitContextConfig } from "../src/lib/migration/commit/c
 import { EventCommitOrchestrator } from "../src/lib/migration/commit/event/EventCommitOrchestrator";
 import { EventCommitRunner } from "../src/lib/migration/commit/event/EventCommitRunner";
 import { EventCommitWriter } from "../src/lib/migration/commit/event/EventCommitWriter";
+import { EventMediaSyncer } from "../src/lib/migration/commit/event/EventMediaSyncer";
 import { runCommitExecutionPlan } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import type { RunCommitExecutionPlanSummary } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import {
@@ -338,6 +339,14 @@ async function main(): Promise<void> {
 
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);
+    const wordpressRepository = new WordPressRepository(executor);
+    const { createMamagoMediaImporter } = await import("../src/lib/migration/media");
+    const eventMediaSyncer = new EventMediaSyncer({
+      prisma,
+      attachmentResolver: wordpressRepository,
+      mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
+      lineageWriter,
+    });
 
     const runners = {
       place: new PlaceCommitRunner({
@@ -349,6 +358,7 @@ async function main(): Promise<void> {
         orchestrator: new EventCommitOrchestrator(new EventCommitWriter(prisma)),
         lineageWriter,
         prisma,
+        mediaSyncer: eventMediaSyncer,
       }),
       article: new ArticleCommitRunner({
         orchestrator: new ArticleCommitOrchestrator(new ArticleCommitWriter(prisma)),
