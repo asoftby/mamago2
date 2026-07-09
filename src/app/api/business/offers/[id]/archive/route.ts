@@ -10,13 +10,13 @@ import {
 function responseFromArchiveError(error: unknown) {
   if (error instanceof OfferArchiveError) {
     return NextResponse.json(
-      { error: error.code, message: error.message },
+      { code: error.code, message: error.message },
       { status: error.statusCode },
     );
   }
 
   return NextResponse.json(
-    { error: "OFFER_ARCHIVE_FAILED", message: "Не удалось выполнить действие" },
+    { code: "OFFER_ARCHIVE_FAILED", message: "Не удалось выполнить действие" },
     { status: 500 },
   );
 }

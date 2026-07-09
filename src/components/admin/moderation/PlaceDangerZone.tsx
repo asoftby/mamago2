@@ -54,7 +54,7 @@ export function PlaceDangerZone({
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to delete place");
+        throw new Error(data.message || data.error || data.code || "Failed to delete place");
       }
 
       toast.success("Место успешно удалено");

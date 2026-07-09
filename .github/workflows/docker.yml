@@ -47,8 +47,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # TODO: restore dev minimum to 900 after legacy WordPress redirects are imported.
+          # 850 = static WP map (893 rows in manifest.csv) with headroom for curation;
+          # DB-derived slug_history rows only add on top.
           build-args: |
-            REDIRECT_MANIFEST_MIN_ROWS=${{ github.ref == 'refs/heads/dev' && '1' || '900' }}
+            REDIRECT_MANIFEST_MIN_ROWS=850
           cache-from: type=gha
           cache-to: type=gha,mode=max

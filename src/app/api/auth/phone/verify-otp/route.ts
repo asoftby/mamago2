@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     // Rate limit check: 5 attempts per 10 minutes per IP + Phone
     const ip = getClientIp(request);
     const rateLimitKey = `otp_verify:${ip}:${phoneE164}`;
-    const rl = checkRateLimit(rateLimitKey, 5, 10 * 60 * 1000);
+    const rl = await checkRateLimit(rateLimitKey, 5, 10 * 60 * 1000);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Слишком много попыток. Попробуйте позже." },
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Reset rate limiter on successful verification
-    resetRateLimit(rateLimitKey);
+    await resetRateLimit(rateLimitKey);
 
     const token = await createSession(user.id);
     const response = NextResponse.json({ ok: true });

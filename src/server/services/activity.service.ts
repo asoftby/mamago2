@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import type { Activity, ActivitySession, ActivityType, ScheduleMode, User } from "@prisma/client";
+import { ContentStatus } from "@prisma/client";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
-import { assertCanHardDeleteContent } from "@/server/services/contentHardDelete.service";
+import { assertContentLifecycleOperationAllowed } from "@/server/services/contentLifecycleOperation.service";
 
 export type CreateActivityInput = {
   title: string;
@@ -138,7 +139,10 @@ export async function listBusinessActivities(
 /**
  * Delete an activity
  */
-export async function deleteActivity(activityId: string): Promise<void> {
+export async function deleteActivity(
+  activityId: string,
+  actorRole: string,
+): Promise<void> {
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
     select: { status: true },
@@ -148,10 +152,15 @@ export async function deleteActivity(activityId: string): Promise<void> {
     return;
   }
 
-  await assertCanHardDeleteContent({
+  const deleteOperation =
+    activity.status === ContentStatus.ARCHIVED ? "deleteArchived" : "deleteDraft";
+
+  await assertContentLifecycleOperationAllowed({
     contentType: "ACTIVITY",
     contentId: activityId,
+    operation: deleteOperation,
     status: activity.status,
+    actorRole,
     prisma,
   });
 

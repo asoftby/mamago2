@@ -1,16 +1,30 @@
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
-import { Badge } from "@/components/ui/badge";
 import { ContentStatus, Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { MODERATION_CONTENT_STATUS_CONFIG } from "@/lib/admin/moderationContentStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { PlacesFilters } from "./PlacesFilters";
 import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import { getPlacePreviewPath } from "@/lib/content-preview/paths";
 import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
-import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
+import { AdminContentRelationsIndicator } from "@/components/admin/content/AdminContentRelationsIndicator";
+import {
+  blockingDependencyItems,
+  nonBlockingDependencyItems,
+  type ContentDependencySummary,
+} from "@/lib/admin/contentDependencySummary";
+import {
+  derivePlaceDeletePreflight,
+  derivePlaceArchivedDeletePreflight,
+  getPlacesDependencySummariesBatch,
+} from "@/server/services/contentDependencySummary.service";
+import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
+import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import {
+  buildAdminLifecycleViewModel,
+  buildAdminPlaceLifecycleInput,
+} from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -103,12 +117,36 @@ async function getPlaces(params: SearchParams) {
   return places;
 }
 
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
+
+function buildCascadeNote(summary: ContentDependencySummary): string | null {
+  const items = nonBlockingDependencyItems(summary);
+  if (items.length === 0) {
+    return null;
+  }
+
+  const parts = items.map((item) => `${item.count} ${item.label.toLowerCase()}`);
+  return `Вместе с черновиком будут удалены: ${parts.join(", ")}.`;
+}
+
+type PlaceRowMeta = {
+  dependencySummary: ContentDependencySummary;
+  deletePreflight: ReturnType<typeof derivePlaceDeletePreflight>;
+  archivedDeletePreflight: ReturnType<typeof derivePlaceArchivedDeletePreflight>;
+};
+
 function PlacesTable({
   places,
   returnTo,
+  placeMetaById,
 }: {
   places: Awaited<ReturnType<typeof getPlaces>>;
   returnTo: string;
+  placeMetaById: Map<string, PlaceRowMeta>;
 }) {
   if (places.length === 0) {
     return (
@@ -136,6 +174,9 @@ function PlacesTable({
               Статус
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
+              Связи
+            </th>
+            <th className="px-4 py-3 text-left font-medium text-gray-700">
               Создано
             </th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">
@@ -145,9 +186,6 @@ function PlacesTable({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {places.map((place) => {
-            const statusConfig =
-              MODERATION_CONTENT_STATUS_CONFIG[place.status] ||
-              MODERATION_CONTENT_STATUS_CONFIG.DRAFT;
             const isArchived = Boolean(place.archivedAt);
             const hasPreviewVersion =
               isArchived ||
@@ -161,11 +199,38 @@ function PlacesTable({
               : null;
             const viewPlaceHref = publicPlaceHref ?? getPlacePreviewPath(place.id);
             
-            // Extract street and house number from formattedAddr or customAddress
             const fullAddress = place.formattedAddr || place.customAddress || "";
             const addressParts = fullAddress.split(",").map(p => p.trim());
-            // Try to get street and house (usually first part before city)
             const streetAddress = addressParts[0] || "";
+            const rowMeta = placeMetaById.get(place.id) ?? {
+              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              deletePreflight: {
+                allowed: place.status !== ContentStatus.DRAFT,
+                reasons: [],
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+              archivedDeletePreflight: {
+                allowed: false,
+                reasons: ["notArchived"],
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+            };
+            const blockingItems = blockingDependencyItems(
+              rowMeta.dependencySummary,
+            );
+            const lifecycleViewModel = buildAdminLifecycleViewModel({
+              ...buildAdminPlaceLifecycleInput({
+                status: place.status,
+                archivedAt: place.archivedAt,
+                deletePreflight: rowMeta.deletePreflight,
+                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+              }),
+              navigationLinks: {
+                edit: true,
+                preview: true,
+                review: place.status === ContentStatus.PENDING,
+              },
+            });
             
             return (
               <tr key={place.id} className="hover:bg-gray-50">
@@ -186,81 +251,65 @@ function PlacesTable({
                     place.createdBy?.email || "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                      {statusConfig.label}
-                    </Badge>
-                    {isArchived ? (
-                      <Badge
-                        variant="outline"
-                        className="border-stone-300 bg-stone-100 text-stone-700"
-                      >
-                        В архиве
-                      </Badge>
-                    ) : null}
-                  </div>
+                  <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
+                </td>
+                <td className="px-4 py-3">
+                  <AdminContentRelationsIndicator
+                    summary={rowMeta.dependencySummary}
+                  />
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
                 </td>
                 <td className="px-4 py-3">
-                  <AdminContentRowActions
-                    editAction={{
-                      icon: "edit",
-                      href: editHref,
-                      label: "Открыть в редакторе",
-                      title: "Открыть в редакторе",
-                    }}
-                    viewAction={{
-                      icon: "view",
-                      href: viewPlaceHref,
-                      newTab: true,
-                      label: publicPlaceHref
-                        ? "Открыть публичную страницу"
-                        : "Открыть предпросмотр",
-                      title: publicPlaceHref
-                        ? "Открыть публичную страницу"
-                        : "Открыть предпросмотр",
-                    }}
-                    reviewAction={{
-                      icon: "review",
-                      href: getPlaceDetailHref(place.id, returnTo),
-                      label: "Открыть модерацию",
-                      title: "Открыть модерацию",
-                    }}
-                    destructiveAction={
-                      place.status !== ContentStatus.DRAFT
-                        ? isArchived
+                  <ContentLifecycleActionsMenu
+                    viewModel={lifecycleViewModel}
+                    contentId={place.id}
+                    contentType="place"
+                    surface="admin"
+                    links={{
+                      edit: {
+                        href: editHref,
+                        label: "Открыть в редакторе",
+                      },
+                      preview: {
+                        href: viewPlaceHref,
+                        newTab: true,
+                        label: publicPlaceHref
+                          ? "Открыть публичную страницу"
+                          : "Открыть предпросмотр",
+                      },
+                      review:
+                        place.status === ContentStatus.PENDING
                           ? {
-                              kind: "restore",
-                              label: "Восстановить",
-                              title: "Восстановить место из архива?",
-                              description:
-                                "Место снова станет доступно в рабочих списках. Если оно опубликовано и не заблокировано другими правилами, публичная страница снова откроется пользователям.",
-                              request: {
-                                url: `/api/admin/places/${place.id}/archive`,
-                                method: "DELETE",
-                              },
-                              confirmLabel: "Восстановить",
-                              successMessage: "Место восстановлено из архива",
-                              errorMessage: "Не удалось восстановить место",
+                              href: getPlaceDetailHref(place.id, returnTo),
+                              label: "Открыть модерацию",
                             }
-                          : {
-                              kind: "archive",
-                              label: "Архивировать",
-                              title: "Архивировать место?",
-                              description:
-                                "Место будет скрыто с публичной страницы и из поиска. Действие можно отменить позже.",
-                              request: {
-                                url: `/api/admin/places/${place.id}/archive`,
-                                method: "POST",
-                              },
-                              confirmLabel: "Архивировать",
-                              successMessage: "Место перемещено в архив",
-                              errorMessage: "Не удалось архивировать место",
+                          : undefined,
+                    }}
+                    deletePreflight={{
+                      deleteDraft: {
+                        blockedDialog: !rowMeta.deletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить черновик",
+                              description: rowMeta.deletePreflight.message,
+                              items: blockingItems,
                             }
-                        : null
-                    }
+                          : null,
+                        cascadeNote: rowMeta.deletePreflight.allowed
+                          ? buildCascadeNote(rowMeta.dependencySummary)
+                          : null,
+                      },
+                      deleteArchived: {
+                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить из архива",
+                              description: rowMeta.archivedDeletePreflight.message,
+                              items: blockingItems,
+                            }
+                          : null,
+                      },
+                    }}
                   />
                 </td>
               </tr>
@@ -283,6 +332,31 @@ export default async function PlacesListPage({
     getPlaces(params),
     getModerationFilterCities(),
   ]);
+  const dependencySummaries = await getPlacesDependencySummariesBatch(
+    places.map((place) => place.id),
+    prisma,
+  );
+  const placeMetaById = new Map<string, PlaceRowMeta>(
+    places.map((place) => {
+      const dependencySummary =
+        dependencySummaries.get(place.id) ?? EMPTY_DEPENDENCY_SUMMARY;
+      return [
+        place.id,
+        {
+          dependencySummary,
+          deletePreflight: derivePlaceDeletePreflight({
+            status: place.status,
+            archivedAt: place.archivedAt,
+            dependencySummary,
+          }),
+          archivedDeletePreflight: derivePlaceArchivedDeletePreflight({
+            archivedAt: place.archivedAt,
+            dependencySummary,
+          }),
+        },
+      ];
+    }),
+  );
   const returnTo = buildReturnTo(params);
 
   return (
@@ -302,7 +376,11 @@ export default async function PlacesListPage({
 
       {/* AdminPageContent */}
       <Suspense fallback={<div>Загрузка...</div>}>
-        <PlacesTable places={places} returnTo={returnTo} />
+        <PlacesTable
+          places={places}
+          returnTo={returnTo}
+          placeMetaById={placeMetaById}
+        />
       </Suspense>
     </div>
   );

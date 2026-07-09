@@ -42,6 +42,26 @@ const EVENT_CATEGORIES: EventCategoryData[] = [
     ],
   },
   {
+    // slug обязан входить в isCinemaEventCategorySlug (src/lib/business/eventCategoryCinema.ts) —
+    // по нему в визарде события открываются кино-поля.
+    nameRu: "Кино",
+    nameEn: "Cinema",
+    slug: "cinema",
+    icon: "🎬",
+    sortOrder: 15,
+    genres: [
+      { nameRu: "Мультфильм", nameEn: "Animation", slug: "animation", sortOrder: 10 },
+      { nameRu: "Семейное кино", nameEn: "Family", slug: "family", sortOrder: 20 },
+      { nameRu: "Приключения", nameEn: "Adventure", slug: "adventure", sortOrder: 30 },
+      { nameRu: "Комедия", nameEn: "Comedy", slug: "comedy", sortOrder: 40 },
+      { nameRu: "Фэнтези", nameEn: "Fantasy", slug: "fantasy", sortOrder: 50 },
+      { nameRu: "Документальное", nameEn: "Documentary", slug: "documentary", sortOrder: 60 },
+      { nameRu: "Образовательное", nameEn: "Educational", slug: "educational", sortOrder: 70 },
+      { nameRu: "Аниме", nameEn: "Anime", slug: "anime", sortOrder: 80 },
+      { nameRu: "Короткометражное", nameEn: "Short Film", slug: "short-film", sortOrder: 90 },
+    ],
+  },
+  {
     nameRu: "Мастер-классы",
     nameEn: "Workshops",
     slug: "workshops",

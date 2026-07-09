@@ -33,7 +33,7 @@ export async function POST(
   }
   const currentUser = user!;
 
-  const rateLimit = checkRateLimit(`direct_complaint:${currentUser.id}`, 5, 60 * 60 * 1000);
+  const rateLimit = await checkRateLimit(`direct_complaint:${currentUser.id}`, 5, 60 * 60 * 1000);
   if (!rateLimit.allowed) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

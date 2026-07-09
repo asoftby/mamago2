@@ -744,6 +744,8 @@ export function ArticleEditorClient({
             ? (data as { message: string }).message
             : typeof (data as { error?: string }).error === "string"
               ? (data as { error: string }).error
+              : typeof (data as { code?: string }).code === "string"
+                ? (data as { code: string }).code
               : "Не удалось удалить статью";
         setError(msg);
         toast.error(msg);
@@ -1070,10 +1072,9 @@ export function ArticleEditorClient({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Удаление статьи</AlertDialogTitle>
+            <AlertDialogTitle>Удалить черновик?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Вы уверены, что хотите удалить статью?</p>
                 <p>Это действие нельзя отменить.</p>
               </div>
             </AlertDialogDescription>

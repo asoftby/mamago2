@@ -21,9 +21,10 @@ import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import {
-  assertCanHardDeleteContent,
-  isContentHardDeleteError,
-} from "@/server/services/contentHardDelete.service";
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 export async function GET(
   request: NextRequest,
@@ -561,9 +562,10 @@ export async function DELETE(
       );
     }
 
-    await assertCanHardDeleteContent({
+    await assertContentLifecycleOperationAllowed({
       contentType: "PLACE",
       contentId: id,
+      operation: "deleteDraft",
       status: existing.status,
       prisma,
     });
@@ -574,13 +576,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (isContentHardDeleteError(error)) {
+    if (isContentLifecycleOperationError(error)) {
       return NextResponse.json(
-        {
-          error: error.code,
-          message: error.message,
-          reasons: error.reasons,
-        },
+        lifecycleErrorResponsePayload(error),
         { status: error.statusCode },
       );
     }

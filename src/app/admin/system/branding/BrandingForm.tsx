@@ -74,6 +74,46 @@ const GOOGLE_FONTS = new Set([
   "Playfair Display",
 ]);
 
+const FAVICON_IMAGE_ACCEPT = "image/png,image/webp,.png,.webp";
+
+function isBrandingConfig(value: unknown): value is BrandingConfig {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  const hasValidLogoAssetId =
+    candidate.logoAssetId === null || typeof candidate.logoAssetId === "string";
+  const hasValidFaviconAssetId =
+    candidate.faviconAssetId === null ||
+    typeof candidate.faviconAssetId === "string";
+  const hasValidLogoUrl =
+    candidate.logoUrl === null || typeof candidate.logoUrl === "string";
+  const hasValidFaviconUrl =
+    candidate.faviconUrl === null || typeof candidate.faviconUrl === "string";
+  const hasValidMimeType =
+    candidate.faviconMimeType === null ||
+    typeof candidate.faviconMimeType === "string";
+  const hasValidVersion =
+    candidate.faviconVersion === null ||
+    typeof candidate.faviconVersion === "string";
+  const hasValidColorsAndFonts =
+    typeof candidate.colorPrimary === "string" &&
+    typeof candidate.colorAccent === "string" &&
+    typeof candidate.colorBackground === "string" &&
+    typeof candidate.colorSurface === "string" &&
+    typeof candidate.colorText === "string" &&
+    typeof candidate.fontHeading === "string" &&
+    typeof candidate.fontBody === "string";
+
+  return (
+    hasValidLogoAssetId &&
+    hasValidFaviconAssetId &&
+    hasValidLogoUrl &&
+    hasValidFaviconUrl &&
+    hasValidMimeType &&
+    hasValidVersion &&
+    hasValidColorsAndFonts
+  );
+}
+
 // ─── Image uploader ───────────────────────────────────────────────────────────
 
 function ImageUploader({
@@ -82,12 +122,14 @@ function ImageUploader({
   previewUrl,
   onUpload,
   onClear,
+  accept = UPLOAD_IMAGE_ACCEPT,
 }: {
   label: string;
   hint?: string;
   previewUrl: string | null;
   onUpload: (assetId: string, url: string) => void;
   onClear: () => void;
+  accept?: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -124,7 +166,7 @@ function ImageUploader({
         <input
           ref={inputRef}
           type="file"
-          accept={UPLOAD_IMAGE_ACCEPT}
+          accept={accept}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -396,15 +438,20 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
           fontBody,
         }),
       });
+      const data = await res.json().catch(() => null);
 
       if (res.ok) {
+        if (isBrandingConfig(data)) {
+          setLogoAssetId(data.logoAssetId);
+          setLogoPreviewUrl(data.logoUrl);
+          setFaviconAssetId(data.faviconAssetId);
+          setFaviconPreviewUrl(data.faviconUrl);
+        }
         toast.success("Оформление сохранено");
         router.refresh();
       } else {
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        toast.error(data.error ?? "Ошибка сохранения");
+        const errorData = data as { error?: string } | null;
+        toast.error(errorData?.error ?? "Ошибка сохранения");
       }
     } catch {
       toast.error("Ошибка сети");
@@ -432,7 +479,8 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
           />
           <ImageUploader
             label="Favicon"
-            hint="Рекомендуется 32×32 или 64×64 px, формат ICO или PNG"
+            hint="Рекомендуется 32×32 или 64×64 px, формат PNG или WebP"
+            accept={FAVICON_IMAGE_ACCEPT}
             previewUrl={faviconPreviewUrl}
             onUpload={(id, url) => {
               setFaviconAssetId(id);

@@ -85,13 +85,15 @@ const happyPath = writeManifest("happy.csv", [
   row("wp_journal", "/journal/about-relaunch", "/"),
   // quoted CSV field with embedded comma must survive parsing
   `wp_journal,${BASE}/journal/with-comma,${BASE}/minsk/blog/with-comma,article,id-q,"notes, with comma"`,
+  // static WP redirect map row (root-level WP article → city blog)
+  row("wp_map", "/wp-legacy-article", "/minsk/blog/wp-legacy-article"),
 ]);
 
 {
   const { rules, issues, totalRedirectRows } = load(happyPath);
   assert.equal(issues.length, 0, `unexpected issues: ${JSON.stringify(issues)}`);
-  assert.equal(totalRedirectRows, 10);
-  assert.equal(rules.length, 10);
+  assert.equal(totalRedirectRows, 11);
+  assert.equal(rules.length, 11);
 
   const byda = new Map(rules.map((r) => [r.source, r]));
   assert.deepEqual(byda.get("/journal/best-playgrounds"), {
@@ -107,6 +109,7 @@ const happyPath = writeManifest("happy.csv", [
   assert.equal(byda.get("/journal/minsk-guide")?.destination, "/minsk");
   assert.equal(byda.get("/journal/about-relaunch")?.destination, "/");
   assert.equal(byda.get("/journal/with-comma")?.destination, "/minsk/blog/with-comma");
+  assert.equal(byda.get("/wp-legacy-article")?.destination, "/minsk/blog/wp-legacy-article");
   // every manifest rule must be a permanent (308) redirect
   assert.ok(rules.every((r) => r.permanent === true));
 }

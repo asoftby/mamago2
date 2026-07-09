@@ -5,6 +5,7 @@ import { isValidE164Phone } from "@/lib/phone/e164";
 import { isRichTextMeaningful, getRichTextLength } from "@/lib/richtext/utils";
 import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
 import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
+import { supportsDurationForCategorySlug } from "@/lib/business/eventCategoryDuration";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -92,10 +93,27 @@ function validateStep1(data: EventFormData): ValidationResult {
     warnings.push("Выберите возраст");
   }
 
+  // Единая длительность — для категорий с supportsDuration (см. slug-set).
+  if (
+    supportsDurationForCategorySlug(data.categorySlug) &&
+    data.durationMinutes != null &&
+    (!Number.isInteger(data.durationMinutes) ||
+      data.durationMinutes < 1 ||
+      data.durationMinutes > 600)
+  ) {
+    errors.push("Продолжительность — целое число от 1 до 600 минут");
+  }
+
   // Cinema-specific validation (по slug выбранной категории)
   if (isCinemaEventCategorySlug(data.categorySlug)) {
-    if (data.cinemaTrailerUrl && !isValidUrl(data.cinemaTrailerUrl)) {
-      errors.push("Некорректная ссылка на трейлер");
+    if (data.cinemaTrailerUrl) {
+      if (!isValidUrl(data.cinemaTrailerUrl)) {
+        errors.push("Некорректная ссылка на трейлер");
+      } else if (!data.cinemaTrailerUrl.trim().toLowerCase().startsWith("https://")) {
+        // Warning, не error: ранее сохранённые http-ссылки не должны
+        // блокировать редактирование и публикацию.
+        warnings.push("Ссылка на трейлер должна начинаться с https://");
+      }
     }
   }
 

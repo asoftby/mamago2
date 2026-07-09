@@ -8,6 +8,7 @@ import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import type { EventFormData } from "../types";
 import { EVENT_FORMAT_OPTIONS, type EventFormatPreset } from "@/lib/business/eventFormatSignals";
 import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
+import { supportsDurationForCategorySlug } from "@/lib/business/eventCategoryDuration";
 import * as LucideIcons from "lucide-react";
 import type { ComponentType } from "react";
 import { FilterSelect } from "@/components/ui/filter-select";
@@ -254,6 +255,7 @@ export function Step1Basics({
   }, [data.categoryId, genresByCategoryId, rootCategories]);
 
   const supportsProgram = Boolean(primaryRoot?.supportsProgram);
+  const supportsDuration = supportsDurationForCategorySlug(primaryRoot?.slug);
   const ageDetection = data.ageDetection ?? {
     raw: null,
     confidence: "none" as const,
@@ -712,6 +714,187 @@ export function Step1Basics({
         />
       </div>
 
+      {/* Основная категория — одиночный выбор */}
+      <div className="space-y-2 w-full">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor="event-primary-category">
+              Основная категория <span className="text-red-500">*</span>
+            </Label>
+            {suggestedFields.mainCategory ? <AiRecommendationBadge /> : null}
+          </div>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Определяет тип события (что это вообще)
+          </p>
+        </div>
+        <FilterSelect
+          id="event-primary-category"
+          aria-label="Основная категория события"
+          value={data.categoryId ?? ""}
+          options={rootSelectOptions}
+          onChange={handleRootCategoryChange}
+          placeholder="Выберите основную категорию"
+          disabled={!isEditable || loading}
+        />
+
+        {primaryRoot != null && (primaryRoot.children?.length ?? 0) > 0 ? (
+          <div className="space-y-1 pt-1">
+            <Label htmlFor="event-primary-subcategory" className="text-xs">
+              Подкатегория <span className="text-red-500">*</span>
+            </Label>
+            <FilterSelect
+              id="event-primary-subcategory"
+              aria-label="Подкатегория"
+              value={data.subcategoryId ?? ""}
+              options={subSelectOptions}
+              onChange={handleSubcategoryChange}
+              placeholder="Выберите подкатегорию"
+              disabled={!isEditable || loading}
+            />
+          </div>
+        ) : null}
+
+        {primaryRoot != null && data.categoryId ? (
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            {(() => {
+              const cat = primaryRoot;
+              const categoryOptions: PublicCategoryOption[] = Array.isArray(cat.options)
+                ? cat.options.filter((option) => option.isActive).sort((a, b) => a.order - b.order)
+                : [];
+              const genresForCat = genresByCategoryId[cat.id] ?? [];
+              const genreLikeItems =
+                categoryOptions.length > 0
+                  ? categoryOptions.map((option) => ({
+                      id: option.id,
+                      title: option.label,
+                      slug: option.value,
+                      sortOrder: option.order,
+                      isActive: option.isActive,
+                    }))
+                  : genresForCat;
+              const hasGenresForCat = genreLikeItems.length > 0;
+              const genreMap = data.genreSlugByRootCategoryId ?? {};
+              const genreItemsForCat: ChipItem[] = genreLikeItems.map((g) => {
+                const selectedSlug = genreMap[cat.id]?.trim() ?? "";
+                const chipActive = selectedSlug === g.slug || selectedSlug === g.title;
+                return {
+                  id: g.id,
+                  label: g.title,
+                  active: chipActive,
+                  disabled: !isEditable || loading,
+                  onClick: () => {
+                    if (!isEditable || loading) return;
+                    onAiManualOverride?.("categoryId");
+                    const next = { ...genreMap };
+                    if (chipActive) {
+                      delete next[cat.id];
+                    } else {
+                      next[cat.id] = g.slug;
+                    }
+                    onChange({
+                      genreSlugByRootCategoryId: next,
+                      ...(isCinemaEventCategorySlug(cat.slug)
+                        ? { cinemaGenre: next[cat.id] ?? "" }
+                        : {}),
+                    });
+                  },
+                  className: "!min-h-[2.25rem] !px-3 !text-[13px]",
+                };
+              });
+
+              const canShowCinema =
+                isCinemaEventCategorySlug(data.categorySlug) ||
+                isCinemaEventCategorySlug(cat.slug);
+
+              return (
+                <>
+                  {hasGenresForCat ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs">
+                        {categoryOptions.length > 0 ? "Категория" : "Жанр"}
+                      </Label>
+                      {loadingGenres ? (
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                          <span className="text-sm text-gray-600">Загрузка жанров...</span>
+                        </div>
+                      ) : (
+                        <ChipsRow
+                          layout="wrap"
+                          aria-label={`Жанры — ${cat.nameRu}`}
+                          items={genreItemsForCat}
+                        />
+                      )}
+                    </div>
+                  ) : loadingGenres ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Жанр</Label>
+                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                        <span className="text-sm text-gray-600">Загрузка жанров...</span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {supportsDuration ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="durationMinutes" className="text-xs">
+                        Продолжительность (минуты)
+                      </Label>
+                      <Input
+                        id="durationMinutes"
+                        type="number"
+                        min={1}
+                        max={600}
+                        value={data.durationMinutes || ""}
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value, 10);
+                          onChange({
+                            durationMinutes: Number.isNaN(parsed)
+                              ? undefined
+                              : Math.min(600, Math.max(1, parsed)),
+                          });
+                        }}
+                        placeholder="90"
+                        disabled={!isEditable}
+                        className="!text-[13px]"
+                      />
+                      <p className="text-[12px] text-muted-foreground">
+                        Сколько длится одно посещение или сеанс. Если событие идёт весь
+                        день — оставьте пустым и укажите часы в расписании.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {canShowCinema ? (
+                    <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        {renderCategoryIcon(cat.icon)}
+                        <h3 className="font-medium text-sm">Дополнительно для кино</h3>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cinemaTrailerLink" className="text-xs">
+                          Ссылка на трейлер
+                        </Label>
+                        <Input
+                          id="cinemaTrailerLink"
+                          value={data.cinemaTrailerUrl || ""}
+                          onChange={(e) => onChange({ cinemaTrailerUrl: e.target.value })}
+                          placeholder="https://youtube.com/..."
+                          disabled={!isEditable}
+                          className="!text-[13px]"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()}
+          </div>
+        ) : null}
+      </div>
+
       <div className="space-y-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -883,176 +1066,6 @@ export function Step1Basics({
           aria-label="Возрастные группы"
           items={ageItems}
         />
-      </div>
-
-      {/* Основная категория — одиночный выбор */}
-      <div className="space-y-2 w-full">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Label htmlFor="event-primary-category">
-              Основная категория <span className="text-red-500">*</span>
-            </Label>
-            {suggestedFields.mainCategory ? <AiRecommendationBadge /> : null}
-          </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Определяет тип события (что это вообще)
-          </p>
-        </div>
-        <FilterSelect
-          id="event-primary-category"
-          aria-label="Основная категория события"
-          value={data.categoryId ?? ""}
-          options={rootSelectOptions}
-          onChange={handleRootCategoryChange}
-          placeholder="Выберите основную категорию"
-          disabled={!isEditable || loading}
-        />
-
-        {primaryRoot != null && (primaryRoot.children?.length ?? 0) > 0 ? (
-          <div className="space-y-1 pt-1">
-            <Label htmlFor="event-primary-subcategory" className="text-xs">
-              Подкатегория <span className="text-red-500">*</span>
-            </Label>
-            <FilterSelect
-              id="event-primary-subcategory"
-              aria-label="Подкатегория"
-              value={data.subcategoryId ?? ""}
-              options={subSelectOptions}
-              onChange={handleSubcategoryChange}
-              placeholder="Выберите подкатегорию"
-              disabled={!isEditable || loading}
-            />
-          </div>
-        ) : null}
-
-        {primaryRoot != null && data.categoryId ? (
-          <div className="space-y-3 pt-2 border-t border-gray-100">
-            {(() => {
-              const cat = primaryRoot;
-              const categoryOptions: PublicCategoryOption[] = Array.isArray(cat.options)
-                ? cat.options.filter((option) => option.isActive).sort((a, b) => a.order - b.order)
-                : [];
-              const genresForCat = genresByCategoryId[cat.id] ?? [];
-              const genreLikeItems =
-                categoryOptions.length > 0
-                  ? categoryOptions.map((option) => ({
-                      id: option.id,
-                      title: option.label,
-                      slug: option.value,
-                      sortOrder: option.order,
-                      isActive: option.isActive,
-                    }))
-                  : genresForCat;
-              const hasGenresForCat = genreLikeItems.length > 0;
-              const genreMap = data.genreSlugByRootCategoryId ?? {};
-              const genreItemsForCat: ChipItem[] = genreLikeItems.map((g) => {
-                const selectedSlug = genreMap[cat.id]?.trim() ?? "";
-                const chipActive = selectedSlug === g.slug || selectedSlug === g.title;
-                return {
-                  id: g.id,
-                  label: g.title,
-                  active: chipActive,
-                  disabled: !isEditable || loading,
-                  onClick: () => {
-                    if (!isEditable || loading) return;
-                    onAiManualOverride?.("categoryId");
-                    const next = { ...genreMap };
-                    if (chipActive) {
-                      delete next[cat.id];
-                    } else {
-                      next[cat.id] = g.slug;
-                    }
-                    onChange({
-                      genreSlugByRootCategoryId: next,
-                      ...(isCinemaEventCategorySlug(cat.slug)
-                        ? { cinemaGenre: next[cat.id] ?? "" }
-                        : {}),
-                    });
-                  },
-                  className: "!min-h-[2.25rem] !px-3 !text-[13px]",
-                };
-              });
-
-              const canShowCinema =
-                isCinemaEventCategorySlug(data.categorySlug) ||
-                isCinemaEventCategorySlug(cat.slug);
-
-              return (
-                <>
-                  {hasGenresForCat ? (
-                    <div className="space-y-2">
-                      <Label className="text-xs">
-                        {categoryOptions.length > 0 ? "Категория" : "Жанр"}
-                      </Label>
-                      {loadingGenres ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                          <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                          <span className="text-sm text-gray-600">Загрузка жанров...</span>
-                        </div>
-                      ) : (
-                        <ChipsRow
-                          layout="wrap"
-                          aria-label={`Жанры — ${cat.nameRu}`}
-                          items={genreItemsForCat}
-                        />
-                      )}
-                    </div>
-                  ) : loadingGenres ? (
-                    <div className="space-y-2">
-                      <Label className="text-xs">Жанр</Label>
-                      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                        <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                        <span className="text-sm text-gray-600">Загрузка жанров...</span>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {canShowCinema ? (
-                    <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        {renderCategoryIcon(cat.icon)}
-                        <h3 className="font-medium text-sm">Дополнительно для кино</h3>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cinemaDuration" className="text-xs">
-                          Продолжительность (минуты)
-                        </Label>
-                        <Input
-                          id="cinemaDuration"
-                          type="number"
-                          value={data.cinemaDuration || ""}
-                          onChange={(e) =>
-                            onChange({
-                              cinemaDuration: parseInt(e.target.value, 10) || undefined,
-                            })
-                          }
-                          placeholder="90"
-                          disabled={!isEditable}
-                          className="!text-[13px]"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cinemaTrailerLink" className="text-xs">
-                          Ссылка на трейлер
-                        </Label>
-                        <Input
-                          id="cinemaTrailerLink"
-                          value={data.cinemaTrailerUrl || ""}
-                          onChange={(e) => onChange({ cinemaTrailerUrl: e.target.value })}
-                          placeholder="https://youtube.com/..."
-                          disabled={!isEditable}
-                          className="!text-[13px]"
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              );
-            })()}
-          </div>
-        ) : null}
       </div>
 
       {/* Program categories (conditional on primary category) */}

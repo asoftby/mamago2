@@ -9,6 +9,11 @@ import prisma from "@/lib/prisma";
 import { updateRoute, normalizeStops } from "@/server/services/route.service";
 import type { BudgetLevel, RouteVisibility } from "@prisma/client";
 import type { RouteStopPriceType } from "@/lib/routes/routeBudget";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────────
 
@@ -144,7 +149,7 @@ export async function DELETE(
     // Find the route
     const route = await prisma.route.findUnique({
       where: { id: resolvedId },
-      select: { id: true, authorId: true, title: true },
+      select: { id: true, authorId: true, title: true, status: true },
     });
 
     if (!route) {
@@ -159,7 +164,15 @@ export async function DELETE(
       );
     }
 
-    // Delete the route (cascade will delete related stops, slug history, etc.)
+    await assertContentLifecycleOperationAllowed({
+      contentType: "ROUTE",
+      contentId: resolvedId,
+      operation: "deleteDraft",
+      status: route.status,
+      prisma,
+    });
+
+    // Delete the draft route (cascade will delete related stops, slug history, etc.)
     await prisma.route.delete({
       where: { id: resolvedId },
     });
@@ -169,6 +182,12 @@ export async function DELETE(
       { status: 200 },
     );
   } catch (err) {
+    if (isContentLifecycleOperationError(err)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(err),
+        { status: err.statusCode },
+      );
+    }
     console.error("[API] DELETE /api/routes/[id] error:", err);
     return NextResponse.json(
       { error: "Internal server error" },

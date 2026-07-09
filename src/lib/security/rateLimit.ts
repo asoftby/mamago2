@@ -1,31 +1,20 @@
 /**
- * Simple in-memory rate limiter for MVP/local/single-instance production.
- * No Redis or external dependencies required.
+ * Postgres-backed fixed-window rate limiter (shared across instances).
+ *
+ * Storage is the primary Postgres database (RateLimitEntry table), so there is
+ * no scenario where "the limiter store is down but the app is up" — any DB
+ * error here means the protected operation would fail anyway. Individual
+ * query failures still fail open (allow + error log) so a transient limiter
+ * problem never locks users out.
+ *
+ * Semantics (kept identical to the previous in-memory implementation):
+ * - first hit in a window creates the counter with resetAt = now + windowMs;
+ * - subsequent hits increment the counter; the window is NOT extended;
+ * - an expired row is reused as a fresh window;
+ * - resetRateLimit deletes the key (reset-on-success for login / otp_verify).
  */
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const storage = new Map<string, RateLimitEntry>();
-
-/**
- * Clean up expired entries to prevent memory leaks.
- * Called periodically or during rate limit checks.
- */
-function cleanup(): void {
-  const now = Date.now();
-  for (const [key, entry] of storage.entries()) {
-    if (now >= entry.resetAt) {
-      storage.delete(key);
-    }
-  }
-}
-
-// Run cleanup every 5 minutes if there's activity
-let lastCleanup = Date.now();
-const CLEANUP_INTERVAL = 5 * 60 * 1000;
+import { prisma } from "@/lib/prisma";
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -33,65 +22,80 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
+// Opportunistic cleanup of expired rows every 5 minutes per instance.
+let lastCleanup = Date.now();
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+
+function cleanupExpired(now: Date): void {
+  void prisma.rateLimitEntry
+    .deleteMany({ where: { resetAt: { lte: now } } })
+    .catch((error) => {
+      console.error("[rateLimit] cleanup failed", error);
+    });
+}
+
 /**
  * Check if a request should be rate-limited.
- * 
+ *
  * @param key Unique identifier (e.g. login:ip:email)
  * @param limit Max allowed attempts in the window
  * @param windowMs Time window in milliseconds
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   limit: number,
   windowMs: number
-): RateLimitResult {
-  const now = Date.now();
+): Promise<RateLimitResult> {
+  const now = new Date();
+  const nextResetAt = new Date(now.getTime() + windowMs);
 
-  // Periodic cleanup
-  if (now - lastCleanup > CLEANUP_INTERVAL) {
-    cleanup();
-    lastCleanup = now;
-  }
+  try {
+    if (now.getTime() - lastCleanup > CLEANUP_INTERVAL) {
+      lastCleanup = now.getTime();
+      cleanupExpired(now);
+    }
 
-  let entry = storage.get(key);
+    // Single atomic statement: insert a fresh window, or increment the
+    // existing one, or restart an expired one — safe under concurrency.
+    const rows = await prisma.$queryRaw<Array<{ count: number; resetAt: Date }>>`
+      INSERT INTO "RateLimitEntry" ("key", "count", "resetAt")
+      VALUES (${key}, 1, ${nextResetAt})
+      ON CONFLICT ("key") DO UPDATE SET
+        "count" = CASE
+          WHEN "RateLimitEntry"."resetAt" <= ${now} THEN 1
+          ELSE "RateLimitEntry"."count" + 1
+        END,
+        "resetAt" = CASE
+          WHEN "RateLimitEntry"."resetAt" <= ${now} THEN ${nextResetAt}
+          ELSE "RateLimitEntry"."resetAt"
+        END
+      RETURNING "count", "resetAt"
+    `;
 
-  // If entry exists but is expired, reset it
-  if (entry && now >= entry.resetAt) {
-    storage.delete(key);
-    entry = undefined;
-  }
-
-  if (!entry) {
-    // First attempt
-    entry = {
-      count: 1,
-      resetAt: now + windowMs,
+    const count = Number(rows[0].count);
+    return {
+      allowed: count <= limit,
+      remaining: Math.max(0, limit - count),
+      resetAt: rows[0].resetAt.getTime(),
     };
-    storage.set(key, entry);
-    
+  } catch (error) {
+    // Fail open: a limiter failure must not take down login/booking flows.
+    console.error("[rateLimit] check failed, allowing request", error);
     return {
       allowed: true,
-      remaining: limit - 1,
-      resetAt: entry.resetAt,
+      remaining: Math.max(0, limit - 1),
+      resetAt: nextResetAt.getTime(),
     };
   }
-
-  // Increment count
-  entry.count += 1;
-
-  const allowed = entry.count <= limit;
-  const remaining = Math.max(0, limit - entry.count);
-
-  return {
-    allowed,
-    remaining,
-    resetAt: entry.resetAt,
-  };
 }
 
 /**
  * Reset rate limit counter for a specific key (e.g. after successful login).
  */
-export function resetRateLimit(key: string): void {
-  storage.delete(key);
+export async function resetRateLimit(key: string): Promise<void> {
+  try {
+    await prisma.rateLimitEntry.deleteMany({ where: { key } });
+  } catch (error) {
+    console.error("[rateLimit] reset failed", error);
+  }
 }

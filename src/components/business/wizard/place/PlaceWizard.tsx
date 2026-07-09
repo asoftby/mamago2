@@ -181,6 +181,18 @@ export function PlaceWizard({
     }
     return getDefaultFormData();
   });
+  /**
+   * Максимальный посещённый шаг. При создании нового места часть шагов
+   * (CTA, FAQ) валидна на пустой форме — непосещённые шаги не должны
+   * показываться в степпере выполненными. В edit-режиме данные пришли
+   * с сервера, поэтому все шаги считаются посещёнными.
+   */
+  const [maxVisitedStep, setMaxVisitedStep] = useState(() =>
+    mode === "edit" ? totalSteps : firstStepNumber
+  );
+  useEffect(() => {
+    setMaxVisitedStep((prev) => Math.max(prev, currentStep));
+  }, [currentStep]);
   const isPublishedEditMode = mode === "edit" && place?.status === "PUBLISHED";
 
   const [isSaving, setIsSaving] = useState(false);
@@ -986,9 +998,11 @@ export function PlaceWizard({
     () => wizardSteps.map((s) => ({
       id: s.id,
       label: s.label,
-      isComplete: validateStep(s.id, formData, ctaStepEnabled).isComplete,
+      isComplete:
+        validateStep(s.id, formData, ctaStepEnabled).isComplete &&
+        s.id <= maxVisitedStep,
     })),
-    [ctaStepEnabled, formData, wizardSteps]
+    [ctaStepEnabled, formData, maxVisitedStep, wizardSteps]
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });

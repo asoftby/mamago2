@@ -44,7 +44,6 @@ export function BusinessContentList<T extends { id: string }>({
   onRestore: onRestoreProp,
   onArchive: onArchiveProp,
   onUnarchive: onUnarchiveProp,
-  deleteEntityLabel = "элемент",
   getDeleteEntityName,
 }: BusinessContentListProps<T>) {
   const router = useRouter();
@@ -178,12 +177,8 @@ export function BusinessContentList<T extends { id: string }>({
       <ConfirmDestructiveActionDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title={`Удалить ${deleteEntityLabel}?`}
-        description={
-          pendingDeleteName
-            ? `Вы уверены, что хотите удалить «${pendingDeleteName}»?`
-            : "Вы уверены, что хотите удалить?"
-        }
+        title="Удалить черновик?"
+        description="Это действие нельзя отменить."
         loading={deleteLoading}
         onConfirm={() => (pendingDeleteId ? handleDelete(pendingDeleteId) : undefined)}
         onCancel={() => setPendingDeleteId(null)}

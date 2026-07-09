@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ContentStatus, OfferStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import {
-  assertCanHardDeleteContent,
-  HARD_DELETE_BLOCK_MESSAGE,
-  isContentHardDeleteError,
-} from "@/server/services/contentHardDelete.service";
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
+import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 export async function GET(
   req: NextRequest,
@@ -120,6 +122,7 @@ export async function DELETE(
         id: true,
         title: true,
         status: true,
+        archivedAt: true,
         _count: {
           select: {
             activities: true,
@@ -142,14 +145,40 @@ export async function DELETE(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    await assertCanHardDeleteContent({
+    const deleteOperation = place.archivedAt ? "deleteArchived" : "deleteDraft";
+
+    await assertContentLifecycleOperationAllowed({
       contentType: "PLACE",
       contentId: id,
+      operation: deleteOperation,
       status: place.status,
+      archivedAt: place.archivedAt,
+      actorRole: user.role,
       prisma,
     });
 
+    await detachImportedRecordsForCatalogEntity(
+      {
+        entityType: "PLACE",
+        entityId: id,
+        reason: "Связанный Place был удалён и больше не считается активной сущностью каталога.",
+      },
+      prisma,
+    );
+
     await prisma.$transaction(async (tx) => {
+      await tx.offer.deleteMany({
+        where: { placeId: id, status: OfferStatus.DRAFT },
+      });
+
+      await tx.activity.deleteMany({
+        where: { placeId: id, status: ContentStatus.DRAFT },
+      });
+
+      await tx.place.deleteMany({
+        where: { parentPlaceId: id, status: ContentStatus.DRAFT },
+      });
+
       await tx.placeImage.deleteMany({
         where: { placeId: id },
       });
@@ -206,13 +235,9 @@ export async function DELETE(
       message: "Place deleted successfully",
     });
   } catch (error: unknown) {
-    if (isContentHardDeleteError(error)) {
+    if (isContentLifecycleOperationError(error)) {
       return NextResponse.json(
-        {
-          error: error.code,
-          message: error.message || HARD_DELETE_BLOCK_MESSAGE,
-          reasons: error.reasons,
-        },
+        lifecycleErrorResponsePayload(error),
         { status: error.statusCode },
       );
     }

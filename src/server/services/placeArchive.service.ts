@@ -9,6 +9,11 @@ import { ContentStatus, type Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
+import {
+  assertContentLifecycleOperationAllowed,
+  ContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 type PlaceArchiveActor = {
   id: string;
@@ -57,6 +62,18 @@ export class PlaceArchiveError extends Error {
     this.statusCode = params.statusCode;
     this.code = params.code;
   }
+}
+
+function rethrowLifecycleAsPlaceArchiveError(error: unknown): never {
+  if (error instanceof ContentLifecycleOperationError) {
+    const payload = lifecycleErrorResponsePayload(error);
+    throw new PlaceArchiveError({
+      code: payload.code,
+      message: payload.message,
+      statusCode: error.statusCode,
+    });
+  }
+  throw error;
 }
 
 async function loadPlaceForArchive(placeId: string) {
@@ -142,12 +159,17 @@ async function assertArchivePreflight(placeId: string) {
 export async function archivePlace(placeId: string, actor: PlaceArchiveActor) {
   const place = await assertPlaceArchiveAccess(placeId, actor);
 
-  if (place.archivedAt) {
-    throw new PlaceArchiveError({
-      code: "PLACE_ALREADY_ARCHIVED",
-      message: "Место уже в архиве",
-      statusCode: 409,
+  try {
+    await assertContentLifecycleOperationAllowed({
+      contentType: "PLACE",
+      contentId: placeId,
+      operation: "archiveContent",
+      status: place.status,
+      archivedAt: place.archivedAt,
+      prisma,
     });
+  } catch (error) {
+    rethrowLifecycleAsPlaceArchiveError(error);
   }
 
   await assertArchivePreflight(placeId);
@@ -175,12 +197,17 @@ export async function archivePlace(placeId: string, actor: PlaceArchiveActor) {
 export async function unarchivePlace(placeId: string, actor: PlaceArchiveActor) {
   const place = await assertPlaceArchiveAccess(placeId, actor);
 
-  if (!place.archivedAt) {
-    throw new PlaceArchiveError({
-      code: "PLACE_NOT_ARCHIVED",
-      message: "Место не находится в архиве",
-      statusCode: 409,
+  try {
+    await assertContentLifecycleOperationAllowed({
+      contentType: "PLACE",
+      contentId: placeId,
+      operation: "restoreArchived",
+      status: place.status,
+      archivedAt: place.archivedAt,
+      prisma,
     });
+  } catch (error) {
+    rethrowLifecycleAsPlaceArchiveError(error);
   }
 
   return prisma.place.update({

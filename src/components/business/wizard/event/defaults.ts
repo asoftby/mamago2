@@ -59,8 +59,8 @@ export function getDefaultFormData(): EventFormData {
     categorySlug: null,
     categoryPathLabel: null,
     programCategoryIds: [],
+    durationMinutes: undefined,
     cinemaGenre: "",
-    cinemaDuration: undefined,
     cinemaTrailerUrl: "",
     
     // Step 2: Description

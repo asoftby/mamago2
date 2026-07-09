@@ -88,15 +88,17 @@ function RouteGridCard({
             >
               <Pencil className="h-3.5 w-3.5" />
             </Link>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={isDeleting}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-neutral-500 shadow-sm backdrop-blur-sm transition-colors hover:text-red-600 disabled:opacity-50"
-              title="Удалить"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            {isDraft ? (
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={isDeleting}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-neutral-500 shadow-sm backdrop-blur-sm transition-colors hover:text-red-600 disabled:opacity-50"
+                title="Удалить черновик"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </div>
         </div>
 

@@ -12,16 +12,10 @@ type Props = {
   publicHref?: string | null;
 };
 
-function deleteCopy(status: ContentStatus): { title: string; description: string } {
-  if (status === ContentStatus.PUBLISHED) {
-    return {
-      title: "Удалить опубликованное событие?",
-      description: "Событие будет снято с публикации и исчезнет из каталога для пользователей.",
-    };
-  }
+function deleteCopy(): { title: string; description: string } {
   return {
-    title: "Удалить событие?",
-    description: "Событие будет скрыто из каталога. Статус изменится на удалённый.",
+    title: "Удалить черновик?",
+    description: "Это действие нельзя отменить.",
   };
 }
 
@@ -32,7 +26,8 @@ export function AdminEventRowActions({ eventId, status, returnTo, publicHref }: 
     return null;
   }
 
-  const copy = deleteCopy(status);
+  const copy = deleteCopy();
+  const isDraft = status === ContentStatus.DRAFT;
   const editHref = `/editor/event/${eventId}/edit?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
@@ -60,17 +55,25 @@ export function AdminEventRowActions({ eventId, status, returnTo, publicHref }: 
         },
       }}
       destructiveAction={{
-        kind: "softDelete",
-        label: "Удалить",
-        title: copy.title,
-        description: copy.description,
+        kind: isDraft ? "hardDelete" : "archive",
+        label: isDraft ? "Удалить черновик" : "Архивировать",
+        title: isDraft ? copy.title : "Переместить в архив?",
+        description: isDraft
+          ? copy.description
+          : "Публикация будет скрыта. Восстановление возможно.",
         request: {
-          url: `/api/admin/moderation/events/${eventId}`,
-          method: "DELETE",
+          url: isDraft
+            ? `/api/admin/moderation/events/${eventId}`
+            : `/api/business/events/${eventId}/archive`,
+          method: isDraft ? "DELETE" : "POST",
         },
-        confirmLabel: "Удалить",
-        successMessage: "Событие удалено из каталога",
-        errorMessage: "Не удалось удалить событие",
+        confirmLabel: isDraft ? "Удалить" : "Архивировать",
+        successMessage: isDraft
+          ? "Черновик события удалён"
+          : "Событие перемещено в архив",
+        errorMessage: isDraft
+          ? "Не удалось удалить черновик"
+          : "Не удалось архивировать событие",
       }}
       align="end"
     />

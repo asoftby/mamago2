@@ -10,9 +10,10 @@ import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 import {
-  assertCanHardDeleteContent,
-  isContentHardDeleteError,
-} from "@/server/services/contentHardDelete.service";
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 export async function DELETE(
   request: NextRequest,
@@ -54,9 +55,10 @@ export async function DELETE(
       );
     }
 
-    await assertCanHardDeleteContent({
+    await assertContentLifecycleOperationAllowed({
       contentType: "PLACE",
       contentId: id,
+      operation: "deleteDraft",
       status: place.status,
       prisma,
     });
@@ -76,13 +78,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (isContentHardDeleteError(error)) {
+    if (isContentLifecycleOperationError(error)) {
       return NextResponse.json(
-        {
-          error: error.code,
-          message: error.message,
-          reasons: error.reasons,
-        },
+        lifecycleErrorResponsePayload(error),
         { status: error.statusCode },
       );
     }

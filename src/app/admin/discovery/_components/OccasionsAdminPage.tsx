@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OccasionType } from "@prisma/client";
 import { occasionTypeLabel } from "@/lib/taxonomy/occasionTypeLabels";
-import { isOccasionCurrentlyActive } from "@/lib/discovery/occasions";
+import { isOccasionCurrentlyActive } from "@/lib/discovery/occasionUtils";
 
 const adminFetch: RequestInit = { credentials: "include" };
 

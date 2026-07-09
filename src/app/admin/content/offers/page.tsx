@@ -1,15 +1,27 @@
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
-import { Badge } from "@/components/ui/badge";
 import { OfferStatus } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ModerationListFilters } from "@/components/admin/moderation/ModerationListFilters";
-import { MODERATION_OFFER_STATUS_CONFIG } from "@/lib/admin/moderationOfferStatusBadges";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
-import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
+import {
+  blockingDependencyItems,
+  type ContentDependencySummary,
+} from "@/lib/admin/contentDependencySummary";
+import {
+  deriveOfferArchivedDeletePreflight,
+  deriveOfferDeletePreflight,
+  getOffersDependencySummariesBatch,
+} from "@/server/services/contentDependencySummary.service";
+import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
+import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import {
+  buildAdminLifecycleViewModel,
+  buildAdminOfferLifecycleInput,
+} from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,6 +36,7 @@ function parseOfferStatusFilter(raw: string | undefined): OfferStatus | undefine
 interface SearchParams {
   status?: string;
   cityId?: string;
+  placeId?: string;
   [key: string]: string | undefined;
 }
 
@@ -43,12 +56,17 @@ function buildReturnTo(params: SearchParams): string {
 async function getOffers(params: SearchParams) {
   const where: {
     status?: OfferStatus;
+    placeId?: string;
     place?: { cityId: string };
   } = {};
 
   const status = parseOfferStatusFilter(params.status);
   if (status) {
     where.status = status;
+  }
+
+  if (params.placeId) {
+    where.placeId = params.placeId;
   }
 
   if (params.cityId) {
@@ -77,12 +95,26 @@ async function getOffers(params: SearchParams) {
   });
 }
 
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
+
+type OfferRowMeta = {
+  dependencySummary: ContentDependencySummary;
+  deletePreflight: ReturnType<typeof deriveOfferDeletePreflight>;
+  archivedDeletePreflight: ReturnType<typeof deriveOfferArchivedDeletePreflight>;
+};
+
 function OffersTable({
   offers,
   returnTo,
+  offerMetaById,
 }: {
   offers: Awaited<ReturnType<typeof getOffers>>;
   returnTo: string;
+  offerMetaById: Map<string, OfferRowMeta>;
 }) {
   if (offers.length === 0) {
     return (
@@ -108,10 +140,36 @@ function OffersTable({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {offers.map((offer) => {
-            const statusConfig =
-              MODERATION_OFFER_STATUS_CONFIG[offer.status] ||
-              MODERATION_OFFER_STATUS_CONFIG.DRAFT;
             const isArchived = Boolean(offer.archivedAt);
+            const rowMeta = offerMetaById.get(offer.id) ?? {
+              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              deletePreflight: {
+                allowed: offer.status === OfferStatus.DRAFT && !isArchived,
+                reasons: [],
+                message: undefined,
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+              archivedDeletePreflight: {
+                allowed: false,
+                reasons: ["notArchived"],
+                message: undefined,
+                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+              },
+            };
+            const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
+            const lifecycleViewModel = buildAdminLifecycleViewModel({
+              ...buildAdminOfferLifecycleInput({
+                status: offer.status,
+                archivedAt: offer.archivedAt,
+                deletePreflight: rowMeta.deletePreflight,
+                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+              }),
+              navigationLinks: {
+                edit: true,
+                preview: true,
+                review: offer.status === "PENDING",
+              },
+            });
             const publicOfferHref =
               !isArchived &&
               !offer.place.archivedAt &&
@@ -132,75 +190,50 @@ function OffersTable({
                     "—"}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={statusConfig.variant} className={statusConfig.className}>
-                      {statusConfig.label}
-                    </Badge>
-                    {isArchived ? (
-                      <Badge
-                        variant="outline"
-                        className="border-stone-300 bg-stone-100 text-stone-700"
-                      >
-                        В архиве
-                      </Badge>
-                    ) : null}
-                  </div>
+                  <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
                 </td>
                 <td className="px-4 py-3">
-                  <AdminContentRowActions
-                    editAction={{
-                      icon: "edit",
-                      href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
-                      label: "Открыть в редакторе",
-                      title: "Открыть в редакторе",
+                  <ContentLifecycleActionsMenu
+                    viewModel={lifecycleViewModel}
+                    contentId={offer.id}
+                    contentType="offer"
+                    surface="admin"
+                    links={{
+                      edit: {
+                        href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
+                        label: "Открыть в редакторе",
+                      },
+                      preview: {
+                        href: viewOfferHref,
+                        newTab: true,
+                        label: publicOfferHref
+                          ? "Открыть публичную страницу"
+                          : "Открыть предпросмотр",
+                      },
                     }}
-                    viewAction={{
-                      icon: "view",
-                      href: viewOfferHref,
-                      newTab: true,
-                      label: publicOfferHref
-                        ? "Открыть публичную страницу"
-                        : "Открыть предпросмотр",
-                      title: publicOfferHref
-                        ? "Открыть публичную страницу"
-                        : "Открыть предпросмотр",
-                    }}
-                    destructiveAction={
-                      offer.status !== "DRAFT"
-                        ? isArchived
+                    deletePreflight={{
+                      deleteDraft: {
+                        blockedDialog: !rowMeta.deletePreflight.allowed
                           ? {
-                              kind: "restore",
-                              label: "Восстановить",
-                              title: "Восстановить предложение из архива?",
-                              description:
-                                "Предложение снова станет доступно в рабочих списках. Если оно опубликовано и место не находится в архиве, публичная страница снова откроется пользователям.",
-                              request: {
-                                url: `/api/admin/offers/${offer.id}/archive`,
-                                method: "DELETE",
-                              },
-                              confirmLabel: "Восстановить",
-                              successMessage: "Предложение восстановлено из архива",
-                              errorMessage: "Не удалось восстановить предложение",
+                              title: "Нельзя удалить черновик",
+                              description: rowMeta.deletePreflight.message,
+                              items: blockingItems,
                             }
-                          : {
-                              kind: "archive",
-                              label: "Архивировать",
-                              title: "Архивировать предложение?",
-                              description:
-                                "Предложение будет скрыто с публичной страницы и из связанных блоков места. Действие можно отменить позже.",
-                              request: {
-                                url: `/api/admin/offers/${offer.id}/archive`,
-                                method: "POST",
-                              },
-                              confirmLabel: "Архивировать",
-                              successMessage: "Предложение перемещено в архив",
-                              errorMessage: "Не удалось архивировать предложение",
+                          : null,
+                      },
+                      deleteArchived: {
+                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                          ? {
+                              title: "Нельзя удалить из архива",
+                              description: rowMeta.archivedDeletePreflight.message,
+                              items: blockingItems,
                             }
-                        : null
-                    }
+                          : null,
+                      },
+                    }}
                   />
                 </td>
               </tr>
@@ -223,6 +256,32 @@ export default async function ModerationOffersPage({
     getOffers(params),
     getModerationFilterCities(),
   ]);
+  const dependencySummaries = await getOffersDependencySummariesBatch(
+    offers.map((offer) => offer.id),
+    prisma,
+  );
+  const offerMetaById = new Map<string, OfferRowMeta>(
+    offers.map((offer) => {
+      const dependencySummary =
+        dependencySummaries.get(offer.id) ?? EMPTY_DEPENDENCY_SUMMARY;
+      return [
+        offer.id,
+        {
+          dependencySummary,
+          deletePreflight: deriveOfferDeletePreflight({
+            status: offer.status,
+            archivedAt: offer.archivedAt,
+            publishedAt: offer.publishedAt,
+            dependencySummary,
+          }),
+          archivedDeletePreflight: deriveOfferArchivedDeletePreflight({
+            archivedAt: offer.archivedAt,
+            dependencySummary,
+          }),
+        },
+      ];
+    }),
+  );
   const returnTo = buildReturnTo(params);
 
   return (
@@ -243,7 +302,7 @@ export default async function ModerationOffersPage({
       />
 
       <Suspense fallback={<div>Загрузка…</div>}>
-        <OffersTable offers={offers} returnTo={returnTo} />
+        <OffersTable offers={offers} returnTo={returnTo} offerMetaById={offerMetaById} />
       </Suspense>
     </div>
   );
