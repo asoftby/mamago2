@@ -1,4 +1,4 @@
-import type { MigrationRecord, PrismaClient } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/client";
 
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
@@ -15,6 +15,7 @@ export interface EventCommitOrchestratorLike {
     operation: CommitOperation;
     candidate: NormalizedEventCandidate;
     context: EventCommitContext;
+    targetActivityId?: string | null;
   }): Promise<ExecuteEventCommitResult>;
 }
 
@@ -44,6 +45,7 @@ export interface MigrationLineageWriterLike {
  */
 export interface EventCommitRunnerPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
+  migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
 }
 
 export interface ExecuteEventCommitRunInput {
@@ -81,6 +83,20 @@ function describeOrchestratorFailure(
   };
 }
 
+function isUpdateAction(action: CommitOperation["action"]): boolean {
+  return action === "UPDATE";
+}
+
+function buildUpdateTargetMissingResult(recordId: string): ExecuteEventCommitRunResult {
+  return {
+    ok: false,
+    recordId,
+    status: "FAILED",
+    reasonCode: "EVENT_UPDATE_TARGET_MISSING",
+    error: new Error("Event UPDATE requires an existing MigrationLineage targetId."),
+  };
+}
+
 /**
  * Wires PR17/PR18/PR19/PR11 into the first complete Event commit vertical:
  * `EventCommitOrchestrator.execute()` -> (on success) `MigrationLineageWriter
@@ -114,10 +130,36 @@ export class EventCommitRunner {
   ) {}
 
   async execute(input: ExecuteEventCommitRunInput): Promise<ExecuteEventCommitRunResult> {
+    const isUpdate = isUpdateAction(input.operation.action);
+    const existingLineage: MigrationLineage | null = isUpdate
+      ? await this.deps.prisma.migrationLineage.findFirst({
+          where: {
+            sourceId: input.record.sourceId,
+            sourceRecordKey: input.record.sourceRecordKey,
+            targetType: "ACTIVITY",
+            isActive: true,
+          },
+        })
+      : null;
+
+    if (isUpdate && !existingLineage?.targetId?.trim()) {
+      const missingTargetResult = buildUpdateTargetMissingResult(input.record.id);
+      await this.deps.prisma.migrationRecord.update({
+        where: { id: input.record.id },
+        data: {
+          status: "FAILED",
+          lastErrorCode: missingTargetResult.reasonCode,
+          lastErrorMessage: missingTargetResult.error?.message ?? null,
+        },
+      });
+      return missingTargetResult;
+    }
+
     const commitResult = await this.deps.orchestrator.execute({
       operation: input.operation,
       candidate: input.candidate,
       context: input.context,
+      targetActivityId: isUpdate ? existingLineage!.targetId : null,
     });
 
     if (!commitResult.ok) {
@@ -142,18 +184,37 @@ export class EventCommitRunner {
 
     let lineageResult: CreateLineageResult;
     try {
-      lineageResult = await this.deps.lineageWriter.createLineage({
-        sourceId: input.record.sourceId,
-        sourceEntityType: input.record.sourceEntityType,
-        sourceStableKey: input.record.sourceStableKey,
-        sourceRecordKey: input.record.sourceRecordKey,
-        targetType: input.operation.targetType,
-        targetId: commitResult.activityId!,
-        targetStableKey: commitResult.activityId!,
-        lastSourceHash: input.record.sourceHash!,
-        runId: input.record.runId,
-        recordId: input.record.id,
-      });
+      if (isUpdate) {
+        const updatedLineage = await this.deps.prisma.migrationLineage.update({
+          where: { id: existingLineage!.id },
+          data: {
+            targetId: commitResult.activityId!,
+            lastSourceHash: input.record.sourceHash!,
+            runId: input.record.runId,
+            recordId: input.record.id,
+            isActive: true,
+          },
+        });
+        lineageResult = {
+          lineageId: updatedLineage.id,
+          sourceRecordKey: updatedLineage.sourceRecordKey,
+          targetType: updatedLineage.targetType,
+          targetId: updatedLineage.targetId!,
+        };
+      } else {
+        lineageResult = await this.deps.lineageWriter.createLineage({
+          sourceId: input.record.sourceId,
+          sourceEntityType: input.record.sourceEntityType,
+          sourceStableKey: input.record.sourceStableKey,
+          sourceRecordKey: input.record.sourceRecordKey,
+          targetType: input.operation.targetType,
+          targetId: commitResult.activityId!,
+          targetStableKey: commitResult.activityId!,
+          lastSourceHash: input.record.sourceHash!,
+          runId: input.record.runId,
+          recordId: input.record.id,
+        });
+      }
     } catch (error) {
       const lineageError = error instanceof Error ? error : new Error(String(error));
 
@@ -162,7 +223,7 @@ export class EventCommitRunner {
         where: { id: input.record.id },
         data: {
           status: "FAILED",
-          lastErrorCode: "LINEAGE_WRITE_FAILED",
+          lastErrorCode: isUpdate ? "LINEAGE_UPDATE_FAILED" : "LINEAGE_WRITE_FAILED",
           lastErrorMessage: lineageError.message,
         },
       });
@@ -172,7 +233,7 @@ export class EventCommitRunner {
         activityId: commitResult.activityId,
         recordId: input.record.id,
         status: "FAILED",
-        reasonCode: "LINEAGE_WRITE_FAILED",
+        reasonCode: isUpdate ? "LINEAGE_UPDATE_FAILED" : "LINEAGE_WRITE_FAILED",
         error: lineageError,
       };
     }

@@ -72,6 +72,13 @@ function createFakeWriter(options: { activityId?: string; throwError?: Error } =
       }
       return { activityId: options.activityId ?? "activity-1", status: "CREATED" as const };
     },
+    updateEventFromDraft: async (activityId, draft) => {
+      calls.push({ activityId, draft });
+      if (options.throwError) {
+        throw options.throwError;
+      }
+      return { activityId, status: "UPDATED" as const };
+    },
   };
   return { writer, calls };
 }
@@ -120,8 +127,27 @@ async function testUnsupportedActionUpdate() {
   );
 
   assert.equal(result.ok, false);
-  assert.equal(result.reasonCode, "UNSUPPORTED_OPERATION_ACTION");
+  assert.equal(result.reasonCode, "EVENT_UPDATE_TARGET_MISSING");
   assert.equal(calls.length, 0);
+}
+
+async function testUpdateWithTargetActivityIdCallsUpdateNotCreate() {
+  const { writer, calls } = createFakeWriter({ activityId: "activity-42" });
+  const orchestrator = new EventCommitOrchestrator(writer);
+
+  const result = await orchestrator.execute(
+    inputFixture({
+      operation: operationFixture({ action: "UPDATE" }),
+      targetActivityId: "activity-99",
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.activityId, "activity-99");
+  assert.equal(calls.length, 1);
+  const call = calls[0] as { activityId: string; draft: { title: string } };
+  assert.equal(call.activityId, "activity-99");
+  assert.equal(call.draft.title, "Kids Fest");
 }
 
 async function testUnsupportedActionSkipUnchanged() {
@@ -193,6 +219,7 @@ async function main() {
   await testHappyPathCreatesEvent();
   await testUnsupportedTargetTypePlace();
   await testUnsupportedActionUpdate();
+  await testUpdateWithTargetActivityIdCallsUpdateNotCreate();
   await testUnsupportedActionSkipUnchanged();
   await testUnsupportedActionSkipPolicy();
   await testUnsupportedActionFail();

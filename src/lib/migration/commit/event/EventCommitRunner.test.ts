@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { MigrationRecord } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord } from "@prisma/client";
 
 import { EventCommitRunner } from "./EventCommitRunner";
 import type {
@@ -138,7 +138,7 @@ function createFakeLineageWriter(options: { result?: CreateLineageResult; throwE
   return { writer, calls };
 }
 
-function createFakePrisma(options: { throwError?: Error } = {}) {
+function createFakePrisma(options: { throwError?: Error; existingLineage?: MigrationLineage | null } = {}) {
   const calls: unknown[] = [];
   const prisma: EventCommitRunnerPrismaClient = {
     migrationRecord: {
@@ -149,6 +149,19 @@ function createFakePrisma(options: { throwError?: Error } = {}) {
         }
         return recordFixture();
       }) as unknown as EventCommitRunnerPrismaClient["migrationRecord"]["update"],
+    },
+    migrationLineage: {
+      findFirst: (async () => options.existingLineage ?? null) as unknown as EventCommitRunnerPrismaClient["migrationLineage"]["findFirst"],
+      update: (async (args: unknown) => {
+        calls.push(args);
+        const existing = options.existingLineage ?? {
+          id: "lineage-1",
+          sourceRecordKey: "wordpress-db:events:401",
+          targetType: "ACTIVITY",
+          targetId: "activity-1",
+        };
+        return existing as unknown as MigrationLineage;
+      }) as unknown as EventCommitRunnerPrismaClient["migrationLineage"]["update"],
     },
   };
   return { prisma, calls };
@@ -174,6 +187,46 @@ async function testHappyPath() {
   const updateCall = prismaCalls[0] as { where: { id: string }; data: Record<string, unknown> };
   assert.equal(updateCall.where.id, "record-1");
   assert.deepEqual(updateCall.data, { status: "LINKED", lastErrorCode: null, lastErrorMessage: null });
+}
+
+async function testUpdateWithoutActiveLineageFailsAndNeverCallsOrchestrator() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
+  const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
+  const { prisma, calls: prismaCalls } = createFakePrisma({ existingLineage: null });
+  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: operationFixture({ action: "UPDATE" }) }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "FAILED");
+  assert.equal(result.reasonCode, "EVENT_UPDATE_TARGET_MISSING");
+  assert.equal(orchestratorCalls.length, 0, "orchestrator must never be called when UPDATE target is missing");
+  assert.equal(lineageCalls.length, 0, "lineage must never be written when UPDATE target is missing");
+
+  assert.equal(prismaCalls.length, 1, "must update MigrationRecord to FAILED exactly once");
+  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  assert.equal(updateCall.data.status, "FAILED");
+  assert.equal(updateCall.data.lastErrorCode, "EVENT_UPDATE_TARGET_MISSING");
+}
+
+async function testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const existingLineage = {
+    id: "lineage-9",
+    sourceRecordKey: "wordpress-db:events:401",
+    targetType: "ACTIVITY",
+    targetId: "activity-99",
+  } as unknown as MigrationLineage;
+  const { prisma } = createFakePrisma({ existingLineage });
+  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  await runner.execute(inputFixture({ operation: operationFixture({ action: "UPDATE" }) }));
+
+  assert.equal(orchestratorCalls.length, 1);
+  const call = orchestratorCalls[0] as { targetActivityId?: string | null; operation: { action: string } };
+  assert.equal(call.operation.action, "UPDATE");
+  assert.equal(call.targetActivityId, "activity-99");
 }
 
 async function testOrchestratorBlockedMarksRecordFailedAndSkipsLineage() {
@@ -294,16 +347,19 @@ async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
 }
 
 async function testNoActivitySessionEventVenueOrMediaDelegateExists() {
-  // `EventCommitRunnerPrismaClient` only ever exposes `migrationRecord` —
-  // there is no `activitySession`/`eventVenue`/`activityImage`/`activity`
-  // delegate to call anything on, and no schedule/media sync helper is
-  // imported anywhere in this module (confirmed by inspection).
+  // `EventCommitRunnerPrismaClient` only ever exposes `migrationRecord` and
+  // `migrationLineage` — there is no `activitySession`/`eventVenue`/
+  // `activityImage`/`activity` delegate to call anything on, and no
+  // schedule/media sync helper is imported anywhere in this module
+  // (confirmed by inspection).
   const { prisma } = createFakePrisma();
-  assert.deepEqual(Object.keys(prisma), ["migrationRecord"]);
+  assert.deepEqual(new Set(Object.keys(prisma)), new Set(["migrationRecord", "migrationLineage"]));
 }
 
 async function main() {
   await testHappyPath();
+  await testUpdateWithoutActiveLineageFailsAndNeverCallsOrchestrator();
+  await testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator();
   await testOrchestratorBlockedMarksRecordFailedAndSkipsLineage();
   await testOrchestratorFailedMarksRecordFailedAndSkipsLineage();
   await testLineageThrowsMarksRecordFailedWithoutRollingBackActivity();

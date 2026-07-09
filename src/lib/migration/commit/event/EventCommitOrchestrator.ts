@@ -8,13 +8,16 @@ import type {
 } from "./types";
 
 export interface EventCommitWriterLike {
-  createEventFromDraft(draft: EventCreateDraft): Promise<{ activityId: string; status: "CREATED" }>;
+  createEventFromDraft(draft: EventCreateDraft): Promise<{ activityId: string; status: "CREATED" | "UPDATED" }>;
+  updateEventFromDraft(activityId: string, draft: EventCreateDraft): Promise<{ activityId: string; status: "UPDATED" }>;
 }
 
 export interface ExecuteEventCommitInput {
   operation: CommitOperation;
   candidate: NormalizedEventCandidate;
   context: EventCommitContext;
+  /** Existing Activity id from lineage, required for UPDATE. */
+  targetActivityId?: string | null;
 }
 
 export interface ExecuteEventCommitResult {
@@ -25,7 +28,8 @@ export interface ExecuteEventCommitResult {
     | "UNSUPPORTED_TARGET_TYPE"
     | "UNSUPPORTED_OPERATION_ACTION"
     | "EVENT_CREATE_BLOCKED"
-    | "EVENT_CREATE_FAILED";
+    | "EVENT_CREATE_FAILED"
+    | "EVENT_UPDATE_TARGET_MISSING";
   blockReasons?: EventCommitBlockReason[];
   error?: Error;
 }
@@ -45,8 +49,16 @@ export class EventCommitOrchestrator {
     if (input.operation.targetType !== "ACTIVITY") {
       return { ok: false, reasonCode: "UNSUPPORTED_TARGET_TYPE" };
     }
-    if (input.operation.action !== "CREATE") {
+    const action = input.operation.action;
+    if (action !== "CREATE" && action !== "UPDATE") {
       return { ok: false, reasonCode: "UNSUPPORTED_OPERATION_ACTION" };
+    }
+    if (action === "UPDATE" && !input.targetActivityId?.trim()) {
+      return {
+        ok: false,
+        reasonCode: "EVENT_UPDATE_TARGET_MISSING",
+        error: new Error("Event UPDATE requires an existing targetActivityId from MigrationLineage."),
+      };
     }
 
     const draftResult = buildEventCreateDraft({ candidate: input.candidate, context: input.context });
@@ -55,7 +67,10 @@ export class EventCommitOrchestrator {
     }
 
     try {
-      const writeResult = await this.writer.createEventFromDraft(draftResult.draft);
+      const writeResult =
+        action === "UPDATE"
+          ? await this.writer.updateEventFromDraft(input.targetActivityId!, draftResult.draft)
+          : await this.writer.createEventFromDraft(draftResult.draft);
       return { ok: true, activityId: writeResult.activityId, draft: draftResult.draft };
     } catch (error) {
       return {
