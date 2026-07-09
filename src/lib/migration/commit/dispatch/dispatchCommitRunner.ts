@@ -165,8 +165,7 @@ function normalizeArticleResult(result: ExecuteArticleCommitRunResult): CommitDi
  * (PLACE -> `PlaceCommitRunner`, ACTIVITY -> `EventCommitRunner`, ARTICLE
  * -> `ArticleCommitRunner`), calls it with the shape it actually expects
  * (Place/Event: `{operation, record, candidate, context}`; Article:
- * `{candidate, context, migrationRecord}` — no `operation`, matching PR22's
- * typed-result writer/orchestrator, not Place/Event's throw-based one),
+ * `{operation, candidate, context, migrationRecord}`),
  * and normalizes whichever result comes back into one
  * `CommitDispatchResult` shape.
  *
@@ -205,6 +204,7 @@ export async function dispatchCommitRunner(input: DispatchCommitRunnerInput): Pr
   if (targetType === "ARTICLE") {
     if (!runners.article) return missingRunnerResult("ARTICLE");
     const result = await runners.article.execute({
+      operation: buildCommitOperation(executionCandidate.planItem, migrationRecord),
       candidate: executionCandidate.candidate as NormalizedArticleCandidate,
       context: resolvedContext as ArticleCommitContext,
       migrationRecord,

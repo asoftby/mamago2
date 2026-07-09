@@ -71,43 +71,52 @@ function articleFixture(overrides: Partial<Article> = {}): Article {
 }
 
 function createFakeClient(
-  options: { createdArticle?: Article; throwError?: Error } = {},
+  options: { createdArticle?: Article; updatedArticle?: Article; throwError?: Error } = {},
 ) {
-  const calls: unknown[] = [];
+  const createCalls: unknown[] = [];
+  const updateCalls: unknown[] = [];
   const client: ArticleCommitWriterPrismaClient = {
     article: {
       create: (async (args: unknown) => {
-        calls.push(args);
+        createCalls.push(args);
         if (options.throwError) {
           throw options.throwError;
         }
         return options.createdArticle ?? articleFixture();
       }) as unknown as ArticleCommitWriterPrismaClient["article"]["create"],
+      update: (async (args: unknown) => {
+        updateCalls.push(args);
+        if (options.throwError) {
+          throw options.throwError;
+        }
+        return options.updatedArticle ?? articleFixture();
+      }) as unknown as ArticleCommitWriterPrismaClient["article"]["update"],
     },
   };
-  return { client, calls };
+  return { client, createCalls, updateCalls };
 }
 
 async function testSuccessfulCreate() {
-  const { client, calls } = createFakeClient({ createdArticle: articleFixture({ id: "article-42" }) });
+  const { client, createCalls } = createFakeClient({ createdArticle: articleFixture({ id: "article-42" }) });
   const writer = new ArticleCommitWriter(client);
 
   const result = await writer.createArticleFromDraft(draftFixture());
 
-  assert.equal(calls.length, 1);
+  assert.equal(createCalls.length, 1);
   assert.deepEqual(result, { ok: true, articleId: "article-42" });
 }
 
 async function testPrismaReceivesExpectedCreatePayload() {
-  const { client, calls } = createFakeClient();
+  const { client, createCalls } = createFakeClient();
   const writer = new ArticleCommitWriter(client);
   await writer.createArticleFromDraft(draftFixture());
 
-  const call = calls[0] as { data: Record<string, unknown> };
+  const call = createCalls[0] as { data: Record<string, unknown> };
   assert.equal(call.data.title, "Hello Article");
   assert.equal(call.data.slug, "hello-article");
   assert.equal(call.data.excerpt, "Some rich content");
-  assert.equal(call.data.publishedAt, "2026-01-01 00:00:00");
+  assert.ok(call.data.publishedAt instanceof Date);
+  assert.equal(call.data.publishedAt.toISOString(), "2026-01-01T00:00:00.000Z");
   assert.equal(call.data.status, "PENDING");
   assert.equal(call.data.seoTitle, "SEO Title");
   assert.equal(call.data.seoDescription, "SEO description");
@@ -121,11 +130,11 @@ async function testPrismaReceivesExpectedCreatePayload() {
 }
 
 async function testExactPayloadFieldSet() {
-  const { client, calls } = createFakeClient();
+  const { client, createCalls } = createFakeClient();
   const writer = new ArticleCommitWriter(client);
   await writer.createArticleFromDraft(draftFixture());
 
-  const call = calls[0] as { data: Record<string, unknown> };
+  const call = createCalls[0] as { data: Record<string, unknown> };
   assert.deepEqual(
     new Set(Object.keys(call.data)),
     new Set([
@@ -178,11 +187,11 @@ async function testOnlyArticleDelegateExists() {
 }
 
 async function testNeverTouchesMigrationRecordOrLineageOrSlugHistory() {
-  const { client, calls } = createFakeClient();
+  const { client, createCalls } = createFakeClient();
   const writer = new ArticleCommitWriter(client);
   await writer.createArticleFromDraft(draftFixture());
 
-  const call = calls[0] as { data: Record<string, unknown> };
+  const call = createCalls[0] as { data: Record<string, unknown> };
   for (const forbiddenKey of [
     "migrationRecord",
     "migrationLineage",
@@ -207,6 +216,35 @@ async function testMissingTitleThrows() {
   await assert.rejects(() => writer.createArticleFromDraft(draftFixture({ title: "  " })));
 }
 
+async function testUpdateOnlyRefreshesContentFields() {
+  const { client, updateCalls } = createFakeClient({ updatedArticle: articleFixture({ id: "article-42" }) });
+  const writer = new ArticleCommitWriter(client);
+  const draft = draftFixture({
+    title: "Changed title should not overwrite",
+    slug: "changed-slug-should-not-overwrite",
+    excerpt: "Updated excerpt",
+    contentJson: { version: 1, blocks: [{ id: "b1", type: "text", text: "Updated body" }] },
+  });
+
+  const result = await writer.updateArticleFromDraft("article-42", draft);
+
+  assert.deepEqual(result, { ok: true, articleId: "article-42" });
+  const call = updateCalls[0] as { where: { id: string }; data: Record<string, unknown> };
+  assert.equal(call.where.id, "article-42");
+  assert.deepEqual(new Set(Object.keys(call.data)), new Set(["excerpt", "contentJson"]));
+  assert.equal(call.data.excerpt, "Updated excerpt");
+  assert.deepEqual(call.data.contentJson, draft.contentJson);
+}
+
+async function testUpdateFailureReturnsTypedError() {
+  const { client } = createFakeClient({ throwError: new Error("update failed") });
+  const writer = new ArticleCommitWriter(client);
+  const result = await writer.updateArticleFromDraft("article-1", draftFixture());
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.errorCode, "ARTICLE_UPDATE_FAILED");
+}
+
 async function main() {
   await testSuccessfulCreate();
   await testPrismaReceivesExpectedCreatePayload();
@@ -216,6 +254,8 @@ async function main() {
   await testOnlyArticleDelegateExists();
   await testNeverTouchesMigrationRecordOrLineageOrSlugHistory();
   await testMissingTitleThrows();
+  await testUpdateOnlyRefreshesContentFields();
+  await testUpdateFailureReturnsTypedError();
 }
 
 main()

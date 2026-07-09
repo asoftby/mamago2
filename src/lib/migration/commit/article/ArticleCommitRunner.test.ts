@@ -83,6 +83,15 @@ function contextFixture(overrides: Partial<ArticleCommitContext> = {}): ArticleC
 
 function inputFixture(overrides: Partial<ExecuteArticleCommitRunInput> = {}): ExecuteArticleCommitRunInput {
   return {
+    operation: {
+      recordId: "record-1",
+      sourceRecordKey: "wordpress-db:post:201",
+      targetType: "ARTICLE",
+      action: "CREATE",
+      order: 0,
+      dependsOn: [],
+      rollbackSteps: [],
+    },
     candidate: candidateFixture(),
     context: contextFixture(),
     migrationRecord: migrationRecordFixture(),
@@ -122,26 +131,58 @@ function createFakeLineageWriter(options: { result?: CreateLineageResult; throwE
   return { writer, calls };
 }
 
-function createFakePrisma(options: { throwError?: Error } = {}) {
-  const calls: unknown[] = [];
+function createFakePrisma(
+  options: {
+    throwError?: Error;
+    existingLineage?: { id: string; targetId: string } | null;
+  } = {},
+) {
+  const recordUpdateCalls: unknown[] = [];
+  const lineageFindCalls: unknown[] = [];
+  const lineageUpdateCalls: unknown[] = [];
   const prisma: ArticleCommitRunnerPrismaClient = {
     migrationRecord: {
       update: (async (args: unknown) => {
-        calls.push(args);
+        recordUpdateCalls.push(args);
         if (options.throwError) {
           throw options.throwError;
         }
         return migrationRecordFixture();
       }) as unknown as ArticleCommitRunnerPrismaClient["migrationRecord"]["update"],
     },
+    migrationLineage: {
+      findFirst: (async (args: unknown) => {
+        lineageFindCalls.push(args);
+        return options.existingLineage
+          ? ({
+              id: options.existingLineage.id,
+              sourceRecordKey: "wordpress-db:post:201",
+              targetType: "ARTICLE",
+              targetId: options.existingLineage.targetId,
+            } as unknown)
+          : null;
+      }) as unknown as ArticleCommitRunnerPrismaClient["migrationLineage"]["findFirst"],
+      update: (async (args: unknown) => {
+        lineageUpdateCalls.push(args);
+        if (options.throwError) {
+          throw options.throwError;
+        }
+        return {
+          id: "lineage-1",
+          sourceRecordKey: "wordpress-db:post:201",
+          targetType: "ARTICLE",
+          targetId: "article-1",
+        } as unknown;
+      }) as unknown as ArticleCommitRunnerPrismaClient["migrationLineage"]["update"],
+    },
   };
-  return { prisma, calls };
+  return { prisma, recordUpdateCalls, lineageFindCalls, lineageUpdateCalls };
 }
 
 async function testHappyPathCreatesLineageAndMarksLinked() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, status: "CREATED", articleId: "article-1" });
   const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
-  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
   const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
 
   const result = await runner.execute(inputFixture());
@@ -154,8 +195,8 @@ async function testHappyPathCreatesLineageAndMarksLinked() {
 
   assert.equal(lineageCalls.length, 1);
   assert.equal((lineageCalls[0] as { targetType: string }).targetType, "ARTICLE");
-  assert.equal(prismaCalls.length, 1);
-  const updateCall = prismaCalls[0] as { where: { id: string }; data: Record<string, unknown> };
+  assert.equal(recordUpdateCalls.length, 1);
+  const updateCall = recordUpdateCalls[0] as { where: { id: string }; data: Record<string, unknown> };
   assert.equal(updateCall.where.id, "record-1");
   assert.deepEqual(updateCall.data, { status: "LINKED", lastErrorCode: null, lastErrorMessage: null });
 }
@@ -167,7 +208,7 @@ async function testOrchestratorBlockedMarksFailedWithArticleBlockedAndSkipsLinea
     blockReasons: [{ code: "MISSING_TITLE", message: "NormalizedArticleCandidate.title is empty." }],
   });
   const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
-  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
   const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
 
   const result = await runner.execute(inputFixture());
@@ -178,7 +219,7 @@ async function testOrchestratorBlockedMarksFailedWithArticleBlockedAndSkipsLinea
   assert.match(result.errorMessage ?? "", /MISSING_TITLE/);
   assert.equal(lineageCalls.length, 0, "lineage must never be written for a blocked draft");
 
-  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
   assert.equal(updateCall.data.status, "FAILED");
   assert.equal(updateCall.data.lastErrorCode, "ARTICLE_BLOCKED");
   assert.match(updateCall.data.lastErrorMessage as string, /MISSING_TITLE/);
@@ -192,7 +233,7 @@ async function testOrchestratorFailedMarksFailedWithWriterErrorCodeAndSkipsLinea
     errorMessage: "db unavailable",
   });
   const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
-  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
   const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
 
   const result = await runner.execute(inputFixture());
@@ -203,7 +244,7 @@ async function testOrchestratorFailedMarksFailedWithWriterErrorCodeAndSkipsLinea
   assert.equal(result.errorMessage, "db unavailable");
   assert.equal(lineageCalls.length, 0);
 
-  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
   assert.equal(updateCall.data.lastErrorCode, "ARTICLE_CREATE_FAILED");
   assert.equal(updateCall.data.lastErrorMessage, "db unavailable");
 }
@@ -211,7 +252,7 @@ async function testOrchestratorFailedMarksFailedWithWriterErrorCodeAndSkipsLinea
 async function testLineageFailureMarksFailedWithLineageWriteFailed() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, status: "CREATED", articleId: "article-1" });
   const { writer: lineageWriter } = createFakeLineageWriter({ throwError: new Error("lineage db down") });
-  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
   const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
 
   const result = await runner.execute(inputFixture());
@@ -222,7 +263,7 @@ async function testLineageFailureMarksFailedWithLineageWriteFailed() {
   assert.equal(result.errorMessage, "lineage db down");
   assert.equal(result.articleId, "article-1", "the already-created Article must still be reported, never hidden or rolled back");
 
-  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
   assert.equal(updateCall.data.status, "FAILED");
   assert.equal(updateCall.data.lastErrorCode, "LINEAGE_WRITE_FAILED");
   assert.equal(updateCall.data.lastErrorMessage, "lineage db down");
@@ -240,12 +281,12 @@ async function testMigrationRecordUpdateThrowPropagatesRaw() {
 async function testArticleIdNeverWrittenToMigrationRecord() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, status: "CREATED", articleId: "article-1" });
   const { writer: lineageWriter } = createFakeLineageWriter();
-  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
   const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
 
   await runner.execute(inputFixture());
 
-  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
   assert.ok(!("articleId" in updateCall.data));
   assert.ok(!("targetId" in updateCall.data));
 }
@@ -253,12 +294,12 @@ async function testArticleIdNeverWrittenToMigrationRecord() {
 async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, status: "CREATED", articleId: "article-1" });
   const { writer: lineageWriter } = createFakeLineageWriter();
-  const { prisma, calls: prismaCalls } = createFakePrisma();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
   const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
 
   await runner.execute(inputFixture());
 
-  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
   assert.deepEqual(
     new Set(Object.keys(updateCall.data)),
     new Set(["status", "lastErrorCode", "lastErrorMessage"]),
@@ -270,11 +311,9 @@ async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
 }
 
 async function testNoMediaSlugHistoryCategoryTagsGeoDelegatesExistOrTouched() {
-  // `ArticleCommitRunnerPrismaClient` only ever exposes `migrationRecord` —
-  // there is no `article`/`articleSlugHistory`/`mediaAsset`/
-  // `discoveryTag` delegate to call anything on.
+  // `ArticleCommitRunnerPrismaClient` only exposes migration status/lineage delegates.
   const { prisma } = createFakePrisma();
-  assert.deepEqual(Object.keys(prisma), ["migrationRecord"]);
+  assert.deepEqual(Object.keys(prisma), ["migrationRecord", "migrationLineage"]);
 }
 
 async function testWarningsAreDeliberatelyNotExposedOnRunnerResult() {
@@ -282,7 +321,7 @@ async function testWarningsAreDeliberatelyNotExposedOnRunnerResult() {
     ok: true,
     status: "CREATED",
     articleId: "article-1",
-    warnings: [{ code: "CONTENT_CONVERTED_LOSSY", message: "lossy conversion" }],
+    warnings: [{ code: "CONTENT_NORMALIZED_WITH_LIMITATIONS", message: "content normalized" }],
   });
   const { writer: lineageWriter } = createFakeLineageWriter();
   const { prisma } = createFakePrisma();
@@ -296,6 +335,69 @@ async function testWarningsAreDeliberatelyNotExposedOnRunnerResult() {
   );
 }
 
+async function testExistingLineageAndUpdateActionUsesUpdateFlow() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({
+    ok: true,
+    status: "UPDATED",
+    articleId: "article-1",
+  });
+  const { writer: lineageWriter, calls: lineageCreateCalls } = createFakeLineageWriter();
+  const { prisma, lineageFindCalls, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: { id: "lineage-1", targetId: "article-1" },
+  });
+  const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(
+    inputFixture({
+      operation: {
+        recordId: "record-1",
+        sourceRecordKey: "wordpress-db:post:201",
+        targetType: "ARTICLE",
+        action: "UPDATE",
+        order: 0,
+        dependsOn: [],
+        rollbackSteps: [],
+      },
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(orchestratorCalls.length, 1);
+  const orchestratorCall = orchestratorCalls[0] as { action?: string; targetArticleId?: string | null };
+  assert.equal(orchestratorCall.action, "UPDATE");
+  assert.equal(orchestratorCall.targetArticleId, "article-1");
+  assert.equal(lineageFindCalls.length, 1);
+  assert.equal(lineageUpdateCalls.length, 1);
+  assert.equal(lineageCreateCalls.length, 0, "lineage row must be updated, never duplicated");
+}
+
+async function testUpdateWithoutExistingLineageFails() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, status: "UPDATED", articleId: "article-1" });
+  const { writer: lineageWriter, calls: lineageCreateCalls } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma({ existingLineage: null });
+  const runner = new ArticleCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(
+    inputFixture({
+      operation: {
+        recordId: "record-1",
+        sourceRecordKey: "wordpress-db:post:201",
+        targetType: "ARTICLE",
+        action: "UPDATE",
+        order: 0,
+        dependsOn: [],
+        rollbackSteps: [],
+      },
+    }),
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "ARTICLE_UPDATE_TARGET_MISSING");
+  assert.equal(orchestratorCalls.length, 0);
+  assert.equal(lineageCreateCalls.length, 0);
+  assert.equal(recordUpdateCalls.length, 1);
+}
+
 async function main() {
   await testHappyPathCreatesLineageAndMarksLinked();
   await testOrchestratorBlockedMarksFailedWithArticleBlockedAndSkipsLineage();
@@ -306,6 +408,8 @@ async function main() {
   await testPlanSummaryNormalizedAndRawPayloadNeverTouched();
   await testNoMediaSlugHistoryCategoryTagsGeoDelegatesExistOrTouched();
   await testWarningsAreDeliberatelyNotExposedOnRunnerResult();
+  await testExistingLineageAndUpdateActionUsesUpdateFlow();
+  await testUpdateWithoutExistingLineageFails();
 }
 
 main()

@@ -1,5 +1,6 @@
-import type { MigrationRecord, PrismaClient } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/client";
 
+import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
 import type { ExecuteArticleCommitResult } from "./ArticleCommitOrchestrator";
 import type { ArticleCommitContext, NormalizedArticleCandidate } from "./buildArticleCreateDraft";
@@ -13,6 +14,8 @@ export interface ArticleCommitOrchestratorLike {
   execute(input: {
     candidate: NormalizedArticleCandidate;
     context: ArticleCommitContext;
+    action?: "CREATE" | "UPDATE";
+    targetArticleId?: string | null;
   }): Promise<ExecuteArticleCommitResult>;
 }
 
@@ -48,9 +51,11 @@ export interface MigrationLineageWriterLike {
  */
 export interface ArticleCommitRunnerPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
+  migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
 }
 
 export interface ExecuteArticleCommitRunInput {
+  operation: CommitOperation;
   candidate: NormalizedArticleCandidate;
   context: ArticleCommitContext;
   migrationRecord: MigrationRecord;
@@ -72,6 +77,20 @@ function describeBlockedDraft(result: ExecuteArticleCommitResult): string {
     return "Article draft was blocked for an unknown reason.";
   }
   return reasons.map((reason) => `${reason.code}: ${reason.message}`).join("; ");
+}
+
+function isUpdateAction(action: CommitOperation["action"]): boolean {
+  return action === "UPDATE";
+}
+
+function buildUpdateTargetMissingResult(recordId: string): ExecuteArticleCommitRunResult {
+  return {
+    ok: false,
+    recordId,
+    status: "FAILED",
+    errorCode: "ARTICLE_UPDATE_TARGET_MISSING",
+    errorMessage: "Article UPDATE requires an existing MigrationLineage targetId.",
+  };
 }
 
 /**
@@ -125,11 +144,37 @@ export class ArticleCommitRunner {
   ) {}
 
   async execute(input: ExecuteArticleCommitRunInput): Promise<ExecuteArticleCommitRunResult> {
-    const { migrationRecord } = input;
+    const { migrationRecord, operation } = input;
+    const isUpdate = isUpdateAction(operation.action);
+    const existingLineage: MigrationLineage | null = isUpdate
+      ? await this.deps.prisma.migrationLineage.findFirst({
+          where: {
+            sourceId: migrationRecord.sourceId,
+            sourceRecordKey: migrationRecord.sourceRecordKey,
+            targetType: "ARTICLE",
+            isActive: true,
+          },
+        })
+      : null;
+
+    if (isUpdate && !existingLineage?.targetId?.trim()) {
+      const missingTargetResult = buildUpdateTargetMissingResult(migrationRecord.id);
+      await this.deps.prisma.migrationRecord.update({
+        where: { id: migrationRecord.id },
+        data: {
+          status: "FAILED",
+          lastErrorCode: missingTargetResult.errorCode,
+          lastErrorMessage: missingTargetResult.errorMessage,
+        },
+      });
+      return missingTargetResult;
+    }
 
     const commitResult = await this.deps.orchestrator.execute({
       candidate: input.candidate,
       context: input.context,
+      action: isUpdate ? "UPDATE" : "CREATE",
+      targetArticleId: existingLineage?.targetId ?? null,
     });
 
     if (!commitResult.ok) {
@@ -157,27 +202,48 @@ export class ArticleCommitRunner {
 
     let lineageResult: CreateLineageResult;
     try {
-      lineageResult = await this.deps.lineageWriter.createLineage({
-        sourceId: migrationRecord.sourceId,
-        sourceEntityType: migrationRecord.sourceEntityType,
-        sourceStableKey: migrationRecord.sourceStableKey,
-        sourceRecordKey: migrationRecord.sourceRecordKey,
-        targetType: "ARTICLE",
-        targetId: commitResult.articleId!,
-        targetStableKey: commitResult.articleId!,
-        lastSourceHash: migrationRecord.sourceHash!,
-        runId: migrationRecord.runId,
-        recordId: migrationRecord.id,
-      });
+      if (isUpdate) {
+        const updatedLineage = await this.deps.prisma.migrationLineage.update({
+          where: { id: existingLineage!.id },
+          data: {
+            targetId: commitResult.articleId!,
+            targetNaturalKey: commitResult.articleId!,
+            lastSourceHash: migrationRecord.sourceHash!,
+            runId: migrationRecord.runId,
+            recordId: migrationRecord.id,
+            isActive: true,
+          },
+        });
+        lineageResult = {
+          lineageId: updatedLineage.id,
+          sourceRecordKey: updatedLineage.sourceRecordKey,
+          targetType: updatedLineage.targetType,
+          targetId: updatedLineage.targetId!,
+        };
+      } else {
+        lineageResult = await this.deps.lineageWriter.createLineage({
+          sourceId: migrationRecord.sourceId,
+          sourceEntityType: migrationRecord.sourceEntityType,
+          sourceStableKey: migrationRecord.sourceStableKey,
+          sourceRecordKey: migrationRecord.sourceRecordKey,
+          targetType: "ARTICLE",
+          targetId: commitResult.articleId!,
+          targetStableKey: commitResult.articleId!,
+          lastSourceHash: migrationRecord.sourceHash!,
+          runId: migrationRecord.runId,
+          recordId: migrationRecord.id,
+        });
+      }
     } catch (error) {
       const lineageError = error instanceof Error ? error : new Error(String(error));
+      const errorCode = isUpdate ? "LINEAGE_UPDATE_FAILED" : "LINEAGE_WRITE_FAILED";
 
       // Article already exists at this point — no rollback, only bookkeeping.
       await this.deps.prisma.migrationRecord.update({
         where: { id: migrationRecord.id },
         data: {
           status: "FAILED",
-          lastErrorCode: "LINEAGE_WRITE_FAILED",
+          lastErrorCode: errorCode,
           lastErrorMessage: lineageError.message,
         },
       });
@@ -187,7 +253,7 @@ export class ArticleCommitRunner {
         articleId: commitResult.articleId,
         recordId: migrationRecord.id,
         status: "FAILED",
-        errorCode: "LINEAGE_WRITE_FAILED",
+        errorCode,
         errorMessage: lineageError.message,
       };
     }

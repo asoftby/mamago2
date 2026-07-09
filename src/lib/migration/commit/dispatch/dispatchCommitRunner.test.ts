@@ -165,8 +165,8 @@ async function testDispatchArticleCallsArticleRunnerWithCorrectShape() {
 
   assert.equal(calls.length, 1);
   const call = calls[0];
-  // Article's runner has no `operation` field at all — confirmed structurally.
-  assert.ok(!("operation" in call));
+  assert.equal(call.operation.targetType, "ARTICLE");
+  assert.equal(call.operation.action, "CREATE");
   assert.deepEqual(call.candidate, { title: "Hello Article" });
   assert.deepEqual(call.context, {});
   assert.equal(call.migrationRecord.id, "record-1");

@@ -10,21 +10,24 @@ import type { ArticleCommitResult } from "./ArticleCommitWriter";
 
 /**
  * The narrowest slice of `ArticleCommitWriter` this orchestrator needs —
- * one method — so tests can inject a fake without constructing a real
+ * two methods — so tests can inject a fake without constructing a real
  * writer chain underneath it.
  */
 export interface ArticleCommitWriterLike {
   createArticleFromDraft(draft: ArticleCreateDraft): Promise<ArticleCommitResult>;
+  updateArticleFromDraft(articleId: string, draft: ArticleCreateDraft): Promise<ArticleCommitResult>;
 }
 
 export interface ExecuteArticleCommitInput {
   candidate: NormalizedArticleCandidate;
   context: ArticleCommitContext;
+  action?: "CREATE" | "UPDATE";
+  targetArticleId?: string | null;
 }
 
 export interface ExecuteArticleCommitResult {
   ok: boolean;
-  status: "CREATED" | "BLOCKED" | "FAILED";
+  status: "CREATED" | "UPDATED" | "BLOCKED" | "FAILED";
   articleId?: string;
   blockReasons?: readonly ArticleCommitBlockReason[];
   warnings?: readonly ArticleCommitWarning[];
@@ -33,14 +36,8 @@ export interface ExecuteArticleCommitResult {
 }
 
 /**
- * Sequences PR21/PR22 into the first working Article commit step:
- * `buildArticleCreateDraft()` -> `ArticleCommitWriter.createArticleFromDraft()`.
- *
- * Unlike `PlaceCommitOrchestrator`/`EventCommitOrchestrator` (PR10/PR19),
- * there is no `CommitOperation`/`targetType`/`action` guard here — this PR
- * only wires the draft builder to the writer, exactly as scoped; a
- * `CommitOperation`-shaped entry point (mirroring Place/Event) is a
- * decision for a later PR, not assumed here.
+ * Sequences Article commit work:
+ * `buildArticleCreateDraft()` -> `ArticleCommitWriter.create/update...()`.
  *
  * There's also no try/catch around the writer call: `ArticleCommitWriter`
  * (PR22) already returns a typed `ArticleCommitResult` instead of
@@ -60,7 +57,20 @@ export class ArticleCommitOrchestrator {
       return { ok: false, status: "BLOCKED", blockReasons: draftResult.reasons };
     }
 
-    const writeResult = await this.writer.createArticleFromDraft(draftResult.draft);
+    const action = input.action ?? "CREATE";
+    if (action === "UPDATE" && !input.targetArticleId?.trim()) {
+      return {
+        ok: false,
+        status: "FAILED",
+        errorCode: "ARTICLE_UPDATE_TARGET_MISSING",
+        errorMessage: "Article UPDATE requires an existing targetArticleId from MigrationLineage.",
+      };
+    }
+
+    const writeResult =
+      action === "UPDATE"
+        ? await this.writer.updateArticleFromDraft(input.targetArticleId!, draftResult.draft)
+        : await this.writer.createArticleFromDraft(draftResult.draft);
 
     if (!writeResult.ok) {
       return {
@@ -73,7 +83,7 @@ export class ArticleCommitOrchestrator {
 
     return {
       ok: true,
-      status: "CREATED",
+      status: action === "UPDATE" ? "UPDATED" : "CREATED",
       articleId: writeResult.articleId,
       warnings: draftResult.warnings,
     };
