@@ -12,6 +12,7 @@ function model(row: unknown) {
   return {
     findUnique: async () => row,
     count: async () => 0,
+    groupBy: async () => [],
   };
 }
 
