@@ -58,11 +58,15 @@ import {
 } from "../src/lib/migration/adapters/wordpress-db/connectExecutor";
 import {
   ARTICLE_ENTITY_TYPE,
+  EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
+  fetchPublishedArticleEnvelopeBySourceRecordKey,
+  fetchPublishedEventEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import type { WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
+import type { SourceRecordEnvelope } from "../src/lib/migration/types";
 import { ArticleCommitOrchestrator } from "../src/lib/migration/commit/article/ArticleCommitOrchestrator";
 import { ArticleCommitRunner } from "../src/lib/migration/commit/article/ArticleCommitRunner";
 import { ArticleCommitWriter } from "../src/lib/migration/commit/article/ArticleCommitWriter";
@@ -87,26 +91,13 @@ import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWrit
 
 export type CommitEntity = "article" | "place" | "event" | "all";
 
-/**
- * `normalizeEvent()`'s own `sourceEntityType` is `"wordpress-db:events"`
- * (see its private, unexported `SOURCE_ENTITY_TYPE` constant in
- * `normalizeEvent.ts`) — reproduced here since it isn't exported.
- * `wordpressDbAdapter.ts`'s `discoverRecords()`/`normalizeRecord()` have
- * never been wired to actually discover or normalize `events` posts (a
- * deliberate PR16 scope boundary, not revisited here). Passing
- * `--entity event` is honest about this: it's a real, valid filter value,
- * but since the adapter never discovers anything with this
- * `sourceEntityType`, the resulting execution plan will always have zero
- * records — an honestly empty run, not a thrown error. This PR does not
- * add event adapter wiring.
- */
-const EVENT_ENTITY_TYPE = "wordpress-db:events";
-
 export interface CommitCliArgs {
   entity: CommitEntity;
   contextConfigPath: string;
   confirmWrites: boolean;
   limit?: number;
+  sourceRecordKey?: string;
+  forceReprocess: boolean;
   allowRemoteReadonly: boolean;
   out?: string;
 }
@@ -147,11 +138,40 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   }
 
   const allowRemoteReadonly = argv.includes("--allow-remote-readonly");
+  const forceReprocess = argv.includes("--force-reprocess");
+
+  const sourceRecordKeyIndex = argv.indexOf("--source-record-key");
+  const sourceRecordKey =
+    sourceRecordKeyIndex !== -1 ? argv[sourceRecordKeyIndex + 1] : undefined;
+  if (sourceRecordKeyIndex !== -1 && !sourceRecordKey) {
+    throw new Error("Missing value for --source-record-key.");
+  }
+
+  if (forceReprocess) {
+    if (entity !== "article") {
+      throw new Error("--force-reprocess is only supported with --entity article.");
+    }
+    if (!sourceRecordKey) {
+      throw new Error("--force-reprocess requires --source-record-key <key>.");
+    }
+    if (limit !== undefined) {
+      throw new Error("--force-reprocess cannot be combined with --limit (mass mode is not allowed).");
+    }
+  }
 
   const outIndex = argv.indexOf("--out");
   const out = outIndex !== -1 ? argv[outIndex + 1] : undefined;
 
-  return { entity, contextConfigPath, confirmWrites, limit, allowRemoteReadonly, out };
+  return {
+    entity,
+    contextConfigPath,
+    confirmWrites,
+    limit,
+    sourceRecordKey,
+    forceReprocess,
+    allowRemoteReadonly,
+    out,
+  };
 }
 
 function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
@@ -171,6 +191,8 @@ function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
 export function buildExecutionPlanInput(input: {
   entity: CommitEntity;
   limit?: number;
+  sourceRecordKey?: string;
+  records?: readonly SourceRecordEnvelope[];
   executor: WordPressQueryExecutor;
   ledger: MigrationLineageLookup;
 }): MigrationRunPlanInput {
@@ -178,7 +200,11 @@ export function buildExecutionPlanInput(input: {
     adapterKey: WORDPRESS_DB_ADAPTER_KEY,
     sourceNamespace: "wordpress-db",
     sourceConfig: { executor: input.executor },
-    filters: { entityTypes: entityTypesFor(input.entity), limit: input.limit },
+    records: input.records,
+    filters: {
+      entityTypes: entityTypesFor(input.entity),
+      limit: input.sourceRecordKey ? 1 : input.limit,
+    },
     ledger: input.ledger,
   };
 }
@@ -233,11 +259,38 @@ function printSummary(summary: RunCommitExecutionPlanSummary, args: CommitCliArg
   console.log();
   console.log(`entity: ${args.entity}`);
   console.log(`limit: ${args.limit ?? "(default)"}`);
+  if (args.sourceRecordKey) {
+    console.log(`sourceRecordKey: ${args.sourceRecordKey}`);
+  }
+  if (args.forceReprocess) {
+    console.log("forceReprocess: true");
+  }
   console.log();
   printCommitExecutionCounters(summary);
   console.log();
   for (const result of summary.results) {
     console.log(formatCommitResultLine(result));
+  }
+}
+
+function applyForcedArticleReprocess(
+  executionPlan: Awaited<ReturnType<typeof createMigrationRunExecutionPlan>>,
+  args: CommitCliArgs,
+): void {
+  if (!args.forceReprocess || !args.sourceRecordKey) {
+    return;
+  }
+  for (const item of executionPlan.plan.items) {
+    if (item.sourceRecordKey === args.sourceRecordKey && item.action === "SKIP_UNCHANGED") {
+      item.action = "UPDATE";
+      item.status = "PLANNED";
+    }
+  }
+  for (const candidate of executionPlan.executionCandidates) {
+    if (candidate.planItem.sourceRecordKey === args.sourceRecordKey && candidate.planItem.action === "SKIP_UNCHANGED") {
+      candidate.planItem.action = "UPDATE";
+      candidate.planItem.status = "PLANNED";
+    }
   }
 }
 
@@ -256,16 +309,32 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient();
   try {
-    // Same `MigrationLedgerRepository` real lineage lookup used by every
-    // other Phoenix entrypoint (PR6) — without it, `createMigrationRunPlan`/
-    // `createMigrationRunExecutionPlan` treat every record as CREATE on
-    // every run, regardless of what was already imported. Wiring it here is
-    // what makes a repeated commit run safe from duplicate creates.
     const ledger = new MigrationLedgerRepository(prisma);
 
+    let records: readonly SourceRecordEnvelope[] | undefined;
+    if (args.sourceRecordKey) {
+      if (args.entity === "article") {
+        records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
+      } else if (args.entity === "event") {
+        records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
+      } else {
+        throw new Error(
+          "--source-record-key is only supported with --entity article|event for golden-sample runs.",
+        );
+      }
+    }
+
     const executionPlan = await createMigrationRunExecutionPlan(
-      buildExecutionPlanInput({ entity: args.entity, limit: args.limit, executor, ledger }),
+      buildExecutionPlanInput({
+        entity: args.entity,
+        limit: args.limit,
+        sourceRecordKey: args.sourceRecordKey,
+        records,
+        executor,
+        ledger,
+      }),
     );
+    applyForcedArticleReprocess(executionPlan, args);
 
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);

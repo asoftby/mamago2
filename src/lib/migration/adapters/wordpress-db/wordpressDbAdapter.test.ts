@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 
 import {
   ARTICLE_ENTITY_TYPE,
+  EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
+  fetchPublishedArticleEnvelopeBySourceRecordKey,
   wordpressDbAdapter,
 } from "./wordpressDbAdapter";
 import type {
@@ -59,8 +61,14 @@ const placeIndexRows: WordPressPlaceIndexRow[] = [
 function createFakeExecutor(): WordPressQueryExecutor {
   return async (sql, params = []) => {
     if (sql.includes("FROM wp_posts") && sql.includes("post_type = ?")) {
-      const [postType] = params;
-      if (postType === "post") return articlePosts as never;
+      const [postType, , postId] = params;
+      const byId = sql.includes("ID = ?");
+      if (postType === "post") {
+        if (byId) {
+          return articlePosts.filter((row) => row.ID === Number(postId)) as never;
+        }
+        return articlePosts as never;
+      }
       if (postType === "places") return placePosts as never;
       return [] as never;
     }
@@ -119,6 +127,26 @@ async function testSourceRecordKeyFormat() {
   assert.equal(place?.sourceStableKey, "wordpress-db:places:301");
 }
 
+async function testFetchPublishedArticleEnvelopeBySourceRecordKey() {
+  const record = await fetchPublishedArticleEnvelopeBySourceRecordKey(
+    createFakeExecutor(),
+    "wordpress-db:post:201",
+  );
+
+  assert.equal(record.sourceEntityType, ARTICLE_ENTITY_TYPE);
+  assert.equal(record.sourceRecordKey, "wordpress-db:post:201");
+  assert.equal(record.sourceStableKey, "wordpress-db:post:201");
+  assert.equal(record.sourceExternalId, undefined);
+  assert.ok(record.sourceHash);
+}
+
+async function testFetchPublishedArticleEnvelopeRejectsWrongKey() {
+  await assert.rejects(
+    () => fetchPublishedArticleEnvelopeBySourceRecordKey(createFakeExecutor(), "wordpress-db:events:201"),
+    /Invalid article sourceRecordKey/,
+  );
+}
+
 async function testStableSourceHash() {
   const first = await wordpressDbAdapter.discoverRecords(contextWith());
   const second = await wordpressDbAdapter.discoverRecords(contextWith());
@@ -170,7 +198,7 @@ async function testMetadata() {
   assert.equal(wordpressDbAdapter.metadata.key, WORDPRESS_DB_ADAPTER_KEY);
   assert.deepEqual(
     [...wordpressDbAdapter.metadata.supportedSourceEntityTypes],
-    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE],
+    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE],
   );
 }
 
@@ -179,6 +207,8 @@ async function main() {
   await testDiscoverPlacesOnly();
   await testDiscoverAll();
   await testSourceRecordKeyFormat();
+  await testFetchPublishedArticleEnvelopeBySourceRecordKey();
+  await testFetchPublishedArticleEnvelopeRejectsWrongKey();
   await testStableSourceHash();
   await testNormalizeRoutesToArticleAndPlace();
   await testNormalizeUnknownEntityTypeThrows();

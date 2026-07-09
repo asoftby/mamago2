@@ -29,6 +29,8 @@ function testParsesValidFlags() {
     contextConfigPath: "config.json",
     confirmWrites: true,
     limit: 5,
+    sourceRecordKey: undefined,
+    forceReprocess: false,
     allowRemoteReadonly: true,
     out: "report.json",
   });
@@ -40,6 +42,7 @@ function testDefaultsWhenOptionalFlagsOmitted() {
   assert.equal(args.entity, "all");
   assert.equal(args.limit, undefined);
   assert.equal(args.allowRemoteReadonly, false);
+  assert.equal(args.forceReprocess, false);
   assert.equal(args.out, undefined);
 }
 
@@ -86,6 +89,44 @@ function testValidEntityValuesAllParse() {
     const args = parseArgs(["--entity", entity, ...REQUIRED_FLAGS]);
     assert.equal(args.entity, entity);
   }
+}
+
+function testForceReprocessRequiresArticleAndSourceRecordKey() {
+  assert.throws(
+    () => parseArgs(["--entity", "place", "--force-reprocess", ...REQUIRED_FLAGS]),
+    /--entity article/,
+  );
+  assert.throws(
+    () => parseArgs(["--entity", "article", "--force-reprocess", ...REQUIRED_FLAGS]),
+    /--source-record-key/,
+  );
+
+  const args = parseArgs([
+    "--entity",
+    "article",
+    "--source-record-key",
+    "wordpress-db:post:201",
+    "--force-reprocess",
+    ...REQUIRED_FLAGS,
+  ]);
+  assert.equal(args.forceReprocess, true);
+}
+
+function testForceReprocessDisallowsMassModeLimit() {
+  assert.throws(
+    () =>
+      parseArgs([
+        "--entity",
+        "article",
+        "--source-record-key",
+        "wordpress-db:post:201",
+        "--force-reprocess",
+        "--limit",
+        "5",
+        ...REQUIRED_FLAGS,
+      ]),
+    /mass mode is not allowed/,
+  );
 }
 
 function testConfigJsonParsedWhenValid() {
@@ -185,6 +226,30 @@ function testBuildExecutionPlanInputPassesLimitThrough() {
   assert.equal(input.filters?.limit, 5);
 }
 
+function testBuildExecutionPlanInputPinsSingleRecordLimit() {
+  const ledger = createFakeLedger();
+  const executor = async () => [];
+
+  const input = buildExecutionPlanInput({
+    entity: "article",
+    limit: 500,
+    sourceRecordKey: "wordpress-db:post:201",
+    records: [
+      {
+        sourceEntityType: "wordpress-db:post",
+        sourceStableKey: "wordpress-db:post:201",
+        sourceRecordKey: "wordpress-db:post:201",
+      },
+    ],
+    executor,
+    ledger,
+  });
+
+  assert.equal(input.filters?.limit, 1);
+  assert.equal(input.records?.length, 1);
+  assert.equal(input.records?.[0].sourceRecordKey, "wordpress-db:post:201");
+}
+
 function main() {
   testParsesValidFlags();
   testDefaultsWhenOptionalFlagsOmitted();
@@ -193,6 +258,8 @@ function main() {
   testInvalidEntityFails();
   testInvalidLimitFails();
   testValidEntityValuesAllParse();
+  testForceReprocessRequiresArticleAndSourceRecordKey();
+  testForceReprocessDisallowsMassModeLimit();
   testConfigJsonParsedWhenValid();
   testConfigJsonAllowsEmptyObject();
   testConfigInvalidJsonFails();
@@ -202,6 +269,7 @@ function main() {
   testBuildExecutionPlanInputPassesLedgerThrough();
   testBuildExecutionPlanInputMapsEntityToEntityTypes();
   testBuildExecutionPlanInputPassesLimitThrough();
+  testBuildExecutionPlanInputPinsSingleRecordLimit();
 }
 
 // No real DB/SSH anywhere in this file — only `parseArgs()`/

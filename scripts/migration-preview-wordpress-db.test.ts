@@ -244,6 +244,8 @@ function testParseArgs() {
   assert.deepEqual(parseArgs([]), {
     entity: "all",
     limit: undefined,
+    sourceRecordKey: undefined,
+    forceReprocess: false,
     out: undefined,
     allowRemoteReadonly: false,
   });
@@ -251,6 +253,8 @@ function testParseArgs() {
   assert.deepEqual(parseArgs(["--entity", "place", "--limit", "20"]), {
     entity: "place",
     limit: 20,
+    sourceRecordKey: undefined,
+    forceReprocess: false,
     out: undefined,
     allowRemoteReadonly: false,
   });
@@ -258,13 +262,58 @@ function testParseArgs() {
   assert.deepEqual(parseArgs(["--entity", "article", "--out", "report.json", "--allow-remote-readonly"]), {
     entity: "article",
     limit: undefined,
+    sourceRecordKey: undefined,
+    forceReprocess: false,
     out: "report.json",
     allowRemoteReadonly: true,
   });
 
+  assert.deepEqual(parseArgs(["--entity", "article", "--source-record-key", "wordpress-db:post:201"]), {
+    entity: "article",
+    limit: undefined,
+    sourceRecordKey: "wordpress-db:post:201",
+    forceReprocess: false,
+    out: undefined,
+    allowRemoteReadonly: false,
+  });
+
+  assert.deepEqual(
+    parseArgs([
+      "--entity",
+      "article",
+      "--source-record-key",
+      "wordpress-db:post:201",
+      "--force-reprocess",
+    ]),
+    {
+      entity: "article",
+      limit: undefined,
+      sourceRecordKey: "wordpress-db:post:201",
+      forceReprocess: true,
+      out: undefined,
+      allowRemoteReadonly: false,
+    },
+  );
+
   assert.throws(() => parseArgs(["--entity", "bogus"]), /Invalid --entity value/);
   assert.throws(() => parseArgs(["--limit", "0"]), /Invalid --limit value/);
   assert.throws(() => parseArgs(["--limit", "not-a-number"]), /Invalid --limit value/);
+  assert.throws(() => parseArgs(["--source-record-key"]), /Missing value for --source-record-key/);
+  assert.throws(() => parseArgs(["--entity", "event", "--force-reprocess"]), /--entity article/);
+  assert.throws(() => parseArgs(["--entity", "article", "--force-reprocess"]), /--source-record-key/);
+  assert.throws(
+    () =>
+      parseArgs([
+        "--entity",
+        "article",
+        "--source-record-key",
+        "wordpress-db:post:201",
+        "--force-reprocess",
+        "--limit",
+        "2",
+      ]),
+    /mass mode is not allowed/,
+  );
 }
 
 async function main() {

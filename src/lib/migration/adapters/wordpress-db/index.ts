@@ -12,8 +12,10 @@ export type {
 } from "./normalizeEvent";
 export {
   ARTICLE_ENTITY_TYPE,
+  EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
+  fetchPublishedEventEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
   wordpressDbAdapter,
 } from "./wordpressDbAdapter";

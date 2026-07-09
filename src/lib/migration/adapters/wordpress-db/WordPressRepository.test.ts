@@ -128,10 +128,17 @@ function createFakeExecutor() {
     calls.push({ sql, params });
 
     if (sql.includes("FROM wp_posts") && sql.includes("post_type = ?")) {
-      const [postType] = params;
-      if (postType === "post") return articlePost as never;
+      const [postType, , postId] = params;
+      const byId = sql.includes("ID = ?");
+      if (postType === "post") {
+        if (byId) return (Number(postId) === articlePost.ID ? articlePost : []) as never;
+        return articlePost as never;
+      }
       if (postType === "places") return placePost as never;
-      if (postType === "events") return eventPost as never;
+      if (postType === "events") {
+        if (byId) return (Number(postId) === eventPost.ID ? eventPost : []) as never;
+        return eventPost as never;
+      }
       return [] as never;
     }
     if (sql.includes("FROM wp_postmeta")) {
@@ -200,6 +207,26 @@ async function testArticleBundle() {
   assert.deepEqual(postsCall!.params, ["post", "publish", DEFAULT_LIMIT]);
 }
 
+async function testPublishedArticleById() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedArticleById(201);
+
+  assert.ok(bundle);
+  assert.deepEqual(bundle.post, articlePost);
+  assert.deepEqual(bundle.postMeta, {
+    _thumbnail_id: ["555"],
+    rank_math_title: ["SEO Title"],
+    rank_math_focus_keyword: ["kids"],
+  });
+  assert.deepEqual(bundle.terms, articleTerms);
+
+  const postsCall = calls.find((call) => call.sql.includes("ID = ?") && call.params[0] === "post");
+  assert.ok(postsCall);
+  assert.deepEqual(postsCall!.params, ["post", "publish", 201]);
+}
+
 async function testPlaceBundle() {
   const { executor } = createFakeExecutor();
   const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
@@ -238,6 +265,20 @@ async function testEventBundle() {
   const postsCall = calls.find((call) => call.sql.includes("post_type = ?") && call.params[0] === "events");
   assert.ok(postsCall);
   assert.deepEqual(postsCall!.params, ["events", "publish", DEFAULT_LIMIT]);
+}
+
+async function testPublishedEventById() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedEventById(401);
+
+  assert.ok(bundle);
+  assert.deepEqual(bundle.post, eventPost);
+
+  const postsCall = calls.find((call) => call.sql.includes("ID = ?") && call.params[0] === "events");
+  assert.ok(postsCall);
+  assert.deepEqual(postsCall!.params, ["events", "publish", 401]);
 }
 
 async function testMissingPlaceIndexDoesNotFailBundle() {
@@ -308,8 +349,10 @@ async function testLimitClamping() {
 
 async function main() {
   await testArticleBundle();
+  await testPublishedArticleById();
   await testPlaceBundle();
   await testEventBundle();
+  await testPublishedEventById();
   await testMissingPlaceIndexDoesNotFailBundle();
   await testEmptyIdListsSkipExecutor();
   await testAttachmentsById();

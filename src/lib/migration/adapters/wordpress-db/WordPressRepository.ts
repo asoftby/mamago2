@@ -2,7 +2,9 @@ import {
   buildAttachmentsQuery,
   buildPlaceIndexQuery,
   buildPostMetaQuery,
+  buildPublishedArticleByIdQuery,
   buildPublishedArticlesQuery,
+  buildPublishedEventByIdQuery,
   buildPublishedEventsQuery,
   buildPublishedPlacesQuery,
   buildRankMathRedirectsQuery,
@@ -72,6 +74,13 @@ export class WordPressRepository {
     return this.assemblePostBundles(posts);
   }
 
+  async getPublishedArticleById(postId: number): Promise<WordPressArticleBundle | null> {
+    const { sql, params } = buildPublishedArticleByIdQuery(postId);
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    const bundles = await this.assemblePostBundles(posts);
+    return bundles[0] ?? null;
+  }
+
   async getPublishedPlaces(limit?: number): Promise<WordPressPlaceBundle[]> {
     const { sql, params } = buildPublishedPlacesQuery(clampLimit(limit));
     const posts = await this.executor<WordPressPostRow>(sql, params);
@@ -100,6 +109,13 @@ export class WordPressRepository {
     const { sql, params } = buildPublishedEventsQuery(clampLimit(limit));
     const posts = await this.executor<WordPressPostRow>(sql, params);
     return this.assemblePostBundles(posts);
+  }
+
+  async getPublishedEventById(postId: number): Promise<WordPressEventBundle | null> {
+    const { sql, params } = buildPublishedEventByIdQuery(postId);
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    const bundles = await this.assemblePostBundles(posts);
+    return bundles[0] ?? null;
   }
 
   private async assemblePostBundles(

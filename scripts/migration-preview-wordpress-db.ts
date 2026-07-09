@@ -33,15 +33,18 @@ import {
 } from "../src/lib/migration/adapters/wordpress-db/connectExecutor";
 import {
   ARTICLE_ENTITY_TYPE,
+  EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
+  fetchPublishedArticleEnvelopeBySourceRecordKey,
+  fetchPublishedEventEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import { runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
 import type { MigrationPlan, MigrationPlanItem, MigrationPlanStats, MigrationWarning } from "../src/lib/migration/types";
 
-export type PreviewEntity = "article" | "place" | "all";
+export type PreviewEntity = "article" | "place" | "event" | "all";
 
 export interface PreviewReportOptions {
   entity: PreviewEntity;
@@ -177,9 +180,14 @@ export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewRep
     push("(none)");
   } else {
     for (const candidate of candidates.slice(0, 3)) {
+      const warningCodes = candidate.warnings.map((w) => w.code).slice(0, 5);
+      const warningCodesLabel =
+        warningCodes.length > 0
+          ? ` | warningCodes: ${warningCodes.join(", ")}${candidate.warnings.length > warningCodes.length ? ", …" : ""}`
+          : "";
       push(
         `- ${candidate.sourceRecordKey} | ${candidate.title ?? "(no title)"} | ${candidate.slug ?? "(no slug)"} ` +
-          `| warnings: ${candidate.warnings.length} | mediaRefs: ${candidate.mediaRefCount} | relationRefs: ${candidate.relationRefCount}`,
+          `| warnings: ${candidate.warnings.length}${warningCodesLabel} | mediaRefs: ${candidate.mediaRefCount} | relationRefs: ${candidate.relationRefCount}`,
       );
     }
   }
@@ -211,13 +219,21 @@ export function buildPreviewJsonReport(plan: MigrationPlan, options: PreviewRepo
 export function parseArgs(argv: readonly string[]): {
   entity: PreviewEntity;
   limit?: number;
+  sourceRecordKey?: string;
+  forceReprocess: boolean;
   out?: string;
   allowRemoteReadonly: boolean;
 } {
   const entityIndex = argv.indexOf("--entity");
   const rawEntity = entityIndex !== -1 ? argv[entityIndex + 1] : undefined;
-  if (rawEntity !== undefined && rawEntity !== "article" && rawEntity !== "place" && rawEntity !== "all") {
-    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|all.`);
+  if (
+    rawEntity !== undefined &&
+    rawEntity !== "article" &&
+    rawEntity !== "place" &&
+    rawEntity !== "event" &&
+    rawEntity !== "all"
+  ) {
+    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|all.`);
   }
   const entity: PreviewEntity = rawEntity ?? "all";
 
@@ -231,22 +247,43 @@ export function parseArgs(argv: readonly string[]): {
     }
   }
 
+  const sourceRecordKeyIndex = argv.indexOf("--source-record-key");
+  const sourceRecordKey =
+    sourceRecordKeyIndex !== -1 ? argv[sourceRecordKeyIndex + 1] : undefined;
+  if (sourceRecordKeyIndex !== -1 && !sourceRecordKey) {
+    throw new Error("Missing value for --source-record-key.");
+  }
+
   const outIndex = argv.indexOf("--out");
   const out = outIndex !== -1 ? argv[outIndex + 1] : undefined;
+  const forceReprocess = argv.includes("--force-reprocess");
+
+  if (forceReprocess) {
+    if (entity !== "article") {
+      throw new Error("--force-reprocess is only supported with --entity article.");
+    }
+    if (!sourceRecordKey) {
+      throw new Error("--force-reprocess requires --source-record-key <key>.");
+    }
+    if (limit !== undefined) {
+      throw new Error("--force-reprocess cannot be combined with --limit (mass mode is not allowed).");
+    }
+  }
 
   const allowRemoteReadonly = argv.includes("--allow-remote-readonly");
 
-  return { entity, limit, out, allowRemoteReadonly };
+  return { entity, limit, sourceRecordKey, forceReprocess, out, allowRemoteReadonly };
 }
 
 function entityTypesFor(entity: PreviewEntity): readonly string[] | undefined {
   if (entity === "article") return [ARTICLE_ENTITY_TYPE];
   if (entity === "place") return [PLACE_ENTITY_TYPE];
+  if (entity === "event") return [EVENT_ENTITY_TYPE];
   return undefined;
 }
 
 async function main(): Promise<void> {
-  const { entity, limit, out, allowRemoteReadonly } = parseArgs(process.argv.slice(2));
+  const { entity, limit, sourceRecordKey, forceReprocess, out, allowRemoteReadonly } = parseArgs(process.argv.slice(2));
 
   const config = readWordPressDbConfigFromEnv(process.env);
   assertRemoteAccessAllowed(config, allowRemoteReadonly);
@@ -257,12 +294,32 @@ async function main(): Promise<void> {
 
   const executor = createWordPressSshMysqlExecutor(config);
 
+  let records;
+  if (sourceRecordKey) {
+    if (entity === "article") {
+      records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+    } else if (entity === "event") {
+      records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+    } else {
+      throw new Error("--source-record-key is only supported with --entity article|event for golden-sample runs.");
+    }
+  }
+
   const { plan } = await runMigrationDryRun({
     adapterKey: WORDPRESS_DB_ADAPTER_KEY,
     sourceNamespace: "wordpress-db",
     sourceConfig: { executor },
-    filters: { entityTypes: entityTypesFor(entity), limit },
+    records,
+    filters: { entityTypes: entityTypesFor(entity), limit: sourceRecordKey ? 1 : limit },
   });
+  if (forceReprocess && sourceRecordKey) {
+    for (const item of plan.items) {
+      if (item.sourceRecordKey === sourceRecordKey && item.action === "SKIP_UNCHANGED") {
+        item.action = "UPDATE";
+        item.status = "PLANNED";
+      }
+    }
+  }
 
   const options: PreviewReportOptions = { entity, limit: limit ?? null };
 

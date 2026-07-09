@@ -37,6 +37,16 @@ export function buildPublishedArticlesQuery(limit: number): SqlQuery {
   };
 }
 
+export function buildPublishedArticleByIdQuery(postId: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type = ? AND post_status = ? AND ID = ?
+      LIMIT 1`,
+    params: ["post", "publish", postId],
+  };
+}
+
 export function buildPublishedPlacesQuery(limit: number): SqlQuery {
   return {
     sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
@@ -62,6 +72,16 @@ export function buildPublishedEventsQuery(limit: number): SqlQuery {
       ORDER BY ID
       LIMIT ?`,
     params: ["events", "publish", limit],
+  };
+}
+
+export function buildPublishedEventByIdQuery(postId: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type = ? AND post_status = ? AND ID = ?
+      LIMIT 1`,
+    params: ["events", "publish", postId],
   };
 }
 

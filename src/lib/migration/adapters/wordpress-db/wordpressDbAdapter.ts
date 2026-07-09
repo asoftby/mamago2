@@ -1,19 +1,20 @@
 /**
- * Wires WordPressRepository + normalizePlace/normalizeArticle into a real
- * `MigrationAdapter` so the generic Phoenix engine (core/orchestrator.ts)
- * can discover and normalize WordPress content. This module never opens a
- * connection itself — the executor must be injected by the caller via
- * `context.config.executor` — and it is never registered as a side effect
- * of importing it; call `registerWordPressDbAdapter()` explicitly.
+ * Wires WordPressRepository + normalizePlace/normalizeArticle/normalizeEvent
+ * into a real `MigrationAdapter` so the generic Phoenix engine
+ * (core/orchestrator.ts) can discover and normalize WordPress content. This
+ * module never opens a connection itself — the executor must be injected by
+ * the caller via `context.config.executor` — and it is never registered as a
+ * side effect of importing it; call `registerWordPressDbAdapter()` explicitly.
  */
 import { createHash } from "node:crypto";
 
 import { registerMigrationAdapter } from "../registry";
 import { normalizeArticle } from "./normalizeArticle";
+import { normalizeEvent } from "./normalizeEvent";
 import { normalizePlace } from "./normalizePlace";
 import { WordPressRepository } from "./WordPressRepository";
 import type { WordPressQueryExecutor } from "./WordPressRepository";
-import type { WordPressArticleBundle, WordPressPlaceBundle } from "./types";
+import type { WordPressArticleBundle, WordPressEventBundle, WordPressPlaceBundle } from "./types";
 import type {
   MigrationAdapterContext,
   NormalizedRecord,
@@ -23,8 +24,9 @@ import type {
 export const WORDPRESS_DB_ADAPTER_KEY = "wordpress-db";
 export const ARTICLE_ENTITY_TYPE = "wordpress-db:post";
 export const PLACE_ENTITY_TYPE = "wordpress-db:places";
+export const EVENT_ENTITY_TYPE = "wordpress-db:events";
 
-type WordPressEntityFilter = "article" | "place" | "all";
+type WordPressEntityFilter = "article" | "place" | "event" | "all";
 
 function getExecutorFromContext(context: MigrationAdapterContext): WordPressQueryExecutor {
   const executor = context.config?.executor;
@@ -43,8 +45,10 @@ function resolveEntityFilter(context: MigrationAdapterContext): WordPressEntityF
 
   const wantsArticles = entityTypes.includes(ARTICLE_ENTITY_TYPE);
   const wantsPlaces = entityTypes.includes(PLACE_ENTITY_TYPE);
-  if (wantsArticles && !wantsPlaces) return "article";
-  if (wantsPlaces && !wantsArticles) return "place";
+  const wantsEvents = entityTypes.includes(EVENT_ENTITY_TYPE);
+  if (wantsArticles && !wantsPlaces && !wantsEvents) return "article";
+  if (wantsPlaces && !wantsArticles && !wantsEvents) return "place";
+  if (wantsEvents && !wantsArticles && !wantsPlaces) return "event";
   return "all";
 }
 
@@ -97,6 +101,18 @@ function toPlaceEnvelope(bundle: WordPressPlaceBundle): SourceRecordEnvelope {
   };
 }
 
+function toEventEnvelope(bundle: WordPressEventBundle): SourceRecordEnvelope {
+  const sourceRecordKey = `${EVENT_ENTITY_TYPE}:${bundle.post.ID}`;
+  return {
+    sourceEntityType: EVENT_ENTITY_TYPE,
+    sourceStableKey: sourceRecordKey,
+    sourceRecordKey,
+    sourceUpdatedAt: bundle.post.post_modified,
+    sourceHash: hashBundle(bundle),
+    rawPayload: bundle,
+  };
+}
+
 async function discoverRecords(
   context: MigrationAdapterContext,
 ): Promise<SourceRecordEnvelope[]> {
@@ -117,6 +133,11 @@ async function discoverRecords(
     envelopes.push(...places.map(toPlaceEnvelope));
   }
 
+  if (entityFilter === "event" || entityFilter === "all") {
+    const events = await repository.getPublishedEvents(limit);
+    envelopes.push(...events.map(toEventEnvelope));
+  }
+
   return envelopes;
 }
 
@@ -127,6 +148,9 @@ async function normalizeRecord(record: SourceRecordEnvelope): Promise<Normalized
   if (record.sourceEntityType === PLACE_ENTITY_TYPE) {
     return normalizePlace(record.rawPayload as WordPressPlaceBundle);
   }
+  if (record.sourceEntityType === EVENT_ENTITY_TYPE) {
+    return normalizeEvent(record.rawPayload as WordPressEventBundle);
+  }
   throw new Error(`wordpress-db adapter cannot normalize sourceEntityType "${record.sourceEntityType}"`);
 }
 
@@ -135,10 +159,10 @@ export const wordpressDbAdapter = {
     key: WORDPRESS_DB_ADAPTER_KEY,
     version: "1.0.0",
     displayName: "WordPress DB (read-only)",
-    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE],
-    supportedTargetTypes: ["ARTICLE", "PLACE"] as const,
+    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE],
+    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY"] as const,
     capabilities: ["DISCOVERY", "NORMALIZATION"] as const,
-    stableIdPolicy: "WordPress post ID, namespaced by post_type (post/places)",
+    stableIdPolicy: "WordPress post ID, namespaced by post_type (post/places/events)",
     hashPolicy:
       "SHA-256 of a key-sorted JSON serialization of the full bundle (post + postmeta + terms + placeIndex)",
     timezonePolicy:
@@ -152,4 +176,56 @@ export const wordpressDbAdapter = {
 /** No auto-connect and no auto-registration on import — the caller opts in explicitly. */
 export function registerWordPressDbAdapter(): void {
   registerMigrationAdapter(wordpressDbAdapter);
+}
+
+/**
+ * Fetches a single published WP article by its Phoenix `sourceRecordKey`
+ * (`wordpress-db:post:{id}`). Used by commit/preview CLIs for golden-sample
+ * runs that must not discover more than one record.
+ */
+export async function fetchPublishedArticleEnvelopeBySourceRecordKey(
+  executor: WordPressQueryExecutor,
+  sourceRecordKey: string,
+): Promise<SourceRecordEnvelope> {
+  const match = /^wordpress-db:post:(\d+)$/.exec(sourceRecordKey.trim());
+  if (!match) {
+    throw new Error(
+      `Invalid article sourceRecordKey "${sourceRecordKey}". Expected format "wordpress-db:post:{wpPostId}".`,
+    );
+  }
+  const postId = Number(match[1]);
+  const repository = new WordPressRepository(executor);
+  const bundle = await repository.getPublishedArticleById(postId);
+  if (!bundle) {
+    throw new Error(
+      `No published WordPress article found for sourceRecordKey "${sourceRecordKey}" (post_type=post, post_status=publish).`,
+    );
+  }
+  return toArticleEnvelope(bundle);
+}
+
+/**
+ * Fetches a single published WP event by its Phoenix `sourceRecordKey`
+ * (`wordpress-db:events:{id}`). Used by commit/preview CLIs for golden-sample
+ * runs that must not discover more than one record.
+ */
+export async function fetchPublishedEventEnvelopeBySourceRecordKey(
+  executor: WordPressQueryExecutor,
+  sourceRecordKey: string,
+): Promise<SourceRecordEnvelope> {
+  const match = /^wordpress-db:events:(\d+)$/.exec(sourceRecordKey.trim());
+  if (!match) {
+    throw new Error(
+      `Invalid event sourceRecordKey "${sourceRecordKey}". Expected format "wordpress-db:events:{wpPostId}".`,
+    );
+  }
+  const postId = Number(match[1]);
+  const repository = new WordPressRepository(executor);
+  const bundle = await repository.getPublishedEventById(postId);
+  if (!bundle) {
+    throw new Error(
+      `No published WordPress event found for sourceRecordKey "${sourceRecordKey}" (post_type=events, post_status=publish).`,
+    );
+  }
+  return toEventEnvelope(bundle);
 }
