@@ -1,7 +1,14 @@
-import prisma from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+
+type EventActivitySessionsPrisma = {
+  activitySession: Pick<
+    PrismaClient["activitySession"],
+    "createMany" | "deleteMany" | "findMany"
+  >;
+};
 
 type ScheduleJsonLike = {
   dates?: unknown;
@@ -74,9 +81,13 @@ export function eventSessionFingerprintFromStoredSessions(
 }
 
 export async function activitySessionsMatchScheduleJson(
-  activityId: string,
-  scheduleJson: unknown,
+  input: {
+    prisma: EventActivitySessionsPrisma;
+    activityId: string;
+    scheduleJson: unknown;
+  },
 ): Promise<boolean> {
+  const { prisma, activityId, scheduleJson } = input;
   const fromJson = eventSessionScheduleFingerprint(scheduleJson);
   const rows = await prisma.activitySession.findMany({
     where: { activityId },
@@ -91,9 +102,13 @@ export async function activitySessionsMatchScheduleJson(
  * Required for submit validation and listings that rely on sessions.
  */
 export async function replaceActivitySessionsFromScheduleJson(
-  activityId: string,
-  scheduleJson: unknown,
+  input: {
+    prisma: EventActivitySessionsPrisma;
+    activityId: string;
+    scheduleJson: unknown;
+  },
 ): Promise<number> {
+  const { prisma, activityId, scheduleJson } = input;
   const started = isServerSavePerfEnabled() ? performance.now() : 0;
   const { dates, startTime } = extractScheduleDatesAndStartTime(scheduleJson);
 

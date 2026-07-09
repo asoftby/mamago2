@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { ContentStatus } from "@prisma/client";
+import { ContentStatus, type PrismaClient } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
@@ -18,6 +18,11 @@ export type ActivityOccurrenceDebugState = {
   upcomingSessionsCount: number;
   totalSessionsCount: number;
   nearestUpcomingSessionStartsAt: Date | null;
+};
+
+type ActivityNextOccurrencePrisma = {
+  activity: Pick<PrismaClient["activity"], "update">;
+  activitySession: Pick<PrismaClient["activitySession"], "findFirst">;
 };
 
 async function getEventRevalidationContext(
@@ -68,8 +73,12 @@ async function getEventRevalidationContext(
 }
 
 export async function syncActivityNextOccurrenceAt(
-  activityId: string,
+  input: {
+    prisma: ActivityNextOccurrencePrisma;
+    activityId: string;
+  },
 ): Promise<Date | null> {
+  const { prisma, activityId } = input;
   const nextUpcomingSession = await prisma.activitySession.findFirst({
     where: {
       activityId,

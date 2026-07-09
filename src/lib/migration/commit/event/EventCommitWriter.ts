@@ -1,21 +1,27 @@
 import type { Activity, Prisma, PrismaClient } from "@prisma/client";
 
+import { syncActivityNextOccurrenceAt } from "@/lib/business/eventMutationSideEffects";
+import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import type { EventCreateDraft } from "./types";
 
 /**
  * The narrowest slice of `PrismaClient` this writer needs — just
- * `activity.create`, typed via Prisma's own generated signature. No
- * `activitySession`, no `eventVenue`, no `activityImage`, no
- * `migrationLineage`/`migrationRecord` delegates — they aren't present on
- * this type, so this writer cannot call them even by mistake.
+ * the Activity write methods plus the existing event discovery sync surface.
+ * No `eventVenue`, no `activityImage`, no `migrationLineage`/
+ * `migrationRecord` delegates — they aren't present on this type, so this
+ * writer cannot call them even by mistake.
  */
 export interface EventCommitWriterPrismaClient {
-  activity: Pick<PrismaClient["activity"], "create">;
+  activity: Pick<PrismaClient["activity"], "create" | "update">;
+  activitySession: Pick<
+    PrismaClient["activitySession"],
+    "createMany" | "deleteMany" | "findFirst" | "findMany"
+  >;
 }
 
 export interface EventCommitResult {
   activityId: string;
-  status: "CREATED";
+  status: "CREATED" | "UPDATED";
 }
 
 function assertDraftIsUsable(draft: EventCreateDraft): void {
@@ -41,11 +47,12 @@ function assertDraftIsUsable(draft: EventCreateDraft): void {
 
 /**
  * The first real Event entity writer: `EventCreateDraft` -> one `Activity`
- * row via one `prisma.activity.create()` call. It makes no decisions —
- * category, organizer, place, schedule, everything already went through
- * `buildEventCreateDraft` (PR17) before reaching here. No
- * `ActivitySession`, no `EventVenue`, no images, no lineage, no
- * `MigrationRecord`, no rollback, no batching — that's later PRs.
+ * row via one `prisma.activity.create()` call, followed by the same
+ * ActivitySession/nextOccurrenceAt sync used by Business Wizard. It makes no
+ * decisions — category, organizer, place, schedule, everything already went
+ * through `buildEventCreateDraft` (PR17) before reaching here. No
+ * `EventVenue`, no images, no lineage, no `MigrationRecord`, no rollback, no
+ * batching — that's later PRs.
  */
 export class EventCommitWriter {
   constructor(private readonly prisma: EventCommitWriterPrismaClient) {}
@@ -66,15 +73,56 @@ export class EventCommitWriter {
         organizerId: draft.organizerId,
         eventCategoryId: draft.eventCategoryId,
         scheduleMode: draft.scheduleMode,
-        // `NormalizedEventScheduleDraft` is already a plain, JSON-serializable
-        // object (`{ mode, dates }`) — this cast only satisfies Prisma's
-        // generated `InputJsonValue` index-signature requirement, it doesn't
-        // change what's actually written.
         scheduleJson: draft.scheduleJson as unknown as Prisma.InputJsonValue,
         priceText: draft.priceText,
       },
     });
 
+    await this.syncEventDiscoveryFields(activity.id, draft.scheduleJson);
+
     return { activityId: activity.id, status: "CREATED" };
+  }
+
+  async updateEventFromDraft(activityId: string, draft: EventCreateDraft): Promise<EventCommitResult> {
+    assertDraftIsUsable(draft);
+    if (!activityId.trim()) {
+      throw new Error("activityId is required for Event update.");
+    }
+
+    const activity: Activity = await this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        title: draft.title,
+        shortDesc: draft.shortDesc,
+        description: draft.description,
+        status: draft.status,
+        cityId: draft.cityId,
+        placeId: draft.placeId,
+        organizerId: draft.organizerId,
+        eventCategoryId: draft.eventCategoryId,
+        scheduleMode: draft.scheduleMode,
+        scheduleJson: draft.scheduleJson as unknown as Prisma.InputJsonValue,
+        priceText: draft.priceText,
+      },
+    });
+
+    await this.syncEventDiscoveryFields(activity.id, draft.scheduleJson);
+
+    return { activityId: activity.id, status: "UPDATED" };
+  }
+
+  private async syncEventDiscoveryFields(
+    activityId: string,
+    scheduleJson: EventCreateDraft["scheduleJson"],
+  ): Promise<void> {
+    await replaceActivitySessionsFromScheduleJson({
+      prisma: this.prisma,
+      activityId,
+      scheduleJson,
+    });
+    await syncActivityNextOccurrenceAt({
+      prisma: this.prisma,
+      activityId,
+    });
   }
 }
