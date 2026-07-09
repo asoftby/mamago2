@@ -31,14 +31,23 @@
  *   singleton is wrapped with `SearchIndexerService` and `globalThis`
  *   dev-hot-reload caching, both Next.js-app concerns a disposable,
  *   one-shot CLI process doesn't need.
- * - No production/staging distinction is made here — see the PR30-prep
- *   audit for why that's an open question, not silently decided.
+ * - `--profile FULL_IMPORT|DEV_VALIDATION|PRODUCTION` (default: derived from
+ *   APP_ENV/VERCEL_ENV, see `resolveMigrationProfile()`) selects a bundle of
+ *   `--media-policy FULL|METADATA|NONE`, `--seo-policy DRY_RUN|VALIDATE|PRODUCTION`
+ *   and `--redirect-policy VALIDATE|APPLY`, each individually overridable.
+ *   The resolved profile is printed before anything runs.
+ * - When the resolved profile is `PRODUCTION`, `ProductionMigrationGuard`
+ *   requires `--confirm-production` and validates the redirect manifest and
+ *   global-noindex flag *before* the WordPress SSH connection or
+ *   `PrismaClient` is ever opened — see `assertProductionMigrationGuard()`.
  *
  * Run:
  *   pnpm migration:commit:wordpress-db --entity place \
  *     --context-config ./commit-context.json --confirm-writes
  *   pnpm migration:commit:wordpress-db --entity all \
  *     --context-config ./commit-context.json --confirm-writes --limit 5 --out report.json
+ *   pnpm migration:commit:wordpress-db --entity all --profile PRODUCTION \
+ *     --context-config ./commit-context.json --confirm-writes --confirm-production
  *
  * Required env vars (same as migration:preview:wordpress-db): WP_SSH_HOST,
  * WP_SSH_USER, WP_DB_NAME, WP_DB_USER, WP_DB_PASSWORD. A non-localhost
@@ -89,6 +98,23 @@ import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/m
 import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
 import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLineageWriter";
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
+import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
+import {
+  formatMigrationProfileForCli,
+  parseMediaPolicyName,
+  parseMigrationProfileName,
+  parseRedirectPolicyName,
+  parseSeoPolicyName,
+  resolveMigrationProfile,
+} from "../src/lib/migration/runtime/MigrationProfile";
+import type {
+  MediaPolicyName,
+  MigrationProfile,
+  MigrationProfileName,
+  RedirectPolicyName,
+  SeoPolicyName,
+} from "../src/lib/migration/runtime/MigrationProfile";
+import { assertProductionMigrationGuard } from "../src/lib/migration/runtime/ProductionMigrationGuard";
 
 export type CommitEntity = "article" | "place" | "event" | "all";
 
@@ -101,6 +127,11 @@ export interface CommitCliArgs {
   forceReprocess: boolean;
   allowRemoteReadonly: boolean;
   out?: string;
+  profileName?: MigrationProfileName;
+  mediaPolicyName?: MediaPolicyName;
+  seoPolicyName?: SeoPolicyName;
+  redirectPolicyName?: RedirectPolicyName;
+  confirmProduction: boolean;
 }
 
 const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "all"];
@@ -163,6 +194,39 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const outIndex = argv.indexOf("--out");
   const out = outIndex !== -1 ? argv[outIndex + 1] : undefined;
 
+  const profileIndex = argv.indexOf("--profile");
+  const rawProfile = profileIndex !== -1 ? argv[profileIndex + 1] : undefined;
+  const profileName = rawProfile !== undefined ? parseMigrationProfileName(rawProfile) : undefined;
+  if (rawProfile !== undefined && profileName === null) {
+    throw new Error(
+      `Invalid --profile value "${rawProfile}". Expected FULL_IMPORT|DEV_VALIDATION|PRODUCTION.`,
+    );
+  }
+
+  const mediaPolicyIndex = argv.indexOf("--media-policy");
+  const rawMediaPolicy = mediaPolicyIndex !== -1 ? argv[mediaPolicyIndex + 1] : undefined;
+  const mediaPolicyName = rawMediaPolicy !== undefined ? parseMediaPolicyName(rawMediaPolicy) : undefined;
+  if (rawMediaPolicy !== undefined && mediaPolicyName === null) {
+    throw new Error(`Invalid --media-policy value "${rawMediaPolicy}". Expected FULL|METADATA|NONE.`);
+  }
+
+  const seoPolicyIndex = argv.indexOf("--seo-policy");
+  const rawSeoPolicy = seoPolicyIndex !== -1 ? argv[seoPolicyIndex + 1] : undefined;
+  const seoPolicyName = rawSeoPolicy !== undefined ? parseSeoPolicyName(rawSeoPolicy) : undefined;
+  if (rawSeoPolicy !== undefined && seoPolicyName === null) {
+    throw new Error(`Invalid --seo-policy value "${rawSeoPolicy}". Expected DRY_RUN|VALIDATE|PRODUCTION.`);
+  }
+
+  const redirectPolicyIndex = argv.indexOf("--redirect-policy");
+  const rawRedirectPolicy = redirectPolicyIndex !== -1 ? argv[redirectPolicyIndex + 1] : undefined;
+  const redirectPolicyName =
+    rawRedirectPolicy !== undefined ? parseRedirectPolicyName(rawRedirectPolicy) : undefined;
+  if (rawRedirectPolicy !== undefined && redirectPolicyName === null) {
+    throw new Error(`Invalid --redirect-policy value "${rawRedirectPolicy}". Expected VALIDATE|APPLY.`);
+  }
+
+  const confirmProduction = argv.includes("--confirm-production");
+
   return {
     entity,
     contextConfigPath,
@@ -172,6 +236,11 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     forceReprocess,
     allowRemoteReadonly,
     out,
+    profileName: profileName ?? undefined,
+    mediaPolicyName: mediaPolicyName ?? undefined,
+    seoPolicyName: seoPolicyName ?? undefined,
+    redirectPolicyName: redirectPolicyName ?? undefined,
+    confirmProduction,
   };
 }
 
@@ -297,6 +366,18 @@ function applyForcedArticleReprocess(
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+
+  const profile: MigrationProfile = resolveMigrationProfile({
+    profileName: args.profileName,
+    mediaPolicyName: args.mediaPolicyName,
+    seoPolicyName: args.seoPolicyName,
+    redirectPolicyName: args.redirectPolicyName,
+  });
+  console.log(formatMigrationProfileForCli(profile));
+  console.log();
+
+  assertProductionMigrationGuard({ profile, confirmProduction: args.confirmProduction });
+
   const contextConfig = loadCommitContextConfig(args.contextConfigPath);
 
   const wpConfig = readWordPressDbConfigFromEnv(process.env);
@@ -341,11 +422,14 @@ async function main(): Promise<void> {
     const lineageWriter = new MigrationLineageWriter(prisma);
     const wordpressRepository = new WordPressRepository(executor);
     const { createMamagoMediaImporter } = await import("../src/lib/migration/media");
-    const eventMediaSyncer = new EventMediaSyncer({
-      prisma,
-      attachmentResolver: wordpressRepository,
-      mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
-      lineageWriter,
+    const eventMediaSyncer = new MediaPolicyGatedEventMediaSyncer({
+      inner: new EventMediaSyncer({
+        prisma,
+        attachmentResolver: wordpressRepository,
+        mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
+        lineageWriter,
+      }),
+      mediaPolicy: profile.mediaPolicy,
     });
 
     const runners = {

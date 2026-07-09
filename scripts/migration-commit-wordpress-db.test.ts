@@ -33,6 +33,11 @@ function testParsesValidFlags() {
     forceReprocess: false,
     allowRemoteReadonly: true,
     out: "report.json",
+    profileName: undefined,
+    mediaPolicyName: undefined,
+    seoPolicyName: undefined,
+    redirectPolicyName: undefined,
+    confirmProduction: false,
   });
 }
 
@@ -127,6 +132,68 @@ function testForceReprocessDisallowsMassModeLimit() {
       ]),
     /mass mode is not allowed/,
   );
+}
+
+function testProfileFlagParsesValidValues() {
+  for (const profile of ["FULL_IMPORT", "DEV_VALIDATION", "PRODUCTION"]) {
+    const args = parseArgs(["--profile", profile, ...REQUIRED_FLAGS]);
+    assert.equal(args.profileName, profile);
+  }
+  assert.equal(parseArgs(REQUIRED_FLAGS).profileName, undefined);
+}
+
+function testInvalidProfileFails() {
+  assert.throws(
+    () => parseArgs(["--profile", "bogus", ...REQUIRED_FLAGS]),
+    /Invalid --profile value "bogus"/,
+  );
+}
+
+function testMediaPolicyFlagParsesValidValues() {
+  for (const policy of ["FULL", "METADATA", "NONE"]) {
+    const args = parseArgs(["--media-policy", policy, ...REQUIRED_FLAGS]);
+    assert.equal(args.mediaPolicyName, policy);
+  }
+}
+
+function testInvalidMediaPolicyFails() {
+  assert.throws(
+    () => parseArgs(["--media-policy", "bogus", ...REQUIRED_FLAGS]),
+    /Invalid --media-policy value "bogus"/,
+  );
+}
+
+function testSeoPolicyFlagParsesValidValues() {
+  for (const policy of ["DRY_RUN", "VALIDATE", "PRODUCTION"]) {
+    const args = parseArgs(["--seo-policy", policy, ...REQUIRED_FLAGS]);
+    assert.equal(args.seoPolicyName, policy);
+  }
+}
+
+function testInvalidSeoPolicyFails() {
+  assert.throws(
+    () => parseArgs(["--seo-policy", "bogus", ...REQUIRED_FLAGS]),
+    /Invalid --seo-policy value "bogus"/,
+  );
+}
+
+function testRedirectPolicyFlagParsesValidValues() {
+  for (const policy of ["VALIDATE", "APPLY"]) {
+    const args = parseArgs(["--redirect-policy", policy, ...REQUIRED_FLAGS]);
+    assert.equal(args.redirectPolicyName, policy);
+  }
+}
+
+function testInvalidRedirectPolicyFails() {
+  assert.throws(
+    () => parseArgs(["--redirect-policy", "bogus", ...REQUIRED_FLAGS]),
+    /Invalid --redirect-policy value "bogus"/,
+  );
+}
+
+function testConfirmProductionFlagParses() {
+  assert.equal(parseArgs(REQUIRED_FLAGS).confirmProduction, false);
+  assert.equal(parseArgs(["--confirm-production", ...REQUIRED_FLAGS]).confirmProduction, true);
 }
 
 function testConfigJsonParsedWhenValid() {
@@ -260,6 +327,15 @@ function main() {
   testValidEntityValuesAllParse();
   testForceReprocessRequiresArticleAndSourceRecordKey();
   testForceReprocessDisallowsMassModeLimit();
+  testProfileFlagParsesValidValues();
+  testInvalidProfileFails();
+  testMediaPolicyFlagParsesValidValues();
+  testInvalidMediaPolicyFails();
+  testSeoPolicyFlagParsesValidValues();
+  testInvalidSeoPolicyFails();
+  testRedirectPolicyFlagParsesValidValues();
+  testInvalidRedirectPolicyFails();
+  testConfirmProductionFlagParses();
   testConfigJsonParsedWhenValid();
   testConfigJsonAllowsEmptyObject();
   testConfigInvalidJsonFails();
