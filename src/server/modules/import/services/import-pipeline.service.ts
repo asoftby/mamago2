@@ -18,6 +18,9 @@ import { getParser } from "../parsers/registry";
 import { normalizeRunRecords } from "./import-normalization.service";
 import { matchRunRecords } from "./import-matching.service";
 import { ensureImportReviewTaskExists } from "./import-review-task.service";
+import { normalizePlacePayload } from "../normalizers/place.normalizer";
+import { normalizeEventPayload } from "../normalizers/event.normalizer";
+import { scorePlaceImport, scoreEventImport } from "./import-quality.service";
 
 export interface RunImportResult {
   runId: string;
@@ -244,4 +247,134 @@ export async function runImportForSource(
       error: message,
     };
   }
+}
+
+// ── Dry-run preview (no DB writes) ──────────────────────────────────────────
+
+export interface PreviewImportItem {
+  sourceUrl: string;
+  externalId: string | null;
+  entityType: string;
+  normalizeSuccess: boolean;
+  qualityScore?: number;
+  warnings?: string[];
+  error?: string;
+}
+
+export interface PreviewImportResult {
+  sourceId: string;
+  sourceSlug: string;
+  parserKey: string;
+  /** Общее количество записей, найденных парсером (может быть больше totalProcessed) */
+  totalFetched: number;
+  /** Сколько записей реально прогнали через normalizer (ограничено limit) */
+  totalProcessed: number;
+  totalParsed: number;
+  totalErrors: number;
+  fetchError?: string;
+  /** Первые несколько обработанных записей для превью */
+  items: PreviewImportItem[];
+}
+
+/**
+ * Dry-run превью import pipeline для одного источника.
+ *
+ * Гарантированно НЕ пишет в БД: не создаёт ImportRun/ImportedRecord/ImportReviewTask,
+ * не обновляет ImportSource. Только читает ImportSource и вызывает parser.parse() +
+ * чистые normalizer/scorer функции (без побочных эффектов).
+ *
+ * Matching намеренно не включён — его persistence (matchStatus, ImportReviewTask
+ * рекомендации) неотделим от DB-записи в текущей реализации import-matching.service.ts.
+ */
+export async function previewImportForSource(
+  sourceId: string,
+  options: { limit?: number } = {},
+): Promise<PreviewImportResult> {
+  const limit = options.limit ?? 20;
+
+  const source = await prisma.importSource.findUnique({ where: { id: sourceId, isActive: true } });
+  if (!source) throw new Error(`ImportSource not found or inactive: ${sourceId}`);
+
+  if (!source.parserKey) {
+    throw new Error(`ImportSource "${source.slug}" has no parserKey configured`);
+  }
+
+  const parser = getParser(source.parserKey);
+  if (!parser) {
+    throw new Error(`No parser registered for key: "${source.parserKey}"`);
+  }
+
+  const parserResult = await parser.parse(source);
+  const toProcess = parserResult.records.slice(0, limit);
+
+  let totalParsed = 0;
+  let totalErrors = 0;
+  const items: PreviewImportItem[] = [];
+
+  for (const raw of toProcess) {
+    const entityType = source.defaultEntity ?? "PLACE";
+
+    try {
+      if (entityType === "PLACE") {
+        const { normalized, warnings } = normalizePlacePayload({
+          rawPayload: raw.rawPayload,
+          sourceSlug: source.slug,
+          sourceUrl: raw.sourceUrl,
+          externalId: raw.externalId ?? null,
+          sourceUpdatedAt: raw.sourceUpdatedAt,
+        });
+        const { score } = scorePlaceImport(normalized);
+        totalParsed++;
+        items.push({
+          sourceUrl: raw.sourceUrl,
+          externalId: raw.externalId ?? null,
+          entityType,
+          normalizeSuccess: true,
+          qualityScore: score,
+          warnings,
+        });
+      } else if (entityType === "EVENT") {
+        const { normalized, warnings } = normalizeEventPayload({
+          rawPayload: raw.rawPayload,
+          sourceSlug: source.slug,
+          sourceUrl: raw.sourceUrl,
+          externalId: raw.externalId ?? null,
+          sourceUpdatedAt: raw.sourceUpdatedAt,
+        });
+        const { score } = scoreEventImport(normalized);
+        totalParsed++;
+        items.push({
+          sourceUrl: raw.sourceUrl,
+          externalId: raw.externalId ?? null,
+          entityType,
+          normalizeSuccess: true,
+          qualityScore: score,
+          warnings,
+        });
+      } else {
+        throw new Error(`Unsupported entityType: ${entityType}`);
+      }
+    } catch (err) {
+      totalErrors++;
+      items.push({
+        sourceUrl: raw.sourceUrl,
+        externalId: raw.externalId ?? null,
+        entityType,
+        normalizeSuccess: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    sourceId,
+    sourceSlug: source.slug,
+    parserKey: source.parserKey,
+    totalFetched: parserResult.totalFound,
+    totalProcessed: toProcess.length,
+    totalParsed,
+    totalErrors,
+    fetchError: parserResult.error,
+    items,
+  };
 }

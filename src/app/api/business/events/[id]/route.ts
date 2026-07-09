@@ -644,9 +644,16 @@ export async function PATCH(
       }
 
       const sessionsSyncStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-      await replaceActivitySessionsFromScheduleJson(saved.id, nextScheduleJson);
+      await replaceActivitySessionsFromScheduleJson({
+        prisma,
+        activityId: saved.id,
+        scheduleJson: nextScheduleJson,
+      });
       perf.mark("schedule-sync");
-      const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt(saved.id);
+      const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt({
+        prisma,
+        activityId: saved.id,
+      });
 
       if (isServerSavePerfEnabled()) {
         console.info("[event-patch-timing] activity-sessions-sync", {

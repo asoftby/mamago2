@@ -217,6 +217,16 @@ model PhoneOtp {
   @@index([phoneE164, purpose])
 }
 
+/// Fixed-window rate limit counters (shared across instances).
+/// key: e.g. `login:{ip}:{email}`; row expires when resetAt <= now.
+model RateLimitEntry {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
 model TelegramLinkToken {
   id          String              @id @default(cuid())
   token       String              @unique
@@ -1073,7 +1083,7 @@ model Place {
   activityTypes                String[]
   addressJson                  Json?
   ageTags                      String[]
-  category                     String
+  category                     String?
   countryCode                  String?
   customAddress                String?
   displayAddress               String?
@@ -3582,6 +3592,490 @@ enum DevTelegramBusinessApplicationStatus {
   PENDING
   CONFIRMED
   REJECTED
+}
+
+// Migration Engine / Project Phoenix
+
+enum MigrationSourceStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+  ERROR
+  ARCHIVED
+}
+
+enum MigrationRunMode {
+  DRY_RUN
+  COMMIT
+}
+
+enum MigrationRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum MigrationRecordStatus {
+  DISCOVERED
+  EXTRACTED
+  NORMALIZED
+  VALIDATED
+  PLANNED
+  PUBLISHED
+  LINKED
+  COMPLETED
+  QUARANTINED
+  FAILED
+}
+
+enum MigrationTargetType {
+  USER
+  USER_PROFILE
+  CHILD
+  BUSINESS
+  BUSINESS_PROFILE
+  ORGANIZER
+  PLACE
+  OFFER
+  ACTIVITY
+  ARTICLE
+  ROUTE
+  ROUTE_STOP
+  PLACE_REVIEW
+  MEDIA_ASSET
+  TAXONOMY
+  RELATION
+  REDIRECT
+}
+
+enum MigrationPlanAction {
+  CREATE
+  UPDATE
+  LINK_EXISTING
+  SKIP_UNCHANGED
+  SKIP_POLICY
+  QUARANTINE
+  FAIL
+}
+
+enum MigrationPlanStatus {
+  PLANNED
+  SKIPPED
+  DUPLICATE
+  APPLIED
+  BOUND
+  LINKED
+  QUARANTINED
+  FAILED
+}
+
+enum MigrationMediaScope {
+  USER_PROFILE
+  BUSINESS_PROFILE
+  PLACE
+  ARTICLE
+  OFFER_SERVICES
+  OFFER_PROGRAMS
+  ROUTE
+  EVENT_BLOCKED
+}
+
+enum MigrationReviewTaskStatus {
+  PENDING
+  IN_REVIEW
+  RESOLVED
+  CANCELLED
+}
+
+enum MigrationReviewDecision {
+  APPROVE
+  REJECT
+  LINK_EXISTING
+  SKIP
+  DEFER
+  NEEDS_MORE_DATA
+}
+
+enum MigrationQuarantineStatus {
+  OPEN
+  RESOLVED
+  IGNORED
+  RETRYING
+}
+
+enum MigrationSeverity {
+  INFO
+  WARNING
+  ERROR
+  BLOCKER
+}
+
+enum MigrationReportType {
+  MACHINE
+  HUMAN
+  MANUAL_REVIEW
+  QUARANTINE
+}
+
+model MigrationSource {
+  id               String                @id @default(cuid())
+  adapterKey       String
+  sourceNamespace  String
+  name             String
+  status           MigrationSourceStatus @default(ACTIVE)
+  config           Json?
+  scope            Json?
+  capabilities     Json?
+  notes            String?
+  lastRunAt        DateTime?
+  lastSuccessAt    DateTime?
+  lastErrorAt      DateTime?
+  lastErrorMessage String?
+  archivedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  runs            MigrationRun[]
+  records         MigrationRecord[]
+  lineage         MigrationLineage[]
+  mediaAssets     MigrationMediaAsset[]
+  relations       MigrationRelation[]
+  redirects       MigrationRedirect[]
+  reviewTasks     MigrationReviewTask[]
+  quarantineItems MigrationQuarantineItem[]
+  reportArtifacts MigrationReportArtifact[]
+
+  @@unique([adapterKey, sourceNamespace])
+  @@index([adapterKey, status])
+  @@index([status])
+  @@index([archivedAt])
+}
+
+model MigrationRun {
+  id               String             @id @default(cuid())
+  sourceId         String
+  mode             MigrationRunMode
+  status           MigrationRunStatus @default(PENDING)
+  adapterVersion   String
+  triggerType      String?
+  triggerUserId    String?
+  resumedFromRunId String?
+  snapshotHash     String?
+  snapshotRef      String?
+  planHash         String?
+  counters         Json?
+  errorMessage     String?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  source          MigrationSource           @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  records         MigrationRecord[]
+  lineage         MigrationLineage[]
+  mediaAssets     MigrationMediaAsset[]
+  relations       MigrationRelation[]
+  redirects       MigrationRedirect[]
+  reviewTasks     MigrationReviewTask[]
+  quarantineItems MigrationQuarantineItem[]
+  reportArtifacts MigrationReportArtifact[]
+
+  @@index([sourceId, status])
+  @@index([sourceId, mode])
+  @@index([status])
+  @@index([createdAt])
+  @@index([resumedFromRunId])
+}
+
+model MigrationRecord {
+  id                   String                @id @default(cuid())
+  sourceId             String
+  runId                String
+  status               MigrationRecordStatus @default(DISCOVERED)
+  sourceEntityType     String
+  sourceExternalId     String?
+  sourceStableKey      String
+  sourceRecordKey      String
+  sourceUrl            String?
+  canonicalSourceUrl   String?
+  sourceUpdatedAt      DateTime?
+  sourceHash           String?
+  rawPayloadRef        String?
+  rawPayload           Json?
+  normalizedPayloadRef String?
+  normalizedPayload    Json?
+  targetTypeHint       MigrationTargetType?
+  planAction           MigrationPlanAction?
+  planSummary          Json?
+  validationSummary    Json?
+  dependencyRefs       Json?
+  mediaRefs            Json?
+  relationRefs         Json?
+  redirectRefs         Json?
+  attemptCount         Int                   @default(0)
+  lastErrorCode        String?
+  lastErrorMessage     String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  source          MigrationSource           @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run             MigrationRun              @relation(fields: [runId], references: [id], onDelete: Cascade)
+  lineage         MigrationLineage[]
+  mediaAssets     MigrationMediaAsset[]
+  relationsFrom   MigrationRelation[]       @relation("MigrationRelationFromRecord")
+  relationsTo     MigrationRelation[]       @relation("MigrationRelationToRecord")
+  redirects       MigrationRedirect[]
+  reviewTasks     MigrationReviewTask[]
+  quarantineItems MigrationQuarantineItem[]
+
+  @@unique([runId, sourceRecordKey])
+  @@index([sourceId, sourceRecordKey])
+  @@index([runId, status])
+  @@index([sourceId, sourceEntityType, status])
+  @@index([sourceHash])
+  @@index([canonicalSourceUrl])
+  @@index([targetTypeHint, status])
+}
+
+model MigrationLineage {
+  id               String               @id @default(cuid())
+  sourceId         String
+  recordId         String?
+  runId            String?
+  sourceEntityType String
+  sourceExternalId String?
+  sourceStableKey  String
+  sourceRecordKey  String
+  targetType       MigrationTargetType
+  targetId         String?
+  targetRole       String               @default("primary")
+  targetNaturalKey String?
+  lastSourceHash   String?
+  lastPlanAction   MigrationPlanAction?
+  isActive         Boolean              @default(true)
+  firstSeenAt      DateTime             @default(now())
+  lastSeenAt       DateTime?
+  lastImportedAt   DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  record MigrationRecord? @relation(fields: [recordId], references: [id])
+  run    MigrationRun?    @relation(fields: [runId], references: [id])
+
+  @@unique([sourceId, sourceRecordKey, targetType, targetRole])
+  @@index([targetType, targetId])
+  @@index([sourceId, sourceEntityType])
+  @@index([sourceId, sourceExternalId])
+  @@index([lastSourceHash])
+  @@index([isActive])
+}
+
+model MigrationMediaAsset {
+  id                    String              @id @default(cuid())
+  sourceId              String
+  runId                 String?
+  recordId              String?
+  status                MigrationPlanStatus @default(PLANNED)
+  sourceMediaKey        String
+  sourceMediaExternalId String?
+  sourceUrl             String?
+  canonicalSourceUrl    String?
+  sourcePath            String?
+  sourceHash            String?
+  contentHash           String?
+  fileName              String?
+  mimeType              String?
+  byteSize              Int?
+  width                 Int?
+  height                Int?
+  altText               String?
+  primaryScope          MigrationMediaScope?
+  requestedBindings     Json?
+  approvedBindings      Json?
+  blockedBindings       Json?
+  targetMediaAssetId    String?
+  bindingPlan           Json?
+  bindingResult         Json?
+  lastErrorMessage      String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run    MigrationRun?    @relation(fields: [runId], references: [id])
+  record MigrationRecord? @relation(fields: [recordId], references: [id])
+
+  @@unique([sourceId, sourceMediaKey])
+  @@index([runId, status])
+  @@index([recordId])
+  @@index([sourceMediaExternalId])
+  @@index([contentHash])
+  @@index([targetMediaAssetId])
+  @@index([primaryScope, status])
+}
+
+model MigrationRelation {
+  id                       String              @id @default(cuid())
+  sourceId                 String
+  runId                    String?
+  fromRecordId             String?
+  toRecordId               String?
+  status                   MigrationPlanStatus @default(PLANNED)
+  sourceRelationKey        String
+  sourceRelationType       String
+  sourceRelationExternalId String?
+  fromSourceRecordKey      String?
+  toSourceRecordKey        String?
+  fromTargetType           MigrationTargetType?
+  fromTargetId             String?
+  toTargetType             MigrationTargetType?
+  toTargetId               String?
+  nativeRelationType       String?
+  planSummary              Json?
+  applyResult              Json?
+  lastErrorMessage         String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  source     MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run        MigrationRun?    @relation(fields: [runId], references: [id])
+  fromRecord MigrationRecord? @relation("MigrationRelationFromRecord", fields: [fromRecordId], references: [id])
+  toRecord   MigrationRecord? @relation("MigrationRelationToRecord", fields: [toRecordId], references: [id])
+
+  @@unique([sourceId, sourceRelationKey])
+  @@index([runId, status])
+  @@index([sourceRelationType])
+  @@index([fromSourceRecordKey])
+  @@index([toSourceRecordKey])
+  @@index([fromTargetType, fromTargetId])
+  @@index([toTargetType, toTargetId])
+}
+
+model MigrationRedirect {
+  id                       String              @id @default(cuid())
+  sourceId                 String
+  runId                    String?
+  recordId                 String?
+  status                   MigrationPlanStatus @default(PLANNED)
+  sourceRedirectKey        String
+  sourceRedirectExternalId String?
+  sourceUrl                String?
+  normalizedSourcePath     String
+  matchMode                String
+  sourceDestinationUrl     String?
+  targetType               MigrationTargetType?
+  targetId                 String?
+  targetUrl                String?
+  httpStatus               Int?
+  priority                 Int                 @default(0)
+  conflictGroupKey         String?
+  planSummary              Json?
+  applyResult              Json?
+  lastErrorMessage         String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run    MigrationRun?    @relation(fields: [runId], references: [id])
+  record MigrationRecord? @relation(fields: [recordId], references: [id])
+
+  @@unique([sourceId, sourceRedirectKey])
+  @@index([runId, status])
+  @@index([recordId])
+  @@index([sourceId, normalizedSourcePath, matchMode])
+  @@index([targetType, targetId])
+  @@index([conflictGroupKey])
+}
+
+model MigrationReviewTask {
+  id               String                    @id @default(cuid())
+  sourceId         String
+  runId            String?
+  recordId         String?
+  status           MigrationReviewTaskStatus @default(PENDING)
+  priority         Int                       @default(0)
+  scopeKey         String
+  reasonCode       String
+  title            String
+  summary          String?
+  context          Json?
+  proposedDecision Json?
+  decision         MigrationReviewDecision?
+  decisionPayload  Json?
+  reviewerUserId   String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run    MigrationRun?    @relation(fields: [runId], references: [id])
+  record MigrationRecord? @relation(fields: [recordId], references: [id])
+
+  @@unique([sourceId, scopeKey, reasonCode])
+  @@index([status, priority])
+  @@index([sourceId, status])
+  @@index([runId, status])
+  @@index([recordId])
+}
+
+model MigrationQuarantineItem {
+  id                   String                    @id @default(cuid())
+  sourceId             String
+  runId                String?
+  recordId             String?
+  status               MigrationQuarantineStatus @default(OPEN)
+  severity             MigrationSeverity         @default(ERROR)
+  quarantineKey        String
+  relatedType          String
+  relatedKey           String
+  lifecycleStatus      MigrationRecordStatus?
+  reasonCode           String
+  reason               String
+  blockingDependencies Json?
+  suggestedResolution  String?
+  retryable            Boolean                   @default(false)
+  resolvedByUserId     String?
+  resolvedAt           DateTime?
+  resolutionNotes      String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run    MigrationRun?    @relation(fields: [runId], references: [id])
+  record MigrationRecord? @relation(fields: [recordId], references: [id])
+
+  @@unique([sourceId, quarantineKey])
+  @@index([runId, status])
+  @@index([sourceId, status])
+  @@index([severity, status])
+  @@index([recordId])
+  @@index([relatedType, relatedKey])
+}
+
+model MigrationReportArtifact {
+  id           String              @id @default(cuid())
+  sourceId     String
+  runId        String
+  type         MigrationReportType
+  format       String
+  artifactRef  String
+  artifactHash String?
+  byteSize     Int?
+  summary      Json?
+  generatedAt  DateTime            @default(now())
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  source MigrationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  run    MigrationRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, type, format])
+  @@index([sourceId, type])
+  @@index([runId])
+  @@index([artifactHash])
 }
 
 enum ImportSourceType {

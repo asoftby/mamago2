@@ -125,8 +125,18 @@ export async function POST(
         : {};
 
     let sessionSyncRan = false;
-    if (!(await activitySessionsMatchScheduleJson(id, scheduleJsonForSync))) {
-      await replaceActivitySessionsFromScheduleJson(id, scheduleJsonForSync);
+    if (
+      !(await activitySessionsMatchScheduleJson({
+        prisma,
+        activityId: id,
+        scheduleJson: scheduleJsonForSync,
+      }))
+    ) {
+      await replaceActivitySessionsFromScheduleJson({
+        prisma,
+        activityId: id,
+        scheduleJson: scheduleJsonForSync,
+      });
       sessionSyncRan = true;
       perf.mark("session-sync");
     } else {

@@ -231,9 +231,13 @@ export async function POST(request: NextRequest) {
     });
     perf.mark("write");
 
-    await replaceActivitySessionsFromScheduleJson(event.id, event.scheduleJson);
+    await replaceActivitySessionsFromScheduleJson({
+      prisma,
+      activityId: event.id,
+      scheduleJson: event.scheduleJson,
+    });
     perf.mark("schedule-sync");
-    await syncActivityNextOccurrenceAt(event.id);
+    await syncActivityNextOccurrenceAt({ prisma, activityId: event.id });
     await replaceActivityGalleryFromMediaIds(
       event.id,
       Array.isArray(body.galleryMediaIds) ? body.galleryMediaIds.filter((id: unknown): id is string => typeof id === "string") : [],
