@@ -4,12 +4,14 @@ import type { MigrationRunExecutionPlan } from "../../core/orchestrator";
 import type { PersistPlanInput, PersistPlanResult } from "../../writer/types";
 import { resolveCommitContextForExecutionCandidate } from "../context/resolveCommitContextConfig";
 import type { MigrationCommitContextConfig } from "../context/resolveCommitContextConfig";
+import { resolveEventCommitContextWithMatching } from "../context/resolveEventCommitContextWithMatching";
 import { dispatchCommitRunner } from "../dispatch/dispatchCommitRunner";
 import type {
   ArticleCommitRunnerLike,
   EventCommitRunnerLike,
   PlaceCommitRunnerLike,
 } from "../dispatch/dispatchCommitRunner";
+import type { MigrationWarning } from "../../types";
 
 /**
  * The narrowest slice of `MigrationRunWriter` this harness needs — one
@@ -34,6 +36,11 @@ export interface CommitRunWriterLike {
  */
 export interface RunCommitExecutionPlanPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
+  // Optional: only needed for Event context matching (Phase 2).
+  city?: Pick<PrismaClient["city"], "findMany" | "findFirst">;
+  eventCategory?: Pick<PrismaClient["eventCategory"], "findMany">;
+  place?: Pick<PrismaClient["place"], "findMany">;
+  migrationLineage?: Pick<PrismaClient["migrationLineage"], "findFirst">;
 }
 
 export interface RunCommitExecutionPlanInput {
@@ -201,9 +208,43 @@ export async function runCommitExecutionPlan(
       continue;
     }
 
+    let resolvedContext = contextResult.context as unknown;
+    if (contextResult.ok && contextResult.targetType === "ACTIVITY") {
+      const canMatch =
+        Boolean(prisma.city) &&
+        Boolean(prisma.eventCategory) &&
+        Boolean(prisma.place) &&
+        Boolean(prisma.migrationLineage);
+
+      if (canMatch) {
+        const match = await resolveEventCommitContextWithMatching({
+          sourceRecordKey,
+          baseContext: contextResult.context,
+          candidate: executionCandidate.candidate as any,
+          prisma: {
+            city: prisma.city!,
+            eventCategory: prisma.eventCategory!,
+            place: prisma.place!,
+            migrationLineage: prisma.migrationLineage!,
+          },
+        });
+        resolvedContext = match.context;
+
+        if (match.warnings.length > 0) {
+          const existing = (migrationRecord.validationSummary as unknown) ?? null;
+          const existingArr = Array.isArray(existing) ? (existing as MigrationWarning[]) : [];
+          const merged = mergeWarnings(existingArr, match.warnings);
+          await prisma.migrationRecord.update({
+            where: { id: migrationRecord.id },
+            data: { validationSummary: merged as unknown as object },
+          });
+        }
+      }
+    }
+
     const dispatchResult = await dispatchCommitRunner({
       executionCandidate,
-      resolvedContext: contextResult.context,
+      resolvedContext: resolvedContext as any,
       migrationRecord,
       runners,
     });
@@ -234,4 +275,16 @@ export async function runCommitExecutionPlan(
     skipped: results.filter((result) => result.outcome === "SKIPPED").length,
     results,
   };
+}
+
+function mergeWarnings(existing: readonly MigrationWarning[], extra: readonly MigrationWarning[]): MigrationWarning[] {
+  const out: MigrationWarning[] = [...existing];
+  const seen = new Set(existing.map((w) => `${w.code}::${w.message}`));
+  for (const w of extra) {
+    const key = `${w.code}::${w.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(w);
+  }
+  return out;
 }
