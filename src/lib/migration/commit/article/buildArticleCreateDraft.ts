@@ -1,6 +1,11 @@
-import type { ArticleBlockMvp, ArticleContentPayload } from "@/lib/publications/articleMvp";
+import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
 
 import type { NormalizedArticleCandidate } from "../../adapters/wordpress-db/normalizeArticle";
+import {
+  normalizeMigrationContent,
+  normalizedContentToArticleContentJson,
+  type ContentNormalizationWarningCode,
+} from "../../content";
 
 export type { NormalizedArticleCandidate };
 
@@ -29,7 +34,9 @@ export interface ArticleCommitBlockReason {
   details?: Record<string, unknown>;
 }
 
-export type ArticleCommitWarningCode = "CONTENT_CONVERTED_LOSSY";
+export type ArticleCommitWarningCode =
+  | "CONTENT_NORMALIZED_WITH_LIMITATIONS"
+  | ContentNormalizationWarningCode;
 
 export interface ArticleCommitWarning {
   code: ArticleCommitWarningCode;
@@ -62,7 +69,7 @@ export interface ArticleCreateDraft {
   seoOgDescription: string | null;
   authorUserId: string | null;
   authorLabel: string | null;
-  /** Always `{ version: 1, blocks: [<one lossy text block>] }` in this MVP — see `CONTENT_CONVERTED_LOSSY`. */
+  /** Native Article MVP content produced by the universal Phoenix content normalization pipeline. */
   contentJson: ArticleContentPayload;
 }
 
@@ -75,30 +82,12 @@ export interface BuildArticleCreateDraftInput {
   context: ArticleCommitContext;
 }
 
-const ARTICLE_CONTENT_VERSION = 1 as const;
-/** Fixed, not randomly generated — this MVP only ever produces exactly one block per article, so a stable id is simpler and keeps tests deterministic. */
-const LOSSY_CONTENT_BLOCK_ID = "lossy-content-block";
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function buildLossyTextBlock(plainText: string): ArticleBlockMvp {
-  return { id: LOSSY_CONTENT_BLOCK_ID, type: "text", text: plainText };
-}
-
 /**
  * Pure function: `NormalizedArticleCandidate` + manual `ArticleCommitContext`
  * -> `ArticleCreateDraft`, or a list of block reasons. Never reads/writes a
- * database. This is a deliberately hard-scoped MVP (see PR21 discussion):
- * it proves the pipeline down to a real `Article.create()`-shaped draft
- * without pretending to solve HTML/Elementor -> `contentJson` blocks
- * conversion. `contentJson` here is always exactly one lossy `text` block
- * built from `stripHtml(candidate.content)` — never a real block-by-block
- * conversion, always flagged with `CONTENT_CONVERTED_LOSSY`.
+ * database. Text/HTML cleanup and structure detection is delegated to the
+ * universal Phoenix `ContentNormalizationPipeline`, not to WordPress-specific
+ * string cleanup in this builder.
  *
  * Elementor and Web Story posts are blocked outright, not lossily
  * converted — `normalizeArticle()` already flags these
@@ -131,11 +120,14 @@ export function buildArticleCreateDraft(input: BuildArticleCreateDraftInput): Ar
     });
   }
 
-  const plainText = stripHtml(candidate.content ?? "");
-  if (!plainText) {
+  const normalizedContent = normalizeMigrationContent({
+    sourceKind: "wordpress",
+    raw: candidate.content ?? "",
+  });
+  if (!normalizedContent.plainText) {
     reasons.push({
       code: "MISSING_CONTENT",
-      message: "candidate.content strips to empty plain text — refusing to write an Article with no content at all.",
+      message: "candidate.content normalizes to empty plain text — refusing to write an Article with no content at all.",
     });
   }
 
@@ -143,10 +135,8 @@ export function buildArticleCreateDraft(input: BuildArticleCreateDraftInput): Ar
     return { ok: false, reasons };
   }
 
-  const contentJson: ArticleContentPayload = {
-    version: ARTICLE_CONTENT_VERSION,
-    blocks: [buildLossyTextBlock(plainText)],
-  };
+  const normalizedArticleContent = normalizedContentToArticleContentJson(normalizedContent);
+  const contentJson: ArticleContentPayload = normalizedArticleContent.contentJson;
 
   const draft: ArticleCreateDraft = {
     title: candidate.title,
@@ -170,11 +160,16 @@ export function buildArticleCreateDraft(input: BuildArticleCreateDraftInput): Ar
     draft,
     warnings: [
       {
-        code: "CONTENT_CONVERTED_LOSSY",
+        code: "CONTENT_NORMALIZED_WITH_LIMITATIONS",
         message:
-          "contentJson is a single lossy plain-text block, not a real HTML->blocks conversion. Needs manual editorial review before this article is considered a finished migration.",
-        details: { plainTextLength: plainText.length },
+          "contentJson was produced by the universal Phoenix content normalization pipeline. Review remaining warnings for MVP down-conversions.",
+        details: {
+          plainTextLength: normalizedContent.plainText.length,
+          normalizedBlockCount: normalizedContent.blocks.length,
+          contentJsonBlockCount: contentJson.blocks.length,
+        },
       },
+      ...normalizedArticleContent.warnings,
     ],
   };
 }

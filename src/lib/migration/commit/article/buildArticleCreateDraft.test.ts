@@ -125,29 +125,42 @@ function testContentJsonIsVersionOneTextBlock() {
   if (!result.ok) return;
   assert.equal(result.draft.contentJson.version, 1);
   assert.equal(result.draft.contentJson.blocks.length, 1);
-  assert.equal(result.draft.contentJson.blocks[0].type, "text");
+  assert.equal(result.draft.contentJson.blocks[0].type, "intro");
 }
 
-function testHtmlStrippedToPlainText() {
+function testHtmlNormalizedToArticleBlocks() {
   const result = buildArticleCreateDraft({
-    candidate: candidateFixture({ content: "<p>Some <b>rich</b>   content about  kids.</p>" }),
+    candidate: candidateFixture({ content: "<h2>Цены:</h2><p>10 руб.</p><p>20 руб.</p><p>Some <b>rich</b> content.</p>" }),
     context: contextFixture(),
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  const block = result.draft.contentJson.blocks[0];
-  assert.equal(block.type, "text");
-  if (block.type !== "text") return;
-  assert.equal(block.text, "Some rich content about kids.");
-  assert.ok(!block.text.includes("<"));
+  assert.deepEqual(
+    result.draft.contentJson.blocks.map((block) => block.type),
+    ["heading", "text", "intro"],
+  );
+  const listBlock = result.draft.contentJson.blocks[1];
+  assert.equal(listBlock.type, "text");
+  if (listBlock.type !== "text") return;
+  assert.equal(listBlock.text, "- 10 руб.\n- 20 руб.");
 }
 
-function testContentConvertedLossyWarningPresent() {
+function testContentNormalizationWarningPresent() {
   const result = buildArticleCreateDraft({ candidate: candidateFixture(), context: contextFixture() });
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.warnings.length, 1);
-  assert.equal(result.warnings[0].code, "CONTENT_CONVERTED_LOSSY");
+  assert.equal(result.warnings[0].code, "CONTENT_NORMALIZED_WITH_LIMITATIONS");
+}
+
+function testContentNormalizationDownconvertWarningPresent() {
+  const result = buildArticleCreateDraft({
+    candidate: candidateFixture({ content: "<p>Цены:</p><p>10 руб.</p><p>20 руб.</p>" }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.warnings.some((warning) => warning.code === "UNSUPPORTED_ARTICLE_BLOCK_DOWNCONVERTED"));
 }
 
 function testMissingContentBlocked() {
@@ -222,8 +235,9 @@ function main() {
   testSeoFieldsCopied();
   testSlugCopiedRawNoGeneration();
   testContentJsonIsVersionOneTextBlock();
-  testHtmlStrippedToPlainText();
-  testContentConvertedLossyWarningPresent();
+  testHtmlNormalizedToArticleBlocks();
+  testContentNormalizationWarningPresent();
+  testContentNormalizationDownconvertWarningPresent();
   testMissingContentBlocked();
   testAuthorContextCopiedWhenProvided();
   testNoMediaCategoryTagsGeoSlugHistoryFieldsWritten();
