@@ -72,6 +72,13 @@ function createFakeWriter(options: { placeId?: string; throwError?: Error } = {}
       }
       return { placeId: options.placeId ?? "place-1", status: "CREATED" as const };
     },
+    updatePlaceFromDraft: async (placeId, draft) => {
+      calls.push({ placeId, draft });
+      if (options.throwError) {
+        throw options.throwError;
+      }
+      return { placeId, status: "UPDATED" as const };
+    },
   };
   return { writer, calls };
 }
@@ -121,7 +128,7 @@ async function testUnsupportedActionUpdate() {
   );
 
   assert.equal(result.ok, false);
-  assert.equal(result.reasonCode, "UNSUPPORTED_OPERATION_ACTION");
+  assert.equal(result.reasonCode, "PLACE_UPDATE_TARGET_MISSING");
   assert.equal(calls.length, 0);
 }
 

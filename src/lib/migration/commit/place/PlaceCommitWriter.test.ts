@@ -122,6 +122,10 @@ function createFakeClient(createdPlace: Place = placeFixture()) {
         calls.push(args);
         return createdPlace;
       }) as unknown as PlaceCommitWriterPrismaClient["place"]["create"],
+      update: (async (args: unknown) => {
+        calls.push(args);
+        return createdPlace;
+      }) as unknown as PlaceCommitWriterPrismaClient["place"]["update"],
     },
   };
   return { client, calls };
@@ -261,6 +265,17 @@ async function testReturnsPlaceIdAndCreatedStatus() {
   assert.deepEqual(result, { placeId: "place-42", status: "CREATED" });
 }
 
+async function testUpdateUsesUpdateAndReturnsUpdatedStatus() {
+  const { client, calls } = createFakeClient(placeFixture({ id: "place-99" }));
+  const writer = new PlaceCommitWriter(client);
+  const result = await writer.updatePlaceFromDraft("place-99", draftFixture({ title: "Updated Place" }));
+
+  assert.deepEqual(result, { placeId: "place-99", status: "UPDATED" });
+  const lastCall = calls[calls.length - 1] as { where: { id: string }; data: Record<string, unknown> };
+  assert.equal(lastCall.where.id, "place-99");
+  assert.equal(lastCall.data.title, "Updated Place");
+}
+
 async function main() {
   await testHappyPathCallsCreateOnce();
   await testDataContainsOnlyAllowedFields();
@@ -275,6 +290,7 @@ async function main() {
   await testEmptyTitleThrows();
   await testEmptyShortDescThrows();
   await testReturnsPlaceIdAndCreatedStatus();
+  await testUpdateUsesUpdateAndReturnsUpdatedStatus();
 }
 
 main()

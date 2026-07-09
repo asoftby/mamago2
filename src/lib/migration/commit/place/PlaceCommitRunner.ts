@@ -1,4 +1,4 @@
-import type { MigrationRecord, PrismaClient } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/client";
 
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
@@ -15,6 +15,7 @@ export interface PlaceCommitOrchestratorLike {
     operation: CommitOperation;
     candidate: NormalizedPlaceCandidate;
     context: PlaceCommitContext;
+    targetPlaceId?: string | null;
   }): Promise<ExecutePlaceCommitResult>;
 }
 
@@ -45,6 +46,7 @@ export interface MigrationLineageWriterLike {
  */
 export interface PlaceCommitRunnerPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
+  migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
 }
 
 export interface ExecutePlaceCommitRunInput {
@@ -82,6 +84,20 @@ function describeOrchestratorFailure(
   };
 }
 
+function isUpdateAction(action: CommitOperation["action"]): boolean {
+  return action === "UPDATE";
+}
+
+function buildUpdateTargetMissingResult(recordId: string): ExecutePlaceCommitRunResult {
+  return {
+    ok: false,
+    recordId,
+    status: "FAILED",
+    reasonCode: "PLACE_UPDATE_TARGET_MISSING",
+    error: new Error("Place UPDATE requires an existing MigrationLineage targetId."),
+  };
+}
+
 /**
  * Wires PR8.5/PR9/PR10/PR11 into the first complete Place commit vertical:
  * `PlaceCommitOrchestrator.execute()` -> (on success) `MigrationLineageWriter
@@ -115,10 +131,36 @@ export class PlaceCommitRunner {
   ) {}
 
   async execute(input: ExecutePlaceCommitRunInput): Promise<ExecutePlaceCommitRunResult> {
+    const isUpdate = isUpdateAction(input.operation.action);
+    const existingLineage: MigrationLineage | null = isUpdate
+      ? await this.deps.prisma.migrationLineage.findFirst({
+          where: {
+            sourceId: input.record.sourceId,
+            sourceRecordKey: input.record.sourceRecordKey,
+            targetType: "PLACE",
+            isActive: true,
+          },
+        })
+      : null;
+
+    if (isUpdate && !existingLineage?.targetId?.trim()) {
+      const missingTargetResult = buildUpdateTargetMissingResult(input.record.id);
+      await this.deps.prisma.migrationRecord.update({
+        where: { id: input.record.id },
+        data: {
+          status: "FAILED",
+          lastErrorCode: missingTargetResult.reasonCode,
+          lastErrorMessage: missingTargetResult.error?.message ?? null,
+        },
+      });
+      return missingTargetResult;
+    }
+
     const commitResult = await this.deps.orchestrator.execute({
       operation: input.operation,
       candidate: input.candidate,
       context: input.context,
+      targetPlaceId: existingLineage?.targetId ?? null,
     });
 
     if (!commitResult.ok) {
@@ -143,17 +185,36 @@ export class PlaceCommitRunner {
 
     let lineageResult: CreateLineageResult;
     try {
-      lineageResult = await this.deps.lineageWriter.createLineage({
-        sourceId: input.record.sourceId,
-        sourceEntityType: input.record.sourceEntityType,
-        sourceStableKey: input.record.sourceStableKey,
-        sourceRecordKey: input.record.sourceRecordKey,
-        targetType: input.operation.targetType,
-        targetId: commitResult.placeId!,
-        lastSourceHash: input.record.sourceHash!,
-        runId: input.record.runId,
-        recordId: input.record.id,
-      });
+      if (isUpdate) {
+        const updatedLineage = await this.deps.prisma.migrationLineage.update({
+          where: { id: existingLineage!.id },
+          data: {
+            targetId: commitResult.placeId!,
+            lastSourceHash: input.record.sourceHash!,
+            runId: input.record.runId,
+            recordId: input.record.id,
+            isActive: true,
+          },
+        });
+        lineageResult = {
+          lineageId: updatedLineage.id,
+          sourceRecordKey: updatedLineage.sourceRecordKey,
+          targetType: updatedLineage.targetType,
+          targetId: updatedLineage.targetId!,
+        };
+      } else {
+        lineageResult = await this.deps.lineageWriter.createLineage({
+          sourceId: input.record.sourceId,
+          sourceEntityType: input.record.sourceEntityType,
+          sourceStableKey: input.record.sourceStableKey,
+          sourceRecordKey: input.record.sourceRecordKey,
+          targetType: input.operation.targetType,
+          targetId: commitResult.placeId!,
+          lastSourceHash: input.record.sourceHash!,
+          runId: input.record.runId,
+          recordId: input.record.id,
+        });
+      }
     } catch (error) {
       const lineageError = error instanceof Error ? error : new Error(String(error));
 
@@ -162,7 +223,7 @@ export class PlaceCommitRunner {
         where: { id: input.record.id },
         data: {
           status: "FAILED",
-          lastErrorCode: "LINEAGE_WRITE_FAILED",
+          lastErrorCode: isUpdate ? "LINEAGE_UPDATE_FAILED" : "LINEAGE_WRITE_FAILED",
           lastErrorMessage: lineageError.message,
         },
       });
@@ -172,7 +233,7 @@ export class PlaceCommitRunner {
         placeId: commitResult.placeId,
         recordId: input.record.id,
         status: "FAILED",
-        reasonCode: "LINEAGE_WRITE_FAILED",
+        reasonCode: isUpdate ? "LINEAGE_UPDATE_FAILED" : "LINEAGE_WRITE_FAILED",
         error: lineageError,
       };
     }

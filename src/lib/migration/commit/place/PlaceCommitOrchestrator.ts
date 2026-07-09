@@ -15,13 +15,16 @@ import type {
  * instance satisfies this structurally.
  */
 export interface PlaceCommitWriterLike {
-  createPlaceFromDraft(draft: PlaceCreateDraft): Promise<{ placeId: string; status: "CREATED" }>;
+  createPlaceFromDraft(draft: PlaceCreateDraft): Promise<{ placeId: string; status: "CREATED" | "UPDATED" }>;
+  updatePlaceFromDraft(placeId: string, draft: PlaceCreateDraft): Promise<{ placeId: string; status: "UPDATED" }>;
 }
 
 export interface ExecutePlaceCommitInput {
   operation: CommitOperation;
   candidate: NormalizedPlaceCandidate;
   context: PlaceCommitContext;
+  /** Existing Place id from lineage, required for UPDATE. */
+  targetPlaceId?: string | null;
 }
 
 export interface ExecutePlaceCommitResult {
@@ -33,7 +36,8 @@ export interface ExecutePlaceCommitResult {
     | "UNSUPPORTED_TARGET_TYPE"
     | "UNSUPPORTED_OPERATION_ACTION"
     | "PLACE_CREATE_BLOCKED"
-    | "PLACE_CREATE_FAILED";
+    | "PLACE_CREATE_FAILED"
+    | "PLACE_UPDATE_TARGET_MISSING";
   blockReasons?: PlaceCommitBlockReason[];
   error?: Error;
 }
@@ -64,12 +68,18 @@ export class PlaceCommitOrchestrator {
       return { ok: false, reasonCode: "UNSUPPORTED_TARGET_TYPE" };
     }
 
-    // Only CREATE is supported — there is no "update an existing Place"
-    // writer yet, so UPDATE (and, defensively, anything else a looser
-    // producer might hand us — SKIP_UNCHANGED/SKIP_POLICY/FAIL) must never
-    // reach `buildPlaceCreateDraft`/the writer.
-    if (input.operation.action !== "CREATE") {
+    const action = input.operation.action;
+
+    if (action !== "CREATE" && action !== "UPDATE") {
       return { ok: false, reasonCode: "UNSUPPORTED_OPERATION_ACTION" };
+    }
+
+    if (action === "UPDATE" && !input.targetPlaceId?.trim()) {
+      return {
+        ok: false,
+        reasonCode: "PLACE_UPDATE_TARGET_MISSING",
+        error: new Error("Place UPDATE requires an existing targetPlaceId from MigrationLineage."),
+      };
     }
 
     const draftResult = buildPlaceCreateDraft({ candidate: input.candidate, context: input.context });
@@ -82,7 +92,11 @@ export class PlaceCommitOrchestrator {
     }
 
     try {
-      const writeResult = await this.writer.createPlaceFromDraft(draftResult.draft);
+      const writeResult =
+        action === "UPDATE"
+          ? await this.writer.updatePlaceFromDraft(input.targetPlaceId!, draftResult.draft)
+          : await this.writer.createPlaceFromDraft(draftResult.draft);
+
       return { ok: true, placeId: writeResult.placeId, draft: draftResult.draft, warnings: draftResult.warnings };
     } catch (error) {
       return {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { MigrationRecord } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord } from "@prisma/client";
 
 import { PlaceCommitRunner } from "./PlaceCommitRunner";
 import type {
@@ -137,7 +137,7 @@ function createFakeLineageWriter(options: { result?: CreateLineageResult; throwE
   return { writer, calls };
 }
 
-function createFakePrisma(options: { throwError?: Error } = {}) {
+function createFakePrisma(options: { throwError?: Error; existingLineage?: MigrationLineage | null } = {}) {
   const calls: unknown[] = [];
   const prisma: PlaceCommitRunnerPrismaClient = {
     migrationRecord: {
@@ -148,6 +148,19 @@ function createFakePrisma(options: { throwError?: Error } = {}) {
         }
         return recordFixture();
       }) as unknown as PlaceCommitRunnerPrismaClient["migrationRecord"]["update"],
+    },
+    migrationLineage: {
+      findFirst: (async () => options.existingLineage ?? null) as unknown as PlaceCommitRunnerPrismaClient["migrationLineage"]["findFirst"],
+      update: (async (args: unknown) => {
+        calls.push(args);
+        const existing = options.existingLineage ?? {
+          id: "lineage-1",
+          sourceRecordKey: "wordpress-db:places:301",
+          targetType: "PLACE",
+          targetId: "place-1",
+        };
+        return existing as unknown as MigrationLineage;
+      }) as unknown as PlaceCommitRunnerPrismaClient["migrationLineage"]["update"],
     },
   };
   return { prisma, calls };

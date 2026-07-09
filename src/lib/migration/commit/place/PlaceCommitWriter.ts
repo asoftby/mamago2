@@ -11,12 +11,12 @@ import type { PlaceCreateDraft } from "./types";
  * call them even by mistake.
  */
 export interface PlaceCommitWriterPrismaClient {
-  place: Pick<PrismaClient["place"], "create">;
+  place: Pick<PrismaClient["place"], "create" | "update">;
 }
 
 export interface PlaceCommitResult {
   placeId: string;
-  status: "CREATED";
+  status: "CREATED" | "UPDATED";
 }
 
 function assertDraftIsUsable(draft: PlaceCreateDraft): void {
@@ -63,10 +63,35 @@ export class PlaceCommitWriter {
       slug: draft.slug,
     } as Prisma.PlaceUncheckedCreateInput;
 
-    const place: Place = await this.prisma.place.create({
+    const place: Place = await this.prisma.place.create({ data });
+    return { placeId: place.id, status: "CREATED" };
+  }
+
+  async updatePlaceFromDraft(placeId: string, draft: PlaceCreateDraft): Promise<PlaceCommitResult> {
+    assertDraftIsUsable(draft);
+    if (!placeId.trim()) {
+      throw new Error("placeId is required for Place update.");
+    }
+
+    const data: Prisma.PlaceUncheckedUpdateInput = {
+      title: draft.title,
+      shortDesc: draft.shortDesc,
+      description: draft.description,
+      ...(draft.category?.trim() ? { category: draft.category } : {}),
+      status: draft.status,
+      locationSource: draft.locationSource,
+      cityId: draft.cityId,
+      lat: draft.lat,
+      lng: draft.lng,
+      phone: draft.phone,
+      website: draft.website,
+    };
+
+    const place: Place = await this.prisma.place.update({
+      where: { id: placeId },
       data,
     });
 
-    return { placeId: place.id, status: "CREATED" };
+    return { placeId: place.id, status: "UPDATED" };
   }
 }
