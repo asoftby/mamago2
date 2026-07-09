@@ -79,7 +79,8 @@ function testFullEvent() {
   assert.deepEqual(record.mediaRefs, [], "event images are never referenced, even when present in source");
   assert.deepEqual(record.relationRefs, ["term:events-category:festival", "term:occasion:summer"]);
 
-  assert.deepEqual(record.warnings, []);
+  // Warning documenting known visibility gap (sessions/nextOccurrenceAt not synced in Phoenix commit yet).
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_DISCOVERY_VISIBILITY_RISK"));
 }
 
 function testScheduleDraftOneTime() {
@@ -87,7 +88,10 @@ function testScheduleDraftOneTime() {
   const payload = payloadOf(record);
   assert.deepEqual(payload.eventDatesRaw, ["2026-08-15 10:00:00"]);
   assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
-  assert.equal(payload.scheduleDraft?.dates.length, 1);
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-08-15"]);
+  assert.ok(payload.scheduleDraft?.scheduleItems && payload.scheduleDraft.scheduleItems.length === 1);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-08-15");
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.startTime, "10:00");
   assert.ok(!record.warnings?.some((w) => w.code.startsWith("EVENT_SCHEDULE")));
 }
 
@@ -102,7 +106,7 @@ function testScheduleDraftMultiDate() {
   );
   const payload = payloadOf(record);
   assert.equal(payload.scheduleDraft?.mode, "MULTI_DATE");
-  assert.equal(payload.scheduleDraft?.dates.length, 3);
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-08-15", "2026-08-16", "2026-08-17"]);
 }
 
 function testScheduleMissingWarns() {
@@ -131,6 +135,91 @@ function testScheduleAmbiguousWarns() {
   assert.deepEqual(warning?.details?.eventDatesRaw, ["2026-08-15 10:00:00", "not-a-real-date"]);
 }
 
+function testScheduleDraftVoxelJsonArray() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-07-12 16:00:00","end":"2026-07-12 17:30:00","multiday":false,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-12"]);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-07-12");
+  assert.ok(!payload.scheduleDraft?.scheduleItems?.[0]?.dateEnd);
+  assert.ok(!record.warnings?.some((w) => w.code.startsWith("EVENT_SCHEDULE")));
+}
+
+function testScheduleDraftVoxelStartEndPreservesRange() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-07-12 16:00:00","end":"2026-07-14 17:30:00","multiday":true,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-12", "2026-07-14"]);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-07-12");
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.dateEnd, "2026-07-14");
+}
+
+function testScheduleDraftVoxelEndBeforeStartNormalizesAndWarns() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-07-14 16:00:00","end":"2026-07-12 17:30:00","multiday":true,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_DATE_RANGE_NORMALIZED"));
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-12", "2026-07-14"]);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-07-12");
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.dateEnd, "2026-07-14");
+}
+
+function testScheduleDraftMalformedEventDateWarnsAmbiguous() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ['[{"start": "not-a-date"}]'],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft, null);
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_SCHEDULE_AMBIGUOUS"));
+}
+
+function testScheduleDraftVoxelJsonMultiDate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-06-28 14:00:00","end":"2026-06-28 15:30:00","multiday":false,"allday":false},{"start":"2026-07-19 16:00:00","end":"2026-07-19 17:30:00","multiday":false,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "MULTI_DATE");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-06-28", "2026-07-19"]);
+}
+
 function testMediaExcludedWarningWhenPresent() {
   const withThumbnail = normalizeEvent(
     buildBundle({ postMeta: { ...buildBundle().postMeta, _thumbnail_id: ["999"] } }),
@@ -154,8 +243,8 @@ function testCategoryOccasionTermsNotMapped() {
   const record = normalizeEvent(buildBundle());
   const payload = payloadOf(record);
   assert.deepEqual(payload.sourceTerms, [
-    { termId: 30, taxonomy: "events-category", name: "Festival", slug: "festival" },
-    { termId: 31, taxonomy: "occasion", name: "Summer", slug: "summer" },
+    { termId: 30, taxonomy: "events-category", name: "Festival", slug: "festival", normalizedName: "festival" },
+    { termId: 31, taxonomy: "occasion", name: "Summer", slug: "summer", normalizedName: "summer" },
   ]);
 }
 
@@ -189,16 +278,79 @@ function testEmptyOrBrokenMetaDoesNotThrow() {
   assert.equal(record.warnings?.[0]?.code, "EVENT_SCHEDULE_MISSING");
 }
 
+function testAgeEvidencePlus() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        age: ["3+"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(payload.ageEvidence);
+  assert.equal(payload.ageEvidence?.confidence, "MATCHED_HIGH");
+  assert.deepEqual(payload.ageEvidence?.parsed, { minYears: 3 });
+}
+
+function testAgeEvidenceRange() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        age_text: ["3–7"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(payload.ageEvidence);
+  assert.equal(payload.ageEvidence?.confidence, "MATCHED_HIGH");
+  assert.deepEqual(payload.ageEvidence?.parsed, { minYears: 3, maxYears: 7 });
+}
+
+function testAgeEvidenceTextMalyshiLowConfidence() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, post_title: "Концерт для малышей" },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(payload.ageEvidence);
+  assert.equal(payload.ageEvidence?.confidence, "MATCHED_LOW");
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_AGE_LOW_CONFIDENCE"));
+}
+
+function testAgeEvidenceUnknownWarnsUnmatched() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        age: ["для всей семьи"],
+      },
+    }),
+  );
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_AGE_UNMATCHED"));
+}
+
 function main() {
   testFullEvent();
   testScheduleDraftOneTime();
   testScheduleDraftMultiDate();
   testScheduleMissingWarns();
   testScheduleAmbiguousWarns();
+  testScheduleDraftVoxelJsonArray();
+  testScheduleDraftVoxelStartEndPreservesRange();
+  testScheduleDraftVoxelEndBeforeStartNormalizesAndWarns();
+  testScheduleDraftMalformedEventDateWarnsAmbiguous();
+  testScheduleDraftVoxelJsonMultiDate();
   testMediaExcludedWarningWhenPresent();
   testCategoryOccasionTermsNotMapped();
   testPriceStrippedToPlainText();
   testEmptyOrBrokenMetaDoesNotThrow();
+  testAgeEvidencePlus();
+  testAgeEvidenceRange();
+  testAgeEvidenceTextMalyshiLowConfidence();
+  testAgeEvidenceUnknownWarnsUnmatched();
 }
 
 main();
