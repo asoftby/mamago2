@@ -39,7 +39,7 @@ export function ImageUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const { uploadImages, uploading, progress, error } = useImageUpload({
+  const { uploadImages, uploading, converting, statusLabel, progress, error } = useImageUpload({
     maxSizeMB,
     maxWidthOrHeight,
     quality,
@@ -123,7 +123,10 @@ export function ImageUploader({
               <div className="flex justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
               </div>
-              <p className="text-sm text-gray-600">Загрузка... {progress}%</p>
+              <p className="text-sm text-gray-600">
+                {statusLabel}
+                {!converting && ` ${progress}%`}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">

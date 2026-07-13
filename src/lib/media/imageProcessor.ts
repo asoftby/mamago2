@@ -236,29 +236,21 @@ export async function processImage(
         mimeType: originalMimeType,
       });
       
-      // Handle HEIC/HEIF specific errors
+      // Defense-in-depth only: HEIC/HEIF should never reach this server-side
+      // processor anymore — the client (useImageUpload/useWizardImageUpload,
+      // see src/lib/uploads/heicConversion.ts) converts HEIC to JPEG before
+      // upload, since prebuilt sharp has no HEVC decoder and that's what
+      // almost every real iPhone HEIC photo is compressed with. Reaching
+      // this branch means client-side conversion didn't run (a direct API
+      // call, an older client, JS disabled, or a real bug in the client
+      // conversion) — not something a server-side format fallback can fix.
       const normalizedMimeTypeForError = normalizeUploadMimeType(originalMimeType);
       if (normalizedMimeTypeForError === "image/heic" || normalizedMimeTypeForError === "image/heif") {
-        if (sharpMsg.includes("unsupported") || 
-            sharpMsg.includes("HEIC") ||
-            sharpMsg.includes("HEIF")) {
-          throw new Error(
-            "HEIC/HEIF format is not supported in the current environment. " +
-            "Please convert to JPEG, PNG, or WebP before uploading, or install libheif support on the server."
-          );
-        }
-        
-        if (sharpMsg.includes("bad seek") || 
-            sharpMsg.includes("compression format")) {
-          throw new Error(
-            "Этот HEIC/HEIF файл использует неподдерживаемый формат сжатия. " +
-            "Попробуйте конвертировать его в JPEG или PNG, или используйте другой HEIC файл."
-          );
-        }
-        
         throw new Error(
-          `Failed to process HEIC/HEIF file: ${sharpMsg}. ` +
-          "Try converting to JPEG, PNG, or WebP before uploading."
+          `HEIC/HEIF file could not be processed server-side (sharp has no HEVC decoder): ${sharpMsg}. ` +
+          "This should have been converted to JPEG automatically before upload — if you're seeing this, " +
+          "client-side HEIC conversion did not run. Please try again, or convert the photo to JPEG/PNG " +
+          "yourself and upload that instead."
         );
       }
       

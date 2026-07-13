@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
+import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
 import { MAX_IMAGE_FILES } from "@/lib/uploads/uploadConfig";
 import type { OfferFormData } from "../types";
 import { isValidVideoUrl } from "../mappers";
@@ -30,8 +31,19 @@ async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[
   const uploaded: MediaUploadItem[] = [];
 
   for (const file of files) {
+    // Prebuilt sharp has no HEVC decoder (see imageProcessor.ts) — this
+    // bypasses the shared upload hooks (its own inline fetch, not
+    // useImageUpload/useWizardImageUpload), so it needs its own HEIC
+    // conversion rather than inheriting it for free.
+    let fileToUpload: File;
+    try {
+      fileToUpload = await convertHeicFileToJpegIfNeeded(file);
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : `Не удалось обработать файл «${file.name}»`);
+    }
+
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", fileToUpload);
 
     const response = await fetch("/api/upload", {
       method: "POST",

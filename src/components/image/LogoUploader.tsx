@@ -23,7 +23,7 @@ export function LogoUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(currentLogo || null);
 
-  const { uploadImage, uploading, progress, error } = useImageUpload({
+  const { uploadImage, uploading, converting, progress, error } = useImageUpload({
     maxSizeMB: 1,
     maxWidthOrHeight: 1024,
     quality: 0.85,
@@ -111,7 +111,7 @@ export function LogoUploader({
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto" />
-              <p className="text-xs text-white mt-2">{progress}%</p>
+              <p className="text-xs text-white mt-2">{converting ? "Конвертируем…" : `${progress}%`}</p>
             </div>
           </div>
         )}
