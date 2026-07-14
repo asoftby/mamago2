@@ -299,13 +299,47 @@ const NUMERIC_COLUMNS = new Set([
   "lng",
 ]);
 
+/**
+ * Reverses MySQL's tab-separated batch-mode output escaping. When `mysql`
+ * writes to a non-tty (this executor always does — one query per SSH round
+ * trip, output is always piped), it escapes NUL, backslash, tab, newline,
+ * and carriage return inside cell values with a leading backslash so the
+ * real tab/newline bytes that separate columns/rows stay unambiguous.
+ * `parseTabularRows` already splits correctly on those real bytes (an
+ * escaped `\n` inside a value is two literal characters, not a newline
+ * byte, so it never breaks line-splitting) — but until this ran, the
+ * escaped-inside-a-value sequences themselves were never converted back:
+ * every downstream consumer saw the literal two characters `\` `n` instead
+ * of a line break. Confirmed on live data: 97/97 imported RouteStop notes
+ * had literal `\n` in place of real line breaks.
+ */
+export function unescapeMysqlBatchValue(value: string): string {
+  return value.replace(/\\(.)/g, (match, char: string) => {
+    switch (char) {
+      case "0":
+        return "\0";
+      case "n":
+        return "\n";
+      case "t":
+        return "\t";
+      case "r":
+        return "\r";
+      case "\\":
+        return "\\";
+      default:
+        return match;
+    }
+  });
+}
+
 function coerceCell(column: string, raw: string): unknown {
   if (raw === "NULL") return null;
+  const unescaped = unescapeMysqlBatchValue(raw);
   if (NUMERIC_COLUMNS.has(column)) {
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : raw;
+    const parsed = Number(unescaped);
+    return Number.isFinite(parsed) ? parsed : unescaped;
   }
-  return raw;
+  return unescaped;
 }
 
 export function parseTabularRows<T>(raw: string): T[] {
