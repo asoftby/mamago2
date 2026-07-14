@@ -2,13 +2,30 @@ import {
   isValidPhoneNumber,
   parsePhoneNumberFromString,
   type CountryCode,
-} from "libphonenumber-js";
+} from "libphonenumber-js/core";
+import metadataImport from "libphonenumber-js/metadata.max.json";
 
 import { preNormalizeBelarusLocal } from "./belarus";
 
 /**
- * Best-effort parse to E.164 for legacy drafts / API strings.
+ * `libphonenumber-js/core` + explicit metadata (instead of the full
+ * `libphonenumber-js` package) — smaller bundle, and this metadata object
+ * is also what makes this module safe to use from Node/migration code
+ * without pulling in the full package's browser-oriented defaults.
+ * `"default" in metadataImport` guards against the CJS/ESM interop shape
+ * differing between bundler and `tsx`/Node's module resolution.
+ */
+const metadata = ("default" in metadataImport ? metadataImport.default : metadataImport) as typeof metadataImport;
+
+/**
+ * Best-effort parse to E.164 for legacy drafts / API strings — this is the
+ * one canonical phone normalizer in the project; `phoneNormalize.ts`
+ * re-exports this function rather than maintaining a second implementation.
  * Сначала белорусская pre-normalization (80… / 375…), затем libphonenumber.
+ * Invalid/ambiguous input is never passed through verbatim — returns `""`
+ * rather than a garbage "looks like E.164 but isn't" string, so callers
+ * can treat an empty result as "needs a real value", not silently accept
+ * unparseable text.
  */
 export function normalizePhoneToE164(input: string): string {
   const trimmed = input.trim();
@@ -27,17 +44,17 @@ export function normalizePhoneToE164(input: string): string {
   for (const c of candidates) {
     if (!c || seen.has(c)) continue;
     seen.add(c);
-    const intl = parsePhoneNumberFromString(c);
+    const intl = parsePhoneNumberFromString(c, metadata);
     if (intl?.isValid()) {
       return intl.format("E.164");
     }
-    const by = parsePhoneNumberFromString(c, "BY");
+    const by = parsePhoneNumberFromString(c, "BY", metadata);
     if (by?.isValid()) {
       return by.format("E.164");
     }
   }
 
-  return byPre || trimmed;
+  return "";
 }
 
 /**
@@ -55,7 +72,8 @@ export function resolvePhoneInputToE164(raw: string, country: CountryCode): stri
   for (const c of candidates) {
     if (!c || seen.has(c)) continue;
     seen.add(c);
-    const p = parsePhoneNumberFromString(c, country) ?? parsePhoneNumberFromString(c);
+    const p =
+      parsePhoneNumberFromString(c, country, metadata) ?? parsePhoneNumberFromString(c, metadata);
     if (p?.isValid()) {
       return p.format("E.164");
     }
@@ -67,5 +85,5 @@ export function resolvePhoneInputToE164(raw: string, country: CountryCode): stri
 export function isValidE164Phone(phone: string): boolean {
   const normalized = normalizePhoneToE164(phone);
   if (!normalized) return false;
-  return isValidPhoneNumber(normalized);
+  return isValidPhoneNumber(normalized, metadata);
 }

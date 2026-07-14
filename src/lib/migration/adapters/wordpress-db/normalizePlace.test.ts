@@ -66,6 +66,7 @@ function testFullPlace() {
   assert.equal(payload.modifiedAt, "2026-01-02 00:00:00");
   assert.equal(payload.shortDescription, "A great place for kids");
   assert.equal(payload.phone, "+375291234567");
+  assert.equal(payload.phoneE164, "+375291234567");
   assert.equal(payload.email, "hello@example.com");
   assert.equal(payload.workHoursRaw, "Mon-Fri 9-18");
   assert.equal(payload.locationRaw, "Minsk, some street");
@@ -138,6 +139,38 @@ function testCategoryTermsNotMappedKeptAsSourceReferences() {
   ]);
 }
 
+/**
+ * `Place.phone` must never receive raw non-E.164 text. Confirmed live
+ * (2026-07-14 readiness audit): target Place 437 was already imported with
+ * literal `"+375 (25) 530-00-53"` before this fix — this is a regression
+ * test against that exact case, not a hypothetical.
+ */
+function testLegacyFormattedPhoneNormalizedWithoutWarning() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, phone: ["+375 (25) 530-00-53"] } }),
+  );
+  const payload = payloadOf(record);
+  // Raw evidence preserved verbatim...
+  assert.equal(payload.phone, "+375 (25) 530-00-53");
+  // ...and the safe-to-write value is the normalized E.164.
+  assert.equal(payload.phoneE164, "+375255300053");
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_PHONE_INVALID"));
+}
+
+function testInvalidPhoneWarnsAndKeepsRawEvidenceWithNullE164() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, phone: ["not a phone at all"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.phone, "not a phone at all", "raw evidence never lost");
+  assert.equal(payload.phoneE164, null, "never a best-effort/garbage value");
+
+  const warning = record.warnings?.find((w) => w.code === "PLACE_PHONE_INVALID");
+  assert.ok(warning);
+  assert.equal(warning?.severity, "WARNING");
+  assert.equal(warning?.details?.phoneRaw, "not a phone at all");
+}
+
 function testEmptyOrBrokenMetaDoesNotThrow() {
   const record = normalizePlace(
     buildBundle({ postMeta: {}, terms: [], placeIndex: null }),
@@ -145,6 +178,9 @@ function testEmptyOrBrokenMetaDoesNotThrow() {
   const payload = payloadOf(record);
   assert.equal(payload.shortDescription, null);
   assert.equal(payload.phone, null);
+  assert.equal(payload.phoneE164, null);
+  // Absent phone must not warn — only present-but-invalid does.
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_PHONE_INVALID"));
   assert.equal(payload.coordinates, null);
   assert.equal(payload.media.thumbnailAttachmentId, null);
   assert.deepEqual(payload.media.galleryAttachmentIds, []);
@@ -172,6 +208,8 @@ function main() {
   testRepeatedGalleryValuesPreserved();
   testLogoExcludedFromMediaOnlyWarned();
   testCategoryTermsNotMappedKeptAsSourceReferences();
+  testLegacyFormattedPhoneNormalizedWithoutWarning();
+  testInvalidPhoneWarnsAndKeepsRawEvidenceWithNullE164();
   testEmptyOrBrokenMetaDoesNotThrow();
 }
 

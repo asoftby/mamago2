@@ -193,6 +193,67 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 
 ## 1. Контентные сущности (инженерная работа по готовому паттерну)
 
+### Places (82 publish)
+
+**Статус: engine готов (§0) → full-batch READINESS AUDITED (2026-07-14) →
+FULL BATCH ЗАПРЕЩЁН до закрытия 4 P0-блокеров ниже.**
+
+Read-only full-batch readiness audit, 2026-07-14 (без commit/`--confirm-writes`,
+без DB writes). Preview всех 82 publish Place: **82/82 успешно normalize (0
+failed)**. Несмотря на чистый preview, полный batch-импорт признан
+преждевременным — normalize "успешно" не означает "корректно для целевой
+модели": preview не ловит семантические проблемы вроде невалидного формата
+телефона (он проходит normalize как непустая строка, просто не E.164).
+
+**Четыре P0-блокера, порядок закрытия: A → D → B → C:**
+
+1. **(A) Phone не в E.164** — 32/76 записей с непустым `phone` postmeta
+   требовали нормализации (легаси-форматы вроде `"+375 (25) 530-00-53"`
+   писались в `Place.phone` как есть). **Исправлено этим PR** — см. запись
+   ниже. Единственный канонический нормализатор `normalizePhoneToE164`
+   (`src/lib/phone/e164.ts`), `normalizePlace.ts` сохраняет raw `phone`
+   evidence + добавляет валидированный `phoneE164` (`null` при
+   нерезолвимом значении, warning `PLACE_PHONE_INVALID`), `Place.phone` в
+   draft пишется только из `phoneE164` — никогда raw.
+2. **(D) Targeted CLI + UPDATE safety** — существующий per-record
+   targeting (`--source-record-key` allowlist) недостаточен сам по себе:
+   UPDATE-ветка commit runner'а не покрыта тестами, защита ручных правок
+   отсутствует. Нужна отдельная PR: allowlist + UPDATE-branch test coverage
+   + manual-edit protection одновременно, не по частям.
+3. **(B) Режим работы (`work_hours`)** — известная проблема, требует
+   отдельного фикса перед full batch; детали фиксируются при выполнении PR B.
+4. **(C) Media** — известная проблема (не совпадает с текущей строкой
+   `Place | ready` в матрице §1.5 — см. исправление там же); детали
+   фиксируются при выполнении PR C.
+
+**Место `437` (уже импортирован в dev-БД) НЕ используется как первый
+UPDATE-sample**: есть ручные правки, `lastImportedAt=null`, UPDATE-ветка
+runner'а не покрыта тестами. Требует отдельной reconciliation-задачи после
+(D) с защитой ручных данных — новые golden samples импортируются first, 437
+проверяется отдельно.
+
+**Реализация (вертикальными PR, без смешивания слоёв):**
+
+- [ ] **PR — Phone E.164 fix** (2026-07-14/15, ветка
+      `fix/migration-place-phone-e164`, **PR открыт, merge ещё не выполнен**)
+      — консолидация двух разошедшихся нормализаторов телефона в один
+      канонический (`src/lib/phone/e164.ts`, `libphonenumber-js/core`),
+      `normalizePlace.ts` добавляет `phoneE164` + `PLACE_PHONE_INVALID`
+      warning, `buildPlaceCreateDraft.ts` пишет `phone` из `phoneE164`.
+      `InternationalPhoneInput` защищён от краша на легаси-значении, не
+      мутирует при рендере. Место 437 в БД не менялось (DB writes
+      отсутствуют). `PlaceScalarLinker` (неподключённый dead code) не
+      тронут функционально — задокументирован как известное расхождение
+      для будущего подключения. *(Отмечается `[x]` отдельным прямым
+      коммитом в `dev` только после фактического merge — см. журнал
+      сессий, паттерн `87bd43f9`.)*
+- [ ] PR — targeted CLI + UPDATE safety (D).
+- [ ] PR — opening-hours fix (B).
+- [ ] PR — media fix (C).
+- [ ] Новые golden samples (после B+C).
+- [ ] Reconciliation места 437 (после D, с защитой ручных правок).
+- [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
+
 ### Routes (14 publish)
 
 - [x] **PR A** (2026-07-13, ветка `feat/phoenix-route-import`, коммит/мердж за
@@ -529,7 +590,7 @@ dispatcher-branch, ни CLI-flag).
 | --- | --- | --- | --- | --- |
 | User profile | pending | FULL | METADATA | Аватары после Users/Profiles decisions. |
 | Business profile | pending | FULL | METADATA | Логотипы/обложки после ownership decisions. |
-| Place | ready | FULL | METADATA | `PlaceMediaLinker` уже есть. |
+| Place | инфраструктура готова, **full-batch НЕ разрешён** | FULL | METADATA | `PlaceMediaLinker` есть, но full-batch readiness audit (2026-07-14, см. §1 Places) нашёл отдельный P0-блокер по медиа (PR C) — «ready» здесь означало только наличие linker'а, не готовность к полному импорту 82 Place. |
 | Article | pending | FULL | METADATA | Нужен ArticleMediaSyncer + remap inline `wp-content/uploads`. |
 | Offer | pending | FULL | METADATA | Вместе с Offer adapter/runner. |
 | Route | ready | FULL | METADATA | `RouteStopMediaSyncer`, сейчас один `photoUrl` на стоп. |
@@ -884,3 +945,55 @@ dispatcher-branch, ни CLI-flag).
   merge за Алексеем/CI. Следующий шаг (по решению Алексея): **пауза
   Offers-кода**, переход на завершение полного Place-батча (82 publish) —
   без него writer (PR 3) нельзя честно проверить end-to-end.
+- **2026-07-14 — Claude Code** — Place full-batch readiness audit (read-only,
+  без commit/`--confirm-writes`, без DB writes). Preview всех 82 publish
+  Place: 82/82 успешно normalize. Несмотря на это, полный batch запрещён —
+  найдены 4 P0-блокера (см. §1 Places): (A) Phone не в E.164
+  (32/76 непустых записей требовали нормализации), (D) targeted CLI без
+  UPDATE-safety/manual-edit protection, (B) режим работы, (C) media (в т.ч.
+  ложный claim `Place | ready` в матрице §1.5, исправлен). Место `437` (уже
+  в dev-БД, ручные правки, `lastImportedAt=null`, UPDATE-ветка без тестов)
+  исключено из роли первого UPDATE-sample — реконсиляция отдельным шагом
+  после (D). Алексей утвердил порядок закрытия: A → D → B → C → новые golden
+  samples → reconciliation 437 → full batch. Следующий шаг: PR Phone E.164
+  (A) — см. следующую запись.
+- **2026-07-15 — Claude Code** — **PR Phone E.164 fix** (ветка
+  `fix/migration-place-phone-e164`, из `origin/dev` `87bd43f9`). Два
+  разошедшихся нормализатора телефона (`src/lib/phone/e164.ts` — строгий,
+  libphonenumber; `src/lib/phone/phoneNormalize.ts` — наивный regex,
+  пропускавший невалидный ввод как есть) консолидированы в один
+  канонический — `phoneNormalize.ts` теперь чистый re-export из `e164.ts`.
+  Проверены все 13 продакшн-вызывающих мест (9 + 4) — 4 вызывающих места
+  `phoneNormalize` уже валидировали результат сразу после вызова, так что
+  более строгое поведение (пустая строка вместо мусора на невалидном вводе)
+  безопасно. `normalizePlace.ts`: добавлено поле `phoneE164` (raw `phone`
+  evidence сохранён отдельно, не тронут), `PLACE_PHONE_INVALID` warning при
+  нерезолвимом непустом значении.
+  `buildPlaceCreateDraft.ts`: `draft.phone` теперь строго из
+  `candidate.phoneE164`, никогда из raw `candidate.phone`.
+  `InternationalPhoneInput.tsx`/новый `internationalPhoneInputValue.ts`:
+  защита от краша на легаси-значении в `value`, `onChange` теперь тоже
+  нормализует; ничего не мутирует при простом рендере/открытии формы.
+  `PlaceScalarLinker.ts` (подтверждённо неподключённый dead code, свой
+  собственный документированный контракт "raw phone verbatim") — поведение
+  не менялось, только докблок с явным флагом расхождения для будущего
+  подключения. Тесты: 4 новых test-файла (`e164.test.ts` — 13 сценариев,
+  `phoneNormalize.test.ts`, `internationalPhoneInputValue.test.ts`) +
+  расширены существующие (`normalizePlace.test.ts`,
+  `buildPlaceCreateDraft.test.ts`, плюс фикстуры в
+  `PlaceCommitOrchestrator.test.ts`/`PlaceCommitRunner.test.ts`/
+  `PlaceScalarLinker.test.ts` под новое поле `phoneE164`). Проверки —
+  все green: targeted phone/Place tests, полный `src/lib/migration/**` +
+  `scripts/migration-*.test.ts` sweep, `src/components/business/wizard/event/
+  mappers.test.ts` (единственный существующий тест среди остальных 6
+  caller-мест), eslint на изменённые файлы, `tsc --noEmit`, `git diff
+  --check`, `pnpm build`. **Место 437 и любые другие Place в БД не
+  трогались — ноль DB writes в этом PR.** `docs/migration/
+  prelaunch-checklist.md` обновлён этим же PR: новая секция «Places (82
+  publish)» в §1 с audit findings, исправлен ложный claim `Place | ready`
+  в §1.5. Пункт «PR — Phone E.164 fix» в §1 Places остаётся `[ ]`
+  ("PR открыт, merge ещё не выполнен") — отмечается `[x]` отдельным прямым
+  коммитом в `dev` только после фактического merge (по паттерну
+  `87bd43f9`). Следующий шаг: PR D —
+  targeted CLI + UPDATE safety (allowlist + UPDATE-branch test coverage +
+  manual-edit protection одновременно, не только allowlist).

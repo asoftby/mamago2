@@ -15,6 +15,17 @@ function assertPlaceIdIsUsable(placeId: string): void {
  * data this doesn't have), and `cityId` (only via an exact-match lookup,
  * never a guess).
  *
+ * **Known discrepancy, not yet reconciled (2026-07-14 Place readiness
+ * audit):** this class is not wired into any real commit path today — see
+ * the Place full-batch readiness audit in `docs/migration/prelaunch-checklist.md`.
+ * `buildPlaceCreateDraft.ts`'s CREATE path now writes `candidate.phoneE164`
+ * (validated E.164, see `normalizePlace.ts`'s `PLACE_PHONE_INVALID`
+ * warning), not raw `candidate.phone`. This class still writes raw
+ * `candidate.phone` verbatim by original design. Whoever wires this class
+ * in (planned as part of the Place media/reconciliation follow-up PR) must
+ * switch it to `phoneE164` first, or it will reintroduce the same
+ * non-E.164 `Place.phone` bug this PR fixes for CREATE.
+ *
  * Everything else on the candidate is deliberately never read:
  * `workHoursRaw` (would require parsing free text into `OpeningHours`
  * relational rows — a later, separate concern), `email` (`Place` has no

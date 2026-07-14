@@ -114,7 +114,11 @@ export function buildPlaceCreateDraft(input: BuildPlaceCreateDraftInput): PlaceC
       cityId: input.context.cityId ?? null,
       lat: input.candidate.coordinates?.lat ?? null,
       lng: input.candidate.coordinates?.lng ?? null,
-      phone: input.candidate.phone ?? null,
+      // `phoneE164` (never the raw `phone` evidence field) — the E.164
+      // invariant is enforced by normalizePlace's PLACE_PHONE_INVALID
+      // check; an unresolvable phone becomes null here, never a garbage
+      // string carried through to the target row.
+      phone: input.candidate.phoneE164 ?? null,
       website: null,
       slug: null,
     },

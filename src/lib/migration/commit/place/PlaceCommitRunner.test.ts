@@ -73,6 +73,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     modifiedAt: "2026-01-02 00:00:00",
     shortDescription: "A great place for kids",
     phone: "+375291234567",
+    phoneE164: "+375291234567",
     email: "hello@example.com",
     workHoursRaw: "Mon-Fri 9-18",
     locationRaw: "Minsk, some street",
