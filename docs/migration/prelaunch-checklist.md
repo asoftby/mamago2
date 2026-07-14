@@ -48,6 +48,99 @@
 
 ---
 
+## 0.5 Фаза 0 — Git hygiene (закрыта 2026-07-14)
+
+- [x] Clean baseline `dev` = `384bb1a2333ee98c8bddd697fdc95d84c4d98fc5`, working
+      tree clean, open PR = 0.
+- [x] PR #37 (HEIC upload fix) смержен в dev.
+- [x] PR #36 (Phoenix Route import, 8→9 clean commits после review-фиксов)
+      смержен в dev обычным merge commit.
+- [x] PR #35 (production-cutover-runbook WP catch-all correction) смержен в dev.
+- [x] 11 старых stash защищены: annotated tags `archive/stash-20260714-00`…`-10`
+      (каждый = стабильный SHA исходного stash) + git bundle вне репозитория:
+      `/Users/shapovalovalexey/dev/archives/mamago2-stash-archive-20260714.bundle`
+      (SHA-256 `33bef6a9c15090a2134f10886faa068c397d60e3ac8a11009acf0a1dc4766901`).
+      Ни один stash не удалён — `git stash list` по-прежнему показывает все 11.
+      Manifest с классификацией по каждому stash:
+      `/Users/shapovalovalexey/dev/archives/mamago2-stash-archive-20260714.md`.
+
+Перенесённые задачи (не Git hygiene — продуктовый/инженерный WIP), см. также §5:
+
+- **Фаза 6 (Product regression), P0** — из `archive/stash-20260714-00`:
+  Phone E.164 fix, Event visibility/city discovery fix, Article
+  admin/blog-city fix. Все три подтверждены отсутствующими в текущем dev
+  прямым diff против базы stash. (Route-admin часть того же stash не
+  переносится — уже дублирована и превзойдена чисткой PR #36.)
+- **Фаза 3 (Импорт изображений)** — media candidates из
+  `archive/stash-20260714-05` (тривиальный `articleMvpRenderData.ts` фикс) и
+  `archive/stash-20260714-06` (смешанный; `RouteDetailClient.tsx`-хунк
+  трогать нельзя — конфликтует с PR #36).
+
+---
+
+## 0.6 Фаза 1 — Scope freeze (закрыта 2026-07-14, решения Алексея)
+
+Frozen scope для Phoenix v1. Заменяет открытые вопросы из
+`wordpress-to-mamago.md` §Needs Decision и §3 ниже там, где они пересекаются.
+
+**P0 — обязательно до cutover:**
+
+- Places, Articles, Events, Routes (адаптеры готовы; Routes — только ручной
+  review 14 маршрутов + slug history/redirect map, не инженерка).
+- **MySQL batch-escape fix** (`connectExecutor.ts`) — идёт первым, до любого
+  дальнейшего импорта/реимпорта: буквальный `\n` вместо реальных переносов
+  строк подтверждён на 97/97 RouteStop notes, executor общий для
+  Place/Article/Event/Route. Пока не исправлен — текстам уже импортированных
+  сущностей верить нельзя.
+- **Offers** (90+, адаптер/раннер/медиа) — далее по приоритету реализации.
+- **Users** (579, адаптер) — identity + legacy ID ledger.
+- **Article media** (ArticleMediaSyncer, cover + inline `wp-content/uploads`
+  remap).
+- **Profiles — identity/media только**: User identity (`wp_users` → `User`,
+  legacy ID mapping) и профильные изображения (аватары/логотипы) — P0.
+  Однозначные Business/Organizer ownership связи — P0. Остальные 536
+  `profile` posts (публичный контент, неоднозначная классификация
+  personal/business) — в migration ledger/quarantine без публикации;
+  классификация — P1.
+- **Reviews** (Voxel `post_reviews`, только approved, ~25 строк) — P0 при
+  таком объёме; зависимость Users+Places будет P0-готова.
+- **RankMath `exact`-режим redirects** — P0 subset (156 строк всего,
+  `start`/`contains` — P1). Редиректы на `/` не принимаются автоматически —
+  перед запуском маппятся на городские/тематические хабы вручную.
+- **WordPress `page`** — только legal/about/contact и другие обязательные
+  страницы, вручную в `Page`, до запуска. Остальное — EXCLUDED.
+- Freeze/snapshot, validation reports, прод-бэкап, dry-run QA — процессные
+  пункты §4.
+
+**Порядок реализации P0** (решение Алексея 2026-07-14): MySQL escape fix →
+Offers → Users → Article media → Profiles identity/media → Reviews → далее
+relations, taxonomy, redirects.
+
+**P1 — первые 7–14 дней после запуска:**
+
+- Profiles — публичный контент, полная personal/business/organizer
+  классификация.
+- RankMath `start`/`contains` redirects после conflict-review.
+- Unpublished/draft контент (187 Places, 538 Events и т.д.) — staging-only в
+  ledger, публикация выборочная post-launch; 187 unpublished Places
+  разбираются вручную после запуска.
+- User/Business avatar-медиа полировка после полной Profiles-классификации.
+
+**EXCLUDED — сознательно не переносим в v1:**
+
+- Past Events — **не импортируются вообще** (ни контент, ни metadata).
+  Старые URL закрывает `wpLegacyCatchAll.ts`; отдельные ценные URL при
+  необходимости добавляются вручную в redirect manifest.
+- Event/Past Event изображения (уже решено ранее).
+- route-budget/route-duration/reels-route/route-level location (уже решено).
+- `collection` (90) и весь long-tail custom-post-types — source сохраняется
+  для будущего решения; возврат в P1 только для конкретных подборок с
+  подтверждённым трафиком/редакционной ценностью.
+- WP comments, Voxel wall/timeline/user-timeline фиды, historical
+  bookings/LatePoint/WooCommerce, RankMath scores/focus-keywords/аналитика.
+
+---
+
 ## 1. Контентные сущности (инженерная работа по готовому паттерну)
 
 ### Routes (14 publish)
@@ -202,22 +295,32 @@
 - [ ] Медиа.
 - [ ] Slug history + редиректы.
 
-### Users (579)
+### Users (579) — P0 (§0.6)
 
-- [ ] Продуктовое решение: политика passwordless-реактивации.
-- [ ] Adapter/normalizer/runner с маппингом legacy user ID.
+- [x] Продуктовое решение: passwordless-реактивация после первого входа,
+      пароли не мигрируются (принято ранее, `wordpress-to-mamago.md`).
+- [ ] Adapter/normalizer/runner с маппингом legacy user ID. Приоритет
+      реализации: сразу после MySQL escape fix, перед Article media.
 
-### Profiles (536) — главный блокер по решениям
+### Profiles (536) — P0 (identity/media) + P1 (публичный контент), решено §0.6
 
-- [ ] **Продуктовое решение: целевая модель** — классификация personal vs
-      business, во что маппится каждый класс. Без этого пункта дальше не двигаться.
-- [ ] Adapter/normalizer/runner по принятой модели.
-- [ ] Связки ownership: business/organizer ↔ places/offers.
+- [x] **Продуктовое решение: разделение по объёму** (2026-07-14) — P0:
+      User identity (`wp_users` → `User`, legacy ID) + профильные изображения
+      (аватары/логотипы) + однозначные Business/Organizer ownership связи.
+      Остальные 536 `profile` posts (публичный контент, неоднозначная
+      personal/business классификация) — migration ledger/quarantine без
+      публикации; классификация — P1.
+- [ ] Adapter/normalizer/runner для identity/media (P0) по принятой модели.
+- [ ] Связки ownership: business/organizer ↔ places/offers (P0, только
+      однозначные случаи; остальное — quarantine).
+- [ ] Публичный profile-контент + полная классификация (P1).
 
-### Reviews → PlaceReview
+### Reviews → PlaceReview — P0 (§0.6, ~25 approved строк)
 
-- [ ] Adapter/normalizer/runner (источник — Voxel `post_reviews`; только approved).
-- [ ] Зависимость: требует уже импортированных users и places.
+- [ ] Adapter/normalizer/runner (источник — Voxel `post_reviews`; только
+      approved). Rating conversion Voxel `-2.00..2.00` → mamaGo 1-5 —
+      нужно подтверждение формулы (предложено: линейная перешкала).
+- [ ] Зависимость: требует уже импортированных users и places (оба P0).
 
 ---
 
@@ -265,20 +368,31 @@
       (`places_category`, `section`, `events-category`, `age`, `metro`,
       `neighbourhood`, `city` и т.д.).
 - [ ] **RankMath redirect ingestion** (156 строк `wp_rank_math_redirections`):
-      ревью + нормализация в redirect manifest.
-- [ ] Политика редиректов для исключённых (прошедших) событий.
+      ревью + нормализация в redirect manifest. Решение (§0.6): `exact` — P0,
+      `start`/`contains` — P1 после conflict-review; редиректы на `/` не
+      принимаются автоматически, маппятся на городские/тематические хабы
+      вручную перед запуском.
+- [x] Политика редиректов для исключённых (прошедших) событий — решено
+      (§0.6, 2026-07-14): Past Events не импортируются вообще; старые URL
+      закрывает `wpLegacyCatchAll.ts`, отдельные ценные URL добавляются
+      вручную в redirect manifest.
 
 ---
 
-## 3. Отложенные продуктовые решения
+## 3. Отложенные продуктовые решения (закрыто §0.6, 2026-07-14)
 
-- [ ] Переподтвердить cutoff-правило для прошедших событий
-      (`shouldExcludePastEvent()` существует, бизнес-политика — нет).
-- [ ] Судьба `page` (71 publish + 13 draft): Page/Article/игнор.
-- [ ] Политика unpublished/draft контента (places 187 unpublished, events 538
-      draft и т.д.): мигрировать как драфты или игнорировать.
-- [ ] Судьба `collection` (90) и остального long-tail из инспекции —
-      подтвердить «вне скоупа».
+- [x] Cutoff-правило для прошедших событий — решено: Past Events не
+      импортируются вообще (ни контент, ни metadata), см. §0.6 EXCLUDED.
+- [x] Судьба `page` (71 publish + 13 draft) — решено: только legal/about/
+      contact и другие обязательные страницы вручную в `Page` до запуска,
+      остальное EXCLUDED (catch-all fallback). См. §0.6 P0.
+- [x] Политика unpublished/draft контента (places 187 unpublished, events 538
+      draft и т.д.) — решено: staging-only в migration ledger, не
+      публикуется автоматически; 187 unpublished Places разбираются вручную
+      после запуска. См. §0.6 P1.
+- [x] Судьба `collection` (90) и остального long-tail — решено: EXCLUDED из
+      v1, source сохраняется; возврат в P1 только для конкретных подборок с
+      подтверждённым трафиком/редакционной ценностью. См. §0.6 EXCLUDED.
 
 ---
 
@@ -550,3 +664,15 @@
   записано, `--apply` не запускался. Следующий шаг: Алексей утверждает пачкой
   или правит точечно; после этого — фактическая публикация 14 маршрутов и
   slug-history/redirect map.
+- **2026-07-14 — Claude Code** — Фаза 0 и Фаза 1 официально закрыты (см. §0.5,
+  §0.6). Фаза 0: PR #35/#36/#37 смержены в dev, 11 stash защищены archive
+  tags + bundle. Фаза 1: frozen scope утверждён Алексеем — P0 включает MySQL
+  escape fix → Offers → Users → Article media → Profiles identity/media →
+  Reviews → relations/taxonomy/redirects; Profiles публичный контент,
+  unpublished/draft контент, RankMath `start`/`contains` — P1; Past Events и
+  `collection`/long-tail — EXCLUDED. Три P0-регрессии из stash@{0} (Phone
+  E.164, Event visibility, Article/blog-city) и Reviews (~25 approved)
+  подняты в P0 по решению Алексея (не P1, как было в первоначальном
+  черновике аудита). Незавершённое: нет по этому пункту. Следующий шаг:
+  отдельный маленький PR на MySQL batch-escape fix (`connectExecutor.ts`),
+  первым по приоритету P0.
