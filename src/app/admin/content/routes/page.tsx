@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import {
   blockingDependencyItems,
   buildContentDependencySummary,
-  type ContentDependencySummary,
 } from "@/lib/admin/contentDependencySummary";
 import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
 import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
@@ -102,12 +101,6 @@ async function getRoutes(params: SearchParams) {
     },
   });
 }
-
-const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
-  total: 0,
-  blockingTotal: 0,
-  items: [],
-};
 
 function routeDependencySummary(route: Awaited<ReturnType<typeof getRoutes>>[number]) {
   return buildContentDependencySummary([
