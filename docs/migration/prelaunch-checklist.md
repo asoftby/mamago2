@@ -234,19 +234,18 @@ runner'а не покрыта тестами. Требует отдельной 
 
 **Реализация (вертикальными PR, без смешивания слоёв):**
 
-- [ ] **PR — Phone E.164 fix** (2026-07-14/15, ветка
-      `fix/migration-place-phone-e164`, **PR открыт, merge ещё не выполнен**)
-      — консолидация двух разошедшихся нормализаторов телефона в один
-      канонический (`src/lib/phone/e164.ts`, `libphonenumber-js/core`),
+- [x] **PR — Phone E.164 fix** (2026-07-14/15, ветка
+      `fix/migration-place-phone-e164`, **PR #43 смержен в dev merge-коммитом
+      `55fb873c`, post-merge Docker Build & Push SUCCESS**) — консолидация
+      двух разошедшихся нормализаторов телефона в один канонический
+      (`src/lib/phone/e164.ts`, `libphonenumber-js/core`),
       `normalizePlace.ts` добавляет `phoneE164` + `PLACE_PHONE_INVALID`
       warning, `buildPlaceCreateDraft.ts` пишет `phone` из `phoneE164`.
       `InternationalPhoneInput` защищён от краша на легаси-значении, не
       мутирует при рендере. Место 437 в БД не менялось (DB writes
       отсутствуют). `PlaceScalarLinker` (неподключённый dead code) не
       тронут функционально — задокументирован как известное расхождение
-      для будущего подключения. *(Отмечается `[x]` отдельным прямым
-      коммитом в `dev` только после фактического merge — см. журнал
-      сессий, паттерн `87bd43f9`.)*
+      для будущего подключения.
 - [ ] PR — targeted CLI + UPDATE safety (D).
 - [ ] PR — opening-hours fix (B).
 - [ ] PR — media fix (C).
@@ -997,3 +996,13 @@ dispatcher-branch, ни CLI-flag).
   `87bd43f9`). Следующий шаг: PR D —
   targeted CLI + UPDATE safety (allowlist + UPDATE-branch test coverage +
   manual-edit protection одновременно, не только allowlist).
+- **2026-07-15 — Claude Code** — PR #43 (Phone E.164 fix) смержен в `dev`
+  обычным merge-коммитом `55fb873c` (CI typecheck PASS, 0 unresolved review
+  threads, `mergeStateStatus=CLEAN`/`mergeable=MERGEABLE`, head SHA не
+  менялся с момента push). Post-merge `Docker Build & Push` — SUCCESS (run
+  29368752652, 13m15s). Локальный `dev` fast-forward на `origin/dev`. Пункт
+  «PR — Phone E.164 fix» в §1 Places этим же прямым докс-коммитом отмечен
+  `[x]` (паттерн `87bd43f9`). DB writes за весь PR — ноль, место 437 не
+  трогалось. Следующий шаг: PR D — targeted CLI + UPDATE safety (allowlist +
+  UPDATE-branch test coverage + manual-edit protection одновременно —
+  Алексей явно предупредил, что одного allowlist недостаточно).
