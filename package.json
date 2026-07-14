@@ -61,6 +61,8 @@
     "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",
+    "migration:route-review": "tsx scripts/migration-route-review.ts",
+    "migration:apply-route-review": "tsx scripts/migration-apply-route-review.ts",
     "notifications:plan-reminders": "tsx src/server/notifications/jobs/run-plan-event-reminders.ts",
     "notifications:plan-tomorrow-digests": "tsx src/server/notifications/jobs/run-plan-tomorrow-digests.ts",
     "db:backup": "bash scripts/backup-local-db.sh",

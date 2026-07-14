@@ -7,6 +7,8 @@ import {
   buildPublishedEventByIdQuery,
   buildPublishedEventsQuery,
   buildPublishedPlacesQuery,
+  buildPublishedRouteByIdQuery,
+  buildPublishedRoutesQuery,
   buildRankMathRedirectsQuery,
   buildTermsQuery,
   buildUsersQuery,
@@ -22,6 +24,7 @@ import type {
   WordPressPostMetaRow,
   WordPressPostRow,
   WordPressRedirectRow,
+  WordPressRouteBundle,
   WordPressTermRow,
   WordPressUserRow,
 } from "./types";
@@ -113,6 +116,24 @@ export class WordPressRepository {
 
   async getPublishedEventById(postId: number): Promise<WordPressEventBundle | null> {
     const { sql, params } = buildPublishedEventByIdQuery(postId);
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    const bundles = await this.assemblePostBundles(posts);
+    return bundles[0] ?? null;
+  }
+
+  /**
+   * No place-index/geo lookup here (see `WordPressRouteBundle` — routes
+   * have no equivalent to `wp_voxel_index_places`), just post + postmeta +
+   * terms, same shape as events.
+   */
+  async getPublishedRoutes(limit?: number): Promise<WordPressRouteBundle[]> {
+    const { sql, params } = buildPublishedRoutesQuery(clampLimit(limit));
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    return this.assemblePostBundles(posts);
+  }
+
+  async getPublishedRouteById(postId: number): Promise<WordPressRouteBundle | null> {
+    const { sql, params } = buildPublishedRouteByIdQuery(postId);
     const posts = await this.executor<WordPressPostRow>(sql, params);
     const bundles = await this.assemblePostBundles(posts);
     return bundles[0] ?? null;

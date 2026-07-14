@@ -100,6 +100,31 @@ const eventTerms: WordPressTermRow[] = [
   { post_id: 401, term_id: 30, name: "Festival", slug: "festival", taxonomy: "events-category" },
 ];
 
+const routePost: WordPressPostRow = {
+  ID: 501,
+  post_author: 5,
+  post_date: "2026-01-01 00:00:00",
+  post_content: "<p>Route intro</p>",
+  post_title: "Kids Route",
+  post_excerpt: "",
+  post_status: "publish",
+  post_name: "kids-route",
+  post_modified: "2026-01-02 00:00:00",
+  post_parent: 0,
+  guid: "https://example.com/?p=501",
+  post_type: "routes",
+  post_mime_type: "",
+};
+
+const routePostMeta: WordPressPostMetaRow[] = [
+  { meta_id: 31, post_id: 501, meta_key: "title-location-1", meta_value: "First Stop" },
+  { meta_id: 32, post_id: 501, meta_key: "location", meta_value: '{"address":"x","latitude":1,"longitude":2}' },
+];
+
+const routeTerms: WordPressTermRow[] = [
+  { post_id: 501, term_id: 40, name: "Бюджетно", slug: "budget-low", taxonomy: "route-budget" },
+];
+
 const attachmentRows: WordPressAttachmentRow[] = [
   { ID: 555, post_title: "cover.jpg", post_name: "cover", post_mime_type: "image/jpeg", guid: "https://example.com/cover.jpg", post_parent: 201 },
 ];
@@ -139,17 +164,23 @@ function createFakeExecutor() {
         if (byId) return (Number(postId) === eventPost.ID ? eventPost : []) as never;
         return eventPost as never;
       }
+      if (postType === "routes") {
+        if (byId) return (Number(postId) === routePost.ID ? routePost : []) as never;
+        return routePost as never;
+      }
       return [] as never;
     }
     if (sql.includes("FROM wp_postmeta")) {
       const ids = params as readonly number[];
-      return [...articlePostMeta, ...placePostMeta, ...eventPostMeta].filter((row) =>
+      return [...articlePostMeta, ...placePostMeta, ...eventPostMeta, ...routePostMeta].filter((row) =>
         ids.includes(row.post_id),
       ) as never;
     }
     if (sql.includes("FROM wp_term_relationships")) {
       const ids = params as readonly number[];
-      return [...articleTerms, ...placeTerms, ...eventTerms].filter((row) => ids.includes(row.post_id)) as never;
+      return [...articleTerms, ...placeTerms, ...eventTerms, ...routeTerms].filter((row) =>
+        ids.includes(row.post_id),
+      ) as never;
     }
     if (sql.includes("FROM wp_voxel_index_places")) {
       const ids = params as readonly number[];
@@ -281,6 +312,40 @@ async function testPublishedEventById() {
   assert.deepEqual(postsCall!.params, ["events", "publish", 401]);
 }
 
+async function testRouteBundle() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedRoutes();
+
+  assert.equal(bundles.length, 1);
+  const [bundle] = bundles;
+  assert.deepEqual(bundle.post, routePost);
+  assert.deepEqual(bundle.postMeta, {
+    "title-location-1": ["First Stop"],
+    location: ['{"address":"x","latitude":1,"longitude":2}'],
+  });
+  assert.deepEqual(bundle.terms, routeTerms);
+
+  const postsCall = calls.find((call) => call.sql.includes("post_type = ?") && call.params[0] === "routes");
+  assert.ok(postsCall);
+  assert.deepEqual(postsCall!.params, ["routes", "publish", DEFAULT_LIMIT]);
+}
+
+async function testPublishedRouteById() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedRouteById(501);
+
+  assert.ok(bundle);
+  assert.deepEqual(bundle.post, routePost);
+
+  const postsCall = calls.find((call) => call.sql.includes("ID = ?") && call.params[0] === "routes");
+  assert.ok(postsCall);
+  assert.deepEqual(postsCall!.params, ["routes", "publish", 501]);
+}
+
 async function testMissingPlaceIndexDoesNotFailBundle() {
   const { executor } = createFakeExecutor();
   const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
@@ -353,6 +418,8 @@ async function main() {
   await testPlaceBundle();
   await testEventBundle();
   await testPublishedEventById();
+  await testRouteBundle();
+  await testPublishedRouteById();
   await testMissingPlaceIndexDoesNotFailBundle();
   await testEmptyIdListsSkipExecutor();
   await testAttachmentsById();

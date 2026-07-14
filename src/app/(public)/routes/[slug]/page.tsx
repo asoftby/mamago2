@@ -10,6 +10,8 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canViewRoute } from "@/lib/routes/routeAccess";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -72,6 +74,9 @@ export async function generateMetadata({ params }: Props) {
       select: {
         title: true,
         slug: true,
+        status: true,
+        visibility: true,
+        authorId: true,
         seoTitle: true,
         seoDescription: true,
         coverImageUrl: true,
@@ -91,7 +96,7 @@ export async function generateMetadata({ params }: Props) {
         },
       },
     });
-    if (db) {
+    if (db && canViewRoute(db, await getCurrentUser())) {
       const budgetSummary = summarizeRouteBudget(db.stops);
       const title = db.seoTitle?.trim() || `${db.title} — маршрут | mamaGo`;
       const description =
@@ -105,6 +110,10 @@ export async function generateMetadata({ params }: Props) {
         description,
         image,
         url: `${publicBase}/routes/${db.slug ?? slug}`,
+        // UNLISTED («по ссылке») и любые непубличные превью не индексируем.
+        ...(db.status !== "PUBLISHED" || db.visibility !== "PUBLIC"
+          ? { robots: { index: false, follow: false } }
+          : {}),
       });
     }
   }
@@ -126,6 +135,8 @@ export default async function RouteDetailPage({ params }: Props) {
         budgetLevel: true,
         coverImageUrl: true,
         authorId: true,
+        status: true,
+        visibility: true,
         cityId: true,
         seoJsonLdOverride: true,
         createdAt: true,
@@ -164,6 +175,9 @@ export default async function RouteDetailPage({ params }: Props) {
       },
     });
     if (db) {
+      if (!canViewRoute(db, await getCurrentUser())) {
+        notFound();
+      }
       const budgetSummary = summarizeRouteBudget(db.stops);
       if (resolved.isRedirect) {
         permanentRedirect(`/routes/${db.slug}`);

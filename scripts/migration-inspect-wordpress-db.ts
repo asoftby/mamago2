@@ -75,8 +75,33 @@ const SQL_STEPS: readonly SqlStep[] = [
     sql: "SELECT meta_key, COUNT(*) AS c FROM wp_postmeta pm JOIN wp_posts p ON p.ID = pm.post_id WHERE p.post_type='places' GROUP BY meta_key ORDER BY c DESC LIMIT 30;",
   },
   {
+    label: "top_postmeta_keys_routes",
+    sql: "SELECT meta_key, COUNT(*) AS c FROM wp_postmeta pm JOIN wp_posts p ON p.ID = pm.post_id WHERE p.post_type='routes' GROUP BY meta_key ORDER BY c DESC LIMIT 60;",
+  },
+  {
+    label: "sample_route_location_meta",
+    sql: "SELECT p.ID, pm.meta_key, pm.meta_value FROM wp_postmeta pm JOIN wp_posts p ON p.ID = pm.post_id WHERE p.post_type='routes' AND p.post_status='publish' AND (pm.meta_key LIKE '%location%' OR pm.meta_key LIKE '%place%' OR pm.meta_key LIKE '%stop%') ORDER BY p.ID, pm.meta_key LIMIT 300;",
+  },
+  {
+    label: "sample_route_full_postmeta",
+    // A `WHERE post_id IN (SELECT ... LIMIT 2)` form was tried first, but
+    // MariaDB rejects `LIMIT` inside an `IN`/`ALL`/`ANY`/`SOME` subquery
+    // (ERROR 1235) — this JOIN-on-a-derived-table form is the MariaDB- and
+    // MySQL-compatible equivalent.
+    sql: "SELECT pm.post_id, pm.meta_key, pm.meta_value FROM wp_postmeta pm JOIN (SELECT ID FROM wp_posts WHERE post_type='routes' AND post_status='publish' ORDER BY ID LIMIT 2) r ON r.ID = pm.post_id ORDER BY pm.post_id, pm.meta_key;",
+  },
+  {
     label: "taxonomy_counts",
     sql: "SELECT taxonomy, COUNT(*) AS c FROM wp_term_taxonomy GROUP BY taxonomy ORDER BY c DESC;",
+  },
+  {
+    label: "route_budget_terms",
+    // Follow-up to PR A: the `route-budget` taxonomy's own term slugs were
+    // never read (only its 6-term count, via taxonomy_counts, and the
+    // always-`0` rank_math_primary_route-budget marker). This is the one
+    // query that finally answers it — see normalizeRoute.ts's
+    // ROUTE_BUDGET_TERM_SLUG_TO_BUDGET_LEVEL.
+    sql: "SELECT t.term_id, t.name, t.slug, tt.count FROM wp_terms t JOIN wp_term_taxonomy tt ON tt.term_id = t.term_id WHERE tt.taxonomy = 'route-budget' ORDER BY t.slug;",
   },
   {
     label: "sample_post_places_rows",
@@ -278,10 +303,38 @@ export function buildHumanReport(sections: ParsedSection[], env: WpDbEnv): strin
   }
   push();
 
+  push("TOP postmeta KEYS — routes");
+  push("--------");
+  for (const [key, count] of findSection(sections, "top_postmeta_keys_routes")?.rows ?? []) {
+    push(`${count}\t${key}`);
+  }
+  push();
+
+  push("SAMPLE route location/place/stop meta VALUES (published routes)");
+  push("--------");
+  for (const [id, key, value] of findSection(sections, "sample_route_location_meta")?.rows ?? []) {
+    push(`${id}\t${key}\t${value}`);
+  }
+  push();
+
+  push("FULL unfiltered postmeta — first 2 published routes (catches keys the filter above might miss)");
+  push("--------");
+  for (const [postId, key, value] of findSection(sections, "sample_route_full_postmeta")?.rows ?? []) {
+    push(`${postId}\t${key}\t${value}`);
+  }
+  push();
+
   push("TAXONOMIES");
   push("--------");
   for (const [taxonomy, count] of findSection(sections, "taxonomy_counts")?.rows ?? []) {
     push(`${count}\t${taxonomy}`);
+  }
+  push();
+
+  push("route-budget TERMS (term_id, name, slug, usage count)");
+  push("--------");
+  for (const [termId, name, slug, count] of findSection(sections, "route_budget_terms")?.rows ?? []) {
+    push(`${termId}\t${name}\t${slug}\t${count}`);
   }
   push();
 

@@ -22,6 +22,8 @@ function adminArchivePath(contentType: LifecycleContentType, contentId: string) 
       return `/api/business/events/${contentId}/archive`;
     case "article":
       return `/api/admin/articles/${contentId}/archive`;
+    case "route":
+      return `/api/admin/routes/${contentId}/archive`;
     default:
       return null;
   }
@@ -55,6 +57,8 @@ function deletePath(
         return `/api/admin/moderation/events/${contentId}`;
       case "article":
         return `/api/admin/articles/${contentId}`;
+      case "route":
+        return `/api/admin/routes/${contentId}`;
       default:
         return null;
     }
@@ -161,7 +165,10 @@ export function resolveLifecycleActionRequest(
           };
         case "route":
           return {
-            url: `/api/routes/${contentId}`,
+            url:
+              surface === "admin"
+                ? `/api/admin/routes/${contentId}`
+                : `/api/routes/${contentId}`,
             method: "PATCH",
             body: { publish: true },
           };
@@ -173,7 +180,10 @@ export function resolveLifecycleActionRequest(
     case "unpublish":
       return contentType === "route"
         ? {
-            url: `/api/routes/${contentId}`,
+            url:
+              surface === "admin"
+                ? `/api/admin/routes/${contentId}`
+                : `/api/routes/${contentId}`,
             method: "PATCH",
             body: { publish: false },
           }

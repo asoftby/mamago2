@@ -209,3 +209,78 @@ This ordering matches the already-established principle (confirmed
 repeatedly this session): build the smallest verified layer first
 (repository → discover → normalize), don't build planner/repository-write/
 commit machinery before there's real normalized output to plan around.
+
+## 10. Routes — live inspection addendum (2026-07-13)
+
+This inspection originally covered only `post`/`places` postmeta (§6/§5).
+`scripts/migration-inspect-wordpress-db.ts` was extended with
+`top_postmeta_keys_routes`, `sample_route_location_meta`, and
+`sample_route_full_postmeta` (a full, unfiltered postmeta dump for the
+first 2 published route posts — the most reliable of the three, since it
+can't miss a field due to a wrong key-name guess) specifically to answer
+one open question before Phase 4 PR A: does a `RouteStop` carry a stable
+WP Place post ID? Run live 2026-07-13 against production (14 published
+`routes` rows, per §2).
+
+Findings:
+
+- Confirmed keys: `title-location-N`, `description-location-N`,
+  `images-location-N`, 1-based, observed up to N=11.
+  `images-location-N` is one comma-separated attachment-id string.
+- **No place/stop reference key exists anywhere** — confirmed both by the
+  aggregated top-60 key list (nothing resembling one, and any systematic
+  per-stop field would show a count comparable to `title-location-N`'s,
+  which none do below the noise floor) and by the full unfiltered dump for
+  2 real routes (85 rows, no exceptions). `RouteStop.placeId` is `null` for
+  all imported stops in Phase 4 PR A — a confirmed fact, not a punted
+  decision.
+- One real route (post 29290) has a bare, unsuffixed
+  `title-location`/`description-location`/`images-location` key whose
+  value exactly duplicates stop 10's content — stale/duplicate data, not a
+  0th/12th stop. The generic `groupIndexedMeta()` helper excludes
+  unsuffixed keys for exactly this reason (see
+  `src/lib/migration/adapters/wordpress-db/groupIndexedMeta.ts`).
+- Route-level `location` postmeta is a single JSON blob
+  (`{address, latitude, longitude, map_picker}`) — one per route, not
+  per-stop. No per-stop coordinates exist in the source. Product decision
+  (2026-07-13): not imported into `Route`/`RouteStop`; preserved only in
+  normalized evidence (`locationRaw`, parsed `location` when valid, and
+  `rawMeta.location`) with warning `ROUTE_LEVEL_LOCATION_DROPPED`.
+- `route-budget`/`route-duration`/`passing-time` are all taxonomies (their
+  `rank_math_primary_*` postmeta is just the RankMath "primary term"
+  marker, not a value). `rank_math_primary_route-budget` was `0` on both
+  sampled real routes — meaning the primary-term marker alone cannot be
+  trusted.
+- `route-duration`/`reels-route`/**`route-budget`**/route-level `location`:
+  product decision (2026-07-13) to never import any of these — see the "Routes" section of
+  `docs/migration/wordpress-to-mamago.md` for the reasoning (budget is
+  derived later from per-stop prices during manual review instead; a
+  static WP-term mapping would only be thrown away once that review sets
+  real prices).
+
+See `src/lib/migration/adapters/wordpress-db/normalizeRoute.ts` and
+`groupIndexedMeta.ts` (Phase 4 PR A) for where these findings were applied.
+
+### `route-budget` terms — live inspection follow-up (2026-07-13)
+
+Not used by the importer (see decision above), but kept here for whoever
+does the manual per-route review — this is what `route-budget` actually
+contains. Run via the added `route_budget_terms` inspect-CLI step
+(`wp_terms` ⋈ `wp_term_taxonomy` `WHERE taxonomy='route-budget'`).
+
+The 6 terms are themselves price-range labels (not abstract budget tiers),
+confirming budget in the source was modeled as a price bracket per route,
+matching the target model's "derive budget from stop prices" approach:
+
+| Price range (term name) | Routes using this term |
+| --- | ---: |
+| до 100 | 5 |
+| 100–200 | 1 |
+| 200–300 | 2 |
+| 300–400 | 0 |
+| 400–500 | 0 |
+| больше 500 | 5 |
+
+Total usage across all 6 terms: 13. There are 14 published routes, so
+exactly one route has no `route-budget` term assigned at all — expected
+given the term is never required, not a data error.

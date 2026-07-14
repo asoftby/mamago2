@@ -5,6 +5,7 @@ import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import {
   ARTICLE_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
+  ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
@@ -52,9 +53,15 @@ const placePosts: WordPressPostRow[] = [
   post({ ID: 302, post_type: "places", post_title: "Unlocated Place", post_name: "unlocated-place" }),
 ];
 
+const routePosts: WordPressPostRow[] = [
+  post({ ID: 701, post_type: "routes", post_title: "Family Route", post_name: "family-route" }),
+];
+
 const postMeta: WordPressPostMetaRow[] = [
   { meta_id: 1, post_id: 201, meta_key: "_thumbnail_id", meta_value: "555" },
   { meta_id: 2, post_id: 202, meta_key: "_elementor_data", meta_value: "[]" },
+  { meta_id: 3, post_id: 701, meta_key: "title-location-1", meta_value: "First stop" },
+  { meta_id: 4, post_id: 701, meta_key: "description-location-1", meta_value: "First stop note" },
 ];
 
 const terms: WordPressTermRow[] = [];
@@ -69,6 +76,7 @@ function createFakeExecutor(): WordPressQueryExecutor {
       const [postType] = params;
       if (postType === "post") return articlePosts as never;
       if (postType === "places") return placePosts as never;
+      if (postType === "routes") return routePosts as never;
       return [] as never;
     }
     if (sql.includes("FROM wp_postmeta")) {
@@ -106,11 +114,14 @@ async function testEngineProducesCreateItemsForAll() {
 
   const articleItems = plan.items.filter((item) => item.sourceEntityType === ARTICLE_ENTITY_TYPE);
   const placeItems = plan.items.filter((item) => item.sourceEntityType === PLACE_ENTITY_TYPE);
+  const routeItems = plan.items.filter((item) => item.sourceEntityType === ROUTE_ENTITY_TYPE);
 
   assert.equal(articleItems.length, 2);
   assert.ok(articleItems.every((item) => item.action === "CREATE"));
   assert.equal(placeItems.length, 2);
   assert.ok(placeItems.every((item) => item.action === "CREATE"));
+  assert.equal(routeItems.length, 1);
+  assert.ok(routeItems.every((item) => item.action === "CREATE"));
   assert.equal(plan.errors.length, 0);
 }
 
@@ -122,14 +133,18 @@ async function testEntityFilterAppliesThroughAdapterAndEngine() {
   const placeOnly = await buildTestPlan([PLACE_ENTITY_TYPE]);
   assert.ok(placeOnly.items.every((item) => item.sourceEntityType === PLACE_ENTITY_TYPE));
   assert.equal(placeOnly.items.length, 2);
+
+  const routeOnly = await buildTestPlan([ROUTE_ENTITY_TYPE]);
+  assert.ok(routeOnly.items.every((item) => item.sourceEntityType === ROUTE_ENTITY_TYPE));
+  assert.equal(routeOnly.items.length, 1);
 }
 
 async function testStatsPresentAndUsedByReport() {
   const plan = await buildTestPlan();
   assert.ok(plan.stats);
 
-  assert.equal(plan.stats!.discoveredCount, 4);
-  assert.equal(plan.stats!.normalizedCount, 4);
+  assert.equal(plan.stats!.discoveredCount, 5);
+  assert.equal(plan.stats!.normalizedCount, 5);
   assert.equal(plan.stats!.failedCount, 0);
   assert.deepEqual(plan.stats!.warningCounts, {
     ARTICLE_ELEMENTOR_CONTENT: 1,
@@ -139,6 +154,7 @@ async function testStatsPresentAndUsedByReport() {
   assert.deepEqual(plan.stats!.sourceEntityTypeCounts, {
     [ARTICLE_ENTITY_TYPE]: 2,
     [PLACE_ENTITY_TYPE]: 2,
+    [ROUTE_ENTITY_TYPE]: 1,
   });
 }
 
@@ -149,16 +165,17 @@ async function testHumanReportContent() {
   assert.match(report, /Migration Preview/);
   assert.match(report, /source: wordpress-db/);
   assert.match(report, /entity: all/);
-  assert.match(report, /Discovered: 4/);
-  assert.match(report, /Normalized: 4/);
+  assert.match(report, /Discovered: 5/);
+  assert.match(report, /Normalized: 5/);
   assert.match(report, /Failed: 0/);
   assert.match(report, /Skipped: 0/);
   assert.match(report, /Success rate: 100\.0%/);
   assert.match(report, /Action counts/);
-  assert.match(report, /CREATE: 4/);
+  assert.match(report, /CREATE: 5/);
   assert.match(report, /Target type counts/);
   assert.match(report, /ARTICLE: 2/);
   assert.match(report, /PLACE: 2/);
+  assert.match(report, /ROUTE: 1/);
   assert.match(report, /Source entity type counts/);
   assert.match(report, /• 1 Elementor articles/);
   assert.match(report, /• 1 articles without a featured image/);
@@ -186,13 +203,13 @@ async function testJsonReportExcludesRawContent() {
   const jsonReport = buildPreviewJsonReport(plan, { entity: "all", limit: null });
 
   assert.ok(jsonReport.stats);
-  assert.equal(jsonReport.stats!.discoveredCount, 4);
+  assert.equal(jsonReport.stats!.discoveredCount, 5);
   assert.deepEqual(jsonReport.stats!.warningCounts, {
     ARTICLE_ELEMENTOR_CONTENT: 1,
     ARTICLE_MISSING_FEATURED_IMAGE: 1,
     PLACE_MISSING_COORDINATES: 1,
   });
-  assert.equal(jsonReport.candidates.length, 4);
+  assert.equal(jsonReport.candidates.length, 5);
 
   for (const candidate of jsonReport.candidates) {
     assert.ok(!("content" in candidate));
@@ -253,6 +270,15 @@ function testParseArgs() {
   assert.deepEqual(parseArgs(["--entity", "place", "--limit", "20"]), {
     entity: "place",
     limit: 20,
+    sourceRecordKey: undefined,
+    forceReprocess: false,
+    out: undefined,
+    allowRemoteReadonly: false,
+  });
+
+  assert.deepEqual(parseArgs(["--entity", "route"]), {
+    entity: "route",
+    limit: undefined,
     sourceRecordKey: undefined,
     forceReprocess: false,
     out: undefined,

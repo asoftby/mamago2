@@ -90,7 +90,7 @@ function testInvalidLimitFails() {
 }
 
 function testValidEntityValuesAllParse() {
-  for (const entity of ["article", "place", "event", "all"]) {
+  for (const entity of ["article", "place", "event", "route", "all"]) {
     const args = parseArgs(["--entity", entity, ...REQUIRED_FLAGS]);
     assert.equal(args.entity, entity);
   }
@@ -281,6 +281,9 @@ function testBuildExecutionPlanInputMapsEntityToEntityTypes() {
   ]);
   assert.deepEqual(buildExecutionPlanInput({ entity: "event", executor, ledger }).filters?.entityTypes, [
     "wordpress-db:events",
+  ]);
+  assert.deepEqual(buildExecutionPlanInput({ entity: "route", executor, ledger }).filters?.entityTypes, [
+    "wordpress-db:routes",
   ]);
   assert.equal(buildExecutionPlanInput({ entity: "all", executor, ledger }).filters?.entityTypes, undefined);
 }

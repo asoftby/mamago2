@@ -6,4 +6,5 @@ export type {
   DispatchCommitRunnerInput,
   EventCommitRunnerLike,
   PlaceCommitRunnerLike,
+  RouteCommitRunnerLike,
 } from "./dispatchCommitRunner";

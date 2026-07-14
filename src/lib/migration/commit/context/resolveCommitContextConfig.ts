@@ -2,6 +2,7 @@ import type { MigrationExecutionCandidate } from "../../core/orchestrator";
 import type { ArticleCommitContext } from "../article/buildArticleCreateDraft";
 import type { EventCommitContext } from "../event/types";
 import type { PlaceCommitContext } from "../place/types";
+import type { RouteCommitContext } from "../route/buildRouteCreateDraft";
 
 /**
  * Per-`targetType` manual context, layered `defaults` -> per-record
@@ -18,6 +19,7 @@ export interface MigrationCommitContextConfig {
     place?: Partial<PlaceCommitContext>;
     event?: Partial<EventCommitContext>;
     article?: Partial<ArticleCommitContext>;
+    route?: Partial<RouteCommitContext>;
   };
   overridesBySourceRecordKey?: Record<
     string,
@@ -25,6 +27,7 @@ export interface MigrationCommitContextConfig {
       place?: Partial<PlaceCommitContext>;
       event?: Partial<EventCommitContext>;
       article?: Partial<ArticleCommitContext>;
+      route?: Partial<RouteCommitContext>;
     }
   >;
 }
@@ -40,6 +43,7 @@ export type ResolveCommitContextResult =
   | { ok: true; targetType: "PLACE"; context: PlaceCommitContext }
   | { ok: true; targetType: "ACTIVITY"; context: EventCommitContext }
   | { ok: true; targetType: "ARTICLE"; context: ArticleCommitContext }
+  | { ok: true; targetType: "ROUTE"; context: RouteCommitContext }
   | { ok: false; errorCode: ResolveCommitContextErrorCode; errorMessage: string };
 
 function shallowMerge<T extends object>(
@@ -105,6 +109,11 @@ export function resolveCommitContextForExecutionCandidate(
   if (targetType === "ARTICLE") {
     const context = shallowMerge(config.defaults?.article, override?.article) as ArticleCommitContext;
     return { ok: true, targetType: "ARTICLE", context };
+  }
+
+  if (targetType === "ROUTE") {
+    const context = shallowMerge(config.defaults?.route, override?.route) as RouteCommitContext;
+    return { ok: true, targetType: "ROUTE", context };
   }
 
   return {

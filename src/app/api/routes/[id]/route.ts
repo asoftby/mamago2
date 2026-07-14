@@ -90,14 +90,22 @@ export async function PATCH(
       }
     }
 
-    const result = await updateRoute(user.id, routeId, {
-      title: title.trim(),
-      ageTags,
-      budgetLevel,
-      visibility,
-      publish,
-      stops,
-    });
+    // Admin/moderator save any route via the shared editor — including
+    // authorless editorial routes (imported from WordPress).
+    const isPrivilegedEditor = user.role === "ADMIN" || user.role === "MODERATOR";
+    const result = await updateRoute(
+      user.id,
+      routeId,
+      {
+        title: title.trim(),
+        ageTags,
+        budgetLevel,
+        visibility,
+        publish,
+        stops,
+      },
+      { allowAnyAuthor: isPrivilegedEditor },
+    );
 
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
@@ -156,8 +164,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Route not found" }, { status: 404 });
     }
 
-    // Check if user is the author
-    if (route.authorId !== user.id) {
+    // Check if user is the author (admin/moderator may delete any route;
+    // the lifecycle guard below still restricts what can be deleted)
+    const canDeleteAny = user.role === "ADMIN" || user.role === "MODERATOR";
+    if (!canDeleteAny && route.authorId !== user.id) {
       return NextResponse.json(
         { error: "You can only delete your own routes" },
         { status: 403 },

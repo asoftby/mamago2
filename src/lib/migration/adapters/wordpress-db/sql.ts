@@ -85,6 +85,33 @@ export function buildPublishedEventByIdQuery(postId: number): SqlQuery {
   };
 }
 
+/**
+ * `post_status = 'publish'` only — confirmed live (2026-07-13) that all 14
+ * real `routes` rows are `publish` anyway, but the filter is still
+ * explicit here rather than assumed, same as every other published-* query
+ * in this file.
+ */
+export function buildPublishedRoutesQuery(limit: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type = ? AND post_status = ?
+      ORDER BY ID
+      LIMIT ?`,
+    params: ["routes", "publish", limit],
+  };
+}
+
+export function buildPublishedRouteByIdQuery(postId: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type = ? AND post_status = ? AND ID = ?
+      LIMIT 1`,
+    params: ["routes", "publish", postId],
+  };
+}
+
 export function buildPostMetaQuery(postIds: readonly number[]): SqlQuery {
   return {
     sql: `SELECT meta_id, post_id, meta_key, meta_value

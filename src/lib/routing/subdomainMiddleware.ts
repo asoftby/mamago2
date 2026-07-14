@@ -24,6 +24,18 @@ function isEditorRoute(pathname: string): boolean {
   return pathname === "/editor" || pathname.startsWith("/editor/");
 }
 
+/**
+ * Route (маршрут) view/create/edit pages live in the public route group but
+ * are also opened from the admin content list (shared RouteEditor wizard).
+ * Like `isEditorRoute`, they must stay on the current subdomain surface:
+ * the admin-host fallback rewrite would turn `/routes/{slug}/edit` into a
+ * nonexistent `/admin/routes/...` page (404), and a cross-origin redirect
+ * would break App Router RSC navigation from admin.
+ */
+function isRouteContentRoute(pathname: string): boolean {
+  return pathname === "/routes" || pathname.startsWith("/routes/");
+}
+
 function isPublicInviteRoute(pathname: string): boolean {
   return pathname === "/invite/business";
 }
@@ -145,6 +157,14 @@ export function resolveSubdomainMiddlewareDecision(params: {
     if (isEditorRoute(pathname)) {
       // Keep the isolated content editor on the current subdomain surface.
       // A cross-origin redirect here breaks App Router RSC navigation from admin.
+      return { kind: "next" };
+    }
+
+    if (isRouteContentRoute(pathname)) {
+      // Route view/create/edit (shared RouteEditor wizard) — same reasoning
+      // as isEditorRoute: serve the public route-group page on this surface
+      // instead of rewriting into a nonexistent /admin/routes/* or
+      // /business/routes/* page.
       return { kind: "next" };
     }
   }

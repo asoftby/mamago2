@@ -426,12 +426,20 @@ export const LIFECYCLE_TRANSITIONS: Record<
 
   route: {
     draft: {
+      admin: [
+        { actionId: "publish", toState: "published", endpointImplemented: true },
+        { actionId: "deleteDraft", toState: "deleted", endpointImplemented: true },
+      ],
       business: [
         { actionId: "publish", toState: "published", endpointImplemented: true },
         { actionId: "deleteDraft", toState: "deleted", endpointImplemented: true },
       ],
     },
     published: {
+      admin: [
+        { actionId: "unpublish", toState: "draft", endpointImplemented: true },
+        { actionId: "archive", toState: "archived", endpointImplemented: true },
+      ],
       business: [
         { actionId: "unpublish", toState: "draft", endpointImplemented: true },
         {
@@ -446,6 +454,13 @@ export const LIFECYCLE_TRANSITIONS: Record<
     needsRevision: {},
     scheduled: {},
     archived: {
+      admin: [
+        {
+          actionId: "restore",
+          toState: "published",
+          endpointImplemented: true,
+        },
+      ],
       business: [
         {
           actionId: "restore",

@@ -77,10 +77,32 @@ const FIXTURE = [
   "phone\t80",
   "work_hours\t75",
   "section",
+  "top_postmeta_keys_routes",
+  "meta_key\tc",
+  "title-location-0\t14",
+  "description-location-0\t14",
+  "images-location-0\t14",
+  "route-budget\t14",
+  "section",
+  "sample_route_location_meta",
+  "ID\tmeta_key\tmeta_value",
+  "901\ttitle-location-0\tSome Stop",
+  "901\tdescription-location-0\tSome description",
+  "section",
+  "sample_route_full_postmeta",
+  "post_id\tmeta_key\tmeta_value",
+  "901\t_edit_lock\t1234567890:1",
+  "901\ttitle-location-0\tSome Stop",
+  "section",
   "taxonomy_counts",
   "taxonomy\tc",
   "places_category\t42",
   "age\t19",
+  "section",
+  "route_budget_terms",
+  "term_id\tname\tslug\tcount",
+  "12\tБесплатно\tfree\t2",
+  "13\tНедорого\tlow-budget\t2",
   "section",
   "sample_post_places_rows",
   "ID\tpost_type\tpost_status\tpost_title\tpost_name\tpost_date",
@@ -107,7 +129,19 @@ const TEST_ENV: WpDbEnv = {
 function main() {
   // --- parseSectionedOutput ---
   const sections = parseSectionedOutput(FIXTURE);
-  assert.equal(sections.length, 14, "all 14 SQL_STEPS sections parsed");
+  assert.equal(sections.length, 18, "all 18 SQL_STEPS sections parsed");
+
+  const routeBudgetTerms = sections.find((s) => s.label === "route_budget_terms");
+  assert.ok(routeBudgetTerms);
+  assert.deepEqual(routeBudgetTerms!.rows[0], ["12", "Бесплатно", "free", "2"]);
+
+  const routeKeys = sections.find((s) => s.label === "top_postmeta_keys_routes");
+  assert.ok(routeKeys);
+  assert.deepEqual(routeKeys!.rows[0], ["title-location-0", "14"]);
+
+  const routeLocationSample = sections.find((s) => s.label === "sample_route_location_meta");
+  assert.ok(routeLocationSample);
+  assert.deepEqual(routeLocationSample!.rows[0], ["901", "title-location-0", "Some Stop"]);
 
   const postCounts = sections.find((s) => s.label === "post_type_status_counts");
   assert.ok(postCounts);
@@ -155,6 +189,16 @@ function main() {
   assert.ok(report.includes("115\tpost (Article)\tpublish"), "MVP post_type label mapping applied");
   assert.ok(report.includes("_location (point)"), "voxel places columns listed");
   assert.ok(report.includes("wp_voxel_index_places._location"), "static recommendations block present");
+  assert.ok(report.includes("14\ttitle-location-0"), "routes postmeta key counts listed");
+  assert.ok(
+    report.includes("901\ttitle-location-0\tSome Stop"),
+    "sample route location/place/stop meta values listed",
+  );
+  assert.ok(
+    report.includes("901\t_edit_lock\t1234567890:1"),
+    "full unfiltered route postmeta sample listed",
+  );
+  assert.ok(report.includes("12\tБесплатно\tfree\t2"), "route-budget terms listed");
 
   console.log("migration-inspect-wordpress-db tests: OK");
 }

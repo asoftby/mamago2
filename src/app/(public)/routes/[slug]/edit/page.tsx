@@ -21,7 +21,12 @@ export default async function EditRoutePage({ params }: Props) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const route = await getEditableRouteBySlug(slug, user.id);
+  // Admin/moderator edit any route via the same shared editor — including
+  // authorless editorial routes (imported from WordPress, authorId === null).
+  const isPrivilegedEditor = user.role === "ADMIN" || user.role === "MODERATOR";
+  const route = await getEditableRouteBySlug(slug, user.id, {
+    allowAnyAuthor: isPrivilegedEditor,
+  });
   if (!route) notFound();
 
   const mappedStops: EditableRouteStop[] = route.stops.map((stop) => {

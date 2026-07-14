@@ -60,6 +60,7 @@ import { pathToFileURL } from "node:url";
 import { PrismaClient } from "@prisma/client";
 
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
+import type { MediaImporterLike } from "../src/lib/migration/media/types";
 import {
   assertRemoteAccessAllowed,
   createWordPressSshMysqlExecutor,
@@ -69,9 +70,11 @@ import {
   ARTICLE_ENTITY_TYPE,
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
+  ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
   fetchPublishedEventEnvelopeBySourceRecordKey,
+  fetchPublishedRouteEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { WordPressRepository, type WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
@@ -93,12 +96,17 @@ import {
 import { PlaceCommitOrchestrator } from "../src/lib/migration/commit/place/PlaceCommitOrchestrator";
 import { PlaceCommitRunner } from "../src/lib/migration/commit/place/PlaceCommitRunner";
 import { PlaceCommitWriter } from "../src/lib/migration/commit/place/PlaceCommitWriter";
+import { RouteCommitOrchestrator } from "../src/lib/migration/commit/route/RouteCommitOrchestrator";
+import { RouteCommitRunner } from "../src/lib/migration/commit/route/RouteCommitRunner";
+import { RouteCommitWriter } from "../src/lib/migration/commit/route/RouteCommitWriter";
+import { RouteStopMediaSyncer } from "../src/lib/migration/commit/route/RouteStopMediaSyncer";
 import { createMigrationRunExecutionPlan } from "../src/lib/migration/core/orchestrator";
 import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/migration/core/orchestrator";
 import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
 import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLineageWriter";
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
+import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
 import {
   formatMigrationProfileForCli,
   parseMediaPolicyName,
@@ -116,7 +124,7 @@ import type {
 } from "../src/lib/migration/runtime/MigrationProfile";
 import { assertProductionMigrationGuard } from "../src/lib/migration/runtime/ProductionMigrationGuard";
 
-export type CommitEntity = "article" | "place" | "event" | "all";
+export type CommitEntity = "article" | "place" | "event" | "route" | "all";
 
 export interface CommitCliArgs {
   entity: CommitEntity;
@@ -134,13 +142,13 @@ export interface CommitCliArgs {
   confirmProduction: boolean;
 }
 
-const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "all"];
+const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "route", "all"];
 
 export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const entityIndex = argv.indexOf("--entity");
   const rawEntity = entityIndex !== -1 ? argv[entityIndex + 1] : undefined;
   if (rawEntity !== undefined && !VALID_ENTITIES.includes(rawEntity as CommitEntity)) {
-    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|all.`);
+    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|route|all.`);
   }
   const entity: CommitEntity = (rawEntity as CommitEntity | undefined) ?? "all";
 
@@ -248,6 +256,7 @@ function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
   if (entity === "article") return [ARTICLE_ENTITY_TYPE];
   if (entity === "place") return [PLACE_ENTITY_TYPE];
   if (entity === "event") return [EVENT_ENTITY_TYPE];
+  if (entity === "route") return [ROUTE_ENTITY_TYPE];
   return undefined;
 }
 
@@ -399,9 +408,11 @@ async function main(): Promise<void> {
         records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else if (args.entity === "event") {
         records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
+      } else if (args.entity === "route") {
+        records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else {
         throw new Error(
-          "--source-record-key is only supported with --entity article|event for golden-sample runs.",
+          "--source-record-key is only supported with --entity article|event|route for golden-sample runs.",
         );
       }
     }
@@ -421,12 +432,45 @@ async function main(): Promise<void> {
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);
     const wordpressRepository = new WordPressRepository(executor);
-    const { createMamagoMediaImporter } = await import("../src/lib/migration/media");
+
+    // `createMamagoMediaImporter` transitively imports `@/server/media/media-storage`,
+    // which is guarded by the `server-only` package. That guard is only a
+    // no-op under Next's bundler (which sets the "react-server" resolve
+    // condition) — under a plain `tsx`/Node process (this CLI), `server-only`
+    // throws unconditionally the moment the module is *loaded*, regardless
+    // of whether it's ever called. So this import must stay lazy and must
+    // only ever be reached when the run's media policy is actually FULL;
+    // `MediaPolicyGated{Event,RouteStop}MediaSyncer` already guarantee
+    // `mediaImporterFactory` itself is never invoked for METADATA/NONE, but
+    // the previous code additionally imported the module eagerly at
+    // startup regardless of policy, which crashed every non-FULL run.
+    let createMamagoMediaImporter: typeof import("../src/lib/migration/media")["createMamagoMediaImporter"] | undefined;
+    if (profile.mediaPolicy.name === "FULL") {
+      ({ createMamagoMediaImporter } = await import("../src/lib/migration/media"));
+    }
+    const mediaImporterFactory = (ownerUserId: string): MediaImporterLike => {
+      if (!createMamagoMediaImporter) {
+        throw new Error(
+          "mediaImporterFactory invoked without mediaPolicy=FULL — this should be unreachable; MediaPolicyGated*Syncer is expected to gate all calls.",
+        );
+      }
+      return createMamagoMediaImporter({ uploadedByUserId: ownerUserId });
+    };
+
     const eventMediaSyncer = new MediaPolicyGatedEventMediaSyncer({
       inner: new EventMediaSyncer({
         prisma,
         attachmentResolver: wordpressRepository,
-        mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
+        mediaImporterFactory,
+        lineageWriter,
+      }),
+      mediaPolicy: profile.mediaPolicy,
+    });
+    const routeStopMediaSyncer = new MediaPolicyGatedRouteStopMediaSyncer({
+      inner: new RouteStopMediaSyncer({
+        prisma,
+        attachmentResolver: wordpressRepository,
+        mediaImporterFactory,
         lineageWriter,
       }),
       mediaPolicy: profile.mediaPolicy,
@@ -448,6 +492,12 @@ async function main(): Promise<void> {
         orchestrator: new ArticleCommitOrchestrator(new ArticleCommitWriter(prisma)),
         lineageWriter,
         prisma,
+      }),
+      route: new RouteCommitRunner({
+        orchestrator: new RouteCommitOrchestrator(new RouteCommitWriter(prisma)),
+        lineageWriter,
+        prisma,
+        mediaSyncer: routeStopMediaSyncer,
       }),
     };
 

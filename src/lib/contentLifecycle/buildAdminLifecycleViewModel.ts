@@ -136,6 +136,31 @@ export function buildAdminArticleLifecycleInput(params: {
   };
 }
 
+export function buildAdminRouteLifecycleInput(params: {
+  status: string;
+  deletePreflight?: {
+    allowed: boolean;
+    message?: string;
+    dependencySummary: ContentDependencySummary;
+  };
+}): ContentLifecycleInput {
+  const isArchived = params.status === "ARCHIVED";
+  return {
+    type: "route",
+    surface: "admin",
+    status: params.status,
+    lifecyclePreflight: {
+      canArchive: params.status === "PUBLISHED" && !isArchived,
+      canRestore: isArchived,
+      canDeleteDraft: params.deletePreflight?.allowed,
+      canDeleteArchived: false,
+      deleteBlockedReason: params.deletePreflight?.message,
+      deleteArchivedBlockedReason: "Удаление архивных маршрутов не поддерживается текущим preflight.",
+      dependencySummary: params.deletePreflight?.dependencySummary,
+    },
+  };
+}
+
 export function buildAdminLifecycleViewModel(
   input: ContentLifecycleInput,
 ): ContentLifecycleViewModel {

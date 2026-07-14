@@ -4,6 +4,7 @@ import {
   ARTICLE_ENTITY_TYPE,
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
+  ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
   wordpressDbAdapter,
@@ -48,6 +49,10 @@ const placePosts: WordPressPostRow[] = [
   post({ ID: 301, post_type: "places", post_title: "Place One", post_name: "place-one" }),
 ];
 
+const routePosts: WordPressPostRow[] = [
+  post({ ID: 501, post_type: "routes", post_title: "Route One", post_name: "route-one" }),
+];
+
 const postMeta: WordPressPostMetaRow[] = [
   { meta_id: 1, post_id: 201, meta_key: "_thumbnail_id", meta_value: "555" },
 ];
@@ -70,6 +75,12 @@ function createFakeExecutor(): WordPressQueryExecutor {
         return articlePosts as never;
       }
       if (postType === "places") return placePosts as never;
+      if (postType === "routes") {
+        if (byId) {
+          return routePosts.filter((row) => row.ID === Number(postId)) as never;
+        }
+        return routePosts as never;
+      }
       return [] as never;
     }
     if (sql.includes("FROM wp_postmeta")) {
@@ -112,19 +123,30 @@ async function testDiscoverPlacesOnly() {
   assert.equal(records[0].sourceEntityType, PLACE_ENTITY_TYPE);
 }
 
+async function testDiscoverRoutesOnly() {
+  const records = await wordpressDbAdapter.discoverRecords(
+    contextWith({ filters: { entityTypes: [ROUTE_ENTITY_TYPE] } }),
+  );
+  assert.equal(records.length, 1);
+  assert.equal(records[0].sourceEntityType, ROUTE_ENTITY_TYPE);
+}
+
 async function testDiscoverAll() {
   const records = await wordpressDbAdapter.discoverRecords(contextWith());
-  assert.equal(records.length, 2);
+  assert.equal(records.length, 3);
 }
 
 async function testSourceRecordKeyFormat() {
   const records = await wordpressDbAdapter.discoverRecords(contextWith());
   const article = records.find((r) => r.sourceEntityType === ARTICLE_ENTITY_TYPE);
   const place = records.find((r) => r.sourceEntityType === PLACE_ENTITY_TYPE);
+  const route = records.find((r) => r.sourceEntityType === ROUTE_ENTITY_TYPE);
   assert.equal(article?.sourceRecordKey, "wordpress-db:post:201");
   assert.equal(article?.sourceStableKey, "wordpress-db:post:201");
   assert.equal(place?.sourceRecordKey, "wordpress-db:places:301");
   assert.equal(place?.sourceStableKey, "wordpress-db:places:301");
+  assert.equal(route?.sourceRecordKey, "wordpress-db:routes:501");
+  assert.equal(route?.sourceStableKey, "wordpress-db:routes:501");
 }
 
 async function testFetchPublishedArticleEnvelopeBySourceRecordKey() {
@@ -174,6 +196,15 @@ async function testNormalizeRoutesToArticleAndPlace() {
   assert.equal(normalizedPlace.sourceRecordKey, "wordpress-db:places:301");
 }
 
+async function testNormalizeRouteEntity() {
+  const records = await wordpressDbAdapter.discoverRecords(contextWith());
+  const route = records.find((r) => r.sourceEntityType === ROUTE_ENTITY_TYPE)!;
+
+  const normalizedRoute = await wordpressDbAdapter.normalizeRecord(route);
+  assert.equal(normalizedRoute.targetTypeHint, "ROUTE");
+  assert.equal(normalizedRoute.sourceRecordKey, "wordpress-db:routes:501");
+}
+
 async function testNormalizeUnknownEntityTypeThrows() {
   await assert.rejects(
     () =>
@@ -198,19 +229,22 @@ async function testMetadata() {
   assert.equal(wordpressDbAdapter.metadata.key, WORDPRESS_DB_ADAPTER_KEY);
   assert.deepEqual(
     [...wordpressDbAdapter.metadata.supportedSourceEntityTypes],
-    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE],
+    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE],
   );
+  assert.ok(wordpressDbAdapter.metadata.supportedTargetTypes.includes("ROUTE"));
 }
 
 async function main() {
   await testDiscoverArticlesOnly();
   await testDiscoverPlacesOnly();
+  await testDiscoverRoutesOnly();
   await testDiscoverAll();
   await testSourceRecordKeyFormat();
   await testFetchPublishedArticleEnvelopeBySourceRecordKey();
   await testFetchPublishedArticleEnvelopeRejectsWrongKey();
   await testStableSourceHash();
   await testNormalizeRoutesToArticleAndPlace();
+  await testNormalizeRouteEntity();
   await testNormalizeUnknownEntityTypeThrows();
   await testMissingExecutorThrows();
   await testMetadata();
