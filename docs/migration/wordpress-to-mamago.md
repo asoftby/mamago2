@@ -346,21 +346,69 @@ Potential field loss:
 
 `Route` and `RouteStop` exist, but the WP source representation is postmeta-heavy.
 
+**Live-confirmed addendum (2026-07-13)**, superseding the "Ready"/"ambiguous"
+framing below wherever the two disagree — see
+`docs/migration/wordpress-db-inspection-2026-07-06.md` for how this was
+obtained (extended `migration:inspect:wordpress-db`, run against production):
+
+- Real per-stop keys are `title-location-N` / `description-location-N` /
+  `images-location-N`, 1-based (`N` starting at 1, observed up to 11).
+  `images-location-N` is a single comma-separated attachment-id string
+  (e.g. `"17885,17886"`), not repeated meta rows. One real route (post
+  29290) also had a bare, unsuffixed `title-location`/`description-location`/
+  `images-location` — but its value duplicated stop 10's content exactly,
+  confirming it's stale/duplicate data, not a genuine extra stop. The
+  importer's `groupIndexedMeta()` (`src/lib/migration/adapters/wordpress-db/groupIndexedMeta.ts`)
+  excludes unsuffixed/malformed-index keys for exactly this reason.
+- **No per-stop WP Place reference exists.** A full, unfiltered postmeta
+  dump for two real published routes (17822, 18437 — 85 rows, zero
+  exceptions) confirmed this. `RouteStop.placeId` is therefore always
+  `null` for imported routes in this phase — not a stub, a fact about the
+  source. See `src/lib/migration/place-resolution/types.ts` for the
+  exact-lineage resolver this would use if a source reference ever existed
+  (its first real use case is `Event.placeIdRaw`, which does have one).
+- Route-level `location` postmeta is a single JSON blob
+  (`{address, latitude, longitude, map_picker}`), **not per-stop** — no
+  per-stop coordinates exist in the source at all. Product decision
+  (2026-07-13): this legacy blob is **not imported into the product
+  `Route`/`RouteStop` model** and no Prisma field is added for it. It is
+  preserved only as migration evidence in `normalizedPayload.locationRaw`
+  and `normalizedPayload.rawMeta.location` (with parsed
+  `normalizedPayload.location` when valid JSON), and non-empty values emit
+  `ROUTE_LEVEL_LOCATION_DROPPED`.
+- **`route-budget`, `route-duration`, `reels-route`, and route-level
+  `location` are all
+  deliberately not imported.** `route-duration` (2026-07-13): computed
+  dynamically from stops via an API in the target product; there is no
+  `Route` field for it and there will not be one, so importing the WP
+  value would have nowhere real to go. `route-budget` (revised
+  2026-07-13): it's a taxonomy (6 real terms, confirmed via
+  `wp_term_taxonomy`, same "term attached to the post" shape as
+  `places_category`) — a static term → `BudgetLevel` mapping was drafted
+  and then dropped, because in the target model `Route.budgetLevel` is
+  derived from per-stop prices (`summarizeRouteBudget`), which the editor
+  fills in during the manual review pass over the 14 imported routes; a
+  static WP-taxonomy mapping would only ever be thrown away once that
+  review sets real prices, so it was never worth keeping. The real
+  `route-budget` terms turn out to be price-range labels themselves (see
+  `docs/migration/wordpress-db-inspection-2026-07-06.md` §10 follow-up) —
+  useful context for that manual review, not for the importer. These are
+  decisions, not gaps — do not resurrect any of them without a dedicated
+  product task.
+
 Ready:
 
-- Route title, slug, age tags, budget level, city, cover image, author, status, visibility, SEO, slug history, stops, ratings.
-- Route stops support place link, Google place ID, coordinates, address, custom title, note, photo, price range, address components and raw Google payload.
+- Route title, slug, age tags, city, cover image, author, status, visibility, SEO, slug history, stops, ratings.
+- Route stops support place link, Google place ID, coordinates, address, custom title, note, photo, price range, address components and raw Google payload — these are `RouteStop` *target* schema capabilities, not confirmed WP source fields (see addendum above for what the source actually has).
 
 Requires transformation:
 
 - Repeated WP fields `title-location-*`, `description-location-*`, `images-location-*` into ordered `RouteStop` rows.
-- `route-budget` to `BudgetLevel`.
-- `route-duration` likely has no direct route duration field; needs decision whether to store in stop notes/content, SEO text, or add a field later.
-- Route image attachments need media ledger.
+- Route image attachments need media ledger (deferred to a later phase — see Phase 4 PR sequencing).
 
 Potential field loss:
 
-- Route-level reels/video.
+- Route-level reels/video (`reels-route`), `route-budget`, `route-duration`, and route-level `location` — consciously dropped, see addendum.
 - Arbitrary route description variants if not represented in `Route` or stop notes.
 
 ## Reviews
