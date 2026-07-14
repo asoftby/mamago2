@@ -36,6 +36,7 @@ import {
   maskHost,
   readWordPressDbConfigFromEnv,
   runSshMysqlCommand,
+  unescapeMysqlBatchValue,
 } from "../src/lib/migration/adapters/wordpress-db/connectExecutor";
 import type { WordPressDbConfig } from "../src/lib/migration/adapters/wordpress-db/types";
 
@@ -149,6 +150,17 @@ export interface ParsedSection {
   rows: string[][];
 }
 
+/**
+ * Splitting on the real tab/newline bytes `mysql --batch` leaves alone is
+ * unaffected by escaping (an escaped `\n` inside a cell is two literal
+ * characters, never the real byte that separates rows) — this loop's
+ * line/column boundaries were always correct. What was missing is
+ * reversing the escaping *inside* each cell value once split out, via the
+ * same `unescapeMysqlBatchValue()` the production `connectExecutor` uses
+ * (`coerceCell`) — otherwise this report shows literal `\n`/`\t`/`\\`
+ * where the source has a real newline/tab/backslash, which reads as a
+ * migration-data defect that isn't actually there.
+ */
 export function parseSectionedOutput(raw: string): ParsedSection[] {
   const lines = raw.split("\n").filter((line) => line.length > 0);
   const sections: ParsedSection[] = [];
@@ -164,12 +176,12 @@ export function parseSectionedOutput(raw: string): ParsedSection[] {
     const label = lines[i + 1];
     i += 2;
 
-    const header = i < lines.length ? lines[i].split("\t") : [];
+    const header = i < lines.length ? lines[i].split("\t").map(unescapeMysqlBatchValue) : [];
     i += 1;
 
     const rows: string[][] = [];
     while (i < lines.length && lines[i] !== "section") {
-      rows.push(lines[i].split("\t"));
+      rows.push(lines[i].split("\t").map(unescapeMysqlBatchValue));
       i += 1;
     }
 
