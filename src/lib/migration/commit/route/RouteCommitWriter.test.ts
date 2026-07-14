@@ -21,15 +21,26 @@ function draftFixture(overrides: Partial<RouteCreateDraft> = {}): RouteCreateDra
   };
 }
 
-function createFakePrisma(options: { existingSlugs?: readonly string[] } = {}) {
-  const calls: { routeCreate: unknown[]; routeFindUnique: unknown[]; routeUpdate: unknown[]; stopDeleteMany: unknown[]; stopCreateMany: unknown[] } = {
+function createFakePrisma(
+  options: { existingSlugs?: readonly string[]; historySlugs?: readonly string[] } = {},
+) {
+  const calls: {
+    routeCreate: unknown[];
+    routeFindUnique: unknown[];
+    routeUpdate: unknown[];
+    stopDeleteMany: unknown[];
+    stopCreateMany: unknown[];
+    routeSlugHistoryFindUnique: unknown[];
+  } = {
     routeCreate: [],
     routeFindUnique: [],
     routeUpdate: [],
     stopDeleteMany: [],
     stopCreateMany: [],
+    routeSlugHistoryFindUnique: [],
   };
   const existingSlugs = new Set(options.existingSlugs ?? []);
+  const historySlugs = new Set(options.historySlugs ?? []);
 
   const route = {
     findUnique: async (args: { where: { slug: string } }) => {
@@ -55,9 +66,16 @@ function createFakePrisma(options: { existingSlugs?: readonly string[] } = {}) {
       return { count: 2 };
     },
   };
+  const routeSlugHistory = {
+    findUnique: async (args: { where: { slug: string } }) => {
+      calls.routeSlugHistoryFindUnique.push(args);
+      return historySlugs.has(args.where.slug) ? { routeId: `history-owner-${args.where.slug}` } : null;
+    },
+  };
   const prisma: RouteCommitWriterPrismaClient = {
     route: route as unknown as RouteCommitWriterPrismaClient["route"],
     routeStop: routeStop as unknown as RouteCommitWriterPrismaClient["routeStop"],
+    routeSlugHistory: routeSlugHistory as unknown as RouteCommitWriterPrismaClient["routeSlugHistory"],
     $transaction: (async (callback: (tx: { route: typeof route; routeStop: typeof routeStop }) => Promise<unknown>) =>
       callback({ route, routeStop })) as unknown as RouteCommitWriterPrismaClient["$transaction"],
   };
@@ -103,6 +121,64 @@ async function testCreateResolvesUniqueSlugWithSuffix() {
   );
 }
 
+async function testCreateKeepsFreeSlugUnchanged() {
+  const { prisma } = createFakePrisma();
+  const writer = new RouteCommitWriter(prisma);
+
+  const result = await writer.createRouteFromDraft(draftFixture());
+
+  assert.equal(result.slug, "family-route");
+}
+
+async function testCreateAvoidsSlugReservedByRouteSlugHistory() {
+  // "family-route" is free in Route but reserved in RouteSlugHistory by
+  // another route — reusing it would hijack that route's /routes/{slug}
+  // redirect, so the import must fall back to the next suffix.
+  const { prisma, calls } = createFakePrisma({ historySlugs: ["family-route"] });
+  const writer = new RouteCommitWriter(prisma);
+
+  const result = await writer.createRouteFromDraft(draftFixture());
+
+  assert.equal(result.slug, "family-route-2");
+  assert.deepEqual(
+    calls.routeSlugHistoryFindUnique.map((call) => (call as { where: { slug: string } }).where.slug),
+    ["family-route", "family-route-2"],
+  );
+}
+
+async function testCreateChecksNextSuffixAgainstBothTables() {
+  // base taken in Route, base-2 taken in RouteSlugHistory — the resolver
+  // must consult both tables at every suffix, not just the first candidate.
+  const { prisma, calls } = createFakePrisma({
+    existingSlugs: ["family-route"],
+    historySlugs: ["family-route-2"],
+  });
+  const writer = new RouteCommitWriter(prisma);
+
+  const result = await writer.createRouteFromDraft(draftFixture());
+
+  assert.equal(result.slug, "family-route-3");
+  assert.deepEqual(
+    calls.routeFindUnique.map((call) => (call as { where: { slug: string } }).where.slug),
+    ["family-route", "family-route-2", "family-route-3"],
+  );
+  assert.deepEqual(
+    calls.routeSlugHistoryFindUnique.map((call) => (call as { where: { slug: string } }).where.slug),
+    ["family-route", "family-route-2", "family-route-3"],
+  );
+}
+
+async function testCreateSlugResolutionIsDeterministic() {
+  const { prisma: prismaA } = createFakePrisma({ historySlugs: ["family-route", "family-route-2"] });
+  const { prisma: prismaB } = createFakePrisma({ historySlugs: ["family-route", "family-route-2"] });
+
+  const resultA = await new RouteCommitWriter(prismaA).createRouteFromDraft(draftFixture());
+  const resultB = await new RouteCommitWriter(prismaB).createRouteFromDraft(draftFixture());
+
+  assert.equal(resultA.slug, "family-route-3");
+  assert.equal(resultA.slug, resultB.slug);
+}
+
 async function testUpdateReplacesStopsAndKeepsSlugOutOfUpdateData() {
   const { prisma, calls } = createFakePrisma();
   const writer = new RouteCommitWriter(prisma);
@@ -125,6 +201,10 @@ async function testUpdateReplacesStopsAndKeepsSlugOutOfUpdateData() {
 async function main() {
   await testCreateWritesRouteAndOrderedStops();
   await testCreateResolvesUniqueSlugWithSuffix();
+  await testCreateKeepsFreeSlugUnchanged();
+  await testCreateAvoidsSlugReservedByRouteSlugHistory();
+  await testCreateChecksNextSuffixAgainstBothTables();
+  await testCreateSlugResolutionIsDeterministic();
   await testUpdateReplacesStopsAndKeepsSlugOutOfUpdateData();
 }
 

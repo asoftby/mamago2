@@ -5,6 +5,7 @@ import type { RouteCreateDraft } from "./buildRouteCreateDraft";
 export interface RouteCommitWriterPrismaClient {
   route: Pick<PrismaClient["route"], "create" | "findUnique" | "update">;
   routeStop: Pick<PrismaClient["routeStop"], "deleteMany" | "createMany">;
+  routeSlugHistory: Pick<PrismaClient["routeSlugHistory"], "findUnique">;
   $transaction: PrismaClient["$transaction"];
 }
 
@@ -41,13 +42,17 @@ function slugVariant(baseSlug: string, suffix: number): string {
 
 async function resolveUniqueRouteSlug(
   routeDelegate: Pick<PrismaClient["route"], "findUnique">,
+  routeSlugHistoryDelegate: Pick<PrismaClient["routeSlugHistory"], "findUnique">,
   baseSlug: string,
 ): Promise<string> {
   const cleanBase = baseSlug.trim();
   for (let suffix = 0; suffix < 1000; suffix += 1) {
     const candidate = slugVariant(cleanBase, suffix);
-    const existing = await routeDelegate.findUnique({ where: { slug: candidate }, select: { id: true } });
-    if (!existing) return candidate;
+    const [existingRoute, existingHistory] = await Promise.all([
+      routeDelegate.findUnique({ where: { slug: candidate }, select: { id: true } }),
+      routeSlugHistoryDelegate.findUnique({ where: { slug: candidate }, select: { routeId: true } }),
+    ]);
+    if (!existingRoute && !existingHistory) return candidate;
   }
   throw new Error(`Could not resolve a unique Route slug for "${baseSlug}" after 1000 attempts.`);
 }
@@ -95,15 +100,17 @@ function buildRouteStopCreateManyData(routeId: string, draft: RouteCreateDraft):
 
 /**
  * Writes the Route entity and its ordered RouteStop children only. Stop
- * media (`images-location-*`), RouteSlugHistory, redirect maps, and
- * route-level location JSON are intentionally outside this writer.
+ * media (`images-location-*`), redirect maps, and route-level location JSON
+ * are intentionally outside this writer. Slug resolution reads
+ * RouteSlugHistory to avoid hijacking a redirect reserved by another route,
+ * but this writer never creates RouteSlugHistory rows itself.
  */
 export class RouteCommitWriter {
   constructor(private readonly prisma: RouteCommitWriterPrismaClient) {}
 
   async createRouteFromDraft(draft: RouteCreateDraft): Promise<RouteCommitResult> {
     assertDraftIsUsable(draft);
-    const slug = await resolveUniqueRouteSlug(this.prisma.route, draft.slug);
+    const slug = await resolveUniqueRouteSlug(this.prisma.route, this.prisma.routeSlugHistory, draft.slug);
 
     const route: Route = await this.prisma.route.create({
       data: buildRouteCreateData(draft, slug),

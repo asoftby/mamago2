@@ -458,6 +458,20 @@ export async function createRoute(
 }
 
 /**
+ * Pure authorization check for `updateRoute`, split out so the
+ * `allowAnyAuthor` save-any-route bypass (admin/moderator surface) can be
+ * unit-tested without a database. Mirrors `buildEditableRouteWhereClause`
+ * for the read side.
+ */
+export function canWriteRoute(
+  existingAuthorId: string | null,
+  userId: string,
+  options?: { allowAnyAuthor?: boolean },
+): boolean {
+  return Boolean(options?.allowAnyAuthor) || existingAuthorId === userId;
+}
+
+/**
  * Update an existing route (draft or published). Slug is never changed.
  *
  * `allowAnyAuthor` (admin/moderator surface): skips the authorship check so
@@ -508,7 +522,7 @@ export async function updateRoute(
     });
 
     if (!existing) throw new Error("ROUTE_NOT_FOUND");
-    if (!options?.allowAnyAuthor && existing.authorId !== userId) {
+    if (!canWriteRoute(existing.authorId, userId, options)) {
       throw new Error("ROUTE_FORBIDDEN");
     }
 
