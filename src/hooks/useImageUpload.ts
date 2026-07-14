@@ -6,7 +6,7 @@
 
 import { useState, useCallback } from "react";
 import { compressImage, validateImageFile, type CompressedImage } from "@/lib/image/compression";
-import { normalizeUploadMimeType, resolveUploadMimeType } from "@/lib/uploads/uploadConfig";
+import { convertHeicFileToJpeg, isHeicFile } from "@/lib/uploads/heicConversion";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 
 export interface UploadedImage {
@@ -35,8 +35,10 @@ export interface UseImageUploadOptions {
 
 export function useImageUpload(options?: UseImageUploadOptions) {
   const [uploading, setUploading] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const statusLabel = converting ? "Конвертируем…" : uploading ? "Загрузка…" : "";
 
   /**
    * Process and upload single image
@@ -56,50 +58,31 @@ export function useImageUpload(options?: UseImageUploadOptions) {
 
         setProgress(20);
 
-        // Skip client-side compression for HEIC/HEIF (not supported by browser-image-compression)
-        // Server will handle these formats with sharp
-        // Check both MIME type and file extension (macOS sometimes sends wrong MIME type)
-        const fileExtension = file.name.split(".").pop()?.toLowerCase();
-        const resolvedMimeType = resolveUploadMimeType(file);
-        const normalizedMimeType = normalizeUploadMimeType(resolvedMimeType);
-        const isHEIC =
-          normalizedMimeType === "image/heic" ||
-          normalizedMimeType === "image/heif" ||
-          fileExtension === "heic" ||
-          fileExtension === "heif";
-        
-        console.log("🔍 [CLIENT] File details:", {
-          name: file.name,
-          type: file.type,
-          extension: fileExtension,
-          size: file.size,
-          isHEIC,
-        });
-        
-        let fileToUpload: File;
-        let imageWidth = 0;
-        let imageHeight = 0;
-        let blurhash = "";
-        let preview = "";
-
-        if (isHEIC) {
-          console.log("📸 [CLIENT] HEIC/HEIF detected, skipping client compression");
-          fileToUpload = file;
-          // Server will provide dimensions after processing
-        } else {
-          console.log("🔄 [CLIENT] Compressing with browser-image-compression");
-          // Compress image for other formats
-          const compressed = await compressImage(file, {
-            maxSizeMB: options?.maxSizeMB,
-            maxWidthOrHeight: options?.maxWidthOrHeight,
-            quality: options?.quality,
-          });
-          fileToUpload = compressed.file;
-          imageWidth = compressed.width;
-          imageHeight = compressed.height;
-          blurhash = compressed.blurhash;
-          preview = compressed.preview;
+        // Prebuilt sharp has no HEVC decoder, and that's what almost every
+        // real iPhone HEIC photo is compressed with — convert to JPEG here
+        // so the rest of this function (compression, upload) never has to
+        // special-case HEIC at all.
+        let workingFile = file;
+        if (isHeicFile(file)) {
+          setConverting(true);
+          try {
+            workingFile = await convertHeicFileToJpeg(file);
+          } finally {
+            setConverting(false);
+          }
         }
+
+        // Compress image (now always a browser-image-compression-supported format)
+        const compressed = await compressImage(workingFile, {
+          maxSizeMB: options?.maxSizeMB,
+          maxWidthOrHeight: options?.maxWidthOrHeight,
+          quality: options?.quality,
+        });
+        const fileToUpload = compressed.file;
+        const imageWidth = compressed.width;
+        const imageHeight = compressed.height;
+        const blurhash = compressed.blurhash;
+        const preview = compressed.preview;
 
         setProgress(50);
 
@@ -190,6 +173,8 @@ export function useImageUpload(options?: UseImageUploadOptions) {
     uploadImages,
     compressOnly,
     uploading,
+    converting,
+    statusLabel,
     progress,
     error,
     clearError: () => setError(null),

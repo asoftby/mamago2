@@ -11,7 +11,7 @@
 
 import { useState, useCallback } from "react";
 import { compressImage, validateImageFile } from "@/lib/image/compression";
-import { normalizeUploadMimeType, resolveUploadMimeType } from "@/lib/uploads/uploadConfig";
+import { convertHeicFileToJpeg, isHeicFile } from "@/lib/uploads/heicConversion";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import type { UploadedImage } from "./useImageUpload";
 
@@ -28,8 +28,10 @@ export interface UseWizardImageUploadOptions {
 
 export function useWizardImageUpload(options: UseWizardImageUploadOptions) {
   const [uploading, setUploading] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const statusLabel = converting ? "Конвертируем…" : uploading ? "Загрузка…" : "";
 
   /**
    * Process and upload single image to wizard endpoint
@@ -49,47 +51,29 @@ export function useWizardImageUpload(options: UseWizardImageUploadOptions) {
 
         setProgress(20);
 
-        // Check for HEIC/HEIF
-        const fileExtension = file.name.split(".").pop()?.toLowerCase();
-        const resolvedMimeType = resolveUploadMimeType(file);
-        const normalizedMimeType = normalizeUploadMimeType(resolvedMimeType);
-        const isHEIC =
-          normalizedMimeType === "image/heic" ||
-          normalizedMimeType === "image/heif" ||
-          fileExtension === "heic" ||
-          fileExtension === "heif";
-        
-        console.log("🔍 [WIZARD UPLOAD] File details:", {
-          name: file.name,
-          type: file.type,
-          extension: fileExtension,
-          size: file.size,
-          isHEIC,
-          wizardSessionId: options.wizardSessionId,
-        });
-        
-        let fileToUpload: File;
-        let imageWidth = 0;
-        let imageHeight = 0;
-        let blurhash = "";
-        let preview = "";
-
-        if (isHEIC) {
-          console.log("📸 [WIZARD UPLOAD] HEIC/HEIF detected, skipping client compression");
-          fileToUpload = file;
-        } else {
-          console.log("🔄 [WIZARD UPLOAD] Compressing with browser-image-compression");
-          const compressed = await compressImage(file, {
-            maxSizeMB: options.maxSizeMB,
-            maxWidthOrHeight: options.maxWidthOrHeight,
-            quality: options.quality,
-          });
-          fileToUpload = compressed.file;
-          imageWidth = compressed.width;
-          imageHeight = compressed.height;
-          blurhash = compressed.blurhash;
-          preview = compressed.preview;
+        // Prebuilt sharp has no HEVC decoder, and that's what almost every
+        // real iPhone HEIC photo is compressed with — convert to JPEG here
+        // so the rest of this function never has to special-case HEIC.
+        let workingFile = file;
+        if (isHeicFile(file)) {
+          setConverting(true);
+          try {
+            workingFile = await convertHeicFileToJpeg(file);
+          } finally {
+            setConverting(false);
+          }
         }
+
+        const compressed = await compressImage(workingFile, {
+          maxSizeMB: options.maxSizeMB,
+          maxWidthOrHeight: options.maxWidthOrHeight,
+          quality: options.quality,
+        });
+        const fileToUpload = compressed.file;
+        const imageWidth = compressed.width;
+        const imageHeight = compressed.height;
+        const blurhash = compressed.blurhash;
+        const preview = compressed.preview;
 
         setProgress(50);
 
@@ -157,6 +141,8 @@ export function useWizardImageUpload(options: UseWizardImageUploadOptions) {
     uploadImage,
     uploadImages,
     uploading,
+    converting,
+    statusLabel,
     progress,
     error,
     clearError: () => setError(null),

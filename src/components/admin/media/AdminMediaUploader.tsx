@@ -20,7 +20,7 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
 
-  const { uploadImage, uploading, progress } = useImageUpload({
+  const { uploadImage, uploading, converting, statusLabel, progress } = useImageUpload({
     maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
     maxWidthOrHeight: 4096,
     quality: 0.9,
@@ -88,7 +88,10 @@ export function AdminMediaUploader({ onUploadComplete }: AdminMediaUploaderProps
             <div className="flex justify-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
             </div>
-            <p className="text-sm text-gray-600">Загрузка... {progress}%</p>
+            <p className="text-sm text-gray-600">
+              {statusLabel}
+              {!converting && ` ${progress}%`}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
