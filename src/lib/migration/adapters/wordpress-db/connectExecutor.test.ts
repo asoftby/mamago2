@@ -11,6 +11,7 @@ import {
   maskHost,
   parseTabularRows,
   readWordPressDbConfigFromEnv,
+  unescapeMysqlBatchValue,
   withSshBannerTimeoutRetry,
 } from "./connectExecutor";
 import type { WordPressDbConfig } from "./types";
@@ -187,6 +188,40 @@ function testParseTabularRows() {
     { post_id: 301, lat: 53.9, lng: 27.5667 },
     { post_id: 302, lat: null, lng: null },
   ]);
+
+  // MySQL batch mode escapes real newlines/tabs/backslashes/NUL inside a
+  // cell value with a leading backslash so they don't get mistaken for the
+  // real tab/newline bytes that separate columns/rows. Line/cell splitting
+  // already ignores these (they're two literal characters, not the real
+  // byte), but the escaped value itself must come back unescaped.
+  interface NoteRow {
+    ID: number;
+    note: string;
+  }
+  const escapedRaw = [
+    "ID\tnote",
+    "301\t" + String.raw`Line one\nLine two\nLine three`,
+    "302\t" + String.raw`Backslash: \\ and tab: \t and null: \0`,
+  ].join("\n");
+  const escapedRows = parseTabularRows<NoteRow>(escapedRaw);
+  assert.deepEqual(escapedRows, [
+    { ID: 301, note: "Line one\nLine two\nLine three" },
+    { ID: 302, note: "Backslash: \\ and tab: \t and null: \0" },
+  ]);
+}
+
+function testUnescapeMysqlBatchValue() {
+  assert.equal(unescapeMysqlBatchValue(String.raw`Line one\nLine two`), "Line one\nLine two");
+  assert.equal(unescapeMysqlBatchValue(String.raw`a\tb`), "a\tb");
+  assert.equal(unescapeMysqlBatchValue(String.raw`a\\b`), "a\\b");
+  assert.equal(unescapeMysqlBatchValue(String.raw`a\0b`), "a\0b");
+  assert.equal(unescapeMysqlBatchValue(String.raw`a\rb`), "a\rb");
+  // No escape sequences present — passes through unchanged.
+  assert.equal(unescapeMysqlBatchValue("plain text"), "plain text");
+  // Unknown escape (mysql never actually emits these) — left as-is rather than silently dropped.
+  assert.equal(unescapeMysqlBatchValue(String.raw`a\qb`), String.raw`a\qb`);
+  // Trailing lone backslash — no character to consume, left as-is.
+  assert.equal(unescapeMysqlBatchValue("trailing\\"), "trailing\\");
 }
 
 async function testRetryHappensForBannerExchangeTimeout() {
@@ -285,6 +320,7 @@ async function main() {
   testBuildManualFallbackMessageNeverContainsPassword();
   testBuildRemoteScriptEscapesEmbeddedQuotes();
   testParseTabularRows();
+  testUnescapeMysqlBatchValue();
   await testRetryHappensForBannerExchangeTimeout();
   await testRetryBoundedMaxAttempts();
   await testNoRetryOnAuthFailure();

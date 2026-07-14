@@ -253,14 +253,21 @@ relations, taxonomy, redirects.
       важное предупреждение (церкариоз на пляже «Урлики», Нарочанский) —
       сохранено как приоритет №1 в короткой версии. Пустых/бесполезных
       исходников не найдено. Ждём review Алексея по артефакту в чате.
-- [ ] **Баг MySQL batch-escape — отдельный follow-up, не часть Route PR.**
-      Найден 2026-07-13 на заметках RouteStop: MySQL batch-режим отдаёт
-      реальные переносы строк как буквальный текст `\n`, а общий
-      `parseTabularRows()` сейчас не разэкранирует такие значения. Для чистого
-      PR #36 оставлен только Route-specific HTML cleanup (`htmlToPlainText`).
-      Потенциальный общий фикс `connectExecutor.ts`/`unescapeMysqlBatchValue`
-      и cleanup уже импортированных данных нужно вынести в отдельный маленький
-      PR после проверки зависимости и стратегии для Place/Article/Event.
+- [x] **Баг MySQL batch-escape — исправлен** (2026-07-14, отдельный маленький
+      PR, не Route-specific). Найден 2026-07-13 на заметках RouteStop: MySQL
+      batch-режим отдаёт реальные переносы строк/табы/бэкслеши/NUL как
+      буквальные escape-последовательности (`\n`, `\t`, `\\`, `\0`), а общий
+      `parseTabularRows()` их не разэкранировал. Добавлена
+      `unescapeMysqlBatchValue()` в `connectExecutor.ts`, применяется в
+      `coerceCell()` до NULL/numeric-обработки; юнит-тесты на все escape-коды
+      + regression-кейс в `testParseTabularRows`. Общий для
+      Place/Article/Event/Route — все используют один executor.
+      **Не входит в этот PR:** cleanup уже импортированных данных (82 Place,
+      115 Article, 28 Event, 97 RouteStop notes уже почищены отдельным
+      Route-specific скриптом до этого фикса, но именно на escape-баг не
+      проверялись) — нужен отдельный follow-up по образцу
+      `scripts/migration-fix-route-note-html.ts` (dry-run → `--apply` →
+      dry-run) для Place/Article/Event после подтверждения стратегии.
 - [ ] Старые URL → `RouteSlugHistory` + redirect map.
 - [x] Общий wizard для пользователя и редактора (решение Алексея 2026-07-13,
       коммит `19a4a7b6`) — подтверждено: `RouteEditor` один для всех;
