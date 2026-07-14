@@ -143,6 +143,54 @@ relations, taxonomy, redirects.
 
 ---
 
+## 0.7 P0 — Первый вход мигрированных пользователей WordPress
+
+**Статус: AUDITED (read-only, 2026-07-14) — реализация не начата.**
+
+**Основное правило:** WordPress password hashes **не переносятся**.
+Мигрированный пользователь обязан подтвердить владение email, активировать
+именно существующий мигрированный `User` (не получить дубль аккаунта), а
+identity-конфликты и неоднозначное ownership не разрешаются автоматически.
+
+Read-only аудит существующей auth-модели (`src/lib/auth/**`,
+`src/server/auth/**`) показал: flow проектируется на 100% существующих
+примитивов, **без изменений Prisma**:
+
+- Sentinel-паттерн для «пароль не задан» уже существует
+  (`DISABLED_PASSWORD_HASH`/`isVerifiablePasswordHash()` в
+  `src/lib/auth/crypto.ts`, коммит `c2de1513`) — новый
+  `MIGRATION_PENDING_PASSWORD_HASH` sentinel продолжает ту же конвенцию.
+- Password-reset flow (`src/server/auth/password-reset.ts`) — hashed token,
+  1ч TTL, single-use, уже enumeration-safe — переиспользуется как есть для
+  активации; один новый явный шаг: `emailVerifiedAt = now()` +
+  `deleteUserSessions()` при переходе из sentinel-состояния.
+- Прямой прецедент в коде: `complete-registration/route.ts` (phone-stub →
+  реальный аккаунт **в той же** `User.id` строке, email/password
+  проставляются на существующую запись) — тот же паттерн, что нужен для
+  WP-активации.
+- `requestPasswordReset` сейчас **не rate-limited** вообще — обязательный
+  prerequisite-фикс перед запуском (enumeration/abuse-риск на 579 email
+  сразу после анонса миграции).
+
+**Правила (зафиксированы, реализация — отдельная задача):**
+
+- WordPress-пароли не мигрируются никогда.
+- Активация требует подтверждения владения email (клик по одноразовой
+  ссылке — не просто ввод email).
+- Активация переиспользует существующий `User.id`, никогда не создаёт
+  вторую строку на тот же email.
+- Identity-конфликты (WP-email уже занят реальным mamaGo-аккаунтом) →
+  quarantine/lineage-attach к существующей строке, пароль/verification
+  существующего аккаунта не трогается — новый `User` не создаётся.
+- Ownership (Business/Place/Offer) не назначается автоматически при
+  неоднозначности — тот же принцип, что и в §0.6 для Profiles/Offers.
+
+Полный дизайн (flow, необходимые изменения кода, security threats,
+тестовая матрица, rollout/rollback, последовательность PR) — см. журнал
+сессий, аудит от 2026-07-14. Реализация не входит в этот коммит.
+
+---
+
 ## 1. Контентные сущности (инженерная работа по готовому паттерну)
 
 ### Routes (14 publish)
@@ -336,10 +384,73 @@ relations, taxonomy, redirects.
 
 ### Offers (services / hb-programs, 90+ publish)
 
-- [ ] Adapter/normalizer (planner `offerMapping` уже есть — использовать).
-- [ ] Commit runner.
-- [ ] Медиа.
-- [ ] Slug history + редиректы.
+**Статус: AUDITED → READY_FOR_PR1–PR2 → BLOCKED_FOR_COMMIT.**
+
+Read-only source/target аудит завершён 2026-07-14 (см. журнал сессий).
+Source: `hb-programs` publish=90/draft=2, `services` publish=1. Target на
+момент аудита: `Offer`=0, `MigrationLineage targetType=OFFER`=0 — чистый
+старт. `offerMapping.ts` (`src/lib/migration/planners/`) — constant-таблица,
+не функциональная логика; полная трассировка подтвердила 0% pipeline
+построено на момент аудита (ни WP repository, ни normalizer, ни writer, ни
+dispatcher-branch, ни CLI-flag).
+
+**Восемь зафиксированных продуктовых решений (Алексей, 2026-07-14):**
+
+1. 27/90 published `hb-programs` без relation к `places` посту →
+   `QUARANTINE`/`NEEDS_OWNER_MAPPING`. Не создавать `Offer`, не назначать
+   фиктивный/default Place, не публиковать.
+2. Множественные Place-relations → авто-выбор только при подтверждённом
+   primary marker/однозначной source-семантике; иначе
+   `MULTIPLE_PLACE_RELATIONS` + editorial review. Никогда не выбирать
+   первый relation просто по порядку SQL.
+3. CAMP/PARTY классификация → **запрещён массовый default
+   `productType=CAMP`**. `hb-programs` — техническое имя WP post type, не
+   доказательство продуктовой категории. Сохранить raw taxonomy/meta,
+   классификация — отдельный review-шаг. `productType` в Prisma —
+   `OfferProductType?` (**nullable, не required** — проверено по схеме,
+   значит это НЕ blocker; можно оставить `null` до классификации).
+4. `program-booking-settings` (JSON, минимум 2 разные схемы в источнике) →
+   P0 сохраняет как raw evidence в normalized candidate; `OfferSession`
+   автоматически **не создаётся**.
+5. `org-capacity` taxonomy (37 терминов — фичи/удобства, не budget-шкала) →
+   сохранить term IDs/slugs/names как evidence; `discoverySignalIds` **не**
+   заполняется автоматически — нужна отдельная кураторская mapping-таблица.
+6. `services` (publish=1) → не отдельный pipeline, а `sourcePostType`
+   внутри общего Offer source bundle; нормализовать отличающиеся meta
+   отдельно; до editorial review не публиковать автоматически.
+7. Draft `hb-programs` (2) → не входят в published commit scope, не
+   публикуются; допустимо только source inventory/staging evidence.
+8. **Offer commit не запускается** до завершения/достаточности Place-батча
+   (сейчас в dev-БД только 2/82 Place) и активного `PLACE` lineage для
+   соответствующих source Place ID у relation-связанных Offers.
+
+**Реализация (вертикальными PR, без смешивания слоёв):**
+
+- [x] **PR 1 — WordPress Offer source repository** (2026-07-14, ветка
+      `feat/migration-offer-source-repository`) — read-only repository/
+      types/SQL слой для `hb-programs`+`services`: `WordPressOfferBundle`
+      (post/postMeta/terms/`placeRelations`, без бизнес-классификации),
+      `WordPressOfferPlaceRelationRow` (обе стороны `wp_voxel_relations`,
+      raw `relation_order`, `relation_side`, без выбора primary),
+      `buildOfferSourceRecordKey()` (`wordpress-db:{post_type}:{id}`).
+      `getPublishedOffers()`/`getPublishedOfferById()`/
+      `getOfferPlaceRelations()` на `WordPressRepository`. 27 записей без
+      relation возвращаются репозиторием честно (`placeRelations: []`) —
+      решение `QUARANTINE` остаётся за будущим normalizer/planner, не
+      принимается на этом слое. Ни normalizer, ни writer, ни dispatcher, ни
+      Prisma — не входят. Merge: см. запись в журнале сессий.
+- [ ] PR 2 — `normalizeOffer.ts` (source → normalized candidate, без
+      записи), классификация CAMP/PARTY и `MULTIPLE_PLACE_RELATIONS`/
+      `QUARANTINE` пометки по решениям 1–3 выше.
+- [ ] PR 3 — `buildOfferCreateDraft` + `OfferCommitWriter/Orchestrator/
+      Runner` — **requires**: Place batch закоммичен (частично/полностью)
+      + активный `PLACE` lineage для relation-связанных source Place ID.
+- [ ] PR 4 — dispatcher/CLI wiring (`--entity offer`).
+- [ ] PR 5 — media (`OfferMediaSyncer`, паттерн Route, scopes
+      `OFFER_SERVICES`/`OFFER_PROGRAMS` уже зарезервированы).
+- [ ] PR 6 — editorial review workflow (CAMP/PARTY, 27 no-Place записей,
+      `org-capacity` кураторская карта).
+- [ ] PR 7 — docs/checklist закрытие после реального импорта.
 
 ### Users (579) — P0 (§0.6)
 
@@ -722,3 +833,17 @@ relations, taxonomy, redirects.
   черновике аудита). Незавершённое: нет по этому пункту. Следующий шаг:
   отдельный маленький PR на MySQL batch-escape fix (`connectExecutor.ts`),
   первым по приоритету P0.
+- **2026-07-14 — Claude Code** — MySQL batch-escape bug исправлен в
+  production executor (PR #38, `066e67da`) и в diagnostic inspect parser
+  (PR #39, `84a8947b`) — оба смержены. Read-only impact audit уже
+  импортированных данных не нашёл повреждённых записей. Offers: read-only
+  source/target аудит + auth-модель для первого входа мигрированных
+  пользователей проведены (read-only, ничего не менялось) — восемь
+  продуктовых решений по Offers зафиксированы Алексеем (см. §Offers), auth
+  flow спроектирован без изменений Prisma (см. §0.7). **PR 1 —
+  WordPress Offer source repository** реализован и смержен (см. §Offers) —
+  read-only repository/types/SQL слой для `hb-programs`/`services`, ни
+  normalizer, ни writer, ни dispatcher, ни Prisma. Offer commit остаётся
+  **BLOCKED_FOR_COMMIT** до Place-батча + активного `PLACE` lineage.
+  Следующий шаг: PR 2 — `normalizeOffer.ts` (классификация CAMP/PARTY,
+  `QUARANTINE`/`MULTIPLE_PLACE_RELATIONS` пометки, без записи в БД).

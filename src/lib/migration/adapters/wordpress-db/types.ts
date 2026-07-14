@@ -122,3 +122,53 @@ export interface WordPressPlaceBundle extends WordPressPostBundle {
  * `normalizeRoute.ts`).
  */
 export type WordPressRouteBundle = WordPressPostBundle;
+
+/**
+ * One `wp_voxel_relations` row linking an Offer source post (`hb-programs`
+ * or `services`) to a `places` post, in whichever direction it was actually
+ * stored — Voxel relations aren't symmetric, and inspection
+ * (2026-07-14) confirmed both directions occur in real data (a `places`
+ * post as `parent_id` pointing at the offer as `child_id` is the common
+ * case, but the reverse also exists). `relation_side` records which side
+ * the offer post was on so a later normalizer can reason about direction
+ * instead of assuming one. `relation_order` is `wp_voxel_relations.order`
+ * verbatim — a possible primary/ordering signal, not yet interpreted here;
+ * deciding what counts as "primary" (if anything) is normalizer/product
+ * work, not this repository's job.
+ */
+export interface WordPressOfferPlaceRelationRow {
+  post_id: number;
+  related_post_id: number;
+  related_post_type: string;
+  relation_key: string;
+  relation_order: number;
+  relation_side: "parent" | "child";
+}
+
+/**
+ * `post.post_type` is the discriminator between the two Offer source post
+ * types (`hb-programs` | `services`) — deliberately not duplicated into a
+ * separate field. `placeRelations` may be empty (source inspection
+ * 2026-07-14: ~30% of published `hb-programs` have none at all) or contain
+ * more than one row — this bundle reports what exists verbatim, it does
+ * not pick a "primary" Place or decide anything is missing/invalid.
+ */
+export interface WordPressOfferBundle extends WordPressPostBundle {
+  placeRelations: readonly WordPressOfferPlaceRelationRow[];
+}
+
+/**
+ * `wordpress-db:{post_type}:{ID}` — every other WordPress-sourced entity
+ * has exactly one source post type, so its normalizer hardcodes a single
+ * `SOURCE_ENTITY_TYPE` constant (e.g. `wordpress-db:routes`) and appends
+ * `:${post.ID}`. Offer has two (`hb-programs`, `services`) sharing one
+ * target, so the post type itself has to be part of the key — this keeps
+ * the same `wordpress-db:{source}:{id}` shape, just with `{source}` read
+ * from the row instead of hardcoded. Pure string formatting only, no
+ * classification or target-field decisions — deliberately kept next to the
+ * bundle type so both this PR's tests and the future normalizer import the
+ * same implementation instead of each hand-rolling the template.
+ */
+export function buildOfferSourceRecordKey(post: Pick<WordPressPostRow, "post_type" | "ID">): string {
+  return `wordpress-db:${post.post_type}:${post.ID}`;
+}
