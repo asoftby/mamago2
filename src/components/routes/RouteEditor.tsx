@@ -227,6 +227,13 @@ function Step1({
     onChange({ ageTags: next });
   };
 
+  const allAgesSelected = state.ageTags.length === AGE_OPTIONS.length;
+  const toggleAllAges = () => {
+    onChange({
+      ageTags: allAgesSelected ? [] : AGE_OPTIONS.map((opt) => opt.key),
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -257,6 +264,17 @@ function Step1({
           Для кого
         </label>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={toggleAllAges}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-sm font-medium transition-all border",
+              allAgesSelected
+                ? "bg-neutral-900 text-white border-neutral-900"
+                : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
+            )}
+          >
+            Любой
+          </button>
           {AGE_OPTIONS.map((opt) => (
             <button
               key={opt.key}
@@ -464,6 +482,7 @@ function StopEditor({
       `Точка ${index + 1}`;
 
   const noteError = hasLocation && stop.note.trim().length === 0;
+  const titleError = needsCustomTitle && !stop.customTitle?.trim();
 
   const handleLocationChange = (loc: typeof stop.location) => {
     const locationChanged =
@@ -520,11 +539,22 @@ function StopEditor({
                     onChange={(e) => onChange({ customTitle: e.target.value })}
                     placeholder="Например: Старт прогулки, Кафе у парка, Смотровая точка"
                     maxLength={80}
-                    className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+                    className={cn(
+                      "w-full h-10 px-3 rounded-xl border bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 transition-all",
+                      titleError
+                        ? "border-red-300 focus:border-red-400"
+                        : "border-neutral-200 focus:border-neutral-400",
+                    )}
                   />
-                  <p className="text-xs text-neutral-400 mt-1.5 px-1">
-                    Название шага маршрута — как его увидят пользователи
-                  </p>
+                  {titleError ? (
+                    <p className="text-xs text-[#ef8855] mt-1.5 px-1">
+                      Добавьте название точки — без него маршрут нельзя опубликовать
+                    </p>
+                  ) : (
+                    <p className="text-xs text-neutral-400 mt-1.5 px-1">
+                      Название шага маршрута — как его увидят пользователи
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -533,7 +563,7 @@ function StopEditor({
                   value={stop.note}
                   onChange={(e) => onChange({ note: e.target.value })}
                   placeholder="Например: лучше приезжать утром или закладывайте около часа"
-                  rows={2}
+                  rows={6}
                   maxLength={200}
                   className={cn(
                     "w-full px-3 py-2.5 rounded-xl border bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 transition-all resize-none",
@@ -814,15 +844,16 @@ function Step3({
           className="flex-1 rounded-2xl font-semibold"
           onClick={onPublish}
           disabled={saving || !canPublish}
-          title={
-            !canPublish
-              ? "Добавьте названия для всех точек без места из каталога"
-              : undefined
-          }
         >
           Опубликовать
         </Button>
       </div>
+      {!canPublish && (
+        <p className="text-xs text-[#ef8855] text-center -mt-2">
+          У некоторых точек не заполнено название — вернитесь назад и добавьте
+          его (поле подсвечено).
+        </p>
+      )}
     </div>
   );
 }
