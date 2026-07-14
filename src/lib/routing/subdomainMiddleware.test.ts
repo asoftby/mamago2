@@ -138,4 +138,72 @@ assert.deepEqual(
   },
 );
 
+// Route (маршрут) view/create/edit — shared RouteEditor wizard opened from
+// the admin content list must stay on the admin/business surface instead of
+// being rewritten into a nonexistent /admin/routes/* or /business/routes/*.
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.local",
+    protocol: "https:",
+    pathname: "/routes/family-picnic/edit",
+    search: "",
+  }),
+  { kind: "next" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.local",
+    protocol: "https:",
+    pathname: "/routes/family-picnic",
+    search: "",
+  }),
+  { kind: "next" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.mamago.local",
+    protocol: "https:",
+    pathname: "/routes/new",
+    search: "",
+  }),
+  { kind: "next" },
+);
+
+// Regression: routes are the only new pass-through — everything else on the
+// admin/business surface still rewrites/redirects exactly as before.
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.local",
+    protocol: "https:",
+    pathname: "/moderation",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/admin/moderation" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.mamago.local",
+    protocol: "https:",
+    pathname: "/places",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/business/places" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.local",
+    protocol: "https:",
+    pathname: "/register",
+    search: "",
+  }),
+  {
+    kind: "redirect",
+    location: "https://mamago.local/register",
+  },
+);
+
 console.log("subdomain middleware tests: OK");

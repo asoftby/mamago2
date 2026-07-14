@@ -326,18 +326,35 @@ export async function getRouteBySlug(
 }
 
 /**
+ * Pure `where` builder for `getEditableRouteBySlug`, split out so the
+ * authorship-bypass rule can be unit-tested without a database.
+ * `allowAnyAuthor` (admin/moderator surface): skips the authorship check so
+ * editors can open any route in the shared RouteEditor — including editorial
+ * routes that have no author at all (`authorId === null`, e.g. the imported
+ * WordPress routes).
+ */
+export function buildEditableRouteWhereClause(
+  routeId: string,
+  userId: string,
+  options?: { allowAnyAuthor?: boolean },
+): { id: string; authorId?: string } {
+  return options?.allowAnyAuthor ? { id: routeId } : { id: routeId, authorId: userId };
+}
+
+/**
  * Get a route by slug for editing — resolves slug history, checks authorship.
  * Returns null if not found or user is not the author.
  */
 export async function getEditableRouteBySlug(
   slug: string,
   userId: string,
+  options?: { allowAnyAuthor?: boolean },
 ): Promise<RouteWithStops | null> {
   const resolved = await findRouteBySlug(slug);
   if (!resolved) return null;
 
   return prisma.route.findUnique({
-    where: { id: resolved.routeId, authorId: userId },
+    where: buildEditableRouteWhereClause(resolved.routeId, userId, options),
     include: routeWithStopsInclude,
   });
 }
@@ -440,11 +457,18 @@ export async function createRoute(
   return created;
 }
 
-/** Update an existing route (draft or published). Slug is never changed. */
+/**
+ * Update an existing route (draft or published). Slug is never changed.
+ *
+ * `allowAnyAuthor` (admin/moderator surface): skips the authorship check so
+ * editors can save any route via the shared RouteEditor — including
+ * authorless editorial routes (`authorId === null`, e.g. imported WP routes).
+ */
 export async function updateRoute(
   userId: string,
   routeId: string,
   data: RouteWriteInput,
+  options?: { allowAnyAuthor?: boolean },
 ): Promise<{ id: string; slug: string }> {
   const normalizedStops = normalizeStops(data.stops);
   const coverImageUrl = deriveCoverImageUrl(normalizedStops);
@@ -484,7 +508,9 @@ export async function updateRoute(
     });
 
     if (!existing) throw new Error("ROUTE_NOT_FOUND");
-    if (existing.authorId !== userId) throw new Error("ROUTE_FORBIDDEN");
+    if (!options?.allowAnyAuthor && existing.authorId !== userId) {
+      throw new Error("ROUTE_FORBIDDEN");
+    }
 
     const stopsChanged =
       buildRouteStopsFingerprint(normalizedStops) !==
