@@ -111,6 +111,8 @@ Frozen scope для Phoenix v1. Заменяет открытые вопросы
   страницы, вручную в `Page`, до запуска. Остальное — EXCLUDED.
 - Freeze/snapshot, validation reports, прод-бэкап, dry-run QA — процессные
   пункты §4.
+- **Docker Build & Push на актуальном dev проходит успешно** — P0-gate.
+  Отмечать выполненным только после зелёного post-merge workflow.
 
 **Порядок реализации P0** (решение Алексея 2026-07-14): MySQL escape fix →
 Offers → Users → Article media → Profiles identity/media → Reviews → далее
