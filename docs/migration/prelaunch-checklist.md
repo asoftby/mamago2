@@ -384,7 +384,9 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 
 ### Offers (services / hb-programs, 90+ publish)
 
-**Статус: AUDITED → READY_FOR_PR1–PR2 → BLOCKED_FOR_COMMIT.**
+**Статус: AUDITED → SOURCE REPOSITORY READY → NORMALIZER READY.**
+**Отдельно (не меняется этим статусом): `BLOCKED_FOR_COMMIT` до Place batch
++ активного `PLACE` lineage для relation-связанных source Place ID.**
 
 Read-only source/target аудит завершён 2026-07-14 (см. журнал сессий).
 Source: `hb-programs` publish=90/draft=2, `services` publish=1. Target на
@@ -439,9 +441,28 @@ dispatcher-branch, ни CLI-flag).
       решение `QUARANTINE` остаётся за будущим normalizer/planner, не
       принимается на этом слое. Ни normalizer, ни writer, ни dispatcher, ни
       Prisma — не входят. Merge: см. запись в журнале сессий.
-- [ ] PR 2 — `normalizeOffer.ts` (source → normalized candidate, без
-      записи), классификация CAMP/PARTY и `MULTIPLE_PLACE_RELATIONS`/
-      `QUARANTINE` пометки по решениям 1–3 выше.
+- [ ] PR 2 — `normalizeOffer.ts` (ветка `feat/migration-offer-normalizer`,
+      2026-07-14; отметить `[x]` только после merge). Pure
+      `WordPressOfferBundle` → `NormalizedOfferCandidate`, без Prisma/target
+      reads/writes/draft builder/writer/dispatcher/media download.
+      `classificationStatus: "UNCLASSIFIED"` всегда — никакого
+      `productType`/`kind`/`category` не присваивается. Place-relations:
+      `NO_PLACE_RELATION`/`SINGLE_PLACE_RELATION`/`MULTIPLE_PLACE_RELATIONS`
+      evidence, primary никогда не выбирается автоматически (решения 1–2).
+      `program-booking-settings` — raw + safely-parsed JSON +
+      `schemaVariant` (`CALENDAR_ADDITIONS`/`PRODUCT_TABLE_BOOKING`/
+      `UNKNOWN`) evidence only, `OfferSession` не создаётся (решение 4).
+      `org-capacity` — raw term evidence, `discoverySignalIds` не
+      заполняется (решение 5). `services` всегда получает
+      `OFFER_SERVICES_MANUAL_REVIEW` (решение 6). `program-age` (6 реальных
+      терминов) — parsedMonths только при точном совпадении с официальной
+      `AGE_OPTIONS` (`src/lib/config/ages.ts`): "до года"/"1-3 года"/"7-9
+      лет" совпадают, "4-6 лет"/"10-12 лет"/"12+" — нет (границы не
+      придуманы, оставлены как evidence + `OFFER_AGE_TERM_UNKNOWN`). Gallery
+      — exact-dedup, order preserved. Read-only preview CLI wiring **не
+      входит** — `wordpressDbAdapter.ts`'s `supportedTargetTypes` явно
+      исключает `OFFER`, менять adapter capability вне scope PR 2; вместо
+      этого — исчерпывающие fixture-based unit tests (20 тестов).
 - [ ] PR 3 — `buildOfferCreateDraft` + `OfferCommitWriter/Orchestrator/
       Runner` — **requires**: Place batch закоммичен (частично/полностью)
       + активный `PLACE` lineage для relation-связанных source Place ID.
@@ -847,3 +868,19 @@ dispatcher-branch, ни CLI-flag).
   **BLOCKED_FOR_COMMIT** до Place-батча + активного `PLACE` lineage.
   Следующий шаг: PR 2 — `normalizeOffer.ts` (классификация CAMP/PARTY,
   `QUARANTINE`/`MULTIPLE_PLACE_RELATIONS` пометки, без записи в БД).
+- **2026-07-14 — Claude Code** — Перед PR 2 проверен deployment gate:
+  `Docker Build & Push` (run 29360738128) — SUCCESS на актуальном dev SHA
+  `abef4a42` (после PR #40 docker-heap fix и PR #41). PR 2 —
+  `normalizeOffer.ts` реализован (ветка `feat/migration-offer-normalizer`):
+  pure `WordPressOfferBundle` → `NormalizedOfferCandidate`, ни Prisma, ни
+  target reads/writes. `classificationStatus` всегда `"UNCLASSIFIED"` — не
+  принято ни одного решения CAMP/PARTY/`productType` (уточнение решения 3:
+  предыдущая формулировка "классификация CAMP/PARTY" в этом же файле была
+  неточной — Алексей явно запретил массовый CAMP-default до PR 2, здесь это
+  соблюдено буквально: PR 2 не классифицирует вообще, только собирает
+  evidence). 20 unit-тестов на fixtures. Read-only preview CLI wiring не
+  делался — `wordpressDbAdapter.ts` explicitly excludes `OFFER` из
+  `supportedTargetTypes`, менять adapter capability вне scope. Незавершённое:
+  merge за Алексеем/CI. Следующий шаг (по решению Алексея): **пауза
+  Offers-кода**, переход на завершение полного Place-батча (82 publish) —
+  без него writer (PR 3) нельзя честно проверить end-to-end.
