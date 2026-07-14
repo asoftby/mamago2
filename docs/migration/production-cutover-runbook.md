@@ -175,14 +175,11 @@ documented decision at preflight time, not a default.
    serialized `exact`/`start`/`contains` rules have no normalization/review
    stage yet). `wordpress-to-mamago.md` also references a "WP legacy
    catch-all classifier" that falls back uncovered WP paths to the default
-   city hub — **that code does not exist on this branch**
-   (`feat/project-phoenix-foundation`); it lives on a separate,
-   not-yet-merged branch (`feat/wp-legacy-catch-all`). Confirm before
-   cutover whether that catch-all needs to land first, and whether its
+   city hub — that code (`src/lib/routing/wpLegacyCatchAll.ts`) is now on
+   `dev`, merged via PR #33. Confirm with the business owner whether that
    fallback behavior is acceptable for launch, or whether RankMath redirect
-   normalization is a launch blocker — this runbook does not resolve that
-   decision, it only flags that the two pieces currently live on different
-   branches.
+   normalization is still a launch blocker — this runbook does not resolve
+   that decision.
 4. Deploy with `REQUIRE_REDIRECT_MANIFEST=1` set in the production build so
    a missing/underfilled/invalid manifest **fails the build** rather than
    silently shipping with broken redirects (mirrors
