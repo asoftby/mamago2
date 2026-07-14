@@ -6,6 +6,7 @@ export type ContentNavItemId =
   | "events"
   | "places"
   | "offers"
+  | "routes"
   | "publications"
   | "media";
 
@@ -23,6 +24,7 @@ export const CONTENT_NAV_ITEMS: readonly ContentNavItemDefinition[] = [
   { id: "events", label: "События", path: "/content/events" },
   { id: "places", label: "Места", path: "/content/places" },
   { id: "offers", label: "Предложения", path: "/content/offers" },
+  { id: "routes", label: "Маршруты", path: "/content/routes" },
   { id: "publications", label: "Публикации", path: "/content/publications" },
   { id: "media", label: "Медиатека", path: "/media" },
 ] as const;
