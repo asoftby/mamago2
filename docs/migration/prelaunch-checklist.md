@@ -441,8 +441,8 @@ dispatcher-branch, ни CLI-flag).
       решение `QUARANTINE` остаётся за будущим normalizer/planner, не
       принимается на этом слое. Ни normalizer, ни writer, ни dispatcher, ни
       Prisma — не входят. Merge: см. запись в журнале сессий.
-- [ ] PR 2 — `normalizeOffer.ts` (ветка `feat/migration-offer-normalizer`,
-      2026-07-14; отметить `[x]` только после merge). Pure
+- [x] PR 2 — `normalizeOffer.ts` (ветка `feat/migration-offer-normalizer`,
+      2026-07-14; PR #42, merge `726628bb`). Pure
       `WordPressOfferBundle` → `NormalizedOfferCandidate`, без Prisma/target
       reads/writes/draft builder/writer/dispatcher/media download.
       `classificationStatus: "UNCLASSIFIED"` всегда — никакого
