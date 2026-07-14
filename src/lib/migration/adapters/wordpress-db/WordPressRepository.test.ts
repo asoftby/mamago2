@@ -2,14 +2,16 @@ import assert from "node:assert/strict";
 
 import { DEFAULT_LIMIT, MAX_LIMIT, clampLimit } from "./sql";
 import { WordPressRepository, type WordPressQueryExecutor } from "./WordPressRepository";
-import type {
-  WordPressAttachmentRow,
-  WordPressPlaceIndexRow,
-  WordPressPostMetaRow,
-  WordPressPostRow,
-  WordPressRedirectRow,
-  WordPressTermRow,
-  WordPressUserRow,
+import {
+  buildOfferSourceRecordKey,
+  type WordPressAttachmentRow,
+  type WordPressOfferPlaceRelationRow,
+  type WordPressPlaceIndexRow,
+  type WordPressPostMetaRow,
+  type WordPressPostRow,
+  type WordPressRedirectRow,
+  type WordPressTermRow,
+  type WordPressUserRow,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -125,6 +127,126 @@ const routeTerms: WordPressTermRow[] = [
   { post_id: 501, term_id: 40, name: "Бюджетно", slug: "budget-low", taxonomy: "route-budget" },
 ];
 
+// --- Offer fixtures (hb-programs + services source post types) ---
+
+function offerPost(overrides: Partial<WordPressPostRow>): WordPressPostRow {
+  return {
+    ID: 601,
+    post_author: 5,
+    post_date: "2026-01-01 00:00:00",
+    post_content: "<p>Camp program description</p>",
+    post_title: "Kids Camp Program",
+    post_excerpt: "",
+    post_status: "publish",
+    post_name: "kids-camp-program",
+    post_modified: "2026-01-02 00:00:00",
+    post_parent: 0,
+    guid: "https://example.com/?p=601",
+    post_type: "hb-programs",
+    post_mime_type: "",
+    ...overrides,
+  };
+}
+
+/** Regular published hb-programs post — one Place relation, full meta/taxonomy. */
+const hbProgramPost = offerPost({ ID: 601 });
+
+/** The single real `services` row (2026-07-14 inspection: publish count = 1). */
+const servicesPost = offerPost({
+  ID: 602,
+  post_title: "Шоу и артисты «Jokers»",
+  post_name: "show-and-artists-jokers",
+  post_content: "<p>Артисты на праздник</p>",
+  post_type: "services",
+});
+
+/** No Place relation at all — the ~30%-of-source case that must not get a fabricated one. */
+const hbProgramNoRelationPost = offerPost({
+  ID: 603,
+  post_title: "Program Without Place",
+  post_name: "program-without-place",
+});
+
+/** Two Place relations, neither structurally "primary" — repository must not pick one. */
+const hbProgramMultiRelationPost = offerPost({
+  ID: 604,
+  post_title: "Program With Two Places",
+  post_name: "program-with-two-places",
+});
+
+/** draft status — must never appear in the published list/by-id methods. */
+const hbProgramDraftPost = offerPost({
+  ID: 605,
+  post_title: "Draft Program",
+  post_name: "draft-program",
+  post_status: "draft",
+});
+
+const hbProgramPostMeta: WordPressPostMetaRow[] = [
+  { meta_id: 41, post_id: 601, meta_key: "program-cost", meta_value: "<ul><li>300 byn - до 10 чел</li></ul>" },
+  { meta_id: 42, post_id: 601, meta_key: "average-check-program", meta_value: "385" },
+  { meta_id: 43, post_id: 601, meta_key: "hb-program-duration", meta_value: "180" },
+  { meta_id: 44, post_id: 601, meta_key: "max-guests-program", meta_value: "15" },
+  { meta_id: 45, post_id: 601, meta_key: "gallery", meta_value: "18929,26663" },
+  {
+    meta_id: 46,
+    post_id: 601,
+    meta_key: "program-booking-settings",
+    meta_value: '{"enabled":true,"base_price":300}',
+  },
+  { meta_id: 47, post_id: 601, meta_key: "rank_math_title", meta_value: "Camp SEO Title" },
+  { meta_id: 48, post_id: 601, meta_key: "_wp_old_slug", meta_value: "old-camp-slug" },
+  // A real embedded newline (post-connectExecutor-fix shape) must pass through the
+  // bundle byte-for-byte — this repository does no HTML/text processing of its own.
+  { meta_id: 49, post_id: 601, meta_key: "short-description", meta_value: "Line one\nLine two" },
+];
+
+const servicesPostMeta: WordPressPostMetaRow[] = [
+  { meta_id: 51, post_id: 602, meta_key: "main-image-service", meta_value: "7001" },
+  { meta_id: 52, post_id: 602, meta_key: "phone-services", meta_value: "+375291112233" },
+];
+
+/** Malformed JSON — repository must return it as-is, never parse/validate/reject it. */
+const hbProgramMultiRelationPostMeta: WordPressPostMetaRow[] = [
+  { meta_id: 53, post_id: 604, meta_key: "program-booking-settings", meta_value: '{"enabled":true, "base_price":' },
+  // A literal two-character escape sequence (backslash + n, not a real newline byte) —
+  // this repository is agnostic to escape semantics entirely (that's connectExecutor's
+  // job, already fixed/tested separately); whatever string arrives must pass through verbatim.
+  { meta_id: 54, post_id: 604, meta_key: "short-description", meta_value: "Contains literal: \\n sequence" },
+];
+
+const hbProgramTerms: WordPressTermRow[] = [
+  { post_id: 601, term_id: 60, name: "Аниматоры", slug: "animatory", taxonomy: "org-capacity" },
+  { post_id: 601, term_id: 61, name: "7-9 лет", slug: "7-9-let", taxonomy: "program-age" },
+];
+
+const offerPlaceRelationRows: WordPressOfferPlaceRelationRow[] = [
+  {
+    post_id: 601,
+    related_post_id: 301,
+    related_post_type: "places",
+    relation_key: "post-relation-hb-programs",
+    relation_order: 0,
+    relation_side: "child",
+  },
+  {
+    post_id: 604,
+    related_post_id: 301,
+    related_post_type: "places",
+    relation_key: "post-relation-hb-programs",
+    relation_order: 0,
+    relation_side: "child",
+  },
+  {
+    post_id: 604,
+    related_post_id: 302,
+    related_post_type: "places",
+    relation_key: "post-relation-hb-programs",
+    relation_order: 1,
+    relation_side: "child",
+  },
+];
+
 const attachmentRows: WordPressAttachmentRow[] = [
   { ID: 555, post_title: "cover.jpg", post_name: "cover", post_mime_type: "image/jpeg", guid: "https://example.com/cover.jpg", post_parent: 201 },
 ];
@@ -152,6 +274,18 @@ function createFakeExecutor() {
   const executor: WordPressQueryExecutor = async (sql, params = []) => {
     calls.push({ sql, params });
 
+    if (sql.includes("FROM wp_posts") && sql.includes("post_type IN (?, ?)")) {
+      // buildPublishedOffersQuery: [servicesType, programsType, "publish", limit].
+      const status = params[2];
+      const allOfferPosts = [
+        hbProgramPost,
+        servicesPost,
+        hbProgramNoRelationPost,
+        hbProgramMultiRelationPost,
+        hbProgramDraftPost,
+      ];
+      return allOfferPosts.filter((post) => post.post_status === status) as never;
+    }
     if (sql.includes("FROM wp_posts") && sql.includes("post_type = ?")) {
       const [postType, , postId] = params;
       const byId = sql.includes("ID = ?");
@@ -168,23 +302,44 @@ function createFakeExecutor() {
         if (byId) return (Number(postId) === routePost.ID ? routePost : []) as never;
         return routePost as never;
       }
+      if (postType === "hb-programs" || postType === "services") {
+        const candidates = [
+          hbProgramPost,
+          servicesPost,
+          hbProgramNoRelationPost,
+          hbProgramMultiRelationPost,
+        ].filter((post) => post.post_type === postType);
+        if (byId) return (candidates.find((post) => post.ID === Number(postId)) ?? []) as never;
+        return candidates as never;
+      }
       return [] as never;
     }
     if (sql.includes("FROM wp_postmeta")) {
       const ids = params as readonly number[];
-      return [...articlePostMeta, ...placePostMeta, ...eventPostMeta, ...routePostMeta].filter((row) =>
-        ids.includes(row.post_id),
-      ) as never;
+      return [
+        ...articlePostMeta,
+        ...placePostMeta,
+        ...eventPostMeta,
+        ...routePostMeta,
+        ...hbProgramPostMeta,
+        ...servicesPostMeta,
+        ...hbProgramMultiRelationPostMeta,
+      ].filter((row) => ids.includes(row.post_id)) as never;
     }
     if (sql.includes("FROM wp_term_relationships")) {
       const ids = params as readonly number[];
-      return [...articleTerms, ...placeTerms, ...eventTerms, ...routeTerms].filter((row) =>
+      return [...articleTerms, ...placeTerms, ...eventTerms, ...routeTerms, ...hbProgramTerms].filter((row) =>
         ids.includes(row.post_id),
       ) as never;
     }
     if (sql.includes("FROM wp_voxel_index_places")) {
       const ids = params as readonly number[];
       return placeIndexRows.filter((row) => ids.includes(row.post_id)) as never;
+    }
+    if (sql.includes("FROM wp_voxel_relations")) {
+      // buildOfferPlaceRelationsQuery: params = [...postIds, ...postIds] (parent-side half, then child-side half).
+      const ids = params as readonly number[];
+      return offerPlaceRelationRows.filter((row) => ids.includes(row.post_id)) as never;
     }
     if (sql.includes("post_type = 'attachment'")) {
       const ids = params as readonly number[];
@@ -412,6 +567,202 @@ async function testLimitClamping() {
   assert.deepEqual(usersCall!.params, [MAX_LIMIT]);
 }
 
+// ---------------------------------------------------------------------------
+// Offer (hb-programs + services) — source repository only, no classification.
+// ---------------------------------------------------------------------------
+
+async function testOfferBundleRegularHbProgram() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedOffers();
+  const bundle = bundles.find((b) => b.post.ID === hbProgramPost.ID);
+
+  assert.ok(bundle);
+  assert.deepEqual(bundle!.post, hbProgramPost);
+  assert.equal(bundle!.post.post_type, "hb-programs");
+
+  // program-cost, gallery, valid booking JSON, RankMath, old slug, and a real
+  // embedded newline all pass through verbatim — no HTML stripping, no JSON
+  // parsing, no gallery-ID splitting. That's normalizer work, not this PR's.
+  assert.deepEqual(bundle!.postMeta, {
+    "program-cost": ["<ul><li>300 byn - до 10 чел</li></ul>"],
+    "average-check-program": ["385"],
+    "hb-program-duration": ["180"],
+    "max-guests-program": ["15"],
+    gallery: ["18929,26663"],
+    "program-booking-settings": ['{"enabled":true,"base_price":300}'],
+    rank_math_title: ["Camp SEO Title"],
+    _wp_old_slug: ["old-camp-slug"],
+    "short-description": ["Line one\nLine two"],
+  });
+
+  assert.deepEqual(bundle!.terms, hbProgramTerms);
+  assert.ok(bundle!.terms.some((t) => t.taxonomy === "org-capacity"));
+  assert.ok(bundle!.terms.some((t) => t.taxonomy === "program-age"));
+
+  assert.deepEqual(bundle!.placeRelations, [
+    {
+      post_id: 601,
+      related_post_id: 301,
+      related_post_type: "places",
+      relation_key: "post-relation-hb-programs",
+      relation_order: 0,
+      relation_side: "child",
+    },
+  ]);
+
+  const listCall = calls.find((call) => call.sql.includes("post_type IN (?, ?)"));
+  assert.ok(listCall);
+  assert.deepEqual(listCall!.params, ["services", "hb-programs", "publish", DEFAULT_LIMIT]);
+}
+
+async function testOfferBundleServices() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedOffers();
+  const bundle = bundles.find((b) => b.post.ID === servicesPost.ID);
+
+  assert.ok(bundle);
+  assert.equal(bundle!.post.post_type, "services");
+  assert.deepEqual(bundle!.postMeta, {
+    "main-image-service": ["7001"],
+    "phone-services": ["+375291112233"],
+  });
+  assert.deepEqual(bundle!.placeRelations, []);
+}
+
+async function testOfferBundleNoPlaceRelation() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedOffers();
+  const bundle = bundles.find((b) => b.post.ID === hbProgramNoRelationPost.ID);
+
+  assert.ok(bundle);
+  // No relation at all — repository reports the fact honestly, it does not
+  // fabricate a Place or throw. Classification (QUARANTINE) is a later step.
+  assert.deepEqual(bundle!.placeRelations, []);
+}
+
+async function testOfferBundleMultiplePlaceRelationsNoFalsePrimary() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedOffers();
+  const bundle = bundles.find((b) => b.post.ID === hbProgramMultiRelationPost.ID);
+
+  assert.ok(bundle);
+  assert.equal(bundle!.placeRelations.length, 2, "both relations reported, none dropped");
+  const relatedIds = bundle!.placeRelations.map((r) => r.related_post_id).sort();
+  assert.deepEqual(relatedIds, [301, 302]);
+  // Order/relation_order is passed through raw — the repository does not
+  // interpret it as a "primary" marker or pick a winner.
+  assert.deepEqual(
+    bundle!.placeRelations.map((r) => r.relation_order),
+    [0, 1],
+  );
+}
+
+async function testOfferMalformedBookingJsonPassesThroughAsRawString() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedOfferById("hb-programs", hbProgramMultiRelationPost.ID);
+  assert.ok(bundle);
+  // Truncated/invalid JSON — must not throw, must not be silently dropped or repaired.
+  const raw = bundle!.postMeta["program-booking-settings"][0];
+  assert.equal(raw, '{"enabled":true, "base_price":');
+  // Confirms the fixture is genuinely malformed (so this test proves something) —
+  // the repository still returned it untouched rather than rejecting it.
+  assert.throws(() => JSON.parse(raw));
+}
+
+async function testOfferLiteralEscapeSequencePassesThroughUnchanged() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedOfferById("hb-programs", hbProgramMultiRelationPost.ID);
+  assert.ok(bundle);
+  // Literal two-char `\n` (not a real newline) — the repository is agnostic
+  // to escape semantics, it neither unescapes nor mangles it further.
+  assert.deepEqual(bundle!.postMeta["short-description"], ["Contains literal: \\n sequence"]);
+}
+
+async function testOfferDraftExcludedFromPublishedMethods() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundles = await repo.getPublishedOffers();
+  assert.ok(
+    !bundles.some((b) => b.post.ID === hbProgramDraftPost.ID),
+    "draft hb-programs must never appear in the published list",
+  );
+
+  const byId = await repo.getPublishedOfferById("hb-programs", hbProgramDraftPost.ID);
+  assert.equal(byId, null, "targeted lookup must not return a draft row either");
+}
+
+async function testOfferTargetedLookupBySourceTypeAndId() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const hbBundle = await repo.getPublishedOfferById("hb-programs", hbProgramPost.ID);
+  assert.ok(hbBundle);
+  assert.equal(hbBundle!.post.post_type, "hb-programs");
+
+  const svcBundle = await repo.getPublishedOfferById("services", servicesPost.ID);
+  assert.ok(svcBundle);
+  assert.equal(svcBundle!.post.post_type, "services");
+
+  // Wrong source type for a valid ID must not match — not a generic "by ID" lookup.
+  const mismatched = await repo.getPublishedOfferById("services", hbProgramPost.ID);
+  assert.equal(mismatched, null);
+
+  const svcCall = calls.find((call) => call.params[0] === "services" && call.sql.includes("ID = ?"));
+  assert.ok(svcCall);
+  assert.deepEqual(svcCall!.params, ["services", "publish", servicesPost.ID]);
+}
+
+function testOfferSourceRecordKeyIsStableAndDistinguishesSourceType() {
+  assert.equal(buildOfferSourceRecordKey(hbProgramPost), "wordpress-db:hb-programs:601");
+  assert.equal(buildOfferSourceRecordKey(servicesPost), "wordpress-db:services:602");
+  // Same numeric ID, different source post type -> different keys (this is
+  // exactly why Offer needs source-type-aware keys, unlike single-source-type
+  // entities like Route/Place/Article/Event).
+  assert.notEqual(
+    buildOfferSourceRecordKey({ post_type: "hb-programs", ID: 602 }),
+    buildOfferSourceRecordKey({ post_type: "services", ID: 602 }),
+  );
+}
+
+async function testOfferEmptyOptionalMetaDoesNotThrow() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedOfferById("hb-programs", hbProgramNoRelationPost.ID);
+  assert.ok(bundle);
+  // No postmeta rows fixtured for this post at all — must resolve to an
+  // empty object, not throw and not fabricate keys.
+  assert.deepEqual(bundle!.postMeta, {});
+  assert.deepEqual(bundle!.terms, []);
+  assert.deepEqual(bundle!.placeRelations, []);
+}
+
+async function testOfferPlaceRelationsQueryQueriesBothDirections() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(executor);
+
+  await repo.getOfferPlaceRelations([601, 604]);
+
+  const relationsCall = calls.find((call) => call.sql.includes("FROM wp_voxel_relations"));
+  assert.ok(relationsCall);
+  // Both halves of the UNION ALL get the same id list — see buildOfferPlaceRelationsQuery.
+  assert.deepEqual(relationsCall!.params, [601, 604, 601, 604]);
+  assert.match(relationsCall!.sql, /relation_side/);
+}
+
 async function main() {
   await testArticleBundle();
   await testPublishedArticleById();
@@ -425,6 +776,18 @@ async function main() {
   await testAttachmentsById();
   await testRedirectsAndUsers();
   await testLimitClamping();
+
+  await testOfferBundleRegularHbProgram();
+  await testOfferBundleServices();
+  await testOfferBundleNoPlaceRelation();
+  await testOfferBundleMultiplePlaceRelationsNoFalsePrimary();
+  await testOfferMalformedBookingJsonPassesThroughAsRawString();
+  await testOfferLiteralEscapeSequencePassesThroughUnchanged();
+  await testOfferDraftExcludedFromPublishedMethods();
+  await testOfferTargetedLookupBySourceTypeAndId();
+  testOfferSourceRecordKeyIsStableAndDistinguishesSourceType();
+  await testOfferEmptyOptionalMetaDoesNotThrow();
+  await testOfferPlaceRelationsQueryQueriesBothDirections();
 }
 
 main()

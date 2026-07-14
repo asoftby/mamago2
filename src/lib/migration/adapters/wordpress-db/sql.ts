@@ -5,6 +5,11 @@
  * interpolation.
  */
 
+import {
+  WORDPRESS_PROGRAMS_POST_TYPE,
+  WORDPRESS_SERVICES_POST_TYPE,
+} from "../../planners/offerMapping";
+
 export interface SqlQuery {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -109,6 +114,64 @@ export function buildPublishedRouteByIdQuery(postId: number): SqlQuery {
       WHERE post_type = ? AND post_status = ? AND ID = ?
       LIMIT 1`,
     params: ["routes", "publish", postId],
+  };
+}
+
+/**
+ * Offer has two source post types (`hb-programs`, `services`) sharing one
+ * target — `post_type IN (?, ?)`, `post_status = 'publish'` only (draft rows
+ * — 2 `hb-programs` as of 2026-07-14 — never reach this query; they stay
+ * staging/inventory-only per product decision, not silently dropped
+ * elsewhere). `ORDER BY post_type, ID` keeps result order deterministic
+ * across the two source types instead of relying on insertion order.
+ */
+export function buildPublishedOffersQuery(limit: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type IN (?, ?) AND post_status = ?
+      ORDER BY post_type, ID
+      LIMIT ?`,
+    params: [WORDPRESS_SERVICES_POST_TYPE, WORDPRESS_PROGRAMS_POST_TYPE, "publish", limit],
+  };
+}
+
+/** Targeted lookup: caller supplies the exact source post type (`hb-programs` | `services`), not just an ID. */
+export function buildPublishedOfferByIdQuery(sourcePostType: string, postId: number): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_content, post_title, post_excerpt, post_status, post_name, post_modified, post_parent, guid, post_type, post_mime_type
+      FROM wp_posts
+      WHERE post_type = ? AND post_status = ? AND ID = ?
+      LIMIT 1`,
+    params: [sourcePostType, "publish", postId],
+  };
+}
+
+/**
+ * `wp_voxel_relations` has no fixed parent/child convention per relation
+ * key — inspection (2026-07-14) found real Offer↔Place relations stored in
+ * both directions. Both halves of this `UNION ALL` are scoped to the
+ * caller's own Offer post IDs (`postIds`, always already known
+ * `hb-programs`/`services` rows — no extra post_type filter needed on that
+ * side), and both join to `wp_posts` only to confirm the *other* side is
+ * genuinely a `places` post, not to resolve anything else. `` `order` ``
+ * is backtick-quoted — it is a real column name in `wp_voxel_relations`
+ * and also a reserved SQL keyword.
+ */
+export function buildOfferPlaceRelationsQuery(postIds: readonly number[]): SqlQuery {
+  const ph = placeholders(postIds.length);
+  return {
+    sql: `SELECT r.parent_id AS post_id, r.child_id AS related_post_id, p2.post_type AS related_post_type, r.relation_key, r.\`order\` AS relation_order, 'child' AS relation_side
+      FROM wp_voxel_relations r
+      JOIN wp_posts p2 ON p2.ID = r.child_id AND p2.post_type = 'places'
+      WHERE r.parent_id IN (${ph})
+      UNION ALL
+      SELECT r.child_id AS post_id, r.parent_id AS related_post_id, p1.post_type AS related_post_type, r.relation_key, r.\`order\` AS relation_order, 'parent' AS relation_side
+      FROM wp_voxel_relations r
+      JOIN wp_posts p1 ON p1.ID = r.parent_id AND p1.post_type = 'places'
+      WHERE r.child_id IN (${ph})
+      ORDER BY post_id, relation_side, relation_order, related_post_id`,
+    params: [...postIds, ...postIds],
   };
 }
 

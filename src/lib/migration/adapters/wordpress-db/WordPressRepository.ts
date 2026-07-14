@@ -1,11 +1,14 @@
 import {
   buildAttachmentsQuery,
+  buildOfferPlaceRelationsQuery,
   buildPlaceIndexQuery,
   buildPostMetaQuery,
   buildPublishedArticleByIdQuery,
   buildPublishedArticlesQuery,
   buildPublishedEventByIdQuery,
   buildPublishedEventsQuery,
+  buildPublishedOfferByIdQuery,
+  buildPublishedOffersQuery,
   buildPublishedPlacesQuery,
   buildPublishedRouteByIdQuery,
   buildPublishedRoutesQuery,
@@ -18,6 +21,8 @@ import type {
   WordPressArticleBundle,
   WordPressAttachmentRow,
   WordPressEventBundle,
+  WordPressOfferBundle,
+  WordPressOfferPlaceRelationRow,
   WordPressPlaceBundle,
   WordPressPlaceIndexRow,
   WordPressPostMetaByKey,
@@ -137,6 +142,58 @@ export class WordPressRepository {
     const posts = await this.executor<WordPressPostRow>(sql, params);
     const bundles = await this.assemblePostBundles(posts);
     return bundles[0] ?? null;
+  }
+
+  /**
+   * Both Offer source post types (`hb-programs`, `services`) in one
+   * deterministically-ordered result — see `buildPublishedOffersQuery`.
+   * `placeRelations` is assembled alongside `postMeta`/`terms`, not
+   * deferred to a caller: every published Offer bundle always carries
+   * whatever Place relations actually exist (zero, one, or several) —
+   * this repository never filters, dedupes, or picks one.
+   */
+  async getPublishedOffers(limit?: number): Promise<WordPressOfferBundle[]> {
+    const { sql, params } = buildPublishedOffersQuery(clampLimit(limit));
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    return this.assembleOfferBundles(posts);
+  }
+
+  /** Targeted lookup — caller must supply the exact source post type, not just an ID (see `buildPublishedOfferByIdQuery`). */
+  async getPublishedOfferById(
+    sourcePostType: string,
+    postId: number,
+  ): Promise<WordPressOfferBundle | null> {
+    const { sql, params } = buildPublishedOfferByIdQuery(sourcePostType, postId);
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    const bundles = await this.assembleOfferBundles(posts);
+    return bundles[0] ?? null;
+  }
+
+  private async assembleOfferBundles(
+    posts: readonly WordPressPostRow[],
+  ): Promise<WordPressOfferBundle[]> {
+    const postIds = posts.map((post) => post.ID);
+    const [postMetaByPost, termsByPost, placeRelationsByPost] = await Promise.all([
+      this.getPostMeta(postIds),
+      this.getTerms(postIds),
+      this.getOfferPlaceRelations(postIds),
+    ]);
+
+    return posts.map((post) => ({
+      post,
+      postMeta: groupPostMetaByKey(postMetaByPost.get(post.ID) ?? []),
+      terms: termsByPost.get(post.ID) ?? [],
+      placeRelations: placeRelationsByPost.get(post.ID) ?? [],
+    }));
+  }
+
+  async getOfferPlaceRelations(
+    postIds: readonly number[],
+  ): Promise<Map<number, WordPressOfferPlaceRelationRow[]>> {
+    if (postIds.length === 0) return new Map();
+    const { sql, params } = buildOfferPlaceRelationsQuery(postIds);
+    const rows = await this.executor<WordPressOfferPlaceRelationRow>(sql, params);
+    return groupByPostId(rows);
   }
 
   private async assemblePostBundles(
