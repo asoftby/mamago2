@@ -1,3 +1,5 @@
+import { normalizePhoneToE164 } from "@/lib/phone/e164";
+
 import type { MigrationWarning, NormalizedRecord } from "../../types";
 import type { WordPressPlaceBundle, WordPressTermRow } from "./types";
 
@@ -27,7 +29,16 @@ export interface NormalizedPlaceCandidate {
   publishedAt: string;
   modifiedAt: string;
   shortDescription: string | null;
+  /** Raw WP `phone` postmeta value, unnormalized evidence — see `phoneE164` for the value safe to write to `Place.phone`. */
   phone: string | null;
+  /**
+   * `phone` run through the project's one canonical E.164 normalizer
+   * (`src/lib/phone/e164.ts`). `null` when `phone` is empty, or when it's
+   * non-empty but can't be resolved to a valid number — never a
+   * best-effort/garbage value. See `PLACE_PHONE_INVALID` warning for the
+   * latter case; `phone` above still preserves exactly what the source had.
+   */
+  phoneE164: string | null;
   email: string | null;
   workHoursRaw: string | null;
   locationRaw: string | null;
@@ -96,6 +107,19 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     });
   }
 
+  const phoneRaw = firstMetaValue(postMeta, "phone");
+  const phoneE164Resolved = phoneRaw ? normalizePhoneToE164(phoneRaw) : "";
+  const phoneE164 = phoneE164Resolved || null;
+  if (phoneRaw && !phoneE164Resolved) {
+    warnings.push({
+      code: "PLACE_PHONE_INVALID",
+      message: "phone postmeta value could not be resolved to a valid E.164 number.",
+      severity: "WARNING",
+      sourceRecordKey,
+      details: { phoneRaw },
+    });
+  }
+
   const logoValues = postMeta["logo"];
   if (logoValues && logoValues.length > 0) {
     warnings.push({
@@ -126,7 +150,8 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     publishedAt: post.post_date,
     modifiedAt: post.post_modified,
     shortDescription: firstMetaValue(postMeta, "short-desc-place"),
-    phone: firstMetaValue(postMeta, "phone"),
+    phone: phoneRaw,
+    phoneE164,
     email: firstMetaValue(postMeta, "email"),
     workHoursRaw: firstMetaValue(postMeta, "work_hours"),
     locationRaw: firstMetaValue(postMeta, "location"),

@@ -14,6 +14,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     modifiedAt: "2026-01-02 00:00:00",
     shortDescription: "A great place for kids",
     phone: "+375291234567",
+    phoneE164: "+375291234567",
     email: "hello@example.com",
     workHoursRaw: "Mon-Fri 9-18",
     locationRaw: "Minsk, some street",
@@ -52,6 +53,32 @@ function testHappyPath() {
   assert.equal(result.draft.lat, 53.9);
   assert.equal(result.draft.lng, 27.5667);
   assert.equal(result.draft.phone, "+375291234567");
+}
+
+/**
+ * `draft.phone` must come from `candidate.phoneE164`, never the raw
+ * `candidate.phone` evidence field — even when they differ (raw legacy
+ * text vs. normalized E.164), the draft only ever sees the safe value.
+ */
+function testDraftPhoneComesFromPhoneE164NotRawPhone() {
+  const result = buildPlaceCreateDraft({
+    candidate: candidateFixture({ phone: "+375 (25) 530-00-53", phoneE164: "+375255300053" }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.phone, "+375255300053");
+}
+
+function testUnresolvablePhoneNeverWrittenAsGarbage() {
+  const result = buildPlaceCreateDraft({
+    candidate: candidateFixture({ phone: "not a phone at all", phoneE164: null }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  // null, never the raw unparseable text.
+  assert.equal(result.draft.phone, null);
 }
 
 function testMissingCreatedByUserIdBlocks() {
@@ -221,6 +248,8 @@ function testCityIdOnlyFromContextNeverGuessedFromCityRaw() {
 
 function main() {
   testHappyPath();
+  testDraftPhoneComesFromPhoneE164NotRawPhone();
+  testUnresolvablePhoneNeverWrittenAsGarbage();
   testMissingCreatedByUserIdBlocks();
   testMissingTitleBlocks();
   testShortDescFromShortDescription();
