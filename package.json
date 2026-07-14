@@ -34,7 +34,7 @@
     "dev:webpack": "next dev",
     "email:preview": "react-email dev --dir ./emails --port 3011",
     "build": "NODE_OPTIONS=--max-old-space-size=6144 next build --webpack",
-    "build:ci": "NODE_OPTIONS=--max-old-space-size=3072 next build --webpack",
+    "build:ci": "NODE_OPTIONS=--max-old-space-size=4096 next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "check": "tsc --noEmit && eslint src --quiet && pnpm build",
