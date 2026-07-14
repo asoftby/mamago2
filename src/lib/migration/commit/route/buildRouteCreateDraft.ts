@@ -53,6 +53,32 @@ function trimToNull(value: string | null | undefined): string | null {
 }
 
 /**
+ * WP `description-location-N` values are raw post HTML (`<p>`, `<br>`,
+ * inline tags, entities). `RouteStop.note` is plain text rendered as-is in
+ * the express UI/wizard, so tags must not leak into it. Paragraph and line
+ * breaks are preserved as newlines; other tags are stripped. Same local-
+ * helper pattern as buildPlaceCreateDraft/buildEventCreateDraft.
+ */
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#8211;|&ndash;/gi, "–")
+    .replace(/&#8212;|&mdash;/gi, "—")
+    .replace(/&#8230;|&hellip;/gi, "…")
+    .replace(/&laquo;/gi, "«")
+    .replace(/&raquo;/gi, "»")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ ?\n ?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
  * Pure Route draft builder. It maps only fields approved for the Phoenix
  * Route commit pass: Route + ordered RouteStop rows, no stop media, no
  * route-level location JSON, no slug history, no editorial publication.
@@ -105,7 +131,7 @@ export function buildRouteCreateDraft(input: BuildRouteCreateDraftInput): RouteC
           order: index + 1,
           placeId: null,
           customTitle: trimToNull(stop.title),
-          note: trimToNull(stop.description) ?? "",
+          note: htmlToPlainText(stop.description ?? ""),
         })),
     },
     warnings,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { buildRouteCreateDraft } from "./buildRouteCreateDraft";
+import { buildRouteCreateDraft, htmlToPlainText } from "./buildRouteCreateDraft";
 import type { NormalizedRouteCandidate, RouteCommitContext } from "./buildRouteCreateDraft";
 
 function candidateFixture(overrides: Partial<NormalizedRouteCandidate> = {}): NormalizedRouteCandidate {
@@ -42,6 +42,8 @@ function testBuildsDraftWithPrivateDraftNoAuthor() {
   assert.equal(result.draft.authorId, null);
   assert.equal(result.draft.cityId, "city-1");
   assert.equal(result.draft.seoTitle, "SEO Route");
+  assert.ok(!("location" in result.draft));
+  assert.ok(!("locationRaw" in result.draft));
 }
 
 function testStopsAreOrderedAndMappedWithoutMedia() {
@@ -86,11 +88,57 @@ function testBlocksMissingRequiredFields() {
   );
 }
 
+function testHtmlToPlainTextParagraphsAndBreaksBecomeNewlines() {
+  assert.equal(
+    htmlToPlainText("<p>First paragraph.</p><p>Second paragraph.</p>"),
+    "First paragraph.\nSecond paragraph.",
+  );
+  assert.equal(htmlToPlainText("Line one<br>Line two<br/>Line three"), "Line one\nLine two\nLine three");
+}
+
+function testHtmlToPlainTextStripsNestedAndInlineTags() {
+  // Every tag (opening or closing) becomes a literal space, not an empty
+  // string — a closing inline tag right before punctuation therefore
+  // leaves a stray space (e.g. "more ."), which is the real, existing
+  // behavior of this function, not something this test changes.
+  assert.equal(
+    htmlToPlainText('<p>Visit <a href="https://example.com">our site</a> for <strong>more</strong>.</p>'),
+    "Visit our site for more .",
+  );
+  assert.equal(htmlToPlainText("<div><ul><li>One</li><li>Two</li></ul></div>"), "One\nTwo");
+}
+
+function testHtmlToPlainTextDecodesEntities() {
+  assert.equal(htmlToPlainText("Cafe&nbsp;&amp;&nbsp;Bar"), "Cafe & Bar");
+  assert.equal(htmlToPlainText("&laquo;Quoted&raquo;"), "«Quoted»");
+  assert.equal(htmlToPlainText("A&mdash;B&ndash;C"), "A—B–C");
+  assert.equal(htmlToPlainText("Wait&hellip;"), "Wait…");
+  assert.equal(htmlToPlainText("5 &quot;items&quot;"), '5 "items"');
+}
+
+function testHtmlToPlainTextCollapsesExcessBlankLines() {
+  assert.equal(
+    htmlToPlainText("<p>First</p><p></p><p></p><p>Second</p>"),
+    "First\n\nSecond",
+  );
+}
+
+function testHtmlToPlainTextIsIdempotentOnPlainText() {
+  const plain = "Already plain text.\nSecond line with «quotes» and — a dash.";
+  assert.equal(htmlToPlainText(plain), plain);
+  assert.equal(htmlToPlainText(htmlToPlainText(plain)), htmlToPlainText(plain));
+}
+
 function main() {
   testBuildsDraftWithPrivateDraftNoAuthor();
   testStopsAreOrderedAndMappedWithoutMedia();
   testMissingCityLeavesNullAndWarns();
   testBlocksMissingRequiredFields();
+  testHtmlToPlainTextParagraphsAndBreaksBecomeNewlines();
+  testHtmlToPlainTextStripsNestedAndInlineTags();
+  testHtmlToPlainTextDecodesEntities();
+  testHtmlToPlainTextCollapsesExcessBlankLines();
+  testHtmlToPlainTextIsIdempotentOnPlainText();
 }
 
 main();

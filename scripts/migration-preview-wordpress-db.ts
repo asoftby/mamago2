@@ -35,16 +35,18 @@ import {
   ARTICLE_ENTITY_TYPE,
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
+  ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
   fetchPublishedEventEnvelopeBySourceRecordKey,
+  fetchPublishedRouteEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import { runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
 import type { MigrationPlan, MigrationPlanItem, MigrationPlanStats, MigrationWarning } from "../src/lib/migration/types";
 
-export type PreviewEntity = "article" | "place" | "event" | "all";
+export type PreviewEntity = "article" | "place" | "event" | "route" | "all";
 
 export interface PreviewReportOptions {
   entity: PreviewEntity;
@@ -231,9 +233,10 @@ export function parseArgs(argv: readonly string[]): {
     rawEntity !== "article" &&
     rawEntity !== "place" &&
     rawEntity !== "event" &&
+    rawEntity !== "route" &&
     rawEntity !== "all"
   ) {
-    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|all.`);
+    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|route|all.`);
   }
   const entity: PreviewEntity = rawEntity ?? "all";
 
@@ -279,6 +282,7 @@ function entityTypesFor(entity: PreviewEntity): readonly string[] | undefined {
   if (entity === "article") return [ARTICLE_ENTITY_TYPE];
   if (entity === "place") return [PLACE_ENTITY_TYPE];
   if (entity === "event") return [EVENT_ENTITY_TYPE];
+  if (entity === "route") return [ROUTE_ENTITY_TYPE];
   return undefined;
 }
 
@@ -300,8 +304,10 @@ async function main(): Promise<void> {
       records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
     } else if (entity === "event") {
       records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+    } else if (entity === "route") {
+      records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
     } else {
-      throw new Error("--source-record-key is only supported with --entity article|event for golden-sample runs.");
+      throw new Error("--source-record-key is only supported with --entity article|event|route for golden-sample runs.");
     }
   }
 

@@ -60,6 +60,7 @@ import { pathToFileURL } from "node:url";
 import { PrismaClient } from "@prisma/client";
 
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
+import type { MediaImporterLike } from "../src/lib/migration/media/types";
 import {
   assertRemoteAccessAllowed,
   createWordPressSshMysqlExecutor,
@@ -431,12 +432,36 @@ async function main(): Promise<void> {
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);
     const wordpressRepository = new WordPressRepository(executor);
-    const { createMamagoMediaImporter } = await import("../src/lib/migration/media");
+
+    // `createMamagoMediaImporter` transitively imports `@/server/media/media-storage`,
+    // which is guarded by the `server-only` package. That guard is only a
+    // no-op under Next's bundler (which sets the "react-server" resolve
+    // condition) — under a plain `tsx`/Node process (this CLI), `server-only`
+    // throws unconditionally the moment the module is *loaded*, regardless
+    // of whether it's ever called. So this import must stay lazy and must
+    // only ever be reached when the run's media policy is actually FULL;
+    // `MediaPolicyGated{Event,RouteStop}MediaSyncer` already guarantee
+    // `mediaImporterFactory` itself is never invoked for METADATA/NONE, but
+    // the previous code additionally imported the module eagerly at
+    // startup regardless of policy, which crashed every non-FULL run.
+    let createMamagoMediaImporter: typeof import("../src/lib/migration/media")["createMamagoMediaImporter"] | undefined;
+    if (profile.mediaPolicy.name === "FULL") {
+      ({ createMamagoMediaImporter } = await import("../src/lib/migration/media"));
+    }
+    const mediaImporterFactory = (ownerUserId: string): MediaImporterLike => {
+      if (!createMamagoMediaImporter) {
+        throw new Error(
+          "mediaImporterFactory invoked without mediaPolicy=FULL — this should be unreachable; MediaPolicyGated*Syncer is expected to gate all calls.",
+        );
+      }
+      return createMamagoMediaImporter({ uploadedByUserId: ownerUserId });
+    };
+
     const eventMediaSyncer = new MediaPolicyGatedEventMediaSyncer({
       inner: new EventMediaSyncer({
         prisma,
         attachmentResolver: wordpressRepository,
-        mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
+        mediaImporterFactory,
         lineageWriter,
       }),
       mediaPolicy: profile.mediaPolicy,
@@ -445,7 +470,7 @@ async function main(): Promise<void> {
       inner: new RouteStopMediaSyncer({
         prisma,
         attachmentResolver: wordpressRepository,
-        mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
+        mediaImporterFactory,
         lineageWriter,
       }),
       mediaPolicy: profile.mediaPolicy,
