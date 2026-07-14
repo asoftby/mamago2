@@ -48,7 +48,9 @@ export async function convertHeicFileToJpeg(file: File, quality = 0.9): Promise<
     const result = await heic2any({ blob: file, toType: "image/jpeg", quality });
     const blob = Array.isArray(result) ? result[0] : result;
     return new File([blob], withJpegExtension(file.name), { type: "image/jpeg" });
-  } catch {
+  } catch (error) {
+    // Surface the real cause for diagnostics — the user-facing message stays generic.
+    console.error("[heicConversion] heic2any failed:", error);
     throw new Error(HEIC_CONVERSION_ERROR_MESSAGE);
   }
 }
