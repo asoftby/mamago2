@@ -8,6 +8,10 @@ import {
   parseSectionedOutput,
   type WpDbEnv,
 } from "./migration-inspect-wordpress-db";
+import {
+  parseTabularRows,
+  unescapeMysqlBatchValue,
+} from "../src/lib/migration/adapters/wordpress-db/connectExecutor";
 
 // Fixture: shape of real `mysql -e "..."` multi-statement output, trimmed to
 // a representative subset of what was actually captured manually against
@@ -157,6 +161,62 @@ function main() {
 
   const users = sections.find((s) => s.label === "users_count");
   assert.equal(users!.rows[0][0], "580");
+
+  // --- parseSectionedOutput: MySQL batch-mode escape reversal ---
+  // Same class of fixture as connectExecutor.test.ts's parseTabularRows
+  // regression case: mysql --batch escapes real newline/tab/backslash/NUL
+  // inside a cell value with a leading backslash. This report must reverse
+  // that (via the same unescapeMysqlBatchValue() connectExecutor uses),
+  // not just leave the literal escape text visible in the human report.
+  const escapeFixture = [
+    "section",
+    "escape_probe",
+    "ID\tmeta_value",
+    "901\t" + String.raw`Line one\nLine two\nLine three`,
+    "902\t" + String.raw`Tab:\tCR:\rNUL:\0Backslash:\\`,
+    "section",
+    "escape_probe_2",
+    "ID\tmeta_value",
+    "903\tplain value, no escapes",
+  ].join("\n");
+  const escapeSections = parseSectionedOutput(escapeFixture);
+  assert.equal(escapeSections.length, 2, "escape sequences inside cells never create phantom sections");
+
+  const probe1 = escapeSections.find((s) => s.label === "escape_probe");
+  assert.ok(probe1);
+  assert.equal(probe1!.rows.length, 2, "escape sequences inside cells never create phantom rows");
+  assert.deepEqual(probe1!.rows[0], ["901", "Line one\nLine two\nLine three"]);
+  assert.deepEqual(probe1!.rows[1], ["902", "Tab:\tCR:\rNUL:\0Backslash:\\"]);
+
+  const probe2 = escapeSections.find((s) => s.label === "escape_probe_2");
+  assert.ok(probe2);
+  assert.equal(probe2!.rows.length, 1, "escape sequences inside cells never create phantom columns/rows across sections");
+  assert.deepEqual(probe2!.rows[0], ["903", "plain value, no escapes"]);
+
+  // Unknown escape sequences and a trailing lone backslash pass through
+  // unchanged — same contract as unescapeMysqlBatchValue() itself.
+  const edgeCaseFixture = [
+    "section",
+    "escape_edge_cases",
+    "ID\tmeta_value",
+    "904\t" + String.raw`unknown escape: \q stays`,
+    "905\t" + "trailing backslash: end\\",
+  ].join("\n");
+  const edgeSections = parseSectionedOutput(edgeCaseFixture);
+  const edgeProbe = edgeSections.find((s) => s.label === "escape_edge_cases");
+  assert.ok(edgeProbe);
+  assert.deepEqual(edgeProbe!.rows[0], ["904", String.raw`unknown escape: \q stays`]);
+  assert.deepEqual(edgeProbe!.rows[1], ["905", "trailing backslash: end\\"]);
+
+  // Production connectExecutor.parseTabularRows and this diagnostic parser
+  // must agree on the unescaped value for the same raw mysql batch output —
+  // they share the single unescapeMysqlBatchValue() implementation, this
+  // just proves the wiring, not just the helper in isolation.
+  const sharedRaw = ["ID\tnote", "1\t" + String.raw`Shared\nvalue\twith\\escapes`].join("\n");
+  const viaProductionExecutor = parseTabularRows<{ ID: number; note: string }>(sharedRaw);
+  const viaInspectParser = parseSectionedOutput(["section", "shared_probe", sharedRaw].join("\n"));
+  assert.equal(viaProductionExecutor[0].note, viaInspectParser[0].rows[0][1]);
+  assert.equal(viaProductionExecutor[0].note, unescapeMysqlBatchValue(String.raw`Shared\nvalue\twith\\escapes`));
 
   // --- assertReadOnlySql ---
   assert.doesNotThrow(() =>

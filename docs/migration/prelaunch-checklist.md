@@ -268,6 +268,43 @@ relations, taxonomy, redirects.
       проверялись) — нужен отдельный follow-up по образцу
       `scripts/migration-fix-route-note-html.ts` (dry-run → `--apply` →
       dry-run) для Place/Article/Event после подтверждения стратегии.
+      Смержено в dev: `066e67da`.
+- [x] **Impact audit уже импортированных данных — 2026-07-14 (read-only, без
+      UPDATE/DELETE/INSERT, без commit/`--apply`)**. Проверены все активно
+      слинкованные записи в этой dev-БД: Place (1), Article (1), Activity
+      (1), Route (14), RouteStop (90, через parent `Route` lineage —
+      `targetType=ROUTE_STOP` нигде не используется). **Affected = 0 по всем
+      пяти.** Place/Article/Activity — тестовые записи по 1 штуке, полные
+      батчи (82/115/28) в эту БД ещё не закоммичены; для них вывод "clean"
+      статистически не показателен, не обобщать. Cleanup runner **не
+      нужен** — нечего чистить. Фикс дополнительно подтверждён на живом WP
+      прямо через production-путь (`WordPressRepository` → исправленный
+      `connectExecutor`, read-only `--allow-remote-readonly`, без commit):
+      route 17822, `description-location-1..3` теперь корректно отдают
+      настоящий byte новой строки. Побочная находка: diagnostic
+      `migration-inspect-wordpress-db.ts` использовал собственный,
+      независимый от `connectExecutor` парсер (`parseSectionedOutput()`) —
+      не разэкранировал batch-значения, влияло только на человекочитаемые
+      inspect-отчёты, не на импортируемые данные. **Закрыто отдельным
+      маленьким PR** (см. следующий пункт) — теперь оба парсера используют
+      один и тот же `unescapeMysqlBatchValue()`. Полные батчи Place/Article/
+      Event (82/115/28) можно импортировать через уже исправленный executor
+      без field-level remediation; валидировать обычными validation
+      reports (§4), отдельный cleanup-скрипт не требуется.
+- [x] **Diagnostic inspect parser — batch-unescape** (2026-07-14, отдельный
+      маленький PR). `parseSectionedOutput()` в
+      `migration-inspect-wordpress-db.ts` теперь переиспользует
+      `unescapeMysqlBatchValue()` из `connectExecutor.ts` (та же
+      реализация, не дублирована) — применяется к каждой cell после
+      корректного разделения по реальным tab/newline byte (само разделение
+      уже было верным, страдала только пост-обработка значений). NULL/
+      numeric coercion в этом скрипте никогда не было — нечего сохранять
+      сверх самого текста. Regression-тесты: `\n`/`\t`/`\r`/`\0`/`\\`,
+      неизвестный escape (passthrough), висящий одиночный backslash,
+      несколько sections подряд, отсутствие фантомных rows/columns от
+      escape-последовательностей, cross-check равенства значения между
+      production `parseTabularRows()` и этим diagnostic-парсером на одном
+      и том же raw input.
 - [ ] Старые URL → `RouteSlugHistory` + redirect map.
 - [x] Общий wizard для пользователя и редактора (решение Алексея 2026-07-13,
       коммит `19a4a7b6`) — подтверждено: `RouteEditor` один для всех;
