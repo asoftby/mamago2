@@ -95,7 +95,7 @@ function testRouteDefaultResolvedWithoutCityId() {
 
 function testRouteOverrideBySourceRecordKeyOverridesDefaults() {
   const config: MigrationCommitContextConfig = {
-    defaults: { route: { cityId: "default-city" } },
+    defaults: { route: { cityId: "default-city", mediaOwnerUserId: "default-owner" } },
     overridesBySourceRecordKey: {
       "wordpress-db:routes:701": { route: { cityId: "override-city" } },
     },
@@ -109,7 +109,7 @@ function testRouteOverrideBySourceRecordKeyOverridesDefaults() {
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.deepEqual(result.context, { cityId: "override-city" });
+  assert.deepEqual(result.context, { cityId: "override-city", mediaOwnerUserId: "default-owner" });
 }
 
 function testOverrideBySourceRecordKeyOverridesDefaults() {

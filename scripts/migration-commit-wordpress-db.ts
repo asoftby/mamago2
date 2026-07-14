@@ -98,12 +98,14 @@ import { PlaceCommitWriter } from "../src/lib/migration/commit/place/PlaceCommit
 import { RouteCommitOrchestrator } from "../src/lib/migration/commit/route/RouteCommitOrchestrator";
 import { RouteCommitRunner } from "../src/lib/migration/commit/route/RouteCommitRunner";
 import { RouteCommitWriter } from "../src/lib/migration/commit/route/RouteCommitWriter";
+import { RouteStopMediaSyncer } from "../src/lib/migration/commit/route/RouteStopMediaSyncer";
 import { createMigrationRunExecutionPlan } from "../src/lib/migration/core/orchestrator";
 import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/migration/core/orchestrator";
 import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
 import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLineageWriter";
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
+import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
 import {
   formatMigrationProfileForCli,
   parseMediaPolicyName,
@@ -439,6 +441,15 @@ async function main(): Promise<void> {
       }),
       mediaPolicy: profile.mediaPolicy,
     });
+    const routeStopMediaSyncer = new MediaPolicyGatedRouteStopMediaSyncer({
+      inner: new RouteStopMediaSyncer({
+        prisma,
+        attachmentResolver: wordpressRepository,
+        mediaImporterFactory: (ownerUserId) => createMamagoMediaImporter({ uploadedByUserId: ownerUserId }),
+        lineageWriter,
+      }),
+      mediaPolicy: profile.mediaPolicy,
+    });
 
     const runners = {
       place: new PlaceCommitRunner({
@@ -461,6 +472,7 @@ async function main(): Promise<void> {
         orchestrator: new RouteCommitOrchestrator(new RouteCommitWriter(prisma)),
         lineageWriter,
         prisma,
+        mediaSyncer: routeStopMediaSyncer,
       }),
     };
 

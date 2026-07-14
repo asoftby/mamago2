@@ -20,9 +20,17 @@ export type {
   ExecuteRouteCommitRunResult,
   RouteCommitOrchestratorLike,
   RouteCommitRunnerPrismaClient,
+  RouteStopMediaSyncerLike,
 } from "./RouteCommitRunner";
 export { RouteCommitWriter } from "./RouteCommitWriter";
 export type {
   RouteCommitResult,
   RouteCommitWriterPrismaClient,
 } from "./RouteCommitWriter";
+export { RouteStopMediaSyncer } from "./RouteStopMediaSyncer";
+export type {
+  RouteStopMediaAttachmentResolver,
+  RouteStopMediaSyncerPrismaClient,
+  RouteStopMediaSyncInput,
+  RouteStopMediaSyncResult,
+} from "./RouteStopMediaSyncer";

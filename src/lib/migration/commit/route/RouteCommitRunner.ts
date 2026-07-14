@@ -35,6 +35,19 @@ export interface RouteCommitRunnerPrismaClient {
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
 }
 
+export interface RouteStopMediaSyncerLike {
+  sync(input: {
+    routeId: string;
+    candidate: NormalizedRouteCandidate;
+    mediaOwnerUserId: string | null | undefined;
+    sourceId: string;
+    sourceHash: string | null;
+    runId?: string | null;
+    recordId?: string | null;
+    sourceRecordKey: string;
+  }): Promise<{ warnings: MigrationWarning[] }>;
+}
+
 export interface ExecuteRouteCommitRunInput {
   operation: CommitOperation;
   record: MigrationRecord;
@@ -90,6 +103,7 @@ export class RouteCommitRunner {
       orchestrator: RouteCommitOrchestratorLike;
       lineageWriter: MigrationLineageWriterLike;
       prisma: RouteCommitRunnerPrismaClient;
+      mediaSyncer?: RouteStopMediaSyncerLike;
     },
   ) {}
 
@@ -144,6 +158,31 @@ export class RouteCommitRunner {
         reasonCode: commitResult.reasonCode,
         error: commitResult.error,
       };
+    }
+
+    const mediaWarnings: MigrationWarning[] = [];
+    if (this.deps.mediaSyncer && commitResult.routeId) {
+      try {
+        const mediaResult = await this.deps.mediaSyncer.sync({
+          routeId: commitResult.routeId,
+          candidate: input.candidate,
+          mediaOwnerUserId: input.context.mediaOwnerUserId,
+          sourceId: input.record.sourceId,
+          sourceHash: input.record.sourceHash,
+          runId: input.record.runId,
+          recordId: input.record.id,
+          sourceRecordKey: input.record.sourceRecordKey,
+        });
+        mediaWarnings.push(...mediaResult.warnings);
+      } catch (error) {
+        mediaWarnings.push({
+          code: "ROUTE_STOP_MEDIA_IMPORT_SKIPPED",
+          message: "Route stop media sync failed unexpectedly; Route commit remains linked.",
+          severity: "WARNING",
+          sourceRecordKey: input.record.sourceRecordKey,
+          details: { error: error instanceof Error ? error.message : String(error) },
+        });
+      }
     }
 
     let lineageResult: CreateLineageResult;
@@ -206,10 +245,11 @@ export class RouteCommitRunner {
       lastErrorCode: null,
       lastErrorMessage: null,
     };
-    if (commitResult.warnings && commitResult.warnings.length > 0) {
+    const allWarnings = [...(commitResult.warnings ?? []), ...mediaWarnings];
+    if (allWarnings.length > 0) {
       const existing = (input.record.validationSummary as unknown) ?? null;
       const existingArr = Array.isArray(existing) ? (existing as MigrationWarning[]) : [];
-      linkUpdateData.validationSummary = mergeWarnings(existingArr, commitResult.warnings) as unknown as object;
+      linkUpdateData.validationSummary = mergeWarnings(existingArr, allWarnings) as unknown as object;
     }
 
     await this.deps.prisma.migrationRecord.update({

@@ -5,6 +5,11 @@ export type { NormalizedRouteCandidate };
 
 export interface RouteCommitContext {
   cityId?: string | null;
+  /**
+   * Optional owner used only for imported `MediaAsset` rows attached to
+   * RouteStop.photoUrl. Route.authorId remains null by product decision.
+   */
+  mediaOwnerUserId?: string | null;
 }
 
 export type RouteCommitBlockReasonCode = "MISSING_TITLE" | "MISSING_SLUG" | "MISSING_STOPS";

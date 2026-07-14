@@ -7,6 +7,7 @@ import type {
   MigrationLineageWriterLike,
   RouteCommitOrchestratorLike,
   RouteCommitRunnerPrismaClient,
+  RouteStopMediaSyncerLike,
 } from "./RouteCommitRunner";
 import type { ExecuteRouteCommitResult } from "./RouteCommitOrchestrator";
 import type { CreateLineageResult } from "../../lineage/types";
@@ -142,6 +143,23 @@ function createFakePrisma(options: { existingLineage?: MigrationLineage | null }
   return { prisma, recordUpdateCalls, lineageFindCalls, lineageUpdateCalls };
 }
 
+function createFakeMediaSyncer(warnings: Array<{ code: string; message: string }> = []) {
+  const calls: unknown[] = [];
+  const syncer: RouteStopMediaSyncerLike = {
+    sync: async (input) => {
+      calls.push(input);
+      return {
+        warnings: warnings.map((warning) => ({
+          ...warning,
+          severity: "WARNING",
+          sourceRecordKey: input.sourceRecordKey,
+        })),
+      };
+    },
+  };
+  return { syncer, calls };
+}
+
 async function testHappyPathCreatesLineageAndMarksLinked() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, routeId: "route-1", warnings: [] });
   const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
@@ -187,6 +205,37 @@ async function testWarningsAreMergedIntoValidationSummary() {
 
   const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
   assert.deepEqual(updateCall.data.validationSummary, [warning]);
+}
+
+async function testMediaSyncerRunsAfterSuccessfulRouteCommitAndMergesWarnings() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, routeId: "route-1", warnings: [] });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
+  const { syncer: mediaSyncer, calls: mediaCalls } = createFakeMediaSyncer([
+    { code: "ROUTE_STOP_MEDIA_IMPORTED", message: "RouteStop photo was imported." },
+  ]);
+  const runner = new RouteCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  await runner.execute({
+    operation: operationFixture(),
+    record: recordFixture(),
+    candidate: candidateFixture(),
+    context: contextFixture({ mediaOwnerUserId: "media-owner-1" }),
+  });
+
+  assert.equal(mediaCalls.length, 1);
+  const mediaCall = mediaCalls[0] as { routeId: string; mediaOwnerUserId?: string | null };
+  assert.equal(mediaCall.routeId, "route-1");
+  assert.equal(mediaCall.mediaOwnerUserId, "media-owner-1");
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  assert.deepEqual(updateCall.data.validationSummary, [
+    {
+      code: "ROUTE_STOP_MEDIA_IMPORTED",
+      message: "RouteStop photo was imported.",
+      severity: "WARNING",
+      sourceRecordKey: "wordpress-db:routes:701",
+    },
+  ]);
 }
 
 async function testUpdateWithActiveLineageIsIdempotentPath() {
@@ -236,6 +285,7 @@ async function testUpdateWithoutLineageFailsBeforeOrchestrator() {
 async function main() {
   await testHappyPathCreatesLineageAndMarksLinked();
   await testWarningsAreMergedIntoValidationSummary();
+  await testMediaSyncerRunsAfterSuccessfulRouteCommitAndMergesWarnings();
   await testUpdateWithActiveLineageIsIdempotentPath();
   await testUpdateWithoutLineageFailsBeforeOrchestrator();
 }
