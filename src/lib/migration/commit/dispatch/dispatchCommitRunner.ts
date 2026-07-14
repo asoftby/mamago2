@@ -15,6 +15,8 @@ import type { EventCommitContext } from "../event/types";
 import type { NormalizedPlaceCandidate } from "../place/types";
 import type { ExecutePlaceCommitRunInput, ExecutePlaceCommitRunResult } from "../place/PlaceCommitRunner";
 import type { PlaceCommitContext } from "../place/types";
+import type { NormalizedRouteCandidate, RouteCommitContext } from "../route/buildRouteCreateDraft";
+import type { ExecuteRouteCommitRunInput, ExecuteRouteCommitRunResult } from "../route/RouteCommitRunner";
 
 /** Narrow enough that the real `PlaceCommitRunner` (PR12) satisfies this unchanged. */
 export interface PlaceCommitRunnerLike {
@@ -31,7 +33,12 @@ export interface ArticleCommitRunnerLike {
   execute(input: ExecuteArticleCommitRunInput): Promise<ExecuteArticleCommitRunResult>;
 }
 
-export type CommitDispatchTargetType = "PLACE" | "ACTIVITY" | "ARTICLE";
+/** Narrow enough that the real `RouteCommitRunner` satisfies this unchanged. */
+export interface RouteCommitRunnerLike {
+  execute(input: ExecuteRouteCommitRunInput): Promise<ExecuteRouteCommitRunResult>;
+}
+
+export type CommitDispatchTargetType = "PLACE" | "ACTIVITY" | "ARTICLE" | "ROUTE";
 
 export interface DispatchCommitRunnerInput {
   executionCandidate: MigrationExecutionCandidate;
@@ -44,12 +51,13 @@ export interface DispatchCommitRunnerInput {
    * not two values that could disagree; this dispatcher never calls the
    * PR26 resolver itself.
    */
-  resolvedContext: PlaceCommitContext | EventCommitContext | ArticleCommitContext;
+  resolvedContext: PlaceCommitContext | EventCommitContext | ArticleCommitContext | RouteCommitContext;
   migrationRecord: MigrationRecord;
   runners: {
     place?: PlaceCommitRunnerLike;
     event?: EventCommitRunnerLike;
     article?: ArticleCommitRunnerLike;
+    route?: RouteCommitRunnerLike;
   };
 }
 
@@ -160,6 +168,26 @@ function normalizeArticleResult(result: ExecuteArticleCommitRunResult): CommitDi
   };
 }
 
+function normalizeRouteResult(result: ExecuteRouteCommitRunResult): CommitDispatchResult {
+  if (result.ok) {
+    return {
+      ok: true,
+      targetType: "ROUTE",
+      targetId: result.routeId as string,
+      lineageId: result.lineageId,
+      status: "LINKED",
+    };
+  }
+
+  return {
+    ok: false,
+    targetType: "ROUTE",
+    status: "FAILED",
+    errorCode: result.reasonCode ?? "ROUTE_COMMIT_FAILED",
+    errorMessage: result.error?.message ?? "Route commit failed for an unknown reason.",
+  };
+}
+
 /**
  * Picks the runner matching `executionCandidate.planItem.targetType`
  * (PLACE -> `PlaceCommitRunner`, ACTIVITY -> `EventCommitRunner`, ARTICLE
@@ -210,6 +238,17 @@ export async function dispatchCommitRunner(input: DispatchCommitRunnerInput): Pr
       migrationRecord,
     });
     return normalizeArticleResult(result);
+  }
+
+  if (targetType === "ROUTE") {
+    if (!runners.route) return missingRunnerResult("ROUTE");
+    const result = await runners.route.execute({
+      operation: buildCommitOperation(executionCandidate.planItem, migrationRecord),
+      record: migrationRecord,
+      candidate: executionCandidate.candidate as NormalizedRouteCandidate,
+      context: resolvedContext as RouteCommitContext,
+    });
+    return normalizeRouteResult(result);
   }
 
   return {

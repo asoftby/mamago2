@@ -12,9 +12,15 @@ import { registerMigrationAdapter } from "../registry";
 import { normalizeArticle } from "./normalizeArticle";
 import { normalizeEvent } from "./normalizeEvent";
 import { normalizePlace } from "./normalizePlace";
+import { normalizeRoute } from "./normalizeRoute";
 import { WordPressRepository } from "./WordPressRepository";
 import type { WordPressQueryExecutor } from "./WordPressRepository";
-import type { WordPressArticleBundle, WordPressEventBundle, WordPressPlaceBundle } from "./types";
+import type {
+  WordPressArticleBundle,
+  WordPressEventBundle,
+  WordPressPlaceBundle,
+  WordPressRouteBundle,
+} from "./types";
 import type {
   MigrationAdapterContext,
   NormalizedRecord,
@@ -25,8 +31,9 @@ export const WORDPRESS_DB_ADAPTER_KEY = "wordpress-db";
 export const ARTICLE_ENTITY_TYPE = "wordpress-db:post";
 export const PLACE_ENTITY_TYPE = "wordpress-db:places";
 export const EVENT_ENTITY_TYPE = "wordpress-db:events";
+export const ROUTE_ENTITY_TYPE = "wordpress-db:routes";
 
-type WordPressEntityFilter = "article" | "place" | "event" | "all";
+type WordPressEntityFilter = "article" | "place" | "event" | "route" | "all";
 
 function getExecutorFromContext(context: MigrationAdapterContext): WordPressQueryExecutor {
   const executor = context.config?.executor;
@@ -43,13 +50,14 @@ function resolveEntityFilter(context: MigrationAdapterContext): WordPressEntityF
   const entityTypes = context.filters?.entityTypes;
   if (!entityTypes || entityTypes.length === 0) return "all";
 
-  const wantsArticles = entityTypes.includes(ARTICLE_ENTITY_TYPE);
-  const wantsPlaces = entityTypes.includes(PLACE_ENTITY_TYPE);
-  const wantsEvents = entityTypes.includes(EVENT_ENTITY_TYPE);
-  if (wantsArticles && !wantsPlaces && !wantsEvents) return "article";
-  if (wantsPlaces && !wantsArticles && !wantsEvents) return "place";
-  if (wantsEvents && !wantsArticles && !wantsPlaces) return "event";
-  return "all";
+  const wanted = {
+    article: entityTypes.includes(ARTICLE_ENTITY_TYPE),
+    place: entityTypes.includes(PLACE_ENTITY_TYPE),
+    event: entityTypes.includes(EVENT_ENTITY_TYPE),
+    route: entityTypes.includes(ROUTE_ENTITY_TYPE),
+  };
+  const wantedKeys = (Object.keys(wanted) as (keyof typeof wanted)[]).filter((key) => wanted[key]);
+  return wantedKeys.length === 1 ? wantedKeys[0] : "all";
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +121,18 @@ function toEventEnvelope(bundle: WordPressEventBundle): SourceRecordEnvelope {
   };
 }
 
+function toRouteEnvelope(bundle: WordPressRouteBundle): SourceRecordEnvelope {
+  const sourceRecordKey = `${ROUTE_ENTITY_TYPE}:${bundle.post.ID}`;
+  return {
+    sourceEntityType: ROUTE_ENTITY_TYPE,
+    sourceStableKey: sourceRecordKey,
+    sourceRecordKey,
+    sourceUpdatedAt: bundle.post.post_modified,
+    sourceHash: hashBundle(bundle),
+    rawPayload: bundle,
+  };
+}
+
 async function discoverRecords(
   context: MigrationAdapterContext,
 ): Promise<SourceRecordEnvelope[]> {
@@ -138,6 +158,11 @@ async function discoverRecords(
     envelopes.push(...events.map(toEventEnvelope));
   }
 
+  if (entityFilter === "route" || entityFilter === "all") {
+    const routes = await repository.getPublishedRoutes(limit);
+    envelopes.push(...routes.map(toRouteEnvelope));
+  }
+
   return envelopes;
 }
 
@@ -151,6 +176,9 @@ async function normalizeRecord(record: SourceRecordEnvelope): Promise<Normalized
   if (record.sourceEntityType === EVENT_ENTITY_TYPE) {
     return normalizeEvent(record.rawPayload as WordPressEventBundle);
   }
+  if (record.sourceEntityType === ROUTE_ENTITY_TYPE) {
+    return normalizeRoute(record.rawPayload as WordPressRouteBundle);
+  }
   throw new Error(`wordpress-db adapter cannot normalize sourceEntityType "${record.sourceEntityType}"`);
 }
 
@@ -159,8 +187,8 @@ export const wordpressDbAdapter = {
     key: WORDPRESS_DB_ADAPTER_KEY,
     version: "1.0.0",
     displayName: "WordPress DB (read-only)",
-    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE],
-    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY"] as const,
+    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE],
+    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY", "ROUTE"] as const,
     capabilities: ["DISCOVERY", "NORMALIZATION"] as const,
     stableIdPolicy: "WordPress post ID, namespaced by post_type (post/places/events)",
     hashPolicy:
@@ -228,4 +256,30 @@ export async function fetchPublishedEventEnvelopeBySourceRecordKey(
     );
   }
   return toEventEnvelope(bundle);
+}
+
+/**
+ * Fetches a single published WP route by its Phoenix `sourceRecordKey`
+ * (`wordpress-db:routes:{id}`). Used by commit/preview CLIs for golden-sample
+ * runs that must not discover more than one record.
+ */
+export async function fetchPublishedRouteEnvelopeBySourceRecordKey(
+  executor: WordPressQueryExecutor,
+  sourceRecordKey: string,
+): Promise<SourceRecordEnvelope> {
+  const match = /^wordpress-db:routes:(\d+)$/.exec(sourceRecordKey.trim());
+  if (!match) {
+    throw new Error(
+      `Invalid route sourceRecordKey "${sourceRecordKey}". Expected format "wordpress-db:routes:{wpPostId}".`,
+    );
+  }
+  const postId = Number(match[1]);
+  const repository = new WordPressRepository(executor);
+  const bundle = await repository.getPublishedRouteById(postId);
+  if (!bundle) {
+    throw new Error(
+      `No published WordPress route found for sourceRecordKey "${sourceRecordKey}" (post_type=routes, post_status=publish).`,
+    );
+  }
+  return toRouteEnvelope(bundle);
 }

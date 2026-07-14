@@ -114,3 +114,11 @@ export type WordPressEventBundle = WordPressPostBundle;
 export interface WordPressPlaceBundle extends WordPressPostBundle {
   placeIndex: WordPressPlaceIndexRow | null;
 }
+
+/**
+ * No index-table equivalent here either (same as events) — routes have no
+ * geospatial index of their own; the route-level `location` postmeta value
+ * is the only coordinate source, and it isn't per-stop (see
+ * `normalizeRoute.ts`).
+ */
+export type WordPressRouteBundle = WordPressPostBundle;

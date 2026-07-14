@@ -76,6 +76,42 @@ function testArticleDefaultResolvedWithoutAuthorUserId() {
   assert.ok(!("authorUserId" in result.context));
 }
 
+function testRouteDefaultResolvedWithoutCityId() {
+  const config: MigrationCommitContextConfig = {
+    defaults: { route: {} },
+  };
+  const result = resolveCommitContextForExecutionCandidate({
+    executionCandidate: executionCandidateFixture({
+      planItem: planItemFixture({ sourceRecordKey: "wordpress-db:routes:701", targetType: "ROUTE" }),
+    }),
+    config,
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.targetType, "ROUTE");
+  assert.deepEqual(result.context, {});
+}
+
+function testRouteOverrideBySourceRecordKeyOverridesDefaults() {
+  const config: MigrationCommitContextConfig = {
+    defaults: { route: { cityId: "default-city" } },
+    overridesBySourceRecordKey: {
+      "wordpress-db:routes:701": { route: { cityId: "override-city" } },
+    },
+  };
+  const result = resolveCommitContextForExecutionCandidate({
+    executionCandidate: executionCandidateFixture({
+      planItem: planItemFixture({ sourceRecordKey: "wordpress-db:routes:701", targetType: "ROUTE" }),
+    }),
+    config,
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.context, { cityId: "override-city" });
+}
+
 function testOverrideBySourceRecordKeyOverridesDefaults() {
   const config: MigrationCommitContextConfig = {
     defaults: { place: { createdByUserId: "default-user", cityId: "default-city" } },
@@ -219,6 +255,8 @@ function main() {
   testPlaceDefaultResolved();
   testEventDefaultResolved();
   testArticleDefaultResolvedWithoutAuthorUserId();
+  testRouteDefaultResolvedWithoutCityId();
+  testRouteOverrideBySourceRecordKeyOverridesDefaults();
   testOverrideBySourceRecordKeyOverridesDefaults();
   testOverrideOnlyAffectsMatchingSourceRecordKey();
   testMissingRequiredPlaceContextReturnsOkFalse();

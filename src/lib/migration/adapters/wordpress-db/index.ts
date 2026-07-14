@@ -10,12 +10,23 @@ export type {
   NormalizedEventScheduleDraft,
   NormalizedEventSourceTerm,
 } from "./normalizeEvent";
+export { normalizeRoute } from "./normalizeRoute";
+export type {
+  NormalizedRouteCandidate,
+  NormalizedRouteLocation,
+  NormalizedRouteSourceTerm,
+  NormalizedRouteStopCandidate,
+} from "./normalizeRoute";
+export { groupIndexedMeta } from "./groupIndexedMeta";
+export type { GroupIndexedMetaResult, IndexedMetaGroup } from "./groupIndexedMeta";
 export {
   ARTICLE_ENTITY_TYPE,
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
+  ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedEventEnvelopeBySourceRecordKey,
+  fetchPublishedRouteEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
   wordpressDbAdapter,
 } from "./wordpressDbAdapter";
@@ -45,6 +56,7 @@ export type {
   WordPressPostMetaRow,
   WordPressPostRow,
   WordPressRedirectRow,
+  WordPressRouteBundle,
   WordPressTermRow,
   WordPressUserRow,
 } from "./types";

@@ -8,12 +8,14 @@ import type {
   DispatchCommitRunnerInput,
   EventCommitRunnerLike,
   PlaceCommitRunnerLike,
+  RouteCommitRunnerLike,
 } from "./dispatchCommitRunner";
 import type { MigrationExecutionCandidate } from "../../core/orchestrator";
 import type { MigrationPlanItem } from "../../types";
 import type { ExecutePlaceCommitRunInput, ExecutePlaceCommitRunResult } from "../place/PlaceCommitRunner";
 import type { ExecuteEventCommitRunInput, ExecuteEventCommitRunResult } from "../event/EventCommitRunner";
 import type { ExecuteArticleCommitRunInput, ExecuteArticleCommitRunResult } from "../article/ArticleCommitRunner";
+import type { ExecuteRouteCommitRunInput, ExecuteRouteCommitRunResult } from "../route/RouteCommitRunner";
 
 function planItemFixture(overrides: Partial<MigrationPlanItem> = {}): MigrationPlanItem {
   return {
@@ -104,6 +106,17 @@ function createFakeArticleRunner(result: ExecuteArticleCommitRunResult) {
   return { runner, calls };
 }
 
+function createFakeRouteRunner(result: ExecuteRouteCommitRunResult) {
+  const calls: ExecuteRouteCommitRunInput[] = [];
+  const runner: RouteCommitRunnerLike = {
+    execute: async (input) => {
+      calls.push(input);
+      return result;
+    },
+  };
+  return { runner, calls };
+}
+
 function baseInput(overrides: Partial<DispatchCommitRunnerInput> = {}): DispatchCommitRunnerInput {
   return {
     executionCandidate: executionCandidateFixture(),
@@ -171,6 +184,29 @@ async function testDispatchArticleCallsArticleRunnerWithCorrectShape() {
   assert.deepEqual(call.context, {});
   assert.equal(call.migrationRecord.id, "record-1");
   assert.equal(result.ok, true);
+}
+
+async function testDispatchRouteCallsRouteRunnerWithCorrectShape() {
+  const { runner: route, calls } = createFakeRouteRunner({ ok: true, routeId: "route-1", status: "LINKED", recordId: "record-1" });
+  const result = await dispatchCommitRunner(
+    baseInput({
+      executionCandidate: executionCandidateFixture({
+        planItem: planItemFixture({ sourceRecordKey: "wordpress-db:routes:701", targetType: "ROUTE" }),
+        candidate: { title: "Family Route" },
+      }),
+      resolvedContext: { cityId: "city-1" },
+      runners: { route },
+    }),
+  );
+
+  assert.equal(calls.length, 1);
+  const call = calls[0];
+  assert.equal(call.operation.targetType, "ROUTE");
+  assert.equal(call.operation.action, "CREATE");
+  assert.deepEqual(call.candidate, { title: "Family Route" });
+  assert.deepEqual(call.context, { cityId: "city-1" });
+  assert.equal(call.record.id, "record-1");
+  assert.deepEqual(result, { ok: true, targetType: "ROUTE", targetId: "route-1", lineageId: undefined, status: "LINKED" });
 }
 
 async function testSuccessResultNormalizedToTargetId() {
@@ -268,6 +304,7 @@ async function main() {
   await testDispatchPlaceCallsPlaceRunnerWithCorrectShape();
   await testDispatchActivityCallsEventRunnerWithCorrectShape();
   await testDispatchArticleCallsArticleRunnerWithCorrectShape();
+  await testDispatchRouteCallsRouteRunnerWithCorrectShape();
   await testSuccessResultNormalizedToTargetId();
   await testFailureResultNormalizedFromErrorObjectRunner();
   await testFailureResultNormalizedFromArticleStringResult();

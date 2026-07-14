@@ -8,10 +8,13 @@ import { resolveEventCommitContextWithMatching } from "../context/resolveEventCo
 import { dispatchCommitRunner } from "../dispatch/dispatchCommitRunner";
 import type {
   ArticleCommitRunnerLike,
+  DispatchCommitRunnerInput,
   EventCommitRunnerLike,
   PlaceCommitRunnerLike,
+  RouteCommitRunnerLike,
 } from "../dispatch/dispatchCommitRunner";
 import type { MigrationWarning } from "../../types";
+import type { NormalizedEventCandidate } from "../event/types";
 
 /**
  * The narrowest slice of `MigrationRunWriter` this harness needs — one
@@ -52,6 +55,7 @@ export interface RunCommitExecutionPlanInput {
     place?: PlaceCommitRunnerLike;
     event?: EventCommitRunnerLike;
     article?: ArticleCommitRunnerLike;
+    route?: RouteCommitRunnerLike;
   };
 }
 
@@ -208,7 +212,7 @@ export async function runCommitExecutionPlan(
       continue;
     }
 
-    let resolvedContext = contextResult.context as unknown;
+    let resolvedContext: DispatchCommitRunnerInput["resolvedContext"] = contextResult.context;
     if (contextResult.ok && contextResult.targetType === "ACTIVITY") {
       const canMatch =
         Boolean(prisma.city) &&
@@ -220,7 +224,7 @@ export async function runCommitExecutionPlan(
         const match = await resolveEventCommitContextWithMatching({
           sourceRecordKey,
           baseContext: contextResult.context,
-          candidate: executionCandidate.candidate as any,
+          candidate: executionCandidate.candidate as NormalizedEventCandidate,
           prisma: {
             city: prisma.city!,
             eventCategory: prisma.eventCategory!,
@@ -244,7 +248,7 @@ export async function runCommitExecutionPlan(
 
     const dispatchResult = await dispatchCommitRunner({
       executionCandidate,
-      resolvedContext: resolvedContext as any,
+      resolvedContext,
       migrationRecord,
       runners,
     });
