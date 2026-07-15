@@ -250,9 +250,10 @@ runner'а не покрыта тестами. Требует отдельной 
       отсутствуют). `PlaceScalarLinker` (неподключённый dead code) не
       тронут функционально — задокументирован как известное расхождение
       для будущего подключения.
-- [ ] **PR — targeted Place commits (D)** (2026-07-15, ветка
-      `feat/migration-place-targeted-update-safety`, **PR открыт, merge ещё
-      не выполнен**) — `--source-record-key wordpress-db:places:{id}`
+- [x] **PR — targeted Place commits (D)** (2026-07-15, ветка
+      `feat/migration-place-targeted-update-safety`, **PR #44 смержен в dev
+      merge-коммитом `dda93869`, post-merge Docker Build & Push SUCCESS**) —
+      `--source-record-key wordpress-db:places:{id}`
       теперь принимается для `--entity place` в commit/preview CLI, с
       собственным строго-положительным-integer regex (строже, чем у
       route/event/article), targeted `getPublishedPlaceById()` в
@@ -279,9 +280,7 @@ runner'а не покрыта тестами. Требует отдельной 
       на CREATE (инжектируемые часы, общий для Route/Article/Event/Place),
       `PlaceCommitRunner` — на UPDATE_SAFE. **Ноль DB writes в этом PR** —
       всё на уровне тестов/классификации; реальный targeted commit
-      (`--confirm-writes`) не запускался. *(Отмечается `[x]` отдельным
-      прямым коммитом в `dev` только после фактического merge, как Phone
-      E.164.)*
+      (`--confirm-writes`) не запускался.
 - [ ] PR — opening-hours fix (B).
 - [ ] PR — media fix (C).
 - [ ] Новые golden samples (после B+C).
@@ -1103,3 +1102,13 @@ dispatcher-branch, ни CLI-flag).
   места 437 (сама по себе, после этого PR), full batch. Следующий шаг:
   PR B — opening hours, затем PR C — Place media; golden samples и
   reconciliation места 437 — только после обоих.
+- **2026-07-15 — Claude Code** — PR #44 (targeted Place commits + UPDATE
+  safety, PR D) смержен в `dev` обычным merge-коммитом `dda93869` (CI
+  typecheck PASS, 0 unresolved review threads,
+  `mergeStateStatus=CLEAN`/`mergeable=MERGEABLE`, head SHA не менялся с
+  момента push). Post-merge `Docker Build & Push` — SUCCESS (run
+  29399515526, 10m38s). Локальный `dev` fast-forward на `origin/dev`. Пункт
+  «PR — targeted Place commits (D)» в §1 Places этим же прямым
+  докс-коммитом отмечен `[x]` (паттерн `87bd43f9`/`b66b27dd`). DB writes за
+  весь PR — ноль, место 437 не трогалось. Следующий шаг: PR B — opening
+  hours.
