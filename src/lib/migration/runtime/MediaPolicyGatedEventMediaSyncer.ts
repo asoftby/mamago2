@@ -12,25 +12,45 @@ function warning(
 }
 
 /**
- * Gates an `EventMediaSyncer` behind the run's `MediaPolicy`, without
- * touching `EventMediaSyncer` itself:
+ * Either a fixed policy for the whole run (unchanged behavior) or a
+ * per-record resolver — used to plug in `resolveSampledMediaPolicy()` so
+ * LOCAL/DEV can give FULL to a small allowlisted sample while everything
+ * else gets METADATA, without this class needing to know anything about
+ * sampling itself.
+ */
+export type EventMediaPolicyResolver =
+  | MediaPolicy
+  | ((sourceRecordKey: string) => { policy: MediaPolicy; reason?: string });
+
+/**
+ * Gates an `EventMediaSyncer` behind the run's `MediaPolicy` (or a
+ * per-record resolver), without touching `EventMediaSyncer` itself:
  * - FULL: delegates straight through — identical to today's behaviour.
  * - METADATA: reports what media evidence was present, but never calls the
- *   inner syncer, so no download/upload/link happens.
+ *   inner syncer, so no download/upload/link happens. If the resolver
+ *   attached a `reason` (e.g. `SKIPPED_BY_MEDIA_SAMPLE_POLICY`), that's
+ *   surfaced as an additional INFO-severity note — never as an error or a
+ *   stronger warning than the existing METADATA evidence notes.
  * - NONE: skips entirely, no evidence reported, no inner call.
  */
 export class MediaPolicyGatedEventMediaSyncer implements EventMediaSyncerLike {
   constructor(
     private readonly deps: {
       inner: EventMediaSyncerLike;
-      mediaPolicy: MediaPolicy;
+      mediaPolicy: EventMediaPolicyResolver;
     },
   ) {}
+
+  private resolve(sourceRecordKey: string): { policy: MediaPolicy; reason?: string } {
+    return typeof this.deps.mediaPolicy === "function"
+      ? this.deps.mediaPolicy(sourceRecordKey)
+      : { policy: this.deps.mediaPolicy };
+  }
 
   async sync(
     input: Parameters<EventMediaSyncerLike["sync"]>[0],
   ): Promise<{ warnings: MigrationWarning[] }> {
-    const { mediaPolicy } = this.deps;
+    const { policy: mediaPolicy, reason } = this.resolve(input.sourceRecordKey);
 
     if (mediaPolicy.name === "NONE") {
       return { warnings: [] };
@@ -58,6 +78,16 @@ export class MediaPolicyGatedEventMediaSyncer implements EventMediaSyncerLike {
             "EVENT_MEDIA_POLICY_METADATA_GALLERY_SKIPPED",
             "Gallery attachment evidence found but not imported (media policy METADATA).",
             { attachmentIds: media.galleryAttachmentIds },
+          ),
+        );
+      }
+
+      if (reason) {
+        warnings.push(
+          warning(
+            input.sourceRecordKey,
+            reason,
+            "Media not imported — this source record is outside the local/dev sample allowlist, not an error.",
           ),
         );
       }

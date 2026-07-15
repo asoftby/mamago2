@@ -373,6 +373,114 @@ runner'а не покрыта тестами. Требует отдельной 
       SELECT — source JSON, parser result и draft shape задокументированы
       выше и в PR body. **Ноль DB writes в этом PR** — ни targeted
       commit, ни `--confirm-writes`, ни golden import не запускались.
+- [ ] **PR — sampled media policy для local/dev** (2026-07-15, ветка
+      `feat/migration-sampled-media-policy`, **PR открыт, merge ещё не
+      выполнен**) — не Place-специфичный PR (затрагивает Event/Place/Offer
+      media policy layer в целом), но входит в Place readiness sequence
+      как отдельный шаг перед PR C.
+
+      **Зафиксированная политика:**
+      - LOCAL/DEV: FULL media только для 9 golden sourceRecordKey (3
+        Event + 3 Place + 3 Offer), остальные записи этих типов —
+        METADATA_ONLY.
+      - PRODUCTION: FULL для всех eligible Event/Place/Offer, allowlist
+        не ограничивает production.
+      - Past Event полностью исключены до media resolver (уже было верно
+        в коде — `shouldExcludePastEvent()` в discover/normalize; не
+        менялось).
+      - Article/Profile/Route media policy не менялась.
+
+      **Девять golden sourceRecordKey** (read-only отобраны 2026-07-15
+      прямым SELECT против live WP, `--allow-remote-readonly`,
+      подтверждены реальные attachment id):
+      - Events: `wordpress-db:events:42041` (cover only, «Музыкальный
+        спектакль «Приключения бременских музыкантов»»),
+        `wordpress-db:events:62097` (cover+gallery, единственное событие
+        с >1 media asset, «Мюзикл «Девчата»»),
+        `wordpress-db:events:60404` (cover only, но многонедельный
+        лагерный формат — структурная, не media-count, аномалия,
+        «Летняя ... программа 2026 «Актив Полис»»).
+      - Places: `wordpress-db:places:5389` (cover+gallery(14)+logo,
+        «Family Сlub»), `wordpress-db:places:895` (gallery(10) без cover
+        — edge case, «Пуговка» на Восточной 137), `wordpress-db:places:43023`
+        (cover+logo+gallery(11), самая сложная реальная форма, «Атмосфера»).
+      - Offers: `wordpress-db:hb-programs:15941` (cover+gallery, «Аква-квест
+        в День Рождения»), `wordpress-db:hb-programs:16403` (gallery only,
+        «Игровая комната»), `wordpress-db:hb-programs:16458` (gallery
+        only, «Семейное кафе «Три Пингвина»»). **Честная находка**: из
+        всех 91 published Offer только эти 3 одновременно имеют И
+        реальные media evidence, И однозначную Place-relation — и все 3
+        относятся к одному и тому же Place (8901, «Penguin»). Это
+        реальная форма source-данных, не артефакт выбора.
+
+      **Найдены и исправлены устаревшие утверждения:**
+      - "Event media всегда NONE" — было ложью относительно РЕАЛЬНОГО
+        кода (`MediaPolicyGatedEventMediaSyncer` уже следовал
+        `profile.mediaPolicy`, включая FULL), но верным относительно
+        `evaluateMediaScope()`/`APPROVED_MEDIA_SCOPES` — неподключённый
+        (0 вызывающих мест вне своего теста) validator, который жёстко
+        блокировал scope `EVENT_BLOCKED`. Исправлено: `EVENT_BLOCKED` →
+        `EVENT`, добавлен в `APPROVED_MEDIA_SCOPES`. Ноль runtime-эффекта
+        (validator и раньше ни на что не влиял), но больше не вводит в
+        заблуждение будущего агента/человека.
+      - Матрица §1.5 "Event/Past Event = NONE во всех профилях" —
+        исправлена на две отдельные строки (Event = ready+sampled,
+        Past Event = EXCLUDED) — см. таблицу выше.
+      - "dev всегда METADATA без исключений" — теперь неверно для 9
+        sampled keys по дизайну; зафиксировано намеренно, не баг.
+      - "local всегда FULL" — теперь неверно для НЕ-sampled Event/Place/
+        Offer записей в local; зафиксировано намеренно.
+
+      **Архитектура:** новый чистый resolver
+      `resolveSampledMediaPolicy()`
+      (`src/lib/migration/runtime/sampledMediaPolicy.ts`) — вход
+      `{environment, sourceRecordKey, fullMediaSourceRecordKeys?}`, выход
+      `{policy, reason?}`. PROD — всегда FULL безусловно. LOCAL/DEV — FULL
+      только при точном совпадении `sourceRecordKey` с allowlist; пустой
+      или невалидный (не массив непустых строк) allowlist — fail closed в
+      METADATA, никогда не в FULL. Неизвестный/некорректный environment —
+      тоже fail closed в METADATA. Никакой случайной выборки, `LIMIT 3`,
+      "первых трёх записей", target id или `NODE_ENV`-ветвления — только
+      явный stable allowlist по `sourceRecordKey` (entity уже виден из
+      префикса ключа, отдельный entity-параметр не нужен).
+      Подключено в `MediaPolicyGatedEventMediaSyncer` (единственный
+      реально подключённый в CLI media syncer сегодня — Place/Offer
+      media syncers ещё не существуют, см. Scope guard) через новый
+      per-record resolver параметр (backward-compatible union-тип,
+      `MediaPolicy | ((sourceRecordKey) => {policy, reason?})` — старые
+      статический-policy вызовы не меняются). Sampling активируется в CLI
+      (`shouldSampleMedia()`, чистая функция) только когда
+      `--media-policy` НЕ передан явно оператором — явный флаг остаётся
+      сильным сигналом и полностью отключает sampling (обратная
+      совместимость с уже существующим use case явного override).
+      METADATA-результат из-за sampling получает дополнительный
+      INFO-severity warning `SKIPPED_BY_MEDIA_SAMPLE_POLICY` (не error, не
+      WARNING-severity) — отличим от «run-wide METADATA» причины.
+
+      **Побочные находки, вынесены в отдельные background-задачи, НЕ
+      исправлены в этом PR** (см. Scope guard):
+      1. `getOfferPlaceRelations()`/`getPublishedOffers()` полностью
+         ломаются при живом SSH-запросе — SQL использует backtick-quoted
+         `` `order` ``, но remote script оборачивает запрос в
+         double-quoted bash-строку, где backticks трактуются как command
+         substitution, не как часть SQL. 100%-й отказ, никогда не пойман
+         юнит-тестами (те используют fake executor). Обнаружено при live
+         read-only проверке Offer-кандидатов в этом PR.
+      2. `normalizePlace.ts` никогда не извлекал Place cover/gallery
+         корректно: cover читается из несуществующего `_thumbnail_id`
+         (реальный meta_key — `cover`), gallery читается как массив
+         отдельных значений, но реально хранится как ОДНА
+         comma-separated строка в одном meta-row. Итог: `media.
+         thumbnailAttachmentId`/`galleryAttachmentIds` всегда `null`/`[]`
+         для всех 82 Place, даже когда реальные изображения есть.
+         Существующие фикстуры `normalizePlace.test.ts` использовали
+         синтетическую (неверную) форму данных и никогда не ловили это.
+         Прямо блокирует PR C (Place media) — нужно исправить ДО
+         PlaceMediaSyncer.
+
+      **Ноль DB writes / media downloads в этом PR** — только
+      конфигурация/резолвер/тесты, никакой реальный targeted commit или
+      golden import не запускался.
 - [ ] PR — media fix (C).
 - [ ] Новые golden samples (после B+C).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
@@ -718,7 +826,8 @@ dispatcher-branch, ни CLI-flag).
 | Article | pending | FULL | METADATA | Нужен ArticleMediaSyncer + remap inline `wp-content/uploads`. |
 | Offer | pending | FULL | METADATA | Вместе с Offer adapter/runner. |
 | Route | ready | FULL | METADATA | `RouteStopMediaSyncer`, сейчас один `photoUrl` на стоп. |
-| Event / Past Event | NONE | NONE | NONE | Past Event импортируется без media до отдельного product decision. |
+| Event | ready | FULL (**sampled**, 3 golden keys) | METADATA (**sampled**, те же 3 golden keys → FULL) | `EventMediaSyncer`/`MediaPolicyGatedEventMediaSyncer`. **Исправлено 2026-07-15** (sampled media policy PR): предыдущая строка "Event/Past Event = NONE во всех профилях" была устаревшей и никогда не отражала реальный код — `MediaPolicyGatedEventMediaSyncer` уже следовал `profile.mediaPolicy` (FULL и в LOCAL, и в PROD) задолго до этой правки. Реальная политика: local/dev — FULL только для 3 sourceRecordKey из sampled allowlist (см. §1 Places-adjacent «Sampled media policy» ниже), production — FULL для всех eligible Event без ограничения allowlist. |
+| Past Event | EXCLUDED | EXCLUDED | EXCLUDED | Past Event полностью исключены из v1 (§0.6) — ни контент, ни media; исключение происходит в discover/normalize (`shouldExcludePastEvent`), до какого-либо media resolver. |
 
 ---
 
@@ -1248,3 +1357,36 @@ dispatcher-branch, ни CLI-flag).
   оставшийся Place P0-блокер — (C) media**; golden samples и
   reconciliation места 437 не начаты, ждут закрытия (C). Offers остаётся
   `BLOCKED_FOR_COMMIT`. Следующий шаг: PR C — Place media.
+- **2026-07-15 — Claude Code** — **PR: sampled media policy для
+  local/dev** (ветка `feat/migration-sampled-media-policy`, из
+  `origin/dev` `2c0d69d6`, baseline подтверждён: `dev = origin/dev`,
+  clean tree, open PR = 0, CI #197 и Docker Build & Push #198 SUCCESS).
+  Аудит существующей архитектуры (`MigrationProfile`/`MediaPolicy`/
+  `MediaPolicyGated*Syncer`/context-config/CLI `--profile`/
+  `--media-policy`) показал: политика сегодня — ОДНА `MediaPolicy` на
+  весь run (LOCAL/PROD по умолчанию FULL, DEV по умолчанию METADATA),
+  без per-record различия; ни один Place/Offer media syncer не подключён
+  в CLI вообще (`PlaceMediaLinker` существует, но не вызывается ниоткуда
+  вне своего теста; `OfferMediaSyncer` не существует). Полная разбивка
+  9 golden sourceRecordKey, policy matrix, найденных устаревших
+  утверждений и двух independent багов (Offer relations SSH-запрос
+  ломается на backtick-quoted `` `order` ``; `normalizePlace.ts` никогда
+  не извлекал Place cover/gallery правильно — оба вынесены в отдельные
+  background-задачи, не исправлены в этом PR) — в §1 Places-adjacent
+  секции выше. Реализация: `resolveSampledMediaPolicy()` (pure resolver),
+  подключён в `MediaPolicyGatedEventMediaSyncer` через backward-compatible
+  resolver-параметр, `shouldSampleMedia()` (pure CLI-активация,
+  уважает явный `--media-policy` override). `EVENT_BLOCKED` → `EVENT` в
+  `MigrationMediaScope`/`APPROVED_MEDIA_SCOPES` (dead-code validator,
+  ноль runtime-эффекта, но был вводящим в заблуждение). Тесты: 28 новых
+  в `sampledMediaPolicy.test.ts`, 4 новых в
+  `MediaPolicyGatedEventMediaSyncer.test.ts`, 5 новых в
+  `migration-commit-wordpress-db.test.ts` (`shouldSampleMedia`),
+  `mediaScopePolicy.test.ts` обновлён под новый scope. Проверки — все
+  green: полный `src/lib/migration/**` + `scripts/migration-*.test.ts`
+  sweep, eslint, `tsc --noEmit`, `git diff --check`. **Ноль DB writes и
+  media downloads** — только policy/resolver/тесты, ни targeted commit,
+  ни golden import не запускались. Незавершённое: PR ещё не смержен.
+  Следующий шаг после merge: PR C — Place media (теперь дополнительно
+  зависит от исправления `normalizePlace.ts` cover/gallery бага,
+  найденного в этом PR).

@@ -46,7 +46,7 @@ export type MigrationMediaScope =
   | "OFFER_SERVICES"
   | "OFFER_PROGRAMS"
   | "ROUTE"
-  | "EVENT_BLOCKED";
+  | "EVENT";
 
 export type MigrationSeverity = "INFO" | "WARNING" | "ERROR" | "BLOCKER";
 

@@ -1,6 +1,5 @@
 export {
   APPROVED_MEDIA_SCOPES,
-  BLOCKED_EVENT_MEDIA_POLICY,
   evaluateMediaScope,
   isApprovedMediaScope,
 } from "./mediaScopePolicy";
