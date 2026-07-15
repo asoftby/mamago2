@@ -39,6 +39,7 @@ import {
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
   fetchPublishedEventEnvelopeBySourceRecordKey,
+  fetchPublishedPlaceEnvelopeBySourceRecordKey,
   fetchPublishedRouteEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
@@ -302,12 +303,14 @@ async function main(): Promise<void> {
   if (sourceRecordKey) {
     if (entity === "article") {
       records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+    } else if (entity === "place") {
+      records = [await fetchPublishedPlaceEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
     } else if (entity === "event") {
       records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
     } else if (entity === "route") {
       records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
     } else {
-      throw new Error("--source-record-key is only supported with --entity article|event|route for golden-sample runs.");
+      throw new Error("--source-record-key is only supported with --entity article|place|event|route for golden-sample runs.");
     }
   }
 

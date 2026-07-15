@@ -320,6 +320,31 @@ function testBuildExecutionPlanInputPinsSingleRecordLimit() {
   assert.equal(input.records?.[0].sourceRecordKey, "wordpress-db:post:201");
 }
 
+/** A targeted Place run must pin `limit: 1` and carry exactly the one requested record — never the other 81 published Places. */
+function testBuildExecutionPlanInputPinsSingleRecordLimitForPlace() {
+  const ledger = createFakeLedger();
+  const executor = async () => [];
+
+  const input = buildExecutionPlanInput({
+    entity: "place",
+    limit: 82,
+    sourceRecordKey: "wordpress-db:places:437",
+    records: [
+      {
+        sourceEntityType: "wordpress-db:places",
+        sourceStableKey: "wordpress-db:places:437",
+        sourceRecordKey: "wordpress-db:places:437",
+      },
+    ],
+    executor,
+    ledger,
+  });
+
+  assert.equal(input.filters?.limit, 1);
+  assert.equal(input.records?.length, 1);
+  assert.equal(input.records?.[0].sourceRecordKey, "wordpress-db:places:437");
+}
+
 function main() {
   testParsesValidFlags();
   testDefaultsWhenOptionalFlagsOmitted();
@@ -349,6 +374,7 @@ function main() {
   testBuildExecutionPlanInputMapsEntityToEntityTypes();
   testBuildExecutionPlanInputPassesLimitThrough();
   testBuildExecutionPlanInputPinsSingleRecordLimit();
+  testBuildExecutionPlanInputPinsSingleRecordLimitForPlace();
 }
 
 // No real DB/SSH anywhere in this file — only `parseArgs()`/

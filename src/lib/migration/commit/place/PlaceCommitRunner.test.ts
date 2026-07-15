@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { MigrationLineage, MigrationRecord } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord, Place } from "@prisma/client";
 
 import { PlaceCommitRunner } from "./PlaceCommitRunner";
 import type {
@@ -8,6 +8,7 @@ import type {
   MigrationLineageWriterLike,
   PlaceCommitOrchestratorLike,
   PlaceCommitRunnerPrismaClient,
+  PlaceUpdateConflictReason,
 } from "./PlaceCommitRunner";
 import type { ExecutePlaceCommitResult } from "./PlaceCommitOrchestrator";
 import type { CreateLineageResult } from "../../lineage/types";
@@ -87,6 +88,43 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
   };
 }
 
+const DEFAULT_LAST_IMPORTED_AT = new Date("2026-01-01T00:00:00.000Z");
+
+function lineageFixture(overrides: Partial<MigrationLineage> = {}): MigrationLineage {
+  return {
+    id: "lineage-1",
+    sourceId: "source-1",
+    recordId: "record-1",
+    runId: "run-1",
+    sourceEntityType: "wordpress-db:places",
+    sourceExternalId: null,
+    sourceStableKey: "wordpress-db:places:301",
+    sourceRecordKey: "wordpress-db:places:301",
+    targetType: "PLACE",
+    targetId: "place-1",
+    targetRole: "primary",
+    targetNaturalKey: null,
+    lastSourceHash: "hash-a",
+    lastPlanAction: null,
+    isActive: true,
+    firstSeenAt: DEFAULT_LAST_IMPORTED_AT,
+    lastSeenAt: null,
+    lastImportedAt: DEFAULT_LAST_IMPORTED_AT,
+    createdAt: DEFAULT_LAST_IMPORTED_AT,
+    updatedAt: DEFAULT_LAST_IMPORTED_AT,
+    ...overrides,
+  } as unknown as MigrationLineage;
+}
+
+/** Minimal — only `id`/`updatedAt` are ever read by the runner. */
+function placeFixture(overrides: Partial<Place> = {}): Place {
+  return {
+    id: "place-1",
+    updatedAt: DEFAULT_LAST_IMPORTED_AT,
+    ...overrides,
+  } as unknown as Place;
+}
+
 function contextFixture(overrides: Partial<PlaceCommitContext> = {}): PlaceCommitContext {
   return {
     createdByUserId: "user-1",
@@ -138,12 +176,23 @@ function createFakeLineageWriter(options: { result?: CreateLineageResult; throwE
   return { writer, calls };
 }
 
-function createFakePrisma(options: { throwError?: Error; existingLineage?: MigrationLineage | null } = {}) {
+function createFakePrisma(
+  options: {
+    throwError?: Error;
+    /** `undefined` (the default) means "not configured" — used only by UPDATE tests, which always pass this explicitly. */
+    existingLineage?: MigrationLineage | null;
+    targetPlace?: Place | null;
+  } = {},
+) {
   const calls: unknown[] = [];
+  const recordUpdateCalls: unknown[] = [];
+  const lineageUpdateCalls: unknown[] = [];
+  const placeFindUniqueCalls: unknown[] = [];
   const prisma: PlaceCommitRunnerPrismaClient = {
     migrationRecord: {
       update: (async (args: unknown) => {
         calls.push(args);
+        recordUpdateCalls.push(args);
         if (options.throwError) {
           throw options.throwError;
         }
@@ -154,17 +203,20 @@ function createFakePrisma(options: { throwError?: Error; existingLineage?: Migra
       findFirst: (async () => options.existingLineage ?? null) as unknown as PlaceCommitRunnerPrismaClient["migrationLineage"]["findFirst"],
       update: (async (args: unknown) => {
         calls.push(args);
-        const existing = options.existingLineage ?? {
-          id: "lineage-1",
-          sourceRecordKey: "wordpress-db:places:301",
-          targetType: "PLACE",
-          targetId: "place-1",
-        };
-        return existing as unknown as MigrationLineage;
+        lineageUpdateCalls.push(args);
+        const existing = options.existingLineage ?? lineageFixture();
+        const data = (args as { data: Record<string, unknown> }).data;
+        return { ...existing, ...data } as unknown as MigrationLineage;
       }) as unknown as PlaceCommitRunnerPrismaClient["migrationLineage"]["update"],
     },
+    place: {
+      findUnique: (async (args: unknown) => {
+        placeFindUniqueCalls.push(args);
+        return options.targetPlace === undefined ? placeFixture() : options.targetPlace;
+      }) as unknown as PlaceCommitRunnerPrismaClient["place"]["findUnique"],
+    },
   };
-  return { prisma, calls };
+  return { prisma, calls, recordUpdateCalls, lineageUpdateCalls, placeFindUniqueCalls };
 }
 
 async function testHappyPath() {
@@ -302,6 +354,221 @@ async function testPlanSummaryAndNormalizedPayloadNeverTouched() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// UPDATE safety — UPDATE_SAFE vs UPDATE_CONFLICT classification.
+// ---------------------------------------------------------------------------
+
+function updateOperationFixture(overrides: Partial<CommitOperation> = {}): CommitOperation {
+  return operationFixture({ action: "UPDATE", ...overrides });
+}
+
+async function testUpdateSafeCallsWriterAndAdvancesLastImportedAt() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const fixedNow = new Date("2026-07-15T00:00:00.000Z");
+  const { prisma, recordUpdateCalls, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture(),
+    targetPlace: placeFixture(),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, now: () => fixedNow });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "LINKED");
+  assert.equal(result.placeId, "place-1");
+  assert.equal(orchestratorCalls.length, 1);
+  assert.equal((orchestratorCalls[0] as { targetPlaceId?: string }).targetPlaceId, "place-1");
+
+  assert.equal(lineageUpdateCalls.length, 1);
+  const lineageCall = lineageUpdateCalls[0] as { data: Record<string, unknown> };
+  assert.equal(lineageCall.data.lastImportedAt, fixedNow, "a successful UPDATE must advance lastImportedAt");
+
+  assert.equal(recordUpdateCalls.length, 1);
+  assert.equal((recordUpdateCalls[0] as { data: Record<string, unknown> }).data.status, "LINKED");
+}
+
+async function testUpdateConflictLineageMissingNeverCallsWriter() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls, lineageUpdateCalls, placeFindUniqueCalls } = createFakePrisma({
+    existingLineage: null,
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.reasonCode, "PLACE_UPDATE_CONFLICT");
+  assert.equal(result.conflictReason, "LINEAGE_MISSING" satisfies PlaceUpdateConflictReason);
+
+  assert.equal(orchestratorCalls.length, 0, "writer must never be reached for a conflicted UPDATE");
+  assert.equal(placeFindUniqueCalls.length, 0, "no lineage means there is no targetId to look up a Place by");
+  assert.equal(lineageUpdateCalls.length, 0, "lineage must never be touched for a conflicted UPDATE");
+
+  assert.equal(recordUpdateCalls.length, 1);
+  const recordCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  assert.equal(recordCall.data.status, "QUARANTINED", "a conflict is not an error — QUARANTINED, not FAILED");
+  assert.equal(recordCall.data.lastErrorCode, "PLACE_UPDATE_CONFLICT");
+}
+
+async function testUpdateConflictLineageMismatchNeverTrustsUnfilteredFake() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  // Simulates a lineage row that doesn't actually belong to this record —
+  // proves the runner verifies the returned row's own key fields rather
+  // than blindly trusting that findFirst's WHERE clause filtered correctly.
+  const { prisma, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture({ sourceRecordKey: "wordpress-db:places:999" }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.conflictReason, "LINEAGE_MISMATCH" satisfies PlaceUpdateConflictReason);
+  assert.equal(orchestratorCalls.length, 0);
+  assert.equal(lineageUpdateCalls.length, 0);
+}
+
+async function testUpdateConflictTargetIdMissing() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, placeFindUniqueCalls, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture({ targetId: "" }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.conflictReason, "TARGET_ID_MISSING" satisfies PlaceUpdateConflictReason);
+  assert.equal(orchestratorCalls.length, 0);
+  assert.equal(placeFindUniqueCalls.length, 0, "no targetId means there is nothing to look up");
+  assert.equal(lineageUpdateCalls.length, 0);
+}
+
+/** "missing target for existing lineage" — lineage claims a targetId, but the Place row itself is gone. */
+async function testUpdateConflictTargetRowMissing() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture(),
+    targetPlace: null,
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.conflictReason, "TARGET_ROW_MISSING" satisfies PlaceUpdateConflictReason);
+  assert.equal(orchestratorCalls.length, 0);
+  assert.equal(lineageUpdateCalls.length, 0);
+}
+
+/**
+ * The exact real-world shape of Place 437: an active lineage with a real
+ * targetId, but `lastImportedAt=null` — this is the regression test for
+ * "Place 437 must classify as UPDATE_CONFLICT, never auto-updated."
+ */
+async function testUpdateConflictLastImportedAtNullMatchesPlace437() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-437" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture({ targetId: "place-437", lastImportedAt: null }),
+    targetPlace: placeFixture({ id: "place-437" }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(
+    inputFixture({
+      operation: updateOperationFixture(),
+      record: recordFixture({ sourceHash: "hash-current" }),
+    }),
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.conflictReason, "LAST_IMPORTED_AT_UNKNOWN" satisfies PlaceUpdateConflictReason);
+  assert.equal(result.conflictDetails?.targetId, "place-437");
+  assert.equal(orchestratorCalls.length, 0, "Place 437 must never be auto-updated");
+  assert.equal(lineageUpdateCalls.length, 0);
+  assert.equal((recordUpdateCalls[0] as { data: Record<string, unknown> }).data.status, "QUARANTINED");
+}
+
+async function testUpdateConflictTargetModifiedAfterImport() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const importedAt = new Date("2026-07-07T17:07:59.179Z");
+  const manuallyEditedAt = new Date("2026-07-07T20:34:25.053Z"); // after importedAt — a manual edit
+  const { prisma, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture({ lastImportedAt: importedAt }),
+    targetPlace: placeFixture({ updatedAt: manuallyEditedAt }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.conflictReason, "TARGET_MODIFIED_AFTER_IMPORT" satisfies PlaceUpdateConflictReason);
+  assert.equal(orchestratorCalls.length, 0);
+  assert.equal(lineageUpdateCalls.length, 0);
+}
+
+async function testUpdateSafeWhenTargetUpdatedAtExactlyEqualsLastImportedAt() {
+  // Strict `>` comparison, not `>=` — equal timestamps (the common case
+  // right after a CREATE, before any manual edit) must classify as safe,
+  // not conflict.
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const t0 = new Date("2026-01-01T00:00:00.000Z");
+  const { prisma } = createFakePrisma({
+    existingLineage: lineageFixture({ lastImportedAt: t0 }),
+    targetPlace: placeFixture({ updatedAt: t0 }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+  assert.equal(result.ok, true);
+}
+
+async function testUpdateWriterFailureNotMarkedSuccessAndLeavesLineageUntouched() {
+  const { orchestrator } = createFakeOrchestrator({
+    ok: false,
+    reasonCode: "PLACE_CREATE_FAILED",
+    error: new Error("db unavailable"),
+  });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture(),
+    targetPlace: placeFixture(),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "FAILED");
+  assert.equal(lineageUpdateCalls.length, 0, "a failed writer call must never advance lineage");
+  assert.equal((recordUpdateCalls[0] as { data: Record<string, unknown> }).data.status, "FAILED");
+}
+
+async function testRealTargetIdFlowsEndToEndOnSafeUpdate() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "real-place-cuid-abc123" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma } = createFakePrisma({
+    existingLineage: lineageFixture({ targetId: "real-place-cuid-abc123" }),
+    targetPlace: placeFixture({ id: "real-place-cuid-abc123" }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, true);
+  assert.equal(result.placeId, "real-place-cuid-abc123", "the real targetId must flow through end-to-end, never a placeholder");
+}
+
 async function main() {
   await testHappyPath();
   await testOrchestratorBlockedMarksRecordFailedAndSkipsLineage();
@@ -311,6 +578,17 @@ async function main() {
   await testSourceHashPassedUnchangedToLineageWriter();
   await testPlaceIdNeverWrittenToMigrationRecord();
   await testPlanSummaryAndNormalizedPayloadNeverTouched();
+
+  await testUpdateSafeCallsWriterAndAdvancesLastImportedAt();
+  await testUpdateConflictLineageMissingNeverCallsWriter();
+  await testUpdateConflictLineageMismatchNeverTrustsUnfilteredFake();
+  await testUpdateConflictTargetIdMissing();
+  await testUpdateConflictTargetRowMissing();
+  await testUpdateConflictLastImportedAtNullMatchesPlace437();
+  await testUpdateConflictTargetModifiedAfterImport();
+  await testUpdateSafeWhenTargetUpdatedAtExactlyEqualsLastImportedAt();
+  await testUpdateWriterFailureNotMarkedSuccessAndLeavesLineageUntouched();
+  await testRealTargetIdFlowsEndToEndOnSafeUpdate();
 }
 
 main()

@@ -293,7 +293,10 @@ function createFakeExecutor() {
         if (byId) return (Number(postId) === articlePost.ID ? articlePost : []) as never;
         return articlePost as never;
       }
-      if (postType === "places") return placePost as never;
+      if (postType === "places") {
+        if (byId) return (Number(postId) === placePost.ID ? placePost : []) as never;
+        return placePost as never;
+      }
       if (postType === "events") {
         if (byId) return (Number(postId) === eventPost.ID ? eventPost : []) as never;
         return eventPost as never;
@@ -499,6 +502,35 @@ async function testPublishedRouteById() {
   const postsCall = calls.find((call) => call.sql.includes("ID = ?") && call.params[0] === "routes");
   assert.ok(postsCall);
   assert.deepEqual(postsCall!.params, ["routes", "publish", 501]);
+}
+
+async function testPublishedPlaceById() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedPlaceById(301);
+
+  assert.ok(bundle);
+  assert.deepEqual(bundle!.post, placePost);
+  assert.deepEqual(bundle!.placeIndex, placeIndexRows[0]);
+
+  const postsCall = calls.find((call) => call.sql.includes("ID = ?") && call.params[0] === "places");
+  assert.ok(postsCall);
+  assert.deepEqual(postsCall!.params, ["places", "publish", 301]);
+
+  // Targeted lookup must never touch the bulk 82-row query path.
+  const bulkCall = calls.find(
+    (call) => call.sql.includes("post_type = ?") && !call.sql.includes("ID = ?") && call.params[0] === "places",
+  );
+  assert.ok(!bulkCall, "getPublishedPlaceById must not also run the bulk getPublishedPlaces query");
+}
+
+async function testPublishedPlaceByIdReturnsNullWhenNotFound() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(wrapSingleRowAsArray(executor));
+
+  const bundle = await repo.getPublishedPlaceById(9999);
+  assert.equal(bundle, null);
 }
 
 async function testMissingPlaceIndexDoesNotFailBundle() {
@@ -767,6 +799,8 @@ async function main() {
   await testArticleBundle();
   await testPublishedArticleById();
   await testPlaceBundle();
+  await testPublishedPlaceById();
+  await testPublishedPlaceByIdReturnsNullWhenNotFound();
   await testEventBundle();
   await testPublishedEventById();
   await testRouteBundle();

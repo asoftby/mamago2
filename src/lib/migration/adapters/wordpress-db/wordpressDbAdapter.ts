@@ -233,6 +233,36 @@ export async function fetchPublishedArticleEnvelopeBySourceRecordKey(
 }
 
 /**
+ * Fetches a single published WP place by its Phoenix `sourceRecordKey`
+ * (`wordpress-db:places:{id}`). Used by commit/preview CLIs for targeted
+ * single-record runs that must not discover more than one of the 82
+ * published Places. Requires a strictly positive integer id — `0` and
+ * leading zeros are rejected, not just non-numeric input (route/event/
+ * article's equivalents predate this requirement and stay looser; Place's
+ * regex is intentionally stricter per the targeted-commit safety review).
+ */
+export async function fetchPublishedPlaceEnvelopeBySourceRecordKey(
+  executor: WordPressQueryExecutor,
+  sourceRecordKey: string,
+): Promise<SourceRecordEnvelope> {
+  const match = /^wordpress-db:places:([1-9]\d*)$/.exec(sourceRecordKey.trim());
+  if (!match) {
+    throw new Error(
+      `Invalid place sourceRecordKey "${sourceRecordKey}". Expected format "wordpress-db:places:{positiveIntegerWpPostId}".`,
+    );
+  }
+  const postId = Number(match[1]);
+  const repository = new WordPressRepository(executor);
+  const bundle = await repository.getPublishedPlaceById(postId);
+  if (!bundle) {
+    throw new Error(
+      `No published WordPress place found for sourceRecordKey "${sourceRecordKey}" (post_type=places, post_status=publish).`,
+    );
+  }
+  return toPlaceEnvelope(bundle);
+}
+
+/**
  * Fetches a single published WP event by its Phoenix `sourceRecordKey`
  * (`wordpress-db:events:{id}`). Used by commit/preview CLIs for golden-sample
  * runs that must not discover more than one record.
