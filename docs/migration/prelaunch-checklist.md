@@ -482,7 +482,7 @@ runner'а не покрыта тестами. Требует отдельной 
       **Ноль DB writes / media downloads в этом PR** — только
       конфигурация/резолвер/тесты, никакой реальный targeted commit или
       golden import не запускался.
-- [ ] **PR C — media fix**, разбит на 2 части:
+- [x] **PR C — media fix**, разбит на 2 части (обе смержены):
   - [x] **PR C1 — Place cover/gallery source fidelity** (2026-07-15, ветка
         `fix/migration-place-media-source`, PR #47, **смержен** —
         merge commit `ee31bd83`, CI + Docker Build & Push SUCCESS на этом
@@ -543,11 +543,12 @@ runner'а не покрыта тестами. Требует отдельной 
         sweep, eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
         **Ноль DB writes и media downloads** — только normalize/preview,
         PlaceMediaSyncer в этом PR не создавался.
-  - [ ] **PR C2 — PlaceMediaSyncer** (2026-07-15, ветка
-        `feat/migration-place-media-syncer`, **PR открыт, merge ещё не
-        выполнен**) — без реальных downloads, без реальных DB writes в
+  - [x] **PR C2 — PlaceMediaSyncer** (2026-07-15, ветка
+        `feat/migration-place-media-syncer`, PR #48, **смержен** —
+        merge commit `ef0b81e7`, CI + Docker Build & Push SUCCESS на этом
+        SHA) — без реальных downloads, без реальных DB writes в
         production/local БД в рамках этого PR (только тесты на fakes);
-        последний Place P0-блокер перед golden samples.
+        последний Place P0-блокер перед golden samples закрыт.
 
         **Архитектурный аудит (до реализации):** у Place НЕТ отдельного
         "cover"-поля в схеме — `PlaceImageKind` только `LOGO | GALLERY`,
@@ -1681,3 +1682,24 @@ dispatcher-branch, ни CLI-flag).
   merge: backup + три новых golden Place, повторный прогон, UI-проверка
   — впервые переходим от разработки к контролируемому записывающему
   этапу.
+- **2026-07-15 — Claude Code** — **PR C2 смержен.** PR #48: review
+  (`chatgpt-codex-connector`, P2) нашёл валидный баг в
+  `mergeWarnings()` — дедуп-ключ `code::message` не учитывал `details`,
+  из-за чего несколько разных attachment'ов с одинаковым
+  code+message (напр. два разных missing attachment, оба
+  `PLACE_MEDIA_SOURCE_MISSING`/"WordPress attachment row was not
+  found.") схлопывались в одну запись, теряя, какие именно attachment
+  ID реально упали/были пропущены, в `MigrationRecord.validationSummary`.
+  Исправлено отдельным коммитом `4fd7fc0c` (не amend): `details`
+  (через `JSON.stringify`) добавлен в дедуп-ключ. Добавлен
+  regression-тест
+  `testWarningsWithSameCodeAndMessageButDifferentDetailsAreNeverCollapsed`.
+  Review thread resolved, все gates green (`mergeStateStatus=CLEAN`,
+  `mergeable=MERGEABLE`, 0 unresolved threads, CI SUCCESS на `4fd7fc0c`)
+  → merge commit `ef0b81e7`. Post-merge CI + Docker Build & Push —
+  SUCCESS на `ef0b81e7`. Local `dev` fast-forwarded. **Оба Place P0-медиа-
+  блокера (PR C1 + PR C2) закрыты.** Следующий шаг — впервые переход от
+  разработки к контролируемому записывающему этапу: backup БД → три
+  новых golden Place → повторный прогон → UI-проверка. Golden imports
+  НЕ запускались в PR C1/C2 — ни одного реального media download или DB
+  write в production/local БД в рамках этой пары PR.
