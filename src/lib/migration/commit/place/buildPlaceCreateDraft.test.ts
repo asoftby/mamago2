@@ -15,6 +15,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     shortDescription: "A great place for kids",
     phone: "+375291234567",
     phoneE164: "+375291234567",
+    openingHours: null,
     email: "hello@example.com",
     workHoursRaw: "Mon-Fri 9-18",
     locationRaw: "Minsk, some street",
@@ -79,6 +80,33 @@ function testUnresolvablePhoneNeverWrittenAsGarbage() {
   if (!result.ok) return;
   // null, never the raw unparseable text.
   assert.equal(result.draft.phone, null);
+}
+
+function testOpeningHoursCarriedThroughVerbatimWhenPresent() {
+  const openingHours: NormalizedPlaceCandidate["openingHours"] = {
+    mode: "WEEKLY",
+    timezone: "Europe/Minsk",
+    rules: [
+      { dayOfWeek: "MON", isOpen: true, allDay: false, intervals: [{ startTime: "09:00", endTime: "18:00" }] },
+    ],
+  };
+  const result = buildPlaceCreateDraft({
+    candidate: candidateFixture({ openingHours }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.draft.openingHours, openingHours);
+}
+
+function testOpeningHoursOmittedFromDraftWhenCandidateHasNone() {
+  const result = buildPlaceCreateDraft({
+    candidate: candidateFixture({ openingHours: null }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(!("openingHours" in result.draft), "must never fabricate a schedule when none exists");
 }
 
 function testMissingCreatedByUserIdBlocks() {
@@ -248,6 +276,8 @@ function testCityIdOnlyFromContextNeverGuessedFromCityRaw() {
 
 function main() {
   testHappyPath();
+  testOpeningHoursCarriedThroughVerbatimWhenPresent();
+  testOpeningHoursOmittedFromDraftWhenCandidateHasNone();
   testDraftPhoneComesFromPhoneE164NotRawPhone();
   testUnresolvablePhoneNeverWrittenAsGarbage();
   testMissingCreatedByUserIdBlocks();

@@ -16,6 +16,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     shortDescription: "A great place for kids",
     phone: null,
     phoneE164: null,
+    openingHours: null,
     email: null,
     workHoursRaw: null,
     locationRaw: null,

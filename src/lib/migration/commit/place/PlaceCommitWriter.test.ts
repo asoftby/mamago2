@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 
-import type { Place } from "@prisma/client";
+import type { OpeningHours, Place } from "@prisma/client";
 
 import { PlaceCommitWriter } from "./PlaceCommitWriter";
 import type { PlaceCommitWriterPrismaClient } from "./PlaceCommitWriter";
 import type { PlaceCreateDraft } from "./types";
+
+function openingHoursDraftFixture(): NonNullable<PlaceCreateDraft["openingHours"]> {
+  return {
+    mode: "WEEKLY",
+    timezone: "Europe/Minsk",
+    rules: [
+      { dayOfWeek: "MON", isOpen: true, allDay: false, intervals: [{ startTime: "09:00", endTime: "18:00" }] },
+    ],
+  };
+}
 
 function draftFixture(overrides: Partial<PlaceCreateDraft> = {}): PlaceCreateDraft {
   return {
@@ -114,21 +124,51 @@ function placeFixture(overrides: Partial<Place> = {}): Place {
   };
 }
 
-function createFakeClient(createdPlace: Place = placeFixture()) {
+function createFakeClient(
+  options: {
+    createdPlace?: Place;
+    existingOpeningHoursId?: string | null;
+    openingHoursCreateThrows?: Error;
+    openingHoursUpdateThrows?: Error;
+  } = {},
+) {
+  const createdPlace = options.createdPlace ?? placeFixture();
   const calls: unknown[] = [];
+  const placeCreateCalls: unknown[] = [];
+  const placeUpdateCalls: unknown[] = [];
+  const openingHoursCreateCalls: unknown[] = [];
+  const openingHoursUpdateCalls: unknown[] = [];
+
   const client: PlaceCommitWriterPrismaClient = {
     place: {
       create: (async (args: unknown) => {
         calls.push(args);
+        placeCreateCalls.push(args);
         return createdPlace;
       }) as unknown as PlaceCommitWriterPrismaClient["place"]["create"],
       update: (async (args: unknown) => {
         calls.push(args);
+        placeUpdateCalls.push(args);
         return createdPlace;
       }) as unknown as PlaceCommitWriterPrismaClient["place"]["update"],
+      findUnique: (async () =>
+        ({ openingHoursId: options.existingOpeningHoursId ?? null }) as unknown) as unknown as PlaceCommitWriterPrismaClient["place"]["findUnique"],
     },
+    openingHours: {
+      create: (async (args: unknown) => {
+        openingHoursCreateCalls.push(args);
+        if (options.openingHoursCreateThrows) throw options.openingHoursCreateThrows;
+        return { id: "opening-hours-1" } as unknown as OpeningHours;
+      }) as unknown as PlaceCommitWriterPrismaClient["openingHours"]["create"],
+      update: (async (args: unknown) => {
+        openingHoursUpdateCalls.push(args);
+        if (options.openingHoursUpdateThrows) throw options.openingHoursUpdateThrows;
+        return { id: (args as { where: { id: string } }).where.id } as unknown as OpeningHours;
+      }) as unknown as PlaceCommitWriterPrismaClient["openingHours"]["update"],
+    },
+    $transaction: (async <T>(fn: (tx: PlaceCommitWriterPrismaClient) => Promise<T>) => fn(client)) as PlaceCommitWriterPrismaClient["$transaction"],
   };
-  return { client, calls };
+  return { client, calls, placeCreateCalls, placeUpdateCalls, openingHoursCreateCalls, openingHoursUpdateCalls };
 }
 
 async function testHappyPathCallsCreateOnce() {
@@ -258,7 +298,7 @@ async function testEmptyShortDescThrows() {
 }
 
 async function testReturnsPlaceIdAndCreatedStatus() {
-  const { client } = createFakeClient(placeFixture({ id: "place-42" }));
+  const { client } = createFakeClient({ createdPlace: placeFixture({ id: "place-42" }) });
   const writer = new PlaceCommitWriter(client);
   const result = await writer.createPlaceFromDraft(draftFixture());
 
@@ -266,7 +306,7 @@ async function testReturnsPlaceIdAndCreatedStatus() {
 }
 
 async function testUpdateUsesUpdateAndReturnsUpdatedStatus() {
-  const { client, calls } = createFakeClient(placeFixture({ id: "place-99" }));
+  const { client, calls } = createFakeClient({ createdPlace: placeFixture({ id: "place-99" }) });
   const writer = new PlaceCommitWriter(client);
   const result = await writer.updatePlaceFromDraft("place-99", draftFixture({ title: "Updated Place" }));
 
@@ -274,6 +314,106 @@ async function testUpdateUsesUpdateAndReturnsUpdatedStatus() {
   const lastCall = calls[calls.length - 1] as { where: { id: string }; data: Record<string, unknown> };
   assert.equal(lastCall.where.id, "place-99");
   assert.equal(lastCall.data.title, "Updated Place");
+}
+
+// ---------------------------------------------------------------------------
+// Opening hours — create/update, transaction boundary, idempotency.
+// ---------------------------------------------------------------------------
+
+async function testCreateWithoutOpeningHoursNeverTouchesOpeningHoursTable() {
+  const { client, openingHoursCreateCalls } = createFakeClient();
+  const writer = new PlaceCommitWriter(client);
+  await writer.createPlaceFromDraft(draftFixture());
+
+  assert.equal(openingHoursCreateCalls.length, 0);
+}
+
+async function testCreateWithOpeningHoursCreatesBothInOneTransaction() {
+  const { client, placeCreateCalls, openingHoursCreateCalls } = createFakeClient({
+    createdPlace: placeFixture({ id: "place-1", openingHoursId: "opening-hours-1" }),
+  });
+  const writer = new PlaceCommitWriter(client);
+  const result = await writer.createPlaceFromDraft(draftFixture({ openingHours: openingHoursDraftFixture() }));
+
+  assert.equal(result.status, "CREATED");
+  assert.equal(openingHoursCreateCalls.length, 1);
+  assert.equal(placeCreateCalls.length, 1);
+  const placeCall = placeCreateCalls[0] as { data: Record<string, unknown> };
+  assert.equal(placeCall.data.openingHoursId, "opening-hours-1", "the Place row must be linked to the newly created OpeningHours row");
+}
+
+async function testCreateOpeningHoursFailureNeverCreatesPlace() {
+  const { client, placeCreateCalls } = createFakeClient({
+    openingHoursCreateThrows: new Error("opening hours db failure"),
+  });
+  const writer = new PlaceCommitWriter(client);
+
+  await assert.rejects(
+    () => writer.createPlaceFromDraft(draftFixture({ openingHours: openingHoursDraftFixture() })),
+    /opening hours db failure/,
+  );
+  assert.equal(placeCreateCalls.length, 0, "a failed OpeningHours create must never leave a Place row behind");
+}
+
+async function testUpdateWithoutOpeningHoursNeverTouchesOpeningHoursTable() {
+  const { client, openingHoursCreateCalls, openingHoursUpdateCalls } = createFakeClient();
+  const writer = new PlaceCommitWriter(client);
+  await writer.updatePlaceFromDraft("place-1", draftFixture());
+
+  assert.equal(openingHoursCreateCalls.length, 0);
+  assert.equal(openingHoursUpdateCalls.length, 0);
+}
+
+async function testUpdateWithExistingOpeningHoursReusesSameRowNeverDuplicates() {
+  const { client, openingHoursCreateCalls, openingHoursUpdateCalls } = createFakeClient({
+    existingOpeningHoursId: "opening-hours-existing",
+  });
+  const writer = new PlaceCommitWriter(client);
+  await writer.updatePlaceFromDraft("place-1", draftFixture({ openingHours: openingHoursDraftFixture() }));
+
+  assert.equal(openingHoursCreateCalls.length, 0, "an already-linked OpeningHours row must be updated, never re-created");
+  assert.equal(openingHoursUpdateCalls.length, 1);
+  const updateCall = openingHoursUpdateCalls[0] as { where: { id: string } };
+  assert.equal(updateCall.where.id, "opening-hours-existing");
+}
+
+async function testUpdateWithNoExistingOpeningHoursCreatesAndLinksOne() {
+  const { client, placeUpdateCalls, openingHoursCreateCalls } = createFakeClient({
+    existingOpeningHoursId: null,
+  });
+  const writer = new PlaceCommitWriter(client);
+  await writer.updatePlaceFromDraft("place-1", draftFixture({ openingHours: openingHoursDraftFixture() }));
+
+  assert.equal(openingHoursCreateCalls.length, 1);
+  const lastPlaceUpdate = placeUpdateCalls[placeUpdateCalls.length - 1] as { data: Record<string, unknown> };
+  assert.equal(lastPlaceUpdate.data.openingHoursId, "opening-hours-1");
+}
+
+async function testRepeatedUpdateStaysIdempotentNoDuplicateOpeningHours() {
+  const { client, openingHoursCreateCalls, openingHoursUpdateCalls } = createFakeClient({
+    existingOpeningHoursId: "opening-hours-existing",
+  });
+  const writer = new PlaceCommitWriter(client);
+
+  await writer.updatePlaceFromDraft("place-1", draftFixture({ openingHours: openingHoursDraftFixture() }));
+  await writer.updatePlaceFromDraft("place-1", draftFixture({ openingHours: openingHoursDraftFixture() }));
+
+  assert.equal(openingHoursCreateCalls.length, 0);
+  assert.equal(openingHoursUpdateCalls.length, 2, "each repeated run updates the same row, never creates a second one");
+}
+
+async function testUpdateOpeningHoursFailureNeverUpdatesPlace() {
+  const { client, placeUpdateCalls } = createFakeClient({
+    existingOpeningHoursId: "opening-hours-existing",
+    openingHoursUpdateThrows: new Error("opening hours update failed"),
+  });
+  const writer = new PlaceCommitWriter(client);
+
+  await assert.rejects(
+    () => writer.updatePlaceFromDraft("place-1", draftFixture({ openingHours: openingHoursDraftFixture() })),
+    /opening hours update failed/,
+  );
+  assert.equal(placeUpdateCalls.length, 0, "a failed OpeningHours update must never proceed to update the Place row");
 }
 
 async function main() {
@@ -291,6 +431,15 @@ async function main() {
   await testEmptyShortDescThrows();
   await testReturnsPlaceIdAndCreatedStatus();
   await testUpdateUsesUpdateAndReturnsUpdatedStatus();
+
+  await testCreateWithoutOpeningHoursNeverTouchesOpeningHoursTable();
+  await testCreateWithOpeningHoursCreatesBothInOneTransaction();
+  await testCreateOpeningHoursFailureNeverCreatesPlace();
+  await testUpdateWithoutOpeningHoursNeverTouchesOpeningHoursTable();
+  await testUpdateWithExistingOpeningHoursReusesSameRowNeverDuplicates();
+  await testUpdateWithNoExistingOpeningHoursCreatesAndLinksOne();
+  await testRepeatedUpdateStaysIdempotentNoDuplicateOpeningHours();
+  await testUpdateOpeningHoursFailureNeverUpdatesPlace();
 }
 
 main()

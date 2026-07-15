@@ -121,6 +121,7 @@ export function buildPlaceCreateDraft(input: BuildPlaceCreateDraftInput): PlaceC
       phone: input.candidate.phoneE164 ?? null,
       website: null,
       slug: null,
+      ...(input.candidate.openingHours ? { openingHours: input.candidate.openingHours } : {}),
     },
     warnings,
   };

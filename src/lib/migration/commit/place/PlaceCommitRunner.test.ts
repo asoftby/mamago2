@@ -75,6 +75,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     shortDescription: "A great place for kids",
     phone: "+375291234567",
     phoneE164: "+375291234567",
+    openingHours: null,
     email: "hello@example.com",
     workHoursRaw: "Mon-Fri 9-18",
     locationRaw: "Minsk, some street",
@@ -497,6 +498,40 @@ async function testUpdateConflictLastImportedAtNullMatchesPlace437() {
   assert.equal((recordUpdateCalls[0] as { data: Record<string, unknown> }).data.status, "QUARANTINED");
 }
 
+/**
+ * Opening hours ride along inside the same Place UPDATE operation as every
+ * other field — this proves candidate.openingHours data present on a
+ * Place-437-shaped conflict still never reaches the orchestrator/writer.
+ * No separate opening-hours-specific classification exists or is needed.
+ */
+async function testUpdateConflictWithOpeningHoursCandidateStillNeverCallsWriter() {
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-437" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, lineageUpdateCalls } = createFakePrisma({
+    existingLineage: lineageFixture({ targetId: "place-437", lastImportedAt: null }),
+    targetPlace: placeFixture({ id: "place-437" }),
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(
+    inputFixture({
+      operation: updateOperationFixture(),
+      candidate: candidateFixture({
+        openingHours: {
+          mode: "WEEKLY",
+          timezone: "Europe/Minsk",
+          rules: [{ dayOfWeek: "MON", isOpen: true, allDay: false, intervals: [{ startTime: "09:00", endTime: "18:00" }] }],
+        },
+      }),
+    }),
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.conflictReason, "LAST_IMPORTED_AT_UNKNOWN" satisfies PlaceUpdateConflictReason);
+  assert.equal(orchestratorCalls.length, 0, "an opening-hours change must not bypass UPDATE_CONFLICT");
+  assert.equal(lineageUpdateCalls.length, 0);
+}
+
 async function testUpdateConflictTargetModifiedAfterImport() {
   const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
   const { writer: lineageWriter } = createFakeLineageWriter();
@@ -585,6 +620,7 @@ async function main() {
   await testUpdateConflictTargetIdMissing();
   await testUpdateConflictTargetRowMissing();
   await testUpdateConflictLastImportedAtNullMatchesPlace437();
+  await testUpdateConflictWithOpeningHoursCandidateStillNeverCallsWriter();
   await testUpdateConflictTargetModifiedAfterImport();
   await testUpdateSafeWhenTargetUpdatedAtExactlyEqualsLastImportedAt();
   await testUpdateWriterFailureNotMarkedSuccessAndLeavesLineageUntouched();

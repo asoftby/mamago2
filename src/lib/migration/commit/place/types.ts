@@ -1,3 +1,5 @@
+import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
+
 import type { NormalizedPlaceCandidate } from "../../adapters/wordpress-db/normalizePlace";
 
 export type { NormalizedPlaceCandidate };
@@ -41,6 +43,14 @@ export interface PlaceCreateDraft {
   /** `Place.website` exists but `NormalizedPlaceCandidate` has no source field for it yet (its `email` is a different WP postmeta key, not a website URL) — always `null` in PR8.5. */
   website: string | null;
   slug: null;
+  /**
+   * Carried through verbatim from `candidate.openingHours` — already the
+   * canonical shape `mapToCreatePayload`/`mapToUpdatePayload`
+   * (`src/lib/openingHours/openingHoursMapper.ts`) expect, so the writer
+   * never re-derives it. `undefined` means "no usable schedule, don't
+   * touch/create an OpeningHours row" — never a fabricated default.
+   */
+  openingHours?: OpeningHoursData;
 }
 
 export type PlaceCommitBlockReasonCode =
