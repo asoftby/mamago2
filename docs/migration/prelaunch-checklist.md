@@ -483,9 +483,10 @@ runner'а не покрыта тестами. Требует отдельной 
       конфигурация/резолвер/тесты, никакой реальный targeted commit или
       golden import не запускался.
 - [ ] **PR C — media fix**, разбит на 2 части:
-  - [ ] **PR C1 — Place cover/gallery source fidelity** (2026-07-15, ветка
-        `fix/migration-place-media-source`, **PR открыт, merge ещё не
-        выполнен**) — без downloads, без DB writes, без syncer.
+  - [x] **PR C1 — Place cover/gallery source fidelity** (2026-07-15, ветка
+        `fix/migration-place-media-source`, PR #47, **смержен** —
+        merge commit `ee31bd83`, CI + Docker Build & Push SUCCESS на этом
+        SHA) — без downloads, без DB writes, без syncer.
 
         **Read-only re-verified source facts** (все 82 published Place):
         `gallery` 62/82 (реальный формат — comma-separated attachment ID в
@@ -1492,3 +1493,20 @@ dispatcher-branch, ни CLI-flag).
   1 из 2, PR C2 (последний Place P0-блокер) остаётся. Незавершённое: PR
   ещё не смержен. Следующий шаг после merge: PR C2 — PlaceMediaSyncer,
   затем golden samples и reconciliation места 437.
+- **2026-07-15 — Claude Code** — **PR C1 смержен.** PR #47: review
+  (`chatgpt-codex-connector`, P2) нашёл валидный баг — malformed-но-
+  присутствующий `cover` (напр. `"abc"`) ошибочно проваливался в
+  `_thumbnail_id` fallback и репортился как "cover отсутствует", хотя
+  primary был present, просто битый. Исправлено отдельным коммитом
+  `dc8062ad` (не amend): добавлена проверка `coverKeyPresent`,
+  разделяющая "cover-ключ действительно отсутствует" от "cover
+  присутствует, но не парсится" — fallback теперь триггерится только по
+  первому условию; malformed-значение остаётся unresolved и репортится
+  только через `PLACE_MEDIA_ID_INVALID`. Добавлен regression-тест
+  `testMalformedCoverNeverFallsThroughToThumbnailId`. Review thread
+  resolved, все gates green (`mergeStateStatus=CLEAN`,
+  `mergeable=MERGEABLE`, 0 unresolved threads, CI SUCCESS на `dc8062ad`)
+  → merge commit `ee31bd83`. Post-merge CI + Docker Build & Push —
+  SUCCESS на `ee31bd83`. Local `dev` fast-forwarded. Следующий шаг:
+  PR C2 — PlaceMediaSyncer (последний Place P0-блокер), затем golden
+  samples и reconciliation места 437.
