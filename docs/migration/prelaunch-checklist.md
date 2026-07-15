@@ -482,7 +482,68 @@ runner'а не покрыта тестами. Требует отдельной 
       **Ноль DB writes / media downloads в этом PR** — только
       конфигурация/резолвер/тесты, никакой реальный targeted commit или
       golden import не запускался.
-- [ ] PR — media fix (C).
+- [ ] **PR C — media fix**, разбит на 2 части:
+  - [ ] **PR C1 — Place cover/gallery source fidelity** (2026-07-15, ветка
+        `fix/migration-place-media-source`, **PR открыт, merge ещё не
+        выполнен**) — без downloads, без DB writes, без syncer.
+
+        **Read-only re-verified source facts** (все 82 published Place):
+        `gallery` 62/82 (реальный формат — comma-separated attachment ID в
+        ОДНОЙ postmeta-строке, не отдельные строки на id — старый parser
+        вызывал `Number()` на всю строку целиком и получал `NaN` →
+        пустой массив всегда); `cover` 61/82 (реальный primary meta key —
+        `cover`; старый normalizer искал `_thumbnail_id`, которого в
+        source 0/82 — thumbnail всегда был `null`); 10/82 действительно
+        не имеют ни одного image-related meta key; `logo` 47/82 (исключение
+        остаётся принятой политикой, `PLACE_LOGO_EXCLUDED`, не менялось);
+        legacy `gallery-place`/`logo-place` — по 1 случаю, оба на месте
+        437, и это ДЕЙСТВИТЕЛЬНО отдельный набор attachment ID
+        (не пересекается с `gallery` того же места) — не артефакт
+        именования, поэтому НЕ смешивается в основную galerie.
+
+        **Реализация:** новый pure parser
+        `parsePlaceMediaAttachmentIds()`
+        (`src/lib/migration/adapters/wordpress-db/parsePlaceMediaAttachmentIds.ts`)
+        — принимает `readonly string[] | undefined` (сырой
+        `postMeta[key]`), для каждой строки делает split по запятой,
+        покрывает разом comma-separated-scalar/single-ID/multiple-rows/
+        mixed-whitespace; только positive integer ID; dedup по первому
+        вхождению, порядок сохраняется; invalid/negative/zero токены не
+        падают процесс, а возвращаются отдельным списком для warning.
+        `normalizePlace.ts`: primary cover key = `cover`,
+        `_thumbnail_id` — документированный fallback (используется только
+        если `cover` отсутствует); если оба присутствуют и расходятся —
+        `cover` побеждает, `PLACE_MEDIA_COVER_CONFLICT` warning (WARNING
+        severity); если оба присутствуют и совпадают — без warning; если
+        fallback реально использован — `PLACE_MEDIA_LEGACY_KEY_USED`
+        (INFO, `merged:true`). `gallery-place`/`logo-place` — raw evidence
+        + `PLACE_MEDIA_LEGACY_KEY_USED` (INFO, `merged:false`), никогда не
+        подмешиваются в `galleryAttachmentIds`. Пустое отсутствие media
+        (10/82) — без единого warning. `rawMeta` не теряет ничего.
+
+        **Read-only preview всех 82** (без единого download):
+        with cover 61, with gallery 62, no media 10, invalid tokens 0
+        places, legacy key used 1 place, cover conflict 0 places, unique
+        attachment ID 496. Три golden Place (allowlist из PR "sampled
+        media policy") подтверждены: 5389 → cover 5406 + gallery 14
+        (+`PLACE_LOGO_EXCLUDED`); 895 → cover `null` + gallery 10, без
+        warnings; 43023 → cover 43025 + gallery 11 (включая тот же 43025,
+        что и cover — реальное пересечение source-данных, не баг) +
+        `PLACE_LOGO_EXCLUDED` + 2×`PLACE_WORK_HOURS_UNSUPPORTED`
+        (наследие overnight-часов из PR B).
+
+        Тесты: 17 новых в `parsePlaceMediaAttachmentIds.test.ts`
+        (comma/single/array/whitespace/dedup/invalid/negative/zero/два
+        golden-места), 12 новых в `normalizePlace.test.ts` (cover через
+        `cover`, `_thumbnail_id` fallback, conflict, agreement без
+        conflict, comma gallery, legacy `gallery-place`/`logo-place`,
+        no-media, deterministic, три golden Place). Проверки — все green:
+        полный `src/lib/migration/**` + `scripts/migration-*.test.ts`
+        sweep, eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
+        **Ноль DB writes и media downloads** — только normalize/preview,
+        PlaceMediaSyncer в этом PR не создавался.
+  - [ ] **PR C2 — PlaceMediaSyncer** (не начат) — фактическое скачивание/
+        upload/link, последний Place P0-блокер перед golden samples.
 - [ ] Новые golden samples (после B+C).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
 - [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
@@ -1406,3 +1467,28 @@ dispatcher-branch, ни CLI-flag).
   reconciliation места 437 всё ещё не начаты. Offers остаётся
   `BLOCKED_FOR_COMMIT`. Следующий шаг: PR C — Place media (после починки
   `normalizePlace.ts` cover/gallery).
+- **2026-07-15 — Claude Code** — **PR C1: Place cover/gallery source
+  fidelity** (ветка `fix/migration-place-media-source`, из `origin/dev`
+  `a2f9a64e`, baseline подтверждён: `dev = origin/dev`, clean tree,
+  open PR = 0, CI #200 и Docker #200 SUCCESS). Read-only повторный аудит
+  всех 82 published Place подтвердил ТОЧНО заявленные числа
+  (`gallery` 62/82 comma-separated-в-одной-строке, `cover` 61/82,
+  `_thumbnail_id` 0/82, 10/82 без единого image-key, `logo` 47/82,
+  legacy `gallery-place`/`logo-place` по 1 случаю — оба на месте 437, и
+  подтверждено, что это ДЕЙСТВИТЕЛЬНО отдельный, не пересекающийся с
+  `gallery` набор ID). Это закрывает background-задачу `task_d022bb3d`
+  (найдена в PR "sampled media policy"). Реализация: новый pure parser
+  `parsePlaceMediaAttachmentIds()`, `normalizePlace.ts` переключён на
+  `cover` как primary key, `_thumbnail_id` — документированный fallback
+  с conflict/legacy-key warnings, `gallery-place`/`logo-place` — raw
+  evidence + warning, никогда не подмешиваются. Read-only preview всех
+  82 (без единого download) подтвердил корректность на реальных данных
+  и всех 3 golden Place. Тесты: 17 новых в
+  `parsePlaceMediaAttachmentIds.test.ts`, 12 новых в
+  `normalizePlace.test.ts`. Проверки — все green: полный
+  `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep, eslint,
+  `tsc --noEmit`, `git diff --check`, `pnpm build`. **Ноль DB writes и
+  media downloads.** PlaceMediaSyncer намеренно не создавался — это PR
+  1 из 2, PR C2 (последний Place P0-блокер) остаётся. Незавершённое: PR
+  ещё не смержен. Следующий шаг после merge: PR C2 — PlaceMediaSyncer,
+  затем golden samples и reconciliation места 437.
