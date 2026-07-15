@@ -285,9 +285,10 @@ runner'а не покрыта тестами. Требует отдельной 
       `PlaceCommitRunner` — на UPDATE_SAFE. **Ноль DB writes в этом PR** —
       всё на уровне тестов/классификации; реальный targeted commit
       (`--confirm-writes`) не запускался.
-- [ ] **PR — import Place opening hours (B)** (2026-07-15, ветка
-      `feat/migration-place-opening-hours`, **PR открыт, merge ещё не
-      выполнен**) — read-only аудит source (`--allow-remote-readonly`
+- [x] **PR — import Place opening hours (B)** (2026-07-15, ветка
+      `feat/migration-place-opening-hours`, **PR #45 смержен в dev
+      merge-коммитом `13892b81`, post-merge Docker Build & Push
+      SUCCESS**) — read-only аудит source (`--allow-remote-readonly`
       SELECT против всех 82 published Place): 77/82 имеют `work_hours`,
       все 77 — валидный JSON-массив day-групп `{days, status, hours}`.
       Status-распределение по группам: `hours` 78, `appointments_only` 23
@@ -372,8 +373,6 @@ runner'а не покрыта тестами. Требует отдельной 
       SELECT — source JSON, parser result и draft shape задокументированы
       выше и в PR body. **Ноль DB writes в этом PR** — ни targeted
       commit, ни `--confirm-writes`, ни golden import не запускались.
-      *(Отмечается `[x]` отдельным прямым коммитом в `dev` только после
-      фактического merge, как Phone E.164 и targeted Place commits.)*
 - [ ] PR — media fix (C).
 - [ ] Новые golden samples (после B+C).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
@@ -1236,6 +1235,16 @@ dispatcher-branch, ни CLI-flag).
   `git diff --check`, `pnpm build`. Read-only live verification 5 golden
   WP ID (5389/5457/13164/13317/9865) выполнена через ту же readonly
   SELECT-сессию — commit/`--confirm-writes` не запускался. **Ноль DB
-  writes.** Незавершённое: PR ещё не смержен. Следующий шаг после merge:
-  PR C — Place media (последний P0-блокер перед golden samples и
-  reconciliation места 437).
+  writes.**
+- **2026-07-15 — Claude Code** — PR #45 (import Place opening hours,
+  PR B) смержен в `dev` обычным merge-коммитом `13892b81` (CI typecheck
+  PASS, 0 unresolved review threads,
+  `mergeStateStatus=CLEAN`/`mergeable=MERGEABLE`, head SHA не менялся с
+  момента push). Post-merge `Docker Build & Push` — SUCCESS (run
+  29405223508, 14m42s). Локальный `dev` fast-forward на `origin/dev`.
+  Пункт «PR — import Place opening hours (B)» в §1 Places этим же прямым
+  докс-коммитом отмечен `[x]` (паттерн `87bd43f9`/`b66b27dd`/`48536159`).
+  DB writes за весь PR — ноль, место 437 не трогалось. **Единственный
+  оставшийся Place P0-блокер — (C) media**; golden samples и
+  reconciliation места 437 не начаты, ждут закрытия (C). Offers остаётся
+  `BLOCKED_FOR_COMMIT`. Следующий шаг: PR C — Place media.
