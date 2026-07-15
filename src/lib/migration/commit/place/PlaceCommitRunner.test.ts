@@ -718,6 +718,36 @@ async function testMediaWarningsMergedIntoValidationSummary() {
   assert.ok(summary.some((w) => w.code === "PLACE_MEDIA_IMPORTED"));
 }
 
+/**
+ * Regression test for a review finding (PR #48, chatgpt-codex-connector):
+ * two different attachments failing with the same code+message (a common
+ * PlaceMediaSyncer shape — every missing attachment gets the exact same
+ * generic message) must never collapse into one warning just because their
+ * `details.attachmentId` differs.
+ */
+async function testWarningsWithSameCodeAndMessageButDifferentDetailsAreNeverCollapsed() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
+  const { syncer: mediaSyncer } = createFakeMediaSyncer({
+    result: {
+      warnings: [
+        { code: "PLACE_MEDIA_SOURCE_MISSING", message: "WordPress attachment row was not found.", severity: "WARNING", details: { attachmentId: 11 } },
+        { code: "PLACE_MEDIA_SOURCE_MISSING", message: "WordPress attachment row was not found.", severity: "WARNING", details: { attachmentId: 12 } },
+      ],
+      skipped: 2,
+    },
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  await runner.execute(inputFixture());
+
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  const summary = updateCall.data.validationSummary as Array<{ code: string; details?: { attachmentId?: number } }>;
+  const attachmentIds = summary.filter((w) => w.code === "PLACE_MEDIA_SOURCE_MISSING").map((w) => w.details?.attachmentId);
+  assert.deepEqual(attachmentIds.sort(), [11, 12], "both attachments must be preserved, not deduped away");
+}
+
 async function testNoMediaWarningsLeavesValidationSummaryUntouched() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
   const { writer: lineageWriter } = createFakeLineageWriter();
@@ -770,6 +800,7 @@ async function main() {
   await testOrchestratorFailureNeverCallsMediaSyncer();
   await testMediaSyncerThrowingIsDemotedToWarningRecordStillLinked();
   await testMediaWarningsMergedIntoValidationSummary();
+  await testWarningsWithSameCodeAndMessageButDifferentDetailsAreNeverCollapsed();
   await testNoMediaWarningsLeavesValidationSummaryUntouched();
   await testNoMediaSyncerConfiguredCommitStillSucceeds();
 }

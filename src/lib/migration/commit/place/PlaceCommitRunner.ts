@@ -413,11 +413,25 @@ export class PlaceCommitRunner {
   }
 }
 
+/**
+ * `details` is part of the dedup key, not just `code`/`message` — found by
+ * review (PR #48, chatgpt-codex-connector) before merge. `PlaceMediaSyncer`
+ * emits one warning per attachment, and several attachments can share the
+ * exact same `code`+`message` (e.g. two different missing attachments both
+ * produce `PLACE_MEDIA_SOURCE_MISSING`/"WordPress attachment row was not
+ * found.") while differing only in `details.attachmentId`. A `code::message`
+ * key alone would silently drop every warning after the first for that
+ * pair, losing which attachments actually failed/were skipped.
+ */
+function warningDedupKey(w: MigrationWarning): string {
+  return `${w.code}::${w.message}::${JSON.stringify(w.details ?? null)}`;
+}
+
 function mergeWarnings(existing: readonly MigrationWarning[], extra: readonly MigrationWarning[]): MigrationWarning[] {
   const out: MigrationWarning[] = [...existing];
-  const seen = new Set(existing.map((w) => `${w.code}::${w.message}`));
+  const seen = new Set(existing.map(warningDedupKey));
   for (const w of extra) {
-    const key = `${w.code}::${w.message}`;
+    const key = warningDedupKey(w);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(w);
