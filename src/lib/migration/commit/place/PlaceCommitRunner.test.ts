@@ -8,9 +8,11 @@ import type {
   MigrationLineageWriterLike,
   PlaceCommitOrchestratorLike,
   PlaceCommitRunnerPrismaClient,
+  PlaceMediaSyncerLike,
   PlaceUpdateConflictReason,
 } from "./PlaceCommitRunner";
 import type { ExecutePlaceCommitResult } from "./PlaceCommitOrchestrator";
+import type { PlaceMediaSyncResult } from "./PlaceMediaSyncer";
 import type { CreateLineageResult } from "../../lineage/types";
 import type { CommitOperation } from "../types";
 import type { NormalizedPlaceCandidate, PlaceCommitContext } from "./types";
@@ -218,6 +220,24 @@ function createFakePrisma(
     },
   };
   return { prisma, calls, recordUpdateCalls, lineageUpdateCalls, placeFindUniqueCalls };
+}
+
+const ZERO_MEDIA_COUNTS = { imported: 0, reused: 0, skipped: 0, failed: 0 };
+
+function createFakeMediaSyncer(
+  options: { result?: Partial<PlaceMediaSyncResult>; throwError?: Error } = {},
+) {
+  const calls: unknown[] = [];
+  const syncer: PlaceMediaSyncerLike = {
+    sync: async (input) => {
+      calls.push(input);
+      if (options.throwError) {
+        throw options.throwError;
+      }
+      return { warnings: [], ...ZERO_MEDIA_COUNTS, ...options.result };
+    },
+  };
+  return { syncer, calls };
 }
 
 async function testHappyPath() {
@@ -604,6 +624,154 @@ async function testRealTargetIdFlowsEndToEndOnSafeUpdate() {
   assert.equal(result.placeId, "real-place-cuid-abc123", "the real targetId must flow through end-to-end, never a placeholder");
 }
 
+// ---------------------------------------------------------------------------
+// Media sync orchestration — when the (optional) mediaSyncer is invoked.
+// ---------------------------------------------------------------------------
+
+async function testCreateCallsMediaSyncerWithNewPlaceId() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-new-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma } = createFakePrisma();
+  const { syncer: mediaSyncer, calls: mediaCalls } = createFakeMediaSyncer();
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  const result = await runner.execute(inputFixture());
+
+  assert.equal(result.ok, true);
+  assert.equal(mediaCalls.length, 1, "CREATE must trigger media sync once the target Place id exists");
+  const call = mediaCalls[0] as { placeId: string; uploadedByUserId: string; sourceRecordKey: string };
+  assert.equal(call.placeId, "place-new-1");
+  assert.equal(call.uploadedByUserId, "user-1", "context.createdByUserId flows through as the media owner");
+  assert.equal(call.sourceRecordKey, "wordpress-db:places:301");
+}
+
+async function testUpdateSafeCallsMediaSyncer() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma } = createFakePrisma({ existingLineage: lineageFixture(), targetPlace: placeFixture() });
+  const { syncer: mediaSyncer, calls: mediaCalls } = createFakeMediaSyncer();
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, true);
+  assert.equal(mediaCalls.length, 1, "a safe UPDATE must also trigger media reconciliation");
+}
+
+async function testUpdateConflictNeverCallsMediaSyncer() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma } = createFakePrisma({ existingLineage: null });
+  const { syncer: mediaSyncer, calls: mediaCalls } = createFakeMediaSyncer();
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  const result = await runner.execute(inputFixture({ operation: updateOperationFixture() }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(mediaCalls.length, 0, "a conflicted UPDATE must never reach media sync — the orchestrator itself never runs");
+}
+
+async function testOrchestratorFailureNeverCallsMediaSyncer() {
+  const { orchestrator } = createFakeOrchestrator({ ok: false, reasonCode: "PLACE_CREATE_FAILED", error: new Error("boom") });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma } = createFakePrisma();
+  const { syncer: mediaSyncer, calls: mediaCalls } = createFakeMediaSyncer();
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  await runner.execute(inputFixture());
+
+  assert.equal(mediaCalls.length, 0);
+}
+
+async function testMediaSyncerThrowingIsDemotedToWarningRecordStillLinked() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
+  const { syncer: mediaSyncer } = createFakeMediaSyncer({ throwError: new Error("media pipeline exploded") });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  const result = await runner.execute(inputFixture());
+
+  assert.equal(result.ok, true, "an unexpected media sync failure must never fail the Place commit");
+  assert.equal(result.status, "LINKED");
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  assert.equal(updateCall.data.status, "LINKED");
+  const summary = updateCall.data.validationSummary as Array<{ code: string; details?: { error?: string } }>;
+  assert.ok(summary.some((w) => w.code === "PLACE_MEDIA_IMPORT_SKIPPED"));
+  assert.equal(summary.find((w) => w.code === "PLACE_MEDIA_IMPORT_SKIPPED")?.details?.error, "media pipeline exploded");
+}
+
+async function testMediaWarningsMergedIntoValidationSummary() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
+  const { syncer: mediaSyncer } = createFakeMediaSyncer({
+    result: { warnings: [{ code: "PLACE_MEDIA_IMPORTED", message: "imported", severity: "INFO" }], imported: 1 },
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  await runner.execute(inputFixture());
+
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  const summary = updateCall.data.validationSummary as Array<{ code: string }>;
+  assert.ok(summary.some((w) => w.code === "PLACE_MEDIA_IMPORTED"));
+}
+
+/**
+ * Regression test for a review finding (PR #48, chatgpt-codex-connector):
+ * two different attachments failing with the same code+message (a common
+ * PlaceMediaSyncer shape — every missing attachment gets the exact same
+ * generic message) must never collapse into one warning just because their
+ * `details.attachmentId` differs.
+ */
+async function testWarningsWithSameCodeAndMessageButDifferentDetailsAreNeverCollapsed() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
+  const { syncer: mediaSyncer } = createFakeMediaSyncer({
+    result: {
+      warnings: [
+        { code: "PLACE_MEDIA_SOURCE_MISSING", message: "WordPress attachment row was not found.", severity: "WARNING", details: { attachmentId: 11 } },
+        { code: "PLACE_MEDIA_SOURCE_MISSING", message: "WordPress attachment row was not found.", severity: "WARNING", details: { attachmentId: 12 } },
+      ],
+      skipped: 2,
+    },
+  });
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  await runner.execute(inputFixture());
+
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  const summary = updateCall.data.validationSummary as Array<{ code: string; details?: { attachmentId?: number } }>;
+  const attachmentIds = summary.filter((w) => w.code === "PLACE_MEDIA_SOURCE_MISSING").map((w) => w.details?.attachmentId);
+  assert.deepEqual(attachmentIds.sort(), [11, 12], "both attachments must be preserved, not deduped away");
+}
+
+async function testNoMediaWarningsLeavesValidationSummaryUntouched() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma, recordUpdateCalls } = createFakePrisma();
+  const { syncer: mediaSyncer } = createFakeMediaSyncer();
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer });
+
+  await runner.execute(inputFixture());
+
+  const updateCall = recordUpdateCalls[0] as { data: Record<string, unknown> };
+  assert.ok(!("validationSummary" in updateCall.data), "no media warnings means validationSummary is never touched");
+}
+
+async function testNoMediaSyncerConfiguredCommitStillSucceeds() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
+  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { prisma } = createFakePrisma();
+  const runner = new PlaceCommitRunner({ orchestrator, lineageWriter, prisma });
+
+  const result = await runner.execute(inputFixture());
+
+  assert.equal(result.ok, true, "mediaSyncer is optional — its absence must never affect the commit");
+}
+
 async function main() {
   await testHappyPath();
   await testOrchestratorBlockedMarksRecordFailedAndSkipsLineage();
@@ -625,6 +793,16 @@ async function main() {
   await testUpdateSafeWhenTargetUpdatedAtExactlyEqualsLastImportedAt();
   await testUpdateWriterFailureNotMarkedSuccessAndLeavesLineageUntouched();
   await testRealTargetIdFlowsEndToEndOnSafeUpdate();
+
+  await testCreateCallsMediaSyncerWithNewPlaceId();
+  await testUpdateSafeCallsMediaSyncer();
+  await testUpdateConflictNeverCallsMediaSyncer();
+  await testOrchestratorFailureNeverCallsMediaSyncer();
+  await testMediaSyncerThrowingIsDemotedToWarningRecordStillLinked();
+  await testMediaWarningsMergedIntoValidationSummary();
+  await testWarningsWithSameCodeAndMessageButDifferentDetailsAreNeverCollapsed();
+  await testNoMediaWarningsLeavesValidationSummaryUntouched();
+  await testNoMediaSyncerConfiguredCommitStillSucceeds();
 }
 
 main()

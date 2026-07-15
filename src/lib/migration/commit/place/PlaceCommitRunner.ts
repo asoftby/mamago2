@@ -1,8 +1,10 @@
 import type { MigrationLineage, MigrationRecord, Place, PrismaClient } from "@prisma/client";
 
+import type { MigrationWarning } from "../../types";
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
 import type { ExecutePlaceCommitResult } from "./PlaceCommitOrchestrator";
+import type { PlaceMediaSyncResult } from "./PlaceMediaSyncer";
 import type { NormalizedPlaceCandidate, PlaceCommitContext } from "./types";
 
 /**
@@ -32,6 +34,19 @@ export interface MigrationLineageWriterLike {
     runId?: string | null;
     recordId?: string | null;
   }): Promise<CreateLineageResult>;
+}
+
+export interface PlaceMediaSyncerLike {
+  sync(input: {
+    placeId: string;
+    candidate: NormalizedPlaceCandidate;
+    uploadedByUserId: string | null | undefined;
+    sourceId: string;
+    sourceHash: string | null;
+    runId?: string | null;
+    recordId?: string | null;
+    sourceRecordKey: string;
+  }): Promise<PlaceMediaSyncResult>;
 }
 
 /**
@@ -168,6 +183,7 @@ export class PlaceCommitRunner {
       orchestrator: PlaceCommitOrchestratorLike;
       lineageWriter: MigrationLineageWriterLike;
       prisma: PlaceCommitRunnerPrismaClient;
+      mediaSyncer?: PlaceMediaSyncerLike;
       now?: () => Date;
     },
   ) {}
@@ -283,6 +299,38 @@ export class PlaceCommitRunner {
       };
     }
 
+    // Runs for both CREATE and UPDATE_SAFE (the only two ways this point is
+    // reached — UPDATE_CONFLICT already returned above, SKIP_UNCHANGED
+    // never dispatches to this runner at all). A media failure never fails
+    // the Place commit itself: an unexpected throw from `mediaSyncer.sync()`
+    // (as opposed to the per-attachment try/catch already inside it) is
+    // caught here and demoted to a single WARNING, exactly like
+    // `EventCommitRunner`.
+    const mediaWarnings: MigrationWarning[] = [];
+    if (this.deps.mediaSyncer && commitResult.placeId) {
+      try {
+        const mediaResult = await this.deps.mediaSyncer.sync({
+          placeId: commitResult.placeId,
+          candidate: input.candidate,
+          uploadedByUserId: input.context.createdByUserId,
+          sourceId: input.record.sourceId,
+          sourceHash: input.record.sourceHash,
+          runId: input.record.runId,
+          recordId: input.record.id,
+          sourceRecordKey: input.record.sourceRecordKey,
+        });
+        mediaWarnings.push(...mediaResult.warnings);
+      } catch (error) {
+        mediaWarnings.push({
+          code: "PLACE_MEDIA_IMPORT_SKIPPED",
+          message: "Place media sync failed unexpectedly; Place commit remains linked.",
+          severity: "WARNING",
+          sourceRecordKey: input.record.sourceRecordKey,
+          details: { error: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
+
     let lineageResult: CreateLineageResult;
     try {
       if (isUpdate) {
@@ -339,13 +387,20 @@ export class PlaceCommitRunner {
       };
     }
 
+    const linkUpdateData: Record<string, unknown> = {
+      status: "LINKED",
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    };
+    if (mediaWarnings.length > 0) {
+      const existing = (input.record.validationSummary as unknown) ?? null;
+      const existingArr = Array.isArray(existing) ? (existing as MigrationWarning[]) : [];
+      linkUpdateData.validationSummary = mergeWarnings(existingArr, mediaWarnings) as unknown as object;
+    }
+
     await this.deps.prisma.migrationRecord.update({
       where: { id: input.record.id },
-      data: {
-        status: "LINKED",
-        lastErrorCode: null,
-        lastErrorMessage: null,
-      },
+      data: linkUpdateData,
     });
 
     return {
@@ -356,4 +411,30 @@ export class PlaceCommitRunner {
       status: "LINKED",
     };
   }
+}
+
+/**
+ * `details` is part of the dedup key, not just `code`/`message` — found by
+ * review (PR #48, chatgpt-codex-connector) before merge. `PlaceMediaSyncer`
+ * emits one warning per attachment, and several attachments can share the
+ * exact same `code`+`message` (e.g. two different missing attachments both
+ * produce `PLACE_MEDIA_SOURCE_MISSING`/"WordPress attachment row was not
+ * found.") while differing only in `details.attachmentId`. A `code::message`
+ * key alone would silently drop every warning after the first for that
+ * pair, losing which attachments actually failed/were skipped.
+ */
+function warningDedupKey(w: MigrationWarning): string {
+  return `${w.code}::${w.message}::${JSON.stringify(w.details ?? null)}`;
+}
+
+function mergeWarnings(existing: readonly MigrationWarning[], extra: readonly MigrationWarning[]): MigrationWarning[] {
+  const out: MigrationWarning[] = [...existing];
+  const seen = new Set(existing.map(warningDedupKey));
+  for (const w of extra) {
+    const key = warningDedupKey(w);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(w);
+  }
+  return out;
 }

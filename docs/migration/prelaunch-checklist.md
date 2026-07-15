@@ -543,8 +543,138 @@ runner'а не покрыта тестами. Требует отдельной 
         sweep, eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
         **Ноль DB writes и media downloads** — только normalize/preview,
         PlaceMediaSyncer в этом PR не создавался.
-  - [ ] **PR C2 — PlaceMediaSyncer** (не начат) — фактическое скачивание/
-        upload/link, последний Place P0-блокер перед golden samples.
+  - [ ] **PR C2 — PlaceMediaSyncer** (2026-07-15, ветка
+        `feat/migration-place-media-syncer`, **PR открыт, merge ещё не
+        выполнен**) — без реальных downloads, без реальных DB writes в
+        production/local БД в рамках этого PR (только тесты на fakes);
+        последний Place P0-блокер перед golden samples.
+
+        **Архитектурный аудит (до реализации):** у Place НЕТ отдельного
+        "cover"-поля в схеме — `PlaceImageKind` только `LOGO | GALLERY`,
+        cover = первый `GALLERY`-образ по `sortOrder` (конвенция,
+        используемая и admin-редактором, и публичной страницей места).
+        `Place.logoImageId` и логотипы остаются вне auto-import (уже
+        принятая политика, `PLACE_LOGO_EXCLUDED`) — синкер никогда не
+        пишет `logoImageId` и не создаёт `LOGO`-строки.
+        `PlaceMediaLinker` (PR14, ранее) оказался мёртвым кодом (0 реальных
+        вызывающих) с несовместимым контрактом (batch-lookup через
+        `PlaceMediaLedgerLike` вместо `migrationLineage.findFirst`,
+        используемого Event/Route) и без своего шага импорта — удалён,
+        его функциональность поглощена новым `PlaceMediaSyncer`
+        (`src/lib/migration/commit/place/PlaceMediaSyncer.ts`), который
+        реализует import-or-reuse-via-lineage по образцу
+        `EventMediaSyncer`/`RouteStopMediaSyncer`.
+
+        **Находка аудита, изменившая дизайн:** read-only проверка
+        подтвердила, что один и тот же attachment id может быть `cover`
+        для одного Place и `gallery` для другого (напр. id 32649: cover
+        для мест 32633/32636, gallery для места 32637). `MigrationLineage`
+        уникален по `(sourceId, sourceRecordKey, targetType, targetRole)`
+        — ролевой `targetRole` ("cover"/"gallery" как у Event) создал бы
+        ДВЕ lineage-строки и скачал бы один физический файл дважды.
+        Решение: единый константный `targetRole = "place-media"` для всех
+        Place-lineage строк — реюз MediaAsset работает межплейсово, не
+        только внутри одного Place.
+
+        **Read-only metadata-аудит всех 496 уникальных attachment id**
+        (без единого байта скачивания): 480/496 строк найдено в
+        `wp_posts` (16 отсутствуют — станут `PLACE_MEDIA_SOURCE_MISSING`,
+        не падением); MIME-состав — 364 `image/webp`, 96 `image/jpeg`, 20
+        `image/png`; **HEIC/HEIF: 0, неподдерживаемые форматы: 0**,
+        невалидных guid: 0; 11/82 Place имеют cover-id, повторяющийся в
+        своём же gallery (не баг, реальные данные — дедуплицируется при
+        записи, сначала cover на `sortOrder:0`); 8 attachment id разделяют
+        между 2-3 разными Place (обоснование единого `targetRole` выше);
+        filesize доступен (best-effort, `_wp_attachment_metadata`) для
+        480/496, образцы 32-150 KB — далеко до лимита `mamagoMediaImporter`
+        10 MB.
+
+        **Реализация `PlaceMediaSyncer`:** вход — normalized `media`
+        (cover + gallery attachment id); порядок записи — cover первым
+        (сортOrder 0), затем gallery по исходному порядку, дубликаты и
+        повтор cover внутри gallery убираются один раз. Реюз через
+        существующий `MigrationLineage(targetType: MEDIA_ASSET)` (как у
+        Event/Route) — если lineage уже есть, скачивание не происходит
+        (`PLACE_MEDIA_ASSET_REUSED`, INFO). **Никогда не удаляет**
+        существующие `PlaceImage`-строки (`deleteMany` не используется
+        нигде) — в отличие от Event (diff+recreate), потому что
+        `PlaceImage` не имеет FK на `MediaAsset` для безопасного диффа, а
+        ручные правки (место 437 и любые другие) не должны стираться
+        повторным запуском; новые строки только *добавляются* (append),
+        `sortOrder` продолжается от максимума уже существующих — тот же
+        паттерн, что и `POST /api/business/places/[id]/images`. Если у
+        этого Place уже есть `PlaceImage` с тем же `url` (повторный
+        прогон) — новая строка не создаётся (`PLACE_MEDIA_LINK_REUSED`,
+        INFO). HEIC/HEIF и неподдерживаемые MIME определяются
+        ПРОАКТИВНО по `post_mime_type` атрибута (без попытки скачивания)
+        — `PLACE_MEDIA_HEIC_UNSUPPORTED`/`PLACE_MEDIA_FORMAT_UNSUPPORTED`,
+        fail-closed. Ошибка одного attachment (`PLACE_MEDIA_DOWNLOAD_FAILED`
+        при сетевой/HTTP-ошибке, `PLACE_MEDIA_PROCESS_FAILED` при прочих)
+        не блокирует остальные — try/catch на attachment, не на весь
+        синкер; при `failed > 0` — сводный `PLACE_MEDIA_PARTIAL` warning.
+        Результат содержит явные счётчики `imported/reused/skipped/failed`.
+        Отсутствующий `uploadedByUserId` — весь медиа-синк пропускается с
+        `PLACE_MEDIA_OWNER_MISSING`, Place commit не страдает.
+
+        **Sampled policy (обязательно из PR #46):** новый
+        `MediaPolicyGatedPlaceMediaSyncer` (`src/lib/migration/runtime/`)
+        оборачивает `PlaceMediaSyncer` тем же паттерном, что и Event/Route
+        — FULL делегирует, METADATA репортит evidence без скачивания
+        (`PLACE_MEDIA_POLICY_METADATA_COVER_SKIPPED`/`..._GALLERY_SKIPPED`
+        + `PLACE_MEDIA_SAMPLE_SKIPPED` при выходе за allowlist), NONE —
+        полный no-op. В CLI (`scripts/migration-commit-wordpress-db.ts`)
+        подключён через уже существующий `resolveSampledMediaPolicy()` и
+        его готовый allowlist из 3 Place (5389/895/43023, уже добавлены в
+        PR #46) — никакого дублирования allowlist внутри синкера.
+        `-from-json` CLI **намеренно не тронут**: он уже не подключает
+        media-синкеры ни для одной сущности (не только Place) — точечное
+        исключение только для Place нарушило бы существующую конвенцию
+        этого CLI, а не исправляло бы пробел.
+
+        **Runtime wiring:** `PlaceCommitRunner` получил опциональный
+        `mediaSyncer` (как `EventCommitRunner`) — вызывается сразу после
+        успешного `orchestrator.execute()` (CREATE и UPDATE_SAFE), ДО
+        записи lineage; для UPDATE_CONFLICT и SKIP_UNCHANGED недостижим
+        (первый блокируется классификацией раньше, второй не доходит до
+        runner вообще — существующая архитектура). Место 437
+        (`lastImportedAt: null`) остаётся классифицированным как
+        UPDATE_CONFLICT существующей логикой `classifyUpdate()` — синкер
+        для него никогда не вызывается, без отдельного кода на этот
+        случай. Неожиданный throw из `mediaSyncer.sync()` понижается до
+        одного WARNING (`PLACE_MEDIA_IMPORT_SKIPPED`) — Place commit
+        остаётся `LINKED`. Media warnings мержатся в
+        `MigrationRecord.validationSummary` (дедуп по `code::message`) —
+        тот же паттерн, что у Event. Никакой долгой Prisma-транзакции
+        вокруг скачивания — синкер, как и Event/Route, не использует
+        `$transaction` (в `src/lib/migration` его нет нигде).
+
+        Тесты (все на fakes, ноль реальных DB/network/storage writes):
+        18 в `PlaceMediaSyncer.test.ts` (cover only, gallery only,
+        cover+gallery, cover-в-gallery без дублирования, дедуп внутри
+        gallery, стабильный порядок, no-media no-op, lineage-реюз без
+        скачивания, повторный прогон без дублей, реюз одного MediaAsset
+        между двумя разными Place, retry скачивает только недостающее,
+        ручные `PlaceImage` никогда не трогаются и не удаляются, отсутствие
+        owner, отсутствующий attachment, неподдерживаемый MIME,
+        HEIC fail-closed, download failure, process failure отдельно от
+        download failure, partial success + `PLACE_MEDIA_PARTIAL`); 8 в
+        `MediaPolicyGatedPlaceMediaSyncer.test.ts` (FULL/METADATA/NONE +
+        реальная интеграция с `resolveSampledMediaPolicy` — allowlisted
+        LOCAL/DEV → FULL, non-allowlisted → METADATA без вызова
+        downloader, PROD → FULL вне зависимости от allowlist); 8 новых в
+        `PlaceCommitRunner.test.ts` (CREATE вызывает media sync с новым
+        placeId, UPDATE_SAFE вызывает, UPDATE_CONFLICT никогда не
+        вызывает, orchestrator-failure никогда не вызывает, throw из
+        синкера понижается до warning и commit остаётся LINKED, media
+        warnings мержатся в validationSummary, отсутствие warnings не
+        трогает validationSummary, mediaSyncer опционален). Проверки —
+        все green: полный `src/lib/migration/**` (56 файлов) +
+        `scripts/migration-*.test.ts` sweep, eslint, `tsc --noEmit`,
+        `pnpm build`.
+
+        **Ноль реальных DB writes и media downloads в этом PR** — только
+        pure-функции/fakes в тестах и read-only metadata-аудит против
+        живой WP БД (не байты, только `wp_posts`/`wp_postmeta` строки).
 - [ ] Новые golden samples (после B+C).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
 - [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
@@ -1510,3 +1640,44 @@ dispatcher-branch, ни CLI-flag).
   SUCCESS на `ee31bd83`. Local `dev` fast-forwarded. Следующий шаг:
   PR C2 — PlaceMediaSyncer (последний Place P0-блокер), затем golden
   samples и reconciliation места 437.
+- **2026-07-15 — Claude Code** — **PR C2: PlaceMediaSyncer** (ветка
+  `feat/migration-place-media-syncer`, из `origin/dev` `8516de3a`,
+  baseline подтверждён: `dev = origin/dev`, clean tree, open PR = 0, CI
+  и Docker SUCCESS на `8516de3a`). Архитектурный аудит перед реализацией
+  вскрыл: у Place нет отдельного cover-поля (cover = первый
+  `GALLERY`-образ по sortOrder); логотип остаётся вне auto-import
+  (неизменная политика); `PlaceMediaLinker` (PR14) оказался мёртвым
+  кодом с несовместимым batch-lookup контрактом и без своего шага
+  импорта — удалён (`PlaceMediaLinker.ts`, `.test.ts`, `types.ts`),
+  функциональность поглощена новым `PlaceMediaSyncer`. Read-only
+  metadata-аудит всех 496 уникальных attachment id (без единого байта
+  скачивания) нашёл: 480/496 строк существуют, 0 HEIC/HEIF, 0
+  неподдерживаемых форматов, 0 невалидных guid — и, что важнее,
+  подтвердил, что один и тот же attachment id может быть `cover` для
+  одного Place и `gallery` для другого (id 32649) — это изменило дизайн
+  lineage: единый константный `targetRole = "place-media"` вместо
+  ролевого ("cover"/"gallery", как у Event), иначе один физический файл
+  скачивался бы дважды под двумя lineage-строками. `PlaceMediaSyncer`
+  никогда не удаляет существующие `PlaceImage` (только append, в
+  отличие от Event'овского diff+recreate) — это осознанное отличие,
+  защищающее ручные правки (место 437 и любые другие) от повторного
+  запуска. HEIC/неподдерживаемые форматы отсекаются проактивно по
+  `post_mime_type`, без попытки скачивания (fail-closed). Sampled policy
+  из PR #46 подключена через `MediaPolicyGatedPlaceMediaSyncer` и уже
+  существующий allowlist (Place 5389/895/43023) — без дублирования
+  allowlist. Runtime wiring — `PlaceCommitRunner` получил опциональный
+  `mediaSyncer`, вызывается после успешного commit (CREATE и
+  UPDATE_SAFE), недостижим для UPDATE_CONFLICT/SKIP_UNCHANGED; throw из
+  синкера понижается до warning, commit остаётся LINKED. `-from-json`
+  CLI намеренно не тронут (не подключает media-синкеры ни для одной
+  сущности). Тесты: 18 в `PlaceMediaSyncer.test.ts`, 8 в
+  `MediaPolicyGatedPlaceMediaSyncer.test.ts` (включая реальную
+  интеграцию с `resolveSampledMediaPolicy`), 8 новых в
+  `PlaceCommitRunner.test.ts`. Проверки — все green: полный
+  `src/lib/migration/**` (56 файлов) + `scripts/migration-*.test.ts`
+  sweep, eslint, `tsc --noEmit`, `pnpm build`. **Ноль реальных DB writes
+  и media downloads** — только fakes в тестах и read-only
+  metadata-аудит. Незавершённое: PR ещё не смержен. Следующий шаг после
+  merge: backup + три новых golden Place, повторный прогон, UI-проверка
+  — впервые переходим от разработки к контролируемому записывающему
+  этапу.

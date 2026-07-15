@@ -97,6 +97,7 @@ import {
 import { PlaceCommitOrchestrator } from "../src/lib/migration/commit/place/PlaceCommitOrchestrator";
 import { PlaceCommitRunner } from "../src/lib/migration/commit/place/PlaceCommitRunner";
 import { PlaceCommitWriter } from "../src/lib/migration/commit/place/PlaceCommitWriter";
+import { PlaceMediaSyncer } from "../src/lib/migration/commit/place/PlaceMediaSyncer";
 import { RouteCommitOrchestrator } from "../src/lib/migration/commit/route/RouteCommitOrchestrator";
 import { RouteCommitRunner } from "../src/lib/migration/commit/route/RouteCommitRunner";
 import { RouteCommitWriter } from "../src/lib/migration/commit/route/RouteCommitWriter";
@@ -107,6 +108,7 @@ import { MigrationLedgerRepository } from "../src/lib/migration/ledger/Migration
 import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLineageWriter";
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
+import { MediaPolicyGatedPlaceMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedPlaceMediaSyncer";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
 import { resolveSampledMediaPolicy } from "../src/lib/migration/runtime/sampledMediaPolicy";
 import {
@@ -515,12 +517,25 @@ async function main(): Promise<void> {
       }),
       mediaPolicy: profile.mediaPolicy,
     });
+    const placeMediaSyncer = new MediaPolicyGatedPlaceMediaSyncer({
+      inner: new PlaceMediaSyncer({
+        prisma,
+        attachmentResolver: wordpressRepository,
+        mediaImporterFactory,
+        lineageWriter,
+      }),
+      mediaPolicy: samplingActive
+        ? (sourceRecordKey: string) =>
+            resolveSampledMediaPolicy({ environment: profile.environment, sourceRecordKey })
+        : profile.mediaPolicy,
+    });
 
     const runners = {
       place: new PlaceCommitRunner({
         orchestrator: new PlaceCommitOrchestrator(new PlaceCommitWriter(prisma)),
         lineageWriter,
         prisma,
+        mediaSyncer: placeMediaSyncer,
       }),
       event: new EventCommitRunner({
         orchestrator: new EventCommitOrchestrator(new EventCommitWriter(prisma)),
