@@ -142,6 +142,15 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   // absent while `_thumbnail_id` is present, it's used and flagged; if
   // both are present and disagree, `cover` (primary) wins and the
   // disagreement is flagged rather than silently picking one.
+  //
+  // "Absent" here means the `cover` meta row itself doesn't exist —
+  // deliberately checked separately from "parsed to zero valid ids", so a
+  // *present but malformed* `cover` value (e.g. `"abc"`) never silently
+  // falls through to the fallback. That would misreport a broken primary
+  // as a clean absent-primary substitution; the malformed value already
+  // surfaces via `PLACE_MEDIA_ID_INVALID` below and is left unresolved
+  // for review instead.
+  const coverKeyPresent = (postMeta["cover"]?.length ?? 0) > 0;
   const coverParsed = parsePlaceMediaAttachmentIds(postMeta["cover"]);
   const thumbnailFallbackParsed = parsePlaceMediaAttachmentIds(postMeta["_thumbnail_id"]);
   const galleryParsed = parsePlaceMediaAttachmentIds(postMeta["gallery"]);
@@ -150,7 +159,7 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   const fallbackCoverId = thumbnailFallbackParsed.ids[0] ?? null;
 
   let thumbnailAttachmentId = primaryCoverId;
-  if (primaryCoverId === null && fallbackCoverId !== null) {
+  if (!coverKeyPresent && fallbackCoverId !== null) {
     thumbnailAttachmentId = fallbackCoverId;
     warnings.push({
       code: "PLACE_MEDIA_LEGACY_KEY_USED",

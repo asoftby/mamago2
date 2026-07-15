@@ -276,6 +276,32 @@ function testThumbnailIdUsedAsDocumentedFallbackWhenCoverAbsent() {
   assert.equal(warning?.details?.merged, true);
 }
 
+/**
+ * `cover` present-but-malformed must never be treated the same as `cover`
+ * genuinely absent — a present-but-unparseable primary must not silently
+ * fall through to `_thumbnail_id`, since that would misreport a broken
+ * primary as a clean absent-primary substitution. Found by review
+ * (PR #47, chatgpt-codex-connector) before merge.
+ */
+function testMalformedCoverNeverFallsThroughToThumbnailId() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, cover: ["not-a-number"], _thumbnail_id: ["777"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, null, "a malformed primary cover must stay unresolved, never silently replaced");
+  assert.ok(
+    !record.warnings?.some((w) => w.code === "PLACE_MEDIA_LEGACY_KEY_USED"),
+    "cover was present (just malformed), so this is not a legacy-fallback situation",
+  );
+  const invalidWarning = record.warnings?.find((w) => w.code === "PLACE_MEDIA_ID_INVALID");
+  assert.ok(invalidWarning, "the malformed cover token itself must still be reported");
+  assert.ok(
+    (invalidWarning?.details?.invalid as { field: string; token: string }[]).some(
+      (entry) => entry.field === "cover" && entry.token === "not-a-number",
+    ),
+  );
+}
+
 function testCoverAndThumbnailIdConflictPrefersCoverAndWarns() {
   const record = normalizePlace(
     buildBundle({ postMeta: { ...buildBundle().postMeta, cover: ["100"], _thumbnail_id: ["200"] } }),
@@ -414,6 +440,7 @@ function main() {
 
   testCoverReadFromPrimaryCoverKey();
   testThumbnailIdUsedAsDocumentedFallbackWhenCoverAbsent();
+  testMalformedCoverNeverFallsThroughToThumbnailId();
   testCoverAndThumbnailIdConflictPrefersCoverAndWarns();
   testCoverAndThumbnailIdAgreeingProducesNoConflictWarning();
   testCommaSeparatedGalleryParsedInOrder();
