@@ -373,9 +373,10 @@ runner'а не покрыта тестами. Требует отдельной 
       SELECT — source JSON, parser result и draft shape задокументированы
       выше и в PR body. **Ноль DB writes в этом PR** — ни targeted
       commit, ни `--confirm-writes`, ни golden import не запускались.
-- [ ] **PR — sampled media policy для local/dev** (2026-07-15, ветка
-      `feat/migration-sampled-media-policy`, **PR открыт, merge ещё не
-      выполнен**) — не Place-специфичный PR (затрагивает Event/Place/Offer
+- [x] **PR — sampled media policy для local/dev** (2026-07-15, ветка
+      `feat/migration-sampled-media-policy`, **PR #46 смержен в dev
+      merge-коммитом `031e0431`, post-merge Docker Build & Push
+      SUCCESS**) — не Place-специфичный PR (затрагивает Event/Place/Offer
       media policy layer в целом), но входит в Place readiness sequence
       как отдельный шаг перед PR C.
 
@@ -1386,7 +1387,22 @@ dispatcher-branch, ни CLI-flag).
   green: полный `src/lib/migration/**` + `scripts/migration-*.test.ts`
   sweep, eslint, `tsc --noEmit`, `git diff --check`. **Ноль DB writes и
   media downloads** — только policy/resolver/тесты, ни targeted commit,
-  ни golden import не запускались. Незавершённое: PR ещё не смержен.
-  Следующий шаг после merge: PR C — Place media (теперь дополнительно
-  зависит от исправления `normalizePlace.ts` cover/gallery бага,
-  найденного в этом PR).
+  ни golden import не запускались.
+- **2026-07-15 — Claude Code** — PR #46 (sampled media policy для
+  local/dev) смержен в `dev` обычным merge-коммитом `031e0431` (CI
+  typecheck PASS, 0 unresolved review threads,
+  `mergeStateStatus=CLEAN`/`mergeable=MERGEABLE`, head SHA не менялся с
+  момента push). Post-merge `Docker Build & Push` — SUCCESS (run
+  29411711513, 14m51s). Локальный `dev` fast-forward на `origin/dev`.
+  Пункт «PR — sampled media policy для local/dev» в §1 Places этим же
+  прямым докс-коммитом отмечен `[x]` (паттерн
+  `87bd43f9`/`b66b27dd`/`48536159`/`2c0d69d6`). DB writes/media downloads
+  за весь PR — ноль. **Единственный оставшийся Place P0-блокер — (C)
+  media** — теперь явно заблокирован на исправлении
+  `normalizePlace.ts` cover/gallery бага (background-задача
+  `task_d022bb3d`), найденного в этом PR; отдельно остаётся открытой
+  background-задача на Offer-relations SQL escaping баг
+  (`task_d13732f5`), не блокирующая PR C напрямую. Golden samples и
+  reconciliation места 437 всё ещё не начаты. Offers остаётся
+  `BLOCKED_FOR_COMMIT`. Следующий шаг: PR C — Place media (после починки
+  `normalizePlace.ts` cover/gallery).
