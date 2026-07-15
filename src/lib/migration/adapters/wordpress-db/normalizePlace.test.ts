@@ -40,8 +40,8 @@ function buildBundle(overrides: Partial<WordPressPlaceBundle> = {}): WordPressPl
       ],
       location: ["Minsk, some street"],
       "city-place": ["Minsk"],
-      gallery: ["111", "222", "333"],
-      _thumbnail_id: ["555"],
+      cover: ["555"],
+      gallery: ["111,222,333"],
       rank_math_title: ["SEO Title"],
       rank_math_focus_keyword: ["kids playground"],
     },
@@ -232,7 +232,7 @@ function testEmptyOrBrokenMetaDoesNotThrow() {
   assert.equal(record.warnings?.length, 1);
   assert.equal(record.warnings?.[0]?.code, "PLACE_MISSING_COORDINATES");
 
-  // Non-numeric gallery/thumbnail values must be dropped, not thrown.
+  // Non-numeric gallery/cover-fallback values must be dropped, not thrown.
   const withGarbageIds = normalizePlace(
     buildBundle({
       postMeta: { gallery: ["abc", "222", ""], _thumbnail_id: ["not-a-number"] },
@@ -241,6 +241,189 @@ function testEmptyOrBrokenMetaDoesNotThrow() {
   const garbagePayload = payloadOf(withGarbageIds);
   assert.equal(garbagePayload.media.thumbnailAttachmentId, null);
   assert.deepEqual(garbagePayload.media.galleryAttachmentIds, [222]);
+  const invalidWarning = withGarbageIds.warnings?.find((w) => w.code === "PLACE_MEDIA_ID_INVALID");
+  assert.ok(invalidWarning, "invalid tokens must be reported, not silently dropped");
+  assert.deepEqual(invalidWarning?.details?.invalid, [
+    { field: "_thumbnail_id", token: "not-a-number" },
+    { field: "gallery", token: "abc" },
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Place cover/gallery source fidelity (2026-07-15 fix — real meta keys/shapes).
+// ---------------------------------------------------------------------------
+
+function testCoverReadFromPrimaryCoverKey() {
+  const record = normalizePlace(buildBundle({ postMeta: { ...buildBundle().postMeta, cover: ["5406"] } }));
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, 5406);
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_MEDIA_LEGACY_KEY_USED"));
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_MEDIA_COVER_CONFLICT"));
+}
+
+function testThumbnailIdUsedAsDocumentedFallbackWhenCoverAbsent() {
+  const metaWithoutCover = { ...buildBundle().postMeta } as Record<string, readonly string[]>;
+  delete metaWithoutCover.cover;
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...metaWithoutCover, _thumbnail_id: ["777"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, 777);
+
+  const warning = record.warnings?.find((w) => w.code === "PLACE_MEDIA_LEGACY_KEY_USED" && w.details?.legacyKey === "_thumbnail_id");
+  assert.ok(warning, "using the fallback must be flagged");
+  assert.equal(warning?.severity, "INFO");
+  assert.equal(warning?.details?.merged, true);
+}
+
+/**
+ * `cover` present-but-malformed must never be treated the same as `cover`
+ * genuinely absent — a present-but-unparseable primary must not silently
+ * fall through to `_thumbnail_id`, since that would misreport a broken
+ * primary as a clean absent-primary substitution. Found by review
+ * (PR #47, chatgpt-codex-connector) before merge.
+ */
+function testMalformedCoverNeverFallsThroughToThumbnailId() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, cover: ["not-a-number"], _thumbnail_id: ["777"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, null, "a malformed primary cover must stay unresolved, never silently replaced");
+  assert.ok(
+    !record.warnings?.some((w) => w.code === "PLACE_MEDIA_LEGACY_KEY_USED"),
+    "cover was present (just malformed), so this is not a legacy-fallback situation",
+  );
+  const invalidWarning = record.warnings?.find((w) => w.code === "PLACE_MEDIA_ID_INVALID");
+  assert.ok(invalidWarning, "the malformed cover token itself must still be reported");
+  assert.ok(
+    (invalidWarning?.details?.invalid as { field: string; token: string }[]).some(
+      (entry) => entry.field === "cover" && entry.token === "not-a-number",
+    ),
+  );
+}
+
+function testCoverAndThumbnailIdConflictPrefersCoverAndWarns() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, cover: ["100"], _thumbnail_id: ["200"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, 100, "primary cover always wins on conflict");
+
+  const conflict = record.warnings?.find((w) => w.code === "PLACE_MEDIA_COVER_CONFLICT");
+  assert.ok(conflict);
+  assert.equal(conflict?.severity, "WARNING");
+  assert.deepEqual(conflict?.details, { coverAttachmentId: 100, thumbnailAttachmentId: 200 });
+}
+
+function testCoverAndThumbnailIdAgreeingProducesNoConflictWarning() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, cover: ["555"], _thumbnail_id: ["555"] } }),
+  );
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_MEDIA_COVER_CONFLICT"));
+}
+
+function testCommaSeparatedGalleryParsedInOrder() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["10,20,30"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media.galleryAttachmentIds, [10, 20, 30]);
+}
+
+function testLegacyGalleryPlaceKeptAsEvidenceNeverMergedIntoGallery() {
+  const record = normalizePlace(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        gallery: ["111,222,333"],
+        "gallery-place": ["999,888"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.media.galleryAttachmentIds, [111, 222, 333], "legacy gallery-place must never be blended in");
+  assert.deepEqual(payload.rawMeta["gallery-place"], ["999,888"], "raw evidence is still preserved");
+
+  const warning = record.warnings?.find((w) => w.code === "PLACE_MEDIA_LEGACY_KEY_USED" && w.details?.legacyKey === "gallery-place");
+  assert.ok(warning);
+  assert.equal(warning?.severity, "INFO");
+  assert.equal(warning?.details?.merged, false);
+}
+
+function testLegacyLogoPlaceKeptAsEvidenceWarned() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, "logo-place": ["765"] } }),
+  );
+  const warning = record.warnings?.find((w) => w.code === "PLACE_MEDIA_LEGACY_KEY_USED" && w.details?.legacyKey === "logo-place");
+  assert.ok(warning);
+  assert.deepEqual(warning?.details?.rawValues, ["765"]);
+}
+
+function testNoMediaAtAllProducesNoMediaWarnings() {
+  const metaWithoutMedia = { ...buildBundle().postMeta } as Record<string, readonly string[]>;
+  delete metaWithoutMedia.cover;
+  delete metaWithoutMedia.gallery;
+  const record = normalizePlace(buildBundle({ postMeta: metaWithoutMedia }));
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, null);
+  assert.deepEqual(payload.media.galleryAttachmentIds, []);
+  assert.ok(!record.warnings?.some((w) => w.code?.startsWith("PLACE_MEDIA_")));
+}
+
+function testDeterministicMediaOutputAcrossRepeatedCalls() {
+  const bundle = buildBundle({
+    postMeta: { ...buildBundle().postMeta, cover: ["100"], _thumbnail_id: ["200"], gallery: ["1,2,abc,1"] },
+  });
+  const first = normalizePlace(bundle);
+  const second = normalizePlace(bundle);
+  assert.deepEqual(first, second);
+}
+
+// Golden Places from the sampled media policy allowlist (2026-07-15 source audit).
+function testGoldenPlace5389HasExpectedSourceMediaIds() {
+  const record = normalizePlace(
+    buildBundle({
+      post: { ...basePost, ID: 5389 },
+      postMeta: {
+        cover: ["5406"],
+        gallery: ["5391,5392,5393,5394,5395,5396,5397,5398,5399,5400,5401,5402,5403,5404"],
+        logo: ["5390"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, 5406);
+  assert.equal(payload.media.galleryAttachmentIds.length, 14);
+  assert.ok(record.warnings?.some((w) => w.code === "PLACE_LOGO_EXCLUDED"));
+}
+
+function testGoldenPlace895HasGalleryButNoCover() {
+  const record = normalizePlace(
+    buildBundle({
+      post: { ...basePost, ID: 895 },
+      postMeta: { gallery: ["1604,10537,10538,7952,7959,7960,7961,10539,10540,10541"] },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, null);
+  assert.equal(payload.media.galleryAttachmentIds.length, 10);
+}
+
+function testGoldenPlace43023HasCoverLogoAndGalleryWithOverlap() {
+  const record = normalizePlace(
+    buildBundle({
+      post: { ...basePost, ID: 43023 },
+      postMeta: {
+        cover: ["43025"],
+        gallery: ["43026,43027,43028,43029,43030,43025,43031,43032,43033,43034,43035"],
+        logo: ["43024"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.media.thumbnailAttachmentId, 43025);
+  assert.equal(payload.media.galleryAttachmentIds.length, 11);
+  assert.ok(payload.media.galleryAttachmentIds.includes(43025), "the real source data has this overlap, not a bug");
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_MEDIA_COVER_CONFLICT"), "no _thumbnail_id present, so no conflict");
 }
 
 function main() {
@@ -254,6 +437,20 @@ function main() {
   testInvalidWorkHoursJsonWarnsWithSourceRecordKey();
   testAppointmentsOnlyWorkHoursPropagatesAsByAppointmentMode();
   testEmptyOrBrokenMetaDoesNotThrow();
+
+  testCoverReadFromPrimaryCoverKey();
+  testThumbnailIdUsedAsDocumentedFallbackWhenCoverAbsent();
+  testMalformedCoverNeverFallsThroughToThumbnailId();
+  testCoverAndThumbnailIdConflictPrefersCoverAndWarns();
+  testCoverAndThumbnailIdAgreeingProducesNoConflictWarning();
+  testCommaSeparatedGalleryParsedInOrder();
+  testLegacyGalleryPlaceKeptAsEvidenceNeverMergedIntoGallery();
+  testLegacyLogoPlaceKeptAsEvidenceWarned();
+  testNoMediaAtAllProducesNoMediaWarnings();
+  testDeterministicMediaOutputAcrossRepeatedCalls();
+  testGoldenPlace5389HasExpectedSourceMediaIds();
+  testGoldenPlace895HasGalleryButNoCover();
+  testGoldenPlace43023HasCoverLogoAndGalleryWithOverlap();
 }
 
 main();
