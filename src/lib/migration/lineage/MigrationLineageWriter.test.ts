@@ -153,6 +153,29 @@ async function testMissingLastSourceHashThrows() {
   await assert.rejects(() => writer.createLineage(inputFixture({ lastSourceHash: "" })));
 }
 
+async function testLastImportedAtStampedFromInjectedClock() {
+  const { client, calls } = createFakeClient();
+  const fixedNow = new Date("2026-07-15T12:00:00.000Z");
+  const writer = new MigrationLineageWriter(client, () => fixedNow);
+  await writer.createLineage(inputFixture());
+
+  const call = calls[0] as { data: Record<string, unknown> };
+  assert.equal(call.data.lastImportedAt, fixedNow);
+}
+
+async function testLastImportedAtDefaultsToRealClockWhenNotInjected() {
+  const { client, calls } = createFakeClient();
+  const writer = new MigrationLineageWriter(client);
+  const before = Date.now();
+  await writer.createLineage(inputFixture());
+  const after = Date.now();
+
+  const call = calls[0] as { data: Record<string, unknown> };
+  const stamped = call.data.lastImportedAt as Date;
+  assert.ok(stamped instanceof Date);
+  assert.ok(stamped.getTime() >= before && stamped.getTime() <= after);
+}
+
 async function testUniqueConstraintErrorPropagatesNotSwallowed() {
   const uniqueConstraintError = Object.assign(
     new Error("Unique constraint failed on the fields: (`sourceId`,`sourceRecordKey`,`targetType`,`targetRole`)"),
@@ -178,6 +201,8 @@ async function main() {
   await testMissingSourceRecordKeyThrows();
   await testMissingTargetIdThrows();
   await testMissingLastSourceHashThrows();
+  await testLastImportedAtStampedFromInjectedClock();
+  await testLastImportedAtDefaultsToRealClockWhenNotInjected();
   await testUniqueConstraintErrorPropagatesNotSwallowed();
 }
 

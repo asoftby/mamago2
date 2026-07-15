@@ -9,6 +9,7 @@ import {
   buildPublishedEventsQuery,
   buildPublishedOfferByIdQuery,
   buildPublishedOffersQuery,
+  buildPublishedPlaceByIdQuery,
   buildPublishedPlacesQuery,
   buildPublishedRouteByIdQuery,
   buildPublishedRoutesQuery,
@@ -106,6 +107,27 @@ export class WordPressRepository {
       terms: termsByPost.get(post.ID) ?? [],
       placeIndex: placeIndexByPost.get(post.ID) ?? null,
     }));
+  }
+
+  /** Targeted lookup — same assembly as `getPublishedPlaces()`, scoped to one `ID` at the SQL layer, not a client-side filter of the bulk 82-row result. */
+  async getPublishedPlaceById(postId: number): Promise<WordPressPlaceBundle | null> {
+    const { sql, params } = buildPublishedPlaceByIdQuery(postId);
+    const posts = await this.executor<WordPressPostRow>(sql, params);
+    if (posts.length === 0) return null;
+
+    const post = posts[0];
+    const [postMetaByPost, termsByPost, placeIndexByPost] = await Promise.all([
+      this.getPostMeta([post.ID]),
+      this.getTerms([post.ID]),
+      this.getPlaceIndexRows([post.ID]),
+    ]);
+
+    return {
+      post,
+      postMeta: groupPostMetaByKey(postMetaByPost.get(post.ID) ?? []),
+      terms: termsByPost.get(post.ID) ?? [],
+      placeIndex: placeIndexByPost.get(post.ID) ?? null,
+    };
   }
 
   /**

@@ -216,10 +216,14 @@ failed)**. Несмотря на чистый preview, полный batch-имп
    нерезолвимом значении, warning `PLACE_PHONE_INVALID`), `Place.phone` в
    draft пишется только из `phoneE164` — никогда raw.
 2. **(D) Targeted CLI + UPDATE safety** — существующий per-record
-   targeting (`--source-record-key` allowlist) недостаточен сам по себе:
-   UPDATE-ветка commit runner'а не покрыта тестами, защита ручных правок
-   отсутствует. Нужна отдельная PR: allowlist + UPDATE-branch test coverage
-   + manual-edit protection одновременно, не по частям.
+   targeting (`--source-record-key`) не поддерживал `--entity place`;
+   UPDATE-ветка `PlaceCommitRunner` была реализована, но не покрыта тестами;
+   защита ручных правок отсутствовала (активного lineage было бы
+   достаточно, чтобы разрешить UPDATE — этого недостаточно). **Исправлено
+   PR "targeted Place commits"** — см. запись ниже: targeted lookup
+   (`getPublishedPlaceById`, не client-side фильтр bulk-результата) +
+   conservative UPDATE_SAFE/UPDATE_CONFLICT классификация в
+   `PlaceCommitRunner`, а не просто allowlist.
 3. **(B) Режим работы (`work_hours`)** — известная проблема, требует
    отдельного фикса перед full batch; детали фиксируются при выполнении PR B.
 4. **(C) Media** — известная проблема (не совпадает с текущей строкой
@@ -246,7 +250,38 @@ runner'а не покрыта тестами. Требует отдельной 
       отсутствуют). `PlaceScalarLinker` (неподключённый dead code) не
       тронут функционально — задокументирован как известное расхождение
       для будущего подключения.
-- [ ] PR — targeted CLI + UPDATE safety (D).
+- [ ] **PR — targeted Place commits (D)** (2026-07-15, ветка
+      `feat/migration-place-targeted-update-safety`, **PR открыт, merge ещё
+      не выполнен**) — `--source-record-key wordpress-db:places:{id}`
+      теперь принимается для `--entity place` в commit/preview CLI, с
+      собственным строго-положительным-integer regex (строже, чем у
+      route/event/article), targeted `getPublishedPlaceById()` в
+      `WordPressRepository`/`sql.ts` (не bulk + client-side фильтр). Полный
+      82-Place bulk путь не тронут. `PlaceCommitRunner`: активного lineage
+      теперь недостаточно для UPDATE — добавлена `classifyUpdate()`,
+      различающая `UPDATE_SAFE` (lineage найден, `sourceRecordKey`/
+      `targetType` совпадают, `targetId` непустой, target-строка Place
+      реально существует, `lastImportedAt` известен и `Place.updatedAt` не
+      позже него) от `UPDATE_CONFLICT` (`LINEAGE_MISSING`/
+      `LINEAGE_MISMATCH`/`TARGET_ID_MISSING`/`TARGET_ROW_MISSING`/
+      `LAST_IMPORTED_AT_UNKNOWN`/`TARGET_MODIFIED_AFTER_IMPORT`) — сравнение
+      таймстампов строгое (`>`), без придуманного буфера; любая
+      неоднозначность классифицируется как conflict. На conflict: writer и
+      lineage никогда не трогаются, `MigrationRecord.status` → `QUARANTINED`
+      (не `FAILED` — это не ошибка), `PLACE_UPDATE_CONFLICT` reasonCode,
+      override/force-флага нет специально. **Место 437 подтверждено
+      классифицируется как `UPDATE_CONFLICT` (`LAST_IMPORTED_AT_UNKNOWN`)** —
+      юнит-тест воспроизводит его точную реальную форму (активный lineage,
+      `targetId` есть, `lastImportedAt=null`). Отдельно исправлен более
+      общий баг: `lastImportedAt` не устанавливался вообще нигде в движке
+      (ни на CREATE, ни на UPDATE, для всех сущностей, не только Place) —
+      `MigrationLineageWriter.createLineage()` теперь ставит `lastImportedAt`
+      на CREATE (инжектируемые часы, общий для Route/Article/Event/Place),
+      `PlaceCommitRunner` — на UPDATE_SAFE. **Ноль DB writes в этом PR** —
+      всё на уровне тестов/классификации; реальный targeted commit
+      (`--confirm-writes`) не запускался. *(Отмечается `[x]` отдельным
+      прямым коммитом в `dev` только после фактического merge, как Phone
+      E.164.)*
 - [ ] PR — opening-hours fix (B).
 - [ ] PR — media fix (C).
 - [ ] Новые golden samples (после B+C).
@@ -1006,3 +1041,65 @@ dispatcher-branch, ни CLI-flag).
   трогалось. Следующий шаг: PR D — targeted CLI + UPDATE safety (allowlist +
   UPDATE-branch test coverage + manual-edit protection одновременно —
   Алексей явно предупредил, что одного allowlist недостаточно).
+- **2026-07-15 — Claude Code** — **PR D: targeted Place commits + UPDATE
+  safety** (ветка `feat/migration-place-targeted-update-safety`, из
+  `origin/dev` `b66b27dd`, baseline подтверждён: `dev = origin/dev`, clean
+  tree, open PR = 0, CI #191 и Docker Build & Push #194 SUCCESS на
+  `b66b27dd`). Read-only аудит перед кодом (см. §1 Places п.2) нашёл: (a)
+  `--source-record-key` не был привязан к `--entity` вообще на уровне
+  `parseArgs()` — фактическая причина отказа для `place` — отсутствие
+  `fetchPublishedPlaceEnvelopeBySourceRecordKey`, не намеренный blocklist;
+  (b) CREATE/UPDATE/SKIP_UNCHANGED резолвится ОБЩИМ кодом
+  (`core/orchestrator.ts`/`MigrationLedgerRepository.getLineageActionForRecord`)
+  для всех сущностей одинаково, не Place-специфично; (c) `PlaceCommitRunner`
+  уже имел UPDATE-ветку, но **ноль** passing-path тестов на неё (в отличие
+  от Route/Article/Event, у которых UPDATE-путь тестируется); (d)
+  `lastImportedAt` не пишется НИГДЕ в движке ни для одной сущности — не
+  Place-специфичный баг, а общий пробел с момента добавления поля; (e)
+  `Place.updatedAt` места 437 (`2026-07-07 20:34:25`) на 3ч26м позже
+  `MigrationLineage.createdAt`/`updatedAt` того же места
+  (`2026-07-07 17:07:59`) — живое подтверждение сценария "ручная правка
+  после импорта, необнаруживаемая существующим кодом"; (f) preview CLI
+  никогда не подключает `MigrationLedgerRepository` — всегда показывает
+  CREATE, даже для уже импортированных записей (отдельный, не исправленный
+  в этом PR пробел, зафиксирован для будущего внимания).
+  Реализация: `sql.ts`/`WordPressRepository.getPublishedPlaceById()` —
+  targeted `WHERE ID = ?`, не bulk+фильтр (тот же паттерн, что Route/Event/
+  Article). `wordpressDbAdapter.fetchPublishedPlaceEnvelopeBySourceRecordKey()`
+  — regex `^wordpress-db:places:([1-9]\d*)$` (строже соседей: `0` и leading
+  zeros отклоняются, не только нечисловой ввод). Оба CLI-скрипта
+  (`migration-commit-wordpress-db.ts`/`migration-preview-wordpress-db.ts`)
+  получили ветку `place` в switch на `--source-record-key`. `PlaceCommitRunner`:
+  новый `classifyUpdate()` — `UPDATE_SAFE` только когда lineage найден
+  (с defensive проверкой, что `sourceRecordKey`/`targetType` реально
+  совпадают — не слепое доверие WHERE), `targetId` непустой, Place-строка
+  реально существует, `lastImportedAt` известен и `Place.updatedAt` не
+  позже него (строгое `>`, без буфера); все прочие случаи → `UPDATE_CONFLICT`
+  с machine-readable `reason` (`LINEAGE_MISSING`/`LINEAGE_MISMATCH`/
+  `TARGET_ID_MISSING`/`TARGET_ROW_MISSING`/`LAST_IMPORTED_AT_UNKNOWN`/
+  `TARGET_MODIFIED_AFTER_IMPORT`) — на конфликте writer/lineage не трогаются,
+  `MigrationRecord.status` → `QUARANTINED`, никакого override/force флага.
+  `MigrationLineageWriter.createLineage()` теперь пишет `lastImportedAt`
+  (инжектируемые часы, дефолт — реальные; это общий фикс, затрагивает
+  будущие CREATE всех сущностей, не только Place — существующие тесты не
+  проверяли `data` целиком, так что это safe additive change).
+  Тесты: 10 новых в `PlaceCommitRunner.test.ts` (UPDATE_SAFE happy path +
+  все 6 conflict reasons, включая точное воспроизведение места 437,
+  writer-failure-on-update, real targetId end-to-end, strict `>` boundary
+  на равных timestamps), 2 новых в `MigrationLineageWriter.test.ts`
+  (инжектированные и реальные часы), 4 новых в `wordpressDbAdapter.test.ts`
+  (happy path, wrong entity prefix, malformed/negative/zero/non-numeric ID,
+  missing source), 2 новых в `WordPressRepository.test.ts` (targeted lookup,
+  not-found), 1 новый в `migration-commit-wordpress-db.test.ts`
+  (`buildExecutionPlanInput` пиннинг `limit: 1` для Place). Проверки — все
+  green: targeted CLI/parser/adapter/repository tests, весь
+  `PlaceCommitRunner`/`PlaceCommitOrchestrator`/`PlaceCommitWriter` набор,
+  полный `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep,
+  eslint на изменённые файлы, `tsc --noEmit`, `git diff --check`,
+  `pnpm build`. **Ноль DB writes** — ни targeted commit, ни
+  `--confirm-writes`, ни golden sample не запускались; место 437 и все
+  остальные Place в dev-БД не тронуты. Не начато и не входит в этот PR:
+  opening-hours (B), Place media (C), Offer writer/CLI, reconciliation
+  места 437 (сама по себе, после этого PR), full batch. Следующий шаг:
+  PR B — opening hours, затем PR C — Place media; golden samples и
+  reconciliation места 437 — только после обоих.

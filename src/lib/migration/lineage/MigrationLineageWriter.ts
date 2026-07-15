@@ -30,11 +30,21 @@ function assertInputIsUsable(input: CreateLineageInput): void {
  * `lastSourceHash` is taken exactly as given by the caller (originally
  * `SourceRecordEnvelope.sourceHash`, carried through `MigrationRecord`) —
  * this writer never computes, re-derives, or touches a hash itself. UPDATE
- * lineage semantics don't exist yet (see PR11 scope) — that's a later PR,
- * once the engine actually has an UPDATE path to record lineage for.
+ * lineage semantics are handled inline in each `XCommitRunner` (Place/Route/
+ * Article/Event), not here — this class only ever creates.
+ *
+ * `lastImportedAt` is stamped with `now()` on every successful create — this
+ * is the one field a later targeted-UPDATE safety check (see
+ * `PlaceCommitRunner`) relies on to prove "we know when this was last
+ * imported," so it must never be left `null` by the CREATE path. `now` is
+ * injectable (defaults to the real clock) purely so tests can assert an
+ * exact value instead of "some `Date` close to `Date.now()`."
  */
 export class MigrationLineageWriter {
-  constructor(private readonly prisma: MigrationLineageWriterPrismaClient) {}
+  constructor(
+    private readonly prisma: MigrationLineageWriterPrismaClient,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
 
   async createLineage(input: CreateLineageInput): Promise<CreateLineageResult> {
     assertInputIsUsable(input);
@@ -53,6 +63,7 @@ export class MigrationLineageWriter {
         runId: input.runId ?? null,
         recordId: input.recordId ?? null,
         isActive: true,
+        lastImportedAt: this.now(),
       },
     });
 

@@ -7,6 +7,7 @@ import {
   ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
+  fetchPublishedPlaceEnvelopeBySourceRecordKey,
   wordpressDbAdapter,
 } from "./wordpressDbAdapter";
 import type {
@@ -74,7 +75,10 @@ function createFakeExecutor(): WordPressQueryExecutor {
         }
         return articlePosts as never;
       }
-      if (postType === "places") return placePosts as never;
+      if (postType === "places") {
+        if (byId) return placePosts.filter((row) => row.ID === Number(postId)) as never;
+        return placePosts as never;
+      }
       if (postType === "routes") {
         if (byId) {
           return routePosts.filter((row) => row.ID === Number(postId)) as never;
@@ -169,6 +173,55 @@ async function testFetchPublishedArticleEnvelopeRejectsWrongKey() {
   );
 }
 
+async function testFetchPublishedPlaceEnvelopeBySourceRecordKey() {
+  const record = await fetchPublishedPlaceEnvelopeBySourceRecordKey(
+    createFakeExecutor(),
+    "wordpress-db:places:301",
+  );
+
+  assert.equal(record.sourceEntityType, PLACE_ENTITY_TYPE);
+  assert.equal(record.sourceRecordKey, "wordpress-db:places:301");
+  assert.equal(record.sourceStableKey, "wordpress-db:places:301");
+  assert.ok(record.sourceHash);
+}
+
+/** Wrong entity/post type prefix — an article-shaped key is not a place key. */
+async function testFetchPublishedPlaceEnvelopeRejectsWrongEntityPrefix() {
+  await assert.rejects(
+    () => fetchPublishedPlaceEnvelopeBySourceRecordKey(createFakeExecutor(), "wordpress-db:post:301"),
+    /Invalid place sourceRecordKey/,
+  );
+}
+
+async function testFetchPublishedPlaceEnvelopeRejectsMalformedIds() {
+  const cases = [
+    "wordpress-db:places:",
+    "wordpress-db:places:abc",
+    "wordpress-db:places:-1",
+    "wordpress-db:places:0",
+    "wordpress-db:places:01",
+    "wordpress-db:places:1.5",
+    "wordpress-db:places:301extra",
+    "not-even-a-key",
+    "",
+  ];
+  for (const key of cases) {
+    await assert.rejects(
+      () => fetchPublishedPlaceEnvelopeBySourceRecordKey(createFakeExecutor(), key),
+      /Invalid place sourceRecordKey/,
+      `expected "${key}" to be rejected`,
+    );
+  }
+}
+
+async function testFetchPublishedPlaceEnvelopeRejectsMissingSource() {
+  await assert.rejects(
+    () => fetchPublishedPlaceEnvelopeBySourceRecordKey(createFakeExecutor(), "wordpress-db:places:99999"),
+    /No published WordPress place found/,
+  );
+}
+
+
 async function testStableSourceHash() {
   const first = await wordpressDbAdapter.discoverRecords(contextWith());
   const second = await wordpressDbAdapter.discoverRecords(contextWith());
@@ -242,6 +295,10 @@ async function main() {
   await testSourceRecordKeyFormat();
   await testFetchPublishedArticleEnvelopeBySourceRecordKey();
   await testFetchPublishedArticleEnvelopeRejectsWrongKey();
+  await testFetchPublishedPlaceEnvelopeBySourceRecordKey();
+  await testFetchPublishedPlaceEnvelopeRejectsWrongEntityPrefix();
+  await testFetchPublishedPlaceEnvelopeRejectsMalformedIds();
+  await testFetchPublishedPlaceEnvelopeRejectsMissingSource();
   await testStableSourceHash();
   await testNormalizeRoutesToArticleAndPlace();
   await testNormalizeRouteEntity();
