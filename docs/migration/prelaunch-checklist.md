@@ -677,10 +677,11 @@ runner'а не покрыта тестами. Требует отдельной 
         pure-функции/fakes в тестах и read-only metadata-аудит против
         живой WP БД (не байты, только `wp_posts`/`wp_postmeta` строки).
 - [x] **PR C3 — resumable Place media retry** (2026-07-15, ветка
-      `feat/migration-place-media-force-reprocess`, **PR открыт, merge ещё
-      не выполнен**) — обнаружен и закрыт blocker, найденный на
-      preflight-этапе перед golden write (§2 golden-write протокола,
-      "media retry preflight"), **до каких-либо DB writes**.
+      `feat/migration-place-media-force-reprocess`, PR #49, **смержен** —
+      merge commit `b3d1c584`, CI + Docker Build & Push SUCCESS на этом
+      SHA) — обнаружен и закрыт blocker, найденный на preflight-этапе
+      перед golden write (§2 golden-write протокола, "media retry
+      preflight"), **до каких-либо DB writes**.
 
       **Root cause (доказано кодом, не предположением):** после частичного
       media failure Place commit всё равно доходит до `LINKED`
@@ -730,17 +731,41 @@ runner'а не покрыта тестами. Требует отдельной 
       full-batch 82, где часть Places реально имеет missing/unsupported
       attachments).
 
+      **Review (chatgpt-codex-connector, P2, до merge):** включение
+      реального retry обнажило отдельный, ранее не reachable баг в самом
+      `PlaceMediaSyncer` (существовал с PR C2, но никогда не мог
+      сработать без рабочего retry) — `sortOrder` назначался как
+      "следующий свободный слот" (`max(existing)+1`), а не по фиксированной
+      позиции attachment'а в cover-first списке. Если cover падал первым
+      прогоном, а gallery успешно импортировалась, повторный прогон
+      восстанавливал cover В КОНЕЦ, а не на `sortOrder:0` — молча ломая
+      конвенцию "cover = первый GALLERY-образ". Исправлено (тот же PR,
+      отдельный коммит `4f0f5a2d`, не amend): `sortOrder` теперь = индекс
+      attachment'а в `orderedUniqueAttachmentIds` (фиксированная позиция,
+      не "следующий слот"); уже существующая связанная строка при
+      необходимости получает `placeImage.update({sortOrder})` — но только
+      если её `url` совпадает с MediaAsset, реально резолвнутым в ЭТОМ
+      вызове для одного из attachment id кандидата, так что чужая/ручная
+      `PlaceImage`-строка по-прежнему никогда не читается и не двигается.
+      Новый regression-тест
+      `testRetryRecoveringEarlierAttachmentRestoresCorrectOrder`
+      воспроизводит ровно этот сценарий (cover падает, gallery успевает,
+      retry восстанавливает cover на `sortOrder:0`).
+
       Тесты: `migration-commit-wordpress-db.test.ts` — `place` теперь
       разрешён с `--force-reprocess` (event/route/all по-прежнему
       отклоняются), 6 новых прямых тестов `applyForcedReprocess` (flip
       для Place, regression для Article, non-matching sourceRecordKey
       игнорируется, CREATE/UPDATE-items не трогаются, no-op без флага,
-      no-op без sourceRecordKey). Проверки — все green: полный
-      `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep,
-      eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
+      no-op без sourceRecordKey); `PlaceMediaSyncer.test.ts` — order-fix
+      regression-тест + обновлённый manual-preservation тест (ручная
+      строка матчится строго по `url`, не по позиции). Проверки — все
+      green: полный `src/lib/migration/**` + `scripts/migration-*.test.ts`
+      sweep, eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
 
-      **Ноль DB writes** — код-изменение и pure-тесты только, golden
-      write возобновится этим же CLI после merge.
+      **Ноль DB writes** — код-изменение и pure-тесты только. Golden
+      write возобновляется этим же CLI после merge, с шага 3 (backup) по
+      исходному плану.
 - [ ] Новые golden samples (после B+C, **с PR C3** для safe media retry).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
 - [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
@@ -1784,3 +1809,25 @@ dispatcher-branch, ни CLI-flag).
   (`feat/migration-place-media-force-reprocess`, детали — см. пункт
   "PR C3" выше) вместо продолжения на свой риск. После merge PR C3 —
   возобновление golden write с шага 3 (backup) по тому же плану.
+- **2026-07-15 — Claude Code** — **PR C3 смержен.** PR #49: расширили
+  `--force-reprocess` с `--entity article` на `--entity article|place`
+  (сама flip-логика `SKIP_UNCHANGED → UPDATE` уже была entity-agnostic,
+  новый Place-специфичный код не потребовался — форсированный `UPDATE`
+  проходит через уже существующий `PlaceCommitRunner` UPDATE_SAFE →
+  `mediaSyncer.sync()`, а `classifyUpdate()` по-прежнему независимо
+  гарантирует безопасность). Review (`chatgpt-codex-connector`, P2)
+  обнаружил, что включение реального retry обнажает отдельный
+  pre-existing баг в `PlaceMediaSyncer` (жил с PR C2, но был недостижим
+  без рабочего retry): `sortOrder` вычислялся как "следующий свободный
+  слот", из-за чего восстановленный после retry cover уезжал в конец
+  вместо `sortOrder:0`. Исправлено отдельным коммитом `4f0f5a2d` (не
+  amend): `sortOrder` теперь = фиксированный индекс attachment'а в
+  cover-first списке, существующая строка при необходимости получает
+  точечный `sortOrder`-update, чужие/ручные строки по-прежнему матчатся
+  и трогаются только по точному совпадению `url`. Review thread
+  resolved, все gates green (`mergeStateStatus=CLEAN`,
+  `mergeable=MERGEABLE`, 0 unresolved threads, CI SUCCESS на `4f0f5a2d`)
+  → merge commit `b3d1c584`. Post-merge CI + Docker Build & Push —
+  SUCCESS на `b3d1c584`. Local `dev` fast-forwarded. **Golden write
+  возобновляется** со следующего шага (backup local DB) по исходному
+  плану — baseline теперь `dev = origin/dev = b3d1c584`.
