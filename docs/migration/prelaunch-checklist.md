@@ -676,7 +676,72 @@ runner'а не покрыта тестами. Требует отдельной 
         **Ноль реальных DB writes и media downloads в этом PR** — только
         pure-функции/fakes в тестах и read-only metadata-аудит против
         живой WP БД (не байты, только `wp_posts`/`wp_postmeta` строки).
-- [ ] Новые golden samples (после B+C).
+- [x] **PR C3 — resumable Place media retry** (2026-07-15, ветка
+      `feat/migration-place-media-force-reprocess`, **PR открыт, merge ещё
+      не выполнен**) — обнаружен и закрыт blocker, найденный на
+      preflight-этапе перед golden write (§2 golden-write протокола,
+      "media retry preflight"), **до каких-либо DB writes**.
+
+      **Root cause (доказано кодом, не предположением):** после частичного
+      media failure Place commit всё равно доходит до `LINKED`
+      (`PlaceCommitRunner.ts` — media warnings идут в
+      `MigrationRecord.validationSummary`, никогда не роняют commit), и
+      PLACE lineage пишется с `lastSourceHash` = текущий hash источника.
+      Простой повторный запуск того же `sourceRecordKey` без изменений в
+      source классифицируется как `SKIP_UNCHANGED`
+      (`MigrationLedgerRepository.getLineageActionForRecord()` сравнивает
+      только `lastSourceHash` PLACE lineage, media не участвует). А
+      `SKIP_UNCHANGED` перехватывается ДО `dispatchCommitRunner()`
+      (`runCommitExecutionPlan.ts`) — `PlaceCommitRunner.execute()`, а
+      значит и `PlaceMediaSyncer.sync()`, повторно не вызывается вообще.
+      Итог: недокачанный attachment остаётся недокачанным навсегда без
+      внешнего вмешательства — никакого force-flag для Place не было
+      (`--force-reprocess` существовал, но был жёстко ограничен
+      `--entity article`).
+
+      **Почему не workaround:** не использован ручной DB-хак (деактивация
+      lineage, ручной SQL) — именно это было explicitly запрещено
+      протоколом golden write ("не обходить проблему force-update").
+
+      **Fix (минимальный, переиспользует существующую, уже
+      протестированную инфраструктуру):** `--force-reprocess` расширен с
+      `--entity article` на `--entity article|place`.
+      `applyForcedArticleReprocess()` переименован в `applyForcedReprocess()`
+      (экспортирован для прямого теста) — его собственная логика уже была
+      entity-agnostic (матчит только по `sourceRecordKey` +
+      `SKIP_UNCHANGED`, никогда по `targetType`), так что никакого нового
+      Place-специфичного кода не потребовалось. Форсированный переход в
+      `UPDATE` проходит через уже существующий, уже покрытый тестами путь
+      `PlaceCommitRunner` UPDATE_SAFE → `mediaSyncer.sync()` (см. PR C2,
+      `testUpdateSafeCallsMediaSyncer`). **Безопасность не ослаблена**:
+      `classifyUpdate()` независимо и безусловно перевычисляет
+      UPDATE_SAFE/UPDATE_CONFLICT по факту (`MigrationLineage`/
+      `Place.updatedAt`) — форсирование plan action не отключает и не
+      обходит эту проверку; место, отредактированное вручную с момента
+      последнего импорта, по-прежнему корректно уходит в
+      `UPDATE_CONFLICT`/`QUARANTINED`.
+
+      **Read-only проверка перед fix:** attachment-health аудит именно
+      для 3 golden Places (5389/895/43023) — все 27 attachment id (15+10+12,
+      с дедупом cover/gallery для 43023) реально существуют в `wp_posts`,
+      все webp/jpeg, ни одного HEIC/unsupported — практический риск
+      partial failure для ЭТИХ трёх низкий, но протокол требует доказать
+      retry-механизм независимо от вероятности (важно для будущего
+      full-batch 82, где часть Places реально имеет missing/unsupported
+      attachments).
+
+      Тесты: `migration-commit-wordpress-db.test.ts` — `place` теперь
+      разрешён с `--force-reprocess` (event/route/all по-прежнему
+      отклоняются), 6 новых прямых тестов `applyForcedReprocess` (flip
+      для Place, regression для Article, non-matching sourceRecordKey
+      игнорируется, CREATE/UPDATE-items не трогаются, no-op без флага,
+      no-op без sourceRecordKey). Проверки — все green: полный
+      `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep,
+      eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
+
+      **Ноль DB writes** — код-изменение и pure-тесты только, golden
+      write возобновится этим же CLI после merge.
+- [ ] Новые golden samples (после B+C, **с PR C3** для safe media retry).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
 - [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
 
@@ -1703,3 +1768,19 @@ dispatcher-branch, ни CLI-flag).
   новых golden Place → повторный прогон → UI-проверка. Golden imports
   НЕ запускались в PR C1/C2 — ни одного реального media download или DB
   write в production/local БД в рамках этой пары PR.
+- **2026-07-15 — Claude Code** — **Golden write остановлен на preflight
+  (§2 протокола), найден реальный blocker, PR C3.** Начали контролируемый
+  golden write для Places 5389/895/43023 (baseline: `dev = origin/dev =
+  2665e3cf`, local Postgres `localhost:5433/mamago2` подтверждён как
+  единственная цель, media storage — local filesystem, sampled policy
+  даёт FULL ровно для этих трёх). Перед backup доказали кодом: после
+  частичного media failure Place остаётся `LINKED`, но повторный запуск
+  того же `sourceRecordKey` без изменений в source классифицируется как
+  `SKIP_UNCHANGED`, который перехватывается ДО вызова
+  `PlaceCommitRunner`/`PlaceMediaSyncer` — недокачанное медиа навсегда
+  остаётся недокачанным без внешнего вмешательства. Per протокол,
+  golden writes НЕ запущены (backup не создавался, DB не тронута) —
+  Алексей выбрал сначала закрыть blocker отдельным минимальным PR
+  (`feat/migration-place-media-force-reprocess`, детали — см. пункт
+  "PR C3" выше) вместо продолжения на свой риск. После merge PR C3 —
+  возобновление golden write с шага 3 (backup) по тому же плану.
