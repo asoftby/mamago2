@@ -108,6 +108,7 @@ import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLi
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
+import { resolveSampledMediaPolicy } from "../src/lib/migration/runtime/sampledMediaPolicy";
 import {
   formatMigrationProfileForCli,
   parseMediaPolicyName,
@@ -118,6 +119,7 @@ import {
 } from "../src/lib/migration/runtime/MigrationProfile";
 import type {
   MediaPolicyName,
+  MigrationEnvironment,
   MigrationProfile,
   MigrationProfileName,
   RedirectPolicyName,
@@ -251,6 +253,21 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     redirectPolicyName: redirectPolicyName ?? undefined,
     confirmProduction,
   };
+}
+
+/**
+ * Whether the sampled media policy (`resolveSampledMediaPolicy`) should be
+ * consulted for this run, pulled out of `main()` as a pure function so
+ * it's testable without a real profile/DB/SSH connection. An explicit
+ * `--media-policy` flag is a stronger, deliberate operator signal that
+ * always overrides sampling — this only ever activates for LOCAL/DEV runs
+ * using their environment's own default media policy.
+ */
+export function shouldSampleMedia(input: {
+  mediaPolicyName: MediaPolicyName | undefined;
+  environment: MigrationEnvironment;
+}): boolean {
+  return input.mediaPolicyName === undefined && (input.environment === "LOCAL" || input.environment === "DEV");
 }
 
 function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
@@ -436,19 +453,36 @@ async function main(): Promise<void> {
     const lineageWriter = new MigrationLineageWriter(prisma);
     const wordpressRepository = new WordPressRepository(executor);
 
+    // The sampled media policy (`resolveSampledMediaPolicy`) only kicks in
+    // when the operator didn't explicitly pin `--media-policy` — an
+    // explicit flag is a stronger, deliberate signal that overrides
+    // sampling entirely, exactly like it overrode the flat run-wide policy
+    // before sampling existed. Without an explicit override, LOCAL/DEV
+    // sample (3 Event + 3 Place + 3 Offer get FULL, everything else
+    // METADATA); PROD's own default is already FULL, so sampling is simply
+    // never invoked there — see `resolveSampledMediaPolicy`'s own
+    // unconditional-FULL-for-PROD guarantee for the belt-and-braces case.
+    const samplingActive = shouldSampleMedia({
+      mediaPolicyName: args.mediaPolicyName,
+      environment: profile.environment,
+    });
+
     // `createMamagoMediaImporter` transitively imports `@/server/media/media-storage`,
     // which is guarded by the `server-only` package. That guard is only a
     // no-op under Next's bundler (which sets the "react-server" resolve
     // condition) — under a plain `tsx`/Node process (this CLI), `server-only`
     // throws unconditionally the moment the module is *loaded*, regardless
     // of whether it's ever called. So this import must stay lazy and must
-    // only ever be reached when the run's media policy is actually FULL;
+    // only ever be reached when the run could actually produce a FULL
+    // write — either the flat run-wide policy is FULL, or per-record
+    // sampling is active (which can hand out FULL to the 9 allowlisted
+    // records even while the run's own baseline is METADATA);
     // `MediaPolicyGated{Event,RouteStop}MediaSyncer` already guarantee
     // `mediaImporterFactory` itself is never invoked for METADATA/NONE, but
     // the previous code additionally imported the module eagerly at
     // startup regardless of policy, which crashed every non-FULL run.
     let createMamagoMediaImporter: typeof import("../src/lib/migration/media")["createMamagoMediaImporter"] | undefined;
-    if (profile.mediaPolicy.name === "FULL") {
+    if (profile.mediaPolicy.name === "FULL" || samplingActive) {
       ({ createMamagoMediaImporter } = await import("../src/lib/migration/media"));
     }
     const mediaImporterFactory = (ownerUserId: string): MediaImporterLike => {
@@ -467,7 +501,10 @@ async function main(): Promise<void> {
         mediaImporterFactory,
         lineageWriter,
       }),
-      mediaPolicy: profile.mediaPolicy,
+      mediaPolicy: samplingActive
+        ? (sourceRecordKey: string) =>
+            resolveSampledMediaPolicy({ environment: profile.environment, sourceRecordKey })
+        : profile.mediaPolicy,
     });
     const routeStopMediaSyncer = new MediaPolicyGatedRouteStopMediaSyncer({
       inner: new RouteStopMediaSyncer({

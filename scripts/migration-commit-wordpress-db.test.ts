@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { MigrationLineageLookup } from "../src/lib/migration/core/orchestrator";
-import { buildExecutionPlanInput, parseArgs, parseCommitContextConfig } from "./migration-commit-wordpress-db";
+import { buildExecutionPlanInput, parseArgs, parseCommitContextConfig, shouldSampleMedia } from "./migration-commit-wordpress-db";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -345,6 +345,32 @@ function testBuildExecutionPlanInputPinsSingleRecordLimitForPlace() {
   assert.equal(input.records?.[0].sourceRecordKey, "wordpress-db:places:437");
 }
 
+// ---------------------------------------------------------------------------
+// shouldSampleMedia — when the sampled media policy activates.
+// ---------------------------------------------------------------------------
+
+function testSampleMediaActiveForLocalWithoutExplicitOverride() {
+  assert.equal(shouldSampleMedia({ mediaPolicyName: undefined, environment: "LOCAL" }), true);
+}
+
+function testSampleMediaActiveForDevWithoutExplicitOverride() {
+  assert.equal(shouldSampleMedia({ mediaPolicyName: undefined, environment: "DEV" }), true);
+}
+
+function testSampleMediaNeverActiveForProd() {
+  assert.equal(shouldSampleMedia({ mediaPolicyName: undefined, environment: "PROD" }), false);
+}
+
+function testSampleMediaDisabledByExplicitOverrideOnLocal() {
+  assert.equal(shouldSampleMedia({ mediaPolicyName: "FULL", environment: "LOCAL" }), false);
+  assert.equal(shouldSampleMedia({ mediaPolicyName: "METADATA", environment: "LOCAL" }), false);
+  assert.equal(shouldSampleMedia({ mediaPolicyName: "NONE", environment: "LOCAL" }), false);
+}
+
+function testSampleMediaDisabledByExplicitOverrideOnDev() {
+  assert.equal(shouldSampleMedia({ mediaPolicyName: "FULL", environment: "DEV" }), false);
+}
+
 function main() {
   testParsesValidFlags();
   testDefaultsWhenOptionalFlagsOmitted();
@@ -375,6 +401,12 @@ function main() {
   testBuildExecutionPlanInputPassesLimitThrough();
   testBuildExecutionPlanInputPinsSingleRecordLimit();
   testBuildExecutionPlanInputPinsSingleRecordLimitForPlace();
+
+  testSampleMediaActiveForLocalWithoutExplicitOverride();
+  testSampleMediaActiveForDevWithoutExplicitOverride();
+  testSampleMediaNeverActiveForProd();
+  testSampleMediaDisabledByExplicitOverrideOnLocal();
+  testSampleMediaDisabledByExplicitOverrideOnDev();
 }
 
 // No real DB/SSH anywhere in this file — only `parseArgs()`/
