@@ -27,7 +27,7 @@ export interface PlaceMediaAttachmentResolver {
 }
 
 export interface PlaceMediaSyncerPrismaClient {
-  placeImage: Pick<PrismaClient["placeImage"], "create" | "findMany">;
+  placeImage: Pick<PrismaClient["placeImage"], "create" | "findMany" | "update">;
   mediaAsset: Pick<PrismaClient["mediaAsset"], "findFirst">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst">;
 }
@@ -134,16 +134,23 @@ function classifyImportError(message: string): "PLACE_MEDIA_DOWNLOAD_FAILED" | "
  *    instead of per-attachment "cover"/"gallery", because real Place
  *    attachment ids are sometimes cover for one Place and gallery for
  *    another.
- * 2. Never deletes an existing `PlaceImage` row. Event's syncer does a
- *    diff-then-`deleteMany`+recreate; Place has no equivalent "safe to
- *    fully replace" guarantee (`PlaceImage` has no `mediaAssetId` FK to
- *    diff against, and manually-added images — e.g. Place 437, which this
- *    syncer must never even be called for — must never be silently
- *    removed by a re-run). This syncer only ever *appends* a new
- *    `PlaceImage` row for an attachment id that doesn't already have a
- *    matching `url` on this Place; sortOrder continues from whatever the
- *    Place already has, exactly like the existing
- *    `POST /api/business/places/[id]/images` write path already does.
+ * 2. Never deletes an existing `PlaceImage` row, and never touches a row
+ *    it doesn't recognize. Event's syncer does a diff-then-`deleteMany`+
+ *    recreate; Place has no equivalent "safe to fully replace" guarantee
+ *    (`PlaceImage` has no `mediaAssetId` FK to diff against, and
+ *    manually-added images — e.g. Place 437, which this syncer must never
+ *    even be called for — must never be silently removed by a re-run).
+ *    A row is only ever created or have its `sortOrder` corrected when its
+ *    `url` matches a `MediaAsset` this exact call just resolved for one of
+ *    the candidate's own attachment ids — an unrelated/manual row (a
+ *    different URL) is never matched, so it's never written to. `sortOrder`
+ *    is assigned by each attachment's fixed position in the cover-first,
+ *    source-ordered list (`orderedUniqueAttachmentIds`), not "whatever
+ *    slot is next free" — a `--force-reprocess` retry can resolve an
+ *    earlier attachment (e.g. the cover) after later gallery items already
+ *    succeeded on a prior run, and a plain "append after max" scheme would
+ *    silently move that recovered item to the back instead of restoring
+ *    correct order.
  *
  * Never touches `Place.logoImageId` or creates a `PlaceImageKind.LOGO`
  * row — Place logo import is a permanent, separate policy exclusion (see
@@ -187,16 +194,31 @@ export class PlaceMediaSyncer {
       this.deps.attachmentResolver.getAttachmentsByIds(ids),
       this.deps.prisma.placeImage.findMany({
         where: { placeId: input.placeId },
-        select: { url: true, sortOrder: true },
+        select: { id: true, url: true, sortOrder: true },
       }),
     ]);
 
-    const existingUrls = new Set(existingImages.map((row) => row.url.trim()));
-    let nextSortOrder = existingImages.reduce((max, row) => Math.max(max, row.sortOrder + 1), 0);
+    // Keyed by URL, not attachment id — an existing row only ever matches
+    // here if some earlier sync() call resolved the exact same MediaAsset
+    // for one of *this* candidate's own attachment ids, so a genuinely
+    // unrelated/manual PlaceImage (a different URL entirely) can never be
+    // matched or touched by the block below.
+    const existingByUrl = new Map(existingImages.map((row) => [row.url.trim(), row]));
 
     const importer = this.deps.mediaImporterFactory(uploadedByUserId);
 
-    for (const id of ids) {
+    for (const [index, id] of ids.entries()) {
+      // The attachment's position in `ids` (cover always 0, then gallery in
+      // source order) *is* its correct sortOrder — not "whatever slot is
+      // next free". A retry (`--force-reprocess`) can resolve an earlier
+      // attachment (e.g. the cover) after later gallery items already
+      // succeeded on a prior run; assigning by fixed index, and correcting
+      // an already-linked row's sortOrder if it's since drifted, keeps
+      // cover-first/source order correct regardless of which attempt each
+      // attachment succeeded on. Found by review (PR #49,
+      // chatgpt-codex-connector) before merge — a plain "append after max"
+      // scheme silently moved a recovered cover/earlier item to the back.
+      const targetSortOrder = index;
       const attachment = attachments.get(id);
       if (!attachment) {
         warnings.push(
@@ -258,12 +280,19 @@ export class PlaceMediaSyncer {
       if (!resolved) continue;
 
       const url = resolved.publicUrl.trim();
-      if (existingUrls.has(url)) {
+      const existingRow = existingByUrl.get(url);
+      if (existingRow) {
+        if (existingRow.sortOrder !== targetSortOrder) {
+          await this.deps.prisma.placeImage.update({
+            where: { id: existingRow.id },
+            data: { sortOrder: targetSortOrder },
+          });
+        }
         warnings.push(
           warning(
             input.sourceRecordKey,
             "PLACE_MEDIA_LINK_REUSED",
-            "This Place already has a PlaceImage row for this attachment's MediaAsset; nothing written.",
+            "This Place already has a PlaceImage row for this attachment's MediaAsset; reused (sortOrder corrected if it had drifted).",
             { attachmentId: id, mediaAssetId: resolved.mediaId },
             "INFO",
           ),
@@ -271,18 +300,17 @@ export class PlaceMediaSyncer {
         continue;
       }
 
-      await this.deps.prisma.placeImage.create({
+      const createdRow = await this.deps.prisma.placeImage.create({
         data: {
           placeId: input.placeId,
           kind: "GALLERY",
           url,
           width: resolved.width,
           height: resolved.height,
-          sortOrder: nextSortOrder,
+          sortOrder: targetSortOrder,
         },
       });
-      existingUrls.add(url);
-      nextSortOrder += 1;
+      existingByUrl.set(url, { id: createdRow.id, url, sortOrder: targetSortOrder });
     }
 
     if (counts.failed > 0) {

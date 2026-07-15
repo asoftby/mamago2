@@ -79,13 +79,21 @@ function createHarness(
   const prisma: PlaceMediaSyncerPrismaClient = {
     placeImage: {
       findMany: (async (args: { where: { placeId: string } }) => {
-        return placeImages.filter((row) => row.placeId === args.where.placeId).map((r) => ({ url: r.url, sortOrder: r.sortOrder }));
+        return placeImages
+          .filter((row) => row.placeId === args.where.placeId)
+          .map((r) => ({ id: r.id, url: r.url, sortOrder: r.sortOrder }));
       }) as unknown as PlaceMediaSyncerPrismaClient["placeImage"]["findMany"],
       create: (async (args: { data: Omit<PlaceImageRow, "id"> }) => {
         const row: PlaceImageRow = { id: `image-${nextRowId++}`, ...args.data };
         placeImages.push(row);
         return row;
       }) as unknown as PlaceMediaSyncerPrismaClient["placeImage"]["create"],
+      update: (async (args: { where: { id: string }; data: { sortOrder: number } }) => {
+        const row = placeImages.find((r) => r.id === args.where.id);
+        if (!row) throw new Error(`placeImage ${args.where.id} not found`);
+        row.sortOrder = args.data.sortOrder;
+        return row;
+      }) as unknown as PlaceMediaSyncerPrismaClient["placeImage"]["update"],
     },
     mediaAsset: {
       findFirst: (async (args: { where: { id?: string } }) => {
@@ -353,11 +361,53 @@ async function testRetryAfterPartialFailureOnlyImportsMissing() {
   );
 }
 
+/**
+ * Regression test for a review finding (PR #49, chatgpt-codex-connector):
+ * when the *cover* (not a gallery item) fails on the first run and later
+ * gallery items succeed, a naive "append after max" scheme would place the
+ * recovered cover at the back on retry instead of restoring it to
+ * sortOrder 0 — breaking the "cover = first GALLERY image" convention the
+ * public Place page and admin editor both rely on.
+ */
+async function testRetryRecoveringEarlierAttachmentRestoresCorrectOrder() {
+  // default candidate: cover=10, gallery=[11, 12]
+  const { syncer, placeImages } = createHarness({ failImportIdsOnce: [10] });
+
+  const first = await syncer.sync(syncInput());
+  assert.equal(first.imported, 2);
+  assert.equal(first.failed, 1);
+  assert.deepEqual(
+    placeImages.map((r) => ({ url: r.url, sortOrder: r.sortOrder })),
+    [
+      { url: "/uploads/11.webp", sortOrder: 1 },
+      { url: "/uploads/12.webp", sortOrder: 2 },
+    ],
+    "gallery items reserve their true target index even when the cover fails first",
+  );
+
+  const second = await syncer.sync(syncInput());
+  assert.equal(second.imported, 1, "the retry recovers only the cover");
+  assert.equal(second.reused, 2, "the already-correct gallery items are reused, not touched");
+
+  const bySortOrder = [...placeImages].sort((a, b) => a.sortOrder - b.sortOrder);
+  assert.deepEqual(
+    bySortOrder.map((r) => ({ url: r.url, sortOrder: r.sortOrder })),
+    [
+      { url: "/uploads/10.webp", sortOrder: 0 },
+      { url: "/uploads/11.webp", sortOrder: 1 },
+      { url: "/uploads/12.webp", sortOrder: 2 },
+    ],
+    "the recovered cover must land at sortOrder 0, not appended after the gallery",
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Manual data preservation — never delete, never touch LOGO.
 // ---------------------------------------------------------------------------
 
-async function testManuallyAddedImagesAreNeverTouchedAndNewOnesAppend() {
+async function testManuallyAddedImagesAreNeverTouchedByUrl() {
+  // A manual image (a URL this call never resolves any attachment to) must
+  // never be read, moved, or deleted — matching is by exact URL only.
   const manualRow: PlaceImageRow = {
     id: "manual-1",
     placeId: "place-1",
@@ -365,7 +415,7 @@ async function testManuallyAddedImagesAreNeverTouchedAndNewOnesAppend() {
     url: "/uploads/manual-photo.webp",
     width: 900,
     height: 600,
-    sortOrder: 0,
+    sortOrder: 99,
   };
   const { syncer, placeImages } = createHarness({ existingPlaceImages: [manualRow] });
 
@@ -375,8 +425,10 @@ async function testManuallyAddedImagesAreNeverTouchedAndNewOnesAppend() {
 
   assert.equal(result.imported, 1);
   assert.equal(placeImages.length, 2, "the manual row must never be deleted");
-  assert.equal(placeImages[0]?.id, "manual-1", "the manual row must be untouched");
-  assert.equal(placeImages[1]?.sortOrder, 1, "a new migrated image must append after existing sortOrder, never overwrite it");
+  const manual = placeImages.find((r) => r.id === "manual-1");
+  assert.deepEqual(manual, manualRow, "the manual row must be completely untouched, including its own sortOrder");
+  const migrated = placeImages.find((r) => r.id !== "manual-1");
+  assert.equal(migrated?.sortOrder, 0, "the migrated cover gets its own correct target index, independent of unrelated rows");
 }
 
 // ---------------------------------------------------------------------------
@@ -491,7 +543,8 @@ async function main() {
   await testSameAttachmentIdAcrossTwoPlacesReusesOneMediaAsset();
   await testRetryAfterPartialFailureOnlyImportsMissing();
 
-  await testManuallyAddedImagesAreNeverTouchedAndNewOnesAppend();
+  await testManuallyAddedImagesAreNeverTouchedByUrl();
+  await testRetryRecoveringEarlierAttachmentRestoresCorrectOrder();
 
   await testMissingUploadedByUserIdSkipsAllMedia();
   await testMissingAttachmentRowWarnsAndContinues();

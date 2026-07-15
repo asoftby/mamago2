@@ -3,8 +3,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { MigrationLineageLookup } from "../src/lib/migration/core/orchestrator";
-import { buildExecutionPlanInput, parseArgs, parseCommitContextConfig, shouldSampleMedia } from "./migration-commit-wordpress-db";
+import type { MigrationLineageLookup, MigrationRunExecutionPlan } from "../src/lib/migration/core/orchestrator";
+import type { CommitCliArgs } from "./migration-commit-wordpress-db";
+import {
+  applyForcedReprocess,
+  buildExecutionPlanInput,
+  parseArgs,
+  parseCommitContextConfig,
+  shouldSampleMedia,
+} from "./migration-commit-wordpress-db";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -96,17 +103,31 @@ function testValidEntityValuesAllParse() {
   }
 }
 
-function testForceReprocessRequiresArticleAndSourceRecordKey() {
-  assert.throws(
-    () => parseArgs(["--entity", "place", "--force-reprocess", ...REQUIRED_FLAGS]),
-    /--entity article/,
-  );
+function testForceReprocessAllowsArticleAndPlaceRejectsOtherEntities() {
+  // Widened from article-only to also support place (2026-07-15): a
+  // partial PlaceMediaSyncer failure never fails the Place commit, but a
+  // plain re-run of the same unchanged sourceRecordKey classifies
+  // SKIP_UNCHANGED and never reaches mediaSyncer.sync() again —
+  // --force-reprocess is the supported way to force a real UPDATE_SAFE
+  // pass that retries incomplete media. Event/route have no equivalent
+  // known need yet, so they stay rejected rather than silently widened.
+  for (const entity of ["event", "route", "all"]) {
+    assert.throws(
+      () => parseArgs(["--entity", entity, "--force-reprocess", ...REQUIRED_FLAGS]),
+      /--entity article\|place/,
+      `entity "${entity}" must still be rejected`,
+    );
+  }
   assert.throws(
     () => parseArgs(["--entity", "article", "--force-reprocess", ...REQUIRED_FLAGS]),
     /--source-record-key/,
   );
+  assert.throws(
+    () => parseArgs(["--entity", "place", "--force-reprocess", ...REQUIRED_FLAGS]),
+    /--source-record-key/,
+  );
 
-  const args = parseArgs([
+  const articleArgs = parseArgs([
     "--entity",
     "article",
     "--source-record-key",
@@ -114,7 +135,17 @@ function testForceReprocessRequiresArticleAndSourceRecordKey() {
     "--force-reprocess",
     ...REQUIRED_FLAGS,
   ]);
-  assert.equal(args.forceReprocess, true);
+  assert.equal(articleArgs.forceReprocess, true);
+
+  const placeArgs = parseArgs([
+    "--entity",
+    "place",
+    "--source-record-key",
+    "wordpress-db:places:5389",
+    "--force-reprocess",
+    ...REQUIRED_FLAGS,
+  ]);
+  assert.equal(placeArgs.forceReprocess, true);
 }
 
 function testForceReprocessDisallowsMassModeLimit() {
@@ -371,6 +402,108 @@ function testSampleMediaDisabledByExplicitOverrideOnDev() {
   assert.equal(shouldSampleMedia({ mediaPolicyName: "FULL", environment: "DEV" }), false);
 }
 
+// ---------------------------------------------------------------------------
+// applyForcedReprocess — flips a SKIP_UNCHANGED plan item to UPDATE,
+// entity-agnostically (Place's resumable-media-sync mechanism).
+// ---------------------------------------------------------------------------
+
+function forceReprocessArgsFixture(overrides: Partial<CommitCliArgs> = {}): CommitCliArgs {
+  return {
+    entity: "place",
+    contextConfigPath: "config.json",
+    confirmWrites: true,
+    sourceRecordKey: "wordpress-db:places:5389",
+    forceReprocess: true,
+    allowRemoteReadonly: false,
+    confirmProduction: false,
+    ...overrides,
+  };
+}
+
+function planItemFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    sourceRecordKey: "wordpress-db:places:5389",
+    sourceEntityType: "wordpress-db:places",
+    action: "SKIP_UNCHANGED",
+    status: "SKIPPED",
+    targetType: "PLACE",
+    ...overrides,
+  };
+}
+
+function executionPlanFixture(items: ReturnType<typeof planItemFixture>[]): MigrationRunExecutionPlan {
+  return {
+    plan: {
+      adapterKey: "wordpress-db",
+      adapterVersion: "1",
+      sourceNamespace: "wordpress-db",
+      mode: "COMMIT",
+      createdAt: new Date().toISOString(),
+      records: [],
+      items: items as never,
+      warnings: [],
+      errors: [],
+    },
+    executionCandidates: items.map((item) => ({ planItem: { ...item } as never, candidate: { fake: true } })),
+  };
+}
+
+function testApplyForcedReprocessFlipsMatchingPlaceSkipUnchanged() {
+  const plan = executionPlanFixture([planItemFixture()]);
+
+  applyForcedReprocess(plan, forceReprocessArgsFixture());
+
+  assert.equal(plan.plan.items[0].action, "UPDATE");
+  assert.equal(plan.plan.items[0].status, "PLANNED");
+  assert.equal(plan.executionCandidates[0].planItem.action, "UPDATE");
+  assert.equal(plan.executionCandidates[0].planItem.status, "PLANNED");
+  assert.deepEqual(plan.executionCandidates[0].candidate, { fake: true }, "the real normalized candidate must survive the flip untouched");
+}
+
+function testApplyForcedReprocessStillWorksForArticle() {
+  // Regression: the original article-only behavior must be unaffected by
+  // widening this to Place.
+  const plan = executionPlanFixture([
+    planItemFixture({ sourceRecordKey: "wordpress-db:post:201", sourceEntityType: "wordpress-db:post", targetType: "ARTICLE" }),
+  ]);
+
+  applyForcedReprocess(plan, forceReprocessArgsFixture({ entity: "article", sourceRecordKey: "wordpress-db:post:201" }));
+
+  assert.equal(plan.plan.items[0].action, "UPDATE");
+}
+
+function testApplyForcedReprocessIgnoresNonMatchingSourceRecordKey() {
+  const plan = executionPlanFixture([planItemFixture({ sourceRecordKey: "wordpress-db:places:99999" })]);
+
+  applyForcedReprocess(plan, forceReprocessArgsFixture());
+
+  assert.equal(plan.plan.items[0].action, "SKIP_UNCHANGED", "a different sourceRecordKey must never be flipped");
+}
+
+function testApplyForcedReprocessIgnoresNonSkipUnchangedActions() {
+  const plan = executionPlanFixture([planItemFixture({ action: "CREATE", status: "PLANNED" })]);
+
+  applyForcedReprocess(plan, forceReprocessArgsFixture());
+
+  assert.equal(plan.plan.items[0].action, "CREATE", "CREATE/UPDATE items are already going to run — never touched");
+}
+
+function testApplyForcedReprocessNoOpWhenFlagNotSet() {
+  const plan = executionPlanFixture([planItemFixture()]);
+
+  applyForcedReprocess(plan, forceReprocessArgsFixture({ forceReprocess: false }));
+
+  assert.equal(plan.plan.items[0].action, "SKIP_UNCHANGED");
+}
+
+function testApplyForcedReprocessNoOpWhenSourceRecordKeyMissing() {
+  const plan = executionPlanFixture([planItemFixture()]);
+
+  applyForcedReprocess(plan, forceReprocessArgsFixture({ sourceRecordKey: undefined }));
+
+  assert.equal(plan.plan.items[0].action, "SKIP_UNCHANGED");
+}
+
 function main() {
   testParsesValidFlags();
   testDefaultsWhenOptionalFlagsOmitted();
@@ -379,7 +512,7 @@ function main() {
   testInvalidEntityFails();
   testInvalidLimitFails();
   testValidEntityValuesAllParse();
-  testForceReprocessRequiresArticleAndSourceRecordKey();
+  testForceReprocessAllowsArticleAndPlaceRejectsOtherEntities();
   testForceReprocessDisallowsMassModeLimit();
   testProfileFlagParsesValidValues();
   testInvalidProfileFails();
@@ -407,6 +540,13 @@ function main() {
   testSampleMediaNeverActiveForProd();
   testSampleMediaDisabledByExplicitOverrideOnLocal();
   testSampleMediaDisabledByExplicitOverrideOnDev();
+
+  testApplyForcedReprocessFlipsMatchingPlaceSkipUnchanged();
+  testApplyForcedReprocessStillWorksForArticle();
+  testApplyForcedReprocessIgnoresNonMatchingSourceRecordKey();
+  testApplyForcedReprocessIgnoresNonSkipUnchangedActions();
+  testApplyForcedReprocessNoOpWhenFlagNotSet();
+  testApplyForcedReprocessNoOpWhenSourceRecordKeyMissing();
 }
 
 // No real DB/SSH anywhere in this file — only `parseArgs()`/

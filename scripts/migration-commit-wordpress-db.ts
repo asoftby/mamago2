@@ -193,8 +193,8 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   }
 
   if (forceReprocess) {
-    if (entity !== "article") {
-      throw new Error("--force-reprocess is only supported with --entity article.");
+    if (entity !== "article" && entity !== "place") {
+      throw new Error("--force-reprocess is only supported with --entity article|place.");
     }
     if (!sourceRecordKey) {
       throw new Error("--force-reprocess requires --source-record-key <key>.");
@@ -372,7 +372,38 @@ function printSummary(summary: RunCommitExecutionPlanSummary, args: CommitCliArg
   }
 }
 
-function applyForcedArticleReprocess(
+/**
+ * Flips a single `SKIP_UNCHANGED` plan item (identified by
+ * `args.sourceRecordKey`) to `UPDATE`, in place, on both the persisted
+ * `plan.items` and the `executionCandidates` that still carry the real
+ * normalized candidate a `SKIP_UNCHANGED` item was never dropped for (see
+ * `runCommitExecutionPlan.ts`'s own doc comment on that). Entity-agnostic —
+ * it only ever matches by `sourceRecordKey` + `SKIP_UNCHANGED`, never by
+ * `targetType` — so the same function already served `--entity article`
+ * and now also serves `--entity place`, without any Place-specific branch.
+ *
+ * Originally article-only in `parseArgs()`'s validation. Widened to Place
+ * to close a real gap: `PlaceMediaSyncer` never crashes on a partial media
+ * failure (the Place commit still reaches `LINKED`), but a *plain* re-run
+ * of an unchanged source record classifies `SKIP_UNCHANGED` and is
+ * intercepted before `dispatchCommitRunner()` — so `PlaceCommitRunner`,
+ * and therefore `mediaSyncer.sync()`, is never invoked again, and any
+ * attachment that failed to import on the first run would stay missing
+ * forever. Forcing the plan item to `UPDATE` gives it a real second pass
+ * through `PlaceCommitRunner`, which invokes `mediaSyncer.sync()` again on
+ * `UPDATE_SAFE` — `PlaceMediaSyncer` is already idempotent (existing
+ * `MigrationLineage(MEDIA_ASSET)`/`PlaceImage` rows are reused, never
+ * re-downloaded or duplicated — see `PlaceMediaSyncer.test.ts`), so this
+ * genuinely retries only what's missing.
+ *
+ * This does **not** bypass Place's own UPDATE safety check: forcing the
+ * plan item's *action* has no effect on `PlaceCommitRunner.classifyUpdate()`,
+ * which independently re-derives safety from `MigrationLineage`/the target
+ * `Place` row's own `updatedAt` regardless of how the action was decided.
+ * A Place that was manually edited since its last import still correctly
+ * comes back `UPDATE_CONFLICT`/`QUARANTINED`, forced or not.
+ */
+export function applyForcedReprocess(
   executionPlan: Awaited<ReturnType<typeof createMigrationRunExecutionPlan>>,
   args: CommitCliArgs,
 ): void {
@@ -449,7 +480,7 @@ async function main(): Promise<void> {
         ledger,
       }),
     );
-    applyForcedArticleReprocess(executionPlan, args);
+    applyForcedReprocess(executionPlan, args);
 
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);
