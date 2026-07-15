@@ -35,7 +35,9 @@ function buildBundle(overrides: Partial<WordPressPlaceBundle> = {}): WordPressPl
       "short-desc-place": ["A great place for kids"],
       phone: ["+375291234567"],
       email: ["hello@example.com"],
-      work_hours: ["Mon-Fri 9-18"],
+      work_hours: [
+        '[{"days":["mon","tue","wed","thu","fri","sat","sun"],"status":"hours","hours":[{"from":"09:00","to":"18:00"}]}]',
+      ],
       location: ["Minsk, some street"],
       "city-place": ["Minsk"],
       gallery: ["111", "222", "333"],
@@ -68,7 +70,13 @@ function testFullPlace() {
   assert.equal(payload.phone, "+375291234567");
   assert.equal(payload.phoneE164, "+375291234567");
   assert.equal(payload.email, "hello@example.com");
-  assert.equal(payload.workHoursRaw, "Mon-Fri 9-18");
+  assert.equal(
+    payload.workHoursRaw,
+    '[{"days":["mon","tue","wed","thu","fri","sat","sun"],"status":"hours","hours":[{"from":"09:00","to":"18:00"}]}]',
+  );
+  assert.equal(payload.openingHours?.mode, "WEEKLY");
+  assert.equal(payload.openingHours?.rules.length, 7);
+  assert.ok(payload.openingHours?.rules.every((r) => r.isOpen));
   assert.equal(payload.locationRaw, "Minsk, some street");
   assert.equal(payload.cityRaw, "Minsk");
   assert.deepEqual(payload.coordinates, { lat: 53.9, lng: 27.5667 });
@@ -171,6 +179,36 @@ function testInvalidPhoneWarnsAndKeepsRawEvidenceWithNullE164() {
   assert.equal(warning?.details?.phoneRaw, "not a phone at all");
 }
 
+function testInvalidWorkHoursJsonWarnsWithSourceRecordKey() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, work_hours: ["Mon-Fri 9-18"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.workHoursRaw, "Mon-Fri 9-18", "raw evidence preserved even when unparseable");
+  assert.equal(payload.openingHours, null);
+
+  const warning = record.warnings?.find((w) => w.code === "PLACE_WORK_HOURS_JSON_INVALID");
+  assert.ok(warning);
+  assert.equal(warning?.severity, "WARNING");
+  assert.equal(warning?.sourceRecordKey, "wordpress-db:places:301");
+}
+
+function testAppointmentsOnlyWorkHoursPropagatesAsByAppointmentMode() {
+  const record = normalizePlace(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        work_hours: [
+          '[{"days":["mon","tue","wed","thu","fri","sat","sun"],"status":"appointments_only","hours":[]}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.openingHours?.mode, "BY_APPOINTMENT");
+  assert.ok(!record.warnings?.some((w) => w.code?.startsWith("PLACE_WORK_HOURS_")));
+}
+
 function testEmptyOrBrokenMetaDoesNotThrow() {
   const record = normalizePlace(
     buildBundle({ postMeta: {}, terms: [], placeIndex: null }),
@@ -181,6 +219,9 @@ function testEmptyOrBrokenMetaDoesNotThrow() {
   assert.equal(payload.phoneE164, null);
   // Absent phone must not warn — only present-but-invalid does.
   assert.ok(!record.warnings?.some((w) => w.code === "PLACE_PHONE_INVALID"));
+  assert.equal(payload.workHoursRaw, null);
+  assert.equal(payload.openingHours, null);
+  assert.ok(!record.warnings?.some((w) => w.code?.startsWith("PLACE_WORK_HOURS_")));
   assert.equal(payload.coordinates, null);
   assert.equal(payload.media.thumbnailAttachmentId, null);
   assert.deepEqual(payload.media.galleryAttachmentIds, []);
@@ -210,6 +251,8 @@ function main() {
   testCategoryTermsNotMappedKeptAsSourceReferences();
   testLegacyFormattedPhoneNormalizedWithoutWarning();
   testInvalidPhoneWarnsAndKeepsRawEvidenceWithNullE164();
+  testInvalidWorkHoursJsonWarnsWithSourceRecordKey();
+  testAppointmentsOnlyWorkHoursPropagatesAsByAppointmentMode();
   testEmptyOrBrokenMetaDoesNotThrow();
 }
 

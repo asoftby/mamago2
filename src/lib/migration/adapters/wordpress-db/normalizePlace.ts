@@ -1,6 +1,8 @@
 import { normalizePhoneToE164 } from "@/lib/phone/e164";
+import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
 
 import type { MigrationWarning, NormalizedRecord } from "../../types";
+import { parsePlaceOpeningHours } from "./parsePlaceOpeningHours";
 import type { WordPressPlaceBundle, WordPressTermRow } from "./types";
 
 const SOURCE_ENTITY_TYPE = "wordpress-db:places";
@@ -41,6 +43,14 @@ export interface NormalizedPlaceCandidate {
   phoneE164: string | null;
   email: string | null;
   workHoursRaw: string | null;
+  /**
+   * `workHoursRaw` run through `parsePlaceOpeningHours()`. `null` when
+   * there is no usable schedule (missing source, invalid JSON, or every
+   * day-group turned out unrepresentable) — see the `PLACE_WORK_HOURS_*`
+   * warnings on this record for why. `workHoursRaw` above still preserves
+   * exactly what the source had, regardless of whether this parses.
+   */
+  openingHours: OpeningHoursData | null;
   locationRaw: string | null;
   cityRaw: string | null;
   coordinates: { lat: number; lng: number } | null;
@@ -132,6 +142,12 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     });
   }
 
+  const workHoursRaw = firstMetaValue(postMeta, "work_hours");
+  const parsedOpeningHours = parsePlaceOpeningHours(workHoursRaw);
+  for (const warning of parsedOpeningHours.warnings) {
+    warnings.push({ ...warning, severity: "WARNING", sourceRecordKey });
+  }
+
   const thumbnailAttachmentId = parseAttachmentId(firstMetaValue(postMeta, "_thumbnail_id"));
   const galleryAttachmentIds = parseAttachmentIds(postMeta["gallery"]);
 
@@ -153,7 +169,8 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     phone: phoneRaw,
     phoneE164,
     email: firstMetaValue(postMeta, "email"),
-    workHoursRaw: firstMetaValue(postMeta, "work_hours"),
+    workHoursRaw,
+    openingHours: parsedOpeningHours.data,
     locationRaw: firstMetaValue(postMeta, "location"),
     cityRaw: firstMetaValue(postMeta, "city-place"),
     coordinates,

@@ -224,8 +224,12 @@ failed)**. Несмотря на чистый preview, полный batch-имп
    (`getPublishedPlaceById`, не client-side фильтр bulk-результата) +
    conservative UPDATE_SAFE/UPDATE_CONFLICT классификация в
    `PlaceCommitRunner`, а не просто allowlist.
-3. **(B) Режим работы (`work_hours`)** — известная проблема, требует
-   отдельного фикса перед full batch; детали фиксируются при выполнении PR B.
+3. **(B) Режим работы (`work_hours`)** — 77/82 Place имеют `work_hours`
+   postmeta (все 77 — валидный JSON), `normalizePlace.ts` сохранял
+   `workHoursRaw` как evidence, но 0% попадало в `OpeningHours` —
+   `buildPlaceCreateDraft`/writer его не использовали. **Исправлено PR
+   "import Place opening hours"** — см. запись ниже: pure parser
+   `parsePlaceOpeningHours()` + writer integration внутри транзакции.
 4. **(C) Media** — известная проблема (не совпадает с текущей строкой
    `Place | ready` в матрице §1.5 — см. исправление там же); детали
    фиксируются при выполнении PR C.
@@ -281,7 +285,95 @@ runner'а не покрыта тестами. Требует отдельной 
       `PlaceCommitRunner` — на UPDATE_SAFE. **Ноль DB writes в этом PR** —
       всё на уровне тестов/классификации; реальный targeted commit
       (`--confirm-writes`) не запускался.
-- [ ] PR — opening-hours fix (B).
+- [ ] **PR — import Place opening hours (B)** (2026-07-15, ветка
+      `feat/migration-place-opening-hours`, **PR открыт, merge ещё не
+      выполнен**) — read-only аудит source (`--allow-remote-readonly`
+      SELECT против всех 82 published Place): 77/82 имеют `work_hours`,
+      все 77 — валидный JSON-массив day-групп `{days, status, hours}`.
+      Status-распределение по группам: `hours` 78, `appointments_only` 23
+      (всегда всю неделю одной группой), `closed` 2 (1 место — вся
+      неделя; 1 место — смешано с `hours` на остальные дни),
+      `open` 1 (единственный случай, `hours: []` — без единого
+      доказательства реальных часов). Найдено: split-часы с обеденным
+      перерывом (несколько intervals в одном дне, WP 50902), overnight
+      diapазоны типа `10:00`–`00:00` (5 мест: 10343, 10380, 11892, 25756,
+      43023). Ни одного malformed JSON, invalid day token, invalid time
+      string, дублирующего дня между группами.
+
+      Target audit: `OpeningHours`/`OpeningHoursRule`/`OpeningHoursInterval`
+      уже поддерживают всё нужное **без Prisma-миграции** —
+      `OpeningHoursMode` enum уже содержит `WEEKLY`/`ALWAYS_OPEN`/
+      `BY_APPOINTMENT`/`TEMPORARILY_CLOSED`. Переиспользован канонический
+      mapper реального admin/business save-пути
+      (`src/lib/openingHours/openingHoursMapper.ts`'s
+      `mapToCreatePayload`/`mapToUpdatePayload`) — новый Prisma-payload
+      builder не писался.
+
+      Продуктовые mapping-решения (полный текст решений — в докблоке
+      `parsePlaceOpeningHours.ts`):
+      - `closed` на всю неделю → `mode: WEEKLY` с 7 закрытыми днями,
+        **никогда** `TEMPORARILY_CLOSED` — этот mode на публичной
+        странице показывает конкретное утверждение "Временно закрыто"
+        (`getOpeningStatus()`), которого per-day WP-расписание не
+        делает; `TEMPORARILY_CLOSED` зарезервирован за явным
+        admin-действием.
+      - `appointments_only` на всю неделю (единственная реальная форма
+        во всех 23 вхождениях) → `mode: BY_APPOINTMENT`.
+      - `open` без `hours` (единственный случай, WP 30411) →
+        **никогда** не мапится в `ALWAYS_OPEN`/24-7 без доказательства —
+        `PLACE_WORK_HOURS_UNSUPPORTED` warning, Place создаётся без
+        OpeningHours вообще (не ложное расписание).
+      - Overnight intervals (`to <= from`) → **не сохраняются как есть**:
+        прослежен `openingHours.utils.ts`'s `compareTime`/
+        `isTimeInInterval` — чистое HH:MM сравнение без rollover через
+        полночь, значит сохранённый `10:00`–`00:00` тихо сломал бы
+        `isOpenNow()`/`getOpeningStatus()` (всегда "закрыто" для всего
+        overnight-окна). `PLACE_WORK_HOURS_UNSUPPORTED` warning вместо
+        сохранения битых данных — задокументированный, не устранённый в
+        этом PR gap целевой модели.
+
+      Pure parser `parsePlaceOpeningHours()`
+      (`src/lib/migration/adapters/wordpress-db/parsePlaceOpeningHours.ts`)
+      — 7 warning-кодов (`PLACE_WORK_HOURS_JSON_INVALID`/
+      `STATUS_UNKNOWN`/`TIME_INVALID`/`DAY_INVALID`/`INTERVAL_OVERLAP`/
+      `UNSUPPORTED`/`EMPTY`), детерминированный, DB writes отсутствуют.
+      Подключён в `normalizePlace.ts` (`NormalizedPlaceCandidate.
+      openingHours`), проброшен через `buildPlaceCreateDraft.ts` в
+      `PlaceCreateDraft.openingHours`.
+
+      `PlaceCommitWriter`: `Place` + `OpeningHours` (+ nested rules/
+      intervals) пишутся в одной `$transaction` — `openingHoursId`
+      нельзя проставить на `place.create()` до существования
+      `OpeningHours`-строки, а неудачный `openingHours.create()` не
+      должен оставлять `Place` (или зависший `openingHoursId`).
+      На UPDATE — читается существующий `openingHoursId` внутри той же
+      транзакции: если есть — `openingHours.update()` той же строки
+      (delete+recreate rules, без дублей при повторных запусках); если
+      нет — создаётся новая и линкуется. `draft.openingHours` отсутствует
+      → расписание существующего Place не трогается (не деструктивный
+      дефолт). UPDATE_SAFE/UPDATE_CONFLICT политика (PR D) не менялась —
+      opening hours едут внутри того же Place-UPDATE, отдельной
+      классификации не требуется; regression-тест подтверждает, что
+      наличие `openingHours` в кандидате не обходит conflict-гейт.
+      Место 437 не трогалось.
+
+      Тесты: 26 в `parsePlaceOpeningHours.test.ts` (5 golden fixtures WP
+      5389/5457/13164/13317/9865 + все сценарии из аудита), 8 в новом
+      `parsePlaceOpeningHours.publicText.test.ts` (source → parser →
+      реальный `buildPublicWorkingHoursText()`, включая WP 30411
+      unsupported и WP 30502 mixed closed/hours), 8 новых в
+      `PlaceCommitWriter.test.ts` (create/update с/без hours,
+      transaction-failure-никогда-не-создаёт-Place, idempotent repeated
+      update, no duplicate OpeningHours), 2 новых в
+      `buildPlaceCreateDraft.test.ts`, 1 новый в
+      `PlaceCommitRunner.test.ts` (opening-hours-не-обходит-conflict), +
+      интеграционные assertions в `normalizePlace.test.ts`. Read-only
+      live verification (без commit) всех 5 golden WP ID через прямой
+      SELECT — source JSON, parser result и draft shape задокументированы
+      выше и в PR body. **Ноль DB writes в этом PR** — ни targeted
+      commit, ни `--confirm-writes`, ни golden import не запускались.
+      *(Отмечается `[x]` отдельным прямым коммитом в `dev` только после
+      фактического merge, как Phone E.164 и targeted Place commits.)*
 - [ ] PR — media fix (C).
 - [ ] Новые golden samples (после B+C).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
@@ -1112,3 +1204,38 @@ dispatcher-branch, ни CLI-flag).
   докс-коммитом отмечен `[x]` (паттерн `87bd43f9`/`b66b27dd`). DB writes за
   весь PR — ноль, место 437 не трогалось. Следующий шаг: PR B — opening
   hours.
+- **2026-07-15 — Claude Code** — **PR B: import Place opening hours**
+  (ветка `feat/migration-place-opening-hours`, из `origin/dev` `48536159`,
+  baseline подтверждён: `dev = origin/dev`, clean tree, open PR = 0,
+  CI #194 и Docker Build & Push #196 SUCCESS). Read-only source audit
+  через прямой SELECT (`--allow-remote-readonly`) против всех 82
+  published Place: 77/82 `work_hours`, все валидный JSON. Полная разбивка
+  форм/статусов/edge-кейсов — в §1 Places п.3 (B) выше. Target audit
+  подтвердил: `OpeningHoursMode` enum уже покрывает WEEKLY/ALWAYS_OPEN/
+  BY_APPOINTMENT/TEMPORARILY_CLOSED — Prisma-миграция не потребовалась.
+  Прослежен реальный runtime `isTimeInInterval()`/`compareTime()` —
+  подтверждён баг: overnight-интервалы (`to <= from`) тихо ломают
+  "is open now" (нет rollover через полночь) — задокументированное,
+  оставленное как есть ограничение целевой модели, opening-hours parser
+  такие интервалы не сохраняет (`PLACE_WORK_HOURS_UNSUPPORTED`).
+  Реализация: pure parser `parsePlaceOpeningHours.ts` (7 warning-кодов),
+  подключён в `normalizePlace.ts`, проброшен через
+  `buildPlaceCreateDraft.ts` в `PlaceCreateDraft.openingHours`.
+  `PlaceCommitWriter` переписан: `Place`+`OpeningHours` пишутся в одной
+  `$transaction` (новый паттерн для проекта — раньше `$transaction`
+  нигде не использовался, даже в реальном admin/business save API),
+  переиспользован канонический `mapToCreatePayload`/`mapToUpdatePayload`
+  вместо второго Prisma-payload builder. UPDATE_SAFE/UPDATE_CONFLICT
+  политика PR D не менялась и не обходится — regression-тест это
+  подтверждает. Место 437 не трогалось. 45 новых/расширенных тестов
+  (детали и разбивка по файлам — в §1 Places п.3 выше). Проверки — все
+  green: `parsePlaceOpeningHours` + `.publicText` (реальный
+  `buildPublicWorkingHoursText()`, не заглушка), Place normalizer/draft/
+  runner/writer, полный `src/lib/migration/**` +
+  `scripts/migration-*.test.ts` sweep, eslint, `tsc --noEmit`,
+  `git diff --check`, `pnpm build`. Read-only live verification 5 golden
+  WP ID (5389/5457/13164/13317/9865) выполнена через ту же readonly
+  SELECT-сессию — commit/`--confirm-writes` не запускался. **Ноль DB
+  writes.** Незавершённое: PR ещё не смержен. Следующий шаг после merge:
+  PR C — Place media (последний P0-блокер перед golden samples и
+  reconciliation места 437).
