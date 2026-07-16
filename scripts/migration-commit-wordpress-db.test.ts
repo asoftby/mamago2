@@ -8,6 +8,7 @@ import type { CommitCliArgs } from "./migration-commit-wordpress-db";
 import {
   applyForcedReprocess,
   buildExecutionPlanInput,
+  installServerOnlyStub,
   parseArgs,
   parseCommitContextConfig,
   shouldSampleMedia,
@@ -504,7 +505,35 @@ function testApplyForcedReprocessNoOpWhenSourceRecordKeyMissing() {
   assert.equal(plan.plan.items[0].action, "SKIP_UNCHANGED");
 }
 
-function main() {
+// ---------------------------------------------------------------------------
+// installServerOnlyStub — real proof `server-only` resolves to a no-op
+// afterward, and that this doesn't touch anything else's resolution
+// (regression test for the rejected --conditions=react-server approach,
+// which broke `react`/`@radix-ui/*` for the rest of this CLI's much wider
+// import graph).
+// ---------------------------------------------------------------------------
+
+async function testInstallServerOnlyStubNeutralizesServerOnly() {
+  installServerOnlyStub();
+  // Matches the CLI's real trigger exactly: an ESM dynamic `import()` of a
+  // *local* module whose transpiled-to-CJS body does `require("server-only")`
+  // as a bare specifier — not a top-level `import("server-only")` here,
+  // which resolves via Node's native ESM resolver to an already-absolute
+  // path before `Module._load` ever sees it, bypassing the bare-string
+  // check entirely (confirmed by reproducing the crash that way first).
+  const media = (await import("../src/lib/migration/media")) as unknown as {
+    createMamagoMediaImporter: (...args: unknown[]) => unknown;
+  };
+  assert.equal(typeof media.createMamagoMediaImporter, "function");
+}
+
+async function testInstallServerOnlyStubDoesNotAffectOtherModules() {
+  installServerOnlyStub();
+  const React = await import("react");
+  assert.equal(typeof React.createContext, "function", "react must still resolve its normal build, not a react-server one");
+}
+
+async function main() {
   testParsesValidFlags();
   testDefaultsWhenOptionalFlagsOmitted();
   testMissingConfirmWritesBlocksBeforeConnection();
@@ -547,6 +576,9 @@ function main() {
   testApplyForcedReprocessIgnoresNonSkipUnchangedActions();
   testApplyForcedReprocessNoOpWhenFlagNotSet();
   testApplyForcedReprocessNoOpWhenSourceRecordKeyMissing();
+
+  await testInstallServerOnlyStubNeutralizesServerOnly();
+  await testInstallServerOnlyStubDoesNotAffectOtherModules();
 }
 
 // No real DB/SSH anywhere in this file — only `parseArgs()`/
@@ -554,6 +586,13 @@ function main() {
 // read of package.json are exercised. `main()` (the actual WP/Prisma
 // wiring) is never called. `buildExecutionPlanInput()`'s ledger tests use a
 // fake `MigrationLineageLookup`, never a real `MigrationLedgerRepository`
-// or `PrismaClient`.
-main();
-console.log("migration-commit-wordpress-db tests: OK");
+// or `PrismaClient`. `installServerOnlyStub()`'s tests do real dynamic
+// imports (`server-only`, `react`) but never touch a database or network.
+main()
+  .then(() => {
+    console.log("migration-commit-wordpress-db tests: OK");
+  })
+  .catch((error) => {
+    console.error("migration-commit-wordpress-db tests: FAILED", error);
+    process.exitCode = 1;
+  });
