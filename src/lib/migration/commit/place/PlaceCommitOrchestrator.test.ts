@@ -45,6 +45,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     email: "hello@example.com",
     workHoursRaw: "Mon-Fri 9-18",
     locationRaw: "Minsk, some street",
+    addressText: null,
     cityRaw: "Minsk",
     coordinates: { lat: 53.9, lng: 27.5667 },
     media: { thumbnailAttachmentId: 555, galleryAttachmentIds: [111, 222] },

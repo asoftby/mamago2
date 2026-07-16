@@ -42,6 +42,13 @@ export interface PlaceCreateDraft {
   phone: string | null;
   /** `Place.website` exists but `NormalizedPlaceCandidate` has no source field for it yet (its `email` is a different WP postmeta key, not a website URL) — always `null` in PR8.5. */
   website: string | null;
+  /**
+   * Verbatim `candidate.addressText` — free-text address as WordPress had
+   * it, never reverse-geocoded or derived from `lat`/`lng`. Paired with
+   * `locationSource: "MANUAL"`, same convention as the legacy Import
+   * module's `mapNormalizedToPlace()` (`formattedAddr = nd.addressText`).
+   */
+  formattedAddr: string | null;
   slug: null;
   /**
    * Carried through verbatim from `candidate.openingHours` — already the

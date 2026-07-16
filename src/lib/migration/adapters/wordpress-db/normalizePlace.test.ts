@@ -38,7 +38,7 @@ function buildBundle(overrides: Partial<WordPressPlaceBundle> = {}): WordPressPl
       work_hours: [
         '[{"days":["mon","tue","wed","thu","fri","sat","sun"],"status":"hours","hours":[{"from":"09:00","to":"18:00"}]}]',
       ],
-      location: ["Minsk, some street"],
+      location: ['{"address":"Minsk, some street","map_picker":false,"latitude":53.9,"longitude":27.5667}'],
       "city-place": ["Minsk"],
       cover: ["555"],
       gallery: ["111,222,333"],
@@ -77,7 +77,11 @@ function testFullPlace() {
   assert.equal(payload.openingHours?.mode, "WEEKLY");
   assert.equal(payload.openingHours?.rules.length, 7);
   assert.ok(payload.openingHours?.rules.every((r) => r.isOpen));
-  assert.equal(payload.locationRaw, "Minsk, some street");
+  assert.equal(
+    payload.locationRaw,
+    '{"address":"Minsk, some street","map_picker":false,"latitude":53.9,"longitude":27.5667}',
+  );
+  assert.equal(payload.addressText, "Minsk, some street");
   assert.equal(payload.cityRaw, "Minsk");
   assert.deepEqual(payload.coordinates, { lat: 53.9, lng: 27.5667 });
   assert.deepEqual(payload.seo, { title: "SEO Title", focusKeyword: "kids playground" });
@@ -90,6 +94,100 @@ function testFullPlace() {
 
   // No coordinates/logo warnings expected for a fully-populated place.
   assert.deepEqual(record.warnings, []);
+}
+
+/**
+ * Regression for the real bug (2026-07-16): golden Place 5389 showed
+ * "Адрес не указан" in admin review. Root cause traced to two gaps:
+ * (1) this normalizer never parsed `location`'s `address` field at all
+ * (only kept the raw JSON as `locationRaw` evidence), and (2)
+ * `buildPlaceCreateDraft` never mapped it to `Place.formattedAddr`. This
+ * file covers (1); `buildPlaceCreateDraft.test.ts` covers (2). Real raw
+ * `location` values captured directly from the WordPress DB.
+ */
+function testAddressExtractedFromRealLocationJson() {
+  const record = normalizePlace(
+    buildBundle({
+      postMeta: {
+        location: [
+          '{"address":"\\u0443\\u043b\\u0438\\u0446\\u0430 \\u041f\\u0435\\u0440\\u0432\\u043e\\u043c\\u0430\\u0439\\u0441\\u043a\\u0430\\u044f 3\\u0430, \\u041c\\u0438\\u043d\\u0441\\u043a, \\u0411\\u0435\\u043b\\u0430\\u0440\\u0443\\u0441\\u044c","map_picker":false,"latitude":53.90234,"longitude":27.57293}',
+        ],
+      },
+    }),
+  );
+  assert.equal(payloadOf(record).addressText, "улица Первомайская 3а, Минск, Беларусь");
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_LOCATION_ADDRESS_UNPARSEABLE"));
+}
+
+function testGoldenPlace5389RealLocationAddress() {
+  const record = normalizePlace(
+    buildBundle({
+      post: { ...basePost, ID: 5389 },
+      postMeta: {
+        location: [
+          '{"address":"\\u0443\\u043b\\u0438\\u0446\\u0430 \\u041f\\u0435\\u0440\\u0432\\u043e\\u043c\\u0430\\u0439\\u0441\\u043a\\u0430\\u044f 3\\u0430, \\u041c\\u0438\\u043d\\u0441\\u043a, \\u0411\\u0435\\u043b\\u0430\\u0440\\u0443\\u0441\\u044c","map_picker":false,"latitude":53.90234,"longitude":27.57293}',
+        ],
+      },
+    }),
+  );
+  assert.equal(payloadOf(record).addressText, "улица Первомайская 3а, Минск, Беларусь");
+}
+
+/**
+ * Place 895's real `location.address` is just "Ул." (source data quality
+ * issue, not a mapping bug) — the extractor must preserve it verbatim,
+ * never discard/upgrade it via `legal-address` or any other field. That
+ * blending decision is a product call left for manual review, not this
+ * mapper's job.
+ */
+function testGoldenPlace895RealLocationAddressIsSparseButPreservedVerbatim() {
+  const record = normalizePlace(
+    buildBundle({
+      post: { ...basePost, ID: 895 },
+      postMeta: {
+        location: ['{"address":"\\u0423\\u043b.","map_picker":true,"latitude":53.94276,"longitude":27.59969}'],
+      },
+    }),
+  );
+  assert.equal(payloadOf(record).addressText, "Ул.");
+}
+
+function testGoldenPlace43023RealLocationAddress() {
+  const record = normalizePlace(
+    buildBundle({
+      post: { ...basePost, ID: 43023 },
+      postMeta: {
+        location: [
+          '{"address":"\\u0443\\u043b\\u0438\\u0446\\u0430 \\u0421\\u043a\\u0440\\u044b\\u0433\\u0430\\u043d\\u043e\\u0432\\u0430 6\\/2, \\u041c\\u0438\\u043d\\u0441\\u043a","map_picker":false,"latitude":53.91129,"longitude":27.51673}',
+        ],
+      },
+    }),
+  );
+  assert.equal(payloadOf(record).addressText, "улица Скрыганова 6/2, Минск");
+}
+
+function testLegacyNonJsonLocationValueYieldsNullAddressWithWarning() {
+  const record = normalizePlace(buildBundle({ postMeta: { location: ["Minsk, some street"] } }));
+  assert.equal(payloadOf(record).addressText, null);
+  assert.equal(payloadOf(record).locationRaw, "Minsk, some street");
+  assert.ok(record.warnings?.some((w) => w.code === "PLACE_LOCATION_ADDRESS_UNPARSEABLE"));
+}
+
+function testMissingLocationKeyYieldsNullAddressWithoutWarning() {
+  const record = normalizePlace(buildBundle({ postMeta: {} }));
+  assert.equal(payloadOf(record).addressText, null);
+  assert.ok(
+    !record.warnings?.some((w) => w.code === "PLACE_LOCATION_ADDRESS_UNPARSEABLE"),
+    "absent source data is not a parsing failure — nothing to warn about",
+  );
+}
+
+function testValidJsonLocationWithoutAddressFieldYieldsNullWithWarning() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { location: ['{"map_picker":false,"latitude":53.9,"longitude":27.5667}'] } }),
+  );
+  assert.equal(payloadOf(record).addressText, null);
+  assert.ok(record.warnings?.some((w) => w.code === "PLACE_LOCATION_ADDRESS_UNPARSEABLE"));
 }
 
 function testMissingCoordinatesWarnsNotErrors() {
@@ -451,6 +549,14 @@ function main() {
   testGoldenPlace5389HasExpectedSourceMediaIds();
   testGoldenPlace895HasGalleryButNoCover();
   testGoldenPlace43023HasCoverLogoAndGalleryWithOverlap();
+
+  testAddressExtractedFromRealLocationJson();
+  testGoldenPlace5389RealLocationAddress();
+  testGoldenPlace895RealLocationAddressIsSparseButPreservedVerbatim();
+  testGoldenPlace43023RealLocationAddress();
+  testLegacyNonJsonLocationValueYieldsNullAddressWithWarning();
+  testMissingLocationKeyYieldsNullAddressWithoutWarning();
+  testValidJsonLocationWithoutAddressFieldYieldsNullWithWarning();
 }
 
 main();

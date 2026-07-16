@@ -53,6 +53,17 @@ export interface NormalizedPlaceCandidate {
    */
   openingHours: OpeningHoursData | null;
   locationRaw: string | null;
+  /**
+   * `locationRaw` is the WP `location` postmeta's raw JSON string
+   * (`{"address":...,"map_picker":...,"latitude":...,"longitude":...}`);
+   * `addressText` is that blob's `address` field, parsed and trimmed —
+   * mirrors the `phone`/`phoneE164` split (raw evidence vs. the value
+   * safe to write to a target field). `null` when `location` is absent,
+   * isn't valid JSON, or its `address` is missing/empty — never a
+   * best-effort/guessed value. See `PLACE_LOCATION_ADDRESS_UNPARSEABLE`
+   * for the "present but unusable" case.
+   */
+  addressText: string | null;
   cityRaw: string | null;
   coordinates: { lat: number; lng: number } | null;
   media: {
@@ -86,6 +97,29 @@ function toSourceTerm(term: WordPressTermRow): NormalizedPlaceSourceTerm {
   return { termId: term.term_id, taxonomy: term.taxonomy, name: term.name, slug: term.slug };
 }
 
+/**
+ * WP's `location` postmeta is a JSON blob:
+ * `{"address":"...","map_picker":bool,"latitude":n,"longitude":n}`
+ * (coordinates come from `wp_voxel_index_places` instead — see
+ * `hasCoordinates` above — this only extracts the free-text address).
+ * `null` for anything that isn't a parseable object with a non-empty
+ * `address` string — never a guessed/best-effort value.
+ */
+function resolvePlaceAddressText(locationRaw: string | null): string | null {
+  if (!locationRaw) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(locationRaw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const address = (parsed as Record<string, unknown>).address;
+  if (typeof address !== "string") return null;
+  const trimmed = address.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   const { post, postMeta, terms, placeIndex } = bundle;
   const sourceRecordKey = `${SOURCE_ENTITY_TYPE}:${post.ID}`;
@@ -102,6 +136,18 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
       message: "No wp_voxel_index_places row (or _location value) for this place.",
       severity: "WARNING",
       sourceRecordKey,
+    });
+  }
+
+  const locationRaw = firstMetaValue(postMeta, "location");
+  const addressText = resolvePlaceAddressText(locationRaw);
+  if (locationRaw && !addressText) {
+    warnings.push({
+      code: "PLACE_LOCATION_ADDRESS_UNPARSEABLE",
+      message: "location postmeta is present but its address could not be extracted (not valid JSON, or address is missing/empty).",
+      severity: "WARNING",
+      sourceRecordKey,
+      details: { locationRaw },
     });
   }
 
@@ -244,7 +290,8 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     email: firstMetaValue(postMeta, "email"),
     workHoursRaw,
     openingHours: parsedOpeningHours.data,
-    locationRaw: firstMetaValue(postMeta, "location"),
+    locationRaw,
+    addressText,
     cityRaw: firstMetaValue(postMeta, "city-place"),
     coordinates,
     media: {

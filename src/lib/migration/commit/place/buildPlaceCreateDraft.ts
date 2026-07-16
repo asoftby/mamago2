@@ -120,6 +120,7 @@ export function buildPlaceCreateDraft(input: BuildPlaceCreateDraftInput): PlaceC
       // string carried through to the target row.
       phone: input.candidate.phoneE164 ?? null,
       website: null,
+      formattedAddr: input.candidate.addressText ?? null,
       slug: null,
       ...(input.candidate.openingHours ? { openingHours: input.candidate.openingHours } : {}),
     },
