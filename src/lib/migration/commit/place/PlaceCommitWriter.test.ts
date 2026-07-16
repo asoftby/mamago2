@@ -30,6 +30,7 @@ function draftFixture(overrides: Partial<PlaceCreateDraft> = {}): PlaceCreateDra
     lng: 27.5667,
     phone: "+375291234567",
     website: null,
+    formattedAddr: null,
     slug: null,
     ...overrides,
   };
@@ -200,6 +201,7 @@ async function testDataContainsOnlyAllowedFields() {
     "lng",
     "phone",
     "website",
+    "formattedAddr",
     "slug",
   ]));
 }

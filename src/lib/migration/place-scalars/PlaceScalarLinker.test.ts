@@ -20,6 +20,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     email: null,
     workHoursRaw: null,
     locationRaw: null,
+    addressText: null,
     cityRaw: null,
     coordinates: null,
     media: { thumbnailAttachmentId: null, galleryAttachmentIds: [] },

@@ -13,6 +13,7 @@ import type { MediaAsset } from "@prisma/client";
 import type { AuthActor } from "@/lib/auth/safeUser";
 import {
   buildMediaFileAccessDenyPayload,
+  canLoadMediaAnonymously,
   canServeMediaResponse,
   ensureMediaAssetForExistingPlaceImageFile,
   findMediaAssetByStorageRelativePath,
@@ -92,7 +93,9 @@ export async function GET(
     }
 
     const user = await getCurrentUser();
-    if (!(await canServeMediaResponse(media, user))) {
+    const isPubliclyServable = await canLoadMediaAnonymously(media);
+    const canServe = isPubliclyServable || (await canServeMediaResponse(media, user));
+    if (!canServe) {
       await devLogDeny({
         media,
         denyReason: "CAN_SERVE_MEDIA_DENIED",
@@ -110,11 +113,21 @@ export async function GET(
     ]);
     const filename = pathSegments[pathSegments.length - 1] ?? "file";
 
+    // Only genuinely public (published + anonymously-servable) media may use
+    // a shared/CDN-cacheable directive. A response reachable solely via
+    // canServeMediaResponse()'s authenticated-user branch (e.g. an admin
+    // previewing a PENDING Place) must never be marked `public` — a shared
+    // cache serving those bytes to a later, unauthorized requester would
+    // silently bypass the access check entirely.
+    const cacheControl = isPubliclyServable
+      ? "public, max-age=31536000, immutable"
+      : "private, no-store";
+
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": mimeTypeFromFilename(filename),
         "Content-Length": fileStat.size.toString(),
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": cacheControl,
         "X-Content-Type-Options": "nosniff",
       },
     });

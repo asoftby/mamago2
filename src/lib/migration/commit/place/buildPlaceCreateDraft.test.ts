@@ -18,7 +18,8 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     openingHours: null,
     email: "hello@example.com",
     workHoursRaw: "Mon-Fri 9-18",
-    locationRaw: "Minsk, some street",
+    locationRaw: '{"address":"Minsk, some street","map_picker":false,"latitude":53.9,"longitude":27.5667}',
+    addressText: "Minsk, some street",
     cityRaw: "Minsk",
     coordinates: { lat: 53.9, lng: 27.5667 },
     media: { thumbnailAttachmentId: 555, galleryAttachmentIds: [111, 222] },
@@ -256,6 +257,33 @@ function testMediaLogoGalleryNeverInDraft() {
   assert.equal(result.draft.website, null);
 }
 
+/**
+ * Regression for the real bug (2026-07-16): golden Place 5389 showed
+ * "Адрес не указан" in admin review despite WordPress having a real
+ * address — `buildPlaceCreateDraft` never mapped `candidate.addressText`
+ * to `draft.formattedAddr` at all.
+ */
+function testDraftFormattedAddrComesFromCandidateAddressText() {
+  const result = buildPlaceCreateDraft({
+    candidate: candidateFixture({ addressText: "улица Первомайская 3а, Минск, Беларусь" }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.formattedAddr, "улица Первомайская 3а, Минск, Беларусь");
+}
+
+function testNullAddressTextNeverInventsAddress() {
+  const result = buildPlaceCreateDraft({
+    candidate: candidateFixture({ addressText: null }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  // null, never derived from coordinates or any other field.
+  assert.equal(result.draft.formattedAddr, null);
+}
+
 function testCityIdOnlyFromContextNeverGuessedFromCityRaw() {
   const result = buildPlaceCreateDraft({
     candidate: candidateFixture({ cityRaw: "Some City That Does Not Exist" }),
@@ -293,6 +321,8 @@ function main() {
   testStatusPendingAndLocationSourceManual();
   testMediaLogoGalleryNeverInDraft();
   testCityIdOnlyFromContextNeverGuessedFromCityRaw();
+  testDraftFormattedAddrComesFromCandidateAddressText();
+  testNullAddressTextNeverInventsAddress();
 }
 
 main();

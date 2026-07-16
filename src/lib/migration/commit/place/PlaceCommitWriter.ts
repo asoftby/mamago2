@@ -56,6 +56,7 @@ function buildCreateData(draft: PlaceCreateDraft): Prisma.PlaceUncheckedCreateIn
     lng: draft.lng,
     phone: draft.phone,
     website: draft.website,
+    formattedAddr: draft.formattedAddr,
     slug: draft.slug,
   } as Prisma.PlaceUncheckedCreateInput;
 }
@@ -73,6 +74,7 @@ function buildUpdateData(draft: PlaceCreateDraft): Prisma.PlaceUncheckedUpdateIn
     lng: draft.lng,
     phone: draft.phone,
     website: draft.website,
+    formattedAddr: draft.formattedAddr,
   };
 }
 

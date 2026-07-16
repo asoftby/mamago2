@@ -247,6 +247,12 @@ export function PlaceModerationView({
                 alt={place.title}
                 fill
                 className="object-cover"
+                // Next's built-in optimizer proxies same-origin images through
+                // a cookie-less internal request, so it can never satisfy our
+                // auth-gated /api/media/file/* route for not-yet-published
+                // content — skip it and let the browser fetch src directly
+                // (with the real session cookie).
+                unoptimized
               />
             </div>
           )}
@@ -405,6 +411,7 @@ export function PlaceModerationView({
                       alt=""
                       fill
                       className="object-cover"
+                      unoptimized
                     />
                   </div>
                 ))}

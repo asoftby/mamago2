@@ -54,6 +54,10 @@ export function ImageDiff({ changes }: ImageDiffProps) {
                   alt={`Фото ${index + 1}`}
                   fill
                   className="object-cover"
+                  // Same-origin gated media (see PlaceModerationView) — Next's
+                  // optimizer proxy can't carry the session cookie this route
+                  // needs, so it must be skipped for not-yet-published Places.
+                  unoptimized
                 />
                 {/* Photo number */}
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
@@ -96,6 +100,7 @@ export function ImageDiff({ changes }: ImageDiffProps) {
                   alt={`Фото ${index + 1}`}
                   fill
                   className="object-cover opacity-60"
+                  unoptimized
                 />
                 <div className="absolute inset-0 bg-red-500 bg-opacity-20" />
                 {/* Photo number */}
@@ -130,6 +135,7 @@ export function ImageDiff({ changes }: ImageDiffProps) {
                   alt={`Фото ${index + 1}`}
                   fill
                   className="object-cover"
+                  unoptimized
                 />
                 {/* Photo number */}
                 <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
@@ -165,6 +171,7 @@ export function ImageDiff({ changes }: ImageDiffProps) {
               alt=""
               fill
               className="object-contain"
+              unoptimized
             />
           </div>
         </div>
