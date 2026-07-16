@@ -55,6 +55,7 @@
  * DATABASE_URL is read implicitly by `new PrismaClient()`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import NodeModule from "node:module";
 import { pathToFileURL } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
@@ -270,6 +271,34 @@ export function shouldSampleMedia(input: {
   environment: MigrationEnvironment;
 }): boolean {
   return input.mediaPolicyName === undefined && (input.environment === "LOCAL" || input.environment === "DEV");
+}
+
+let serverOnlyStubInstalled = false;
+
+/**
+ * Patches Node's CJS loader (`Module._load`) to resolve the bare specifier
+ * `"server-only"` to an empty stub instead of the real
+ * `node_modules/server-only/index.js`, which throws unconditionally
+ * outside Next.js's bundler (see the long comment at the call site).
+ * Deliberately narrower than the global `--conditions=react-server` flag
+ * this replaced: only the exact string `"server-only"` is special-cased,
+ * so `react`, `@radix-ui/*`, and everything else this CLI's import graph
+ * happens to touch still resolve completely normally. Idempotent — safe
+ * to call more than once (e.g. from a test).
+ */
+export function installServerOnlyStub(): void {
+  if (serverOnlyStubInstalled) return;
+  serverOnlyStubInstalled = true;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patchable = NodeModule as any;
+  const originalLoad = patchable._load;
+  patchable._load = function (request: string, ...rest: unknown[]) {
+    if (request === "server-only") {
+      return {};
+    }
+    return originalLoad.apply(this, [request, ...rest]);
+  };
 }
 
 function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
@@ -514,8 +543,28 @@ async function main(): Promise<void> {
     // `mediaImporterFactory` itself is never invoked for METADATA/NONE, but
     // the previous code additionally imported the module eagerly at
     // startup regardless of policy, which crashed every non-FULL run.
+    //
+    // Confirmed 2026-07-15 (first real golden-write attempt): laziness
+    // alone does not make a *FULL* run work — the module still throws the
+    // moment it's actually loaded. The first fix attempted here was a
+    // global `NODE_OPTIONS`/`--conditions=react-server` flag, matching
+    // `server-only`'s own conditional package.json export
+    // (`"react-server": "./empty.js"` vs `"default": "./index.js"`) — this
+    // was REJECTED after testing: `--conditions` is process-global, so it
+    // also changes how `react` itself resolves for every other package in
+    // this CLI's much larger import graph (this script transitively pulls
+    // in a lot more than just the media pipeline), and several UI
+    // dependencies (e.g. `@radix-ui/react-*`) crashed with
+    // `React.createContext is not a function` — the "react-server" build
+    // of React doesn't have it. `installServerOnlyStub()` below is the
+    // safe fix instead: it patches Node's CJS loader to special-case only
+    // the exact bare specifier `"server-only"`, so nothing else in the
+    // process resolves any differently (verified directly: `react` and
+    // `@radix-ui/*` still resolve to their normal builds with this patch
+    // applied).
     let createMamagoMediaImporter: typeof import("../src/lib/migration/media")["createMamagoMediaImporter"] | undefined;
     if (profile.mediaPolicy.name === "FULL" || samplingActive) {
+      installServerOnlyStub();
       ({ createMamagoMediaImporter } = await import("../src/lib/migration/media"));
     }
     const mediaImporterFactory = (ownerUserId: string): MediaImporterLike => {

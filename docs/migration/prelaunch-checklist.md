@@ -766,7 +766,64 @@ runner'а не покрыта тестами. Требует отдельной 
       **Ноль DB writes** — код-изменение и pure-тесты только. Golden
       write возобновляется этим же CLI после merge, с шага 3 (backup) по
       исходному плану.
-- [ ] Новые golden samples (после B+C, **с PR C3** для safe media retry).
+- [x] **PR C4 — CLI real-media runtime fix** (2026-07-15, ветка
+      `fix/migration-cli-full-media-server-only`, **PR открыт, merge ещё
+      не выполнен**) — второй blocker, найденный на самом первом реальном
+      targeted commit (Place 5389, media policy FULL) уже после merge PR
+      C3, **до какого-либо DB write**.
+
+      **Root cause:** `createMamagoMediaImporter` (используется FULL
+      media policy) транзитивно импортирует `@/server/media/media-storage.ts`,
+      который начинается с `import "server-only"`. Пакет `server-only`
+      throw'ит безусловно везде, кроме Next.js-бандлера (который
+      подставляет no-op через собственный conditional export пакета —
+      `"react-server": "./empty.js"` vs `"default": "./index.js"`) — под
+      обычным `tsx`/Node это бросает исключение в момент загрузки модуля,
+      независимо от того, насколько лениво он импортирован. Это НЕ
+      Place-специфичный баг — тот же `mamagoMediaImporter` используют
+      `EventMediaSyncer`/`RouteStopMediaSyncer`; похоже, что ни один
+      real-write прогон с FULL media policy ни для одной сущности не
+      выполнялся через этот CLI раньше (всё предыдущее покрытие — только
+      unit-тесты на fakes).
+
+      **Отклонённый первый fix:** глобальный флаг
+      `--conditions=react-server` (`node`/`tsx` поддерживают `--conditions`,
+      что в точности соответствует conditional export `server-only`).
+      Протестировано и ОТКЛОНЕНО: `--conditions` — process-global, поэтому
+      он же меняет резолвинг `react` для ВСЕГО остального import-графа
+      этого CLI (который транзитивно тянет за собой намного больше, чем
+      просто media pipeline) — несколько UI-зависимостей (`@radix-ui/react-*`)
+      падали с `React.createContext is not a function`, потому что
+      "react-server"-сборка React не содержит хуков. Найдено и
+      подтверждено ДО применения к реальному golden write.
+
+      **Финальный fix (минимальный, узкий):** `installServerOnlyStub()` в
+      `scripts/migration-commit-wordpress-db.ts` патчит Node CJS loader
+      (`Module._load`) так, чтобы только ТОЧНАЯ bare-specifier строка
+      `"server-only"` резолвилась в пустой no-op объект — ничего другого
+      в процессе не резолвится иначе. Подтверждено напрямую: `react` и
+      `@radix-ui/*` резолвятся в свои нормальные сборки как обычно, а
+      `createMamagoMediaImporter` успешно импортируется. Вызывается
+      лениво, только внутри того же `if (mediaPolicy.name === "FULL" ||
+      samplingActive)` блока, где раньше был голый `await import(...)`.
+
+      Тесты: `testInstallServerOnlyStubNeutralizesServerOnly` (реальный
+      динамический импорт `../src/lib/migration/media`, воспроизводящий
+      точный триггер CLI — не top-level `import("server-only")`
+      напрямую, у которого другой путь резолвинга через нативный ESM
+      resolver, что при первой попытке теста тоже было найдено и
+      исправлено), `testInstallServerOnlyStubDoesNotAffectOtherModules`
+      (`React.createContext` остаётся функцией). Проверки — все green:
+      полный `src/lib/migration/**` + `scripts/migration-*.test.ts`
+      sweep, eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
+
+      **Ноль DB writes** — код-изменение и тесты (включая реальные, но
+      read-only динамические импорты) только. Golden write возобновляется
+      этим же CLI после merge, с шага 5A (Place 5389 targeted commit) —
+      backup и preflight (шаги 3–4) уже выполнены до этого blocker'а и
+      остаются в силе.
+- [ ] Новые golden samples (после B+C, **с PR C3 + PR C4** для реального
+      media write).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
 - [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
 
@@ -1831,3 +1888,23 @@ dispatcher-branch, ни CLI-flag).
   SUCCESS на `b3d1c584`. Local `dev` fast-forwarded. **Golden write
   возобновляется** со следующего шага (backup local DB) по исходному
   плану — baseline теперь `dev = origin/dev = b3d1c584`.
+- **2026-07-15 — Claude Code** — **Golden write: backup сделан, preflight
+  пройден, но самый первый реальный targeted commit (Place 5389) сразу
+  упал с новым, отдельным blocker'ом — PR C4.** Backup local Postgres
+  создан (`~/dev/archives/mamago2-place-golden-pre-20260715-1941.dump`,
+  774501 bytes, SHA-256 `804ba6dd...29b0b3`, `pg_restore --list`
+  подтвердил 1419 TOC entries, `dbname: mamago2`). Read-only preflight
+  для всех трёх golden Places подтвердил action=CREATE, отсутствие
+  existing lineage, отсутствие slug/city collision, ожидаемые
+  media/warning counts (совпадают с более ранними read-only аудитами).
+  Первый реальный `pnpm migration:commit:wordpress-db --entity place
+  --source-record-key wordpress-db:places:5389 --profile FULL_IMPORT
+  --confirm-writes ...` упал с `server-only`'s own error ДО первого DB
+  write (подтверждено: все counts после падения идентичны counts до
+  запуска — 0 partial writes). Root cause и два fix-варианта (один
+  отклонён после тестирования, второй подтверждён) — см. "PR C4" выше.
+  Per протокол — golden write снова приостановлен, DB не тронута,
+  Алексей выбрал сначала закрыть blocker отдельным PR
+  (`fix/migration-cli-full-media-server-only`). После merge PR C4 —
+  возобновление с шага 5A (Place 5389 targeted commit); backup и
+  preflight остаются валидными, повторять не нужно.
