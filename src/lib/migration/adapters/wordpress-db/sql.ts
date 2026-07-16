@@ -209,10 +209,20 @@ export function buildTermsQuery(postIds: readonly number[]): SqlQuery {
 
 export function buildAttachmentsQuery(ids: readonly number[]): SqlQuery {
   return {
+    // A correlated scalar subquery, not a plain LEFT JOIN — wp_postmeta has
+    // no unique constraint on (post_id, meta_key), so a JOIN could return
+    // more than one row per attachment if a source DB ever has duplicate
+    // `_wp_attached_file` rows, and the row-collapsing in
+    // `WordPressRepository.getAttachmentsByIds()` would then pick whichever
+    // one happened to come back last — nondeterministic. `ORDER BY meta_id
+    // ASC LIMIT 1` guarantees exactly one row per attachment (the earliest
+    // recorded value) regardless. Found by review (PR #51,
+    // chatgpt-codex-connector) before merge.
     sql: `SELECT p.ID, p.post_title, p.post_name, p.post_mime_type, p.guid, p.post_parent,
-        pm.meta_value AS attached_file
+        (SELECT pm.meta_value FROM wp_postmeta pm
+          WHERE pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
+          ORDER BY pm.meta_id ASC LIMIT 1) AS attached_file
       FROM wp_posts p
-      LEFT JOIN wp_postmeta pm ON pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
       WHERE p.post_type = 'attachment' AND p.ID IN (${placeholders(ids.length)})`,
     params: ids,
   };
