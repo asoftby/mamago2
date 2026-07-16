@@ -248,7 +248,15 @@ const offerPlaceRelationRows: WordPressOfferPlaceRelationRow[] = [
 ];
 
 const attachmentRows: WordPressAttachmentRow[] = [
-  { ID: 555, post_title: "cover.jpg", post_name: "cover", post_mime_type: "image/jpeg", guid: "https://example.com/cover.jpg", post_parent: 201 },
+  {
+    ID: 555,
+    post_title: "cover.jpg",
+    post_name: "cover",
+    post_mime_type: "image/jpeg",
+    guid: "https://example.com/cover.jpg",
+    post_parent: 201,
+    attached_file: "2020/01/cover.jpg",
+  },
 ];
 
 const redirectRows: WordPressRedirectRow[] = [

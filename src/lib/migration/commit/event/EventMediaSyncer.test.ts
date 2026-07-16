@@ -20,6 +20,7 @@ function attachment(id: number, overrides: Partial<WordPressAttachmentRow> = {})
     post_mime_type: "image/jpeg",
     guid: `https://wp.example.com/${id}.jpg`,
     post_parent: 401,
+    attached_file: null,
     ...overrides,
   };
 }

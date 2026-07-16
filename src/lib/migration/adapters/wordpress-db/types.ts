@@ -49,7 +49,16 @@ export interface WordPressTermRow {
   taxonomy: string;
 }
 
-/** Subset of `wp_posts` columns for `post_type = 'attachment'` rows. */
+/**
+ * Subset of `wp_posts` columns for `post_type = 'attachment'` rows, plus
+ * `attached_file` (`wp_postmeta._wp_attached_file`, `LEFT JOIN`ed — `null`
+ * when absent). `guid` is kept verbatim as raw evidence but is NOT
+ * necessarily a fetchable file URL — confirmed 2026-07-16 against the real
+ * site: `guid` there resolves to the attachment's HTML permalink page
+ * (`text/html`), not the uploaded file. `attached_file` (the uploads-
+ * relative path WordPress itself uses to serve the real file) is the
+ * reliable field; see `resolveWordPressAttachmentFileUrl()`.
+ */
 export interface WordPressAttachmentRow {
   ID: number;
   post_title: string;
@@ -57,6 +66,7 @@ export interface WordPressAttachmentRow {
   post_mime_type: string;
   guid: string;
   post_parent: number;
+  attached_file: string | null;
 }
 
 /** One row of `wp_rank_math_redirections`. */

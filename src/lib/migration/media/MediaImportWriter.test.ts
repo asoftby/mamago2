@@ -19,6 +19,7 @@ function attachmentFixture(overrides: Partial<WordPressAttachmentRow> = {}): Wor
     post_mime_type: "image/jpeg",
     guid: "https://old.example.com/wp-content/uploads/2020/01/cozy-cafe.jpg",
     post_parent: 301,
+    attached_file: null,
     ...overrides,
   };
 }
@@ -139,6 +140,28 @@ async function testLastSourceHashPassedUnchanged() {
   assert.equal(lineageCalls[0].lastSourceHash, "sha256-exact-value");
 }
 
+async function testUsesResolvedAttachedFileUrlNotGuidWhenPresent() {
+  // Regression for the real bug (2026-07-16): guid alone resolved to an
+  // HTML attachment page on the live site, not the file.
+  const { mediaImporter, calls: importerCalls } = createFakeMediaImporter();
+  const { lineageWriter } = createFakeLineageWriter();
+  const writer = new MediaImportWriter({ mediaImporter, lineageWriter });
+
+  await writer.importWordPressAttachment(
+    inputFixture({
+      attachment: attachmentFixture({
+        guid: "https://mamago.by/?attachment_id=5391",
+        attached_file: "2023/07/6c616226f44eb482200f63155b374b75.webp",
+      }),
+    }),
+  );
+
+  assert.equal(
+    importerCalls[0].sourceUrl,
+    "https://mamago.by/wp-content/uploads/2023/07/6c616226f44eb482200f63155b374b75.webp",
+  );
+}
+
 async function testMissingGuidThrows() {
   const { mediaImporter } = createFakeMediaImporter();
   const { lineageWriter } = createFakeLineageWriter();
@@ -232,6 +255,7 @@ async function main() {
   await testHappyPath();
   await testTargetStableKeyUsesStorageKeyNotPublicUrl();
   await testLastSourceHashPassedUnchanged();
+  await testUsesResolvedAttachedFileUrlNotGuidWhenPresent();
   await testMissingGuidThrows();
   await testMissingSourceIdThrows();
   await testMissingSourceRecordKeyThrows();

@@ -209,9 +209,11 @@ export function buildTermsQuery(postIds: readonly number[]): SqlQuery {
 
 export function buildAttachmentsQuery(ids: readonly number[]): SqlQuery {
   return {
-    sql: `SELECT ID, post_title, post_name, post_mime_type, guid, post_parent
-      FROM wp_posts
-      WHERE post_type = 'attachment' AND ID IN (${placeholders(ids.length)})`,
+    sql: `SELECT p.ID, p.post_title, p.post_name, p.post_mime_type, p.guid, p.post_parent,
+        pm.meta_value AS attached_file
+      FROM wp_posts p
+      LEFT JOIN wp_postmeta pm ON pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
+      WHERE p.post_type = 'attachment' AND p.ID IN (${placeholders(ids.length)})`,
     params: ids,
   };
 }
