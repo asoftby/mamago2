@@ -767,8 +767,9 @@ runner'а не покрыта тестами. Требует отдельной 
       write возобновляется этим же CLI после merge, с шага 3 (backup) по
       исходному плану.
 - [x] **PR C4 — CLI real-media runtime fix** (2026-07-15, ветка
-      `fix/migration-cli-full-media-server-only`, **PR открыт, merge ещё
-      не выполнен**) — второй blocker, найденный на самом первом реальном
+      `fix/migration-cli-full-media-server-only`, PR #50, **смержен** —
+      merge commit `55786060`, CI + Docker Build & Push SUCCESS на этом
+      SHA) — второй blocker, найденный на самом первом реальном
       targeted commit (Place 5389, media policy FULL) уже после merge PR
       C3, **до какого-либо DB write**.
 
@@ -1908,3 +1909,26 @@ dispatcher-branch, ни CLI-flag).
   (`fix/migration-cli-full-media-server-only`). После merge PR C4 —
   возобновление с шага 5A (Place 5389 targeted commit); backup и
   preflight остаются валидными, повторять не нужно.
+- **2026-07-15 — Claude Code** — **PR C4 смержен.** PR #50: root cause
+  подтверждён — `server-only` бросает исключение вне Next.js bundler
+  безусловно, независимо от того, насколько лениво модуль
+  импортирован; это НЕ Place-специфичный баг (общий `mamagoMediaImporter`
+  используют и Event/Route), и, судя по всему, ни один real-write FULL
+  media прогон ни для одной сущности не выполнялся через этот CLI
+  раньше. Первый вариант fix'а (глобальный `--conditions=react-server`
+  на npm-скрипте) протестирован и ОТКЛОНЁН до применения к golden write:
+  флаг process-global, ломает резолвинг `react` для всего остального
+  import-графа CLI — несколько `@radix-ui/react-*` падали с
+  `React.createContext is not a function`. Финальный fix —
+  `installServerOnlyStub()`, узкий патч Node CJS loader'а только для
+  точной bare-specifier строки `"server-only"`; подтверждено, что
+  `react`/`@radix-ui/*` резолвятся нормально. Ревью прошло без
+  замечаний (0 threads). Все gates green
+  (`mergeStateStatus=CLEAN`, `mergeable=MERGEABLE`, CI SUCCESS на
+  `c7715a54`) → merge commit `55786060`. Post-merge CI + Docker Build &
+  Push — SUCCESS на `55786060`. Local `dev` fast-forwarded. **Golden
+  write возобновляется** с шага 5A (Place 5389 targeted commit) —
+  baseline теперь `dev = origin/dev = 55786060`; backup
+  (`~/dev/archives/mamago2-place-golden-pre-20260715-1941.dump`) и
+  preflight (все три golden Places) остаются валидными от предыдущей
+  попытки, повторять не нужно.
