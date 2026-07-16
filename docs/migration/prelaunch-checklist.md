@@ -824,10 +824,11 @@ runner'а не покрыта тестами. Требует отдельной 
       backup и preflight (шаги 3–4) уже выполнены до этого blocker'а и
       остаются в силе.
 - [x] **PR C5 — resolve real WP attachment file URL** (2026-07-15/16,
-      ветка `fix/migration-wp-attachment-file-url`, **PR открыт, merge
-      ещё не выполнен**) — третий blocker, найденный на первом РЕАЛЬНОМ
-      write после merge PR C4 (Place 5389 действительно создан, но
-      **все 15/15 media attachment упали**).
+      ветка `fix/migration-wp-attachment-file-url`, PR #51, **смержен**
+      — merge commit `d2f5c262`, CI + Docker Build & Push SUCCESS на
+      этом SHA) — третий blocker, найденный на первом РЕАЛЬНОМ write
+      после merge PR C4 (Place 5389 действительно создан, но **все
+      15/15 media attachment упали**).
 
       **Что произошло:** `pnpm migration:commit:wordpress-db --entity
       place --source-record-key wordpress-db:places:5389 --profile
@@ -2014,3 +2015,25 @@ dispatcher-branch, ни CLI-flag).
   строился `--force-reprocess` (PR C3). После merge PR C5:
   `--force-reprocess` на 5389 для докачки media, затем 895 → 43023 по
   прежнему плану.
+- **2026-07-16 — Claude Code** — **PR C5 смержен.** PR #51: review
+  (`chatgpt-codex-connector`, P2) нашёл валидный баг в самом fix —
+  `wp_postmeta` не имеет unique-ограничения на `(post_id, meta_key)`,
+  так что прямой `LEFT JOIN` за `_wp_attached_file` мог вернуть больше
+  одной строки на attachment при дублирующихся postmeta-записях, а
+  `WordPressRepository.getAttachmentsByIds()` схлопывает строки по ID
+  через `map.set()` — при дубликатах выигрывала бы произвольная,
+  недетерминированная строка. Исправлено отдельным коммитом `01111330`
+  (не amend): заменили `LEFT JOIN` на correlated scalar subquery
+  (`ORDER BY meta_id ASC LIMIT 1`), гарантирующий ровно одну строку на
+  attachment независимо от дублей. Заодно всплыла и исправлена
+  хрупкость самого fake executor'а в тесте — naive substring-роутинг
+  (`sql.includes("FROM wp_postmeta")`) стал ambiguous с новым
+  subquery, порядок проверок переставлен. Подтверждено напрямую против
+  живой WP БД (read-only): резолвинг для трёх уже проверенных
+  attachment остался корректным. Review thread resolved, все gates
+  green (`mergeStateStatus=CLEAN`, `mergeable=MERGEABLE`, 0 unresolved
+  threads, CI SUCCESS на `01111330`) → merge commit `d2f5c262`.
+  Post-merge CI + Docker Build & Push — SUCCESS на `d2f5c262`. Local
+  `dev` fast-forwarded. **Golden write возобновляется**:
+  `--force-reprocess` на Place 5389 для докачки media (baseline теперь
+  `dev = origin/dev = d2f5c262`), затем 895 → 43023 по прежнему плану.
