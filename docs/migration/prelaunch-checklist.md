@@ -823,8 +823,71 @@ runner'а не покрыта тестами. Требует отдельной 
       этим же CLI после merge, с шага 5A (Place 5389 targeted commit) —
       backup и preflight (шаги 3–4) уже выполнены до этого blocker'а и
       остаются в силе.
-- [ ] Новые golden samples (после B+C, **с PR C3 + PR C4** для реального
-      media write).
+- [x] **PR C5 — resolve real WP attachment file URL** (2026-07-15/16,
+      ветка `fix/migration-wp-attachment-file-url`, **PR открыт, merge
+      ещё не выполнен**) — третий blocker, найденный на первом РЕАЛЬНОМ
+      write после merge PR C4 (Place 5389 действительно создан, но
+      **все 15/15 media attachment упали**).
+
+      **Что произошло:** `pnpm migration:commit:wordpress-db --entity
+      place --source-record-key wordpress-db:places:5389 --profile
+      FULL_IMPORT --confirm-writes ...` успешно создал Place (LINKED,
+      корректные title/phone E.164/opening hours/city), но каждый из 15
+      attachment вернул `PLACE_MEDIA_PROCESS_FAILED`:
+      `Media at https://mamago.by/?attachment_id=5391 is not an image
+      (text/html)`.
+
+      **Root cause:** на живом сайте `wp_posts.guid` для attachment
+      резолвится в HTML-страницу самого attachment (pretty-permalink
+      вида `.../2021-07-11-jpg/` либо legacy `?attachment_id=N`), а НЕ
+      в файл. Подтверждено напрямую: `_wp_attached_file`
+      (`wp_postmeta`) для того же attachment даёт настоящий
+      uploads-relative путь (`2023/07/6c616226....webp`); прямой
+      `curl -I` на `{origin(guid)}/wp-content/uploads/{attached_file}`
+      вернул `HTTP 200, content-type: image/webp, content-length:
+      105800` — байт-в-байт совпадающий с `filesize` в
+      `_wp_attachment_metadata`. Это **не Place-специфичный баг** —
+      `MediaImportWriter` (единая точка входа для
+      Event/Route/Place-синкеров) везде читал `attachment.guid`
+      напрямую; судя по всему, ни один реальный media-download ни для
+      одной сущности никогда не проходил через этот CLI успешно.
+
+      **Fix (минимальный, единая точка исправления):**
+      `resolveWordPressAttachmentFileUrl()` (новый чистый helper,
+      `src/lib/migration/adapters/wordpress-db/resolveAttachmentFileUrl.ts`)
+      — если `attached_file` присутствует, строит URL как
+      `{origin(guid)}/wp-content/uploads/{attached_file}`; иначе
+      fallback на `guid` verbatim (сохраняет прежнее поведение всех
+      существующих тестов/фикстур, у которых `attached_file` не
+      задан). `buildAttachmentsQuery()` теперь `LEFT JOIN wp_postmeta`
+      за `_wp_attached_file`; `WordPressAttachmentRow` получил поле
+      `attached_file: string | null`. `MediaImportWriter.importWordPressAttachment()`
+      — единственное место, где строится `sourceUrl` для скачивания
+      — переключено на резолвер. Ни `EventMediaSyncer`,
+      `RouteStopMediaSyncer`, ни `PlaceMediaSyncer` не тронуты —
+      фикс на уровне общего `MediaImportWriter` чинит все три сразу.
+
+      Тесты: 7 новых в `resolveAttachmentFileUrl.test.ts`
+      (attached_file строит URL из origin guid — включая случай
+      pretty-permalink guid; fallback на guid при отсутствии/пустом/
+      whitespace-only attached_file; fallback на raw guid при
+      unparseable guid; null когда оба поля непригодны), 1 новый в
+      `MediaImportWriter.test.ts` (regression — attached_file
+      предпочитается над guid, точно воспроизводит реальный кейс
+      5391). Существующие фикстуры (`attachmentFixture`/`attachment()`
+      в Event/Route/Place-синкер-тестах, `WordPressRepository.test.ts`)
+      обновлены полем `attached_file: null` — поведение не изменилось,
+      только typecheck. Проверки — все green: полный
+      `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep,
+      eslint, `tsc --noEmit`, `git diff --check`, `pnpm build`.
+
+      **Место 5389 остаётся в БД как есть** (Алексей решил не
+      откатывать) — реальный, корректный Place без media. После merge
+      PR C5: `--force-reprocess` дозагрузит его media (тот самый
+      сценарий, для которого PR C3 и создавался), затем golden write
+      продолжится на 895/43023.
+- [ ] Новые golden samples (после B+C, **с PR C3 + PR C4 + PR C5** для
+      реального media write).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
 - [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
 
@@ -1932,3 +1995,22 @@ dispatcher-branch, ни CLI-flag).
   (`~/dev/archives/mamago2-place-golden-pre-20260715-1941.dump`) и
   preflight (все три golden Places) остаются валидными от предыдущей
   попытки, повторять не нужно.
+- **2026-07-16 — Claude Code** — **Первый реальный write состоялся, но
+  третий blocker сразу нашёлся на media — PR C5.** `pnpm
+  migration:commit:wordpress-db --entity place --source-record-key
+  wordpress-db:places:5389 --profile FULL_IMPORT --confirm-writes ...`
+  успешно создал Place 5389 (LINKED; title/phone E.164/opening hours/
+  city всё корректно; `placeCount 2→3`, `openingHoursCount 2→3`,
+  `migrationLineageCount 17→18`, `migrationRecordCount 35→36` — ровно
+  одна новая запись каждого типа, Place 437 подтверждён
+  bit-for-bit неизменным). Но все 15/15 media attachment упали —
+  `guid` резолвится в HTML-страницу, а не в файл (подтверждено прямым
+  `curl`: правильный URL строится из `_wp_attached_file`, вернул
+  `HTTP 200 image/webp` с точным совпадением filesize). Per протокол —
+  остановились, 895/43023 не запускали. Алексей решил: Place 5389
+  оставить как есть (реальный, корректный, просто без media пока) и
+  закрыть blocker отдельным PR (`fix/migration-wp-attachment-file-url`,
+  детали — см. "PR C5" выше) — именно тот сценарий, для которого
+  строился `--force-reprocess` (PR C3). После merge PR C5:
+  `--force-reprocess` на 5389 для докачки media, затем 895 → 43023 по
+  прежнему плану.

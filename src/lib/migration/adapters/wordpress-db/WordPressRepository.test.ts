@@ -248,7 +248,15 @@ const offerPlaceRelationRows: WordPressOfferPlaceRelationRow[] = [
 ];
 
 const attachmentRows: WordPressAttachmentRow[] = [
-  { ID: 555, post_title: "cover.jpg", post_name: "cover", post_mime_type: "image/jpeg", guid: "https://example.com/cover.jpg", post_parent: 201 },
+  {
+    ID: 555,
+    post_title: "cover.jpg",
+    post_name: "cover",
+    post_mime_type: "image/jpeg",
+    guid: "https://example.com/cover.jpg",
+    post_parent: 201,
+    attached_file: "2020/01/cover.jpg",
+  },
 ];
 
 const redirectRows: WordPressRedirectRow[] = [
@@ -317,6 +325,16 @@ function createFakeExecutor() {
       }
       return [] as never;
     }
+    // Checked before the generic "FROM wp_postmeta" branch below: the real
+    // buildAttachmentsQuery() now has a `_wp_attached_file` correlated
+    // subquery that also contains the substring "FROM wp_postmeta" (a
+    // review finding, PR #51 — the query itself is fine, only this fake
+    // executor's naive substring routing needed reordering to stay
+    // unambiguous).
+    if (sql.includes("post_type = 'attachment'")) {
+      const ids = params as readonly number[];
+      return attachmentRows.filter((row) => ids.includes(row.ID)) as never;
+    }
     if (sql.includes("FROM wp_postmeta")) {
       const ids = params as readonly number[];
       return [
@@ -343,10 +361,6 @@ function createFakeExecutor() {
       // buildOfferPlaceRelationsQuery: params = [...postIds, ...postIds] (parent-side half, then child-side half).
       const ids = params as readonly number[];
       return offerPlaceRelationRows.filter((row) => ids.includes(row.post_id)) as never;
-    }
-    if (sql.includes("post_type = 'attachment'")) {
-      const ids = params as readonly number[];
-      return attachmentRows.filter((row) => ids.includes(row.ID)) as never;
     }
     if (sql.includes("FROM wp_rank_math_redirections")) {
       return redirectRows as never;

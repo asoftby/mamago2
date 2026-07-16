@@ -1,3 +1,4 @@
+import { resolveWordPressAttachmentFileUrl } from "../adapters/wordpress-db/resolveAttachmentFileUrl";
 import type {
   ImportWordPressAttachmentInput,
   ImportWordPressAttachmentResult,
@@ -60,8 +61,17 @@ export class MediaImportWriter {
   ): Promise<ImportWordPressAttachmentResult> {
     assertInputIsUsable(input);
 
+    // `guid` is not necessarily a fetchable file URL — see
+    // `resolveWordPressAttachmentFileUrl()`'s own docblock. `assertInputIsUsable`
+    // already guarantees a non-empty `guid`, so the only way this comes
+    // back `null` is a real programmer error, not a data-shape one.
+    const sourceUrl = resolveWordPressAttachmentFileUrl(input.attachment);
+    if (!sourceUrl) {
+      throw new Error("Could not resolve a file URL for this WordPress attachment.");
+    }
+
     const imported = await this.deps.mediaImporter.importFromUrl({
-      sourceUrl: input.attachment.guid,
+      sourceUrl,
       filenameHint: input.attachment.post_name || null,
       title: input.attachment.post_title || null,
       sourceRecordKey: input.sourceRecordKey,
