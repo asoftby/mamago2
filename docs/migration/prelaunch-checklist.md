@@ -14,9 +14,10 @@
    Перед началом работы прочитать его целиком + `CLAUDE.md` в корне репо
    (критично: правила Prisma-миграций — никаких `migrate dev` / `db push` / reset).
 2. **Порядок:** двигаться по разделам §1 → §2 → §3 → §4. Внутри §1 порядок:
-   Routes → Offers → Users → Profiles → Reviews (Reviews зависит от Users+Places).
-   Продуктовые решения (§3 и помеченные «продуктовое решение») агент сам
-   не принимает — формулирует варианты и спрашивает Алексея.
+   Places → Routes → Events → Offers → Users → Profiles → Reviews (Reviews
+   зависит от Users+Places). Продуктовые решения (§3 и помеченные
+   «продуктовое решение») агент сам не принимает — формулирует варианты и
+   спрашивает Алексея.
 3. **При закрытии пункта:** поставить `[x]`, дописать в скобках дату и
    PR/коммит. Новые обнаруженные задачи — добавлять пунктом в нужный раздел,
    а не держать в голове/чате.
@@ -33,6 +34,37 @@
    секреты в git не коммитить никогда. Подхват: `set -a; source .env; set +a`.
    SSH-аутентификация скриптов — только по ключу (BatchMode); интерактивный
    пароль скрипты не принимают by design.
+7. **Ускоренный PR/Docker workflow (закреплено 2026-07-16 — было слишком
+   медленно на серии мелких PR подряд):**
+   - Маленький кодовый PR: targeted-тесты (только затронутые файлы, не
+     полный sweep, если риск низкий) + targeted ESLint + `tsc --noEmit` +
+     `git diff --check`. Полный `pnpm build` — максимум один раз, только
+     если это обязательный pre-push hook или риск это оправдывает; **не
+     запускать `pnpm build` второй раз вручную**, если тот же build уже
+     отработал через pre-push hook.
+   - После merge кодового PR — один Docker Build & Push на merge SHA.
+     Больше ничего не ждать в текущей сессии: результат достаточно
+     проверить перед следующим реальным DB write / full batch, не держать
+     сессию открытой 10–15 минут ради одного docs-only Docker-рана.
+   - **Отдельный docs-коммит после каждого маленького PR — не делать.**
+     Флип `[ ]` → `[x]` и запись в handoff log — пакетно, по завершении
+     сущности/фазы (например, всего golden write, а не каждого PR внутри
+     него).
+   - Docs-only push (`docs/**`, `**/*.md`) не должен запускать Docker
+     Build & Push вообще — см. `.github/workflows/docker.yml`
+     `paths-ignore`. Ждать Docker для docs-only изменений не нужно.
+   - Не выполнять постоянный polling GitHub Actions в цикле
+     sleep-check-repeat. После открытия PR — короткий отчёт с первым
+     статусом CI, и дальше не ждать, если явно не попросили следить.
+   - Полный `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep,
+     полный `pnpm build`, и подтверждённый green Docker — обязательны на
+     фазовых воротах: перед первым реальным write, перед full batch,
+     перед RC, перед production cutover. Ускорение касается только серии
+     мелких fix-PR внутри одной фазы, не самих ворот.
+   - Ускорение НЕ отменяет: backup перед реальными write, доказанную
+     idempotency, план rollback, Prisma/schema guards (см. `CLAUDE.md`),
+     auth/security-проверки, запрет destructive DB операций без
+     подтверждения Алексея, и Go/No-Go перед production.
 
 ---
 
@@ -887,10 +919,29 @@ runner'а не покрыта тестами. Требует отдельной 
       PR C5: `--force-reprocess` дозагрузит его media (тот самый
       сценарий, для которого PR C3 и создавался), затем golden write
       продолжится на 895/43023.
-- [ ] Новые golden samples (после B+C, **с PR C3 + PR C4 + PR C5** для
-      реального media write).
+- [ ] **Golden samples: 1/3, частично.** Не путать с "3 golden Places
+      импортированы" — это НЕ так.
+      - Place `5389`: scalar-уровень создан корректно (Place,
+        OpeningHours, активный PLACE lineage, MigrationRecord — все
+        созданы; Place 437 не изменён bit-for-bit; дублей нет). **Media
+        для 5389 ещё не импортированы** — все 15/15 attachment упали
+        на первом прогоне (root cause и fix — PR C5 выше); докачка
+        через `--force-reprocess` ещё не выполнялась.
+      - Place `895` и `43023`: **ещё не запускались вообще** — ни
+        preview, ни commit.
+      - Следующий gate, строго по порядку:
+        1. targeted media retry (`--force-reprocess`) только для уже
+           существующего Place 5389;
+        2. не менять его scalar-поля/`sourceHash` без необходимости;
+        3. проверить media/lineage/UI после докачки;
+        4. повторный запуск того же `--force-reprocess` должен дать 0
+           downloads и 0 writes (доказательство идемпотентности);
+        5. только после этого — commit 895, затем 43023;
+        6. затем reconciliation места 437;
+        7. затем full local batch (82 Place).
 - [ ] Reconciliation места 437 (после D, с защитой ручных правок).
-- [ ] Full batch (82 Place) — только после закрытия всех пунктов выше.
+- [ ] Full batch (82 Place) — только после закрытия всех пунктов выше,
+      **не запускался**.
 
 ### Routes (14 publish)
 
@@ -1080,6 +1131,45 @@ runner'а не покрыта тестами. Требует отдельной 
       связывает первый успешно импортированный asset и предупреждает о
       дополнительных attachment IDs как не импортированных/не представимых
       без расширения модели/UI.
+
+### Events (28 eligible)
+
+**Статус: engine готов (§0 — adapter/normalizer/runner +
+`EventMediaSyncer` существуют) → фактический импорт НЕ НАЧАТ.**
+Готовность движка ≠ выполненный импорт — ниже отдельный, самостоятельный
+трек для реальных данных, по аналогии с Places/Routes/Offers.
+
+- [ ] Полный source inventory всех событий (все Event-посты источника,
+      не только уже известные 28 eligible — подтвердить, что 28 это
+      действительно полный отфильтрованный набор, а не устаревшая
+      оценка).
+- [ ] 28 eligible active/future Event — read-only preview/аудит перед
+      любым commit (аналогично Places §1 read-only readiness audit).
+- [ ] Три golden Event — targeted commit по одному, с теми же gates,
+      что и у Place golden write (backup, preflight, idempotency,
+      repeat-run 0 downloads/0 writes).
+- [ ] Media policy: подтвердить поведение отдельно для local/dev
+      (sampled allowlist, см. `resolveSampledMediaPolicy`) и production
+      (FULL для всех eligible) — не предполагать, читать код.
+- [ ] UI verification: date/time, city, visibility, публичная +
+      admin-страница для golden Event.
+- [ ] Idempotency: повторный targeted commit того же Event — 0
+      duplicate entity/lineage/media.
+- [ ] Event visibility/city regression — подтвердить, что миграция не
+      ломает существующую publish/visibility-логику для уже созданных
+      вручную Event.
+- [ ] Full batch (28 Event) — только после закрытия всех пунктов выше,
+      **не запускался**.
+- [ ] Production FULL media — только после успешного local/dev batch и
+      отдельного Go-решения, **не запускался**.
+- [ ] Поведение завершившегося (past) нативного Event после миграции —
+      подтвердить, что уже прошедшие события ведут себя корректно
+      (`shouldExcludePastEvent()` уже существует в discover/normalize —
+      подтвердить его реальное поведение на живых данных, не только по
+      коду).
+- [ ] 100% legacy URL coverage прошедших событий через 301/410 —
+      подтвердить, что каждый прошедший Event имеет редирект-запись в
+      `manifest.csv`, ни один legacy URL не остаётся без 301/410.
 
 ### Offers (services / hb-programs, 90+ publish)
 
