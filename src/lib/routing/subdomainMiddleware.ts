@@ -36,6 +36,21 @@ function isRouteContentRoute(pathname: string): boolean {
   return pathname === "/routes" || pathname.startsWith("/routes/");
 }
 
+/**
+ * `/me/{places|offers|events}/{id}/preview` — opened from the admin content
+ * list (relative link) as well as from the business cabinet. Like
+ * `isEditorRoute`/`isRouteContentRoute`, these must stay on the current
+ * subdomain surface: the admin/business fallback rewrite would turn this
+ * into a nonexistent `/admin/me/...` or `/business/me/...` page (404).
+ * Deliberately an exact-format allowlist, not a blanket `/me/*` bypass —
+ * every other `/me/...` route keeps going through the normal rewrite.
+ */
+const CONTENT_PREVIEW_ROUTE_PATTERN = /^\/me\/(places|offers|events)\/[^/]+\/preview$/;
+
+function isContentPreviewRoute(pathname: string): boolean {
+  return CONTENT_PREVIEW_ROUTE_PATTERN.test(pathname);
+}
+
 function isPublicInviteRoute(pathname: string): boolean {
   return pathname === "/invite/business";
 }
@@ -165,6 +180,10 @@ export function resolveSubdomainMiddlewareDecision(params: {
       // as isEditorRoute: serve the public route-group page on this surface
       // instead of rewriting into a nonexistent /admin/routes/* or
       // /business/routes/* page.
+      return { kind: "next" };
+    }
+
+    if (isContentPreviewRoute(pathname)) {
       return { kind: "next" };
     }
   }
