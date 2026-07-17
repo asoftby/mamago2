@@ -59,9 +59,10 @@ export interface NormalizedPlaceCandidate {
    * `addressText` is that blob's `address` field, parsed and trimmed —
    * mirrors the `phone`/`phoneE164` split (raw evidence vs. the value
    * safe to write to a target field). `null` when `location` is absent,
-   * isn't valid JSON, or its `address` is missing/empty — never a
-   * best-effort/guessed value. See `PLACE_LOCATION_ADDRESS_UNPARSEABLE`
-   * for the "present but unusable" case.
+   * isn't valid JSON, its `address` is missing/empty (see
+   * `PLACE_LOCATION_ADDRESS_UNPARSEABLE`), or the extracted text is a
+   * content-free placeholder like "ул."/"улица" (see
+   * `PLACE_ADDRESS_INCOMPLETE`) — never a best-effort/guessed value.
    */
   addressText: string | null;
   cityRaw: string | null;
@@ -120,6 +121,22 @@ function resolvePlaceAddressText(locationRaw: string | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * Legacy WP address text that carries no real location information: empty,
+ * punctuation-only, or a bare street-type word with nothing after it (e.g.
+ * "Ул." — Place 895's real source value). Deliberately narrow — only the
+ * documented Russian street-type tokens, never a general junk detector —
+ * so a genuine multi-word address is never mistaken for a placeholder.
+ */
+const ADDRESS_PLACEHOLDER_TOKENS = new Set(["ул", "улица"]);
+
+function isPlaceholderOnlyAddress(address: string): boolean {
+  const normalized = address.trim().toLowerCase().replace(/\.+$/, "").trim();
+  if (normalized.length === 0) return true;
+  if (!/[\p{L}\p{N}]/u.test(normalized)) return true;
+  return ADDRESS_PLACEHOLDER_TOKENS.has(normalized);
+}
+
 export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   const { post, postMeta, terms, placeIndex } = bundle;
   const sourceRecordKey = `${SOURCE_ENTITY_TYPE}:${post.ID}`;
@@ -140,14 +157,26 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   }
 
   const locationRaw = firstMetaValue(postMeta, "location");
-  const addressText = resolvePlaceAddressText(locationRaw);
-  if (locationRaw && !addressText) {
+  const extractedAddressText = resolvePlaceAddressText(locationRaw);
+  if (locationRaw && !extractedAddressText) {
     warnings.push({
       code: "PLACE_LOCATION_ADDRESS_UNPARSEABLE",
       message: "location postmeta is present but its address could not be extracted (not valid JSON, or address is missing/empty).",
       severity: "WARNING",
       sourceRecordKey,
       details: { locationRaw },
+    });
+  }
+  const addressText =
+    extractedAddressText && !isPlaceholderOnlyAddress(extractedAddressText) ? extractedAddressText : null;
+  if (extractedAddressText && !addressText) {
+    warnings.push({
+      code: "PLACE_ADDRESS_INCOMPLETE",
+      message:
+        "location.address parsed but is a content-free placeholder (empty, punctuation-only, or a bare street-type word like \"ул\"/\"ул.\"/\"улица\") — never written to the target address field. Needs manual review.",
+      severity: "WARNING",
+      sourceRecordKey,
+      details: { extractedAddressText },
     });
   }
 
