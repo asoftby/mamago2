@@ -41,6 +41,7 @@ import {
   isPlaceReviewStep,
 } from "./config";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { canEditPlaceInWizard } from "./canEditPlaceInWizard";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
@@ -942,9 +943,8 @@ export function PlaceWizard({
     }
   };
 
-  // Determine if editable
-  const isEditable = mode === "create" ||
-    (mode === "edit" && place?.status !== "PENDING");
+  // Determine if editable — single source of truth, never re-derive per step.
+  const isEditable = canEditPlaceInWizard({ mode, status: place?.status, userRole });
 
   // Render current step
   const renderStep = () => {
