@@ -7,6 +7,7 @@ import {
   buildMysqlClientConfig,
   buildRemoteScript,
   buildSshArgs,
+  concatBuffersToUtf8,
   isLocalHost,
   maskHost,
   parseTabularRows,
@@ -224,6 +225,43 @@ function testUnescapeMysqlBatchValue() {
   assert.equal(unescapeMysqlBatchValue("trailing\\"), "trailing\\");
 }
 
+/**
+ * Regression for the real bug (2026-07-17): golden Place 895's
+ * `_seopress_analysis_data` postmeta came back with a Cyrillic "д"
+ * (U+0434, 2 UTF-8 bytes: 0xD0 0xB4) replaced by U+FFFD in one CLI run
+ * but not another — confirmed via byte-level diff of two live fetches.
+ * Root cause: `runSshMysqlCommand` called `chunk.toString()` on each
+ * stream `"data"` event independently; when a multi-byte character's
+ * bytes land in two different chunks, decoding each chunk in isolation
+ * corrupts the split character. This in turn made `sourceHash`
+ * nondeterministic (the corrupted/clean bytes hash differently), so a
+ * targeted re-run kept reporting LINKED instead of SKIP_UNCHANGED
+ * despite zero real source changes.
+ */
+function testConcatBuffersToUtf8HandlesSplitMultiByteCharacter() {
+  const full = Buffer.from("для детского", "utf8");
+  // "д" (0xD0 0xB4) sits right after "для " — split its two bytes across
+  // two separate chunks, exactly like a stream boundary landing mid-character.
+  const splitIndex = full.indexOf(Buffer.from("д", "utf8")) + 1;
+  const chunkA = full.subarray(0, splitIndex);
+  const chunkB = full.subarray(splitIndex);
+
+  // The old, buggy behavior: decode each chunk independently and concatenate
+  // the resulting *strings*. This is what corrupted the real data.
+  const buggyResult = chunkA.toString("utf8") + chunkB.toString("utf8");
+  assert.ok(buggyResult.includes("�"), "sanity check: per-chunk decoding must reproduce the real corruption");
+
+  // The fix: concatenate the raw *bytes* first, decode exactly once.
+  const fixedResult = concatBuffersToUtf8([chunkA, chunkB]);
+  assert.equal(fixedResult, "для детского");
+  assert.ok(!fixedResult.includes("�"));
+}
+
+function testConcatBuffersToUtf8SingleChunkUnaffected() {
+  assert.equal(concatBuffersToUtf8([Buffer.from("plain ascii", "utf8")]), "plain ascii");
+  assert.equal(concatBuffersToUtf8([]), "");
+}
+
 async function testRetryHappensForBannerExchangeTimeout() {
   let calls = 0;
   const result = await withSshBannerTimeoutRetry(
@@ -321,6 +359,8 @@ async function main() {
   testBuildRemoteScriptEscapesEmbeddedQuotes();
   testParseTabularRows();
   testUnescapeMysqlBatchValue();
+  testConcatBuffersToUtf8HandlesSplitMultiByteCharacter();
+  testConcatBuffersToUtf8SingleChunkUnaffected();
   await testRetryHappensForBannerExchangeTimeout();
   await testRetryBoundedMaxAttempts();
   await testNoRetryOnAuthFailure();

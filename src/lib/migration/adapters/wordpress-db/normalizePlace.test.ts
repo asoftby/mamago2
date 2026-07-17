@@ -134,22 +134,27 @@ function testGoldenPlace5389RealLocationAddress() {
 }
 
 /**
- * Place 895's real `location.address` is just "Ул." (source data quality
- * issue, not a mapping bug) — the extractor must preserve it verbatim,
- * never discard/upgrade it via `legal-address` or any other field. That
- * blending decision is a product call left for manual review, not this
- * mapper's job.
+ * Place 895's real `location.address` is just "Ул." — a bare street-type
+ * word with nothing after it, not a real address (source data quality
+ * issue, not a mapping bug). `addressText` must be `null` (never written
+ * to the target address field), `locationRaw` still preserves the raw
+ * evidence verbatim, and `PLACE_ADDRESS_INCOMPLETE` routes it to manual
+ * review. Never discarded/upgraded via `legal-address` or any other
+ * field — that blending decision is a product call for manual review,
+ * not this mapper's job.
  */
-function testGoldenPlace895RealLocationAddressIsSparseButPreservedVerbatim() {
+function testGoldenPlace895RealLocationAddressIsPlaceholderOnlyRejected() {
+  const rawLocation = '{"address":"\\u0423\\u043b.","map_picker":true,"latitude":53.94276,"longitude":27.59969}';
   const record = normalizePlace(
     buildBundle({
       post: { ...basePost, ID: 895 },
-      postMeta: {
-        location: ['{"address":"\\u0423\\u043b.","map_picker":true,"latitude":53.94276,"longitude":27.59969}'],
-      },
+      postMeta: { location: [rawLocation] },
     }),
   );
-  assert.equal(payloadOf(record).addressText, "Ул.");
+  const payload = payloadOf(record);
+  assert.equal(payload.addressText, null);
+  assert.equal(payload.locationRaw, rawLocation, "raw evidence must still be preserved verbatim");
+  assert.ok(record.warnings?.some((w) => w.code === "PLACE_ADDRESS_INCOMPLETE"));
 }
 
 function testGoldenPlace43023RealLocationAddress() {
@@ -164,6 +169,40 @@ function testGoldenPlace43023RealLocationAddress() {
     }),
   );
   assert.equal(payloadOf(record).addressText, "улица Скрыганова 6/2, Минск");
+}
+
+/** Case/period variants of the same bare street-type placeholder — all must reject, none guessed. */
+function testAddressPlaceholderVariantsAllRejected() {
+  const placeholders = ["ул", "ул.", "Ул.", "УЛИЦА", "улица", "  ул.  ", "ул..."];
+  for (const address of placeholders) {
+    const record = normalizePlace(
+      buildBundle({ postMeta: { location: [JSON.stringify({ address })] } }),
+    );
+    assert.equal(payloadOf(record).addressText, null, `expected "${address}" to be rejected`);
+    assert.ok(
+      record.warnings?.some((w) => w.code === "PLACE_ADDRESS_INCOMPLETE"),
+      `expected "${address}" to warn PLACE_ADDRESS_INCOMPLETE`,
+    );
+  }
+}
+
+/** Empty and punctuation-only addresses must also reject, not just the ул/улица family. */
+function testEmptyAndPunctuationOnlyAddressesRejected() {
+  for (const address of ["", "   ", "-", "—", ".."]) {
+    const record = normalizePlace(
+      buildBundle({ postMeta: { location: [JSON.stringify({ address })] } }),
+    );
+    assert.equal(payloadOf(record).addressText, null, `expected "${address}" to be rejected`);
+  }
+}
+
+/** A real multi-word address must never be mistaken for a placeholder just because it starts with "ул." */
+function testFullAddressStartingWithStreetTypeIsNotRejected() {
+  const record = normalizePlace(
+    buildBundle({ postMeta: { location: [JSON.stringify({ address: "ул. Ратомская 7, Минск" })] } }),
+  );
+  assert.equal(payloadOf(record).addressText, "ул. Ратомская 7, Минск");
+  assert.ok(!record.warnings?.some((w) => w.code === "PLACE_ADDRESS_INCOMPLETE"));
 }
 
 function testLegacyNonJsonLocationValueYieldsNullAddressWithWarning() {
@@ -552,7 +591,10 @@ function main() {
 
   testAddressExtractedFromRealLocationJson();
   testGoldenPlace5389RealLocationAddress();
-  testGoldenPlace895RealLocationAddressIsSparseButPreservedVerbatim();
+  testGoldenPlace895RealLocationAddressIsPlaceholderOnlyRejected();
+  testAddressPlaceholderVariantsAllRejected();
+  testEmptyAndPunctuationOnlyAddressesRejected();
+  testFullAddressStartingWithStreetTypeIsNotRejected();
   testGoldenPlace43023RealLocationAddress();
   testLegacyNonJsonLocationValueYieldsNullAddressWithWarning();
   testMissingLocationKeyYieldsNullAddressWithoutWarning();

@@ -182,6 +182,19 @@ export function buildManualFallbackMessage(config: WordPressDbConfig, remoteScri
  * SSH and returns raw stdout. One SSH round trip per call — no batching of
  * unrelated queries into a single connection.
  */
+/**
+ * A multi-byte UTF-8 character (e.g. any Cyrillic letter) can be split
+ * across two separate stream `"data"` chunks — decoding each chunk with
+ * `Buffer.toString()` independently corrupts the split character into the
+ * U+FFFD replacement character, silently mangling any sufficiently large
+ * response and making `sourceHash` (computed from this same output)
+ * nondeterministic between runs. Concatenating the raw bytes first and
+ * decoding exactly once avoids splitting any multi-byte sequence.
+ */
+export function concatBuffersToUtf8(chunks: readonly Buffer[]): string {
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 export function runSshMysqlCommand(config: WordPressDbConfig, remoteScript: string): Promise<string> {
   const cnfContent = buildMysqlClientConfig(config);
   const args = buildSshArgs(config, remoteScript);
@@ -189,16 +202,16 @@ export function runSshMysqlCommand(config: WordPressDbConfig, remoteScript: stri
   return new Promise((resolve, reject) => {
     const child = spawn("ssh", args, { stdio: ["pipe", "pipe", "pipe"] });
 
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => (stdout += chunk.toString()));
-    child.stderr.on("data", (chunk) => (stderr += chunk.toString()));
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    child.stdout.on("data", (chunk) => stdoutChunks.push(chunk));
+    child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
     child.on("error", (error) => reject(error));
     child.on("close", (code) => {
       if (code === 0) {
-        resolve(stdout);
+        resolve(concatBuffersToUtf8(stdoutChunks));
       } else {
-        reject(new Error(`ssh exited with code ${code}: ${stderr.trim()}`));
+        reject(new Error(`ssh exited with code ${code}: ${concatBuffersToUtf8(stderrChunks).trim()}`));
       }
     });
 

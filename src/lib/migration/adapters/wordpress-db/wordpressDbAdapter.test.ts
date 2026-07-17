@@ -235,6 +235,66 @@ async function testStableSourceHash() {
   assert.notEqual(firstArticle?.sourceHash, place?.sourceHash);
 }
 
+/**
+ * Regression for the real bug (2026-07-17): golden Place 895's targeted
+ * re-run kept coming back LINKED instead of SKIPPED despite an unchanged
+ * source and zero data deltas. Root-caused to `runSshMysqlCommand`
+ * decoding each stream chunk independently (fixed in connectExecutor.ts,
+ * see `concatBuffersToUtf8`) — not row/key ordering, which this test
+ * confirms was already stable: `stableStringify` (wordpressDbAdapter.ts)
+ * sorts postMeta's object keys, so feeding the exact same meta rows in a
+ * different SQL/array order must still produce an identical sourceHash.
+ */
+function createFakeExecutorWithReorderedPlaceMeta(reversed: boolean): WordPressQueryExecutor {
+  const placeMetaRows: WordPressPostMetaRow[] = [
+    { meta_id: 10, post_id: 301, meta_key: "location", meta_value: '{"address":"Test St 1"}' },
+    { meta_id: 11, post_id: 301, meta_key: "phone", meta_value: "+375291234567" },
+    { meta_id: 12, post_id: 301, meta_key: "city-place", meta_value: "Минск" },
+  ];
+  const orderedRows = reversed ? [...placeMetaRows].reverse() : placeMetaRows;
+
+  return async (sql, params = []) => {
+    if (sql.includes("FROM wp_posts") && sql.includes("post_type = ?")) {
+      const [postType, , postId] = params;
+      const byId = sql.includes("ID = ?");
+      if (postType === "places") {
+        return (byId ? placePosts.filter((row) => row.ID === Number(postId)) : placePosts) as never;
+      }
+      return [] as never;
+    }
+    if (sql.includes("FROM wp_postmeta")) {
+      const ids = params as readonly number[];
+      return orderedRows.filter((row) => ids.includes(row.post_id)) as never;
+    }
+    if (sql.includes("FROM wp_term_relationships")) {
+      return [] as never;
+    }
+    if (sql.includes("FROM wp_voxel_index_places")) {
+      const ids = params as readonly number[];
+      return placeIndexRows.filter((row) => ids.includes(row.post_id)) as never;
+    }
+    throw new Error(`Unexpected query in test fake: ${sql}`);
+  };
+}
+
+async function testSourceHashStableAcrossPostMetaRowOrder() {
+  const forward = await fetchPublishedPlaceEnvelopeBySourceRecordKey(
+    createFakeExecutorWithReorderedPlaceMeta(false),
+    "wordpress-db:places:301",
+  );
+  const reversed = await fetchPublishedPlaceEnvelopeBySourceRecordKey(
+    createFakeExecutorWithReorderedPlaceMeta(true),
+    "wordpress-db:places:301",
+  );
+
+  assert.ok(forward.sourceHash);
+  assert.equal(
+    forward.sourceHash,
+    reversed.sourceHash,
+    "identical postmeta rows in a different SQL/array order must hash identically",
+  );
+}
+
 async function testNormalizeRoutesToArticleAndPlace() {
   const records = await wordpressDbAdapter.discoverRecords(contextWith());
   const article = records.find((r) => r.sourceEntityType === ARTICLE_ENTITY_TYPE)!;
@@ -300,6 +360,7 @@ async function main() {
   await testFetchPublishedPlaceEnvelopeRejectsMalformedIds();
   await testFetchPublishedPlaceEnvelopeRejectsMissingSource();
   await testStableSourceHash();
+  await testSourceHashStableAcrossPostMetaRowOrder();
   await testNormalizeRoutesToArticleAndPlace();
   await testNormalizeRouteEntity();
   await testNormalizeUnknownEntityTypeThrows();
