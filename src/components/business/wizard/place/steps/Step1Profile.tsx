@@ -15,6 +15,9 @@ import type { PlaceFormData } from "../types";
 
 const MAX_SUBCATEGORIES = 3;
 
+/** UI-only chip id — never stored. "Любой возраст" is represented by `ageTags: []`. */
+const ANY_AGE_CHIP_ID = "__any_age__";
+
 type PlaceCategoryChild = {
   id: string;
   nameRu: string;
@@ -326,17 +329,34 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <div className="mt-2">
           <ChipsRow
             layout="masonry"
-            items={AGE_OPTIONS.map((ageOption): ChipItem => ({
-              id: ageOption.key,
-              label: ageOption.shortLabel,
-              active: ageTags.includes(ageOption.key),
-              disabled: !isEditable,
-              onClick: () => isEditable && toggleAgeTag(ageOption.key),
-            }))}
+            items={[
+              {
+                id: ANY_AGE_CHIP_ID,
+                label: "Любой возраст",
+                // Derived, not separate state — ageTags=[] *is* "Любой возраст".
+                // Selecting a specific age naturally clears this (ageTags becomes
+                // non-empty); selecting this chip clears ageTags, which naturally
+                // deactivates every specific-age chip. No dual-selection is possible.
+                active: ageTags.length === 0,
+                disabled: !isEditable,
+                onClick: () => {
+                  if (!isEditable || ageTags.length === 0) return;
+                  setAgeTags([]);
+                  onChange({ ageTags: [] });
+                },
+              },
+              ...AGE_OPTIONS.map((ageOption): ChipItem => ({
+                id: ageOption.key,
+                label: ageOption.shortLabel,
+                active: ageTags.includes(ageOption.key),
+                disabled: !isEditable,
+                onClick: () => isEditable && toggleAgeTag(ageOption.key),
+              })),
+            ]}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          Выберите хотя бы один возрастной диапазон
+          Выберите «Любой возраст» или один либо несколько возрастных диапазонов
         </p>
       </div>
 

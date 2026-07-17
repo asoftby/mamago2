@@ -36,7 +36,8 @@ const PLACE_WIZARD_BASE_STEPS: WizardStepConfig<PlaceFormData>[] = [
       data.shortDesc?.trim() &&
       data.description?.trim() &&
       data.category &&
-      data.ageTags?.length > 0 &&
+      // ageTags is always "complete": either a specific selection, or an
+      // empty array representing the deliberate "Любой возраст" choice.
       data.visitFormats?.length > 0
     ),
     
@@ -56,9 +57,9 @@ const PLACE_WIZARD_BASE_STEPS: WizardStepConfig<PlaceFormData>[] = [
       },
       {
         label: "Возраст",
-        value: data.ageTags?.length > 0 
+        value: data.ageTags?.length > 0
           ? sortAgeKeys(data.ageTags).join(", ")
-          : "Не указан",
+          : "Любой возраст",
       },
     ],
     
@@ -68,7 +69,6 @@ const PLACE_WIZARD_BASE_STEPS: WizardStepConfig<PlaceFormData>[] = [
       if (!data.shortDesc?.trim()) missing.push("Краткое описание");
       if (!data.description?.trim()) missing.push("Полное описание");
       if (!data.category) missing.push("Категория");
-      if (!data.ageTags?.length) missing.push("Возрастные группы");
       if (!data.visitFormats?.length) missing.push("Формат посещения");
       return missing;
     },
