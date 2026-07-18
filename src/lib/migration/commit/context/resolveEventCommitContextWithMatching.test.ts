@@ -128,12 +128,38 @@ async function testPlaceUnmatchedPreservesRawWarning() {
   assert.ok(result.warnings.some((w) => w.code === "EVENT_RAW_LOCATION_PRESERVED"));
 }
 
+async function testOrganizerLeftNullWarnsForReview() {
+  const prisma = createFakePrisma();
+  const result = await resolveEventCommitContextWithMatching({
+    sourceRecordKey: "wordpress-db:events:401",
+    baseContext: baseContext(),
+    candidate: baseCandidate(),
+    prisma,
+  });
+  assert.equal(result.context.organizerId, undefined, "no matcher exists — organizerId must never be auto-assigned");
+  assert.ok(result.warnings.some((w) => w.code === "EVENT_ORGANIZER_REQUIRES_REVIEW"));
+}
+
+async function testOrganizerFromContextSuppressesWarning() {
+  const prisma = createFakePrisma();
+  const result = await resolveEventCommitContextWithMatching({
+    sourceRecordKey: "wordpress-db:events:401",
+    baseContext: baseContext({ organizerId: "organizer-1" }),
+    candidate: baseCandidate(),
+    prisma,
+  });
+  assert.equal(result.context.organizerId, "organizer-1");
+  assert.ok(!result.warnings.some((w) => w.code === "EVENT_ORGANIZER_REQUIRES_REVIEW"));
+}
+
 async function main() {
   await testContextOverrideWins();
   await testCityFromRawMinsk();
   await testCategoryExactMatchByNameRu();
   await testPlaceLineageMatch();
   await testPlaceUnmatchedPreservesRawWarning();
+  await testOrganizerLeftNullWarnsForReview();
+  await testOrganizerFromContextSuppressesWarning();
 }
 
 main()

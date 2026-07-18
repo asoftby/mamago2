@@ -1,4 +1,5 @@
 import type { MigrationWarning, NormalizedRecord } from "../../types";
+import { pruneEventScheduleToEligibleSessions } from "./pruneEventSchedule";
 import type { WordPressEventBundle, WordPressTermRow } from "./types";
 
 const SOURCE_ENTITY_TYPE = "wordpress-db:events";
@@ -436,23 +437,52 @@ function buildScheduleDraft(
   };
 }
 
-export function normalizeEvent(bundle: WordPressEventBundle): NormalizedRecord {
+/**
+ * `options.now`, when provided, is the migration clock (Europe/Minsk local
+ * day) used to prune past sessions out of a multi-date schedule and to
+ * exclude past-only events entirely (Phoenix v1 scope: past Events are
+ * never migrated — prelaunch-checklist §0.6). Omitted in most unit tests on
+ * purpose: without a clock, no session is ever considered "past", so
+ * `scheduleDraft` comes back exactly as parsed — real callers (the
+ * wordpress-db adapter's `normalizeRecord`) always pass the run's `now`.
+ */
+export function normalizeEvent(bundle: WordPressEventBundle, options?: { now?: Date }): NormalizedRecord {
   const { post, postMeta, terms } = bundle;
   const sourceRecordKey = `${SOURCE_ENTITY_TYPE}:${post.ID}`;
   const warnings: MigrationWarning[] = [];
 
   const eventDatesRaw = postMeta["event_date"] ?? [];
-  const { scheduleDraft, warnings: scheduleWarnings } = buildScheduleDraft(eventDatesRaw, sourceRecordKey);
+  const { scheduleDraft: parsedScheduleDraft, warnings: scheduleWarnings } = buildScheduleDraft(eventDatesRaw, sourceRecordKey);
   warnings.push(...scheduleWarnings);
-  if (scheduleDraft) {
-    warnings.push({
-      code: "EVENT_DISCOVERY_VISIBILITY_RISK",
-      message:
-        "Phoenix commit currently writes scheduleJson but does not create ActivitySession rows or nextOccurrenceAt; public discovery feeds may rely on those fields for upcoming visibility.",
-      severity: "INFO",
-      sourceRecordKey,
-      details: { scheduleMode: scheduleDraft.mode },
-    });
+
+  let scheduleDraft = parsedScheduleDraft;
+  if (scheduleDraft && options?.now) {
+    const pruneResult = pruneEventScheduleToEligibleSessions({ scheduleDraft, now: options.now });
+    if (!pruneResult.eligible) {
+      scheduleDraft = null;
+      warnings.push({
+        code: "EVENT_PAST_ONLY_EXCLUDED",
+        message:
+          "Every event_date session is in the past relative to the migration clock; Phoenix v1 excludes past events entirely (see prelaunch-checklist §0.6).",
+        severity: "WARNING",
+        sourceRecordKey,
+        details: { droppedPastDates: pruneResult.droppedPastDates },
+      });
+    } else {
+      scheduleDraft = pruneResult.scheduleDraft;
+      if (pruneResult.droppedPastDates.length > 0) {
+        warnings.push({
+          code: "EVENT_PAST_SESSIONS_PRUNED",
+          message: "Past event_date sessions were dropped; only active/future sessions are kept for migration.",
+          severity: "INFO",
+          sourceRecordKey,
+          details: {
+            droppedPastDates: pruneResult.droppedPastDates,
+            retainedDates: scheduleDraft.dates,
+          },
+        });
+      }
+    }
   }
 
   const featured = parseAttachmentId(firstMetaValue(postMeta, "_thumbnail_id"));

@@ -21,6 +21,7 @@ function draftFixture(overrides: Partial<EventCreateDraft> = {}): EventCreateDra
     scheduleMode: "ONE_TIME",
     scheduleJson: { mode: "ONE_TIME", dates: ["2026-08-15"] },
     priceText: "10 BYN",
+    venue: null,
     ...overrides,
   };
 }
@@ -90,7 +91,7 @@ function activityFixture(overrides: Partial<Activity> = {}): Activity {
 }
 
 type FakeCall = {
-  delegate: "activity" | "activitySession";
+  delegate: "activity" | "activitySession" | "eventVenue";
   method: string;
   args: unknown;
 };
@@ -128,6 +129,12 @@ function createFakeClient(
         calls.push({ delegate: "activitySession", method: "findMany", args });
         return [];
       }) as unknown as EventCommitWriterPrismaClient["activitySession"]["findMany"],
+    },
+    eventVenue: {
+      upsert: (async (args: unknown) => {
+        calls.push({ delegate: "eventVenue", method: "upsert", args });
+        return { id: "venue-1" };
+      }) as unknown as EventCommitWriterPrismaClient["eventVenue"]["upsert"],
     },
   };
   return { client, calls };
@@ -472,6 +479,97 @@ async function testUpdateReplacesSessions() {
   ]);
 }
 
+async function testCreateWithNoVenueNeverCallsUpsert() {
+  const { client, calls } = createFakeClient();
+  const writer = new EventCommitWriter(client);
+  await writer.createEventFromDraft(draftFixture({ venue: null }));
+
+  assert.ok(!calls.some((call) => call.delegate === "eventVenue"));
+}
+
+async function testCreateWithManualVenueUpsertsByActivityId() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-1" }));
+  const writer = new EventCommitWriter(client);
+  await writer.createEventFromDraft(
+    draftFixture({
+      venue: {
+        kind: "MANUAL",
+        placeId: null,
+        title: "Central Park",
+        addressLine: "ul. Central, 1",
+        cityId: "city-1",
+        note: "Source city hint: Minsk",
+        source: "wordpress-db",
+      },
+    }),
+  );
+
+  const call = findCall(calls, "eventVenue", "upsert").args as {
+    where: { activityId: string };
+    create: Record<string, unknown>;
+    update: Record<string, unknown>;
+  };
+  assert.equal(call.where.activityId, "activity-1");
+  assert.equal(call.create.activityId, "activity-1");
+  assert.equal(call.create.kind, "MANUAL");
+  assert.equal(call.create.placeId, null);
+  assert.equal(call.create.title, "Central Park");
+  assert.equal(call.create.addressLine, "ul. Central, 1");
+  assert.deepEqual(call.update, {
+    kind: "MANUAL",
+    placeId: null,
+    title: "Central Park",
+    addressLine: "ul. Central, 1",
+    cityId: "city-1",
+    note: "Source city hint: Minsk",
+    source: "wordpress-db",
+  });
+}
+
+async function testCreateWithPlaceVenueSetsKindPlace() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-1" }));
+  const writer = new EventCommitWriter(client);
+  await writer.createEventFromDraft(
+    draftFixture({
+      venue: {
+        kind: "PLACE",
+        placeId: "place-9",
+        title: "Central Park",
+        addressLine: "ul. Central, 1",
+        cityId: "city-1",
+        note: null,
+        source: "wordpress-db",
+      },
+    }),
+  );
+
+  const call = findCall(calls, "eventVenue", "upsert").args as { create: Record<string, unknown> };
+  assert.equal(call.create.kind, "PLACE");
+  assert.equal(call.create.placeId, "place-9");
+}
+
+async function testUpdateWithVenueUpsertsSameActivityId() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-99" }));
+  const writer = new EventCommitWriter(client);
+  await writer.updateEventFromDraft(
+    "activity-99",
+    draftFixture({
+      venue: {
+        kind: "MANUAL",
+        placeId: null,
+        title: "Updated Venue",
+        addressLine: null,
+        cityId: null,
+        note: null,
+        source: "wordpress-db",
+      },
+    }),
+  );
+
+  const call = findCall(calls, "eventVenue", "upsert").args as { where: { activityId: string } };
+  assert.equal(call.where.activityId, "activity-99");
+}
+
 async function main() {
   await testHappyPathCallsCreateOnce();
   await testDataContainsOnlyAllowedFields();
@@ -494,6 +592,10 @@ async function main() {
   await testReturnsActivityIdAndCreatedStatus();
   await testUpdateUsesUpdateAndReturnsUpdatedStatus();
   await testUpdateReplacesSessions();
+  await testCreateWithNoVenueNeverCallsUpsert();
+  await testCreateWithManualVenueUpsertsByActivityId();
+  await testCreateWithPlaceVenueSetsKindPlace();
+  await testUpdateWithVenueUpsertsSameActivityId();
 }
 
 main()

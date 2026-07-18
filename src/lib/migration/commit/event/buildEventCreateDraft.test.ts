@@ -214,8 +214,124 @@ function testDraftHasExactlyTheApprovedFieldSet() {
       "scheduleMode",
       "scheduleJson",
       "priceText",
+      "venue",
     ]),
   );
+}
+
+function testVenueDraftManualWhenNoPlaceMatch() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: "Central Park",
+      addressEventPlaceRaw: "ul. Central, 1",
+      cityRaw: "Minsk",
+    }),
+    context: contextFixture({ cityId: "city-1" }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.draft.venue, {
+    kind: "MANUAL",
+    placeId: null,
+    title: "Central Park",
+    addressLine: "ul. Central, 1",
+    cityId: "city-1",
+    note: "Source city hint: Minsk",
+    source: "wordpress-db",
+  });
+}
+
+function testVenueDraftPlaceWhenMatched() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({ venueNameRaw: "Central Park", addressEventPlaceRaw: "ul. Central, 1" }),
+    context: contextFixture({ placeId: "place-9", cityId: "city-1" }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.draft.venue, {
+    kind: "PLACE",
+    placeId: "place-9",
+    title: "Central Park",
+    addressLine: "ul. Central, 1",
+    cityId: "city-1",
+    note: null,
+    source: "wordpress-db",
+  });
+}
+
+function testVenueDraftBlankAddressMetaFallsBackToLocationRaw() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "",
+      locationRaw: "Минск, ул. Примерная, 10",
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.draft.venue);
+  assert.equal(result.draft.venue?.kind, "MANUAL");
+  assert.equal(result.draft.venue?.placeId, null);
+  assert.equal(result.draft.venue?.addressLine, "Минск, ул. Примерная, 10");
+}
+
+function testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "   ",
+      locationRaw: "Минск, ул. Примерная, 10",
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "Минск, ул. Примерная, 10");
+}
+
+function testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "  ul. Central, 1  ",
+      locationRaw: "Минск, ул. Примерная, 10",
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ul. Central, 1");
+}
+
+function testVenueDraftNullWhenNoEvidenceAtAll() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({ venueNameRaw: null, addressEventPlaceRaw: null, locationRaw: null }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue, null, "no matched Place and no venue/address hint at all -> no fallback row");
+}
+
+function testVenueDraftFallsBackToLocationRawWhenAddressMissing() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({ venueNameRaw: null, addressEventPlaceRaw: null, locationRaw: "Minsk, Central Park" }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.kind, "MANUAL");
+  assert.equal(result.draft.venue?.addressLine, "Minsk, Central Park");
+}
+
+function testVenueDraftUnresolvedPlaceNeverBlocksDraft() {
+  // No context.placeId (unresolved/low-confidence Place match) but venue evidence exists.
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({ venueNameRaw: "Some Venue" }),
+    context: contextFixture(),
+  });
+  assert.equal(result.ok, true, "an unresolved Place match must never block Event creation");
 }
 
 function main() {
@@ -233,6 +349,14 @@ function main() {
   testPriceRawCopiedOnlyToPriceText();
   testTicketUrlNeverAppearsInDraft();
   testDraftHasExactlyTheApprovedFieldSet();
+  testVenueDraftManualWhenNoPlaceMatch();
+  testVenueDraftPlaceWhenMatched();
+  testVenueDraftBlankAddressMetaFallsBackToLocationRaw();
+  testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw();
+  testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent();
+  testVenueDraftNullWhenNoEvidenceAtAll();
+  testVenueDraftFallsBackToLocationRawWhenAddressMissing();
+  testVenueDraftUnresolvedPlaceNeverBlocksDraft();
 }
 
 main();

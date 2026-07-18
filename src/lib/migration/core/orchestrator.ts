@@ -169,6 +169,30 @@ function toSkipPolicyItem(record: SourceRecordEnvelope): MigrationPlanItem {
   };
 }
 
+const EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE = "EVENT_PAST_ONLY_EXCLUDED";
+
+/** Set by `normalizeEvent()` (post-normalize, since only the parsed schedule can tell a past-only multi-date event from a real one) — never a pre-normalize `metadata.startsAt` check like `isExcludedPastEvent` above. */
+function isPastOnlyExcludedEvent(normalized: NormalizedRecord): boolean {
+  return (normalized.warnings ?? []).some((warning) => warning.code === EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE);
+}
+
+function toEventPastOnlySkipPolicyItem(record: SourceRecordEnvelope, normalized: NormalizedRecord): MigrationPlanItem {
+  return {
+    sourceRecordKey: record.sourceRecordKey,
+    sourceEntityType: record.sourceEntityType,
+    action: "SKIP_POLICY",
+    status: "SKIPPED",
+    targetType: normalized.targetTypeHint,
+    summary: {
+      title: extractStringField(normalized.normalizedPayload, "title"),
+      slug: extractStringField(normalized.normalizedPayload, "slug"),
+      policyKey: PHOENIX_V1_PAST_EVENTS_EXCLUSION_POLICY.policyKey,
+      reasonCode: EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE,
+    },
+    warnings: normalized.warnings,
+  };
+}
+
 function toFailItem(record: SourceRecordEnvelope): MigrationPlanItem {
   return {
     sourceRecordKey: record.sourceRecordKey,
@@ -339,6 +363,10 @@ async function runDiscoverNormalizeLoop(
 
     try {
       const normalized = await adapter.normalizeRecord(record, context);
+      if (isPastOnlyExcludedEvent(normalized)) {
+        items.push(toEventPastOnlySkipPolicyItem(record, normalized));
+        continue;
+      }
       const action = resolveLineageAction(record, normalized, lineageByKey);
       const planItem = toNormalizedItem(record, normalized, action);
       items.push(planItem);

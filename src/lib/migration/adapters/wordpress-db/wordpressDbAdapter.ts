@@ -166,7 +166,7 @@ async function discoverRecords(
   return envelopes;
 }
 
-async function normalizeRecord(record: SourceRecordEnvelope): Promise<NormalizedRecord> {
+async function normalizeRecord(record: SourceRecordEnvelope, context?: MigrationAdapterContext): Promise<NormalizedRecord> {
   if (record.sourceEntityType === ARTICLE_ENTITY_TYPE) {
     return normalizeArticle(record.rawPayload as WordPressArticleBundle);
   }
@@ -174,7 +174,13 @@ async function normalizeRecord(record: SourceRecordEnvelope): Promise<Normalized
     return normalizePlace(record.rawPayload as WordPressPlaceBundle);
   }
   if (record.sourceEntityType === EVENT_ENTITY_TYPE) {
-    return normalizeEvent(record.rawPayload as WordPressEventBundle);
+    // Real Event past-only exclusion/pruning needs an actual clock — unlike
+    // `normalizeEvent()`'s own default (no clock => no pruning, kept only so
+    // its unit tests stay deterministic without passing `now`), the adapter
+    // boundary is what every real caller (preview/commit CLIs) goes through,
+    // so it must never silently skip pruning just because the caller didn't
+    // pass `now` explicitly.
+    return normalizeEvent(record.rawPayload as WordPressEventBundle, { now: context?.now ?? new Date() });
   }
   if (record.sourceEntityType === ROUTE_ENTITY_TYPE) {
     return normalizeRoute(record.rawPayload as WordPressRouteBundle);

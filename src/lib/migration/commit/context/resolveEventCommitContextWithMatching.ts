@@ -236,6 +236,19 @@ export async function resolveEventCommitContextWithMatching(
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Organizer (Section 7, Phoenix v1 scope): never auto-created/auto-assigned
+  // from weak WordPress data — this resolver has no matcher for it at all, so
+  // `ctx.organizerId` only ever carries a value the caller explicitly passed
+  // in via `baseContext`. Flag the common (null) case for editorial review
+  // rather than silently leaving it unexplained.
+  // ---------------------------------------------------------------------------
+  if (!ctx.organizerId) {
+    warnings.push(
+      warning(sourceRecordKey, "EVENT_ORGANIZER_REQUIRES_REVIEW", "No organizer matching is implemented; organizerId left null for editorial review."),
+    );
+  }
+
   return { context: ctx, warnings };
 }
 

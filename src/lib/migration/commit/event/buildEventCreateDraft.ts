@@ -3,6 +3,7 @@ import type {
   EventCommitContext,
   EventCreateDraft,
   EventCreateDraftResult,
+  EventVenueDraft,
   NormalizedEventCandidate,
 } from "./types";
 
@@ -47,6 +48,45 @@ function resolveEventShortDesc(candidate: NormalizedEventCandidate): string | nu
 export interface BuildEventCreateDraftInput {
   candidate: NormalizedEventCandidate;
   context: EventCommitContext;
+}
+
+/** First value that is non-null/non-undefined and non-blank after trimming, trimmed; `null` if every candidate is missing or blank. */
+function firstNonBlank(...values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+/**
+ * `context.placeId` unset (no match, or a low-confidence match the resolver
+ * deliberately left null) must never block the Event, and must never lose
+ * the raw venue evidence either — a `MANUAL` `EventVenue` preserves it for
+ * editorial review. `null` only when there's truly nothing to preserve: no
+ * matched Place *and* no venue/address hint at all.
+ */
+function buildVenueDraft(candidate: NormalizedEventCandidate, context: EventCommitContext): EventVenueDraft | null {
+  const title = candidate.venueNameRaw;
+  // `??` alone would let a blank/whitespace-only `addressEventPlaceRaw`
+  // mask a real `locationRaw` — firstNonBlank() falls through past blanks.
+  const addressLine = firstNonBlank(candidate.addressEventPlaceRaw, candidate.locationRaw);
+  const placeId = context.placeId ?? null;
+
+  if (!placeId && !title && !addressLine) {
+    return null;
+  }
+
+  return {
+    kind: placeId ? "PLACE" : "MANUAL",
+    placeId,
+    title,
+    addressLine,
+    cityId: context.cityId ?? null,
+    note: !placeId && candidate.cityRaw ? `Source city hint: ${candidate.cityRaw}` : null,
+    source: "wordpress-db",
+  };
 }
 
 /**
@@ -121,6 +161,7 @@ export function buildEventCreateDraft(input: BuildEventCreateDraftInput): EventC
     scheduleMode: candidate.scheduleDraft!.mode,
     scheduleJson: candidate.scheduleDraft!,
     priceText: candidate.priceRaw,
+    venue: buildVenueDraft(candidate, context),
   };
 
   return { ok: true, draft };

@@ -5,6 +5,7 @@ import type { MigrationLineage } from "@prisma/client";
 import { registerMigrationAdapter } from "../adapters/registry";
 import {
   PHASE_7_COMMIT_MODE_ERROR,
+  createMigrationRunExecutionPlan,
   createMigrationRunPlan,
   runMigrationCommit,
 } from "./orchestrator";
@@ -305,6 +306,77 @@ async function testExcludePastEventsProducesSkipPolicyItem() {
   assert.equal(pastItem?.action, "SKIP_POLICY");
   assert.equal(pastItem?.status, "SKIPPED");
   assert.equal(futureItem?.action, "CREATE");
+}
+
+/**
+ * The real wordpress-db adapter never sets `metadata.startsAt` (multi-date
+ * Event schedules can't be reduced to one timestamp pre-normalize), so
+ * `EVENT_PAST_ONLY_EXCLUDED` is a *post*-normalize warning `normalizeEvent()`
+ * emits instead — this is the mechanism that actually protects a real
+ * past-only WordPress Event (e.g. source id 49842) from being planned as
+ * CREATE.
+ */
+async function testEventPastOnlyWarningProducesSkipPolicyItemWithoutExecutionCandidate() {
+  registerMockAdapter("mock-past-only-warning", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "wordpress-db:events:49842", sourceEntityType: "wordpress-db:events" }),
+        envelope({ sourceRecordKey: "wordpress-db:events:42041", sourceEntityType: "wordpress-db:events" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      if (record.sourceRecordKey === "wordpress-db:events:49842") {
+        return {
+          sourceRecordKey: record.sourceRecordKey,
+          sourceEntityType: record.sourceEntityType,
+          targetTypeHint: "ACTIVITY",
+          normalizedPayload: { title: "Past-only event" },
+          warnings: [
+            {
+              code: "EVENT_PAST_ONLY_EXCLUDED",
+              message: "Every event_date session is in the past.",
+              severity: "WARNING",
+              sourceRecordKey: record.sourceRecordKey,
+            },
+          ],
+        };
+      }
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ACTIVITY",
+        normalizedPayload: { title: "Active event" },
+      };
+    },
+  });
+
+  const executionPlan = await createMigrationRunExecutionPlan({
+    adapterKey: "mock-past-only-warning",
+    sourceNamespace: "test",
+  });
+
+  const pastOnlyItem = executionPlan.plan.items.find(
+    (item) => item.sourceRecordKey === "wordpress-db:events:49842",
+  );
+  assert.equal(pastOnlyItem?.action, "SKIP_POLICY");
+  assert.equal(pastOnlyItem?.status, "SKIPPED");
+  assert.equal(pastOnlyItem?.summary?.reasonCode, "EVENT_PAST_ONLY_EXCLUDED");
+  assert.ok(pastOnlyItem?.warnings?.some((w) => w.code === "EVENT_PAST_ONLY_EXCLUDED"));
+
+  assert.ok(
+    !executionPlan.executionCandidates.some(
+      (candidate) => candidate.planItem.sourceRecordKey === "wordpress-db:events:49842",
+    ),
+    "a past-only excluded Event must never reach execution candidates (the commit runner must never be invoked for it)",
+  );
+
+  const activeItem = executionPlan.plan.items.find(
+    (item) => item.sourceRecordKey === "wordpress-db:events:42041",
+  );
+  assert.equal(activeItem?.action, "CREATE");
+  assert.ok(executionPlan.plan.stats);
+  assert.equal(executionPlan.plan.stats!.actionCounts["SKIP_POLICY"], 1);
+  assert.equal(executionPlan.plan.stats!.actionCounts["CREATE"], 1);
 }
 
 async function testStatsPresentAndCorrect() {
@@ -645,6 +717,7 @@ async function main() {
   await testNormalizeErrorDoesNotCrashRun();
   await testWarningsPreservedOnItem();
   await testExcludePastEventsProducesSkipPolicyItem();
+  await testEventPastOnlyWarningProducesSkipPolicyItemWithoutExecutionCandidate();
   await testStatsPresentAndCorrect();
   await testZeroRecordPlanDoesNotThrow();
   await testLedgerNoLineageIsCreate();
