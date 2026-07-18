@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 
-import { buildPreviewHumanReport, buildPreviewJsonReport, parseArgs, applyStateAwarePlacePreview } from "./migration-preview-wordpress-db";
+import {
+  buildPreviewHumanReport,
+  buildPreviewJsonReport,
+  parseArgs,
+  applyStateAwarePlacePreview,
+  includesPlacePreview,
+} from "./migration-preview-wordpress-db";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import {
   ARTICLE_ENTITY_TYPE,
@@ -436,6 +442,96 @@ async function testPreviewTargetModifiedAfterImportConflict() {
   assert.equal(processed.items[0].summary?.conflictReason, "TARGET_MODIFIED_AFTER_IMPORT");
 }
 
+async function testAllEntityPreviewEnablesStateAwarePlaceDependency() {
+  assert.equal(includesPlacePreview("place"), true);
+  assert.equal(includesPlacePreview("all"), true);
+  assert.equal(includesPlacePreview("article"), false);
+  assert.equal(includesPlacePreview("event"), false);
+  assert.equal(includesPlacePreview("route"), false);
+}
+
+async function testMixedPlanPlaceSkipUnchangedAndNonPlaceUnchanged() {
+  const placeItem = planItemFixture({
+    sourceRecordKey: "wordpress-db:places:301",
+    action: "SKIP_UNCHANGED",
+    status: "SKIPPED",
+  });
+  const articleItem = planItemFixture({
+    sourceRecordKey: "wordpress-db:post:201",
+    sourceEntityType: ARTICLE_ENTITY_TYPE,
+    targetType: "ARTICLE",
+    action: "CREATE",
+    status: "PLANNED",
+    summary: { title: "Plain Article", slug: "plain-article", mediaRefCount: 0, relationRefCount: 0 },
+  });
+
+  const processed = await applyStateAwarePlacePreview({
+    plan: planFixture([placeItem, articleItem]),
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => null },
+      place: { findUnique: async () => null },
+    },
+  });
+
+  const byKey = new Map(processed.items.map((item) => [item.sourceRecordKey, item]));
+  assert.equal(byKey.get("wordpress-db:places:301")?.action, "SKIP_UNCHANGED");
+  assert.equal(byKey.get("wordpress-db:places:301")?.summary?.mediaPolicy, "METADATA");
+  assert.equal(byKey.get("wordpress-db:post:201")?.action, "CREATE");
+  assert.equal(byKey.get("wordpress-db:post:201")?.summary?.mediaPolicy, undefined);
+  assert.deepEqual(byKey.get("wordpress-db:post:201"), articleItem);
+}
+
+async function testMixedPlanSafePlaceUpdateUsesClassifierAndNonPlaceUnchanged() {
+  const articleItem = planItemFixture({
+    sourceRecordKey: "wordpress-db:post:201",
+    sourceEntityType: ARTICLE_ENTITY_TYPE,
+    targetType: "ARTICLE",
+    action: "UPDATE",
+    status: "PLANNED",
+    summary: { title: "Plain Article", slug: "plain-article", mediaRefCount: 0, relationRefCount: 0 },
+  });
+  const processed = await applyStateAwarePlacePreview({
+    plan: planFixture([planItemFixture({ action: "UPDATE" }), articleItem]),
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => lineageRow({ targetId: "place-1" }) },
+      place: { findUnique: async () => placeRow({ id: "place-1" }) },
+    },
+  });
+
+  const byKey = new Map(processed.items.map((item) => [item.sourceRecordKey, item]));
+  assert.equal(byKey.get("wordpress-db:places:301")?.action, "UPDATE");
+  assert.equal(byKey.get("wordpress-db:places:301")?.summary?.targetId, "place-1");
+  assert.equal(byKey.get("wordpress-db:post:201"), articleItem);
+}
+
+async function testMixedPlanUnsafePlaceUpdateBecomesConflictAndNonPlaceUnchanged() {
+  const routeItem = planItemFixture({
+    sourceRecordKey: "wordpress-db:routes:701",
+    sourceEntityType: ROUTE_ENTITY_TYPE,
+    targetType: "ROUTE",
+    action: "CREATE",
+    status: "PLANNED",
+    summary: { title: "Family Route", slug: "family-route", mediaRefCount: 0, relationRefCount: 0 },
+  });
+  const processed = await applyStateAwarePlacePreview({
+    plan: planFixture([planItemFixture({ action: "UPDATE" }), routeItem]),
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => lineageRow({ targetId: "place-1", lastImportedAt: null }) },
+      place: { findUnique: async () => placeRow({ id: "place-1" }) },
+    },
+  });
+
+  const byKey = new Map(processed.items.map((item) => [item.sourceRecordKey, item]));
+  assert.equal(byKey.get("wordpress-db:places:301")?.action, "UPDATE_CONFLICT");
+  assert.equal(byKey.get("wordpress-db:places:301")?.status, "BLOCKED");
+  assert.equal(byKey.get("wordpress-db:places:301")?.summary?.targetId, "place-1");
+  assert.equal(byKey.get("wordpress-db:places:301")?.summary?.conflictReason, "LAST_IMPORTED_AT_UNKNOWN");
+  assert.equal(byKey.get("wordpress-db:routes:701"), routeItem);
+}
+
 async function testSampledPlaceMediaPolicy() {
   const previousAppEnv = process.env.APP_ENV;
   process.env.APP_ENV = "LOCAL";
@@ -590,6 +686,10 @@ async function main() {
   await testPreviewConflictDoesNotRequireWriteDelegatesAndSerializesSafeFields();
   await testPreviewTargetRowMissingConflict();
   await testPreviewTargetModifiedAfterImportConflict();
+  await testAllEntityPreviewEnablesStateAwarePlaceDependency();
+  await testMixedPlanPlaceSkipUnchangedAndNonPlaceUnchanged();
+  await testMixedPlanSafePlaceUpdateUsesClassifierAndNonPlaceUnchanged();
+  await testMixedPlanUnsafePlaceUpdateBecomesConflictAndNonPlaceUnchanged();
   await testSampledPlaceMediaPolicy();
   await testNormalizeFailureSurfacesAsFailAction();
   testParseArgs();

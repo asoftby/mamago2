@@ -441,6 +441,10 @@ function entityTypesFor(entity: PreviewEntity): readonly string[] | undefined {
   return undefined;
 }
 
+export function includesPlacePreview(entity: PreviewEntity): boolean {
+  return entity === "place" || entity === "all";
+}
+
 async function main(): Promise<void> {
   const { entity, limit, sourceRecordKey, forceReprocess, out, allowRemoteReadonly } = parseArgs(process.argv.slice(2));
 
@@ -455,8 +459,8 @@ async function main(): Promise<void> {
   let prisma: PrismaClient | null = null;
   let ledger: MigrationLineageLookup | undefined;
   let sourceId: string | null = null;
-  const isPlacePreview = entity === "place";
-  if (isPlacePreview) {
+  const hasStateAwarePlacePreview = includesPlacePreview(entity);
+  if (hasStateAwarePlacePreview) {
     prisma = new PrismaClient();
     const repository = new MigrationLedgerRepository(prisma);
     ledger = repository;
@@ -489,7 +493,7 @@ async function main(): Promise<void> {
       ledger,
     });
     let plan = rawPlan;
-    if (isPlacePreview && prisma) {
+    if (hasStateAwarePlacePreview && prisma) {
       plan = await applyStateAwarePlacePreview({ plan: rawPlan, sourceId, prisma });
     }
     if (forceReprocess && sourceRecordKey) {
