@@ -65,6 +65,34 @@ function testMissingSessionNeverShowsImportEvenWithHandle() {
   );
 }
 
+/**
+ * The Contacts step's field and the Photos step's fallback field both call
+ * `normalizeInstagramHandle` directly and pass its result straight to the
+ * shared `onChange` — no per-step transform of their own. Same input must
+ * produce byte-identical output regardless of which one calls it, proving
+ * there's exactly one normalization path, never two that could drift.
+ */
+function testSameInputNormalizesIdenticallyFromEitherEntryPoint() {
+  const fromContacts = normalizeInstagramHandle("@atmosphera_minsk");
+  const fromPhotos = normalizeInstagramHandle("@atmosphera_minsk");
+  assert.deepEqual(fromContacts, fromPhotos);
+  assert.deepEqual(fromContacts, { instagramHandle: "atmosphera_minsk", instagramUrl: "https://instagram.com/atmosphera_minsk" });
+}
+
+/**
+ * Clearing the field (either step) must fully reset both fields — a stray
+ * `instagramUrl` surviving an empty handle would make the Photos-step
+ * import affordance's visibility check inconsistent with the stored data.
+ */
+function testClearingResetsBothFieldsAndHidesImport() {
+  const cleared = normalizeInstagramHandle("");
+  assert.deepEqual(cleared, { instagramHandle: "", instagramUrl: null });
+  assert.equal(
+    shouldShowInstagramAvatarImport({ instagramHandle: cleared.instagramHandle, wizardSessionId: "sess-1" }),
+    false,
+  );
+}
+
 function main() {
   testAtPrefixedHandleIsStripped();
   testBareHandlePassesThrough();
@@ -75,6 +103,8 @@ function main() {
   testFilledHandleAndSessionShowsImport();
   testEmptyHandleNeverShowsImport();
   testMissingSessionNeverShowsImportEvenWithHandle();
+  testSameInputNormalizesIdenticallyFromEitherEntryPoint();
+  testClearingResetsBothFieldsAndHidesImport();
 }
 
 main();
