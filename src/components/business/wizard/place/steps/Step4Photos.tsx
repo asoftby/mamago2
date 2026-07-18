@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isValidVideoUrl } from "@/components/business/wizard/offer/mappers";
 import type { PlaceFormData, PlaceImage } from "../types";
+import { shouldShowInstagramAvatarImport } from "../normalizeInstagramHandle";
 
 interface Step4PhotosProps {
   data: PlaceFormData;
@@ -28,7 +29,7 @@ export function Step4Photos({
   const hasLogo = !!(logoImage?.url || data.logoUrl);
   const instagramHandle = data.instagramHandle?.trim() || "";
   // В режиме редактирования лого уже есть в БД — всё равно показываем импорт (замена из Instagram).
-  const showInstagramImport = !!instagramHandle && !!wizardSessionId;
+  const showInstagramImport = shouldShowInstagramAvatarImport({ instagramHandle, wizardSessionId });
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() =>
@@ -106,7 +107,7 @@ export function Step4Photos({
           Добавьте логотип или главное фото вашего места
         </p>
 
-        {showInstagramImport && (
+        {showInstagramImport ? (
           <InstagramAvatarImport
             instagramHandle={instagramHandle}
             wizardSessionId={wizardSessionId!}
@@ -115,7 +116,11 @@ export function Step4Photos({
             replaceExisting={hasLogo}
             className="mb-3"
           />
-        )}
+        ) : !instagramHandle ? (
+          <p className="text-xs text-muted-foreground mb-3">
+            Чтобы подтянуть логотип из Instagram, укажите имя профиля на шаге «Контакты».
+          </p>
+        ) : null}
 
         <PlaceLogoUploadTemp
           wizardSessionId={wizardSessionId || ""}

@@ -43,6 +43,7 @@ import {
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { canEditPlaceInWizard } from "./canEditPlaceInWizard";
 import { resolvePlaceWizardSubmitAction } from "./resolvePlaceWizardSubmitAction";
+import { canNavigateToPlaceWizardStep } from "./canNavigateToPlaceWizardStep";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
@@ -195,8 +196,6 @@ export function PlaceWizard({
   useEffect(() => {
     setMaxVisitedStep((prev) => Math.max(prev, currentStep));
   }, [currentStep]);
-  const isPublishedEditMode = mode === "edit" && place?.status === "PUBLISHED";
-
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -419,15 +418,15 @@ export function PlaceWizard({
   };
 
   const handleGoToStep = (step: number) => {
-    if (step < firstStepNumber || step > totalSteps) return;
-
-    if (isPublishedEditMode) {
-      setCurrentStep(step);
-      return;
-    }
-
-    // Allow backward navigation freely; forward only up to currentStep+1 (sequential)
-    if (step <= currentStep + 1 || step < currentStep) {
+    if (
+      canNavigateToPlaceWizardStep({
+        mode,
+        currentStep,
+        targetStep: step,
+        firstStep: firstStepNumber,
+        totalSteps,
+      })
+    ) {
       setCurrentStep(step);
     }
   };

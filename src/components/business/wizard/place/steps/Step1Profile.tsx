@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { canonicalizeAgeTags, isPlaceAgeChipActive } from "../isPlaceAgeChipActive";
 import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
@@ -148,9 +149,13 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   };
 
   const toggleAgeTag = (tag: string) => {
-    const newTags = ageTags.includes(tag)
+    const rawTags = ageTags.includes(tag)
       ? ageTags.filter((t) => t !== tag)
       : [...ageTags, tag];
+    // If every known age ended up selected, that's the same thing as "any
+    // age" — collapse back to [] so storage never has two representations
+    // of the same "no restriction" meaning.
+    const newTags = canonicalizeAgeTags(rawTags);
     setAgeTags(newTags);
     onChange({ ageTags: newTags });
   };
@@ -348,7 +353,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
               ...AGE_OPTIONS.map((ageOption): ChipItem => ({
                 id: ageOption.key,
                 label: ageOption.shortLabel,
-                active: ageTags.includes(ageOption.key),
+                active: isPlaceAgeChipActive({ storedAgeTags: ageTags, chipAgeTag: ageOption.key }),
                 disabled: !isEditable,
                 onClick: () => isEditable && toggleAgeTag(ageOption.key),
               })),
@@ -356,7 +361,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
           />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          Выберите «Любой возраст» или один либо несколько возрастных диапазонов
+          «Любой возраст» означает, что место подходит детям всех возрастов.
         </p>
       </div>
 

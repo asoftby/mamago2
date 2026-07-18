@@ -150,7 +150,7 @@ export function InstagramAvatarImport({
         ) : replaceExisting ? (
           "Обновить из Instagram"
         ) : (
-          "Получить из Instagram"
+          "Загрузить логотип из Instagram"
         )}
       </Button>
     </div>
