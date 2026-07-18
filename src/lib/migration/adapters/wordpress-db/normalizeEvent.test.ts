@@ -79,9 +79,6 @@ function testFullEvent() {
   assert.deepEqual(payload.media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
   assert.deepEqual(record.mediaRefs, []);
   assert.deepEqual(record.relationRefs, ["term:events-category:festival", "term:occasion:summer"]);
-
-  // Warning documenting known visibility gap (sessions/nextOccurrenceAt not synced in Phoenix commit yet).
-  assert.ok(record.warnings?.some((w) => w.code === "EVENT_DISCOVERY_VISIBILITY_RISK"));
 }
 
 function testScheduleDraftOneTime() {
@@ -379,6 +376,105 @@ function testAgeEvidenceUnknownWarnsUnmatched() {
   assert.ok(record.warnings?.some((w) => w.code === "EVENT_AGE_UNMATCHED"));
 }
 
+// Fixed migration clock (Europe/Minsk local day) mirroring the real
+// 2026-07-18 read-only Event audit — never `new Date()`, so these tests stay
+// deterministic regardless of when they actually run.
+const MIGRATION_NOW = new Date("2026-07-18T00:00:00+03:00");
+
+function testNoClockMeansNoPruning() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, event_date: ["2020-01-01 00:00:00"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.deepEqual(
+    payload.scheduleDraft?.dates,
+    ["2020-01-01"],
+    "without an injected clock, normalizeEvent never prunes or excludes sessions",
+  );
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_PAST_ONLY_EXCLUDED"));
+}
+
+function testPastOnlyEventExcluded_49842() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 49842 },
+      postMeta: { ...buildBundle().postMeta, event_date: ["2025-12-13 00:00:00", "2026-03-14 00:00:00"] },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:49842");
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft, null, "past-only event must not carry a schedule draft forward");
+  const warning = record.warnings?.find((w) => w.code === "EVENT_PAST_ONLY_EXCLUDED");
+  assert.ok(warning, "expected EVENT_PAST_ONLY_EXCLUDED warning");
+  assert.deepEqual(warning?.details?.droppedPastDates, ["2025-12-13", "2026-03-14"]);
+}
+
+function testMixedPastFuturePrunesPastSessions_42041() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 42041 },
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ["2026-03-28 00:00:00", "2026-05-30 00:00:00", "2026-07-19 00:00:00"],
+      },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:42041");
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-19"]);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  const warning = record.warnings?.find((w) => w.code === "EVENT_PAST_SESSIONS_PRUNED");
+  assert.ok(warning);
+  assert.deepEqual(warning?.details?.droppedPastDates, ["2026-03-28", "2026-05-30"]);
+}
+
+function testMixedPastFuturePrunesPastSessions_56226() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 56226 },
+      postMeta: { ...buildBundle().postMeta, event_date: ["2026-06-28 00:00:00", "2026-07-19 00:00:00"] },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:56226");
+  assert.deepEqual(payloadOf(record).scheduleDraft?.dates, ["2026-07-19"]);
+}
+
+function testTodaySessionCountsAsActive_62097() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 62097 },
+      postMeta: { ...buildBundle().postMeta, event_date: ["2026-07-10 00:00:00", "2026-07-18 00:00:00"] },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:62097");
+  assert.deepEqual(
+    payloadOf(record).scheduleDraft?.dates,
+    ["2026-07-18"],
+    "today's session must count as active, not past",
+  );
+}
+
+function testDateRangeCrossingTodayCountsAsActive() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ['[{"start":"2026-07-15 10:00:00","end":"2026-07-20 18:00:00","multiday":true,"allday":false}]'],
+      },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.deepEqual(
+    payloadOf(record).scheduleDraft?.dates,
+    ["2026-07-15", "2026-07-20"],
+    "a range already underway (end >= today) must be retained",
+  );
+}
+
 function main() {
   testFullEvent();
   testScheduleDraftOneTime();
@@ -401,6 +497,12 @@ function main() {
   testAgeEvidenceRange();
   testAgeEvidenceTextMalyshiLowConfidence();
   testAgeEvidenceUnknownWarnsUnmatched();
+  testNoClockMeansNoPruning();
+  testPastOnlyEventExcluded_49842();
+  testMixedPastFuturePrunesPastSessions_42041();
+  testMixedPastFuturePrunesPastSessions_56226();
+  testTodaySessionCountsAsActive_62097();
+  testDateRangeCrossingTodayCountsAsActive();
 }
 
 main();
