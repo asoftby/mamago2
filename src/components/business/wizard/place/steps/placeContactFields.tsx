@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import type { PlaceFormData } from "../types";
 import { PLACE_PHONE_LABEL_MAX_LENGTH } from "@/lib/place/placePhones";
+import { normalizeInstagramHandle } from "../normalizeInstagramHandle";
 
 export interface PlaceContactFieldsSharedProps {
   data: PlaceFormData;
@@ -256,24 +257,14 @@ export function PlaceInstagramField({
   isEditable = true,
 }: PlaceContactFieldsSharedProps) {
   const handleInstagramChange = (value: string) => {
-    let normalized = value.trim();
-    if (normalized.startsWith("@")) {
-      normalized = normalized.slice(1);
-    }
-    if (normalized.includes("instagram.com/")) {
-      normalized = normalized.split("instagram.com/")[1].split("/")[0];
-    }
-    onChange({
-      instagramHandle: normalized,
-      instagramUrl: normalized ? `https://instagram.com/${normalized}` : null,
-    });
+    onChange(normalizeInstagramHandle(value));
   };
 
   const instagram = data.instagramHandle ?? "";
 
   return (
     <div>
-      <Label htmlFor="place-instagram">Instagram</Label>
+      <Label htmlFor="place-instagram">Имя профиля в Instagram</Label>
       <div className="mt-2 flex gap-2">
         <Input
           id="place-instagram"
@@ -293,6 +284,9 @@ export function PlaceInstagramField({
           </Button>
         ) : null}
       </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        Укажите @username или ссылку. На шаге «Фото» можно будет загрузить аватар профиля как логотип.
+      </p>
       {instagram ? (
         <p className="text-xs text-muted-foreground mt-1">instagram.com/{instagram}</p>
       ) : null}

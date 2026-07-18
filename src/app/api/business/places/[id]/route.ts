@@ -11,6 +11,7 @@ import { MediaEntityType } from "@prisma/client";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
 import { createRequestPerf } from "@/server/utils/requestPerf";
@@ -197,6 +198,21 @@ export async function PATCH(
     if (!canManage) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
+        { status: 403 }
+      );
+    }
+
+    // A PENDING Place is under moderation review — only staff may edit it
+    // there (e.g. to fix imported/submitted data before approving). The
+    // owner/creator can already reach this Place via canManagePlaceAsync
+    // above, but reaching it is not the same as being allowed to change it
+    // while a moderator is reviewing the submission.
+    if (existing.status === "PENDING" && !canEditPendingPlace(user.role)) {
+      return NextResponse.json(
+        {
+          error: "PENDING_PLACE_REQUIRES_STAFF",
+          message: "Pending places can only be edited by staff (ADMIN/MODERATOR) while under moderation review.",
+        },
         { status: 403 }
       );
     }
@@ -466,8 +482,13 @@ export async function PATCH(
     }
     perf.mark("write");
 
-    // Auto-assign slug on first meaningful title fill (idempotent).
-    if (body.title !== undefined) {
+    // Auto-assign slug on first meaningful title fill (idempotent) — but
+    // never for a PENDING Place. That auto-assign exists for the normal
+    // DRAFT authoring flow (an early preview URL while a business owner is
+    // still filling in the wizard); a PENDING Place is awaiting moderation
+    // and must only get a slug via the publish/approve action, even when
+    // staff edits+saves other fields while it's under review.
+    if (body.title !== undefined && existing.status !== "PENDING") {
       const t = String(body.title).trim();
       if (t) {
         await assignPlaceSlugIfMissing(id, t);

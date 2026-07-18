@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { canonicalizeAgeTags, isPlaceAgeChipActive } from "../isPlaceAgeChipActive";
 import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
@@ -14,6 +15,9 @@ import { generateSummary } from "@/lib/openingHours/openingHoursMapper";
 import type { PlaceFormData } from "../types";
 
 const MAX_SUBCATEGORIES = 3;
+
+/** UI-only chip id — never stored. "Любой возраст" is represented by `ageTags: []`. */
+const ANY_AGE_CHIP_ID = "__any_age__";
 
 type PlaceCategoryChild = {
   id: string;
@@ -145,9 +149,13 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   };
 
   const toggleAgeTag = (tag: string) => {
-    const newTags = ageTags.includes(tag)
+    const rawTags = ageTags.includes(tag)
       ? ageTags.filter((t) => t !== tag)
       : [...ageTags, tag];
+    // If every known age ended up selected, that's the same thing as "any
+    // age" — collapse back to [] so storage never has two representations
+    // of the same "no restriction" meaning.
+    const newTags = canonicalizeAgeTags(rawTags);
     setAgeTags(newTags);
     onChange({ ageTags: newTags });
   };
@@ -326,17 +334,34 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <div className="mt-2">
           <ChipsRow
             layout="masonry"
-            items={AGE_OPTIONS.map((ageOption): ChipItem => ({
-              id: ageOption.key,
-              label: ageOption.shortLabel,
-              active: ageTags.includes(ageOption.key),
-              disabled: !isEditable,
-              onClick: () => isEditable && toggleAgeTag(ageOption.key),
-            }))}
+            items={[
+              {
+                id: ANY_AGE_CHIP_ID,
+                label: "Любой возраст",
+                // Derived, not separate state — ageTags=[] *is* "Любой возраст".
+                // Selecting a specific age naturally clears this (ageTags becomes
+                // non-empty); selecting this chip clears ageTags, which naturally
+                // deactivates every specific-age chip. No dual-selection is possible.
+                active: ageTags.length === 0,
+                disabled: !isEditable,
+                onClick: () => {
+                  if (!isEditable || ageTags.length === 0) return;
+                  setAgeTags([]);
+                  onChange({ ageTags: [] });
+                },
+              },
+              ...AGE_OPTIONS.map((ageOption): ChipItem => ({
+                id: ageOption.key,
+                label: ageOption.shortLabel,
+                active: isPlaceAgeChipActive({ storedAgeTags: ageTags, chipAgeTag: ageOption.key }),
+                disabled: !isEditable,
+                onClick: () => isEditable && toggleAgeTag(ageOption.key),
+              })),
+            ]}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          Выберите хотя бы один возрастной диапазон
+          «Любой возраст» означает, что место подходит детям всех возрастов.
         </p>
       </div>
 

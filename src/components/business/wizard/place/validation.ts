@@ -1,5 +1,6 @@
 import type { PlaceFormData, StepValidation } from "./types";
 import { getPlaceWizardTotalSteps, getStepKey } from "./config";
+import { isValidAgeKey } from "@/lib/config/ages";
 
 export function validateStep1(data: PlaceFormData): StepValidation {
   const errors: string[] = [];
@@ -19,7 +20,14 @@ export function validateStep1(data: PlaceFormData): StepValidation {
   if (!data.description || data.description.trim().length === 0) {
     errors.push("Полное описание обязательно");
   }
-  if (!data.ageTags || data.ageTags.length === 0) errors.push("Выберите хотя бы один возраст");
+  // Empty ageTags is a valid, deliberate choice — "Любой возраст" (no age
+  // restriction), not an incomplete field. Only reject unknown tag values.
+  if (data.ageTags && data.ageTags.length > 0) {
+    const unknownAgeTags = data.ageTags.filter((tag) => !isValidAgeKey(tag));
+    if (unknownAgeTags.length > 0) {
+      errors.push(`Неизвестные значения возраста: ${unknownAgeTags.join(", ")}`);
+    }
+  }
   if (!data.visitFormats || data.visitFormats.length === 0) {
     errors.push("Выберите хотя бы один формат посещения");
   }

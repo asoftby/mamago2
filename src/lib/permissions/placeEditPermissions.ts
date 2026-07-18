@@ -4,6 +4,8 @@
  * Business-based ownership model
  */
 
+import type { Role } from "@prisma/client";
+
 import type { CurrentUser } from "@/lib/auth/safeUser";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
@@ -30,6 +32,18 @@ export async function canEditPlace(user: CurrentUser | null, place: PlaceEditCon
  */
 export async function canShowEditButton(user: CurrentUser | null, place: PlaceEditContext): Promise<boolean> {
   return await canEditPlace(user, place);
+}
+
+/**
+ * A PENDING Place is under moderation review — writes are only allowed
+ * for staff (ADMIN/MODERATOR) fixing data before approving it, never for
+ * the owner/creator while the submission is being reviewed. Called from
+ * `PATCH /api/business/places/[id]` *after* `canManagePlaceAsync` already
+ * confirmed the caller may manage this Place at all — this is a separate,
+ * status-specific rule on top of that, not a replacement for it.
+ */
+export function canEditPendingPlace(userRole: Role | undefined): boolean {
+  return userRole === "ADMIN" || userRole === "MODERATOR";
 }
 
 /**

@@ -16,6 +16,7 @@ import type { OpeningHoursData } from "@/components/openingHours";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
 
 /**
  * GET /api/business/places/[id]/opening-hours
@@ -121,6 +122,21 @@ export async function PUT(
     if (!isAdminOrModerator) {
       if (!place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      // A PENDING place is under moderation review — same staff-only rule
+      // as the plain PATCH endpoint (src/app/api/business/places/[id]/route.ts),
+      // reusing the exact same helper so the two never drift into different
+      // policies. Must run before the data === null delete branch below —
+      // otherwise the owner could delete a PENDING place's schedule via a
+      // null-data PUT even though they can't edit it any other way.
+      if (place.status === "PENDING" && !canEditPendingPlace(user.role)) {
+        return NextResponse.json(
+          {
+            error: "PENDING_PLACE_REQUIRES_STAFF",
+            message: "Pending places can only be edited by staff (ADMIN/MODERATOR) while under moderation review.",
+          },
+          { status: 403 }
+        );
       }
       // For published places, non-admins must use the revision flow
       if (place.status === "PUBLISHED") {

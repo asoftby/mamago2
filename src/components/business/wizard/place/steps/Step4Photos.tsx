@@ -3,11 +3,11 @@
 import { useCallback, useMemo } from "react";
 import { PlaceLogoUploadTemp } from "@/components/business/place/PlaceLogoUploadTemp";
 import { PlaceGalleryUploadTemp, type GalleryItem } from "@/components/business/place/PlaceGalleryUploadTemp";
-import { InstagramAvatarImport } from "@/components/business/place/InstagramAvatarImport";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isValidVideoUrl } from "@/components/business/wizard/offer/mappers";
 import type { PlaceFormData, PlaceImage } from "../types";
+import { PlacePhotosInstagramField } from "./placePhotosInstagramField";
 
 interface Step4PhotosProps {
   data: PlaceFormData;
@@ -26,9 +26,6 @@ export function Step4Photos({
   const galleryImages = data.images.filter((img) => img.kind === "GALLERY");
 
   const hasLogo = !!(logoImage?.url || data.logoUrl);
-  const instagramHandle = data.instagramHandle?.trim() || "";
-  // В режиме редактирования лого уже есть в БД — всё равно показываем импорт (замена из Instagram).
-  const showInstagramImport = !!instagramHandle && !!wizardSessionId;
 
   // Convert PlaceImage[] to GalleryItem[]
   const initialGalleryItems: GalleryItem[] = useMemo(() =>
@@ -106,16 +103,14 @@ export function Step4Photos({
           Добавьте логотип или главное фото вашего места
         </p>
 
-        {showInstagramImport && (
-          <InstagramAvatarImport
-            instagramHandle={instagramHandle}
-            wizardSessionId={wizardSessionId!}
-            onImportComplete={handleLogoUploadComplete}
-            disabled={!isEditable}
-            replaceExisting={hasLogo}
-            className="mb-3"
-          />
-        )}
+        <PlacePhotosInstagramField
+          data={data}
+          onChange={onChange}
+          wizardSessionId={wizardSessionId}
+          hasLogo={hasLogo}
+          onImportComplete={handleLogoUploadComplete}
+          isEditable={isEditable}
+        />
 
         <PlaceLogoUploadTemp
           wizardSessionId={wizardSessionId || ""}

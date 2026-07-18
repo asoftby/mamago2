@@ -78,11 +78,18 @@ export async function getLatestModerationMessage(
  * Changes status from PENDING to PUBLISHED
  * Sends notification to owner.
  */
+export interface ApprovedPlaceResult {
+  id: string;
+  status: ContentStatus;
+  slug: string | null;
+  updatedAt: Date;
+}
+
 export async function approvePlace(
   placeId: string,
   reviewedByUserId: string,
   message?: string
-): Promise<void> {
+): Promise<ApprovedPlaceResult> {
   const timer = createPublishTimer("publish:place");
   const place = await prisma.place.findUnique({
     where: { id: placeId },
@@ -100,8 +107,8 @@ export async function approvePlace(
   ]);
   timer.mark("status");
 
-  const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
   if (!place.slug) {
+    const { assignSlugOnPublish } = await import("@/lib/slug/placeSlugService");
     await assignSlugOnPublish(placeId);
   }
   timer.mark("response");
@@ -112,6 +119,12 @@ export async function approvePlace(
   notifyPlaceApproved(placeId, place.title, place.createdByUserId).catch((e) =>
     console.error("[moderation] notifyPlaceApproved failed:", e),
   );
+
+  const published = await prisma.place.findUniqueOrThrow({
+    where: { id: placeId },
+    select: { id: true, status: true, slug: true, updatedAt: true },
+  });
+  return published;
 }
 
 export async function needsRevisionPlace(
