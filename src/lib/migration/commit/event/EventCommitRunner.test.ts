@@ -8,10 +8,10 @@ import type {
   EventMediaSyncerLike,
   EventCommitRunnerPrismaClient,
   ExecuteEventCommitRunInput,
-  MigrationLineageWriterLike,
+  RunAtomicEventCreateLike,
 } from "./EventCommitRunner";
+import type { EventCreateTransactionClient, RunAtomicEventCreateResult } from "./runAtomicEventCreate";
 import type { ExecuteEventCommitResult } from "./EventCommitOrchestrator";
-import type { CreateLineageResult } from "../../lineage/types";
 import type { CommitOperation } from "../types";
 import type { EventCommitContext, NormalizedEventCandidate } from "./types";
 
@@ -118,29 +118,39 @@ function createFakeOrchestrator(result: ExecuteEventCommitResult) {
   return { orchestrator, calls };
 }
 
-function createFakeLineageWriter(options: { result?: CreateLineageResult; throwError?: Error } = {}) {
-  const calls: unknown[] = [];
-  const writer: MigrationLineageWriterLike = {
-    createLineage: async (input) => {
-      calls.push(input);
-      if (options.throwError) {
-        throw options.throwError;
-      }
-      return (
-        options.result ?? {
-          lineageId: "lineage-1",
-          sourceRecordKey: input.sourceRecordKey,
-          targetType: input.targetType,
-          targetId: input.targetId,
-        }
-      );
+/** A no-op orchestrator — CREATE-path tests never call it, but the constructor still requires one. */
+function unusedOrchestrator(): EventCommitOrchestratorLike {
+  return {
+    execute: async () => {
+      throw new Error("orchestrator.execute() must never be called for a CREATE — that's runAtomicCreate's job now");
     },
   };
-  return { writer, calls };
+}
+
+function createFakeRunAtomicCreate(
+  result: RunAtomicEventCreateResult | { throwError: Error },
+): { runAtomicCreate: RunAtomicEventCreateLike; calls: unknown[] } {
+  const calls: unknown[] = [];
+  const runAtomicCreate: RunAtomicEventCreateLike = async (_tx, input) => {
+    calls.push(input);
+    if ("throwError" in result) {
+      throw result.throwError;
+    }
+    return result;
+  };
+  return { runAtomicCreate, calls };
+}
+
+/** A no-op atomic-create — UPDATE-path tests never call it, but the constructor still requires one. */
+function unusedRunAtomicCreate(): RunAtomicEventCreateLike {
+  return async () => {
+    throw new Error("runAtomicCreate must never be called for an UPDATE");
+  };
 }
 
 function createFakePrisma(options: { throwError?: Error; existingLineage?: MigrationLineage | null } = {}) {
   const calls: unknown[] = [];
+  let transactionCallCount = 0;
   const prisma: EventCommitRunnerPrismaClient = {
     migrationRecord: {
       update: (async (args: unknown) => {
@@ -164,8 +174,14 @@ function createFakePrisma(options: { throwError?: Error; existingLineage?: Migra
         return existing as unknown as MigrationLineage;
       }) as unknown as EventCommitRunnerPrismaClient["migrationLineage"]["update"],
     },
+    $transaction: async <T>(fn: (tx: EventCreateTransactionClient) => Promise<T>): Promise<T> => {
+      transactionCallCount += 1;
+      // The fake `tx` is never actually used by these tests — `runAtomicCreate`
+      // is itself faked and ignores it — but the real signature must be honored.
+      return fn({} as EventCreateTransactionClient);
+    },
   };
-  return { prisma, calls };
+  return { prisma, calls, transactionCallCount: () => transactionCallCount };
 }
 
 function createFakeMediaSyncer(warnings: Array<{ code: string; message: string }> = []) {
@@ -185,11 +201,14 @@ function createFakeMediaSyncer(warnings: Array<{ code: string; message: string }
   return { syncer, calls };
 }
 
-async function testHappyPath() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
-  const { prisma, calls: prismaCalls } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+async function testCreateHappyPathRunsAtomicallyAndLinks() {
+  const { runAtomicCreate, calls: atomicCalls } = createFakeRunAtomicCreate({
+    ok: true,
+    activityId: "activity-1",
+    lineageResult: { lineageId: "lineage-1", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-1" },
+  });
+  const { prisma, calls: prismaCalls, transactionCallCount } = createFakePrisma();
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma });
 
   const result = await runner.execute(inputFixture());
 
@@ -199,8 +218,10 @@ async function testHappyPath() {
   assert.equal(result.recordId, "record-1");
   assert.equal(result.status, "LINKED");
 
-  assert.equal(lineageCalls.length, 1);
-  assert.equal((lineageCalls[0] as { targetType: string }).targetType, "ACTIVITY");
+  assert.equal(transactionCallCount(), 1, "CREATE must go through exactly one $transaction call");
+  assert.equal(atomicCalls.length, 1);
+  assert.equal((atomicCalls[0] as { lineageInput: { targetType: string } }).lineageInput.targetType, "ACTIVITY");
+
   assert.equal(prismaCalls.length, 1);
   const updateCall = prismaCalls[0] as { where: { id: string }; data: Record<string, unknown> };
   assert.equal(updateCall.where.id, "record-1");
@@ -209,9 +230,8 @@ async function testHappyPath() {
 
 async function testUpdateWithoutActiveLineageFailsAndNeverCallsOrchestrator() {
   const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
   const { prisma, calls: prismaCalls } = createFakePrisma({ existingLineage: null });
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator, runAtomicCreate: unusedRunAtomicCreate(), prisma });
 
   const result = await runner.execute(inputFixture({ operation: operationFixture({ action: "UPDATE" }) }));
 
@@ -219,7 +239,6 @@ async function testUpdateWithoutActiveLineageFailsAndNeverCallsOrchestrator() {
   assert.equal(result.status, "FAILED");
   assert.equal(result.reasonCode, "EVENT_UPDATE_TARGET_MISSING");
   assert.equal(orchestratorCalls.length, 0, "orchestrator must never be called when UPDATE target is missing");
-  assert.equal(lineageCalls.length, 0, "lineage must never be written when UPDATE target is missing");
 
   assert.equal(prismaCalls.length, 1, "must update MigrationRecord to FAILED exactly once");
   const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
@@ -229,7 +248,6 @@ async function testUpdateWithoutActiveLineageFailsAndNeverCallsOrchestrator() {
 
 async function testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator() {
   const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter } = createFakeLineageWriter();
   const existingLineage = {
     id: "lineage-9",
     sourceRecordKey: "wordpress-db:events:401",
@@ -237,7 +255,7 @@ async function testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator()
     targetId: "activity-99",
   } as unknown as MigrationLineage;
   const { prisma } = createFakePrisma({ existingLineage });
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator, runAtomicCreate: unusedRunAtomicCreate(), prisma });
 
   await runner.execute(inputFixture({ operation: operationFixture({ action: "UPDATE" }) }));
 
@@ -247,22 +265,33 @@ async function testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator()
   assert.equal(call.targetActivityId, "activity-99");
 }
 
-async function testOrchestratorBlockedMarksRecordFailedAndSkipsLineage() {
-  const { orchestrator } = createFakeOrchestrator({
+async function testUpdateNeverOpensATransaction() {
+  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
+  const existingLineage = { id: "lineage-9", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-99" } as unknown as MigrationLineage;
+  const { prisma, transactionCallCount } = createFakePrisma({ existingLineage });
+  const runner = new EventCommitRunner({ orchestrator, runAtomicCreate: unusedRunAtomicCreate(), prisma });
+
+  await runner.execute(inputFixture({ operation: operationFixture({ action: "UPDATE" }) }));
+
+  assert.equal(transactionCallCount(), 0, "UPDATE keeps its own non-transactional path — untouched by the CREATE atomicity fix");
+}
+
+async function testCreateDraftBlockedMarksRecordFailedNeverTouchesOrchestrator() {
+  const { runAtomicCreate } = createFakeRunAtomicCreate({
     ok: false,
     reasonCode: "EVENT_CREATE_BLOCKED",
     blockReasons: [{ code: "MISSING_SCHEDULE", message: "candidate.scheduleDraft is null" }],
   });
-  const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
+  const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
   const { prisma, calls: prismaCalls } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator, runAtomicCreate, prisma });
 
   const result = await runner.execute(inputFixture());
 
   assert.equal(result.ok, false);
   assert.equal(result.status, "FAILED");
   assert.equal(result.recordId, "record-1");
-  assert.equal(lineageCalls.length, 0, "lineage must never be written for a blocked commit");
+  assert.equal(orchestratorCalls.length, 0, "CREATE never touches the orchestrator at all anymore");
 
   assert.equal(prismaCalls.length, 1);
   const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
@@ -270,40 +299,24 @@ async function testOrchestratorBlockedMarksRecordFailedAndSkipsLineage() {
   assert.match(updateCall.data.lastErrorMessage as string, /MISSING_SCHEDULE/);
 }
 
-async function testOrchestratorFailedMarksRecordFailedAndSkipsLineage() {
-  const writerError = new Error("db unavailable");
-  const { orchestrator } = createFakeOrchestrator({
-    ok: false,
-    reasonCode: "EVENT_CREATE_FAILED",
-    error: writerError,
-  });
-  const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
+async function testCreateTransactionThrowsMarksFailedAndNeverReportsAnActivityId() {
+  // Simulates the exact bug this whole fix exists for: the lineage write
+  // (or anything else inside the transaction) fails. Because
+  // runAtomicCreate is invoked inside prisma.$transaction, a real Prisma
+  // client would roll back everything — this fake demonstrates the
+  // runner's own handling of that thrown error: FAILED, no activityId
+  // ever surfaces, because as far as the runner can tell, nothing was
+  // durably committed.
+  const { runAtomicCreate } = createFakeRunAtomicCreate({ throwError: new Error("lineage db down") });
   const { prisma, calls: prismaCalls } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma });
 
   const result = await runner.execute(inputFixture());
 
   assert.equal(result.ok, false);
   assert.equal(result.status, "FAILED");
-  assert.equal(result.error, writerError);
-  assert.equal(lineageCalls.length, 0);
-
-  const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
-  assert.equal(updateCall.data.status, "FAILED");
-  assert.equal(updateCall.data.lastErrorMessage, "db unavailable");
-}
-
-async function testLineageThrowsMarksRecordFailedWithoutRollingBackActivity() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter } = createFakeLineageWriter({ throwError: new Error("lineage db down") });
-  const { prisma, calls: prismaCalls } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
-
-  const result = await runner.execute(inputFixture());
-
-  assert.equal(result.ok, false);
-  assert.equal(result.status, "FAILED");
-  assert.equal(result.activityId, "activity-1", "the already-created Activity must still be reported, never hidden or rolled back");
+  assert.equal(result.reasonCode, "EVENT_CREATE_TRANSACTION_FAILED");
+  assert.equal(result.activityId, undefined, "no activityId is ever reported for a rolled-back transaction — nothing survived");
 
   assert.equal(prismaCalls.length, 1);
   const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
@@ -312,31 +325,40 @@ async function testLineageThrowsMarksRecordFailedWithoutRollingBackActivity() {
 }
 
 async function testMigrationRecordUpdateThrowPropagatesRaw() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { runAtomicCreate } = createFakeRunAtomicCreate({
+    ok: true,
+    activityId: "activity-1",
+    lineageResult: { lineageId: "lineage-1", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-1" },
+  });
   const { prisma } = createFakePrisma({ throwError: new Error("update failed") });
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma });
 
   await assert.rejects(() => runner.execute(inputFixture()), /update failed/);
 }
 
-async function testSourceHashPassedUnchangedToLineageWriter() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter, calls: lineageCalls } = createFakeLineageWriter();
+async function testSourceHashPassedUnchangedIntoLineageInput() {
+  const { runAtomicCreate, calls: atomicCalls } = createFakeRunAtomicCreate({
+    ok: true,
+    activityId: "activity-1",
+    lineageResult: { lineageId: "lineage-1", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-1" },
+  });
   const { prisma } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma });
 
   await runner.execute(inputFixture({ record: recordFixture({ sourceHash: "sha256-exact-value" }) }));
 
-  const call = lineageCalls[0] as { lastSourceHash: string };
-  assert.equal(call.lastSourceHash, "sha256-exact-value");
+  const call = atomicCalls[0] as { lineageInput: { lastSourceHash: string } };
+  assert.equal(call.lineageInput.lastSourceHash, "sha256-exact-value");
 }
 
 async function testActivityIdNeverWrittenToMigrationRecord() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { runAtomicCreate } = createFakeRunAtomicCreate({
+    ok: true,
+    activityId: "activity-1",
+    lineageResult: { lineageId: "lineage-1", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-1" },
+  });
   const { prisma, calls: prismaCalls } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma });
 
   await runner.execute(inputFixture());
 
@@ -346,25 +368,27 @@ async function testActivityIdNeverWrittenToMigrationRecord() {
 }
 
 async function testMediaWarningsMergedIntoValidationSummary() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { runAtomicCreate } = createFakeRunAtomicCreate({
+    ok: true,
+    activityId: "activity-1",
+    lineageResult: { lineageId: "lineage-1", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-1" },
+  });
   const { prisma, calls: prismaCalls } = createFakePrisma();
   const { syncer, calls: mediaCalls } = createFakeMediaSyncer([
     { code: "EVENT_MEDIA_DOWNLOAD_FAILED", message: "download failed" },
   ]);
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma, mediaSyncer: syncer });
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma, mediaSyncer: syncer });
 
   await runner.execute(
     inputFixture({
       record: recordFixture({
-        validationSummary: [
-          { code: "EVENT_CITY_UNMATCHED", message: "city missing", severity: "WARNING" },
-        ],
+        validationSummary: [{ code: "EVENT_CITY_UNMATCHED", message: "city missing", severity: "WARNING" }],
       }),
     }),
   );
 
   assert.equal(mediaCalls.length, 1);
+  assert.equal((mediaCalls[0] as { activityId: string }).activityId, "activity-1", "media sync uses the Activity created by the transaction");
   const updateCall = prismaCalls[0] as { data: Record<string, unknown> };
   const validationSummary = updateCall.data.validationSummary as Array<{ code: string }>;
   assert.deepEqual(validationSummary.map((warning) => warning.code), [
@@ -373,11 +397,25 @@ async function testMediaWarningsMergedIntoValidationSummary() {
   ]);
 }
 
+async function testMediaSyncNeverRunsWhenTransactionFails() {
+  const { runAtomicCreate } = createFakeRunAtomicCreate({ throwError: new Error("lineage db down") });
+  const { prisma } = createFakePrisma();
+  const { syncer, calls: mediaCalls } = createFakeMediaSyncer();
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma, mediaSyncer: syncer });
+
+  await runner.execute(inputFixture());
+
+  assert.equal(mediaCalls.length, 0, "media sync must never run for a rolled-back create — there is no Activity to attach media to");
+}
+
 async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
-  const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const { writer: lineageWriter } = createFakeLineageWriter();
+  const { runAtomicCreate } = createFakeRunAtomicCreate({
+    ok: true,
+    activityId: "activity-1",
+    lineageResult: { lineageId: "lineage-1", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-1" },
+  });
   const { prisma, calls: prismaCalls } = createFakePrisma();
-  const runner = new EventCommitRunner({ orchestrator, lineageWriter, prisma });
+  const runner = new EventCommitRunner({ orchestrator: unusedOrchestrator(), runAtomicCreate, prisma });
 
   await runner.execute(inputFixture());
 
@@ -392,29 +430,19 @@ async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
   assert.ok(!("rawPayload" in updateCall.data));
 }
 
-async function testNoActivitySessionEventVenueOrMediaDelegateExists() {
-  // `EventCommitRunnerPrismaClient` only ever exposes `migrationRecord` and
-  // `migrationLineage` — there is no `activitySession`/`eventVenue`/
-  // `activityImage`/`activity` delegate to call anything on, and no
-  // schedule/media sync helper is imported anywhere in this module
-  // (confirmed by inspection).
-  const { prisma } = createFakePrisma();
-  assert.deepEqual(new Set(Object.keys(prisma)), new Set(["migrationRecord", "migrationLineage"]));
-}
-
 async function main() {
-  await testHappyPath();
+  await testCreateHappyPathRunsAtomicallyAndLinks();
   await testUpdateWithoutActiveLineageFailsAndNeverCallsOrchestrator();
   await testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator();
-  await testOrchestratorBlockedMarksRecordFailedAndSkipsLineage();
-  await testOrchestratorFailedMarksRecordFailedAndSkipsLineage();
-  await testLineageThrowsMarksRecordFailedWithoutRollingBackActivity();
+  await testUpdateNeverOpensATransaction();
+  await testCreateDraftBlockedMarksRecordFailedNeverTouchesOrchestrator();
+  await testCreateTransactionThrowsMarksFailedAndNeverReportsAnActivityId();
   await testMigrationRecordUpdateThrowPropagatesRaw();
-  await testSourceHashPassedUnchangedToLineageWriter();
+  await testSourceHashPassedUnchangedIntoLineageInput();
   await testActivityIdNeverWrittenToMigrationRecord();
   await testMediaWarningsMergedIntoValidationSummary();
+  await testMediaSyncNeverRunsWhenTransactionFails();
   await testPlanSummaryNormalizedAndRawPayloadNeverTouched();
-  await testNoActivitySessionEventVenueOrMediaDelegateExists();
 }
 
 main()

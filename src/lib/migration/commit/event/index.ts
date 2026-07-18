@@ -14,8 +14,14 @@ export type {
   EventCommitRunnerPrismaClient,
   ExecuteEventCommitRunInput,
   ExecuteEventCommitRunResult,
-  MigrationLineageWriterLike,
+  RunAtomicEventCreateLike,
 } from "./EventCommitRunner";
+export { runAtomicEventCreate } from "./runAtomicEventCreate";
+export type {
+  EventCreateTransactionClient,
+  RunAtomicEventCreateInput,
+  RunAtomicEventCreateResult,
+} from "./runAtomicEventCreate";
 export type {
   EventCommitBlockReason,
   EventCommitBlockReasonCode,
