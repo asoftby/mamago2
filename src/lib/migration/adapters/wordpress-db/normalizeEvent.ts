@@ -1,4 +1,6 @@
 import type { MigrationWarning, NormalizedRecord } from "../../types";
+import { parseEventLocationRaw } from "./parseEventLocationRaw";
+import type { ParsedEventLocation } from "./parseEventLocationRaw";
 import { pruneEventScheduleToEligibleSessions } from "./pruneEventSchedule";
 import type { WordPressEventBundle, WordPressTermRow } from "./types";
 
@@ -65,8 +67,10 @@ export interface NormalizedEventCandidate {
   scheduleDraft: NormalizedEventScheduleDraft | null;
   /** From `event-place-name` — a venue name, not an `Organizer`. */
   venueNameRaw: string | null;
-  /** From `location`. */
+  /** From `location`, unparsed — either plain text or a JSON-object string (`{"address":...,"latitude":...,"longitude":...}`). Kept only as raw evidence; never copy this directly into `EventVenue.addressLine`, use `location` below instead. */
   locationRaw: string | null;
+  /** `parseEventLocationRaw(locationRaw)`'s result — `null` when there's nothing usable (blank, or JSON-shaped with no valid address/coordinates). */
+  location?: ParsedEventLocation | null;
   /** From `adress-event-place` (WP's own key, typo preserved) — kept separate from `locationRaw` rather than merged, since which one is authoritative isn't confirmed. */
   addressEventPlaceRaw: string | null;
   /** From `event_city`. */
@@ -482,6 +486,21 @@ export function normalizeEvent(bundle: WordPressEventBundle, options?: { now?: D
           },
         });
       }
+      for (const clamp of pruneResult.clampedActiveRanges) {
+        warnings.push({
+          code: "EVENT_ACTIVE_RANGE_START_CLAMPED",
+          message:
+            "An active event_date range started in the past; its start was clamped to today's local date so past days are never materialized as sessions.",
+          severity: "INFO",
+          sourceRecordKey,
+          details: {
+            originalStartDate: clamp.originalStartDate,
+            clampedStartDate: clamp.clampedStartDate,
+            endDate: clamp.endDate,
+            droppedPastDayCount: clamp.droppedPastDayCount,
+          },
+        });
+      }
     }
   }
 
@@ -538,6 +557,17 @@ export function normalizeEvent(bundle: WordPressEventBundle, options?: { now?: D
       firstMetaValue(postMeta, "place_id"),
   );
 
+  const locationRaw = firstMetaValue(postMeta, "location");
+  const { location, invalidJsonLike: locationJsonInvalid } = parseEventLocationRaw(locationRaw);
+  if (locationJsonInvalid) {
+    warnings.push({
+      code: "EVENT_LOCATION_JSON_INVALID",
+      message: "location postmeta looks like a JSON object but could not be parsed; address/coordinates evidence is unavailable.",
+      severity: "WARNING",
+      sourceRecordKey,
+    });
+  }
+
   const normalizedPayload: NormalizedEventCandidate = {
     title: post.post_title,
     slug: post.post_name,
@@ -549,7 +579,8 @@ export function normalizeEvent(bundle: WordPressEventBundle, options?: { now?: D
     eventDatesRaw,
     scheduleDraft,
     venueNameRaw: firstMetaValue(postMeta, "event-place-name"),
-    locationRaw: firstMetaValue(postMeta, "location"),
+    locationRaw,
+    location,
     addressEventPlaceRaw: firstMetaValue(postMeta, "adress-event-place"),
     cityRaw: firstMetaValue(postMeta, "event_city"),
     venuePlacePostIdRaw,

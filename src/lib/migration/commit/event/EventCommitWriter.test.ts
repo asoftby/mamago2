@@ -498,6 +498,8 @@ async function testCreateWithManualVenueUpsertsByActivityId() {
         title: "Central Park",
         addressLine: "ul. Central, 1",
         cityId: "city-1",
+        lat: 53.89602,
+        lng: 27.53968,
         note: "Source city hint: Minsk",
         source: "wordpress-db",
       },
@@ -521,6 +523,8 @@ async function testCreateWithManualVenueUpsertsByActivityId() {
     title: "Central Park",
     addressLine: "ul. Central, 1",
     cityId: "city-1",
+    lat: 53.89602,
+    lng: 27.53968,
     note: "Source city hint: Minsk",
     source: "wordpress-db",
   });
@@ -537,6 +541,8 @@ async function testCreateWithPlaceVenueSetsKindPlace() {
         title: "Central Park",
         addressLine: "ul. Central, 1",
         cityId: "city-1",
+        lat: null,
+        lng: null,
         note: null,
         source: "wordpress-db",
       },
@@ -546,6 +552,8 @@ async function testCreateWithPlaceVenueSetsKindPlace() {
   const call = findCall(calls, "eventVenue", "upsert").args as { create: Record<string, unknown> };
   assert.equal(call.create.kind, "PLACE");
   assert.equal(call.create.placeId, "place-9");
+  assert.equal(call.create.lat, null);
+  assert.equal(call.create.lng, null);
 }
 
 async function testUpdateWithVenueUpsertsSameActivityId() {
@@ -560,6 +568,8 @@ async function testUpdateWithVenueUpsertsSameActivityId() {
         title: "Updated Venue",
         addressLine: null,
         cityId: null,
+        lat: null,
+        lng: null,
         note: null,
         source: "wordpress-db",
       },

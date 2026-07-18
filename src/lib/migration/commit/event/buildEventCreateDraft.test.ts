@@ -236,6 +236,8 @@ function testVenueDraftManualWhenNoPlaceMatch() {
     title: "Central Park",
     addressLine: "ul. Central, 1",
     cityId: "city-1",
+    lat: null,
+    lng: null,
     note: "Source city hint: Minsk",
     source: "wordpress-db",
   });
@@ -243,7 +245,11 @@ function testVenueDraftManualWhenNoPlaceMatch() {
 
 function testVenueDraftPlaceWhenMatched() {
   const result = buildEventCreateDraft({
-    candidate: candidateFixture({ venueNameRaw: "Central Park", addressEventPlaceRaw: "ul. Central, 1" }),
+    candidate: candidateFixture({
+      venueNameRaw: "Central Park",
+      addressEventPlaceRaw: "ul. Central, 1",
+      location: { address: "ul. Central, 1", lat: 53.9, lng: 27.5 },
+    }),
     context: contextFixture({ placeId: "place-9", cityId: "city-1" }),
   });
   assert.equal(result.ok, true);
@@ -254,17 +260,20 @@ function testVenueDraftPlaceWhenMatched() {
     title: "Central Park",
     addressLine: "ul. Central, 1",
     cityId: "city-1",
+    // A matched Place is the coordinate source of truth — never duplicated onto the venue row, even when parsed source coordinates exist.
+    lat: null,
+    lng: null,
     note: null,
     source: "wordpress-db",
   });
 }
 
-function testVenueDraftBlankAddressMetaFallsBackToLocationRaw() {
+function testVenueDraftBlankAddressMetaFallsBackToParsedLocation() {
   const result = buildEventCreateDraft({
     candidate: candidateFixture({
       venueNameRaw: null,
       addressEventPlaceRaw: "",
-      locationRaw: "Минск, ул. Примерная, 10",
+      location: { address: "Минск, ул. Примерная, 10", lat: null, lng: null },
     }),
     context: contextFixture({ placeId: null }),
   });
@@ -276,12 +285,12 @@ function testVenueDraftBlankAddressMetaFallsBackToLocationRaw() {
   assert.equal(result.draft.venue?.addressLine, "Минск, ул. Примерная, 10");
 }
 
-function testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw() {
+function testVenueDraftWhitespaceAddressMetaFallsBackToParsedLocation() {
   const result = buildEventCreateDraft({
     candidate: candidateFixture({
       venueNameRaw: null,
       addressEventPlaceRaw: "   ",
-      locationRaw: "Минск, ул. Примерная, 10",
+      location: { address: "Минск, ул. Примерная, 10", lat: null, lng: null },
     }),
     context: contextFixture({ placeId: null }),
   });
@@ -290,12 +299,12 @@ function testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw() {
   assert.equal(result.draft.venue?.addressLine, "Минск, ул. Примерная, 10");
 }
 
-function testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent() {
+function testVenueDraftAddressMetaTakesPriorityOverParsedLocationWhenBothPresent() {
   const result = buildEventCreateDraft({
     candidate: candidateFixture({
       venueNameRaw: null,
       addressEventPlaceRaw: "  ul. Central, 1  ",
-      locationRaw: "Минск, ул. Примерная, 10",
+      location: { address: "Минск, ул. Примерная, 10", lat: null, lng: null },
     }),
     context: contextFixture({ placeId: null }),
   });
@@ -306,7 +315,7 @@ function testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent() 
 
 function testVenueDraftNullWhenNoEvidenceAtAll() {
   const result = buildEventCreateDraft({
-    candidate: candidateFixture({ venueNameRaw: null, addressEventPlaceRaw: null, locationRaw: null }),
+    candidate: candidateFixture({ venueNameRaw: null, addressEventPlaceRaw: null, locationRaw: null, location: null }),
     context: contextFixture(),
   });
   assert.equal(result.ok, true);
@@ -314,15 +323,164 @@ function testVenueDraftNullWhenNoEvidenceAtAll() {
   assert.equal(result.draft.venue, null, "no matched Place and no venue/address hint at all -> no fallback row");
 }
 
-function testVenueDraftFallsBackToLocationRawWhenAddressMissing() {
+function testVenueDraftFallsBackToParsedLocationWhenAddressMissing() {
   const result = buildEventCreateDraft({
-    candidate: candidateFixture({ venueNameRaw: null, addressEventPlaceRaw: null, locationRaw: "Minsk, Central Park" }),
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: "Minsk, Central Park", lat: null, lng: null },
+    }),
     context: contextFixture(),
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.draft.venue?.kind, "MANUAL");
   assert.equal(result.draft.venue?.addressLine, "Minsk, Central Park");
+}
+
+function testVenueDraftNeverEmbedsRawJsonLocationString() {
+  // The exact real-world shape from source 42041: no addressEventPlaceRaw,
+  // locationRaw is a JSON-object string. buildVenueDraft() must consume the
+  // already-parsed `candidate.location`, never `candidate.locationRaw`.
+  const rawJson =
+    '{"address":"улица Мясникова 44, Минск","map_picker":false,"latitude":53.89602,"longitude":27.53968}';
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: "Музыкальный театр",
+      addressEventPlaceRaw: null,
+      locationRaw: rawJson,
+      location: { address: "улица Мясникова 44, Минск", lat: 53.89602, lng: 27.53968 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.draft.venue, {
+    kind: "MANUAL",
+    placeId: null,
+    title: "Музыкальный театр",
+    addressLine: "улица Мясникова 44, Минск",
+    cityId: null,
+    lat: 53.89602,
+    lng: 27.53968,
+    note: "Source city hint: Minsk",
+    source: "wordpress-db",
+  });
+  assert.ok(!result.draft.venue?.addressLine?.startsWith("{"), "addressLine must never be the raw JSON blob");
+}
+
+function testVenueDraftCoordinatesNullWhenLocationHasNone() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: "Клуб приключений",
+      addressEventPlaceRaw: null,
+      location: { address: null, lat: null, lng: null },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, null);
+  assert.equal(result.draft.venue?.lat, null);
+  assert.equal(result.draft.venue?.lng, null);
+}
+
+function testVenueDraftCoordinateOnlyEvidenceCreatesManualVenue() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: null, lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.draft.venue, "a valid coordinate pair alone is real venue evidence, not nothing");
+  assert.equal(result.draft.venue?.kind, "MANUAL");
+  assert.equal(result.draft.venue?.addressLine, null);
+  assert.equal(result.draft.venue?.lat, 53.9);
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftConflictingAddressesDropCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "ул. Первая, 1",
+      location: { address: "ул. Другая, 99", lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, null, "coordinates belong to the address that lost priority — must not attach to a different one");
+  assert.equal(result.draft.venue?.lng, null);
+}
+
+function testVenueDraftSameAddressBothSourcesKeepsCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "ул. Первая, 1",
+      location: { address: "ул. Первая, 1", lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, 53.9);
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftLocationAddressSelectedKeepsCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: "ул. Первая, 1", lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, 53.9);
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftExplicitAddressWithNoConflictingLocationAddressKeepsCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "ул. Первая, 1",
+      location: { address: null, lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, 53.9, "no second address evidence to conflict with — coordinates are kept");
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftPlaceMatchCoordinatesAlwaysNullEvenWithCoordinateOnlyLocation() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: null, lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: "place-9" }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.kind, "PLACE");
+  assert.equal(result.draft.venue?.lat, null);
+  assert.equal(result.draft.venue?.lng, null);
 }
 
 function testVenueDraftUnresolvedPlaceNeverBlocksDraft() {
@@ -351,12 +509,20 @@ function main() {
   testDraftHasExactlyTheApprovedFieldSet();
   testVenueDraftManualWhenNoPlaceMatch();
   testVenueDraftPlaceWhenMatched();
-  testVenueDraftBlankAddressMetaFallsBackToLocationRaw();
-  testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw();
-  testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent();
+  testVenueDraftBlankAddressMetaFallsBackToParsedLocation();
+  testVenueDraftWhitespaceAddressMetaFallsBackToParsedLocation();
+  testVenueDraftAddressMetaTakesPriorityOverParsedLocationWhenBothPresent();
   testVenueDraftNullWhenNoEvidenceAtAll();
-  testVenueDraftFallsBackToLocationRawWhenAddressMissing();
+  testVenueDraftFallsBackToParsedLocationWhenAddressMissing();
   testVenueDraftUnresolvedPlaceNeverBlocksDraft();
+  testVenueDraftNeverEmbedsRawJsonLocationString();
+  testVenueDraftCoordinatesNullWhenLocationHasNone();
+  testVenueDraftCoordinateOnlyEvidenceCreatesManualVenue();
+  testVenueDraftConflictingAddressesDropCoordinates();
+  testVenueDraftSameAddressBothSourcesKeepsCoordinates();
+  testVenueDraftLocationAddressSelectedKeepsCoordinates();
+  testVenueDraftExplicitAddressWithNoConflictingLocationAddressKeepsCoordinates();
+  testVenueDraftPlaceMatchCoordinatesAlwaysNullEvenWithCoordinateOnlyLocation();
 }
 
 main();

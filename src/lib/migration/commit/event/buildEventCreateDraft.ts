@@ -61,20 +61,68 @@ function firstNonBlank(...values: Array<string | null | undefined>): string | nu
 }
 
 /**
+ * `parseEventLocationRaw()` guarantees `lat`/`lng` are either both non-null
+ * (a validated pair) or both null — never partial — so this only has one
+ * real decision to make: is there a second, *different* address on record
+ * that the coordinates might actually belong to instead? If
+ * `explicitAddress` (from `addressEventPlaceRaw`) and `locationAddress`
+ * (from the parsed `location`) are both present and disagree after
+ * trimming, the coordinates came from the address that *lost* the
+ * `addressLine` priority — attaching them anyway would silently point the
+ * venue at the wrong place. Any other case (only one address present, or
+ * both agree) has no conflicting evidence, so the coordinates are kept.
+ */
+function resolveManualVenueCoordinates(input: {
+  explicitAddress: string | null;
+  locationAddress: string | null;
+  lat: number | null;
+  lng: number | null;
+}): { lat: number | null; lng: number | null } {
+  if (input.lat === null || input.lng === null) {
+    return { lat: null, lng: null };
+  }
+  const bothAddressesPresent = input.explicitAddress !== null && input.locationAddress !== null;
+  const addressesConflict = bothAddressesPresent && input.explicitAddress !== input.locationAddress;
+  if (addressesConflict) {
+    return { lat: null, lng: null };
+  }
+  return { lat: input.lat, lng: input.lng };
+}
+
+/**
  * `context.placeId` unset (no match, or a low-confidence match the resolver
  * deliberately left null) must never block the Event, and must never lose
  * the raw venue evidence either — a `MANUAL` `EventVenue` preserves it for
  * editorial review. `null` only when there's truly nothing to preserve: no
- * matched Place *and* no venue/address hint at all.
+ * matched Place, no venue/address hint, *and* no coordinate evidence — a
+ * valid coordinate pair on its own is real venue evidence, not something to
+ * discard just because there's no address text alongside it.
  */
 function buildVenueDraft(candidate: NormalizedEventCandidate, context: EventCommitContext): EventVenueDraft | null {
   const title = candidate.venueNameRaw;
   // `??` alone would let a blank/whitespace-only `addressEventPlaceRaw`
-  // mask a real `locationRaw` — firstNonBlank() falls through past blanks.
-  const addressLine = firstNonBlank(candidate.addressEventPlaceRaw, candidate.locationRaw);
+  // mask a real address — firstNonBlank() falls through past blanks. Falls
+  // back to `candidate.location.address` (from `parseEventLocationRaw()`),
+  // never to `candidate.locationRaw` directly — that field can be a raw
+  // JSON-object string, and landing it verbatim in `addressLine` is exactly
+  // the bug this function used to have.
+  const explicitAddress = firstNonBlank(candidate.addressEventPlaceRaw);
+  const locationAddress = firstNonBlank(candidate.location?.address);
+  const addressLine = explicitAddress ?? locationAddress;
   const placeId = context.placeId ?? null;
 
-  if (!placeId && !title && !addressLine) {
+  // Never on a PLACE venue — the matched Place is the coordinate source of
+  // truth, this field never duplicates or second-guesses it.
+  const { lat, lng } = placeId
+    ? { lat: null, lng: null }
+    : resolveManualVenueCoordinates({
+        explicitAddress,
+        locationAddress,
+        lat: candidate.location?.lat ?? null,
+        lng: candidate.location?.lng ?? null,
+      });
+
+  if (!placeId && !title && !addressLine && lat === null && lng === null) {
     return null;
   }
 
@@ -84,6 +132,8 @@ function buildVenueDraft(candidate: NormalizedEventCandidate, context: EventComm
     title,
     addressLine,
     cityId: context.cityId ?? null,
+    lat,
+    lng,
     note: !placeId && candidate.cityRaw ? `Source city hint: ${candidate.cityRaw}` : null,
     source: "wordpress-db",
   };

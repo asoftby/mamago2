@@ -144,6 +144,8 @@ export class EventCommitWriter {
       title: venue.title,
       addressLine: venue.addressLine,
       cityId: venue.cityId,
+      lat: venue.lat,
+      lng: venue.lng,
       note: venue.note,
       source: venue.source,
     };
