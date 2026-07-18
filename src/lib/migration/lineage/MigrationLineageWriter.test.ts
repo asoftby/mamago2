@@ -46,20 +46,57 @@ function lineageFixture(overrides: Partial<MigrationLineage> = {}): MigrationLin
   };
 }
 
-function createFakeClient(options: { returnRow?: MigrationLineage; throwError?: Error } = {}) {
-  const calls: unknown[] = [];
+function fakeUniqueConstraintError(): Error {
+  return Object.assign(
+    new Error("Unique constraint failed on the fields: (`sourceId`,`sourceRecordKey`,`targetType`,`targetRole`)"),
+    { code: "P2002", clientVersion: "test", name: "PrismaClientKnownRequestError" },
+  );
+}
+
+type FakeCall = { method: "create" | "updateMany" | "findUniqueOrThrow"; args: unknown };
+
+/**
+ * `createThrows`, when set, is thrown by `create()` — used to simulate the
+ * unique-constraint conflict path. `updateManyCount` controls whether the
+ * simulated reactivation "finds" an inactive row (`1`) or not (`0`,
+ * default — simulating an active-row conflict).
+ */
+function createFakeClient(
+  options: {
+    createThrows?: Error;
+    updateManyCount?: number;
+    reactivatedRow?: MigrationLineage;
+  } = {},
+) {
+  const calls: FakeCall[] = [];
   const client: MigrationLineageWriterPrismaClient = {
     migrationLineage: {
       create: (async (args: unknown) => {
-        calls.push(args);
-        if (options.throwError) {
-          throw options.throwError;
+        calls.push({ method: "create", args });
+        if (options.createThrows) {
+          throw options.createThrows;
         }
-        return options.returnRow ?? lineageFixture();
+        return lineageFixture();
       }) as unknown as MigrationLineageWriterPrismaClient["migrationLineage"]["create"],
+      updateMany: (async (args: unknown) => {
+        calls.push({ method: "updateMany", args });
+        return { count: options.updateManyCount ?? 0 };
+      }) as unknown as MigrationLineageWriterPrismaClient["migrationLineage"]["updateMany"],
+      findUniqueOrThrow: (async (args: unknown) => {
+        calls.push({ method: "findUniqueOrThrow", args });
+        return options.reactivatedRow ?? lineageFixture({ id: "lineage-1", isActive: true });
+      }) as unknown as MigrationLineageWriterPrismaClient["migrationLineage"]["findUniqueOrThrow"],
     },
   };
   return { client, calls };
+}
+
+function dataOf(call: FakeCall): Record<string, unknown> {
+  return (call.args as { data: Record<string, unknown> }).data;
+}
+
+function whereOf(call: FakeCall): Record<string, unknown> {
+  return (call.args as { where: Record<string, unknown> }).where;
 }
 
 async function testHappyPathCallsCreateOnce() {
@@ -69,6 +106,7 @@ async function testHappyPathCallsCreateOnce() {
   const result = await writer.createLineage(inputFixture());
 
   assert.equal(calls.length, 1);
+  assert.equal(calls[0]!.method, "create");
   assert.deepEqual(result, {
     lineageId: "lineage-1",
     sourceRecordKey: "wordpress-db:places:301",
@@ -82,8 +120,7 @@ async function testTargetRoleDefaultsToPrimary() {
   const writer = new MigrationLineageWriter(client);
   await writer.createLineage(inputFixture());
 
-  const call = calls[0] as { data: Record<string, unknown> };
-  assert.equal(call.data.targetRole, "primary");
+  assert.equal(dataOf(calls[0]!).targetRole, "primary");
 }
 
 async function testCustomTargetRole() {
@@ -91,8 +128,7 @@ async function testCustomTargetRole() {
   const writer = new MigrationLineageWriter(client);
   await writer.createLineage(inputFixture({ targetRole: "cover" }));
 
-  const call = calls[0] as { data: Record<string, unknown> };
-  assert.equal(call.data.targetRole, "cover");
+  assert.equal(dataOf(calls[0]!).targetRole, "cover");
 }
 
 async function testLastSourceHashSavedExactlyAsPassed() {
@@ -100,8 +136,7 @@ async function testLastSourceHashSavedExactlyAsPassed() {
   const writer = new MigrationLineageWriter(client);
   await writer.createLineage(inputFixture({ lastSourceHash: "sha256-deadbeef" }));
 
-  const call = calls[0] as { data: Record<string, unknown> };
-  assert.equal(call.data.lastSourceHash, "sha256-deadbeef");
+  assert.equal(dataOf(calls[0]!).lastSourceHash, "sha256-deadbeef");
 }
 
 async function testRunIdAndRecordIdSavedIntoCorrectFields() {
@@ -109,24 +144,22 @@ async function testRunIdAndRecordIdSavedIntoCorrectFields() {
   const writer = new MigrationLineageWriter(client);
   await writer.createLineage(inputFixture({ runId: "run-42", recordId: "record-42" }));
 
-  const call = calls[0] as { data: Record<string, unknown> };
-  assert.equal(call.data.runId, "run-42");
-  assert.equal(call.data.recordId, "record-42");
+  assert.equal(dataOf(calls[0]!).runId, "run-42");
+  assert.equal(dataOf(calls[0]!).recordId, "record-42");
 }
 
-async function testNoUpsertUpdateOrFindIsCalled() {
-  // The injected client type only exposes `create` — structurally there is
-  // no `upsert`/`update`/`findUnique`/`findFirst` to call. This test
-  // confirms the one call that *is* made is exactly `create`'s shape
-  // (a `data` object, not a `where`+`update`/`create` upsert shape).
+async function testHappyPathOnlyCallsCreateNoUpdateOrFind() {
+  // The common (no prior row) case must still be exactly one create() call
+  // — updateMany()/findUniqueOrThrow() only exist for the reactivation path
+  // (see the reactivation tests below), never touched on the happy path.
   const { client, calls } = createFakeClient();
   const writer = new MigrationLineageWriter(client);
   await writer.createLineage(inputFixture());
 
-  const call = calls[0] as Record<string, unknown>;
-  assert.ok("data" in call);
-  assert.ok(!("where" in call), "a plain create() call must never carry a where clause");
-  assert.ok(!("update" in call), "a plain create() call must never carry an update clause");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]!.method, "create");
+  assert.ok("data" in (calls[0]!.args as object));
+  assert.ok(!("where" in (calls[0]!.args as object)), "a plain create() call must never carry a where clause");
 }
 
 async function testMissingSourceIdThrows() {
@@ -159,8 +192,7 @@ async function testLastImportedAtStampedFromInjectedClock() {
   const writer = new MigrationLineageWriter(client, () => fixedNow);
   await writer.createLineage(inputFixture());
 
-  const call = calls[0] as { data: Record<string, unknown> };
-  assert.equal(call.data.lastImportedAt, fixedNow);
+  assert.equal(dataOf(calls[0]!).lastImportedAt, fixedNow);
 }
 
 async function testLastImportedAtDefaultsToRealClockWhenNotInjected() {
@@ -170,23 +202,108 @@ async function testLastImportedAtDefaultsToRealClockWhenNotInjected() {
   await writer.createLineage(inputFixture());
   const after = Date.now();
 
-  const call = calls[0] as { data: Record<string, unknown> };
-  const stamped = call.data.lastImportedAt as Date;
+  const stamped = dataOf(calls[0]!).lastImportedAt as Date;
   assert.ok(stamped instanceof Date);
   assert.ok(stamped.getTime() >= before && stamped.getTime() <= after);
 }
 
-async function testUniqueConstraintErrorPropagatesNotSwallowed() {
-  const uniqueConstraintError = Object.assign(
-    new Error("Unique constraint failed on the fields: (`sourceId`,`sourceRecordKey`,`targetType`,`targetRole`)"),
-    { code: "P2002" },
-  );
-  const { client } = createFakeClient({ throwError: uniqueConstraintError });
+async function testNonUniqueErrorsPropagateUnchangedWithoutReactivationAttempt() {
+  const infraError = new Error("connection reset");
+  const { client, calls } = createFakeClient({ createThrows: infraError });
   const writer = new MigrationLineageWriter(client);
 
   await assert.rejects(
     () => writer.createLineage(inputFixture()),
-    (error: unknown) => error === uniqueConstraintError,
+    (error: unknown) => error === infraError,
+  );
+  assert.equal(calls.length, 1, "no reactivation attempt for a non-unique-constraint error");
+}
+
+async function testReactivatesInactiveRowOnUniqueConflict() {
+  const { client, calls } = createFakeClient({
+    createThrows: fakeUniqueConstraintError(),
+    updateManyCount: 1,
+    reactivatedRow: lineageFixture({ id: "lineage-1", targetId: "place-99", isActive: true }),
+  });
+  const writer = new MigrationLineageWriter(client);
+
+  const result = await writer.createLineage(inputFixture({ targetId: "place-99" }));
+
+  assert.deepEqual(
+    calls.map((c) => c.method),
+    ["create", "updateMany", "findUniqueOrThrow"],
+  );
+  assert.deepEqual(result, {
+    lineageId: "lineage-1",
+    sourceRecordKey: "wordpress-db:places:301",
+    targetType: "PLACE",
+    targetId: "place-99",
+  });
+}
+
+async function testReactivationGuardedByExactKeyAndInactiveOnly() {
+  const { client, calls } = createFakeClient({ createThrows: fakeUniqueConstraintError(), updateManyCount: 1 });
+  const writer = new MigrationLineageWriter(client);
+  await writer.createLineage(inputFixture({ targetRole: "cover" }));
+
+  const updateManyCall = calls.find((c) => c.method === "updateMany")!;
+  assert.deepEqual(whereOf(updateManyCall), {
+    sourceId: "source-1",
+    sourceRecordKey: "wordpress-db:places:301",
+    targetType: "PLACE",
+    targetRole: "cover",
+    isActive: false,
+  });
+}
+
+async function testReactivationUpdatesAllMutableFields() {
+  const fixedNow = new Date("2026-07-19T00:00:00.000Z");
+  const { client, calls } = createFakeClient({ createThrows: fakeUniqueConstraintError(), updateManyCount: 1 });
+  const writer = new MigrationLineageWriter(client, () => fixedNow);
+  await writer.createLineage(
+    inputFixture({ targetId: "place-99", targetStableKey: "place-99-slug", lastSourceHash: "hash-b", runId: "run-7", recordId: "record-7" }),
+  );
+
+  const updateManyCall = calls.find((c) => c.method === "updateMany")!;
+  assert.deepEqual(dataOf(updateManyCall), {
+    targetId: "place-99",
+    targetNaturalKey: "place-99-slug",
+    lastSourceHash: "hash-b",
+    runId: "run-7",
+    recordId: "record-7",
+    isActive: true,
+    lastImportedAt: fixedNow,
+  });
+}
+
+async function testFindUniqueOrThrowUsesCompoundUniqueKeyAfterReactivation() {
+  const { client, calls } = createFakeClient({ createThrows: fakeUniqueConstraintError(), updateManyCount: 1 });
+  const writer = new MigrationLineageWriter(client);
+  await writer.createLineage(inputFixture());
+
+  const findCall = calls.find((c) => c.method === "findUniqueOrThrow")!;
+  assert.deepEqual(whereOf(findCall), {
+    sourceId_sourceRecordKey_targetType_targetRole: {
+      sourceId: "source-1",
+      sourceRecordKey: "wordpress-db:places:301",
+      targetType: "PLACE",
+      targetRole: "primary",
+    },
+  });
+}
+
+async function testActiveLineageConflictThrowsWithoutOverwriting() {
+  // updateManyCount defaults to 0 — simulates the guarded update() finding
+  // no matching *inactive* row, i.e. the existing row at this exact key is
+  // active. Must throw a clear, descriptive error, never silently overwrite.
+  const { client, calls } = createFakeClient({ createThrows: fakeUniqueConstraintError(), updateManyCount: 0 });
+  const writer = new MigrationLineageWriter(client);
+
+  await assert.rejects(() => writer.createLineage(inputFixture()), /refusing to overwrite an active mapping/);
+  assert.deepEqual(
+    calls.map((c) => c.method),
+    ["create", "updateMany"],
+    "must never reach findUniqueOrThrow when the row is active — nothing to fetch, nothing was changed",
   );
 }
 
@@ -196,14 +313,19 @@ async function main() {
   await testCustomTargetRole();
   await testLastSourceHashSavedExactlyAsPassed();
   await testRunIdAndRecordIdSavedIntoCorrectFields();
-  await testNoUpsertUpdateOrFindIsCalled();
+  await testHappyPathOnlyCallsCreateNoUpdateOrFind();
   await testMissingSourceIdThrows();
   await testMissingSourceRecordKeyThrows();
   await testMissingTargetIdThrows();
   await testMissingLastSourceHashThrows();
   await testLastImportedAtStampedFromInjectedClock();
   await testLastImportedAtDefaultsToRealClockWhenNotInjected();
-  await testUniqueConstraintErrorPropagatesNotSwallowed();
+  await testNonUniqueErrorsPropagateUnchangedWithoutReactivationAttempt();
+  await testReactivatesInactiveRowOnUniqueConflict();
+  await testReactivationGuardedByExactKeyAndInactiveOnly();
+  await testReactivationUpdatesAllMutableFields();
+  await testFindUniqueOrThrowUsesCompoundUniqueKeyAfterReactivation();
+  await testActiveLineageConflictThrowsWithoutOverwriting();
 }
 
 main()

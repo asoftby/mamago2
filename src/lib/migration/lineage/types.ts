@@ -1,14 +1,14 @@
 import type { MigrationLineage, MigrationTargetType, PrismaClient } from "@prisma/client";
 
 /**
- * The narrowest slice of `PrismaClient` this writer needs — `create` only.
- * No `upsert`, no `update`, no `findUnique`/`findFirst` — this writer must
- * be structurally incapable of doing anything but a single insert (see
- * PR11 scope: UPDATE/upsert lineage semantics don't exist yet, so this
- * type doesn't pretend they do).
+ * The narrowest slice of `PrismaClient` this writer needs. `create` for the
+ * common (no prior row) case; `updateMany` + `findUniqueOrThrow` only for
+ * the exact-key-conflict-with-an-inactive-row reactivation path — see
+ * `createLineage()`'s doc comment for why a guarded `updateMany` is used
+ * instead of a plain `update`.
  */
 export interface MigrationLineageWriterPrismaClient {
-  migrationLineage: Pick<PrismaClient["migrationLineage"], "create">;
+  migrationLineage: Pick<PrismaClient["migrationLineage"], "create" | "updateMany" | "findUniqueOrThrow">;
 }
 
 /**
