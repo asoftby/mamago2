@@ -70,8 +70,12 @@ function firstNonBlank(...values: Array<string | null | undefined>): string | nu
 function buildVenueDraft(candidate: NormalizedEventCandidate, context: EventCommitContext): EventVenueDraft | null {
   const title = candidate.venueNameRaw;
   // `??` alone would let a blank/whitespace-only `addressEventPlaceRaw`
-  // mask a real `locationRaw` — firstNonBlank() falls through past blanks.
-  const addressLine = firstNonBlank(candidate.addressEventPlaceRaw, candidate.locationRaw);
+  // mask a real address — firstNonBlank() falls through past blanks. Falls
+  // back to `candidate.location.address` (from `parseEventLocationRaw()`),
+  // never to `candidate.locationRaw` directly — that field can be a raw
+  // JSON-object string, and landing it verbatim in `addressLine` is exactly
+  // the bug this function used to have.
+  const addressLine = firstNonBlank(candidate.addressEventPlaceRaw, candidate.location?.address);
   const placeId = context.placeId ?? null;
 
   if (!placeId && !title && !addressLine) {
@@ -84,6 +88,10 @@ function buildVenueDraft(candidate: NormalizedEventCandidate, context: EventComm
     title,
     addressLine,
     cityId: context.cityId ?? null,
+    // Never on a PLACE venue — the matched Place is the coordinate source
+    // of truth, this field never duplicates or second-guesses it.
+    lat: placeId ? null : candidate.location?.lat ?? null,
+    lng: placeId ? null : candidate.location?.lng ?? null,
     note: !placeId && candidate.cityRaw ? `Source city hint: ${candidate.cityRaw}` : null,
     source: "wordpress-db",
   };

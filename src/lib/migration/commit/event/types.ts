@@ -29,6 +29,14 @@ export interface EventVenueDraft {
   title: string | null;
   addressLine: string | null;
   cityId: string | null;
+  /**
+   * Only ever populated for `kind === "MANUAL"`, from parsed source
+   * coordinates (`candidate.location`). `kind === "PLACE"` always gets
+   * `null` here — the matched `Place` row is the coordinate source of
+   * truth, this field never duplicates or second-guesses it.
+   */
+  lat: number | null;
+  lng: number | null;
   note: string | null;
   source: string;
 }
