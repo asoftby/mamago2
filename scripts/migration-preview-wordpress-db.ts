@@ -26,6 +26,8 @@
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { PrismaClient } from "@prisma/client";
+
 import {
   assertRemoteAccessAllowed,
   createWordPressSshMysqlExecutor,
@@ -44,7 +46,13 @@ import {
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
+import { classifyPlaceUpdateSafety } from "../src/lib/migration/commit/place/classifyPlaceUpdateSafety";
 import { runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
+import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
+import { resolveMigrationEnvironment } from "../src/lib/migration/runtime/MigrationProfile";
+import { resolveSampledMediaPolicy } from "../src/lib/migration/runtime/sampledMediaPolicy";
+import type { PlaceUpdateConflictReason } from "../src/lib/migration/commit/place/classifyPlaceUpdateSafety";
+import type { MigrationLineageLookup } from "../src/lib/migration/core/orchestrator";
 import type { MigrationPlan, MigrationPlanItem, MigrationPlanStats, MigrationWarning } from "../src/lib/migration/types";
 
 export type PreviewEntity = "article" | "place" | "event" | "route" | "all";
@@ -62,9 +70,17 @@ export interface PreviewCandidateSummary {
   slug: string | null;
   action: string;
   status: string;
+  targetId?: string;
+  conflictReason?: PlaceUpdateConflictReason;
   warnings: readonly MigrationWarning[];
   mediaRefCount: number;
   relationRefCount: number;
+  mediaPolicy?: string;
+  plannedMediaAction?: "FULL_IMPORT" | "METADATA_ONLY" | "NO_MEDIA";
+  addressSummary?: string | null;
+  hasCity?: boolean;
+  hasCategory?: boolean;
+  hasCoordinates?: boolean;
 }
 
 export interface PreviewJsonReport {
@@ -102,6 +118,14 @@ function toCandidateSummary(item: MigrationPlanItem): PreviewCandidateSummary {
     slug?: unknown;
     mediaRefCount?: unknown;
     relationRefCount?: unknown;
+    targetId?: unknown;
+    conflictReason?: unknown;
+    mediaPolicy?: unknown;
+    plannedMediaAction?: unknown;
+    addressSummary?: unknown;
+    hasCity?: unknown;
+    hasCategory?: unknown;
+    hasCoordinates?: unknown;
   };
   return {
     sourceRecordKey: item.sourceRecordKey,
@@ -111,10 +135,134 @@ function toCandidateSummary(item: MigrationPlanItem): PreviewCandidateSummary {
     slug: typeof summary.slug === "string" ? summary.slug : null,
     action: item.action,
     status: item.status,
+    targetId: typeof summary.targetId === "string" ? summary.targetId : undefined,
+    conflictReason:
+      typeof summary.conflictReason === "string"
+        ? (summary.conflictReason as PlaceUpdateConflictReason)
+        : undefined,
     warnings: item.warnings ?? [],
     mediaRefCount: typeof summary.mediaRefCount === "number" ? summary.mediaRefCount : 0,
     relationRefCount: typeof summary.relationRefCount === "number" ? summary.relationRefCount : 0,
+    mediaPolicy: typeof summary.mediaPolicy === "string" ? summary.mediaPolicy : undefined,
+    plannedMediaAction:
+      summary.plannedMediaAction === "FULL_IMPORT" ||
+      summary.plannedMediaAction === "METADATA_ONLY" ||
+      summary.plannedMediaAction === "NO_MEDIA"
+        ? summary.plannedMediaAction
+        : undefined,
+    addressSummary:
+      typeof summary.addressSummary === "string" || summary.addressSummary === null
+        ? summary.addressSummary
+        : undefined,
+    hasCity: typeof summary.hasCity === "boolean" ? summary.hasCity : undefined,
+    hasCategory: typeof summary.hasCategory === "boolean" ? summary.hasCategory : undefined,
+    hasCoordinates: typeof summary.hasCoordinates === "boolean" ? summary.hasCoordinates : undefined,
   };
+}
+
+function retally(items: readonly MigrationPlanItem[], key: (item: MigrationPlanItem) => string | undefined): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const value = key(item);
+    if (value) counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function retallyWarnings(items: readonly MigrationPlanItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    for (const warning of item.warnings ?? []) {
+      counts[warning.code] = (counts[warning.code] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+function recomputePlanStats(plan: MigrationPlan, items: readonly MigrationPlanItem[]): MigrationPlanStats | undefined {
+  if (!plan.stats) return undefined;
+  const actionCounts = retally(items, (item) => item.action);
+  const failedCount = actionCounts.FAIL ?? 0;
+  const skippedCount = actionCounts.SKIP_POLICY ?? 0;
+  const normalizedCount =
+    (actionCounts.CREATE ?? 0) +
+    (actionCounts.UPDATE ?? 0) +
+    (actionCounts.SKIP_UNCHANGED ?? 0) +
+    (actionCounts.UPDATE_CONFLICT ?? 0);
+  return {
+    ...plan.stats,
+    plannedCount: items.length,
+    normalizedCount,
+    failedCount,
+    skippedCount,
+    successRate: plan.stats.discoveredCount === 0 ? 0 : normalizedCount / plan.stats.discoveredCount,
+    actionCounts,
+    statusCounts: retally(items, (item) => item.status),
+    targetTypeCounts: retally(items, (item) => item.targetType),
+    sourceEntityTypeCounts: retally(items, (item) => item.sourceEntityType),
+    warningCounts: retallyWarnings(items),
+  };
+}
+
+function withMediaPlanSummary(item: MigrationPlanItem): MigrationPlanItem {
+  if (item.targetType !== "PLACE") return item;
+  const summary = { ...(item.summary ?? {}) };
+  const mediaRefCount = typeof summary.mediaRefCount === "number" ? summary.mediaRefCount : 0;
+  const mediaPolicy = resolveSampledMediaPolicy({
+    environment: resolveMigrationEnvironment(process.env),
+    sourceRecordKey: item.sourceRecordKey,
+  }).policy.name;
+  const plannedMediaAction =
+    mediaRefCount === 0 ? "NO_MEDIA" : mediaPolicy === "FULL" ? "FULL_IMPORT" : "METADATA_ONLY";
+  return { ...item, summary: { ...summary, mediaPolicy, plannedMediaAction } };
+}
+
+export async function applyStateAwarePlacePreview(input: {
+  plan: MigrationPlan;
+  sourceId: string | null;
+  prisma: Parameters<typeof classifyPlaceUpdateSafety>[0]["prisma"];
+}): Promise<MigrationPlan> {
+  const items: MigrationPlanItem[] = [];
+  for (const item of input.plan.items) {
+    const withMedia = withMediaPlanSummary(item);
+    if (withMedia.targetType !== "PLACE" || withMedia.action !== "UPDATE") {
+      items.push(withMedia);
+      continue;
+    }
+    if (!input.sourceId) {
+      items.push({
+        ...withMedia,
+        action: "UPDATE_CONFLICT",
+        status: "BLOCKED",
+        summary: { ...(withMedia.summary ?? {}), conflictReason: "LINEAGE_MISSING" satisfies PlaceUpdateConflictReason },
+      });
+      continue;
+    }
+    const classification = await classifyPlaceUpdateSafety({
+      prisma: input.prisma,
+      sourceId: input.sourceId,
+      sourceRecordKey: withMedia.sourceRecordKey,
+    });
+    if (classification.classification === "UPDATE_SAFE") {
+      items.push({
+        ...withMedia,
+        summary: { ...(withMedia.summary ?? {}), targetId: classification.targetId },
+      });
+      continue;
+    }
+    items.push({
+      ...withMedia,
+      action: "UPDATE_CONFLICT",
+      status: "BLOCKED",
+      summary: {
+        ...(withMedia.summary ?? {}),
+        targetId: classification.targetId,
+        conflictReason: classification.reason,
+      },
+    });
+  }
+
+  return { ...input.plan, items, stats: recomputePlanStats(input.plan, items) };
 }
 
 function pushRecordBreakdown(push: (line?: string) => void, title: string, counts: Record<string, number>): void {
@@ -188,8 +336,14 @@ export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewRep
         warningCodes.length > 0
           ? ` | warningCodes: ${warningCodes.join(", ")}${candidate.warnings.length > warningCodes.length ? ", …" : ""}`
           : "";
+      const targetLabel = candidate.targetId ? ` | targetId: ${candidate.targetId}` : "";
+      const conflictLabel = candidate.conflictReason ? ` | conflict: ${candidate.conflictReason}` : "";
+      const mediaLabel = candidate.mediaPolicy
+        ? ` | media: ${candidate.mediaPolicy}/${candidate.plannedMediaAction ?? "NO_MEDIA"}`
+        : "";
       push(
         `- ${candidate.sourceRecordKey} | ${candidate.title ?? "(no title)"} | ${candidate.slug ?? "(no slug)"} ` +
+          `| action: ${candidate.action} | status: ${candidate.status}${targetLabel}${conflictLabel}${mediaLabel} ` +
           `| warnings: ${candidate.warnings.length}${warningCodesLabel} | mediaRefs: ${candidate.mediaRefCount} | relationRefs: ${candidate.relationRefCount}`,
       );
     }
@@ -298,45 +452,69 @@ async function main(): Promise<void> {
   }
 
   const executor = createWordPressSshMysqlExecutor(config);
-
-  let records;
-  if (sourceRecordKey) {
-    if (entity === "article") {
-      records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
-    } else if (entity === "place") {
-      records = [await fetchPublishedPlaceEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
-    } else if (entity === "event") {
-      records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
-    } else if (entity === "route") {
-      records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
-    } else {
-      throw new Error("--source-record-key is only supported with --entity article|place|event|route for golden-sample runs.");
-    }
+  let prisma: PrismaClient | null = null;
+  let ledger: MigrationLineageLookup | undefined;
+  let sourceId: string | null = null;
+  const isPlacePreview = entity === "place";
+  if (isPlacePreview) {
+    prisma = new PrismaClient();
+    const repository = new MigrationLedgerRepository(prisma);
+    ledger = repository;
+    const source = await repository.findSourceByAdapter(WORDPRESS_DB_ADAPTER_KEY, "wordpress-db");
+    sourceId = source?.id ?? null;
   }
 
-  const { plan } = await runMigrationDryRun({
-    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
-    sourceNamespace: "wordpress-db",
-    sourceConfig: { executor },
-    records,
-    filters: { entityTypes: entityTypesFor(entity), limit: sourceRecordKey ? 1 : limit },
-  });
-  if (forceReprocess && sourceRecordKey) {
-    for (const item of plan.items) {
-      if (item.sourceRecordKey === sourceRecordKey && item.action === "SKIP_UNCHANGED") {
-        item.action = "UPDATE";
-        item.status = "PLANNED";
+  try {
+    let records;
+    if (sourceRecordKey) {
+      if (entity === "article") {
+        records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+      } else if (entity === "place") {
+        records = [await fetchPublishedPlaceEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+      } else if (entity === "event") {
+        records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+      } else if (entity === "route") {
+        records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, sourceRecordKey)];
+      } else {
+        throw new Error("--source-record-key is only supported with --entity article|place|event|route for golden-sample runs.");
       }
     }
-  }
 
-  const options: PreviewReportOptions = { entity, limit: limit ?? null };
+    const { plan: rawPlan } = await runMigrationDryRun({
+      adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+      sourceNamespace: "wordpress-db",
+      sourceConfig: { executor },
+      records,
+      filters: { entityTypes: entityTypesFor(entity), limit: sourceRecordKey ? 1 : limit },
+      ledger,
+    });
+    let plan = rawPlan;
+    if (isPlacePreview && prisma) {
+      plan = await applyStateAwarePlacePreview({ plan: rawPlan, sourceId, prisma });
+    }
+    if (forceReprocess && sourceRecordKey) {
+      const mutableItems = [...plan.items];
+      for (const item of mutableItems) {
+        if (item.sourceRecordKey === sourceRecordKey && item.action === "SKIP_UNCHANGED") {
+          item.action = "UPDATE";
+          item.status = "PLANNED";
+        }
+      }
+      plan = { ...plan, items: mutableItems, stats: recomputePlanStats(plan, mutableItems) };
+    }
 
-  console.log(buildPreviewHumanReport(plan, options));
+    const options: PreviewReportOptions = { entity, limit: limit ?? null };
 
-  if (out) {
-    writeFileSync(out, JSON.stringify(buildPreviewJsonReport(plan, options), null, 2));
-    console.log(`\nJSON report written to ${out}`);
+    console.log(buildPreviewHumanReport(plan, options));
+
+    if (out) {
+      writeFileSync(out, JSON.stringify(buildPreviewJsonReport(plan, options), null, 2));
+      console.log(`\nJSON report written to ${out}`);
+    }
+  } finally {
+    if (prisma) {
+      await prisma.$disconnect();
+    }
   }
 }
 

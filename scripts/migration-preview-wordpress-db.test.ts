@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { buildPreviewHumanReport, buildPreviewJsonReport, parseArgs } from "./migration-preview-wordpress-db";
+import { buildPreviewHumanReport, buildPreviewJsonReport, parseArgs, applyStateAwarePlacePreview } from "./migration-preview-wordpress-db";
 import { getMigrationAdapter } from "../src/lib/migration/adapters/registry";
 import {
   ARTICLE_ENTITY_TYPE,
@@ -10,6 +10,7 @@ import {
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { createMigrationRunPlan, runMigrationDryRun } from "../src/lib/migration/core/orchestrator";
+import type { MigrationLineage, Place } from "@prisma/client";
 import type {
   WordPressPlaceIndexRow,
   WordPressPostMetaRow,
@@ -17,6 +18,7 @@ import type {
   WordPressTermRow,
 } from "../src/lib/migration/adapters/wordpress-db/types";
 import type { WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
+import type { MigrationPlan, MigrationPlanItem } from "../src/lib/migration/types";
 
 // ---------------------------------------------------------------------------
 // Fixtures: 2 articles (one plain, one with Elementor + no featured image)
@@ -62,9 +64,15 @@ const postMeta: WordPressPostMetaRow[] = [
   { meta_id: 2, post_id: 202, meta_key: "_elementor_data", meta_value: "[]" },
   { meta_id: 3, post_id: 701, meta_key: "title-location-1", meta_value: "First stop" },
   { meta_id: 4, post_id: 701, meta_key: "description-location-1", meta_value: "First stop note" },
+  { meta_id: 5, post_id: 301, meta_key: "cover", meta_value: "1001" },
+  { meta_id: 6, post_id: 301, meta_key: "gallery", meta_value: "1002,1003" },
+  { meta_id: 7, post_id: 301, meta_key: "location", meta_value: "{\"address\":\"Minsk, Test 1\"}" },
+  { meta_id: 8, post_id: 301, meta_key: "city-place", meta_value: "Minsk" },
 ];
 
-const terms: WordPressTermRow[] = [];
+const terms: WordPressTermRow[] = [
+  { post_id: 301, term_id: 9001, taxonomy: "place-category", name: "Cafe", slug: "cafe" },
+];
 
 const placeIndexRows: WordPressPlaceIndexRow[] = [
   { post_id: 301, post_status: "publish", priority: 1, lat: 53.9, lng: 27.5667 },
@@ -123,6 +131,88 @@ async function testEngineProducesCreateItemsForAll() {
   assert.equal(routeItems.length, 1);
   assert.ok(routeItems.every((item) => item.action === "CREATE"));
   assert.equal(plan.errors.length, 0);
+}
+
+function lineageRow(overrides: Partial<MigrationLineage> = {}): MigrationLineage {
+  return {
+    id: "lineage-1",
+    sourceId: "source-1",
+    recordId: "record-1",
+    runId: "run-1",
+    sourceEntityType: PLACE_ENTITY_TYPE,
+    sourceExternalId: null,
+    sourceStableKey: "wordpress-db:places:301",
+    sourceRecordKey: "wordpress-db:places:301",
+    targetType: "PLACE",
+    targetId: "place-1",
+    targetRole: "primary",
+    targetNaturalKey: null,
+    lastSourceHash: "hash-old",
+    lastPlanAction: null,
+    isActive: true,
+    firstSeenAt: new Date("2026-01-01T00:00:00.000Z"),
+    lastSeenAt: null,
+    lastImportedAt: new Date("2026-01-01T00:00:00.000Z"),
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...overrides,
+  } as unknown as MigrationLineage;
+}
+
+function placeRow(overrides: Partial<Place> = {}): Place {
+  return {
+    id: "place-1",
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...overrides,
+  } as unknown as Place;
+}
+
+async function testLedgerSameHashPlansSkipUnchanged() {
+  const createPlan = await buildTestPlan([PLACE_ENTITY_TYPE], 1);
+  const sourceHash = createPlan.records[0].sourceHash;
+  assert.ok(sourceHash, "fixture Place must carry a sourceHash");
+
+  const { plan } = await runMigrationDryRun({
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    sourceNamespace: "test",
+    sourceConfig: { executor: createFakeExecutor() },
+    filters: { entityTypes: [PLACE_ENTITY_TYPE], limit: 1 },
+    ledger: {
+      findLineageBySourceRecordKeys: async () =>
+        new Map([["wordpress-db:places:301", [lineageRow({ lastSourceHash: sourceHash })]]]),
+    },
+  });
+
+  assert.equal(plan.items[0].action, "SKIP_UNCHANGED");
+  assert.equal(plan.items[0].status, "SKIPPED");
+}
+
+async function testLedgerChangedHashPlansUpdateAndSafePreviewKeepsUpdate() {
+  const { plan: rawPlan } = await runMigrationDryRun({
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    sourceNamespace: "test",
+    sourceConfig: { executor: createFakeExecutor() },
+    filters: { entityTypes: [PLACE_ENTITY_TYPE], limit: 1 },
+    ledger: {
+      findLineageBySourceRecordKeys: async () =>
+        new Map([["wordpress-db:places:301", [lineageRow({ lastSourceHash: "different-hash" })]]]),
+    },
+  });
+
+  assert.equal(rawPlan.items[0].action, "UPDATE");
+
+  const postProcessed = await applyStateAwarePlacePreview({
+    plan: rawPlan,
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => lineageRow({ lastSourceHash: "different-hash" }) },
+      place: { findUnique: async () => placeRow() },
+    },
+  });
+
+  assert.equal(postProcessed.items[0].action, "UPDATE");
+  assert.equal(postProcessed.items[0].status, "PLANNED");
+  assert.equal(postProcessed.items[0].summary?.targetId, "place-1");
 }
 
 async function testEntityFilterAppliesThroughAdapterAndEngine() {
@@ -232,6 +322,152 @@ async function testJsonReportExcludesRawContent() {
   const locatedPlace = jsonReport.candidates.find((c) => c.sourceRecordKey === "wordpress-db:places:301");
   assert.equal(locatedPlace?.title, "Located Place");
   assert.equal(locatedPlace?.targetTypeHint, "PLACE");
+  assert.equal(locatedPlace?.mediaRefCount, 3);
+  assert.equal(locatedPlace?.addressSummary, "Minsk, Test 1");
+  assert.equal(locatedPlace?.hasCity, true);
+  assert.equal(locatedPlace?.hasCategory, true);
+  assert.equal(locatedPlace?.hasCoordinates, true);
+}
+
+function planItemFixture(overrides: Partial<MigrationPlanItem> = {}): MigrationPlanItem {
+  return {
+    sourceRecordKey: "wordpress-db:places:301",
+    sourceEntityType: PLACE_ENTITY_TYPE,
+    targetType: "PLACE",
+    action: "UPDATE",
+    status: "PLANNED",
+    summary: {
+      title: "Located Place",
+      slug: "located-place",
+      mediaRefCount: 1,
+      relationRefCount: 0,
+      addressSummary: "Minsk, Test 1",
+      hasCity: true,
+      hasCategory: true,
+      hasCoordinates: true,
+    },
+    warnings: [],
+    ...overrides,
+  };
+}
+
+function planFixture(items: readonly MigrationPlanItem[]): MigrationPlan {
+  return {
+    adapterKey: WORDPRESS_DB_ADAPTER_KEY,
+    adapterVersion: "test",
+    sourceNamespace: "test",
+    mode: "DRY_RUN",
+    createdAt: "2026-07-18T00:00:00.000Z",
+    records: [],
+    items,
+    warnings: [],
+    errors: [],
+    stats: {
+      discoveredCount: items.length,
+      plannedCount: items.length,
+      normalizedCount: items.length,
+      failedCount: 0,
+      skippedCount: 0,
+      successRate: 1,
+      actionCounts: { UPDATE: items.length },
+      statusCounts: { PLANNED: items.length },
+      targetTypeCounts: { PLACE: items.length },
+      sourceEntityTypeCounts: { [PLACE_ENTITY_TYPE]: items.length },
+      warningCounts: {},
+      durationsMs: { discover: 0, filter: 0, normalize: 0, plan: 0, total: 0 },
+    },
+  };
+}
+
+async function testPreviewConflictDoesNotRequireWriteDelegatesAndSerializesSafeFields() {
+  const plan = planFixture([planItemFixture()]);
+  const processed = await applyStateAwarePlacePreview({
+    plan,
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => lineageRow({ lastImportedAt: null }) },
+      place: { findUnique: async () => placeRow() },
+    },
+  });
+
+  assert.equal(processed.items[0].action, "UPDATE_CONFLICT");
+  assert.equal(processed.items[0].status, "BLOCKED");
+  assert.equal(processed.items[0].summary?.targetId, "place-1");
+  assert.equal(processed.items[0].summary?.conflictReason, "LAST_IMPORTED_AT_UNKNOWN");
+  assert.deepEqual(processed.stats?.actionCounts, { UPDATE_CONFLICT: 1 });
+
+  const jsonReport = buildPreviewJsonReport(processed, { entity: "place", limit: null });
+  assert.equal(jsonReport.candidates[0].targetId, "place-1");
+  assert.equal(jsonReport.candidates[0].conflictReason, "LAST_IMPORTED_AT_UNKNOWN");
+  assert.equal(jsonReport.candidates[0].mediaPolicy, "METADATA");
+  assert.equal(jsonReport.candidates[0].plannedMediaAction, "METADATA_ONLY");
+
+  const serialized = JSON.stringify(jsonReport);
+  assert.ok(!serialized.includes("normalizedPayload"));
+  assert.ok(!serialized.includes("rawMeta"));
+}
+
+async function testPreviewTargetRowMissingConflict() {
+  const processed = await applyStateAwarePlacePreview({
+    plan: planFixture([planItemFixture()]),
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => lineageRow({ targetId: "missing-place" }) },
+      place: { findUnique: async () => null },
+    },
+  });
+
+  assert.equal(processed.items[0].action, "UPDATE_CONFLICT");
+  assert.equal(processed.items[0].summary?.targetId, "missing-place");
+  assert.equal(processed.items[0].summary?.conflictReason, "TARGET_ROW_MISSING");
+}
+
+async function testPreviewTargetModifiedAfterImportConflict() {
+  const processed = await applyStateAwarePlacePreview({
+    plan: planFixture([planItemFixture()]),
+    sourceId: "source-1",
+    prisma: {
+      migrationLineage: { findFirst: async () => lineageRow({ targetId: "place-1" }) },
+      place: { findUnique: async () => placeRow({ updatedAt: new Date("2026-01-02T00:00:00.000Z") }) },
+    },
+  });
+
+  assert.equal(processed.items[0].action, "UPDATE_CONFLICT");
+  assert.equal(processed.items[0].summary?.conflictReason, "TARGET_MODIFIED_AFTER_IMPORT");
+}
+
+async function testSampledPlaceMediaPolicy() {
+  const previousAppEnv = process.env.APP_ENV;
+  process.env.APP_ENV = "LOCAL";
+  try {
+    const processed = await applyStateAwarePlacePreview({
+      plan: planFixture([
+        planItemFixture({ sourceRecordKey: "wordpress-db:places:5389", action: "CREATE", summary: { mediaRefCount: 2 } }),
+        planItemFixture({ sourceRecordKey: "wordpress-db:places:895", action: "CREATE", summary: { mediaRefCount: 11 } }),
+        planItemFixture({ sourceRecordKey: "wordpress-db:places:43023", action: "CREATE", summary: { mediaRefCount: 13 } }),
+        planItemFixture({ sourceRecordKey: "wordpress-db:places:301", action: "CREATE", summary: { mediaRefCount: 1 } }),
+      ]),
+      sourceId: "source-1",
+      prisma: {
+        migrationLineage: { findFirst: async () => null },
+        place: { findUnique: async () => null },
+      },
+    });
+
+    const byKey = new Map(processed.items.map((item) => [item.sourceRecordKey, item]));
+    assert.equal(byKey.get("wordpress-db:places:5389")?.summary?.mediaPolicy, "FULL");
+    assert.equal(byKey.get("wordpress-db:places:5389")?.summary?.plannedMediaAction, "FULL_IMPORT");
+    assert.equal(byKey.get("wordpress-db:places:895")?.summary?.mediaPolicy, "FULL");
+    assert.equal(byKey.get("wordpress-db:places:43023")?.summary?.mediaPolicy, "FULL");
+    assert.equal(byKey.get("wordpress-db:places:301")?.summary?.mediaPolicy, "METADATA");
+    assert.equal(byKey.get("wordpress-db:places:301")?.summary?.plannedMediaAction, "METADATA_ONLY");
+  } finally {
+    if (previousAppEnv === undefined) {
+      delete process.env.APP_ENV;
+    } else {
+      process.env.APP_ENV = previousAppEnv;
+    }
+  }
 }
 
 async function testNormalizeFailureSurfacesAsFailAction() {
@@ -344,11 +580,17 @@ function testParseArgs() {
 
 async function main() {
   await testEngineProducesCreateItemsForAll();
+  await testLedgerSameHashPlansSkipUnchanged();
+  await testLedgerChangedHashPlansUpdateAndSafePreviewKeepsUpdate();
   await testEntityFilterAppliesThroughAdapterAndEngine();
   await testStatsPresentAndUsedByReport();
   await testHumanReportContent();
   await testHumanReportEntityFilterNarrowsBreakdown();
   await testJsonReportExcludesRawContent();
+  await testPreviewConflictDoesNotRequireWriteDelegatesAndSerializesSafeFields();
+  await testPreviewTargetRowMissingConflict();
+  await testPreviewTargetModifiedAfterImportConflict();
+  await testSampledPlaceMediaPolicy();
   await testNormalizeFailureSurfacesAsFailAction();
   testParseArgs();
 }

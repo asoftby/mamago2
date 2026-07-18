@@ -152,10 +152,10 @@ function statsToJson(stats: MigrationPlan["stats"] | undefined): object | undefi
  * Maps an engine `MigrationPlanItem` to a lightweight `MigrationRecord`
  * create payload. `status` collapses onto Prisma's `MigrationRecordStatus`
  * enum, which doesn't share the engine's SKIPPED/DUPLICATE/APPLIED/BOUND
- * vocabulary: only FAIL maps to FAILED, everything else (CREATE/UPDATE/
- * SKIP_UNCHANGED/SKIP_POLICY) maps to PLANNED — the precise outcome is
- * already captured exactly by `planAction`, which shares the engine's
- * action vocabulary 1:1, so nothing is lost.
+ * vocabulary: FAIL maps to FAILED, preview-only UPDATE_CONFLICT maps to a
+ * persisted QUARANTINED/QUARANTINE pair, and everything else (CREATE/
+ * UPDATE/SKIP_UNCHANGED/SKIP_POLICY) maps to PLANNED — the precise
+ * outcome is already captured by `planAction`.
  */
 function buildRecordCreateData(
   sourceId: string,
@@ -166,11 +166,14 @@ function buildRecordCreateData(
 ) {
   const envelope = envelopeByKey.get(item.sourceRecordKey);
   const error = errorByKey.get(item.sourceRecordKey);
+  const planAction = item.action === "UPDATE_CONFLICT" ? "QUARANTINE" : item.action;
+  const status =
+    item.action === "FAIL" ? ("FAILED" as const) : item.action === "UPDATE_CONFLICT" ? ("QUARANTINED" as const) : ("PLANNED" as const);
 
   return {
     sourceId,
     runId,
-    status: item.action === "FAIL" ? ("FAILED" as const) : ("PLANNED" as const),
+    status,
     sourceEntityType: item.sourceEntityType,
     sourceStableKey: envelope?.sourceStableKey ?? item.sourceRecordKey,
     sourceRecordKey: item.sourceRecordKey,
@@ -182,7 +185,7 @@ function buildRecordCreateData(
     rawPayload: Prisma.JsonNull,
     normalizedPayload: Prisma.JsonNull,
     targetTypeHint: item.targetType,
-    planAction: item.action,
+    planAction,
     planSummary: item.summary ? (JSON.parse(JSON.stringify(item.summary)) as object) : undefined,
     validationSummary:
       item.warnings && item.warnings.length > 0

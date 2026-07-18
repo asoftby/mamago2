@@ -1,8 +1,10 @@
-import type { MigrationLineage, MigrationRecord, Place, PrismaClient } from "@prisma/client";
+import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/client";
 
 import type { MigrationWarning } from "../../types";
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
+import { classifyPlaceUpdateSafety } from "./classifyPlaceUpdateSafety";
+import type { PlaceUpdateConflictReason } from "./classifyPlaceUpdateSafety";
 import type { ExecutePlaceCommitResult } from "./PlaceCommitOrchestrator";
 import type { PlaceMediaSyncResult } from "./PlaceMediaSyncer";
 import type { NormalizedPlaceCandidate, PlaceCommitContext } from "./types";
@@ -68,14 +70,6 @@ export interface PlaceCommitRunnerPrismaClient {
  * candidate/draft field values, only lineage/target identifiers, since this
  * can end up in `MigrationRecord.lastErrorMessage`.
  */
-export type PlaceUpdateConflictReason =
-  | "LINEAGE_MISSING"
-  | "LINEAGE_MISMATCH"
-  | "TARGET_ID_MISSING"
-  | "TARGET_ROW_MISSING"
-  | "LAST_IMPORTED_AT_UNKNOWN"
-  | "TARGET_MODIFIED_AFTER_IMPORT";
-
 type UpdateClassification =
   | { safe: true; lineage: MigrationLineage }
   | { safe: false; reason: PlaceUpdateConflictReason; targetId?: string };
@@ -198,45 +192,15 @@ export class PlaceCommitRunner {
    * guarantee zero DB writes for a conflicted UPDATE.
    */
   private async classifyUpdate(input: ExecutePlaceCommitRunInput): Promise<UpdateClassification> {
-    const lineage: MigrationLineage | null = await this.deps.prisma.migrationLineage.findFirst({
-      where: {
-        sourceId: input.record.sourceId,
-        sourceRecordKey: input.record.sourceRecordKey,
-        targetType: "PLACE",
-        isActive: true,
-      },
+    const result = await classifyPlaceUpdateSafety({
+      prisma: this.deps.prisma,
+      sourceId: input.record.sourceId,
+      sourceRecordKey: input.record.sourceRecordKey,
     });
-
-    if (!lineage) {
-      return { safe: false, reason: "LINEAGE_MISSING" };
+    if (result.classification === "UPDATE_SAFE") {
+      return { safe: true, lineage: result.lineage };
     }
-    // Defensive: never trust that the query's WHERE actually filtered
-    // correctly (a fake Prisma client in tests, or a future refactor, could
-    // hand back a row that doesn't belong to this record) — verify the key
-    // fields match before ever using the lineage's targetId.
-    if (lineage.sourceRecordKey !== input.record.sourceRecordKey || lineage.targetType !== "PLACE") {
-      return { safe: false, reason: "LINEAGE_MISMATCH", targetId: lineage.targetId ?? undefined };
-    }
-    if (!lineage.targetId?.trim()) {
-      return { safe: false, reason: "TARGET_ID_MISSING" };
-    }
-
-    const targetPlace: Place | null = await this.deps.prisma.place.findUnique({
-      where: { id: lineage.targetId },
-    });
-    if (!targetPlace) {
-      return { safe: false, reason: "TARGET_ROW_MISSING", targetId: lineage.targetId };
-    }
-
-    if (!lineage.lastImportedAt) {
-      return { safe: false, reason: "LAST_IMPORTED_AT_UNKNOWN", targetId: lineage.targetId };
-    }
-
-    if (targetPlace.updatedAt.getTime() > lineage.lastImportedAt.getTime()) {
-      return { safe: false, reason: "TARGET_MODIFIED_AFTER_IMPORT", targetId: lineage.targetId };
-    }
-
-    return { safe: true, lineage };
+    return { safe: false, reason: result.reason, targetId: result.targetId };
   }
 
   async execute(input: ExecutePlaceCommitRunInput): Promise<ExecutePlaceCommitRunResult> {
