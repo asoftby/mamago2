@@ -16,6 +16,24 @@ export interface EventCommitContext {
 }
 
 /**
+ * A fallback/matched venue for `EventVenue` — always written separately from
+ * the `Activity` row itself (see `EventCommitWriter`). `null`/absent only
+ * when there is no venue evidence at all (no `venueNameRaw`/address hint and
+ * no matched `placeId`); a real `Place` match is never required to produce
+ * one — Section 5's "unresolved Place must never block the Event" policy.
+ */
+export interface EventVenueDraft {
+  kind: "PLACE" | "MANUAL";
+  /** Set only when `kind === "PLACE"`. */
+  placeId: string | null;
+  title: string | null;
+  addressLine: string | null;
+  cityId: string | null;
+  note: string | null;
+  source: string;
+}
+
+/**
  * Only fields confirmed to exist on the real `Activity` model
  * (`prisma/schema.prisma`) are present here. Notably absent, checked and
  * rejected during PR17: there is no `website`/`ticketUrl`-shaped field on
@@ -39,6 +57,8 @@ export interface EventCreateDraft {
   scheduleJson: NormalizedEventScheduleDraft;
   /** From `candidate.priceRaw`, verbatim — no parsing into `priceFrom`/`priceTo`, no `priceDetails` fabrication. */
   priceText: string | null;
+  /** Never embedded in the `Activity` row — written via a separate `EventVenue` upsert. */
+  venue: EventVenueDraft | null;
 }
 
 export type EventCommitBlockReasonCode =

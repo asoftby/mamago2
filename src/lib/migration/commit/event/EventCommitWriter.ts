@@ -5,11 +5,11 @@ import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEven
 import type { EventCreateDraft } from "./types";
 
 /**
- * The narrowest slice of `PrismaClient` this writer needs — just
- * the Activity write methods plus the existing event discovery sync surface.
- * No `eventVenue`, no `activityImage`, no `migrationLineage`/
- * `migrationRecord` delegates — they aren't present on this type, so this
- * writer cannot call them even by mistake.
+ * The narrowest slice of `PrismaClient` this writer needs — the Activity
+ * write methods, the existing event discovery sync surface, and one
+ * `eventVenue.upsert` for the fallback/matched venue row. No `activityImage`,
+ * no `migrationLineage`/`migrationRecord` delegates — they aren't present on
+ * this type, so this writer cannot call them even by mistake.
  */
 export interface EventCommitWriterPrismaClient {
   activity: Pick<PrismaClient["activity"], "create" | "update">;
@@ -17,6 +17,7 @@ export interface EventCommitWriterPrismaClient {
     PrismaClient["activitySession"],
     "createMany" | "deleteMany" | "findFirst" | "findMany"
   >;
+  eventVenue: Pick<PrismaClient["eventVenue"], "upsert">;
 }
 
 export interface EventCommitResult {
@@ -48,11 +49,12 @@ function assertDraftIsUsable(draft: EventCreateDraft): void {
 /**
  * The first real Event entity writer: `EventCreateDraft` -> one `Activity`
  * row via one `prisma.activity.create()` call, followed by the same
- * ActivitySession/nextOccurrenceAt sync used by Business Wizard. It makes no
- * decisions — category, organizer, place, schedule, everything already went
- * through `buildEventCreateDraft` (PR17) before reaching here. No
- * `EventVenue`, no images, no lineage, no `MigrationRecord`, no rollback, no
- * batching — that's later PRs.
+ * ActivitySession/nextOccurrenceAt sync used by Business Wizard, plus an
+ * `EventVenue` upsert when `draft.venue` carries fallback/matched venue
+ * evidence. It makes no decisions — category, organizer, place, schedule,
+ * venue, everything already went through `buildEventCreateDraft` before
+ * reaching here. No images, no lineage, no `MigrationRecord`, no rollback,
+ * no batching — that's later PRs.
  */
 export class EventCommitWriter {
   constructor(private readonly prisma: EventCommitWriterPrismaClient) {}
@@ -79,6 +81,7 @@ export class EventCommitWriter {
     });
 
     await this.syncEventDiscoveryFields(activity.id, draft.scheduleJson);
+    await this.syncEventVenue(activity.id, draft.venue);
 
     return { activityId: activity.id, status: "CREATED" };
   }
@@ -107,6 +110,7 @@ export class EventCommitWriter {
     });
 
     await this.syncEventDiscoveryFields(activity.id, draft.scheduleJson);
+    await this.syncEventVenue(activity.id, draft.venue);
 
     return { activityId: activity.id, status: "UPDATED" };
   }
@@ -123,6 +127,30 @@ export class EventCommitWriter {
     await syncActivityNextOccurrenceAt({
       prisma: this.prisma,
       activityId,
+    });
+  }
+
+  /**
+   * `null` (no venue evidence at all) is a no-op — never clears an existing
+   * `EventVenue` row on UPDATE just because this run's candidate happened to
+   * carry no evidence. Otherwise `upsert` on the unique `activityId` keeps
+   * repeated runs idempotent: one row per Activity, never duplicated.
+   */
+  private async syncEventVenue(activityId: string, venue: EventCreateDraft["venue"]): Promise<void> {
+    if (!venue) return;
+    const data = {
+      kind: venue.kind,
+      placeId: venue.placeId,
+      title: venue.title,
+      addressLine: venue.addressLine,
+      cityId: venue.cityId,
+      note: venue.note,
+      source: venue.source,
+    };
+    await this.prisma.eventVenue.upsert({
+      where: { activityId },
+      create: { activityId, ...data },
+      update: data,
     });
   }
 }
