@@ -468,11 +468,72 @@ function testDateRangeCrossingTodayCountsAsActive() {
     }),
     { now: MIGRATION_NOW },
   );
+  // Retained (underway, end >= today), but the start is clamped to today —
+  // the original past start (2026-07-15) must never reach the writer.
   assert.deepEqual(
     payloadOf(record).scheduleDraft?.dates,
-    ["2026-07-15", "2026-07-20"],
-    "a range already underway (end >= today) must be retained",
+    ["2026-07-18", "2026-07-20"],
+    "a range already underway must be retained with its start clamped to today",
   );
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_ACTIVE_RANGE_START_CLAMPED"));
+}
+
+function testActiveRangeClamped_64251() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 64251 },
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ['[{"start":"2026-06-01 08:30:00","end":"2026-08-21 18:00:00","multiday":true,"allday":false}]'],
+      },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:64251");
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-18", "2026-08-21"]);
+  assert.deepEqual(payload.scheduleDraft?.scheduleItems, [
+    { date: "2026-07-18", dateEnd: "2026-08-21", startTime: "08:30" },
+  ]);
+  const warning = record.warnings?.find((w) => w.code === "EVENT_ACTIVE_RANGE_START_CLAMPED");
+  assert.ok(warning);
+  assert.deepEqual(warning?.details, {
+    originalStartDate: "2026-06-01",
+    clampedStartDate: "2026-07-18",
+    endDate: "2026-08-21",
+    droppedPastDayCount: 47,
+  });
+}
+
+function testLocationParsedFromJsonMeta() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        location: [
+          '{"address":"улица Мясникова 44, Минск","map_picker":false,"latitude":53.89602,"longitude":27.53968}',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.location, { address: "улица Мясникова 44, Минск", lat: 53.89602, lng: 27.53968 });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_LOCATION_JSON_INVALID"));
+}
+
+function testLocationParsedFromPlainText() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, location: ["Минск, Central Park"] } }),
+  );
+  assert.deepEqual(payloadOf(record).location, { address: "Минск, Central Park", lat: null, lng: null });
+}
+
+function testLocationMalformedJsonWarns() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, location: ['{"address":"broken'] } }),
+  );
+  assert.equal(payloadOf(record).location, null);
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_LOCATION_JSON_INVALID"));
 }
 
 function main() {
@@ -503,6 +564,10 @@ function main() {
   testMixedPastFuturePrunesPastSessions_56226();
   testTodaySessionCountsAsActive_62097();
   testDateRangeCrossingTodayCountsAsActive();
+  testActiveRangeClamped_64251();
+  testLocationParsedFromJsonMeta();
+  testLocationParsedFromPlainText();
+  testLocationMalformedJsonWarns();
 }
 
 main();

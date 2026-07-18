@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 
+import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+
 import { localDateKeyInTimeZone, pruneEventScheduleToEligibleSessions } from "./pruneEventSchedule";
 import type { NormalizedEventScheduleDraft } from "./normalizeEvent";
 
@@ -87,7 +89,13 @@ function testDateRangeUnderwayCountsAsActive() {
   });
   assert.equal(result.eligible, true);
   if (!result.eligible) return;
-  assert.deepEqual(result.scheduleDraft.dates, ["2026-07-15", "2026-07-20"]);
+  // The range is retained (underway, not past) but its start is clamped to
+  // today — the original past start (2026-07-15) must never survive into
+  // the writer's day-by-day expansion.
+  assert.deepEqual(result.scheduleDraft.dates, ["2026-07-18", "2026-07-20"]);
+  assert.deepEqual(result.clampedActiveRanges, [
+    { originalStartDate: "2026-07-15", clampedStartDate: "2026-07-18", endDate: "2026-07-20", droppedPastDayCount: 3 },
+  ]);
 }
 
 function testDateRangeFullyPastIsDropped() {
@@ -151,6 +159,104 @@ function testFirstRetainedStartTimeCarriedOver() {
   assert.equal(result.scheduleDraft.startTime, "18:30");
 }
 
+function testActiveRangeCrossingTodayClampsStart() {
+  const result = pruneEventScheduleToEligibleSessions({
+    scheduleDraft: draft({
+      mode: "ONE_TIME",
+      dates: ["2026-06-01", "2026-08-21"],
+      scheduleItems: [{ date: "2026-06-01", dateEnd: "2026-08-21", startTime: "08:30" }],
+      startTime: "08:30",
+    }),
+    now: MIGRATION_NOW,
+  });
+  assert.equal(result.eligible, true);
+  if (!result.eligible) return;
+  assert.deepEqual(result.scheduleDraft.scheduleItems, [
+    { date: "2026-07-18", dateEnd: "2026-08-21", startTime: "08:30" },
+  ]);
+  assert.deepEqual(result.scheduleDraft.dates, ["2026-07-18", "2026-08-21"]);
+  assert.deepEqual(result.clampedActiveRanges, [
+    { originalStartDate: "2026-06-01", clampedStartDate: "2026-07-18", endDate: "2026-08-21", droppedPastDayCount: 47 },
+  ]);
+}
+
+function testActiveRangeExpansionNeverProducesPastDates() {
+  const result = pruneEventScheduleToEligibleSessions({
+    scheduleDraft: draft({
+      mode: "ONE_TIME",
+      dates: ["2026-06-01", "2026-08-21"],
+      scheduleItems: [{ date: "2026-06-01", dateEnd: "2026-08-21", startTime: "08:30" }],
+      startTime: "08:30",
+    }),
+    now: MIGRATION_NOW,
+  });
+  assert.equal(result.eligible, true);
+  if (!result.eligible) return;
+  const expanded = expandScheduleItemDates(result.scheduleDraft.scheduleItems as { date: string; dateEnd?: string }[]);
+  assert.equal(expanded.length, 35);
+  assert.equal(expanded[0], "2026-07-18");
+  assert.equal(expanded[expanded.length - 1], "2026-08-21");
+  assert.ok(expanded.every((d) => d >= "2026-07-18"), "no expanded date may be before today");
+}
+
+function testFutureRangeUnchangedByClamping() {
+  const result = pruneEventScheduleToEligibleSessions({
+    scheduleDraft: draft({
+      mode: "ONE_TIME",
+      dates: ["2026-08-01", "2026-08-10"],
+      scheduleItems: [{ date: "2026-08-01", dateEnd: "2026-08-10" }],
+    }),
+    now: MIGRATION_NOW,
+  });
+  assert.equal(result.eligible, true);
+  if (!result.eligible) return;
+  assert.deepEqual(result.scheduleDraft.scheduleItems, [{ date: "2026-08-01", dateEnd: "2026-08-10" }]);
+  assert.deepEqual(result.clampedActiveRanges, []);
+}
+
+function testRangeEndingTodayClampsToSingleDate() {
+  const result = pruneEventScheduleToEligibleSessions({
+    scheduleDraft: draft({
+      mode: "ONE_TIME",
+      dates: ["2026-07-01", "2026-07-18"],
+      scheduleItems: [{ date: "2026-07-01", dateEnd: "2026-07-18", startTime: "09:00" }],
+      startTime: "09:00",
+    }),
+    now: MIGRATION_NOW,
+  });
+  assert.equal(result.eligible, true);
+  if (!result.eligible) return;
+  assert.deepEqual(result.scheduleDraft.scheduleItems, [{ date: "2026-07-18", startTime: "09:00" }]);
+  const expanded = expandScheduleItemDates(result.scheduleDraft.scheduleItems as { date: string; dateEnd?: string }[]);
+  assert.deepEqual(expanded, ["2026-07-18"]);
+}
+
+function testMixedItemsPastDroppedActiveClampedFutureKept() {
+  const result = pruneEventScheduleToEligibleSessions({
+    scheduleDraft: draft({
+      mode: "MULTI_DATE",
+      dates: ["2026-06-01", "2026-06-10", "2026-07-01", "2026-07-25", "2026-09-01"],
+      scheduleItems: [
+        { date: "2026-06-01", dateEnd: "2026-06-10" }, // fully past -> dropped
+        { date: "2026-07-01", dateEnd: "2026-07-25" }, // underway -> clamped
+        { date: "2026-09-01" }, // future -> kept as-is
+      ],
+    }),
+    now: MIGRATION_NOW,
+  });
+  assert.equal(result.eligible, true);
+  if (!result.eligible) return;
+  assert.deepEqual(result.droppedPastDates, ["2026-06-01"]);
+  assert.deepEqual(result.clampedActiveRanges, [
+    { originalStartDate: "2026-07-01", clampedStartDate: "2026-07-18", endDate: "2026-07-25", droppedPastDayCount: 17 },
+  ]);
+  assert.deepEqual(result.scheduleDraft.scheduleItems, [
+    { date: "2026-07-18", dateEnd: "2026-07-25" },
+    { date: "2026-09-01" },
+  ]);
+  assert.deepEqual(result.scheduleDraft.dates, ["2026-07-18", "2026-07-25", "2026-09-01"]);
+}
+
 function main() {
   testLocalDateKeyUsesMinskByDefault();
   testAllFutureRetainsEverything();
@@ -162,6 +268,11 @@ function main() {
   testDuplicateSessionsDeduped();
   testResultSortedAscending();
   testFirstRetainedStartTimeCarriedOver();
+  testActiveRangeCrossingTodayClampsStart();
+  testActiveRangeExpansionNeverProducesPastDates();
+  testFutureRangeUnchangedByClamping();
+  testRangeEndingTodayClampsToSingleDate();
+  testMixedItemsPastDroppedActiveClampedFutureKept();
 }
 
 main();
