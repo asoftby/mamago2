@@ -385,6 +385,104 @@ function testVenueDraftCoordinatesNullWhenLocationHasNone() {
   assert.equal(result.draft.venue?.lng, null);
 }
 
+function testVenueDraftCoordinateOnlyEvidenceCreatesManualVenue() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: null, lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.draft.venue, "a valid coordinate pair alone is real venue evidence, not nothing");
+  assert.equal(result.draft.venue?.kind, "MANUAL");
+  assert.equal(result.draft.venue?.addressLine, null);
+  assert.equal(result.draft.venue?.lat, 53.9);
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftConflictingAddressesDropCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "ул. Первая, 1",
+      location: { address: "ул. Другая, 99", lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, null, "coordinates belong to the address that lost priority — must not attach to a different one");
+  assert.equal(result.draft.venue?.lng, null);
+}
+
+function testVenueDraftSameAddressBothSourcesKeepsCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "ул. Первая, 1",
+      location: { address: "ул. Первая, 1", lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, 53.9);
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftLocationAddressSelectedKeepsCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: "ул. Первая, 1", lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, 53.9);
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftExplicitAddressWithNoConflictingLocationAddressKeepsCoordinates() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "ул. Первая, 1",
+      location: { address: null, lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ул. Первая, 1");
+  assert.equal(result.draft.venue?.lat, 53.9, "no second address evidence to conflict with — coordinates are kept");
+  assert.equal(result.draft.venue?.lng, 27.56);
+}
+
+function testVenueDraftPlaceMatchCoordinatesAlwaysNullEvenWithCoordinateOnlyLocation() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: null,
+      location: { address: null, lat: 53.9, lng: 27.56 },
+    }),
+    context: contextFixture({ placeId: "place-9" }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.kind, "PLACE");
+  assert.equal(result.draft.venue?.lat, null);
+  assert.equal(result.draft.venue?.lng, null);
+}
+
 function testVenueDraftUnresolvedPlaceNeverBlocksDraft() {
   // No context.placeId (unresolved/low-confidence Place match) but venue evidence exists.
   const result = buildEventCreateDraft({
@@ -419,6 +517,12 @@ function main() {
   testVenueDraftUnresolvedPlaceNeverBlocksDraft();
   testVenueDraftNeverEmbedsRawJsonLocationString();
   testVenueDraftCoordinatesNullWhenLocationHasNone();
+  testVenueDraftCoordinateOnlyEvidenceCreatesManualVenue();
+  testVenueDraftConflictingAddressesDropCoordinates();
+  testVenueDraftSameAddressBothSourcesKeepsCoordinates();
+  testVenueDraftLocationAddressSelectedKeepsCoordinates();
+  testVenueDraftExplicitAddressWithNoConflictingLocationAddressKeepsCoordinates();
+  testVenueDraftPlaceMatchCoordinatesAlwaysNullEvenWithCoordinateOnlyLocation();
 }
 
 main();
