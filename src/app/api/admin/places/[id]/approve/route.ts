@@ -28,11 +28,11 @@ export async function POST(
     const body = await req.json();
     const { note } = body;
 
-    await approvePlace(placeId, user.id, note);
+    const place = await approvePlace(placeId, user.id, note);
     timer.mark("status");
     timer.log({ flow: "admin-approve" });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, place });
   } catch (error) {
     timer.log({ error: 1 });
     console.error("Error approving place:", error);

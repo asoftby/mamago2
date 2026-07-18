@@ -42,6 +42,7 @@ import {
 } from "./config";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { canEditPlaceInWizard } from "./canEditPlaceInWizard";
+import { resolvePlaceWizardSubmitAction } from "./resolvePlaceWizardSubmitAction";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
@@ -745,53 +746,108 @@ export function PlaceWizard({
           status: publishDirect ? "PUBLISHED" : "PENDING",
         });
       } else {
-        // Submit existing place or create revision
+        // Existing place — the primary submit button's behavior is fully
+        // determined by status + role, never re-derived inline per branch.
         if (!place) {
-            toast.error("Ошибка: данные места отсутствуют");
-            setIsSubmitting(false);
-            return;
-          }
-          if (place.status === "PUBLISHED") {
-          const isAdmin = userRole === "ADMIN" || userRole === "MODERATOR";
+          toast.error("Ошибка: данные места отсутствуют");
+          setIsSubmitting(false);
+          return;
+        }
 
-          if (isAdmin) {
-            // Admin: save directly without revision (+ attach фото/лого из wizardSessionId)
-            const changes = extractChanges(formData, originalData);
+        const submitAction = resolvePlaceWizardSubmitAction({ mode, status: place.status, userRole });
 
-            if (Object.keys(changes).length > 0 || wizardSessionId) {
-              const response = await fetch(`/api/business/places/${place.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...changes, wizardSessionId }),
-              });
-              if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || error.error || "Failed to save");
-              }
-            }
+        if (submitAction === "FORBIDDEN") {
+          toast.error("У вас нет прав для этого действия");
+        } else if (submitAction === "APPROVE_PENDING") {
+          // Staff approving an imported/submitted PENDING Place: save first,
+          // then publish via the same PENDING → PUBLISHED transition the
+          // moderation queue's own Approve button performs. Never falls
+          // through to /submit, which only accepts DRAFT/REJECTED/
+          // NEEDS_REVISION and correctly rejects an already-PENDING Place.
+          const changes = extractChanges(formData, originalData);
 
-            if (formData.openingHoursData !== null) {
-              const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ data: formData.openingHoursData }),
-              });
-              if (!ohResponse.ok) {
-                const error = await ohResponse.json();
-                throw new Error(error.message || error.error || "Failed to save opening hours");
-              }
-            }
-
-            setOriginalData(formData);
-            showSuccessModal({
-              kind: "place",
-              outcome: "changes_published",
-              id: place.id,
-              isEdit: true,
-              slug: place.slug ?? place.id,
-              status: "PUBLISHED",
+          if (Object.keys(changes).length > 0 || wizardSessionId) {
+            const response = await fetch(`/api/business/places/${place.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...changes, wizardSessionId }),
             });
-          } else {
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || error.error || "Failed to save");
+            }
+          }
+
+          if (formData.openingHoursData !== null) {
+            const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: formData.openingHoursData }),
+            });
+            if (!ohResponse.ok) {
+              const error = await ohResponse.json();
+              throw new Error(error.message || error.error || "Failed to save opening hours");
+            }
+          }
+
+          const approveResponse = await fetch(`/api/admin/places/${place.id}/approve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          if (!approveResponse.ok) {
+            const error = await approveResponse.json().catch(() => ({}));
+            throw new Error(error.message || error.error || "Failed to approve place");
+          }
+          const { place: publishedPlace } = await approveResponse.json();
+
+          setOriginalData(formData);
+          showSuccessModal({
+            kind: "place",
+            outcome: "published",
+            id: publishedPlace.id,
+            isEdit: true,
+            slug: publishedPlace.slug,
+            status: "PUBLISHED",
+          });
+        } else if (submitAction === "SAVE_PUBLISHED_DIRECT") {
+          // Admin: save directly without revision (+ attach фото/лого из wizardSessionId)
+          const changes = extractChanges(formData, originalData);
+
+          if (Object.keys(changes).length > 0 || wizardSessionId) {
+            const response = await fetch(`/api/business/places/${place.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...changes, wizardSessionId }),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || error.error || "Failed to save");
+            }
+          }
+
+          if (formData.openingHoursData !== null) {
+            const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: formData.openingHoursData }),
+            });
+            if (!ohResponse.ok) {
+              const error = await ohResponse.json();
+              throw new Error(error.message || error.error || "Failed to save opening hours");
+            }
+          }
+
+          setOriginalData(formData);
+          showSuccessModal({
+            kind: "place",
+            outcome: "changes_published",
+            id: place.id,
+            isEdit: true,
+            slug: place.slug ?? place.id,
+            status: "PUBLISHED",
+          });
+        } else if (submitAction === "SUBMIT_PUBLISHED_REVISION") {
           // Non-admin: create/update revision for published place and submit
           const changes = extractChanges(formData, originalData);
           const openingHoursChanged =
@@ -857,9 +913,9 @@ export function PlaceWizard({
             slug: place.slug ?? place.id,
             status: "PENDING",
           });
-          }
         } else {
-          // Submit draft place
+          // SUBMIT_EXISTING: DRAFT/REJECTED/NEEDS_REVISION → PENDING (or
+          // PUBLISHED directly, if the role allows direct publish).
           const response = await fetch(`/api/business/places/${place.id}/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
