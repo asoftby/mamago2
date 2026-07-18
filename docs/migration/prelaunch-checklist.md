@@ -2127,3 +2127,79 @@ dispatcher-branch, ни CLI-flag).
   `dev` fast-forwarded. **Golden write возобновляется**:
   `--force-reprocess` на Place 5389 для докачки media (baseline теперь
   `dev = origin/dev = d2f5c262`), затем 895 → 43023 по прежнему плану.
+- **2026-07-18 — Claude Code** — **Event v1 scope-safety PR открыт (не
+  смержен).** Codex провёл read-only Event аудит (2026-07-18,
+  `Europe/Minsk`): 3431 source-событий, 12 published, 11 active/future
+  eligible, 1 past-only (`wordpress-db:events:49842`). Присланный промт
+  на устранение блокеров содержал требование форсировать Event media
+  policy в `NONE` безусловно — это прямо противоречит уже смерженному
+  3 дня назад решению (PR #46, sampled media policy, см. §1.5 Image
+  import matrix: Event = `ready`, FULL sampled в local/dev, FULL для
+  всех eligible в production). Конфликт вынесен Алексею явным
+  вопросом до какой-либо реализации; решение — **media policy не
+  трогать**, оставить как есть (PR #46 не отменяется). Реализована
+  только реально подтверждённая часть блокеров: ветка
+  `fix/migration-event-v1-scope-safety`, PR #57
+  (`https://github.com/asoftby/mamago2/pull/57`) в `dev`, head SHA
+  `b27cf34e2fb85e3d118a588569a939af7fe3f355`, 3 коммита:
+  1. **Past-only exclusion + session pruning** — подтверждён живой баг:
+     `metadata.startsAt` (на который завязан pre-normalize
+     `excludePastEvents` фильтр в `orchestrator.ts`) никогда не
+     проставляется wordpress-db Event адаптером — мёртвый код для
+     реальных данных, поэтому `49842` (все сессии в прошлом) планировался
+     как `CREATE`. Новый чистый helper
+     `pruneEventScheduleToEligibleSessions()`
+     (`src/lib/migration/adapters/wordpress-db/pruneEventSchedule.ts`,
+     Europe/Minsk local-day boundary, инжектируемые часы) вызывается из
+     `normalizeEvent()` на уже распарсенном `scheduleDraft`: 0 eligible
+     sessions → `scheduleDraft: null` + `EVENT_PAST_ONLY_EXCLUDED`
+     warning; смешанный past/future → прошедшие sessions обрезаются +
+     `EVENT_PAST_SESSIONS_PRUNED`. `orchestrator.ts` теперь ловит
+     `EVENT_PAST_ONLY_EXCLUDED` post-normalize и превращает plan item в
+     `SKIP_POLICY`, без execution candidate (runner не вызывается).
+     Заодно удалён `EVENT_DISCOVERY_VISIBILITY_RISK` — warning,
+     утверждавший, что commit не синкает `ActivitySession`/
+     `nextOccurrenceAt`, что стало ложным ещё с `2103b913`
+     (2026-07-09, за 18 минут до появления этого warning).
+  2. **Fallback `EventVenue`** — раньше вообще не писался
+     (`EventCommitWriter`'s собственный докблок: "No `EventVenue`...
+     that's later PRs"), из-за чего у Event без matched Place (в т.ч.
+     намеренно отклонённый low-confidence match, напр. `64505`) вся
+     venue evidence терялась на commit. `buildEventCreateDraft()`
+     теперь строит `EventVenueDraft` (`kind: PLACE` при
+     `context.placeId`, иначе `kind: MANUAL` с raw evidence) при любой
+     venue evidence; unresolved Place по-прежнему не блокирует Event.
+     `EventCommitWriter` пишет через отдельный `eventVenue.upsert()`
+     по уникальному `activityId` — идемпотентно, `venue: null` — no-op
+     (не стирает существующую строку). Без изменений Prisma schema —
+     `EventVenue` уже существовала для этого.
+  3. **`EVENT_ORGANIZER_REQUIRES_REVIEW`** warning в
+     `resolveEventCommitContextWithMatching.ts` — organizerId и раньше
+     никогда не назначался автоматически, но без сигнала для
+     редактора; теперь есть warning по аналогии с
+     `EVENT_CATEGORY_UNMATCHED`.
+
+  Полный `src/lib/migration/**` + `scripts/migration-*.test.ts` sweep
+  green (тронут `orchestrator.ts`, общий core-файл), targeted eslint
+  чистый (уже существовавшие `any`-ошибки в
+  `resolveEventCommitContextWithMatching.*` подтверждены baseline-diff
+  как не мои), `tsc --noEmit` чистый, `pnpm build` green через pre-push
+  hook. Один read-only preview против живой WP БД
+  (`APP_ENV=LOCAL pnpm migration:preview:wordpress-db --entity event
+  --allow-remote-readonly`, отчёт вне git,
+  `/private/tmp/mamago2-event-v1-safe-preview.json`): discovered 12,
+  CREATE 11, SKIP_POLICY 1 (`49842`), UPDATE 0, FAIL 0, 5 candidates с
+  `EVENT_PAST_SESSIONS_PRUNED`, 0 retained past sessions в любом CREATE.
+  DB invariants до/после идентичны (Activity EVENT 1, ActivitySession 1,
+  EventVenue 1, MigrationLineage ACTIVITY 1, MigrationRun 25,
+  MigrationRecord 213) — ноль writes. **Event commit не запускался**,
+  `--confirm-writes` не использовался. CI на PR #57 был pending на
+  момент завершения сессии — не поллился дальше по правилу. **PR не
+  смержен** — ждёт Алексея. Чек-боксы раздела «Events» (полный
+  source inventory, read-only readiness audit, golden Event commits и
+  т.д.) остаются `[ ]`: эта сессия закрыла инженерные блокеры
+  (prerequisite), а не сами пункты golden-write трека — после merge PR
+  #57 следующий шаг по плану — «28 eligible active/future Event —
+  read-only preview/аудит» (с уточнением: живой аудит 2026-07-18 дал
+  12 published/11 eligible, а не 28 — цифра 28 в заголовке раздела,
+  видимо, устарела и требует отдельной проверки перед golden write).
