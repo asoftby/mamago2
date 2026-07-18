@@ -259,6 +259,51 @@ function testVenueDraftPlaceWhenMatched() {
   });
 }
 
+function testVenueDraftBlankAddressMetaFallsBackToLocationRaw() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "",
+      locationRaw: "Минск, ул. Примерная, 10",
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.draft.venue);
+  assert.equal(result.draft.venue?.kind, "MANUAL");
+  assert.equal(result.draft.venue?.placeId, null);
+  assert.equal(result.draft.venue?.addressLine, "Минск, ул. Примерная, 10");
+}
+
+function testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "   ",
+      locationRaw: "Минск, ул. Примерная, 10",
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "Минск, ул. Примерная, 10");
+}
+
+function testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent() {
+  const result = buildEventCreateDraft({
+    candidate: candidateFixture({
+      venueNameRaw: null,
+      addressEventPlaceRaw: "  ul. Central, 1  ",
+      locationRaw: "Минск, ул. Примерная, 10",
+    }),
+    context: contextFixture({ placeId: null }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.venue?.addressLine, "ul. Central, 1");
+}
+
 function testVenueDraftNullWhenNoEvidenceAtAll() {
   const result = buildEventCreateDraft({
     candidate: candidateFixture({ venueNameRaw: null, addressEventPlaceRaw: null, locationRaw: null }),
@@ -306,6 +351,9 @@ function main() {
   testDraftHasExactlyTheApprovedFieldSet();
   testVenueDraftManualWhenNoPlaceMatch();
   testVenueDraftPlaceWhenMatched();
+  testVenueDraftBlankAddressMetaFallsBackToLocationRaw();
+  testVenueDraftWhitespaceAddressMetaFallsBackToLocationRaw();
+  testVenueDraftAddressMetaTakesPriorityOverLocationRawWhenBothPresent();
   testVenueDraftNullWhenNoEvidenceAtAll();
   testVenueDraftFallsBackToLocationRawWhenAddressMissing();
   testVenueDraftUnresolvedPlaceNeverBlocksDraft();

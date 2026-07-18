@@ -50,6 +50,16 @@ export interface BuildEventCreateDraftInput {
   context: EventCommitContext;
 }
 
+/** First value that is non-null/non-undefined and non-blank after trimming, trimmed; `null` if every candidate is missing or blank. */
+function firstNonBlank(...values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
 /**
  * `context.placeId` unset (no match, or a low-confidence match the resolver
  * deliberately left null) must never block the Event, and must never lose
@@ -59,7 +69,9 @@ export interface BuildEventCreateDraftInput {
  */
 function buildVenueDraft(candidate: NormalizedEventCandidate, context: EventCommitContext): EventVenueDraft | null {
   const title = candidate.venueNameRaw;
-  const addressLine = candidate.addressEventPlaceRaw ?? candidate.locationRaw;
+  // `??` alone would let a blank/whitespace-only `addressEventPlaceRaw`
+  // mask a real `locationRaw` — firstNonBlank() falls through past blanks.
+  const addressLine = firstNonBlank(candidate.addressEventPlaceRaw, candidate.locationRaw);
   const placeId = context.placeId ?? null;
 
   if (!placeId && !title && !addressLine) {
