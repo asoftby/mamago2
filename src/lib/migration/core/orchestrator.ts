@@ -98,6 +98,19 @@ function extractStringField(payload: unknown, key: "title" | "slug"): string | n
   return typeof value === "string" ? value : null;
 }
 
+function extractPlacePreviewFields(payload: unknown): Record<string, unknown> {
+  if (typeof payload !== "object" || payload === null) return {};
+  const record = payload as Record<string, unknown>;
+  const sourceTerms = record.sourceTerms;
+  const coordinates = record.coordinates;
+  return {
+    addressSummary: typeof record.addressText === "string" ? record.addressText : null,
+    hasCity: typeof record.cityRaw === "string" && record.cityRaw.trim().length > 0,
+    hasCategory: Array.isArray(sourceTerms) && sourceTerms.length > 0,
+    hasCoordinates: typeof coordinates === "object" && coordinates !== null,
+  };
+}
+
 function toNormalizedItem(
   record: SourceRecordEnvelope,
   normalized: NormalizedRecord,
@@ -114,6 +127,7 @@ function toNormalizedItem(
       slug: extractStringField(normalized.normalizedPayload, "slug"),
       mediaRefCount: normalized.mediaRefs?.length ?? 0,
       relationRefCount: normalized.relationRefs?.length ?? 0,
+      ...(normalized.targetTypeHint === "PLACE" ? extractPlacePreviewFields(normalized.normalizedPayload) : {}),
     },
     warnings: normalized.warnings,
   };

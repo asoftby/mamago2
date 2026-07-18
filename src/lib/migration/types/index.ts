@@ -22,6 +22,7 @@ export type MigrationTargetType =
 export type MigrationPlanAction =
   | "CREATE"
   | "UPDATE"
+  | "UPDATE_CONFLICT"
   | "LINK_EXISTING"
   | "SKIP_UNCHANGED"
   | "SKIP_POLICY"
@@ -35,6 +36,7 @@ export type MigrationPlanStatus =
   | "APPLIED"
   | "BOUND"
   | "LINKED"
+  | "BLOCKED"
   | "QUARANTINED"
   | "FAILED";
 

@@ -3,14 +3,15 @@ import assert from "node:assert/strict";
 import type { MigrationLineage, MigrationRecord, Place } from "@prisma/client";
 
 import { PlaceCommitRunner } from "./PlaceCommitRunner";
+import { classifyPlaceUpdateSafety } from "./classifyPlaceUpdateSafety";
 import type {
   ExecutePlaceCommitRunInput,
   MigrationLineageWriterLike,
   PlaceCommitOrchestratorLike,
   PlaceCommitRunnerPrismaClient,
   PlaceMediaSyncerLike,
-  PlaceUpdateConflictReason,
 } from "./PlaceCommitRunner";
+import type { PlaceUpdateConflictReason } from "./classifyPlaceUpdateSafety";
 import type { ExecutePlaceCommitResult } from "./PlaceCommitOrchestrator";
 import type { PlaceMediaSyncResult } from "./PlaceMediaSyncer";
 import type { CreateLineageResult } from "../../lineage/types";
@@ -410,6 +411,22 @@ async function testUpdateSafeCallsWriterAndAdvancesLastImportedAt() {
   assert.equal((recordUpdateCalls[0] as { data: Record<string, unknown> }).data.status, "LINKED");
 }
 
+async function testSharedClassifierUpdateSafeContract() {
+  const { prisma } = createFakePrisma({
+    existingLineage: lineageFixture({ targetId: "place-1" }),
+    targetPlace: placeFixture({ id: "place-1", updatedAt: DEFAULT_LAST_IMPORTED_AT }),
+  });
+
+  const result = await classifyPlaceUpdateSafety({
+    prisma,
+    sourceId: "source-1",
+    sourceRecordKey: "wordpress-db:places:301",
+  });
+
+  assert.equal(result.classification, "UPDATE_SAFE");
+  assert.equal(result.targetId, "place-1");
+}
+
 async function testUpdateConflictLineageMissingNeverCallsWriter() {
   const { orchestrator, calls: orchestratorCalls } = createFakeOrchestrator({ ok: true, placeId: "place-1" });
   const { writer: lineageWriter } = createFakeLineageWriter();
@@ -784,6 +801,7 @@ async function main() {
   await testPlanSummaryAndNormalizedPayloadNeverTouched();
 
   await testUpdateSafeCallsWriterAndAdvancesLastImportedAt();
+  await testSharedClassifierUpdateSafeContract();
   await testUpdateConflictLineageMissingNeverCallsWriter();
   await testUpdateConflictLineageMismatchNeverTrustsUnfilteredFake();
   await testUpdateConflictTargetIdMissing();

@@ -16,6 +16,13 @@ export type {
   PlaceCommitOrchestratorLike,
   PlaceCommitRunnerPrismaClient,
 } from "./PlaceCommitRunner";
+export { classifyPlaceUpdateSafety } from "./classifyPlaceUpdateSafety";
+export type {
+  ClassifyPlaceUpdateSafetyInput,
+  PlaceUpdateConflictReason,
+  PlaceUpdateSafetyClassification,
+  PlaceUpdateSafetyPrismaClient,
+} from "./classifyPlaceUpdateSafety";
 export type {
   PlaceCommitBlockReason,
   PlaceCommitBlockReasonCode,
