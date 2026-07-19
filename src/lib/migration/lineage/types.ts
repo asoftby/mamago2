@@ -2,13 +2,13 @@ import type { MigrationLineage, MigrationTargetType, PrismaClient } from "@prism
 
 /**
  * The narrowest slice of `PrismaClient` this writer needs. `create` for the
- * common (no prior row) case; `updateMany` + `findUniqueOrThrow` only for
- * the exact-key-conflict-with-an-inactive-row reactivation path — see
- * `createLineage()`'s doc comment for why a guarded `updateMany` is used
- * instead of a plain `update`.
+ * common (no prior row) case; `updateMany` for the guarded reactivation
+ * attempt tried first; `findUnique`/`findUniqueOrThrow` to read the exact
+ * row afterwards (which outcome happened) without ever issuing a statement
+ * expected to fail — see `createLineage()`'s doc comment.
  */
 export interface MigrationLineageWriterPrismaClient {
-  migrationLineage: Pick<PrismaClient["migrationLineage"], "create" | "updateMany" | "findUniqueOrThrow">;
+  migrationLineage: Pick<PrismaClient["migrationLineage"], "create" | "updateMany" | "findUnique" | "findUniqueOrThrow">;
 }
 
 /**

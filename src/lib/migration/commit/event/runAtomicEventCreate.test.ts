@@ -145,11 +145,23 @@ function lineageFixture(overrides: Partial<MigrationLineage> = {}): MigrationLin
 
 type FakeCall = { delegate: string; method: string; args: unknown };
 
+/**
+ * `lineageUpdateManyCount` defaults to `0` (no inactive row to reactivate —
+ * the ordinary "fresh create" case). `lineageExistingRow` is what
+ * `findUnique()` returns when `updateMany` matched nothing — `null` (falls
+ * through to `create()`) or a row (active conflict, `create()` never
+ * called). `lineageReactivatedRow` is used only when
+ * `lineageUpdateManyCount` is `1`. `lineageCreateThrows` simulates a
+ * genuine concurrent-insert race on the final `create()` — never a
+ * unique-constraint-then-retry, since `MigrationLineageWriter` no longer
+ * attempts `create()` speculatively at all.
+ */
 function createFakeTx(options: {
   createActivityThrows?: Error;
-  createLineageThrows?: Error;
-  updateManyCount?: number;
-  reactivatedLineage?: MigrationLineage;
+  lineageUpdateManyCount?: number;
+  lineageExistingRow?: MigrationLineage | null;
+  lineageReactivatedRow?: MigrationLineage;
+  lineageCreateThrows?: Error;
 } = {}) {
   const calls: FakeCall[] = [];
   const tx: EventCreateTransactionClient = {
@@ -180,19 +192,23 @@ function createFakeTx(options: {
       }) as unknown as EventCreateTransactionClient["eventVenue"]["upsert"],
     },
     migrationLineage: {
-      create: (async (args: unknown) => {
-        calls.push({ delegate: "migrationLineage", method: "create", args });
-        if (options.createLineageThrows) throw options.createLineageThrows;
-        return lineageFixture();
-      }) as unknown as EventCreateTransactionClient["migrationLineage"]["create"],
       updateMany: (async (args: unknown) => {
         calls.push({ delegate: "migrationLineage", method: "updateMany", args });
-        return { count: options.updateManyCount ?? 0 };
+        return { count: options.lineageUpdateManyCount ?? 0 };
       }) as unknown as EventCreateTransactionClient["migrationLineage"]["updateMany"],
       findUniqueOrThrow: (async (args: unknown) => {
         calls.push({ delegate: "migrationLineage", method: "findUniqueOrThrow", args });
-        return options.reactivatedLineage ?? lineageFixture();
+        return options.lineageReactivatedRow ?? lineageFixture();
       }) as unknown as EventCreateTransactionClient["migrationLineage"]["findUniqueOrThrow"],
+      findUnique: (async (args: unknown) => {
+        calls.push({ delegate: "migrationLineage", method: "findUnique", args });
+        return options.lineageExistingRow ?? null;
+      }) as unknown as EventCreateTransactionClient["migrationLineage"]["findUnique"],
+      create: (async (args: unknown) => {
+        calls.push({ delegate: "migrationLineage", method: "create", args });
+        if (options.lineageCreateThrows) throw options.lineageCreateThrows;
+        return lineageFixture();
+      }) as unknown as EventCreateTransactionClient["migrationLineage"]["create"],
     },
   };
   return { tx, calls };
@@ -252,11 +268,11 @@ async function testWriterFailurePropagatesWithoutTouchingLineage() {
 async function testLineageReactivatesInactiveRowOnConflict_64251Regression() {
   // The exact real-world shape: an authorized rollback deactivated the
   // historical lineage row for wordpress-db:events:64251, and a replay
-  // commit must reactivate it rather than fail outright.
+  // commit must reactivate it in place — via the guarded `updateMany()`
+  // attempted first, never via a `create()` that's expected to fail.
   const { tx, calls } = createFakeTx({
-    createLineageThrows: uniqueConstraintError(),
-    updateManyCount: 1,
-    reactivatedLineage: lineageFixture({ id: "cmrqrgamh002kws21c93jy619", targetId: "activity-1" }),
+    lineageUpdateManyCount: 1,
+    lineageReactivatedRow: lineageFixture({ id: "cmrqrgamh002kws21c93jy619", targetId: "activity-1" }),
   });
 
   const result = await runAtomicEventCreate(tx, {
@@ -270,16 +286,50 @@ async function testLineageReactivatesInactiveRowOnConflict_64251Regression() {
   assert.equal(result.lineageResult.lineageId, "cmrqrgamh002kws21c93jy619", "reactivates the same historical row, never a second one");
   assert.deepEqual(
     calls.filter((c) => c.delegate === "migrationLineage").map((c) => c.method),
-    ["create", "updateMany", "findUniqueOrThrow"],
+    ["updateMany", "findUniqueOrThrow"],
+    "reactivation never calls create() — no statement is ever issued that's expected to fail",
   );
 }
 
 async function testLineageActiveConflictPropagatesForTransactionRollback() {
-  const { tx } = createFakeTx({ createLineageThrows: uniqueConstraintError(), updateManyCount: 0 });
+  const { tx, calls } = createFakeTx({
+    lineageUpdateManyCount: 0,
+    lineageExistingRow: lineageFixture({ isActive: true }),
+  });
 
   await assert.rejects(
     () => runAtomicEventCreate(tx, { candidate: candidateFixture(), context: contextFixture(), lineageInput: lineageInputFixture() }),
     /refusing to overwrite an active mapping/,
+  );
+  assert.deepEqual(
+    calls.filter((c) => c.delegate === "migrationLineage").map((c) => c.method),
+    ["updateMany", "findUnique"],
+    "an active conflict is detected by a read, never by a failed create()",
+  );
+}
+
+async function testConcurrentLineageCreateConflictPropagatesWithoutRecoveryAttempt() {
+  // A genuine concurrent insert winning the exact same race after this
+  // process's own updateMany()+findUnique() both saw no row: create()
+  // throws P2002, and MigrationLineageWriter must not attempt any further
+  // recovery on the same (now-aborted, if inside a real Postgres tx)
+  // connection — the error must propagate so the caller's own
+  // `prisma.$transaction` rolls back the Activity/Session/Venue writes too.
+  const raceError = uniqueConstraintError();
+  const { tx, calls } = createFakeTx({
+    lineageUpdateManyCount: 0,
+    lineageExistingRow: null,
+    lineageCreateThrows: raceError,
+  });
+
+  await assert.rejects(
+    () => runAtomicEventCreate(tx, { candidate: candidateFixture(), context: contextFixture(), lineageInput: lineageInputFixture() }),
+    (error: unknown) => error === raceError,
+  );
+  assert.deepEqual(
+    calls.filter((c) => c.delegate === "migrationLineage").map((c) => c.method),
+    ["updateMany", "findUnique", "create"],
+    "no updateMany/findUnique retry is attempted after create() fails",
   );
 }
 
@@ -303,6 +353,7 @@ async function main() {
   await testWriterFailurePropagatesWithoutTouchingLineage();
   await testLineageReactivatesInactiveRowOnConflict_64251Regression();
   await testLineageActiveConflictPropagatesForTransactionRollback();
+  await testConcurrentLineageCreateConflictPropagatesWithoutRecoveryAttempt();
   await testNowClockThreadedIntoLineageWriter();
 }
 

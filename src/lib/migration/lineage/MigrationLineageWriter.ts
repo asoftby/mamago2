@@ -2,19 +2,6 @@ import type { CreateLineageInput, CreateLineageResult, MigrationLineageWriterPri
 
 const DEFAULT_TARGET_ROLE = "primary";
 
-/**
- * Postgres unique-violation, surfaced by Prisma as error code `P2002` — see
- * https://www.prisma.io/docs/orm/reference/error-reference#p2002. Checked by
- * duck-typing the `code` property rather than `instanceof
- * Prisma.PrismaClientKnownRequestError`: that class's constructor isn't
- * meant to be called outside Prisma's own client internals (its shape has
- * changed across Prisma versions), so tests can't cheaply construct a real
- * instance — `code` is the one stable, documented contract callers rely on.
- */
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
-}
-
 function assertInputIsUsable(input: CreateLineageInput): void {
   if (!input.sourceId?.trim()) {
     throw new Error("CreateLineageInput.sourceId is required.");
@@ -36,43 +23,60 @@ function assertInputIsUsable(input: CreateLineageInput): void {
 /**
  * Records lineage after a successful entity CREATE.
  *
- * The common case — no row yet at this exact key — is one
- * `migrationLineage.create()` call, unchanged from the original PR11
- * design: `lastSourceHash` is taken exactly as given by the caller
- * (originally `SourceRecordEnvelope.sourceHash`, carried through
- * `MigrationRecord`), never computed or re-derived here; UPDATE lineage
- * semantics for an *active* mapping are still handled inline in each
- * `XCommitRunner` (Place/Route/Article/Event), not here.
- *
- * The one case this now also handles: the exact unique key
- * (`sourceId` + `sourceRecordKey` + `targetType` + `targetRole`) already
- * has a row, but it's `isActive: false` — e.g. left behind by an
- * explicitly authorized rollback that deactivated rather than deleted the
- * row, to preserve migration audit history (see prelaunch-checklist.md).
  * `MigrationLineage` is a durable *mapping*, not a log of every attempt
- * (`MigrationRecord` is the log) — the full, non-partial unique index says
+ * (`MigrationRecord` is the log) — the full, non-partial unique index
+ * (`sourceId` + `sourceRecordKey` + `targetType` + `targetRole`) says
  * exactly that: at most one row can ever exist for a given key, active or
- * not. So a plain `.create()` retry there was never going to work again,
- * ever, for that source key — reactivating the existing row in place is
- * the only way a legitimate re-CREATE after a rollback can succeed.
+ * not. A row can be `isActive: false` — e.g. left behind by an explicitly
+ * authorized rollback that deactivated rather than deleted it, to preserve
+ * migration audit history (see prelaunch-checklist.md) — and a legitimate
+ * re-CREATE for that same source key must reactivate that row in place,
+ * since a plain `.create()` retry can never succeed there again.
  *
- * This is race-safe: reactivation is a single `updateMany()` guarded by
- * `isActive: false` in its own `where`, not a read-then-write. If a
- * concurrent process already reactivated the same row between our failed
- * `.create()` and this `updateMany()`, the guard condition no longer
- * matches, `count` comes back `0`, and this throws instead of silently
- * overwriting a target another process just set — never a second reader
- * winning and clobbering the first. If the existing row is *active* at
- * the time of the conflict — a real double-run of the same commit
- * operation, the original failure mode this class was built to catch —
- * this still throws, exactly as before: an active mapping is never
- * silently overwritten by a CREATE.
+ * This never issues a statement expected to fail as part of normal control
+ * flow. That matters because `createLineage()` can run inside a Prisma
+ * interactive transaction (`runAtomicEventCreate`), and in PostgreSQL a
+ * failed statement aborts the *whole* surrounding transaction — every
+ * later statement on that same connection fails too, "current transaction
+ * is aborted." An earlier version of this class tried `create()` first and
+ * reactivated on catching the resulting `P2002` — which is exactly the
+ * catch-then-retry-on-the-same-connection pattern that breaks once this
+ * runs inside a transaction: the `updateMany()` retry would itself fail
+ * against an already-aborted transaction, so the reactivation this class
+ * exists for could never actually succeed there. Fixed by never
+ * speculatively creating: reactivation is attempted first, with no prior
+ * failing statement.
+ *
+ * 1. Attempt reactivation: a single `updateMany()` guarded by
+ *    `isActive: false` in its own `where` (not a read-then-write). If it
+ *    updates exactly one row, that row is fetched by the same unique key
+ *    and returned — same lineage `id`, never a second row.
+ * 2. If it updates zero rows, read the exact key with `findUnique()` to
+ *    find out why: an existing *active* row throws a deterministic
+ *    conflict (never silently overwritten by a CREATE — the original
+ *    failure mode this class exists to catch, e.g. a real double-run of
+ *    the same commit operation). No row at all falls through to `create()`
+ *    — the ordinary case.
+ * 3. `create()` is the only statement ever attempted after a read already
+ *    confirmed no row exists, so it's never expected to fail — but a
+ *    genuine concurrent insert winning the exact same race would still
+ *    throw `P2002` here, and that failure is deliberately left to
+ *    propagate rather than retried: the caller's own transaction (if any)
+ *    rolls back cleanly instead of this class issuing another statement on
+ *    an already-aborted connection.
  *
  * `lastImportedAt` is stamped with `now()` on both create and reactivate —
  * the one field a later targeted-UPDATE safety check (see
  * `PlaceCommitRunner`) relies on to prove "we know when this was last
  * imported," so it must never be left `null`/stale. `now` is injectable
  * (defaults to the real clock) purely so tests can assert an exact value.
+ *
+ * No real-Postgres integration harness exists in this repo yet to prove
+ * transaction-abort recovery end-to-end (checked: no testcontainers/pg-mem/
+ * disposable-DB setup anywhere under `src/lib/migration`) — the guarantee
+ * here is structural instead: reactivation is attempted with zero prior
+ * statements in this call, so there is no failed statement for a real
+ * Postgres transaction to have aborted on by the time `updateMany()` runs.
  */
 export class MigrationLineageWriter {
   constructor(
@@ -83,44 +87,6 @@ export class MigrationLineageWriter {
   async createLineage(input: CreateLineageInput): Promise<CreateLineageResult> {
     assertInputIsUsable(input);
     const targetRole = input.targetRole ?? DEFAULT_TARGET_ROLE;
-
-    try {
-      const lineage = await this.prisma.migrationLineage.create({
-        data: {
-          sourceId: input.sourceId,
-          sourceEntityType: input.sourceEntityType,
-          sourceStableKey: input.sourceStableKey,
-          sourceRecordKey: input.sourceRecordKey,
-          targetType: input.targetType,
-          targetRole,
-          targetId: input.targetId,
-          targetNaturalKey: input.targetStableKey ?? null,
-          lastSourceHash: input.lastSourceHash,
-          runId: input.runId ?? null,
-          recordId: input.recordId ?? null,
-          isActive: true,
-          lastImportedAt: this.now(),
-        },
-      });
-
-      return {
-        lineageId: lineage.id,
-        sourceRecordKey: input.sourceRecordKey,
-        targetType: input.targetType,
-        targetId: input.targetId,
-      };
-    } catch (error) {
-      if (!isUniqueConstraintViolation(error)) {
-        throw error;
-      }
-      return this.reactivateInactiveRow(input, targetRole);
-    }
-  }
-
-  private async reactivateInactiveRow(
-    input: CreateLineageInput,
-    targetRole: string,
-  ): Promise<CreateLineageResult> {
     const exactKey = {
       sourceId: input.sourceId,
       sourceRecordKey: input.sourceRecordKey,
@@ -141,7 +107,23 @@ export class MigrationLineageWriter {
       },
     });
 
-    if (reactivated.count === 0) {
+    if (reactivated.count === 1) {
+      const row = await this.prisma.migrationLineage.findUniqueOrThrow({
+        where: { sourceId_sourceRecordKey_targetType_targetRole: exactKey },
+      });
+      return {
+        lineageId: row.id,
+        sourceRecordKey: input.sourceRecordKey,
+        targetType: input.targetType,
+        targetId: input.targetId,
+      };
+    }
+
+    const existing = await this.prisma.migrationLineage.findUnique({
+      where: { sourceId_sourceRecordKey_targetType_targetRole: exactKey },
+    });
+
+    if (existing) {
       throw new Error(
         `MigrationLineage already has an active row for sourceId=${input.sourceId} ` +
           `sourceRecordKey=${input.sourceRecordKey} targetType=${input.targetType} ` +
@@ -149,12 +131,26 @@ export class MigrationLineageWriter {
       );
     }
 
-    const row = await this.prisma.migrationLineage.findUniqueOrThrow({
-      where: { sourceId_sourceRecordKey_targetType_targetRole: exactKey },
+    const lineage = await this.prisma.migrationLineage.create({
+      data: {
+        sourceId: input.sourceId,
+        sourceEntityType: input.sourceEntityType,
+        sourceStableKey: input.sourceStableKey,
+        sourceRecordKey: input.sourceRecordKey,
+        targetType: input.targetType,
+        targetRole,
+        targetId: input.targetId,
+        targetNaturalKey: input.targetStableKey ?? null,
+        lastSourceHash: input.lastSourceHash,
+        runId: input.runId ?? null,
+        recordId: input.recordId ?? null,
+        isActive: true,
+        lastImportedAt: this.now(),
+      },
     });
 
     return {
-      lineageId: row.id,
+      lineageId: lineage.id,
       sourceRecordKey: input.sourceRecordKey,
       targetType: input.targetType,
       targetId: input.targetId,
