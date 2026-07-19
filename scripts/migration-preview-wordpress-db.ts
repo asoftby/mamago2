@@ -81,6 +81,14 @@ export interface PreviewCandidateSummary {
   hasCity?: boolean;
   hasCategory?: boolean;
   hasCoordinates?: boolean;
+  /** Materialized per-day session count (see `materializeEventScheduleSessions()`) — never the raw boundary-date count. Events only. */
+  sessionCount?: number;
+  /** Raw `scheduleDraft.scheduleItems.length` — diagnostic, not the session count. Events only. */
+  rawRangeCount?: number;
+  /** Raw `scheduleDraft.dates.length` — the boundary-marker count for range schedules; diagnostic, not the session count. Events only. */
+  boundaryDateCount?: number;
+  firstSessionDate?: string | null;
+  lastSessionDate?: string | null;
 }
 
 export interface PreviewJsonReport {
@@ -126,6 +134,11 @@ function toCandidateSummary(item: MigrationPlanItem): PreviewCandidateSummary {
     hasCity?: unknown;
     hasCategory?: unknown;
     hasCoordinates?: unknown;
+    sessionCount?: unknown;
+    rawRangeCount?: unknown;
+    boundaryDateCount?: unknown;
+    firstSessionDate?: unknown;
+    lastSessionDate?: unknown;
   };
   return {
     sourceRecordKey: item.sourceRecordKey,
@@ -157,6 +170,17 @@ function toCandidateSummary(item: MigrationPlanItem): PreviewCandidateSummary {
     hasCity: typeof summary.hasCity === "boolean" ? summary.hasCity : undefined,
     hasCategory: typeof summary.hasCategory === "boolean" ? summary.hasCategory : undefined,
     hasCoordinates: typeof summary.hasCoordinates === "boolean" ? summary.hasCoordinates : undefined,
+    sessionCount: typeof summary.sessionCount === "number" ? summary.sessionCount : undefined,
+    rawRangeCount: typeof summary.rawRangeCount === "number" ? summary.rawRangeCount : undefined,
+    boundaryDateCount: typeof summary.boundaryDateCount === "number" ? summary.boundaryDateCount : undefined,
+    firstSessionDate:
+      typeof summary.firstSessionDate === "string" || summary.firstSessionDate === null
+        ? summary.firstSessionDate
+        : undefined,
+    lastSessionDate:
+      typeof summary.lastSessionDate === "string" || summary.lastSessionDate === null
+        ? summary.lastSessionDate
+        : undefined,
   };
 }
 
@@ -341,9 +365,14 @@ export function buildPreviewHumanReport(plan: MigrationPlan, options: PreviewRep
       const mediaLabel = candidate.mediaPolicy
         ? ` | media: ${candidate.mediaPolicy}/${candidate.plannedMediaAction ?? "NO_MEDIA"}`
         : "";
+      const sessionsLabel =
+        typeof candidate.sessionCount === "number"
+          ? ` | sessions: ${candidate.sessionCount} (raw ranges: ${candidate.rawRangeCount ?? 0}, boundary dates: ${candidate.boundaryDateCount ?? 0})` +
+            (candidate.firstSessionDate ? ` | range: ${candidate.firstSessionDate} -> ${candidate.lastSessionDate}` : "")
+          : "";
       push(
         `- ${candidate.sourceRecordKey} | ${candidate.title ?? "(no title)"} | ${candidate.slug ?? "(no slug)"} ` +
-          `| action: ${candidate.action} | status: ${candidate.status}${targetLabel}${conflictLabel}${mediaLabel} ` +
+          `| action: ${candidate.action} | status: ${candidate.status}${targetLabel}${conflictLabel}${mediaLabel}${sessionsLabel} ` +
           `| warnings: ${candidate.warnings.length}${warningCodesLabel} | mediaRefs: ${candidate.mediaRefCount} | relationRefs: ${candidate.relationRefCount}`,
       );
     }

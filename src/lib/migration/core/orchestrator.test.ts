@@ -701,6 +701,98 @@ async function testLedgerStatsReflectCreateUpdateSkipUnchanged() {
   assert.equal(plan.stats!.successRate, 1);
 }
 
+/**
+ * The exact real-world shape this fix targets: `wordpress-db:events:60404`'s
+ * `scheduleDraft` has 6 boundary dates across 3 twelve-day ranges — the plan
+ * item's `summary.sessionCount` must report the materialized 36, never the
+ * raw `dates.length`.
+ */
+async function testEventPreviewFieldsReportMaterializedSessionCount() {
+  registerMockAdapter("mock-event-session-count", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "wordpress-db:events:60404", sourceEntityType: "wordpress-db:events" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ACTIVITY",
+        normalizedPayload: {
+          title: "Актив Полис",
+          scheduleDraft: {
+            mode: "MULTI_DATE",
+            dates: ["2026-07-20", "2026-07-31", "2026-08-01", "2026-08-12", "2026-08-13", "2026-08-24"],
+            scheduleItems: [
+              { date: "2026-07-20", dateEnd: "2026-07-31" },
+              { date: "2026-08-01", dateEnd: "2026-08-12" },
+              { date: "2026-08-13", dateEnd: "2026-08-24" },
+            ],
+          },
+        },
+      };
+    },
+  });
+
+  const plan = await createMigrationRunPlan({ adapterKey: "mock-event-session-count", sourceNamespace: "test" });
+  const item = plan.items.find((i) => i.sourceRecordKey === "wordpress-db:events:60404");
+
+  assert.equal(item?.summary?.rawRangeCount, 3);
+  assert.equal(item?.summary?.boundaryDateCount, 6);
+  assert.equal(item?.summary?.sessionCount, 36, "must report the materialized daily count, not the 6 boundary dates");
+  assert.equal(item?.summary?.firstSessionDate, "2026-07-20");
+  assert.equal(item?.summary?.lastSessionDate, "2026-08-24");
+}
+
+/** A single-date (non-range) Event schedule is unaffected — the materialized count equals the one date, same as before this fix. */
+async function testEventPreviewFieldsSingleDateUnchanged() {
+  registerMockAdapter("mock-event-single-date", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "wordpress-db:events:56226", sourceEntityType: "wordpress-db:events" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ACTIVITY",
+        normalizedPayload: {
+          title: "Игра",
+          scheduleDraft: { mode: "ONE_TIME", dates: ["2026-08-01"] },
+        },
+      };
+    },
+  });
+
+  const plan = await createMigrationRunPlan({ adapterKey: "mock-event-single-date", sourceNamespace: "test" });
+  const item = plan.items.find((i) => i.sourceRecordKey === "wordpress-db:events:56226");
+
+  assert.equal(item?.summary?.sessionCount, 1);
+  assert.equal(item?.summary?.rawRangeCount, 0);
+  assert.equal(item?.summary?.boundaryDateCount, 1);
+}
+
+/** Non-Event (PLACE) items never get Event-only summary fields — mirrors Place fields never leaking onto ACTIVITY items. */
+async function testEventPreviewFieldsAbsentForNonEventTargetType() {
+  registerMockAdapter("mock-place-not-event", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: "wordpress-db:places:1", sourceEntityType: "wordpress-db:places" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "PLACE",
+        normalizedPayload: { title: "A place" },
+      };
+    },
+  });
+
+  const plan = await createMigrationRunPlan({ adapterKey: "mock-place-not-event", sourceNamespace: "test" });
+  const item = plan.items.find((i) => i.sourceRecordKey === "wordpress-db:places:1");
+
+  assert.equal(item?.summary?.sessionCount, undefined);
+  assert.equal(item?.summary?.rawRangeCount, undefined);
+}
+
 async function testCommitModeStillThrows() {
   await assert.rejects(
     () => runMigrationCommit(),
@@ -728,6 +820,9 @@ async function main() {
   await testLedgerEmptyRecordsSkipsLookup();
   await testLedgerNormalizeFailureDoesNotBreakLineageLogic();
   await testLedgerStatsReflectCreateUpdateSkipUnchanged();
+  await testEventPreviewFieldsReportMaterializedSessionCount();
+  await testEventPreviewFieldsSingleDateUnchanged();
+  await testEventPreviewFieldsAbsentForNonEventTargetType();
   await testCommitModeStillThrows();
 }
 
