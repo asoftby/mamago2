@@ -283,6 +283,106 @@ function testEmptyMediaSourceWarnsWithoutFailingCandidate() {
   assert.ok(record.warnings?.some((w) => w.code === "EVENT_GALLERY_EMPTY"));
 }
 
+// ---------------------------------------------------------------------------
+// gallery comma-separated attachment ids — WordPress sometimes stores the
+// whole gallery as one comma-joined meta value instead of one meta row per
+// id (confirmed live for wordpress-db:events:60404).
+// ---------------------------------------------------------------------------
+
+function testGallerySingleIntegerValueUnchanged() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111] });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"));
+}
+
+function testGallerySeparateMetaValuesUnchanged() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111", "222", "333"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222, 333] });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"));
+}
+
+function testGalleryCommaSeparatedStringSplits() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["60407,60408,60409,60410"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, {
+    featuredAttachmentId: null,
+    galleryAttachmentIds: [60407, 60408, 60409, 60410],
+  });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"));
+}
+
+function testGalleryCommaSeparatedStringWithWhitespaceTrims() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: [" 111 , 222 ,333"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222, 333] });
+}
+
+function testGalleryCommaSeparatedStringPreservesOrder() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["333,111,222"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [333, 111, 222] });
+}
+
+function testGalleryCommaSeparatedStringDedupesKeepingFirstOccurrence() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111,222,111,333,222"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222, 333] });
+}
+
+function testGalleryMixedValidInvalidTokensKeepsValidAndWarnsOnlyInvalid() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["60407,abc,60409,-1,60410,1.5"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, {
+    featuredAttachmentId: null,
+    galleryAttachmentIds: [60407, 60409, 60410],
+  });
+  const warnings = record.warnings?.filter((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID") ?? [];
+  assert.deepEqual(
+    warnings.map((w) => (w.details as { value?: string } | undefined)?.value),
+    ["abc", "-1", "1.5"],
+  );
+}
+
+function testGalleryFullyInvalidValueYieldsEmptyResultAndWarning() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["abc,def,-1"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
+  const warnings = record.warnings?.filter((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID") ?? [];
+  assert.equal(warnings.length, 3);
+}
+
+/** Regression fixture for wordpress-db:events:60404 — real observed shape. */
+function testGalleryCommaSeparatedRegression_60404() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: ["60406"],
+        gallery: ["60407,60408,60409,60410"],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, {
+    featuredAttachmentId: 60406,
+    galleryAttachmentIds: [60407, 60408, 60409, 60410],
+  });
+  assert.ok(
+    !record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"),
+    "EVENT_MEDIA_SOURCE_INVALID must no longer fire for this real comma-joined gallery value",
+  );
+}
+
 function testCategoryOccasionTermsNotMapped() {
   const record = normalizeEvent(buildBundle());
   const payload = payloadOf(record);
@@ -551,6 +651,15 @@ function main() {
   testMediaEvidenceDedupesDuplicateIds();
   testInvalidMediaSourceWarnsWithoutFailingCandidate();
   testEmptyMediaSourceWarnsWithoutFailingCandidate();
+  testGallerySingleIntegerValueUnchanged();
+  testGallerySeparateMetaValuesUnchanged();
+  testGalleryCommaSeparatedStringSplits();
+  testGalleryCommaSeparatedStringWithWhitespaceTrims();
+  testGalleryCommaSeparatedStringPreservesOrder();
+  testGalleryCommaSeparatedStringDedupesKeepingFirstOccurrence();
+  testGalleryMixedValidInvalidTokensKeepsValidAndWarnsOnlyInvalid();
+  testGalleryFullyInvalidValueYieldsEmptyResultAndWarning();
+  testGalleryCommaSeparatedRegression_60404();
   testCategoryOccasionTermsNotMapped();
   testPriceStrippedToPlainText();
   testEmptyOrBrokenMetaDoesNotThrow();
