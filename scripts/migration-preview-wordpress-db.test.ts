@@ -370,6 +370,57 @@ function testJsonReportIncludesMaterializedSessionFields() {
   assert.equal(candidate.lastSessionDate, "2026-08-24");
 }
 
+/**
+ * `buildScheduleDraft()` in `normalizeEvent.ts` emits a `scheduleItems`
+ * entry for an ordinary one-time event too, just without a `dateEnd` — the
+ * P2 regression this fixture guards: that must never render as
+ * "raw ranges: 1" in either report.
+ */
+function singleDateEventPlanFixture(): MigrationPlan {
+  const item: MigrationPlanItem = {
+    sourceRecordKey: "wordpress-db:events:56226",
+    sourceEntityType: "wordpress-db:events",
+    action: "CREATE",
+    status: "PLANNED",
+    targetType: "ACTIVITY",
+    summary: {
+      title: "Игра",
+      slug: "igra",
+      mediaRefCount: 0,
+      relationRefCount: 0,
+      rawRangeCount: 0,
+      boundaryDateCount: 1,
+      sessionCount: 1,
+      firstSessionDate: "2026-08-01",
+      lastSessionDate: "2026-08-01",
+    },
+    warnings: [],
+  };
+  return {
+    ...eventPlanFixture(),
+    items: [item],
+    stats: {
+      ...eventPlanFixture().stats!,
+      sourceEntityTypeCounts: { "wordpress-db:events": 1 },
+    },
+  };
+}
+
+function testHumanReportSingleDateEventNeverShowsAsARange() {
+  const report = buildPreviewHumanReport(singleDateEventPlanFixture(), { entity: "event", limit: null });
+
+  assert.match(report, /sessions: 1 \(raw ranges: 0, boundary dates: 1\)/);
+  assert.ok(!report.includes("raw ranges: 1"), "a single-date event's own scheduleItems entry must never be counted as a range");
+}
+
+function testJsonReportSingleDateEventHasZeroRawRangeCount() {
+  const jsonReport = buildPreviewJsonReport(singleDateEventPlanFixture(), { entity: "event", limit: null });
+  const candidate = jsonReport.candidates[0];
+
+  assert.equal(candidate.rawRangeCount, 0);
+  assert.equal(candidate.sessionCount, 1);
+}
+
 async function testJsonReportExcludesRawContent() {
   const plan = await buildTestPlan();
   const jsonReport = buildPreviewJsonReport(plan, { entity: "all", limit: null });
@@ -760,6 +811,8 @@ async function main() {
   await testHumanReportEntityFilterNarrowsBreakdown();
   testHumanReportShowsMaterializedSessionCountForEvents();
   testJsonReportIncludesMaterializedSessionFields();
+  testHumanReportSingleDateEventNeverShowsAsARange();
+  testJsonReportSingleDateEventHasZeroRawRangeCount();
   await testJsonReportExcludesRawContent();
   await testPreviewConflictDoesNotRequireWriteDelegatesAndSerializesSafeFields();
   await testPreviewTargetRowMissingConflict();

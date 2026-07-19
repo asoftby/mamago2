@@ -7,7 +7,7 @@ type ScheduleItemLike = {
   dateEnd?: unknown;
 };
 
-function isLocalDateString(value: unknown): value is string {
+export function isLocalDateString(value: unknown): value is string {
   return typeof value === "string" && LOCAL_DATE_RE.test(value);
 }
 

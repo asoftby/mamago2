@@ -1,4 +1,4 @@
-import { expandScheduleItemDates } from "./expandScheduleItemDates";
+import { expandScheduleItemDates, isLocalDateString } from "./expandScheduleItemDates";
 
 export type ScheduleJsonLike = {
   dates?: unknown;
@@ -50,7 +50,17 @@ export function extractScheduleDatesAndStartTime(scheduleJson: unknown): {
 }
 
 export interface MaterializedEventSchedule {
-  /** Raw `scheduleItems.length` — 0 when the schedule has no ranges at all (plain `dates`). Diagnostic only. */
+  /**
+   * Count of `scheduleItems` entries that are *actual* ranges — those
+   * carrying a valid date-only `dateEnd` (present, `YYYY-MM-DD`). A
+   * single-date item has no `dateEnd` at all (`buildScheduleDraft()` in
+   * `normalizeEvent.ts` only sets it when the parsed end differs from the
+   * start), so an ordinary one-time event's `scheduleItems.length` of 1
+   * must never be reported as "1 range" — this counts real ranges only.
+   * An explicit one-day range (`dateEnd === date`) still counts, since the
+   * caller specified a range even if it happens to be degenerate.
+   * Diagnostic only.
+   */
   rawRangeCount: number;
   /** Raw `dates.length` on the schedule as received — the boundary-marker count for range schedules, or the true session count for non-range ones. Diagnostic only, never the reported session count. */
   boundaryDateCount: number;
@@ -87,9 +97,12 @@ export function materializeEventScheduleSessions(scheduleJson: unknown): Materia
   const j = scheduleJson as ScheduleJsonLike;
   const { dates } = extractScheduleDatesAndStartTime(scheduleJson);
   const sortedForDisplay = [...dates].sort();
+  const scheduleItems = Array.isArray(j.scheduleItems)
+    ? (j.scheduleItems as Array<{ dateEnd?: unknown }>)
+    : [];
 
   return {
-    rawRangeCount: Array.isArray(j.scheduleItems) ? j.scheduleItems.length : 0,
+    rawRangeCount: scheduleItems.filter((item) => isLocalDateString(item.dateEnd)).length,
     boundaryDateCount: Array.isArray(j.dates) ? j.dates.length : 0,
     materializedDates: dates,
     materializedSessionCount: dates.length,

@@ -165,6 +165,71 @@ function testRegression_60404_ThreeCampShifts() {
   assert.deepEqual([...result.materializedDates], expected);
 }
 
+// ---------------------------------------------------------------------------
+// rawRangeCount must count actual ranges (a valid dateEnd present), never
+// scheduleItems.length verbatim — buildScheduleDraft() in normalizeEvent.ts
+// emits a scheduleItems entry for every single-date event too, just without
+// a dateEnd, and that must not be reported as "1 range" (P2 review finding).
+// ---------------------------------------------------------------------------
+
+function testSingleDateScheduleItemWithoutDateEndIsNotARange() {
+  const result = materializeEventScheduleSessions({
+    mode: "ONE_TIME",
+    dates: ["2026-08-01"],
+    scheduleItems: [{ date: "2026-08-01" }],
+  });
+  assert.equal(result.rawRangeCount, 0, "a scheduleItems entry with no dateEnd is a single date, not a range");
+  assert.equal(result.materializedSessionCount, 1);
+}
+
+function testSingleDateScheduleItemWithDateEndEqualToDateIsARange() {
+  const result = materializeEventScheduleSessions({
+    mode: "ONE_TIME",
+    dates: ["2026-08-01"],
+    scheduleItems: [{ date: "2026-08-01", dateEnd: "2026-08-01" }],
+  });
+  assert.equal(result.rawRangeCount, 1, "an explicit one-day range still counts as a range");
+  assert.equal(result.materializedSessionCount, 1);
+}
+
+function testInvalidDateEndDoesNotCountAsARange() {
+  const result = materializeEventScheduleSessions({
+    mode: "ONE_TIME",
+    dates: ["2026-08-01"],
+    scheduleItems: [{ date: "2026-08-01", dateEnd: "not-a-date" }],
+  });
+  assert.equal(result.rawRangeCount, 0, "a malformed dateEnd is not a valid range end");
+  assert.equal(result.materializedSessionCount, 1);
+}
+
+function testMultipleSingleDateItemsAreNotRanges() {
+  const result = materializeEventScheduleSessions({
+    mode: "MULTI_DATE",
+    dates: ["2026-08-01", "2026-08-05", "2026-08-10"],
+    scheduleItems: [
+      { date: "2026-08-01" },
+      { date: "2026-08-05" },
+      { date: "2026-08-10" },
+    ],
+  });
+  assert.equal(result.rawRangeCount, 0);
+  assert.equal(result.materializedSessionCount, 3);
+  assert.deepEqual(result.materializedDates, ["2026-08-01", "2026-08-05", "2026-08-10"]);
+}
+
+function testMixedSingleDateAndRealRangeCountsOnlyTheRange() {
+  const result = materializeEventScheduleSessions({
+    mode: "MULTI_DATE",
+    dates: ["2026-08-01", "2026-08-10", "2026-08-14"],
+    scheduleItems: [
+      { date: "2026-08-01" },
+      { date: "2026-08-10", dateEnd: "2026-08-14" },
+    ],
+  });
+  assert.equal(result.rawRangeCount, 1, "only the second item is a real range");
+  assert.equal(result.materializedSessionCount, 6, "1 single date + 5-day range (08-10..08-14)");
+}
+
 function testNullScheduleDraftYieldsZero() {
   const result = materializeEventScheduleSessions(null);
   assert.equal(result.materializedSessionCount, 0);
@@ -203,6 +268,11 @@ function main() {
   testActiveRangeClampedScheduleMaterializesFaithfully();
   testMonthBoundaryNoDateDrift();
   testRegression_60404_ThreeCampShifts();
+  testSingleDateScheduleItemWithoutDateEndIsNotARange();
+  testSingleDateScheduleItemWithDateEndEqualToDateIsARange();
+  testInvalidDateEndDoesNotCountAsARange();
+  testMultipleSingleDateItemsAreNotRanges();
+  testMixedSingleDateAndRealRangeCountsOnlyTheRange();
   testNullScheduleDraftYieldsZero();
   testPureNoSideEffects();
   testExtractScheduleDatesAndStartTimeUsesFirstScheduleItemStartTime();
