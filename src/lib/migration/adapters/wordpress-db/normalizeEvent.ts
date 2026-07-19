@@ -135,15 +135,28 @@ function parseAttachmentId(raw: string | null): { id: number | null; invalidRaw?
   return { id: n };
 }
 
+/**
+ * Each `gallery` meta value is itself split on `,` before parsing — WordPress
+ * sometimes stores the whole gallery as one comma-joined string in a single
+ * meta row (confirmed live for `wordpress-db:events:60404`: `gallery` is one
+ * row `"60407,60408,60409,60410"`) rather than one meta row per id. A plain
+ * value with no comma splits to itself, so the separate-meta-row shape is
+ * unaffected. One invalid token inside an otherwise-valid comma list no
+ * longer discards the rest — each token is parsed independently.
+ */
 function parseAttachmentIds(
   values: readonly string[] | undefined,
 ): { ids: number[]; invalidRaw: string[]; hadValues: boolean } {
   const ids: number[] = [];
   const invalidRaw: string[] = [];
   for (const value of values ?? []) {
-    const parsed = parseAttachmentId(value);
-    if (parsed.id !== null) ids.push(parsed.id);
-    else if (parsed.invalidRaw !== undefined) invalidRaw.push(parsed.invalidRaw);
+    for (const part of value.split(",")) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const parsed = parseAttachmentId(trimmed);
+      if (parsed.id !== null) ids.push(parsed.id);
+      else if (parsed.invalidRaw !== undefined) invalidRaw.push(parsed.invalidRaw);
+    }
   }
   return { ids: [...new Set(ids)], invalidRaw, hadValues: (values?.length ?? 0) > 0 };
 }
