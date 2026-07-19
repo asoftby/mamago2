@@ -89,6 +89,7 @@ import { EventCommitOrchestrator } from "../src/lib/migration/commit/event/Event
 import { EventCommitRunner } from "../src/lib/migration/commit/event/EventCommitRunner";
 import { EventCommitWriter } from "../src/lib/migration/commit/event/EventCommitWriter";
 import { EventMediaSyncer } from "../src/lib/migration/commit/event/EventMediaSyncer";
+import { runAtomicEventCreate } from "../src/lib/migration/commit/event/runAtomicEventCreate";
 import { runCommitExecutionPlan } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import type { RunCommitExecutionPlanSummary } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import {
@@ -619,7 +620,7 @@ async function main(): Promise<void> {
       }),
       event: new EventCommitRunner({
         orchestrator: new EventCommitOrchestrator(new EventCommitWriter(prisma)),
-        lineageWriter,
+        runAtomicCreate: runAtomicEventCreate,
         prisma,
         mediaSyncer: eventMediaSyncer,
       }),

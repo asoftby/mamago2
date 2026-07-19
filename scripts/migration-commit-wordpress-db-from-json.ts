@@ -37,6 +37,7 @@ import type { MigrationCommitContextConfig } from "../src/lib/migration/commit/c
 import { EventCommitOrchestrator } from "../src/lib/migration/commit/event/EventCommitOrchestrator";
 import { EventCommitRunner } from "../src/lib/migration/commit/event/EventCommitRunner";
 import { EventCommitWriter } from "../src/lib/migration/commit/event/EventCommitWriter";
+import { runAtomicEventCreate } from "../src/lib/migration/commit/event/runAtomicEventCreate";
 import { runCommitExecutionPlan } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import type { RunCommitExecutionPlanSummary } from "../src/lib/migration/commit/harness/runCommitExecutionPlan";
 import {
@@ -186,6 +187,37 @@ export function buildExecutionPlanInputFromJsonFixture(input: {
   };
 }
 
+/**
+ * Wires the three commit runners against `prisma`. Extracted out of
+ * `main()` so a test can construct it against a fake `PrismaClient`-shaped
+ * object and prove the Event runner is wired with a real, callable
+ * `runAtomicCreate` — the exact wiring bug this function's extraction was
+ * added to catch a regression of (an earlier version still constructed
+ * `EventCommitRunner` with a stale `lineageWriter` dependency it no longer
+ * accepts, only caught by chance since `scripts/` is excluded from
+ * `tsconfig.json`).
+ */
+export function buildRunners(prisma: PrismaClient) {
+  const lineageWriter = new MigrationLineageWriter(prisma);
+  return {
+    place: new PlaceCommitRunner({
+      orchestrator: new PlaceCommitOrchestrator(new PlaceCommitWriter(prisma)),
+      lineageWriter,
+      prisma,
+    }),
+    event: new EventCommitRunner({
+      orchestrator: new EventCommitOrchestrator(new EventCommitWriter(prisma)),
+      runAtomicCreate: runAtomicEventCreate,
+      prisma,
+    }),
+    article: new ArticleCommitRunner({
+      orchestrator: new ArticleCommitOrchestrator(new ArticleCommitWriter(prisma)),
+      lineageWriter,
+      prisma,
+    }),
+  };
+}
+
 function printSummary(summary: RunCommitExecutionPlanSummary, fixturePath: string): void {
   console.log("Migration Commit From JSON Fixture");
   console.log();
@@ -217,24 +249,7 @@ async function main(): Promise<void> {
     );
 
     const runWriter = new MigrationRunWriter(prisma);
-    const lineageWriter = new MigrationLineageWriter(prisma);
-    const runners = {
-      place: new PlaceCommitRunner({
-        orchestrator: new PlaceCommitOrchestrator(new PlaceCommitWriter(prisma)),
-        lineageWriter,
-        prisma,
-      }),
-      event: new EventCommitRunner({
-        orchestrator: new EventCommitOrchestrator(new EventCommitWriter(prisma)),
-        lineageWriter,
-        prisma,
-      }),
-      article: new ArticleCommitRunner({
-        orchestrator: new ArticleCommitOrchestrator(new ArticleCommitWriter(prisma)),
-        lineageWriter,
-        prisma,
-      }),
-    };
+    const runners = buildRunners(prisma);
 
     const summary = await runCommitExecutionPlan({
       executionPlan,
