@@ -599,13 +599,14 @@ async function main(): Promise<void> {
       return createMamagoMediaImporter({ uploadedByUserId: ownerUserId });
     };
 
+    const innerEventMediaSyncer = new EventMediaSyncer({
+      prisma,
+      attachmentResolver: wordpressRepository,
+      mediaImporterFactory,
+      lineageWriter,
+    });
     const eventMediaSyncer = new MediaPolicyGatedEventMediaSyncer({
-      inner: new EventMediaSyncer({
-        prisma,
-        attachmentResolver: wordpressRepository,
-        mediaImporterFactory,
-        lineageWriter,
-      }),
+      inner: innerEventMediaSyncer,
       mediaPolicy: samplingActive
         ? (sourceRecordKey: string) =>
             resolveSampledMediaPolicy({ environment: profile.environment, sourceRecordKey })
@@ -613,11 +614,12 @@ async function main(): Promise<void> {
     });
 
     // `--force-media-reprocess`: a narrow, separate replay path for a single
-    // Event's media only (see eventMediaOnlyReprocess.ts doc comment for
-    // why this exists instead of widening the unsafe `--force-reprocess` to
-    // events). This branch never reaches `createMigrationRunExecutionPlan`/
-    // `runCommitExecutionPlan`/`EventCommitRunner` at all — the only write
-    // this can ever perform is `eventMediaSyncer.sync()`.
+    // Event's media only (see eventMediaOnlyReprocess.ts/strictEventMediaReplay.ts
+    // doc comments for why this exists instead of widening the unsafe
+    // `--force-reprocess` to events, and why it uses the fail-closed strict
+    // replay rather than plain `EventMediaSyncer.sync()`). This branch never
+    // reaches `createMigrationRunExecutionPlan`/`runCommitExecutionPlan`/
+    // `EventCommitRunner` at all.
     if (args.forceMediaReprocess && args.sourceRecordKey) {
       const wpPostId = parseEventPostIdFromSourceRecordKey(args.sourceRecordKey);
       if (wpPostId === null) {
@@ -628,7 +630,10 @@ async function main(): Promise<void> {
         where: { sourceRecordKey: args.sourceRecordKey, targetType: "ACTIVITY", isActive: true },
       });
       const target = lineage?.targetId
-        ? await prisma.activity.findUnique({ where: { id: lineage.targetId }, select: { id: true, ownerUserId: true } })
+        ? await prisma.activity.findUnique({
+            where: { id: lineage.targetId },
+            select: { id: true, ownerUserId: true, coverImageId: true },
+          })
         : null;
 
       const runtimeGuard = validateEventMediaOnlyReprocessRuntime({
@@ -642,6 +647,12 @@ async function main(): Promise<void> {
         throw new Error(`--force-media-reprocess refused: ${runtimeGuard.reason}`);
       }
 
+      const currentImages = await prisma.activityImage.findMany({
+        where: { activityId: target!.id },
+        orderBy: { sortOrder: "asc" },
+        select: { mediaAssetId: true },
+      });
+
       const result = await runEventMediaOnlyReprocess({
         sourceId: lineage!.sourceId,
         sourceRecordKey: args.sourceRecordKey,
@@ -649,7 +660,12 @@ async function main(): Promise<void> {
         ownerUserId: target!.ownerUserId,
         candidate: runtimeGuard.candidate,
         freshHash: runtimeGuard.freshHash,
-        mediaSyncer: eventMediaSyncer,
+        current: {
+          coverImageId: target!.coverImageId,
+          galleryMediaAssetIds: currentImages.map((image) => image.mediaAssetId),
+        },
+        mediaImporter: innerEventMediaSyncer,
+        prisma,
       });
 
       console.log("Event media-only reprocess");
@@ -657,13 +673,27 @@ async function main(): Promise<void> {
       console.log(`sourceRecordKey: ${args.sourceRecordKey}`);
       console.log(`activityId: ${target!.id}`);
       console.log(`hash (unchanged): ${runtimeGuard.freshHash}`);
-      console.log(`warnings: ${result.warnings.length}`);
-      for (const warning of result.warnings) {
-        console.log(`  - ${warning.code}: ${warning.message}`);
-      }
+      console.log(`result: ${result.status}`);
+
       if (args.out) {
-        writeFileSync(args.out, JSON.stringify({ sourceRecordKey: args.sourceRecordKey, activityId: target!.id, warnings: result.warnings }, null, 2));
+        writeFileSync(args.out, JSON.stringify({ sourceRecordKey: args.sourceRecordKey, activityId: target!.id, result }, null, 2));
         console.log(`\nJSON report written to ${args.out}`);
+      }
+
+      if (result.status === "REFUSED") {
+        throw new Error(`--force-media-reprocess refused: ${result.code}: ${result.message}`);
+      }
+      if (result.status === "FAILED") {
+        throw new Error(
+          `--force-media-reprocess failed: ${result.code}: ${result.message} — failures: ${JSON.stringify(result.failures)}`,
+        );
+      }
+      if (result.status === "APPLIED") {
+        console.log(`coverMediaId: ${result.coverMediaId ?? "(none)"}`);
+        console.log(`galleryMediaIds: ${JSON.stringify(result.galleryMediaIds)}`);
+        console.log(`reused: ${JSON.stringify(result.reusedAttachmentIds)}, imported: ${JSON.stringify(result.importedAttachmentIds)}`);
+      } else {
+        console.log(`coverMediaId (unchanged): ${result.coverMediaId ?? "(none)"}`);
       }
       return;
     }

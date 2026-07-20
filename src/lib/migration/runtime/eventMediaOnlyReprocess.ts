@@ -7,11 +7,18 @@
  * `docs/migration/prelaunch-checklist.md`, Event UPDATE-safety finding,
  * 2026-07-20). Recovering one skipped cover image is not worth that blast
  * radius. This module never touches `EventCommitRunner`, `Activity` domain
- * fields, `ActivitySession`, `EventVenue`, or `MigrationLineage(ACTIVITY)` —
- * it only ever calls the existing `EventMediaSyncerLike.sync()`, the exact
- * same media path a normal Event UPDATE would use, in isolation.
+ * fields, `ActivitySession`, `EventVenue`, or `MigrationLineage(ACTIVITY)`.
  *
- * Two guard layers:
+ * The actual write is delegated to `runStrictEventMediaReplay()`
+ * (`strictEventMediaReplay.ts`) — plain `EventMediaSyncerLike.sync()` has
+ * destructive-replacement semantics (a failed/partial import can wipe an
+ * existing cover or gallery item) that are correct for a real commit but
+ * unsafe for a standalone recovery tool; the strict replay is fail-closed
+ * instead: any missing attachment, invalid URL, download failure, or
+ * unproven existing target media refuses the whole operation before
+ * touching `Activity`/`ActivityImage` at all.
+ *
+ * Three guard layers:
  * - `validateEventMediaOnlyReprocessArgs()` — pure, synchronous, CLI-flag-only
  *   checks (entity/source-record-key count/media-policy/conflicting flags).
  * - `validateEventMediaOnlyReprocessRuntime()` — needs a live source fetch +
@@ -20,14 +27,21 @@
  *   canonical hash is byte-identical to the stored lineage hash, i.e. there
  *   is zero possibility of a domain-content change riding along with the
  *   media fix.
+ * - `runStrictEventMediaReplay()`'s own preflight/divergence checks (see
+ *   that module) — the actual media-level safety gate.
  */
 import { CANONICAL_SOURCE_HASH_VERSION, hashEventBundle } from "../adapters/wordpress-db/canonicalSourceHash";
 import { normalizeEvent } from "../adapters/wordpress-db/normalizeEvent";
 import type { WordPressEventBundle } from "../adapters/wordpress-db/types";
-import type { EventMediaSyncerLike } from "../commit/event/EventCommitRunner";
 import type { NormalizedEventCandidate } from "../commit/event/types";
-import type { MigrationWarning } from "../types";
 import type { MediaPolicyName } from "./MigrationProfile";
+import {
+  runStrictEventMediaReplay,
+  type StrictEventMediaImporter,
+  type StrictEventMediaReplayCurrentState,
+  type StrictEventMediaReplayPrismaClient,
+  type StrictEventMediaReplayResult,
+} from "./strictEventMediaReplay";
 
 const EVENT_SOURCE_RECORD_KEY_PATTERN = /^wordpress-db:events:(\d+)$/;
 
@@ -131,30 +145,30 @@ export interface RunEventMediaOnlyReprocessInput {
   ownerUserId: string | null | undefined;
   candidate: NormalizedEventCandidate;
   freshHash: string;
-  mediaSyncer: EventMediaSyncerLike;
+  current: StrictEventMediaReplayCurrentState;
+  mediaImporter: StrictEventMediaImporter;
+  prisma: StrictEventMediaReplayPrismaClient;
 }
 
 /**
- * The entire allowed write surface of this module: one call into the
- * existing, already-idempotent `EventMediaSyncerLike.sync()` — no
- * `EventCommitRunner`, no `ActivitySession`/`EventVenue` write, no
- * `MigrationLineage(ACTIVITY)` update. `runId`/`recordId` are passed as
- * `null` deliberately: this is a standalone replay, not part of any
- * `MigrationRun`, and `EventMediaSyncer`'s own `EventMediaSyncInput` already
- * declares both fields optional/nullable for exactly this kind of one-off
- * call.
+ * The entire allowed write surface of this module: delegates to
+ * `runStrictEventMediaReplay()` — no `EventCommitRunner`, no
+ * `ActivitySession`/`EventVenue` write, no `MigrationLineage(ACTIVITY)`
+ * update, and (per that module) no write at all unless every required
+ * attachment resolved successfully and no existing target media is of
+ * unproven origin.
  */
 export async function runEventMediaOnlyReprocess(
   input: RunEventMediaOnlyReprocessInput,
-): Promise<{ warnings: MigrationWarning[] }> {
-  return input.mediaSyncer.sync({
+): Promise<StrictEventMediaReplayResult> {
+  return runStrictEventMediaReplay({
     activityId: input.activityId,
     candidate: input.candidate,
     ownerUserId: input.ownerUserId,
     sourceId: input.sourceId,
     sourceHash: input.freshHash,
-    runId: null,
-    recordId: null,
-    sourceRecordKey: input.sourceRecordKey,
+    current: input.current,
+    mediaImporter: input.mediaImporter,
+    prisma: input.prisma,
   });
 }

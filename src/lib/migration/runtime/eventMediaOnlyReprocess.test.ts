@@ -4,16 +4,16 @@
 import assert from "node:assert/strict";
 
 import { CANONICAL_SOURCE_HASH_VERSION, hashEventBundle } from "../adapters/wordpress-db/canonicalSourceHash";
+import type { AttachmentImportOutcome } from "../commit/event/EventMediaSyncer";
 import type { WordPressEventBundle, WordPressPostRow } from "../adapters/wordpress-db/types";
-import type { EventMediaSyncerLike } from "../commit/event/EventCommitRunner";
 import type { NormalizedEventCandidate } from "../commit/event/types";
-import type { MigrationWarning } from "../types";
 import {
   parseEventPostIdFromSourceRecordKey,
   runEventMediaOnlyReprocess,
   validateEventMediaOnlyReprocessArgs,
   validateEventMediaOnlyReprocessRuntime,
 } from "./eventMediaOnlyReprocess";
+import type { StrictEventMediaImporter, StrictEventMediaReplayPrismaClient } from "./strictEventMediaReplay";
 
 // ---------------------------------------------------------------------------
 // parseEventPostIdFromSourceRecordKey
@@ -233,19 +233,39 @@ function candidateFixture(overrides: Partial<NormalizedEventCandidate> = {}): No
   };
 }
 
-function recordingSyncer(warnings: MigrationWarning[]): { syncer: EventMediaSyncerLike; calls: () => unknown[] } {
+function recordingMediaImporter(outcome: AttachmentImportOutcome): { importer: StrictEventMediaImporter; calls: () => unknown[] } {
   const calls: unknown[] = [];
-  const syncer: EventMediaSyncerLike = {
-    async sync(input) {
+  const importer: StrictEventMediaImporter = {
+    async resolveAndImportAttachments(input) {
       calls.push(input);
-      return { warnings };
+      return new Map(input.ids.map((id) => [id, outcome]));
     },
   };
-  return { syncer, calls: () => calls };
+  return { importer, calls: () => calls };
 }
 
-async function testRunCallsOnlyMediaSyncerWithNullRunAndRecordId() {
-  const { syncer, calls } = recordingSyncer([{ code: "EVENT_COVER_IMPORTED", message: "ok", severity: "INFO" }]);
+function fakePrisma(): StrictEventMediaReplayPrismaClient {
+  const activityUpdates: unknown[] = [];
+  return {
+    activity: {
+      update: (async (args: unknown) => {
+        activityUpdates.push(args);
+        return {};
+      }) as unknown as StrictEventMediaReplayPrismaClient["activity"]["update"],
+    },
+    activityImage: {
+      create: (async () => ({})) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["create"],
+      deleteMany: (async () => ({ count: 0 })) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["deleteMany"],
+      findMany: (async () => []) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["findMany"],
+    },
+    mediaAsset: {
+      findFirst: (async () => ({ id: "media-64511", publicUrl: "/uploads/64511.webp" })) as unknown as StrictEventMediaReplayPrismaClient["mediaAsset"]["findFirst"],
+    },
+  };
+}
+
+async function testRunDelegatesToStrictReplayWithNullRunAndRecordId() {
+  const { importer, calls } = recordingMediaImporter({ ok: true, reused: false, mediaId: "media-64511", publicUrl: "/uploads/64511.webp" });
   const result = await runEventMediaOnlyReprocess({
     sourceId: "src-1",
     sourceRecordKey: "wordpress-db:events:56062",
@@ -253,18 +273,19 @@ async function testRunCallsOnlyMediaSyncerWithNullRunAndRecordId() {
     ownerUserId: "owner-1",
     candidate: candidateFixture(),
     freshHash: `${CANONICAL_SOURCE_HASH_VERSION}:deadbeef`,
-    mediaSyncer: syncer,
+    current: { coverImageId: null, galleryMediaAssetIds: [] },
+    mediaImporter: importer,
+    prisma: fakePrisma(),
   });
 
-  assert.equal(calls().length, 1, "must call the media syncer exactly once");
+  assert.equal(calls().length, 1, "must resolve/import attachments exactly once");
   const call = calls()[0] as Record<string, unknown>;
-  assert.equal(call.activityId, "activity-1");
   assert.equal(call.sourceId, "src-1");
-  assert.equal(call.sourceRecordKey, "wordpress-db:events:56062");
   assert.equal(call.sourceHash, `${CANONICAL_SOURCE_HASH_VERSION}:deadbeef`);
   assert.equal(call.runId, null, "must never attach a MigrationRun — this is a standalone replay");
   assert.equal(call.recordId, null, "must never attach a MigrationRecord — this is a standalone replay");
-  assert.equal(result.warnings[0]?.code, "EVENT_COVER_IMPORTED");
+  assert.equal(result.status, "APPLIED");
+  if (result.status === "APPLIED") assert.equal(result.coverMediaId, "media-64511");
 }
 
 async function main() {
@@ -286,7 +307,7 @@ async function main() {
   testRuntimeRejectsHashMismatch();
   testRuntimeAcceptsHashMatch();
 
-  await testRunCallsOnlyMediaSyncerWithNullRunAndRecordId();
+  await testRunDelegatesToStrictReplayWithNullRunAndRecordId();
 }
 
 main()
