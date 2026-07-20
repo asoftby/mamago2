@@ -6,8 +6,12 @@
  * the caller via `context.config.executor` — and it is never registered as a
  * side effect of importing it; call `registerWordPressDbAdapter()` explicitly.
  */
-import { createHash } from "node:crypto";
-
+import {
+  hashArticleBundle,
+  hashEventBundle,
+  hashPlaceBundle,
+  hashRouteBundle,
+} from "./canonicalSourceHash";
 import { registerMigrationAdapter } from "../registry";
 import { normalizeArticle } from "./normalizeArticle";
 import { normalizeEvent } from "./normalizeEvent";
@@ -60,31 +64,6 @@ function resolveEntityFilter(context: MigrationAdapterContext): WordPressEntityF
   return wantedKeys.length === 1 ? wantedKeys[0] : "all";
 }
 
-// ---------------------------------------------------------------------------
-// Deterministic hashing — a plain `JSON.stringify` would depend on object
-// key insertion order, which isn't guaranteed stable across code paths that
-// build logically-identical bundles differently. Sorting keys removes that
-// non-determinism; array order is preserved since it's meaningful there.
-// ---------------------------------------------------------------------------
-
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  return `{${keys
-    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
-    .join(",")}}`;
-}
-
-function hashBundle(bundle: unknown): string {
-  return createHash("sha256").update(stableStringify(bundle)).digest("hex");
-}
-
 function toArticleEnvelope(bundle: WordPressArticleBundle): SourceRecordEnvelope {
   const sourceRecordKey = `${ARTICLE_ENTITY_TYPE}:${bundle.post.ID}`;
   return {
@@ -92,7 +71,7 @@ function toArticleEnvelope(bundle: WordPressArticleBundle): SourceRecordEnvelope
     sourceStableKey: sourceRecordKey,
     sourceRecordKey,
     sourceUpdatedAt: bundle.post.post_modified,
-    sourceHash: hashBundle(bundle),
+    sourceHash: hashArticleBundle(bundle),
     rawPayload: bundle,
   };
 }
@@ -104,7 +83,7 @@ function toPlaceEnvelope(bundle: WordPressPlaceBundle): SourceRecordEnvelope {
     sourceStableKey: sourceRecordKey,
     sourceRecordKey,
     sourceUpdatedAt: bundle.post.post_modified,
-    sourceHash: hashBundle(bundle),
+    sourceHash: hashPlaceBundle(bundle),
     rawPayload: bundle,
   };
 }
@@ -116,7 +95,7 @@ function toEventEnvelope(bundle: WordPressEventBundle): SourceRecordEnvelope {
     sourceStableKey: sourceRecordKey,
     sourceRecordKey,
     sourceUpdatedAt: bundle.post.post_modified,
-    sourceHash: hashBundle(bundle),
+    sourceHash: hashEventBundle(bundle),
     rawPayload: bundle,
   };
 }
@@ -128,7 +107,7 @@ function toRouteEnvelope(bundle: WordPressRouteBundle): SourceRecordEnvelope {
     sourceStableKey: sourceRecordKey,
     sourceRecordKey,
     sourceUpdatedAt: bundle.post.post_modified,
-    sourceHash: hashBundle(bundle),
+    sourceHash: hashRouteBundle(bundle),
     rawPayload: bundle,
   };
 }
