@@ -213,9 +213,20 @@ const PLACE_POSTMETA_ALLOWLIST: readonly string[] = [
  * `normalizePlace()`, so including it would reintroduce exactly the kind
  * of "hashed but not domain-significant" field this whole fix removes
  * elsewhere.
+ *
+ * Mirrors `normalizePlace()`'s own `hasCoordinates` check exactly
+ * (`placeIndex != null && placeIndex.lat !== null && placeIndex.lng !== null`)
+ * rather than projecting the raw index row: a missing row, a row with
+ * `{lat: null, lng: null}`, and a row with only one coordinate present
+ * all normalize to the same `coordinates: null` — hashing the raw row
+ * shape would have made those equivalent states look different and
+ * produced a false `UPDATE` for a Place whose coordinates were never
+ * actually resolvable, before or after.
  */
-function placeIndexProjection(placeIndex: WordPressPlaceBundle["placeIndex"]): { lat: number | null; lng: number | null } | null {
-  if (!placeIndex) return null;
+function placeCoordinatesProjection(placeIndex: WordPressPlaceBundle["placeIndex"]): { lat: number; lng: number } | null {
+  if (!placeIndex || placeIndex.lat === null || placeIndex.lng === null) {
+    return null;
+  }
   return { lat: placeIndex.lat, lng: placeIndex.lng };
 }
 
@@ -224,7 +235,7 @@ export function buildPlaceCanonicalSourceHashInput(bundle: WordPressPlaceBundle)
     version: CANONICAL_SOURCE_HASH_VERSION,
     post: pickPostFields(bundle.post, PLACE_POST_FIELDS),
     postMeta: pickPostMeta(bundle.postMeta, PLACE_POSTMETA_ALLOWLIST),
-    placeIndex: placeIndexProjection(bundle.placeIndex),
+    placeCoordinates: placeCoordinatesProjection(bundle.placeIndex),
     terms: canonicalTerms(bundle.terms),
   };
 }

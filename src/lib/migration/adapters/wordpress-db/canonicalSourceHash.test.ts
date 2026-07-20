@@ -176,6 +176,37 @@ function testPlacePriorityDoesNotChangeHash() {
   assert.equal(a, b, "priority is not read by normalizePlace() — must not affect the hash");
 }
 
+// normalizePlace()'s hasCoordinates check treats a missing placeIndex row,
+// {lat: null, lng: null}, and any partial pair the same way — all resolve to
+// coordinates: null. The canonical hash must be equally insensitive to the
+// difference between "no row" and "row present but not fully resolvable",
+// or a Place would flip to UPDATE for a coordinate state that never actually
+// changed from the model's point of view.
+
+function testPlaceNoIndexAndNullNullIndexProduceSameHash() {
+  const noIndex = hashPlaceBundle(placeBundle({ placeIndex: null }));
+  const nullNullIndex = hashPlaceBundle(
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority: 1, lat: null, lng: null } }),
+  );
+  assert.equal(noIndex, nullNullIndex, "no placeIndex row and {lat:null,lng:null} must hash identically");
+}
+
+function testPlaceNoIndexAndLatOnlyIndexProduceSameHash() {
+  const noIndex = hashPlaceBundle(placeBundle({ placeIndex: null }));
+  const latOnlyIndex = hashPlaceBundle(
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority: 1, lat: 53.9, lng: null } }),
+  );
+  assert.equal(noIndex, latOnlyIndex, "no placeIndex row and {lat:53.9,lng:null} must hash identically");
+}
+
+function testPlaceNoIndexAndLngOnlyIndexProduceSameHash() {
+  const noIndex = hashPlaceBundle(placeBundle({ placeIndex: null }));
+  const lngOnlyIndex = hashPlaceBundle(
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority: 1, lat: null, lng: 27.56 } }),
+  );
+  assert.equal(noIndex, lngOnlyIndex, "no placeIndex row and {lat:null,lng:27.56} must hash identically");
+}
+
 function testArticleVolatileMetaNeverChangesHash() {
   const base = hashArticleBundle(articleBundle());
   assert.equal(
@@ -467,6 +498,9 @@ function main() {
   testPlaceCoordinatesFromIndexChangeHash();
   testPlaceCoordinatesNullToPresentChangesHash();
   testPlacePriorityDoesNotChangeHash();
+  testPlaceNoIndexAndNullNullIndexProduceSameHash();
+  testPlaceNoIndexAndLatOnlyIndexProduceSameHash();
+  testPlaceNoIndexAndLngOnlyIndexProduceSameHash();
   testArticleVolatileMetaNeverChangesHash();
   testRouteVolatileMetaNeverChangesHash();
 
