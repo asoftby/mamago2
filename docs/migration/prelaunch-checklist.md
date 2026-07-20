@@ -231,7 +231,7 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | --- | --- |
 | Places | DONE |
 | Routes | IMPORTED 14/14; manual review, publish и redirects pending |
-| Events | 4/8 eligible imported; 4 CREATE и 66 sessions pending |
+| Events | 4/9 eligible imported; 5 CREATE и 67 sessions pending |
 | Offers | NOT STARTED |
 | Users + activation | NOT STARTED |
 | Profiles/ownership/media | NOT STARTED |
@@ -241,10 +241,11 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | Production validation/cutover | NOT STARTED |
 
 Оценка (2026-07-20): Events engineering readiness ≈85%; после закрытия
-Events остаётся 8 крупных P0-блоков (Offers, Users+activation,
-Profiles/ownership/media, Reviews, Article media, Redirects/pages/SEO,
-Production validation/cutover, плюс сам Events full batch); до
-технического cutover ориентировочно остаётся 55–65% взвешенного объёма.
+Events остаётся 8 крупных P0-блоков: Routes (manual review, publish,
+redirects), Offers, Users + activation, Profiles/ownership/media,
+Reviews, Article media, Redirects/pages/SEO, Production
+validation/cutover; до технического cutover ориентировочно остаётся
+55–65% взвешенного объёма.
 
 ### Places (82 publish)
 
@@ -1153,10 +1154,10 @@ runner'а не покрыта тестами. Требует отдельной 
       дополнительных attachment IDs как не импортированных/не представимых
       без расширения модели/UI.
 
-### Events (8 eligible + 1 past-only excluded, live count 2026-07-20 — заголовок "28" был устаревшей оценкой, см. журнал сессий)
+### Events (9 eligible + 1 past-only excluded, live count 2026-07-20)
 
 **Статус: engine готов (§0) → 4 golden sample закрыты (CREATE → реальные
-файлы → SKIP_UNCHANGED) → 4 CREATE Event остаются перед full batch.**
+файлы → SKIP_UNCHANGED) → 5 CREATE Event остаются перед full batch.**
 
 #### Закрытые golden samples
 
@@ -1215,12 +1216,13 @@ runner'а не покрыта тестами. Требует отдельной 
   `56479`, `60404`.
 - **CREATE remaining** (media policy `METADATA`, изображения не
   загружать до отдельного решения):
+  - `56062` — 1 session, `2026-08-06`;
   - `62977` — 29 materialized sessions;
   - `63510` — 35 materialized sessions;
   - `64159` — 1 session;
   - `64505` — 1 session.
-- **Итого**: осталось 4 CREATE Event, 66 `ActivitySession` суммарно,
-  media policy `METADATA` для всех четырёх.
+- **Итого**: осталось 5 CREATE Event, 67 `ActivitySession` суммарно,
+  media policy `METADATA` для всех пяти.
 
 Protected Event `55980` не входит в текущую WP publish selection и
 остаётся неизменным (ручное редактирование post-import защищено — см.
@@ -1230,12 +1232,12 @@ Protected Event `55980` не входит в текущую WP publish selection
 
 - [ ] Docker Build & Push SUCCESS на exact SHA
       `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf` (PR #62).
-- [ ] Ledger-aware read-only preview оставшихся 4 CREATE Event (`62977`,
-      `63510`, `64159`, `64505`) с правильными materialized session
-      counts (после PR #62).
-- [ ] Controlled targeted commit `62977`/`63510`/`64159`/`64505` с
-      media policy `METADATA`.
-- [ ] Idempotency replay всех четырёх — `SKIP_UNCHANGED`, zero
+- [ ] Ledger-aware read-only preview оставшихся 5 CREATE Event (`56062`,
+      `62977`, `63510`, `64159`, `64505`) с правильными materialized
+      session counts (после PR #62).
+- [ ] Controlled targeted commit `56062`/`62977`/`63510`/`64159`/`64505`
+      с media policy `METADATA`.
+- [ ] Idempotency replay всех пяти — `SKIP_UNCHANGED`, zero
       domain/media/lineage delta.
 - [ ] Editorial review: category/place/organizer matching для всех
       импортированных Event (`EVENT_CATEGORY_UNMATCHED`/
@@ -2316,28 +2318,27 @@ dispatcher-branch, ни CLI-flag).
   Текущая live Event selection (ledger-aware read-only preview,
   2026-07-20): `49842` — `SKIP_POLICY` (past-only); `64251`/`56226`/
   `56479`/`60404` — `SKIP_UNCHANGED` (golden samples выше);
-  `62977`/`63510`/`64159`/`64505` — `CREATE`, media policy `METADATA`
-  (изображения для них пока не загружаются), суммарно 66
-  materialized `ActivitySession` (29+35+1+1). Protected Event `55980`
+  `56062`/`62977`/`63510`/`64159`/`64505` — `CREATE`, media policy
+  `METADATA` (изображения для них пока не загружаются), суммарно 67
+  materialized `ActivitySession` (1+29+35+1+1). Protected Event `55980`
   вне текущей WP publish selection, не тронут (тот же
   manual-protected-паттерн, что и у Places 437/5389/895).
 
-  **Известное расхождение, не внесённое в счётчики выше по продуктовому
-  решению Алексея**: тот же live discover, выполненный сразу после
-  merge PR #62 (до этой docs-сессии), вернул ПЯТЫЙ `CREATE`-кандидат —
-  `wordpress-db:events:56062` (single date, `2026-08-06`, 1
-  materialized session) — которого нет ни в одном списке "4 CREATE
-  remaining" этой сессии. Это либо реальный новый Event, опубликованный
-  на живом WP-сайте между прогонами превью в этой сессии, либо
-  разночтение в scope текущей selection — требует отдельной проверки/
-  решения Алексея перед следующим ledger-aware preview, не
-  экстраполировать самостоятельно.
+  **Решение по `56062` принято (Алексей, 2026-07-20)**: тот же
+  `wordpress-db:events:56062` (single date, `2026-08-06`, 1 materialized
+  session), впервые замеченный в read-only verification PR #62 и снова
+  подтверждённый следующим live discover как `CREATE`, — не отдельный
+  scope exception, а часть текущего batch. Включён в CREATE remaining
+  выше (5 Event, 67 sessions суммарно); больше не расхождение, требующее
+  отдельного решения.
 
   Незавершённое: ветка `docs/update-event-migration-progress-20260720`
   не смержена (PR открыт, docs-only, merge за Алексеем). Следующий шаг:
   дождаться Docker Build & Push SUCCESS на exact SHA
   `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf` (одна проверка, без
-  polling), затем ledger-aware read-only preview оставшихся четырёх (или
-  пяти — см. расхождение выше) `CREATE` Event с правильными
-  materialized session counts, и только после этого — controlled
+  polling — на момент этой записи всё ещё `PENDING`, отдельного
+  подтверждения `SUCCESS` не было), затем ledger-aware read-only preview
+  **всех пяти** `CREATE` Event (`56062`, `62977`, `63510`, `64159`,
+  `64505`) с правильными materialized session counts (итоговый ожидаемый
+  pending count — 67 sessions), и только после этого — controlled
   targeted commit с media policy `METADATA`.
