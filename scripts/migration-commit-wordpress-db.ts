@@ -109,6 +109,12 @@ import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/m
 import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
 import { MigrationLineageWriter } from "../src/lib/migration/lineage/MigrationLineageWriter";
 import { MigrationRunWriter } from "../src/lib/migration/writer/MigrationRunWriter";
+import {
+  parseEventPostIdFromSourceRecordKey,
+  runEventMediaOnlyReprocess,
+  validateEventMediaOnlyReprocessArgs,
+  validateEventMediaOnlyReprocessRuntime,
+} from "../src/lib/migration/runtime/eventMediaOnlyReprocess";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
 import { MediaPolicyGatedPlaceMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedPlaceMediaSyncer";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
@@ -140,6 +146,7 @@ export interface CommitCliArgs {
   limit?: number;
   sourceRecordKey?: string;
   forceReprocess: boolean;
+  forceMediaReprocess: boolean;
   allowRemoteReadonly: boolean;
   out?: string;
   profileName?: MigrationProfileName;
@@ -186,6 +193,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
 
   const allowRemoteReadonly = argv.includes("--allow-remote-readonly");
   const forceReprocess = argv.includes("--force-reprocess");
+  const forceMediaReprocess = argv.includes("--force-media-reprocess");
 
   const sourceRecordKeyIndex = argv.indexOf("--source-record-key");
   const sourceRecordKey =
@@ -193,6 +201,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   if (sourceRecordKeyIndex !== -1 && !sourceRecordKey) {
     throw new Error("Missing value for --source-record-key.");
   }
+  const sourceRecordKeyCount = argv.filter((token) => token === "--source-record-key").length;
 
   if (forceReprocess) {
     if (entity !== "article" && entity !== "place") {
@@ -225,6 +234,18 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     throw new Error(`Invalid --media-policy value "${rawMediaPolicy}". Expected FULL|METADATA|NONE.`);
   }
 
+  if (forceMediaReprocess) {
+    const guard = validateEventMediaOnlyReprocessArgs({
+      entity,
+      sourceRecordKeyCount,
+      mediaPolicyName: mediaPolicyName ?? undefined,
+      forceReprocess,
+    });
+    if (!guard.ok) {
+      throw new Error(guard.reason);
+    }
+  }
+
   const seoPolicyIndex = argv.indexOf("--seo-policy");
   const rawSeoPolicy = seoPolicyIndex !== -1 ? argv[seoPolicyIndex + 1] : undefined;
   const seoPolicyName = rawSeoPolicy !== undefined ? parseSeoPolicyName(rawSeoPolicy) : undefined;
@@ -249,6 +270,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     limit,
     sourceRecordKey,
     forceReprocess,
+    forceMediaReprocess,
     allowRemoteReadonly,
     out,
     profileName: profileName ?? undefined,
@@ -589,6 +611,63 @@ async function main(): Promise<void> {
             resolveSampledMediaPolicy({ environment: profile.environment, sourceRecordKey })
         : profile.mediaPolicy,
     });
+
+    // `--force-media-reprocess`: a narrow, separate replay path for a single
+    // Event's media only (see eventMediaOnlyReprocess.ts doc comment for
+    // why this exists instead of widening the unsafe `--force-reprocess` to
+    // events). This branch never reaches `createMigrationRunExecutionPlan`/
+    // `runCommitExecutionPlan`/`EventCommitRunner` at all — the only write
+    // this can ever perform is `eventMediaSyncer.sync()`.
+    if (args.forceMediaReprocess && args.sourceRecordKey) {
+      const wpPostId = parseEventPostIdFromSourceRecordKey(args.sourceRecordKey);
+      if (wpPostId === null) {
+        throw new Error(`--force-media-reprocess: invalid Event sourceRecordKey "${args.sourceRecordKey}".`);
+      }
+      const bundle = await wordpressRepository.getPublishedEventById(wpPostId);
+      const lineage = await prisma.migrationLineage.findFirst({
+        where: { sourceRecordKey: args.sourceRecordKey, targetType: "ACTIVITY", isActive: true },
+      });
+      const target = lineage?.targetId
+        ? await prisma.activity.findUnique({ where: { id: lineage.targetId }, select: { id: true, ownerUserId: true } })
+        : null;
+
+      const runtimeGuard = validateEventMediaOnlyReprocessRuntime({
+        bundle,
+        lineage: lineage
+          ? { sourceId: lineage.sourceId, isActive: lineage.isActive, targetId: lineage.targetId, lastSourceHash: lineage.lastSourceHash }
+          : null,
+        targetExists: target !== null,
+      });
+      if (!runtimeGuard.ok) {
+        throw new Error(`--force-media-reprocess refused: ${runtimeGuard.reason}`);
+      }
+
+      const result = await runEventMediaOnlyReprocess({
+        sourceId: lineage!.sourceId,
+        sourceRecordKey: args.sourceRecordKey,
+        activityId: target!.id,
+        ownerUserId: target!.ownerUserId,
+        candidate: runtimeGuard.candidate,
+        freshHash: runtimeGuard.freshHash,
+        mediaSyncer: eventMediaSyncer,
+      });
+
+      console.log("Event media-only reprocess");
+      console.log();
+      console.log(`sourceRecordKey: ${args.sourceRecordKey}`);
+      console.log(`activityId: ${target!.id}`);
+      console.log(`hash (unchanged): ${runtimeGuard.freshHash}`);
+      console.log(`warnings: ${result.warnings.length}`);
+      for (const warning of result.warnings) {
+        console.log(`  - ${warning.code}: ${warning.message}`);
+      }
+      if (args.out) {
+        writeFileSync(args.out, JSON.stringify({ sourceRecordKey: args.sourceRecordKey, activityId: target!.id, warnings: result.warnings }, null, 2));
+        console.log(`\nJSON report written to ${args.out}`);
+      }
+      return;
+    }
+
     const routeStopMediaSyncer = new MediaPolicyGatedRouteStopMediaSyncer({
       inner: new RouteStopMediaSyncer({
         prisma,
