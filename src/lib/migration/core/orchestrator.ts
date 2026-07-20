@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 
+import { materializeEventScheduleSessions } from "@/lib/event/materializeScheduleSessions";
 import { getMigrationAdapter } from "../adapters/registry";
 import { getLineageActionForRecord } from "../ledger";
 import { buildHumanReport, buildMachineReport } from "../reporters/buildReports";
@@ -111,6 +112,28 @@ function extractPlacePreviewFields(payload: unknown): Record<string, unknown> {
   };
 }
 
+/**
+ * `sessionCount`/`sessionDateRange` are the *materialized* per-day count —
+ * see `materializeEventScheduleSessions()` — never `scheduleDraft.dates.length`.
+ * For a range-based schedule (`scheduleItems` present, e.g. a multi-day camp
+ * shift), `dates` only holds each range's boundary markers; reporting that
+ * length as "sessions" undercounts what the real commit actually creates
+ * (confirmed for wordpress-db:events:60404: 6 boundary dates across 3
+ * ranges, 36 materialized daily sessions).
+ */
+function extractEventPreviewFields(payload: unknown): Record<string, unknown> {
+  if (typeof payload !== "object" || payload === null) return {};
+  const record = payload as Record<string, unknown>;
+  const materialized = materializeEventScheduleSessions(record.scheduleDraft ?? null);
+  return {
+    rawRangeCount: materialized.rawRangeCount,
+    boundaryDateCount: materialized.boundaryDateCount,
+    sessionCount: materialized.materializedSessionCount,
+    firstSessionDate: materialized.firstSessionDate,
+    lastSessionDate: materialized.lastSessionDate,
+  };
+}
+
 function toNormalizedItem(
   record: SourceRecordEnvelope,
   normalized: NormalizedRecord,
@@ -128,6 +151,7 @@ function toNormalizedItem(
       mediaRefCount: normalized.mediaRefs?.length ?? 0,
       relationRefCount: normalized.relationRefs?.length ?? 0,
       ...(normalized.targetTypeHint === "PLACE" ? extractPlacePreviewFields(normalized.normalizedPayload) : {}),
+      ...(normalized.targetTypeHint === "ACTIVITY" ? extractEventPreviewFields(normalized.normalizedPayload) : {}),
     },
     warnings: normalized.warnings,
   };

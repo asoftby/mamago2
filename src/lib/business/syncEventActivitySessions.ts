@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
-import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+import { extractScheduleDatesAndStartTime } from "@/lib/event/materializeScheduleSessions";
 
 type EventActivitySessionsPrisma = {
   activitySession: Pick<
@@ -9,43 +9,6 @@ type EventActivitySessionsPrisma = {
     "createMany" | "deleteMany" | "findMany"
   >;
 };
-
-type ScheduleJsonLike = {
-  dates?: unknown;
-  startTime?: unknown;
-  scheduleItems?: unknown;
-};
-
-function extractScheduleDatesAndStartTime(scheduleJson: unknown): {
-  dates: string[];
-  startTime: string;
-} {
-  const j = scheduleJson as ScheduleJsonLike | null | undefined;
-
-  let dates: string[] = [];
-
-  let startTime =
-    typeof j?.startTime === "string" && /^\d{2}:\d{2}$/.test(j.startTime)
-      ? j.startTime
-      : "10:00";
-
-  if (j && Array.isArray(j.scheduleItems) && j.scheduleItems.length > 0) {
-    const items = j.scheduleItems as Array<{ date?: unknown; dateEnd?: unknown; startTime?: unknown }>;
-    dates = expandScheduleItemDates(items);
-    const firstSt = items[0]?.startTime;
-    if (typeof firstSt === "string" && /^\d{2}:\d{2}$/.test(firstSt)) {
-      startTime = firstSt;
-    }
-  }
-
-  if (dates.length === 0 && j && Array.isArray(j.dates)) {
-    dates = (j.dates as unknown[]).filter(
-      (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
-    );
-  }
-
-  return { dates, startTime };
-}
 
 /**
  * Fingerprint of schedule fields that drive ActivitySession rows (dates + time).

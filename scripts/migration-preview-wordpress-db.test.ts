@@ -294,6 +294,133 @@ async function testHumanReportEntityFilterNarrowsBreakdown() {
   assert.ok(!report.includes(PLACE_ENTITY_TYPE));
 }
 
+/**
+ * `buildPreviewHumanReport`/`buildPreviewJsonReport` are pure functions of
+ * a `MigrationPlan` — a hand-built Event `MigrationPlanItem` (the same
+ * `summary` shape `toNormalizedItem()` in `core/orchestrator.ts` now
+ * produces for ACTIVITY items) is enough to test the report layer without
+ * a full WordPress Event postmeta fixture through the adapter.
+ */
+function eventPlanFixture(): MigrationPlan {
+  const item: MigrationPlanItem = {
+    sourceRecordKey: "wordpress-db:events:60404",
+    sourceEntityType: "wordpress-db:events",
+    action: "CREATE",
+    status: "PLANNED",
+    targetType: "ACTIVITY",
+    summary: {
+      title: "Актив Полис",
+      slug: "aktiv-polis",
+      mediaRefCount: 0,
+      relationRefCount: 0,
+      rawRangeCount: 3,
+      boundaryDateCount: 6,
+      sessionCount: 36,
+      firstSessionDate: "2026-07-20",
+      lastSessionDate: "2026-08-24",
+    },
+    warnings: [],
+  };
+  return {
+    adapterKey: "wordpress-db",
+    adapterVersion: "1",
+    sourceNamespace: "wordpress-db",
+    mode: "PREVIEW",
+    createdAt: new Date().toISOString(),
+    records: [],
+    items: [item],
+    warnings: [],
+    errors: [],
+    stats: {
+      discoveredCount: 1,
+      plannedCount: 1,
+      normalizedCount: 1,
+      failedCount: 0,
+      skippedCount: 0,
+      successRate: 1,
+      actionCounts: { CREATE: 1 },
+      statusCounts: { PLANNED: 1 },
+      targetTypeCounts: { ACTIVITY: 1 },
+      sourceEntityTypeCounts: { "wordpress-db:events": 1 },
+      warningCounts: {},
+      durationsMs: { discover: 0, filter: 0, normalize: 0, plan: 0, total: 0 },
+    },
+  };
+}
+
+function testHumanReportShowsMaterializedSessionCountForEvents() {
+  const report = buildPreviewHumanReport(eventPlanFixture(), { entity: "event", limit: null });
+
+  assert.match(report, /sessions: 36 \(raw ranges: 3, boundary dates: 6\)/);
+  assert.match(report, /range: 2026-07-20 -> 2026-08-24/);
+  assert.ok(
+    !report.includes("sessions: 6 "),
+    "the boundary-date count (6) must never be reported as the session count",
+  );
+}
+
+function testJsonReportIncludesMaterializedSessionFields() {
+  const jsonReport = buildPreviewJsonReport(eventPlanFixture(), { entity: "event", limit: null });
+  const candidate = jsonReport.candidates[0];
+
+  assert.equal(candidate.sessionCount, 36);
+  assert.equal(candidate.rawRangeCount, 3);
+  assert.equal(candidate.boundaryDateCount, 6);
+  assert.equal(candidate.firstSessionDate, "2026-07-20");
+  assert.equal(candidate.lastSessionDate, "2026-08-24");
+}
+
+/**
+ * `buildScheduleDraft()` in `normalizeEvent.ts` emits a `scheduleItems`
+ * entry for an ordinary one-time event too, just without a `dateEnd` — the
+ * P2 regression this fixture guards: that must never render as
+ * "raw ranges: 1" in either report.
+ */
+function singleDateEventPlanFixture(): MigrationPlan {
+  const item: MigrationPlanItem = {
+    sourceRecordKey: "wordpress-db:events:56226",
+    sourceEntityType: "wordpress-db:events",
+    action: "CREATE",
+    status: "PLANNED",
+    targetType: "ACTIVITY",
+    summary: {
+      title: "Игра",
+      slug: "igra",
+      mediaRefCount: 0,
+      relationRefCount: 0,
+      rawRangeCount: 0,
+      boundaryDateCount: 1,
+      sessionCount: 1,
+      firstSessionDate: "2026-08-01",
+      lastSessionDate: "2026-08-01",
+    },
+    warnings: [],
+  };
+  return {
+    ...eventPlanFixture(),
+    items: [item],
+    stats: {
+      ...eventPlanFixture().stats!,
+      sourceEntityTypeCounts: { "wordpress-db:events": 1 },
+    },
+  };
+}
+
+function testHumanReportSingleDateEventNeverShowsAsARange() {
+  const report = buildPreviewHumanReport(singleDateEventPlanFixture(), { entity: "event", limit: null });
+
+  assert.match(report, /sessions: 1 \(raw ranges: 0, boundary dates: 1\)/);
+  assert.ok(!report.includes("raw ranges: 1"), "a single-date event's own scheduleItems entry must never be counted as a range");
+}
+
+function testJsonReportSingleDateEventHasZeroRawRangeCount() {
+  const jsonReport = buildPreviewJsonReport(singleDateEventPlanFixture(), { entity: "event", limit: null });
+  const candidate = jsonReport.candidates[0];
+
+  assert.equal(candidate.rawRangeCount, 0);
+  assert.equal(candidate.sessionCount, 1);
+}
+
 async function testJsonReportExcludesRawContent() {
   const plan = await buildTestPlan();
   const jsonReport = buildPreviewJsonReport(plan, { entity: "all", limit: null });
@@ -682,6 +809,10 @@ async function main() {
   await testStatsPresentAndUsedByReport();
   await testHumanReportContent();
   await testHumanReportEntityFilterNarrowsBreakdown();
+  testHumanReportShowsMaterializedSessionCountForEvents();
+  testJsonReportIncludesMaterializedSessionFields();
+  testHumanReportSingleDateEventNeverShowsAsARange();
+  testJsonReportSingleDateEventHasZeroRawRangeCount();
   await testJsonReportExcludesRawContent();
   await testPreviewConflictDoesNotRequireWriteDelegatesAndSerializesSafeFields();
   await testPreviewTargetRowMissingConflict();
