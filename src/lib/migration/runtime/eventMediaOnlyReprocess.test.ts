@@ -236,6 +236,9 @@ function candidateFixture(overrides: Partial<NormalizedEventCandidate> = {}): No
 function recordingMediaImporter(outcome: AttachmentImportOutcome): { importer: StrictEventMediaImporter; calls: () => unknown[] } {
   const calls: unknown[] = [];
   const importer: StrictEventMediaImporter = {
+    async findExistingMediaAssets() {
+      return new Map(); // nothing proven yet — matches the empty-target scenario these tests exercise.
+    },
     async resolveAndImportAttachments(input) {
       calls.push(input);
       return new Map(input.ids.map((id) => [id, outcome]));
@@ -246,21 +249,29 @@ function recordingMediaImporter(outcome: AttachmentImportOutcome): { importer: S
 
 function fakePrisma(): StrictEventMediaReplayPrismaClient {
   const activityUpdates: unknown[] = [];
-  return {
+  let coverImageId: string | null = null;
+  const rows: unknown[] = [];
+  const txClient = {
     activity: {
-      update: (async (args: unknown) => {
+      findUnique: (async () => ({ coverImageId })) as unknown as StrictEventMediaReplayPrismaClient["activity"]["findUnique"],
+      update: (async (args: { data: { coverImageId: string | null } }) => {
         activityUpdates.push(args);
+        coverImageId = args.data.coverImageId;
         return {};
       }) as unknown as StrictEventMediaReplayPrismaClient["activity"]["update"],
     },
     activityImage: {
       create: (async () => ({})) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["create"],
       deleteMany: (async () => ({ count: 0 })) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["deleteMany"],
-      findMany: (async () => []) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["findMany"],
+      findMany: (async () => rows) as unknown as StrictEventMediaReplayPrismaClient["activityImage"]["findMany"],
     },
     mediaAsset: {
       findFirst: (async () => ({ id: "media-64511", publicUrl: "/uploads/64511.webp" })) as unknown as StrictEventMediaReplayPrismaClient["mediaAsset"]["findFirst"],
     },
+  };
+  return {
+    ...txClient,
+    $transaction: async (fn) => fn(txClient),
   };
 }
 

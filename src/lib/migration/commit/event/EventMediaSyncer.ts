@@ -274,20 +274,29 @@ export class EventMediaSyncer {
     return outcomes;
   }
 
-  private async importOrReuseAttachment(input: {
-    attachmentId: number;
-    attachment: WordPressAttachmentRow;
-    importer: MediaImporterLike;
-    sourceId: string;
-    sourceHash: string;
-    runId: string | null;
-    recordId: string | null;
-    targetRole: string;
-  }): Promise<AttachmentImportOutcome> {
-    const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
+  /**
+   * Read-only existing-lineage lookup, extracted out of
+   * `importOrReuseAttachment()`'s own dedup check so a caller can ask "is
+   * this attachment already imported?" without risking a download attempt
+   * for the ones that aren't — used by `strictEventMediaReplay.ts`'s
+   * preflight, which must prove existing target media's origin using only
+   * already-committed lineage, never a fresh (and therefore write-causing)
+   * import attempt.
+   */
+  async findExistingMediaAssets(input: { ids: readonly number[]; sourceId: string }): Promise<Map<number, ImportedEventMedia>> {
+    const found = new Map<number, ImportedEventMedia>();
+    for (const id of input.ids) {
+      const existing = await this.findExistingMediaAssetForAttachment(input.sourceId, id);
+      if (existing) found.set(id, existing);
+    }
+    return found;
+  }
+
+  private async findExistingMediaAssetForAttachment(sourceId: string, attachmentId: number): Promise<ImportedEventMedia | null> {
+    const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(attachmentId);
     const existingLineage = await this.deps.prisma.migrationLineage.findFirst({
       where: {
-        sourceId: input.sourceId,
+        sourceId,
         sourceRecordKey: attachmentSourceRecordKey,
         targetType: "MEDIA_ASSET",
         isActive: true,
@@ -300,10 +309,28 @@ export class EventMediaSyncer {
         select: { id: true, publicUrl: true },
       });
       if (asset?.publicUrl?.trim()) {
-        return { ok: true, reused: true, mediaId: asset.id, publicUrl: asset.publicUrl.trim() };
+        return { mediaId: asset.id, publicUrl: asset.publicUrl.trim() };
       }
     }
+    return null;
+  }
 
+  private async importOrReuseAttachment(input: {
+    attachmentId: number;
+    attachment: WordPressAttachmentRow;
+    importer: MediaImporterLike;
+    sourceId: string;
+    sourceHash: string;
+    runId: string | null;
+    recordId: string | null;
+    targetRole: string;
+  }): Promise<AttachmentImportOutcome> {
+    const existing = await this.findExistingMediaAssetForAttachment(input.sourceId, input.attachmentId);
+    if (existing) {
+      return { ok: true, reused: true, mediaId: existing.mediaId, publicUrl: existing.publicUrl };
+    }
+
+    const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
     try {
       const writer = new MediaImportWriter({
         mediaImporter: input.importer,
