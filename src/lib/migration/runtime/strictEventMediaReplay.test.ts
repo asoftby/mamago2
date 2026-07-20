@@ -457,6 +457,89 @@ async function testOwnerMissingRejectsWithoutTouchingTarget() {
   assert.equal(activityUpdates.length, 0);
 }
 
+// ---------------------------------------------------------------------------
+// Gallery normalization — cover excluded, duplicates deduped preserving
+// order, consistently across preflight/NOOP/apply/result.
+// ---------------------------------------------------------------------------
+
+async function testCoverAlsoPresentInGalleryIsExcludedFromGallery() {
+  const { eventMediaSyncer, strictPrisma, getCommittedCoverImageId, getCommittedRows } = createHarness();
+  const result = await runStrictEventMediaReplay(
+    replayInput({
+      candidate: candidateFixture({ media: { featuredAttachmentId: 10, galleryAttachmentIds: [10, 11] } }),
+      mediaImporter: eventMediaSyncer,
+      prisma: strictPrisma,
+    }),
+  );
+  assert.equal(result.status, "APPLIED");
+  if (result.status === "APPLIED") {
+    assert.deepEqual(result.galleryMediaIds, ["media-11"], "the cover's own attachment id must never also appear in the gallery result");
+  }
+  assert.equal(getCommittedCoverImageId(), "media-10");
+  assert.deepEqual(getCommittedRows(), [{ activityId: "activity-1", mediaAssetId: "media-11", url: "/uploads/11.webp", sortOrder: 0 }]);
+}
+
+async function testDuplicateGalleryAttachmentIdsAreDeduped() {
+  const { eventMediaSyncer, strictPrisma, getCommittedRows } = createHarness();
+  const result = await runStrictEventMediaReplay(
+    replayInput({
+      candidate: candidateFixture({ media: { featuredAttachmentId: 10, galleryAttachmentIds: [11, 11, 12] } }),
+      mediaImporter: eventMediaSyncer,
+      prisma: strictPrisma,
+    }),
+  );
+  assert.equal(result.status, "APPLIED");
+  if (result.status === "APPLIED") {
+    assert.deepEqual(result.galleryMediaIds, ["media-11", "media-12"], "a duplicate attachment id must produce exactly one gallery row, order preserved");
+  }
+  assert.deepEqual(getCommittedRows(), [
+    { activityId: "activity-1", mediaAssetId: "media-11", url: "/uploads/11.webp", sortOrder: 0 },
+    { activityId: "activity-1", mediaAssetId: "media-12", url: "/uploads/12.webp", sortOrder: 1 },
+  ]);
+}
+
+async function testRepeatedReplayOfCoverInGalleryScenarioIsNoop() {
+  const { eventMediaSyncer, strictPrisma, getCommittedCoverImageId, getCommittedRows } = createHarness();
+  const candidate = candidateFixture({ media: { featuredAttachmentId: 10, galleryAttachmentIds: [10, 11, 11] } });
+
+  const first = await runStrictEventMediaReplay(replayInput({ candidate, mediaImporter: eventMediaSyncer, prisma: strictPrisma }));
+  assert.equal(first.status, "APPLIED");
+
+  const second = await runStrictEventMediaReplay(
+    replayInput({
+      candidate,
+      current: { coverImageId: getCommittedCoverImageId(), galleryMediaAssetIds: getCommittedRows().map((r) => r.mediaAssetId) },
+      mediaImporter: eventMediaSyncer,
+      prisma: strictPrisma,
+    }),
+  );
+  assert.equal(second.status, "NOOP_ALREADY_SYNCED", "the normalized (cover-excluded, deduped) gallery must round-trip identically on a repeat replay");
+  assert.equal(getCommittedRows().length, 1, "still exactly one gallery row — no duplicates from either normalization or the repeat run");
+}
+
+async function testMissingOutcomeForRequestedAttachmentFailsWithoutTouchingTarget() {
+  const { eventMediaSyncer, strictPrisma, activityUpdates, getCommittedCoverImageId, getCommittedRows } = createHarness();
+  // A defensive case: the importer's map doesn't cover every requested id
+  // (should never happen with the real EventMediaSyncer, but must not be
+  // silently treated as success if it ever did).
+  const wrappedImporter = {
+    findExistingMediaAssets: eventMediaSyncer.findExistingMediaAssets.bind(eventMediaSyncer),
+    resolveAndImportAttachments: async (input: Parameters<typeof eventMediaSyncer.resolveAndImportAttachments>[0]) => {
+      const outcomes = await eventMediaSyncer.resolveAndImportAttachments(input);
+      outcomes.delete(12); // simulate a missing outcome for one requested attachment
+      return outcomes;
+    },
+  };
+  const result = await runStrictEventMediaReplay(replayInput({ mediaImporter: wrappedImporter, prisma: strictPrisma }));
+  assert.equal(result.status, "FAILED");
+  if (result.status === "FAILED") {
+    assert.ok(result.failures.some((f) => f.attachmentId === 12 && f.code === "EVENT_MEDIA_ONLY_OUTCOME_MISSING"));
+  }
+  assert.equal(activityUpdates.length, 0);
+  assert.equal(getCommittedCoverImageId(), null);
+  assert.deepEqual(getCommittedRows(), []);
+}
+
 async function main() {
   await testUnknownExistingCoverRejectsBeforeAnyImport();
   await testUnknownExistingGalleryRejectsBeforeAnyImport();
@@ -470,6 +553,11 @@ async function main() {
   await testFailedAttachmentImportLeavesTargetUntouched();
   await testSourceMediaMissingRejectsWithoutTouchingTarget();
   await testOwnerMissingRejectsWithoutTouchingTarget();
+
+  await testCoverAlsoPresentInGalleryIsExcludedFromGallery();
+  await testDuplicateGalleryAttachmentIdsAreDeduped();
+  await testRepeatedReplayOfCoverInGalleryScenarioIsNoop();
+  await testMissingOutcomeForRequestedAttachmentFailsWithoutTouchingTarget();
 }
 
 main()

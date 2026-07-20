@@ -94,6 +94,26 @@ function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
+/**
+ * The gallery relation never includes the cover (see
+ * `replaceActivityGalleryFromMediaIds`'s own `id !== coverMediaId` filter
+ * and its de-dupe via `Set`) — every preflight comparison, NOOP check,
+ * import projection, apply, and result payload in this module must use
+ * this exact same normalized list, or they'll disagree with what actually
+ * ends up written (and with each other on a repeat replay).
+ */
+function normalizedGalleryAttachmentIds(galleryAttachmentIds: readonly number[], featuredAttachmentId: number | null): number[] {
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (const id of galleryAttachmentIds) {
+    if (id === featuredAttachmentId) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
+}
+
 class TargetChangedDuringReplayError extends Error {}
 
 export async function runStrictEventMediaReplay(
@@ -118,7 +138,7 @@ export async function runStrictEventMediaReplay(
   }
 
   const featuredAttachmentId = input.candidate.media?.featuredAttachmentId ?? null;
-  const galleryAttachmentIds = input.candidate.media?.galleryAttachmentIds ?? [];
+  const galleryAttachmentIds = normalizedGalleryAttachmentIds(input.candidate.media?.galleryAttachmentIds ?? [], featuredAttachmentId);
 
   // --- Read-only preflight: prove existing target media's origin using
   // only already-committed MEDIA_ASSET lineage — no import attempt, no
@@ -164,7 +184,11 @@ export async function runStrictEventMediaReplay(
     return {
       status: "NOOP_ALREADY_SYNCED",
       coverMediaId: provenCoverMediaId,
-      galleryMediaIds: galleryProvenIds as string[],
+      // No unsafe cast: `gallerySyncedOrNotNeeded` above already guarantees
+      // every entry is proven (non-null) whenever the gallery is non-empty
+      // — filtering (rather than asserting) drops any stray null instead
+      // of lying about it.
+      galleryMediaIds: galleryProvenIds.filter((id): id is string => id !== null),
     };
   }
 
@@ -180,9 +204,20 @@ export async function runStrictEventMediaReplay(
     featuredAttachmentId,
   });
 
+  // Iterate over every *requested* id, not just whatever happens to be
+  // present in `outcomes` — a missing entry for a requested attachment is
+  // itself a failure, never silently treated as success (which the old
+  // `as string[]` cast further down could otherwise have papered over).
   const failures: AttachmentFailure[] = [];
-  for (const [attachmentId, outcome] of outcomes) {
-    if (!outcome.ok) {
+  for (const attachmentId of ids) {
+    const outcome = outcomes.get(attachmentId);
+    if (!outcome) {
+      failures.push({
+        attachmentId,
+        code: "EVENT_MEDIA_ONLY_OUTCOME_MISSING",
+        message: "No import outcome was returned for this attachment id.",
+      });
+    } else if (!outcome.ok) {
       failures.push({ attachmentId, code: outcome.code, message: outcome.message, details: outcome.details });
     }
   }
@@ -196,13 +231,24 @@ export async function runStrictEventMediaReplay(
     };
   }
 
-  const resolvedCover = featuredAttachmentId !== null ? outcomes.get(featuredAttachmentId) : undefined;
-  const resolvedCoverMediaId = resolvedCover && isOk(resolvedCover) ? resolvedCover.mediaId : null;
-  const resolvedCoverPublicUrl = resolvedCover && isOk(resolvedCover) ? resolvedCover.publicUrl : null;
-  const resolvedGalleryMediaIds = galleryAttachmentIds.map((id) => {
-    const outcome = outcomes.get(id);
-    return outcome && isOk(outcome) ? outcome.mediaId : null;
-  }) as string[]; // every id succeeded — failures already returned above.
+  // Safe by construction: every id in `ids` (which is a superset of
+  // `galleryAttachmentIds` and includes `featuredAttachmentId`) has a
+  // confirmed `ok: true` outcome at this point — the `failures` check
+  // above already returned otherwise. No unsafe cast: this throws (rather
+  // than silently smuggling a `null` through as a `string`) if that
+  // invariant is somehow ever violated.
+  function requireResolvedMediaId(attachmentId: number): { mediaId: string; publicUrl: string } {
+    const outcome = outcomes.get(attachmentId);
+    if (!outcome || !isOk(outcome)) {
+      throw new Error(`Unreachable: no successful outcome for attachment ${attachmentId} after the failures check passed.`);
+    }
+    return outcome;
+  }
+
+  const resolvedCover = featuredAttachmentId !== null ? requireResolvedMediaId(featuredAttachmentId) : null;
+  const resolvedCoverMediaId = resolvedCover?.mediaId ?? null;
+  const resolvedCoverPublicUrl = resolvedCover?.publicUrl ?? null;
+  const resolvedGalleryMediaIds = galleryAttachmentIds.map((id) => requireResolvedMediaId(id).mediaId);
 
   // --- Atomic apply, with a concurrency guard re-proving the target
   // hasn't changed since preflight (e.g. a concurrent manual edit). File
