@@ -225,6 +225,27 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 
 ## 1. Контентные сущности (инженерная работа по готовому паттерну)
 
+### Progress matrix (снимок 2026-07-20)
+
+| Трек | Статус |
+| --- | --- |
+| Places | DONE |
+| Routes | IMPORTED 14/14; manual review, publish и redirects pending |
+| Events | 4/8 eligible imported; 4 CREATE и 66 sessions pending |
+| Offers | NOT STARTED |
+| Users + activation | NOT STARTED |
+| Profiles/ownership/media | NOT STARTED |
+| Reviews | NOT STARTED |
+| Article media | NOT STARTED |
+| Redirects/pages/SEO | PARTIAL |
+| Production validation/cutover | NOT STARTED |
+
+Оценка (2026-07-20): Events engineering readiness ≈85%; после закрытия
+Events остаётся 8 крупных P0-блоков (Offers, Users+activation,
+Profiles/ownership/media, Reviews, Article media, Redirects/pages/SEO,
+Production validation/cutover, плюс сам Events full batch); до
+технического cutover ориентировочно остаётся 55–65% взвешенного объёма.
+
 ### Places (82 publish)
 
 **Статус: engine готов (§0) → full-batch READINESS AUDITED (2026-07-14) →
@@ -1132,44 +1153,101 @@ runner'а не покрыта тестами. Требует отдельной 
       дополнительных attachment IDs как не импортированных/не представимых
       без расширения модели/UI.
 
-### Events (28 eligible)
+### Events (8 eligible + 1 past-only excluded, live count 2026-07-20 — заголовок "28" был устаревшей оценкой, см. журнал сессий)
 
-**Статус: engine готов (§0 — adapter/normalizer/runner +
-`EventMediaSyncer` существуют) → фактический импорт НЕ НАЧАТ.**
-Готовность движка ≠ выполненный импорт — ниже отдельный, самостоятельный
-трек для реальных данных, по аналогии с Places/Routes/Offers.
+**Статус: engine готов (§0) → 4 golden sample закрыты (CREATE → реальные
+файлы → SKIP_UNCHANGED) → 4 CREATE Event остаются перед full batch.**
 
-- [ ] Полный source inventory всех событий (все Event-посты источника,
-      не только уже известные 28 eligible — подтвердить, что 28 это
-      действительно полный отфильтрованный набор, а не устаревшая
-      оценка).
-- [ ] 28 eligible active/future Event — read-only preview/аудит перед
-      любым commit (аналогично Places §1 read-only readiness audit).
-- [ ] Три golden Event — targeted commit по одному, с теми же gates,
-      что и у Place golden write (backup, preflight, idempotency,
-      repeat-run 0 downloads/0 writes).
-- [ ] Media policy: подтвердить поведение отдельно для local/dev
-      (sampled allowlist, см. `resolveSampledMediaPolicy`) и production
-      (FULL для всех eligible) — не предполагать, читать код.
-- [ ] UI verification: date/time, city, visibility, публичная +
-      admin-страница для golden Event.
-- [ ] Idempotency: повторный targeted commit того же Event — 0
-      duplicate entity/lineage/media.
-- [ ] Event visibility/city regression — подтвердить, что миграция не
-      ломает существующую publish/visibility-логику для уже созданных
-      вручную Event.
-- [ ] Full batch (28 Event) — только после закрытия всех пунктов выше,
-      **не запускался**.
+#### Закрытые golden samples
+
+- **Event 64251** — CREATE с 34 будущими `ActivitySession`; один `MANUAL`
+  `EventVenue`; historical lineage реактивирована in-place (не создан
+  дубль); повторный targeted commit → `SKIP_UNCHANGED`. Golden sample
+  closed.
+- **Event 56226** — media policy `FULL`; cover attachment `64508`; 1
+  новый `MediaAsset`; 0 `ActivityImage` (галереи в источнике нет);
+  повторный commit → `SKIP_UNCHANGED`, без повторной загрузки/обработки
+  изображения, файл и его responsive-варианты не изменились.
+- **Event 56479** — media policy `FULL`; cover attachment `64499`; 1
+  новый `MediaAsset`; 0 `ActivityImage`; повторный commit →
+  `SKIP_UNCHANGED`, без повторной загрузки.
+- **Event 60404** — media policy `FULL`; cover `60406`; gallery
+  `60407`→`60408`→`60409`→`60410` (4 изображения, порядок
+  `ActivityImage.sortOrder` подтверждён); 5 новых `MediaAsset`, 4
+  `ActivityImage`; 36 materialized `ActivitySession` (3 range × 12 дней,
+  не 6 boundary dates — см. PR #62); повторный commit → `SKIP_UNCHANGED`,
+  без повторной загрузки/пересборки ни одного из 5 файлов.
+
+Все четыре golden sample верифицированы напрямую в БД и на файловой
+системе (точные ID строк, exact file sizes/MIME, mtimes не менялись при
+повторном запуске) — не только по логам commit-скрипта.
+
+#### Закрытые кодовые исправления
+
+- **PR #59** — atomic Event CREATE (Activity/ActivitySession/EventVenue/
+  lineage в одной Prisma-транзакции); guarded reactivation
+  существующей (неактивной) historical lineage вместо `create()`-then-
+  catch-`P2002`, который ломался внутри транзакции; исправлено stale
+  wiring в `scripts/migration-commit-wordpress-db-from-json.ts`
+  (`EventCommitRunner` конструировался с удалённым `lineageWriter`
+  вместо `runAtomicCreate`).
+- **PR #61** — comma-separated Event gallery attachment IDs
+  (`parseAttachmentIds()` в `normalizeEvent.ts` теперь разбивает каждое
+  meta-значение по запятой, а не только по отдельным meta-строкам).
+  Merge SHA `a4235f8a11513301e67376a026ca5b9e831a4682`. Docker Build &
+  Push — SUCCESS.
+- **PR #62** — общий pure helper `materializeEventScheduleSessions()`
+  (`src/lib/event/materializeScheduleSessions.ts`), переиспользуемый и
+  commit-путём (`event-sessions-sync`), и preview/reporting — preview
+  теперь показывает реально материализуемое число `ActivitySession`, а
+  не число boundary dates диапазона. Single-date Event показывает
+  `rawRangeCount: 0` (не `1` — `buildScheduleDraft()` всегда создаёт один
+  `scheduleItems`-item даже без `dateEnd`). `60404` показывает 3 range /
+  6 boundary dates / 36 materialized sessions. Merge SHA
+  `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf`. CI — SUCCESS. **Docker
+  Build & Push на момент этой записи — IN_PROGRESS, не отмечать SUCCESS
+  до отдельного подтверждения.**
+
+#### Текущая Event selection (live discover, 2026-07-20)
+
+- **SKIP_POLICY**: `49842` — past-only (`EVENT_PAST_ONLY_EXCLUDED`).
+- **SKIP_UNCHANGED** (golden samples закрыты выше): `64251`, `56226`,
+  `56479`, `60404`.
+- **CREATE remaining** (media policy `METADATA`, изображения не
+  загружать до отдельного решения):
+  - `62977` — 29 materialized sessions;
+  - `63510` — 35 materialized sessions;
+  - `64159` — 1 session;
+  - `64505` — 1 session.
+- **Итого**: осталось 4 CREATE Event, 66 `ActivitySession` суммарно,
+  media policy `METADATA` для всех четырёх.
+
+Protected Event `55980` не входит в текущую WP publish selection и
+остаётся неизменным (ручное редактирование post-import защищено — см.
+паттерн "manual-protected" уже применённый к Places 437/5389/895).
+
+#### Следующие открытые пункты Events
+
+- [ ] Docker Build & Push SUCCESS на exact SHA
+      `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf` (PR #62).
+- [ ] Ledger-aware read-only preview оставшихся 4 CREATE Event (`62977`,
+      `63510`, `64159`, `64505`) с правильными materialized session
+      counts (после PR #62).
+- [ ] Controlled targeted commit `62977`/`63510`/`64159`/`64505` с
+      media policy `METADATA`.
+- [ ] Idempotency replay всех четырёх — `SKIP_UNCHANGED`, zero
+      domain/media/lineage delta.
+- [ ] Editorial review: category/place/organizer matching для всех
+      импортированных Event (`EVENT_CATEGORY_UNMATCHED`/
+      `EVENT_PLACE_UNMATCHED`/`EVENT_ORGANIZER_REQUIRES_REVIEW` —
+      известное, ожидаемое поведение, требует ручного разбора перед
+      публикацией).
+- [ ] Event slug history и redirect validation (301/410 coverage для
+      прошедших/legacy Event URL).
+- [ ] Full batch за пределами текущей selection (если появятся новые
+      Event на источнике) — не запускался.
 - [ ] Production FULL media — только после успешного local/dev batch и
       отдельного Go-решения, **не запускался**.
-- [ ] Поведение завершившегося (past) нативного Event после миграции —
-      подтвердить, что уже прошедшие события ведут себя корректно
-      (`shouldExcludePastEvent()` уже существует в discover/normalize —
-      подтвердить его реальное поведение на живых данных, не только по
-      коду).
-- [ ] 100% legacy URL coverage прошедших событий через 301/410 —
-      подтвердить, что каждый прошедший Event имеет редирект-запись в
-      `manifest.csv`, ни один legacy URL не остаётся без 301/410.
 
 ### Offers (services / hb-programs, 90+ publish)
 
@@ -2203,3 +2281,63 @@ dispatcher-branch, ни CLI-flag).
   read-only preview/аудит» (с уточнением: живой аудит 2026-07-18 дал
   12 published/11 eligible, а не 28 — цифра 28 в заголовке раздела,
   видимо, устарела и требует отдельной проверки перед golden write).
+- **2026-07-20 — Claude Code** — Четыре Event golden sample закрыты:
+  `64251` (CREATE, 34 будущих `ActivitySession`, 1 `MANUAL` `EventVenue`,
+  historical lineage реактивирована in-place, повторный commit →
+  `SKIP_UNCHANGED`); `56226` и `56479` (media policy `FULL`, по 1
+  cover `MediaAsset`, 0 `ActivityImage`, повторный commit →
+  `SKIP_UNCHANGED` без повторной загрузки); `60404` (media policy
+  `FULL`, cover `60406` + gallery `60407`→`60408`→`60409`→`60410`, 5
+  `MediaAsset`, 4 `ActivityImage` в подтверждённом порядке, 36
+  materialized `ActivitySession`, повторный commit → `SKIP_UNCHANGED`
+  без повторной загрузки/пересборки файлов). Все четыре верифицированы
+  напрямую в БД и на файловой системе (точные ID, exact file
+  sizes/MIME, неизменные mtimes при повторном запуске), не только по
+  логам commit-скрипта.
+
+  Три кодовых PR смержены в dev в ходе тех же сессий: **PR #59**
+  (atomic Event CREATE, guarded historical lineage reactivation,
+  исправлено stale wiring в `-from-json` CLI); **PR #61** (parse
+  comma-separated Event gallery attachment id — `60404`'s gallery была
+  бы полностью потеряна без этого фикса; merge SHA
+  `a4235f8a11513301e67376a026ca5b9e831a4682`, Docker SUCCESS); **PR
+  #62 + follow-up** (общий pure helper
+  `materializeEventScheduleSessions()`, переиспользуемый и commit-, и
+  preview-путём — preview для range-based schedule раньше показывал
+  число boundary dates диапазона вместо реально материализуемых
+  ActivitySession, `60404` показывал бы «6 sessions» вместо 36; отдельным
+  follow-up commit в том же PR исправлен P2 review finding —
+  `rawRangeCount` считал `scheduleItems.length` буквально, из-за чего
+  обычный single-date Event показывался бы как «1 range»; merge SHA
+  `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf`, CI SUCCESS, **Docker Build
+  & Push на момент этой записи ещё IN_PROGRESS** — не отмечать SUCCESS
+  до отдельного подтверждения в следующей сессии).
+
+  Текущая live Event selection (ledger-aware read-only preview,
+  2026-07-20): `49842` — `SKIP_POLICY` (past-only); `64251`/`56226`/
+  `56479`/`60404` — `SKIP_UNCHANGED` (golden samples выше);
+  `62977`/`63510`/`64159`/`64505` — `CREATE`, media policy `METADATA`
+  (изображения для них пока не загружаются), суммарно 66
+  materialized `ActivitySession` (29+35+1+1). Protected Event `55980`
+  вне текущей WP publish selection, не тронут (тот же
+  manual-protected-паттерн, что и у Places 437/5389/895).
+
+  **Известное расхождение, не внесённое в счётчики выше по продуктовому
+  решению Алексея**: тот же live discover, выполненный сразу после
+  merge PR #62 (до этой docs-сессии), вернул ПЯТЫЙ `CREATE`-кандидат —
+  `wordpress-db:events:56062` (single date, `2026-08-06`, 1
+  materialized session) — которого нет ни в одном списке "4 CREATE
+  remaining" этой сессии. Это либо реальный новый Event, опубликованный
+  на живом WP-сайте между прогонами превью в этой сессии, либо
+  разночтение в scope текущей selection — требует отдельной проверки/
+  решения Алексея перед следующим ledger-aware preview, не
+  экстраполировать самостоятельно.
+
+  Незавершённое: ветка `docs/update-event-migration-progress-20260720`
+  не смержена (PR открыт, docs-only, merge за Алексеем). Следующий шаг:
+  дождаться Docker Build & Push SUCCESS на exact SHA
+  `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf` (одна проверка, без
+  polling), затем ledger-aware read-only preview оставшихся четырёх (или
+  пяти — см. расхождение выше) `CREATE` Event с правильными
+  materialized session counts, и только после этого — controlled
+  targeted commit с media policy `METADATA`.
