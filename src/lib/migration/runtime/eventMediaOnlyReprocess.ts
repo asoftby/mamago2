@@ -26,13 +26,17 @@
  *   most: this replay is only ever allowed when the freshly computed
  *   canonical hash is byte-identical to the stored lineage hash, i.e. there
  *   is zero possibility of a domain-content change riding along with the
- *   media fix.
+ *   media fix. Also applies the same past-only-Event eligibility policy the
+ *   real migration planner uses (`EVENT_PAST_ONLY_EXCLUDED`, see
+ *   `core/orchestrator.ts`'s `isPastOnlyExcludedEvent()`) — a past-only
+ *   Event is refused here too, before any media preflight/import/write.
  * - `runStrictEventMediaReplay()`'s own preflight/divergence checks (see
  *   that module) — the actual media-level safety gate.
  */
 import { CANONICAL_SOURCE_HASH_VERSION, hashEventBundle } from "../adapters/wordpress-db/canonicalSourceHash";
 import { normalizeEvent } from "../adapters/wordpress-db/normalizeEvent";
 import type { WordPressEventBundle } from "../adapters/wordpress-db/types";
+import type { MigrationWarning } from "../types";
 import type { NormalizedEventCandidate } from "../commit/event/types";
 import type { MediaPolicyName } from "./MigrationProfile";
 import {
@@ -44,6 +48,22 @@ import {
 } from "./strictEventMediaReplay";
 
 const EVENT_SOURCE_RECORD_KEY_PATTERN = /^wordpress-db:events:(\d+)$/;
+
+/**
+ * Same exact warning code `core/orchestrator.ts`'s own
+ * `isPastOnlyExcludedEvent()` checks to plan a past-only Event as
+ * `SKIP_POLICY` (Phoenix v1 never migrates past-only Events — see
+ * `docs/migration/prelaunch-checklist.md` §0.6). Media-only replay must
+ * apply the identical eligibility policy: never checked via
+ * `scheduleDraft === null` alone, since that's also produced by a missing
+ * or unparseable schedule — an entirely different, unrelated case this
+ * exact warning code disambiguates from "every session was in the past".
+ */
+const EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE = "EVENT_PAST_ONLY_EXCLUDED";
+
+function isPastOnlyExcludedEvent(warnings: readonly MigrationWarning[] | undefined): boolean {
+  return (warnings ?? []).some((warning) => warning.code === EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE);
+}
 
 export function parseEventPostIdFromSourceRecordKey(sourceRecordKey: string): number | null {
   const match = EVENT_SOURCE_RECORD_KEY_PATTERN.exec(sourceRecordKey.trim());
@@ -135,6 +155,13 @@ export function validateEventMediaOnlyReprocessRuntime(
     };
   }
   const normalized = normalizeEvent(input.bundle, { now: input.now ?? new Date() });
+  if (isPastOnlyExcludedEvent(normalized.warnings)) {
+    return {
+      ok: false,
+      reason:
+        "Source Event is past-only (every event_date session is in the past relative to the migration clock) — Phoenix v1 excludes past-only Events entirely; media-only replay refused.",
+    };
+  }
   return { ok: true, freshHash, candidate: normalized.normalizedPayload as NormalizedEventCandidate };
 }
 

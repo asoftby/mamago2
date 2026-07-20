@@ -201,6 +201,99 @@ function testRuntimeAcceptsHashMatch() {
 }
 
 // ---------------------------------------------------------------------------
+// Past-only Event eligibility — must apply the identical policy
+// `core/orchestrator.ts`'s `isPastOnlyExcludedEvent()` uses for the real
+// migration planner (SKIP_POLICY), keyed on the exact
+// `EVENT_PAST_ONLY_EXCLUDED` warning code — never on `scheduleDraft ===
+// null` alone, since that's also produced by a missing/unparseable
+// schedule (an unrelated case).
+// ---------------------------------------------------------------------------
+
+const PAST_ONLY_MIGRATION_NOW = new Date("2026-07-20T12:00:00Z");
+
+function testRuntimeRejectsPastOnlyEvent() {
+  const bundle = bundleFixture({ postMeta: { _thumbnail_id: ["64511"], event_date: ["2020-01-01 00:00:00"] } });
+  const result = validateEventMediaOnlyReprocessRuntime({
+    bundle,
+    lineage: { sourceId: "src-1", isActive: true, targetId: "activity-1", lastSourceHash: hashEventBundle(bundle) },
+    targetExists: true,
+    now: PAST_ONLY_MIGRATION_NOW,
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /past-only/i);
+    assert.match(result.reason, /Phoenix v1/);
+  }
+}
+
+function testRuntimeAcceptsFutureOnlyEvent() {
+  const bundle = bundleFixture({ postMeta: { _thumbnail_id: ["64511"], event_date: ["2027-01-01 00:00:00"] } });
+  const result = validateEventMediaOnlyReprocessRuntime({
+    bundle,
+    lineage: { sourceId: "src-1", isActive: true, targetId: "activity-1", lastSourceHash: hashEventBundle(bundle) },
+    targetExists: true,
+    now: PAST_ONLY_MIGRATION_NOW,
+  });
+  assert.equal(result.ok, true);
+}
+
+function testRuntimeAcceptsMixedPastFutureEventRetainingFutureSessions() {
+  const bundle = bundleFixture({
+    postMeta: { _thumbnail_id: ["64511"], event_date: ["2020-01-01 00:00:00", "2027-01-01 00:00:00"] },
+  });
+  const result = validateEventMediaOnlyReprocessRuntime({
+    bundle,
+    lineage: { sourceId: "src-1", isActive: true, targetId: "activity-1", lastSourceHash: hashEventBundle(bundle) },
+    targetExists: true,
+    now: PAST_ONLY_MIGRATION_NOW,
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.candidate.scheduleDraft?.dates, ["2027-01-01"], "only the future session must survive pruning");
+  }
+}
+
+function testRuntimeScheduleDraftNullWithoutPastOnlyWarningIsNotRejected() {
+  // bundleFixture() has no event_date postmeta at all — buildScheduleDraft()
+  // produces scheduleDraft: null via EVENT_SCHEDULE_MISSING, an entirely
+  // different (and non-blocking) warning code. Must not be conflated with
+  // past-only exclusion.
+  const bundle = bundleFixture();
+  const result = validateEventMediaOnlyReprocessRuntime({
+    bundle,
+    lineage: { sourceId: "src-1", isActive: true, targetId: "activity-1", lastSourceHash: hashEventBundle(bundle) },
+    targetExists: true,
+    now: PAST_ONLY_MIGRATION_NOW,
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.candidate.scheduleDraft, null);
+  }
+}
+
+function testPastOnlyGuardPreventsAnyStrictReplayCall() {
+  const bundle = bundleFixture({ postMeta: { _thumbnail_id: ["64511"], event_date: ["2020-01-01 00:00:00"] } });
+  const guardResult = validateEventMediaOnlyReprocessRuntime({
+    bundle,
+    lineage: { sourceId: "src-1", isActive: true, targetId: "activity-1", lastSourceHash: hashEventBundle(bundle) },
+    targetExists: true,
+    now: PAST_ONLY_MIGRATION_NOW,
+  });
+  assert.equal(guardResult.ok, false);
+
+  // The real CLI (migration-commit-wordpress-db.ts) only ever calls
+  // runEventMediaOnlyReprocess after checking `runtimeGuard.ok` — and
+  // TypeScript's own control-flow narrowing on the discriminated
+  // `EventMediaOnlyReprocessRuntimeGuardResult` already proves a
+  // `guardResult.ok` branch is unreachable here (there is no `.candidate`/
+  // `.freshHash` to even construct the call's input from on the `ok:false`
+  // branch) — so this recording importer, never touched by this test,
+  // stands in for the CLI call that structurally cannot happen.
+  const { calls } = recordingMediaImporter({ ok: true, reused: false, mediaId: "media-64511", publicUrl: "/uploads/64511.webp" });
+  assert.equal(calls().length, 0, "resolveAndImportAttachments must never be called for a past-only event");
+}
+
+// ---------------------------------------------------------------------------
 // runEventMediaOnlyReprocess — the entire allowed write surface: one call
 // into EventMediaSyncerLike.sync(), nothing else.
 // ---------------------------------------------------------------------------
@@ -317,6 +410,12 @@ async function main() {
   testRuntimeRejectsMissingHash();
   testRuntimeRejectsHashMismatch();
   testRuntimeAcceptsHashMatch();
+
+  testRuntimeRejectsPastOnlyEvent();
+  testRuntimeAcceptsFutureOnlyEvent();
+  testRuntimeAcceptsMixedPastFutureEventRetainingFutureSessions();
+  testRuntimeScheduleDraftNullWithoutPastOnlyWarningIsNotRejected();
+  testPastOnlyGuardPreventsAnyStrictReplayCall();
 
   await testRunDelegatesToStrictReplayWithNullRunAndRecordId();
 }
