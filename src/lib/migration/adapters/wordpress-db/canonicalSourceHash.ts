@@ -10,6 +10,11 @@ import type {
   WordPressTermRow,
 } from "./types";
 
+/** `postMeta[key]` is present with at least one value — same semantics as `normalizeArticle.ts`'s own `hasMeta()`. */
+function hasMeta(postMeta: WordPressPostMetaByKey, key: string): boolean {
+  return (postMeta[key]?.length ?? 0) > 0;
+}
+
 /**
  * Bumped whenever the canonical hash *input* changes shape (a new
  * allowlisted field added/removed, a serialization rule changed) — never
@@ -142,11 +147,31 @@ const ARTICLE_POSTMETA_ALLOWLIST: readonly string[] = [
   "_wp_old_slug",
 ];
 
+/**
+ * `normalizeArticle()` never parses `_elementor_data`/`wp-story-image` and
+ * friends — it only checks *presence* (`hasMeta()`) to derive
+ * `hasElementorContent`/`hasWebStoryContent`, which drive the
+ * `ARTICLE_ELEMENTOR_CONTENT`/`ARTICLE_WEB_STORY` warnings. Hashing the
+ * raw (often huge) Elementor JSON would make the hash sensitive to
+ * Elementor's own internal churn (which changes on every builder
+ * re-save with zero visible content change) while missing the actual
+ * domain-significant transition: absent ↔ present. Projecting to the
+ * exact boolean the normalizer computes keeps the hash exactly as
+ * sensitive as the target model actually is — no more, no less.
+ */
+function articleContentFlags(postMeta: WordPressPostMetaByKey): { hasElementorContent: boolean; hasWebStoryContent: boolean } {
+  return {
+    hasElementorContent: hasMeta(postMeta, "_elementor_data") || hasMeta(postMeta, "_elementor_template_type"),
+    hasWebStoryContent: hasMeta(postMeta, "wp-story-image") || hasMeta(postMeta, "wp-story-cycle-image"),
+  };
+}
+
 export function buildArticleCanonicalSourceHashInput(bundle: WordPressArticleBundle): unknown {
   return {
     version: CANONICAL_SOURCE_HASH_VERSION,
     post: pickPostFields(bundle.post, ARTICLE_POST_FIELDS),
     postMeta: pickPostMeta(bundle.postMeta, ARTICLE_POSTMETA_ALLOWLIST),
+    contentFlags: articleContentFlags(bundle.postMeta),
     terms: canonicalTerms(bundle.terms),
   };
 }
@@ -179,17 +204,28 @@ const PLACE_POSTMETA_ALLOWLIST: readonly string[] = [
   "rank_math_focus_keyword",
 ];
 
+/**
+ * `normalizePlace()` reads real coordinates from `placeIndex.lat`/`.lng`
+ * (`wp_voxel_index_places`), not from any postmeta key — those feed
+ * `NormalizedPlaceCandidate.coordinates` directly. Omitting this table
+ * from the hash meant a real coordinate edit produced a false
+ * `SKIP_UNCHANGED`. `priority` is excluded: confirmed unread by
+ * `normalizePlace()`, so including it would reintroduce exactly the kind
+ * of "hashed but not domain-significant" field this whole fix removes
+ * elsewhere.
+ */
+function placeIndexProjection(placeIndex: WordPressPlaceBundle["placeIndex"]): { lat: number | null; lng: number | null } | null {
+  if (!placeIndex) return null;
+  return { lat: placeIndex.lat, lng: placeIndex.lng };
+}
+
 export function buildPlaceCanonicalSourceHashInput(bundle: WordPressPlaceBundle): unknown {
   return {
     version: CANONICAL_SOURCE_HASH_VERSION,
     post: pickPostFields(bundle.post, PLACE_POST_FIELDS),
     postMeta: pickPostMeta(bundle.postMeta, PLACE_POSTMETA_ALLOWLIST),
+    placeIndex: placeIndexProjection(bundle.placeIndex),
     terms: canonicalTerms(bundle.terms),
-    // No geospatial-index equivalent for Place hashing today: `placeIndex`
-    // (lat/lng/priority) is a separate table read alongside the bundle,
-    // not part of `WordPressPostBundle` — deliberately out of scope for
-    // this fix (the confirmed drift bug is postmeta-only); tracked as a
-    // known gap, not silently ignored.
   };
 }
 
@@ -243,10 +279,17 @@ export function hashEventBundle(bundle: WordPressEventBundle): string {
   return versionedHash(buildEventCanonicalSourceHashInput(bundle));
 }
 
+/**
+ * No `post_content`/`post_excerpt` — `normalizeRoute()`'s own
+ * `NormalizedRouteCandidate` has no route-level description field at all
+ * (title, slug, status, stops, location, media, SEO, terms only; see its
+ * doc comment). Hashing raw WP content the normalizer never reads would
+ * make Route sourceHash flip on edits with zero effect on the target
+ * model. Stop-level descriptions are real domain data and are already
+ * covered separately via `description-location-N`.
+ */
 const ROUTE_POST_FIELDS: readonly (keyof WordPressPostRow)[] = [
   "post_title",
-  "post_content",
-  "post_excerpt",
   "post_status",
   "post_name",
 ];

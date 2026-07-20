@@ -11,6 +11,7 @@ import type {
   WordPressArticleBundle,
   WordPressEventBundle,
   WordPressPlaceBundle,
+  WordPressPlaceIndexRow,
   WordPressPostMetaByKey,
   WordPressPostRow,
   WordPressRouteBundle,
@@ -56,12 +57,13 @@ function placeBundle(overrides: {
   post?: Partial<WordPressPostRow>;
   postMeta?: WordPressPostMetaByKey;
   terms?: readonly WordPressTermRow[];
+  placeIndex?: WordPressPlaceIndexRow | null;
 } = {}): WordPressPlaceBundle {
   return {
     post: post({ post_type: "places", ...overrides.post }),
     postMeta: overrides.postMeta ?? { cover: ["100"] },
     terms: overrides.terms ?? [],
-    placeIndex: null,
+    placeIndex: overrides.placeIndex ?? null,
   };
 }
 
@@ -138,6 +140,40 @@ function testPlaceVolatileMetaNeverChangesHash() {
     hashPlaceBundle(placeBundle({ postMeta: { cover: ["100"], unknown_plugin_meta: ["x"] } })),
     base,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Place coordinates come from `placeIndex.lat`/`.lng` (wp_voxel_index_places),
+// not from any postmeta key — normalizePlace() reads them directly into
+// NormalizedPlaceCandidate.coordinates. `priority` is unread and must stay
+// hash-insignificant.
+// ---------------------------------------------------------------------------
+
+function testPlaceCoordinatesFromIndexChangeHash() {
+  const withIndex = (lat: number, lng: number, priority = 1) =>
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority, lat, lng } });
+
+  const base = hashPlaceBundle(withIndex(53.9, 27.5667));
+  assert.notEqual(hashPlaceBundle(withIndex(54.0, 27.5667)), base, "changed lat must change the hash");
+  assert.notEqual(hashPlaceBundle(withIndex(53.9, 27.6)), base, "changed lng must change the hash");
+}
+
+function testPlaceCoordinatesNullToPresentChangesHash() {
+  const withoutIndex = hashPlaceBundle(placeBundle({ placeIndex: null }));
+  const withIndex = hashPlaceBundle(
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority: 1, lat: 53.9, lng: 27.5667 } }),
+  );
+  assert.notEqual(withoutIndex, withIndex, "gaining real coordinates (null -> present) must change the hash");
+}
+
+function testPlacePriorityDoesNotChangeHash() {
+  const a = hashPlaceBundle(
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority: 1, lat: 53.9, lng: 27.5667 } }),
+  );
+  const b = hashPlaceBundle(
+    placeBundle({ placeIndex: { post_id: 1, post_status: "publish", priority: 99, lat: 53.9, lng: 27.5667 } }),
+  );
+  assert.equal(a, b, "priority is not read by normalizePlace() — must not affect the hash");
 }
 
 function testArticleVolatileMetaNeverChangesHash() {
@@ -234,7 +270,7 @@ function testPlaceDomainFieldsChangeHash() {
   assert.notEqual(
     hashPlaceBundle(placeBundle({ postMeta: { cover: ["100"], location: ['{"address":"Minsk"}'] } })),
     base,
-    "address/coordinates",
+    "address evidence (raw location postmeta) — not the real Place coordinates, which come from placeIndex, see testPlaceCoordinatesFromIndexChangeHash",
   );
   assert.notEqual(
     hashPlaceBundle(placeBundle({ postMeta: { cover: ["100"], phone: ["+375291234567"] } })),
@@ -281,10 +317,53 @@ function testArticleDomainFieldsChangeHash() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Article content flags — normalizeArticle() only checks *presence* of
+// _elementor_data/_elementor_template_type/wp-story-image/
+// wp-story-cycle-image (hasMeta()), never their content, to compute
+// hasElementorContent/hasWebStoryContent (ARTICLE_ELEMENTOR_CONTENT/
+// ARTICLE_WEB_STORY warnings). The hash must track that exact boolean.
+// ---------------------------------------------------------------------------
+
+function testArticleElementorDataPresenceChangesHash() {
+  const absent = hashArticleBundle(articleBundle());
+  const present = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ['{"a":1}'] } }));
+  assert.notEqual(absent, present, "absent -> _elementor_data present must change the hash");
+}
+
+function testArticleElementorTemplateTypePresenceChangesHash() {
+  const absent = hashArticleBundle(articleBundle());
+  const present = hashArticleBundle(articleBundle({ postMeta: { _elementor_template_type: ["wp-post"] } }));
+  assert.notEqual(absent, present, "absent -> _elementor_template_type present must change the hash");
+}
+
+function testArticleElementorPayloadChurnDoesNotChangeHash() {
+  const first = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ['{"a":1,"b":[1,2,3]}'] } }));
+  const second = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ['{"totally":"different","nested":{"x":99}}'] } }));
+  assert.equal(first, second, "two different non-empty Elementor payloads must hash the same — only presence is domain-significant");
+}
+
+function testArticleWebStoryImagePresenceChangesHash() {
+  const absent = hashArticleBundle(articleBundle());
+  const present = hashArticleBundle(articleBundle({ postMeta: { "wp-story-image": ["123"] } }));
+  assert.notEqual(absent, present, "absent -> wp-story-image present must change the hash");
+}
+
+function testArticleWebStoryCycleImagePresenceChangesHash() {
+  const absent = hashArticleBundle(articleBundle());
+  const present = hashArticleBundle(articleBundle({ postMeta: { "wp-story-cycle-image": ["456"] } }));
+  assert.notEqual(absent, present, "absent -> wp-story-cycle-image present must change the hash");
+}
+
+function testArticleWebStoryValueChurnDoesNotChangeHash() {
+  const first = hashArticleBundle(articleBundle({ postMeta: { "wp-story-image": ["111"] } }));
+  const second = hashArticleBundle(articleBundle({ postMeta: { "wp-story-image": ["222"] } }));
+  assert.equal(first, second, "two different non-empty Web Story values must hash the same — only presence is domain-significant");
+}
+
 function testRouteDomainFieldsChangeHash() {
   const base = hashRouteBundle(routeBundle());
   assert.notEqual(hashRouteBundle(routeBundle({ post: { post_title: "New route title" } })), base);
-  assert.notEqual(hashRouteBundle(routeBundle({ post: { post_content: "<p>new</p>" } })), base, "description");
   assert.notEqual(
     hashRouteBundle(routeBundle({ postMeta: { "title-location-0": ["Stop 1"], "title-location-1": ["Stop 2"] } })),
     base,
@@ -320,6 +399,20 @@ function testRouteStopOrderChangesHash() {
     routeBundle({ postMeta: { "title-location-0": ["B"], "title-location-1": ["A"] } }),
   );
   assert.notEqual(forward, swapped, "swapping which stop index holds which title must change the hash");
+}
+
+function testRouteIgnoredPostFieldsDoNotChangeHash() {
+  const base = hashRouteBundle(routeBundle());
+  assert.equal(
+    hashRouteBundle(routeBundle({ post: { post_content: "<p>completely different content</p>" } })),
+    base,
+    "normalizeRoute() has no route-level description field at all — post_content must not affect the hash",
+  );
+  assert.equal(
+    hashRouteBundle(routeBundle({ post: { post_excerpt: "completely different excerpt" } })),
+    base,
+    "post_excerpt is equally unread by normalizeRoute()",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +464,9 @@ function main() {
   testEventVolatileMetaNeverChangesHash();
   testPostModifiedNeverChangesHashForAnyEntity();
   testPlaceVolatileMetaNeverChangesHash();
+  testPlaceCoordinatesFromIndexChangeHash();
+  testPlaceCoordinatesNullToPresentChangesHash();
+  testPlacePriorityDoesNotChangeHash();
   testArticleVolatileMetaNeverChangesHash();
   testRouteVolatileMetaNeverChangesHash();
 
@@ -380,8 +476,15 @@ function main() {
   testEventStatusChangesHash();
   testPlaceDomainFieldsChangeHash();
   testArticleDomainFieldsChangeHash();
+  testArticleElementorDataPresenceChangesHash();
+  testArticleElementorTemplateTypePresenceChangesHash();
+  testArticleElementorPayloadChurnDoesNotChangeHash();
+  testArticleWebStoryImagePresenceChangesHash();
+  testArticleWebStoryCycleImagePresenceChangesHash();
+  testArticleWebStoryValueChurnDoesNotChangeHash();
   testRouteDomainFieldsChangeHash();
   testRouteStopOrderChangesHash();
+  testRouteIgnoredPostFieldsDoNotChangeHash();
 
   testUnorderedMetaRowPermutationDoesNotChangeHash();
   testUnorderedTermPermutationDoesNotChangeHash();
