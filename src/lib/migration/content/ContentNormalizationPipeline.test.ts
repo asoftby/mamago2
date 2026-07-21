@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   normalizeMigrationContent,
   normalizedContentToArticleContentJson,
+  normalizedContentToArticleContentJsonWithMedia,
 } from "./ContentNormalizationPipeline";
 
 function textOf(result: ReturnType<typeof normalizeMigrationContent>): string {
@@ -163,6 +164,155 @@ function testArticleContentJsonHasNoLiteralBackslashN() {
   }
 }
 
+const GALLERY_SAMPLE_HTML = `
+  <p>Intro paragraph.</p>
+  <figure class="wp-block-image"><img src="https://mamago.by/a-576x1024.jpg" alt="" class="wp-image-111"/></figure>
+  <figure class="wp-block-image"><a href="https://mamago.by/a.jpg"><img src="https://mamago.by/b-576x1024.jpg" alt="" class="wp-image-222"/></a></figure>
+  <p>Middle paragraph.</p>
+  <figure class="wp-block-image"><img src="https://mamago.by/c-576x1024.jpg" alt="cap" class="wp-image-333"/></figure>
+  <p>Final paragraph.</p>
+`;
+
+// ---------------------------------------------------------------------------
+// preserveImagePositions / Article media replay
+// ---------------------------------------------------------------------------
+
+function testDefaultModeStillDropsImageBlocks() {
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: GALLERY_SAMPLE_HTML });
+  assert.deepEqual(
+    result.blocks.map((b) => b.type),
+    ["paragraph", "paragraph", "paragraph", "image", "image", "image"],
+    "default mode still appends images after all text blocks, unchanged",
+  );
+
+  const { contentJson, warnings } = normalizedContentToArticleContentJson(result);
+  assert.deepEqual(
+    contentJson.blocks.map((b) => b.type),
+    ["intro", "text", "text"],
+    "default downconversion still drops every image block",
+  );
+  assert.equal(
+    warnings.filter((w) => w.code === "UNSUPPORTED_ARTICLE_BLOCK_DOWNCONVERTED").length,
+    3,
+    "each dropped image still produces its warning",
+  );
+}
+
+function testAnchorWrappedImageIsNotDestroyed() {
+  // The middle gallery image in GALLERY_SAMPLE_HTML is wrapped in a
+  // link-to-self <a> (WordPress's "Media File" link destination) — before
+  // the normalizeAnchors() fix this silently destroyed the <img> entirely,
+  // in both default and replay mode.
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: GALLERY_SAMPLE_HTML });
+  const images = result.blocks.filter((b) => b.type === "image");
+  assert.equal(images.length, 3, "all three images survive, including the anchor-wrapped one");
+}
+
+function testReplayModePreservesImagePositionsAndAttachmentIds() {
+  const result = normalizeMigrationContent({
+    sourceKind: "wordpress",
+    raw: GALLERY_SAMPLE_HTML,
+    preserveImagePositions: true,
+  });
+
+  assert.deepEqual(
+    result.blocks.map((b) => (b.type === "image" ? `image:${b.attachmentId}` : b.type)),
+    ["paragraph", "image:111", "image:222", "paragraph", "image:333", "paragraph"],
+    "images are interleaved at their original position, each carrying its wp-image-<id>",
+  );
+}
+
+function testReplayNonImageProjectionMatchesDefault() {
+  const defaultResult = normalizeMigrationContent({ sourceKind: "wordpress", raw: GALLERY_SAMPLE_HTML });
+  const replayResult = normalizeMigrationContent({
+    sourceKind: "wordpress",
+    raw: GALLERY_SAMPLE_HTML,
+    preserveImagePositions: true,
+  });
+
+  const defaultProjection = normalizedContentToArticleContentJson(defaultResult).contentJson.blocks;
+  // Passing replay's interleaved blocks through the *default* (resolveImageBlock: null)
+  // downconverter is exactly the content-divergence preflight's projection step.
+  const replayProjection = normalizedContentToArticleContentJson(replayResult).contentJson.blocks;
+
+  assert.deepEqual(replayProjection, defaultProjection, "non-image projection is identical regardless of interleaving");
+}
+
+function testMediaAwareDownconversionResolvesImageBlocks() {
+  const result = normalizeMigrationContent({
+    sourceKind: "wordpress",
+    raw: GALLERY_SAMPLE_HTML,
+    preserveImagePositions: true,
+  });
+
+  const mediaIdByAttachmentId: Record<number, string> = { 111: "media-a", 222: "media-b", 333: "media-c" };
+  const { contentJson, warnings } = normalizedContentToArticleContentJsonWithMedia(result, (block) => {
+    const mediaId = block.attachmentId !== undefined ? mediaIdByAttachmentId[block.attachmentId] : undefined;
+    return mediaId ? { mediaId, alt: block.alt } : null;
+  });
+
+  assert.deepEqual(
+    contentJson.blocks.map((b) => b.type),
+    ["intro", "image", "image", "text", "image", "text"],
+    "resolved image blocks land at their interleaved position in the final contentJson",
+  );
+  const imageBlocks = contentJson.blocks.filter((b): b is Extract<typeof b, { type: "image" }> => b.type === "image");
+  assert.deepEqual(
+    imageBlocks.map((b) => b.mediaId),
+    ["media-a", "media-b", "media-c"],
+    "each image block carries the resolved MediaAsset id, in document order",
+  );
+  assert.equal(
+    warnings.filter((w) => w.code === "UNSUPPORTED_ARTICLE_BLOCK_DOWNCONVERTED").length,
+    0,
+    "no image was dropped once every attachment resolved",
+  );
+}
+
+function testMediaAwareDownconversionDropsUnresolvedImageWithSameWarningAsDefault() {
+  const result = normalizeMigrationContent({
+    sourceKind: "wordpress",
+    raw: GALLERY_SAMPLE_HTML,
+    preserveImagePositions: true,
+  });
+
+  // Only resolve attachment 111 — 222/333 are refused (e.g. outside a
+  // replay's explicit allowlist), same as if resolveImageBlock were null.
+  const { contentJson, warnings } = normalizedContentToArticleContentJsonWithMedia(result, (block) =>
+    block.attachmentId === 111 ? { mediaId: "media-a" } : null,
+  );
+
+  assert.deepEqual(
+    contentJson.blocks.map((b) => b.type),
+    ["intro", "image", "text", "text"],
+    "only the resolved image is kept; the other two are dropped exactly like default mode",
+  );
+  const dropWarnings = warnings.filter((w) => w.code === "UNSUPPORTED_ARTICLE_BLOCK_DOWNCONVERTED");
+  assert.equal(dropWarnings.length, 2, "one drop warning per unresolved image");
+}
+
+function testDuplicateAttachmentReferencesPreserveEachOccurrence() {
+  const html = `
+    <p>Before.</p>
+    <img src="https://mamago.by/x-thumb.jpg" alt="" class="wp-image-99"/>
+    <p>Between.</p>
+    <img src="https://mamago.by/x-thumb.jpg" alt="" class="wp-image-99"/>
+    <p>After.</p>
+  `;
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: html, preserveImagePositions: true });
+  const images = result.blocks.filter((b) => b.type === "image");
+  assert.equal(images.length, 2, "both occurrences of the same attachment id are kept as separate image blocks");
+  assert.deepEqual(images.map((b) => b.attachmentId), [99, 99]);
+
+  const { contentJson } = normalizedContentToArticleContentJsonWithMedia(result, () => ({ mediaId: "shared-media-id" }));
+  const imageBlocks = contentJson.blocks.filter((b): b is Extract<typeof b, { type: "image" }> => b.type === "image");
+  assert.equal(imageBlocks.length, 2, "both occurrences reach contentJson as distinct blocks");
+  assert.ok(
+    imageBlocks.every((b) => b.mediaId === "shared-media-id"),
+    "both occurrences reference the same single resolved MediaAsset id — the pipeline never creates a second one",
+  );
+}
+
 function main() {
   testNewlineCleanup();
   testHtmlCleanup();
@@ -175,6 +325,13 @@ function main() {
   testGooglePlacesSample();
   testCsvSample();
   testArticleContentJsonHasNoLiteralBackslashN();
+  testDefaultModeStillDropsImageBlocks();
+  testAnchorWrappedImageIsNotDestroyed();
+  testReplayModePreservesImagePositionsAndAttachmentIds();
+  testReplayNonImageProjectionMatchesDefault();
+  testMediaAwareDownconversionResolvesImageBlocks();
+  testMediaAwareDownconversionDropsUnresolvedImageWithSameWarningAsDefault();
+  testDuplicateAttachmentReferencesPreserveEachOccurrence();
 }
 
 main();

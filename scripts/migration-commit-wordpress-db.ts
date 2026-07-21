@@ -115,6 +115,13 @@ import {
   validateEventMediaOnlyReprocessArgs,
   validateEventMediaOnlyReprocessRuntime,
 } from "../src/lib/migration/runtime/eventMediaOnlyReprocess";
+import {
+  parseArticlePostIdFromSourceRecordKey,
+  validateArticleMediaReplayArgs,
+  validateArticleMediaReplayRuntime,
+} from "../src/lib/migration/runtime/articleMediaOnlyReplay";
+import { runStrictArticleMediaReplay } from "../src/lib/migration/runtime/strictArticleMediaReplay";
+import { ArticleMediaReplaySyncer } from "../src/lib/migration/commit/article/ArticleMediaReplaySyncer";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
 import { MediaPolicyGatedPlaceMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedPlaceMediaSyncer";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
@@ -147,6 +154,8 @@ export interface CommitCliArgs {
   sourceRecordKey?: string;
   forceReprocess: boolean;
   forceMediaReprocess: boolean;
+  forceArticleMediaReplay: boolean;
+  mediaOwnerUserId?: string;
   allowRemoteReadonly: boolean;
   out?: string;
   profileName?: MigrationProfileName;
@@ -194,6 +203,10 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const allowRemoteReadonly = argv.includes("--allow-remote-readonly");
   const forceReprocess = argv.includes("--force-reprocess");
   const forceMediaReprocess = argv.includes("--force-media-reprocess");
+  const forceArticleMediaReplay = argv.includes("--force-article-media-replay");
+
+  const mediaOwnerUserIdIndex = argv.indexOf("--media-owner-user-id");
+  const mediaOwnerUserId = mediaOwnerUserIdIndex !== -1 ? argv[mediaOwnerUserIdIndex + 1] : undefined;
 
   const sourceRecordKeyIndex = argv.indexOf("--source-record-key");
   const sourceRecordKey =
@@ -246,6 +259,20 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     }
   }
 
+  if (forceArticleMediaReplay) {
+    const guard = validateArticleMediaReplayArgs({
+      entity,
+      sourceRecordKeyCount,
+      mediaPolicyName: mediaPolicyName ?? undefined,
+      forceReprocess,
+      forceMediaReprocess,
+      mediaOwnerUserId,
+    });
+    if (!guard.ok) {
+      throw new Error(guard.reason);
+    }
+  }
+
   const seoPolicyIndex = argv.indexOf("--seo-policy");
   const rawSeoPolicy = seoPolicyIndex !== -1 ? argv[seoPolicyIndex + 1] : undefined;
   const seoPolicyName = rawSeoPolicy !== undefined ? parseSeoPolicyName(rawSeoPolicy) : undefined;
@@ -271,6 +298,8 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     sourceRecordKey,
     forceReprocess,
     forceMediaReprocess,
+    forceArticleMediaReplay,
+    mediaOwnerUserId,
     allowRemoteReadonly,
     out,
     profileName: profileName ?? undefined,
@@ -694,6 +723,107 @@ async function main(): Promise<void> {
         console.log(`reused: ${JSON.stringify(result.reusedAttachmentIds)}, imported: ${JSON.stringify(result.importedAttachmentIds)}`);
       } else {
         console.log(`coverMediaId (unchanged): ${result.coverMediaId ?? "(none)"}`);
+      }
+      return;
+    }
+
+    // `--force-article-media-replay`: a narrow, separate replay path for a
+    // single Article's inline/cover media only (see
+    // articleMediaOnlyReplay.ts/strictArticleMediaReplay.ts doc comments).
+    // Never reaches `createMigrationRunExecutionPlan`/`runCommitExecutionPlan`/
+    // `ArticleCommitRunner` at all — the normal Article commit path stays
+    // content-only, unchanged.
+    if (args.forceArticleMediaReplay && args.sourceRecordKey) {
+      const wpPostId = parseArticlePostIdFromSourceRecordKey(args.sourceRecordKey);
+      if (wpPostId === null) {
+        throw new Error(`--force-article-media-replay: invalid Article sourceRecordKey "${args.sourceRecordKey}".`);
+      }
+      const bundle = await wordpressRepository.getPublishedArticleById(wpPostId);
+      const activeLineageCount = await prisma.migrationLineage.count({
+        where: { sourceRecordKey: args.sourceRecordKey, targetType: "ARTICLE", isActive: true },
+      });
+      const lineage = await prisma.migrationLineage.findFirst({
+        where: { sourceRecordKey: args.sourceRecordKey, targetType: "ARTICLE", isActive: true },
+      });
+      const target = lineage?.targetId
+        ? await prisma.article.findUnique({
+            where: { id: lineage.targetId },
+            select: { id: true, contentJson: true, coverImageId: true },
+          })
+        : null;
+
+      const runtimeGuard = validateArticleMediaReplayRuntime({
+        bundle,
+        lineage: lineage
+          ? { sourceId: lineage.sourceId, isActive: lineage.isActive, targetId: lineage.targetId, lastSourceHash: lineage.lastSourceHash }
+          : null,
+        activeLineageCount,
+        targetExists: target !== null,
+      });
+      if (!runtimeGuard.ok) {
+        throw new Error(`--force-article-media-replay refused: ${runtimeGuard.reason}`);
+      }
+
+      const candidate = runtimeGuard.candidate;
+      const attachmentAllowlist = [
+        ...new Set(
+          candidate.featuredImageAttachmentId !== null
+            ? [candidate.featuredImageAttachmentId, ...candidate.inlineImageAttachmentIds]
+            : candidate.inlineImageAttachmentIds,
+        ),
+      ];
+
+      const articleMediaSyncer = new ArticleMediaReplaySyncer({
+        prisma,
+        attachmentResolver: wordpressRepository,
+        mediaImporterFactory,
+        lineageWriter,
+      });
+
+      const result = await runStrictArticleMediaReplay({
+        articleId: target!.id,
+        sourceId: lineage!.sourceId,
+        sourceHash: runtimeGuard.freshHash,
+        rawContent: candidate.content,
+        featuredAttachmentId: candidate.featuredImageAttachmentId,
+        attachmentAllowlist,
+        ownerUserId: args.mediaOwnerUserId!,
+        current: {
+          contentJson: target!.contentJson as never,
+          coverImageId: target!.coverImageId,
+        },
+        mediaImporter: articleMediaSyncer,
+        prisma,
+      });
+
+      console.log("Article media replay");
+      console.log();
+      console.log(`sourceRecordKey: ${args.sourceRecordKey}`);
+      console.log(`articleId: ${target!.id}`);
+      console.log(`hash (unchanged): ${runtimeGuard.freshHash}`);
+      console.log(`attachmentAllowlist: ${JSON.stringify(attachmentAllowlist)}`);
+      console.log(`result: ${result.status}`);
+
+      if (args.out) {
+        writeFileSync(args.out, JSON.stringify({ sourceRecordKey: args.sourceRecordKey, articleId: target!.id, attachmentAllowlist, result }, null, 2));
+        console.log(`\nJSON report written to ${args.out}`);
+      }
+
+      if (result.status === "REFUSED") {
+        throw new Error(`--force-article-media-replay refused: ${result.code}: ${result.message}`);
+      }
+      if (result.status === "FAILED") {
+        throw new Error(
+          `--force-article-media-replay failed: ${result.code}: ${result.message} — failures: ${JSON.stringify(result.failures)}`,
+        );
+      }
+      if (result.status === "APPLIED") {
+        console.log(`coverMediaId: ${result.coverMediaId ?? "(none)"}`);
+        console.log(`imageBlockCount: ${result.imageBlockCount}`);
+        console.log(`reused: ${JSON.stringify(result.reusedAttachmentIds)}, imported: ${JSON.stringify(result.importedAttachmentIds)}`);
+      } else {
+        console.log(`coverMediaId (unchanged): ${result.coverMediaId ?? "(none)"}`);
+        console.log(`imageBlockCount (unchanged): ${result.imageBlockCount}`);
       }
       return;
     }

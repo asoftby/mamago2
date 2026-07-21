@@ -40,6 +40,8 @@ function testParsesValidFlags() {
     sourceRecordKey: undefined,
     forceReprocess: false,
     forceMediaReprocess: false,
+    forceArticleMediaReplay: false,
+    mediaOwnerUserId: undefined,
     allowRemoteReadonly: true,
     out: "report.json",
     profileName: undefined,
@@ -277,6 +279,112 @@ function testForceMediaReprocessRejectsCombinationWithForceReprocess() {
         ...REQUIRED_FLAGS,
       ]),
     /--force-reprocess/,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// --force-article-media-replay — narrow media-only Article replay flag.
+// Guard logic itself lives in `validateArticleMediaReplayArgs()`
+// (articleMediaOnlyReplay.test.ts covers it directly); these tests only
+// confirm `parseArgs()` wires argv into that guard correctly.
+// ---------------------------------------------------------------------------
+
+const FORCE_ARTICLE_MEDIA_REPLAY_BASE_FLAGS = [
+  "--entity",
+  "article",
+  "--source-record-key",
+  "wordpress-db:post:24774",
+  "--media-policy",
+  "FULL",
+  "--media-owner-user-id",
+  "user-1",
+  "--force-article-media-replay",
+];
+
+function testForceArticleMediaReplayAcceptsArticleSourceKeyFullOwner() {
+  const args = parseArgs([...FORCE_ARTICLE_MEDIA_REPLAY_BASE_FLAGS, ...REQUIRED_FLAGS]);
+  assert.equal(args.forceArticleMediaReplay, true);
+  assert.equal(args.sourceRecordKey, "wordpress-db:post:24774");
+  assert.equal(args.mediaPolicyName, "FULL");
+  assert.equal(args.mediaOwnerUserId, "user-1");
+}
+
+function testForceArticleMediaReplayRejectsMissingOwner() {
+  assert.throws(
+    () =>
+      parseArgs([
+        "--entity",
+        "article",
+        "--source-record-key",
+        "wordpress-db:post:24774",
+        "--media-policy",
+        "FULL",
+        "--force-article-media-replay",
+        ...REQUIRED_FLAGS,
+      ]),
+    /--media-owner-user-id/,
+  );
+}
+
+function testForceArticleMediaReplayRejectsNonArticleEntities() {
+  for (const entity of ["event", "place", "route"]) {
+    assert.throws(
+      () =>
+        parseArgs([
+          "--entity",
+          entity,
+          "--source-record-key",
+          "wordpress-db:post:24774",
+          "--media-policy",
+          "FULL",
+          "--media-owner-user-id",
+          "user-1",
+          "--force-article-media-replay",
+          ...REQUIRED_FLAGS,
+        ]),
+      /--entity article/,
+      `entity "${entity}" must be rejected`,
+    );
+  }
+}
+
+function testForceArticleMediaReplayRejectsNonFullMediaPolicy() {
+  for (const mediaPolicy of ["METADATA", "NONE"]) {
+    assert.throws(
+      () =>
+        parseArgs([
+          "--entity",
+          "article",
+          "--source-record-key",
+          "wordpress-db:post:24774",
+          "--media-policy",
+          mediaPolicy,
+          "--media-owner-user-id",
+          "user-1",
+          "--force-article-media-replay",
+          ...REQUIRED_FLAGS,
+        ]),
+      /--media-policy FULL/,
+      `media policy "${mediaPolicy}" must be rejected`,
+    );
+  }
+}
+
+function testForceArticleMediaReplayRejectsCombinationWithForceMediaReprocess() {
+  // `--force-media-reprocess`'s own guard (`validateEventMediaOnlyReprocessArgs`,
+  // entity must be "event") runs first in `parseArgs()` and fires here
+  // since entity is "article" — still correctly rejected, just via that
+  // guard rather than `validateArticleMediaReplayArgs()`'s own "cannot be
+  // combined" branch (exercised directly, with a fabricated input that
+  // bypasses this CLI-level ordering, in articleMediaOnlyReplay.test.ts).
+  assert.throws(
+    () =>
+      parseArgs([
+        ...FORCE_ARTICLE_MEDIA_REPLAY_BASE_FLAGS,
+        "--force-media-reprocess",
+        ...REQUIRED_FLAGS,
+      ]),
+    /--force-media-reprocess/,
   );
 }
 
@@ -663,6 +771,11 @@ async function main() {
   testForceMediaReprocessRejectsNonEventEntities();
   testForceMediaReprocessRejectsNonFullMediaPolicy();
   testForceMediaReprocessRejectsCombinationWithForceReprocess();
+  testForceArticleMediaReplayAcceptsArticleSourceKeyFullOwner();
+  testForceArticleMediaReplayRejectsMissingOwner();
+  testForceArticleMediaReplayRejectsNonArticleEntities();
+  testForceArticleMediaReplayRejectsNonFullMediaPolicy();
+  testForceArticleMediaReplayRejectsCombinationWithForceMediaReprocess();
   testProfileFlagParsesValidValues();
   testInvalidProfileFails();
   testMediaPolicyFlagParsesValidValues();
