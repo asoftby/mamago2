@@ -231,7 +231,7 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | --- | --- |
 | Places | DONE |
 | Routes | IMPORTED 14/14; manual review, publish и redirects pending |
-| Events | 4/9 eligible imported; 5 CREATE и 67 sessions pending |
+| Events | **MVP COMPLETE — 9/9 eligible imported**, canonical hash v2, idempotent |
 | Offers | NOT STARTED |
 | Users + activation | NOT STARTED |
 | Profiles/ownership/media | NOT STARTED |
@@ -240,12 +240,13 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | Redirects/pages/SEO | PARTIAL |
 | Production validation/cutover | NOT STARTED |
 
-Оценка (2026-07-20): Events engineering readiness ≈85%; после закрытия
-Events остаётся 8 крупных P0-блоков: Routes (manual review, publish,
-redirects), Offers, Users + activation, Profiles/ownership/media,
-Reviews, Article media, Redirects/pages/SEO, Production
+Оценка (2026-07-21): **Events закрыт** (9/9 eligible imported, canonical
+`wordpress-db-domain-v2` hash, idempotency подтверждена read-only preview).
+Остаётся 8 крупных P0-блоков: Routes (manual review, publish, redirects),
+Offers, Users + activation, Profiles/ownership/media, Reviews, Article
+media (inventory — следующий шаг), Redirects/pages/SEO, Production
 validation/cutover; до технического cutover ориентировочно остаётся
-55–65% взвешенного объёма.
+50–60% взвешенного объёма.
 
 ### Places (82 publish)
 
@@ -1154,10 +1155,17 @@ runner'а не покрыта тестами. Требует отдельной 
       дополнительных attachment IDs как не импортированных/не представимых
       без расширения модели/UI.
 
-### Events (9 eligible + 1 past-only excluded, live count 2026-07-20)
+### Events (9 eligible + 1 past-only excluded, live count 2026-07-20) — **MVP COMPLETE**
 
-**Статус: engine готов (§0) → 4 golden sample закрыты (CREATE → реальные
-файлы → SKIP_UNCHANGED) → 5 CREATE Event остаются перед full batch.**
+**Статус: MVP COMPLETE (2026-07-21) — все 9 eligible Event импортированы,
+canonical `wordpress-db-domain-v2` source hash, idempotency подтверждена
+read-only preview (5 × `SKIP_UNCHANGED`). Единственное известное открытое
+исключение — protected `55980` (source вне текущей WP publish selection,
+lineage остаётся на legacy hash, не трогается) и один некритичный gap:
+cover image `64511` для `56062` был корректно пропущен под media policy
+`METADATA` при импорте и пока не забэкфиллен через новый
+`--force-media-reprocess` (см. ниже, PR #65 — capability готова, сам
+replay ещё не выполнялся).**
 
 #### Закрытые golden samples
 
@@ -1199,46 +1207,135 @@ runner'а не покрыта тестами. Требует отдельной 
   Push — SUCCESS.
 - **PR #62** — общий pure helper `materializeEventScheduleSessions()`
   (`src/lib/event/materializeScheduleSessions.ts`), переиспользуемый и
-  commit-путём (`event-sessions-sync`), и preview/reporting — preview
-  теперь показывает реально материализуемое число `ActivitySession`, а
-  не число boundary dates диапазона. Single-date Event показывает
-  `rawRangeCount: 0` (не `1` — `buildScheduleDraft()` всегда создаёт один
-  `scheduleItems`-item даже без `dateEnd`). `60404` показывает 3 range /
-  6 boundary dates / 36 materialized sessions. Merge SHA
-  `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf`. CI — SUCCESS. **Docker
-  Build & Push на момент этой записи — IN_PROGRESS, не отмечать SUCCESS
-  до отдельного подтверждения.**
+  commit-путём (`event-sessions-sync`), и preview/reporting. Merge SHA
+  `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf`. CI и Docker Build & Push —
+  SUCCESS (подтверждено).
+- **PR #64** — canonical source hash v2 (`wordpress-db-domain-v2`).
+  Старый `sourceHash` был `sha256(stableStringify(bundle))` над всем
+  raw-bundle без allowlist — плагинные/технические postmeta-поля
+  (`rank_math_internal_links_processed`, `voxel:view_counts`,
+  `_edit_lock` и т.п.) меняли hash без реального изменения контента,
+  что вызвало **ложный UPDATE и delete+recreate `ActivitySession`** у
+  одного из пяти оставшихся CREATE Event при первой попытке идемпотентной
+  проверки (см. форензику ниже). Заменено на entity-specific
+  allowlist-based canonical hash (`canonicalSourceHash.ts`) — по одному
+  builder на Event/Place/Article/Route, поля аудированы напрямую против
+  кода нормализаторов. Три раунда review закрыты: Place coordinates
+  спроецированы как реальные coordinates из `placeIndex` (не raw row
+  presence — пустой/partial index эквивалентен `coordinates: null`);
+  Route hash больше не включает непрочитанные `post_content`/
+  `post_excerpt`; Article hash включает семантические
+  `contentFlags.hasElementorContent`/`hasWebStoryContent` вместо raw
+  плагинного JSON. Merge SHA `d1193175c069e50b4221f75df627e04630ebb2ca`
+  (родитель `d16103b2`). Docker Build & Push run `29743475087` —
+  SUCCESS.
+- **PR #65** — безопасный media-only replay для Event (`fix/event-media-
+  only-reprocess`). Проблема: после перехода на hash v2, Event `56062`
+  (cover attachment `64511`, корректно пропущенный при импорте под media
+  policy `METADATA` — `MigrationRecord.validationSummary` содержит
+  `EVENT_MEDIA_POLICY_METADATA_COVER_SKIPPED`) навсегда классифицируется
+  как `SKIP_UNCHANGED`, а существующий `--force-reprocess` не поддерживает
+  Event (Event `UPDATE` удаляет/пересоздаёт `ActivitySession` и
+  переупсертит `EventVenue` — недопустимый blast radius ради одной
+  картинки). Добавлен отдельный `--force-media-reprocess` (`--entity
+  event --source-record-key <key> --media-policy FULL`), который **не
+  запускает** `EventCommitRunner`/domain writer вообще. Пять раундов
+  review закрыты: (1) базовый CLI + guards; (2) fail-closed вместо
+  destructive-replace (`EventMediaSyncer.resolveAndImportAttachments()`
+  выделен как общий, типизированный per-attachment outcome вместо
+  shared warnings-массива — обычный failed/missing/invalid-URL attachment
+  раньше тихо очищал существующий cover/gallery); (3) preflight ДО
+  записи (`findExistingMediaAssets()` — только existing lineage, без
+  попытки импорта) + атомарный apply в одной Prisma-транзакции с
+  concurrency guard (`EVENT_MEDIA_ONLY_TARGET_CHANGED_DURING_REPLAY`);
+  (4) нормализация gallery (исключение cover id, дедупликация с
+  сохранением порядка, missing outcome теперь = `FAILED`, убраны unsafe
+  `as string[]` касты); (5) past-only Event eligibility — guard теперь
+  проверяет точный warning-код `EVENT_PAST_ONLY_EXCLUDED` (тот же, что
+  использует `core/orchestrator.ts`), никогда не полагаясь на
+  `scheduleDraft === null` (тот же null бывает и при отсутствующем/
+  нераспознанном расписании — не past-only). Merge commit
+  `88a0696c70ac4a41871c10de8ac160f04e4aef80` (родитель `d1193175`, head
+  `690cce067812d799a44ddd5fc302e7668c7830a5`). Docker Build & Push #223
+  и CI #266 — SUCCESS на exact merge SHA. **Сам `--force-media-reprocess`
+  для `56062` ещё не запускался** — capability готова, backfill cover
+  `64511` остаётся отдельным follow-up (см. открытые пункты ниже).
 
-#### Текущая Event selection (live discover, 2026-07-20)
+#### Canonical hash v2 backfill и idempotency (2026-07-20/21)
+
+После merge PR #64 старые (v1 или частично неверные v2) `lastSourceHash`
+у уже импортированных lineage не обновляются автоматически — понадобился
+отдельный read-only reconciliation + guarded hash-only backfill (только
+`MigrationLineage.lastSourceHash`, без затрагивания domain-полей/
+`lastImportedAt`/target-сущностей):
+
+- **Reconciliation** (`/private/tmp/wordpress-v2-lineage-reconciliation-20260720.json`):
+  107 активных lineage (ACTIVITY 10, PLACE 82, ARTICLE 1, ROUTE 14; MEDIA_ASSET
+  43 — посчитаны отдельно, не тронуты). 83 сразу `SAFE_HASH_ONLY_BACKFILL`
+  (PLACE 78, ACTIVITY 5). Manual review: ACTIVITY `55980` (source вне
+  publish selection), `56062`/`56226`/`56479`/`60404` (`target.updatedAt >
+  lastImportedAt` — подозрение на ручную правку); PLACE `437`/`895`/`5389`/
+  `43023` (те же известные manual-protected + один новый `43023`); ARTICLE
+  (1) и ROUTE (14) — **100% с `lastImportedAt: null`** (структурный gap:
+  `ArticleCommitRunner`/`RouteCommitRunner`'s UPDATE-ветка никогда не
+  обновляет `lastImportedAt`, в отличие от `PlaceCommitRunner`; зафиксировано
+  как отдельный backlog-пункт, не блокирует Events).
+- **Backfill #1** (83 lineage → v2 hash, backup
+  `mamago-local-2026-07-20-18-19-19.sql.gz`, отчёт
+  `/private/tmp/wordpress-v2-lineage-backfill-20260720.json`): атомарная
+  transaction, guarded update по `id + isActive + lastSourceHash=expected`,
+  ровно 83 обновлено, zero target/audit-таблица mutation.
+- **Idempotency (5 safe Events)**: read-only preview `64251`/`64159`/
+  `64505`/`62977`/`63510` → 5 × `SKIP_UNCHANGED`, zero mutation
+  (`/private/tmp/event-v2-idempotency-preview-20260720.json`).
+- **Field-level review 4 manual Events**: `56062`/`56226`/`56479`/`60404`
+  доказаны `SAFE_HASH_ONLY_BACKFILL` — `target.updatedAt > lastImportedAt`
+  оказался артефактом того же commit-транзакшена (delta 1.3–9.6 секунд для
+  трёх; 12.5 минут для `56062` — совпадает с известным false-UPDATE
+  инцидентом до PR #64, не ручной правкой), домен и media (cover/gallery
+  MediaAsset createdAt) не разошлись. По пути найден и исправлен баг
+  собственного reconciliation-скрипта: schedule-сравнение `60404` (6
+  boundary dates / 3 range) нужно прунить относительно `lastImportedAt`,
+  а не "без прунинга" и не "текущего now" — иначе ложное расхождение
+  (отчёт `/private/tmp/event-v2-manual-four-field-review-20260720.json`).
+- **Backfill #2** (те же 4 → v2 hash, отчёт
+  `/private/tmp/event-v2-manual-four-hash-backfill-20260720.json`):
+  ACTIVITY lineage финально — **9 × canonical v2, 1 × legacy/protected
+  (`55980`)**.
+
+#### Текущая Event selection (live discover, 2026-07-20/21) — все 9 закрыты
 
 - **SKIP_POLICY**: `49842` — past-only (`EVENT_PAST_ONLY_EXCLUDED`).
-- **SKIP_UNCHANGED** (golden samples закрыты выше): `64251`, `56226`,
-  `56479`, `60404`.
-- **CREATE remaining** (media policy `METADATA`, изображения не
-  загружать до отдельного решения):
-  - `56062` — 1 session, `2026-08-06`;
-  - `62977` — 29 materialized sessions;
-  - `63510` — 35 materialized sessions;
-  - `64159` — 1 session;
-  - `64505` — 1 session.
-- **Итого**: осталось 5 CREATE Event, 67 `ActivitySession` суммарно,
-  media policy `METADATA` для всех пяти.
+- **SKIP_UNCHANGED, canonical v2, idempotency подтверждена**: `64251`,
+  `56226`, `56479`, `60404` (golden samples), `56062`, `62977`, `63510`,
+  `64159`, `64505` (committed этой же волной, ранее числились как CREATE
+  remaining — итог **полностью совпал с preview-oracle**, 67
+  `ActivitySession` суммарно).
+- **Итого**: 9/9 eligible Event — `SKIP_UNCHANGED`, canonical
+  `wordpress-db-domain-v2` hash.
 
 Protected Event `55980` не входит в текущую WP publish selection и
 остаётся неизменным (ручное редактирование post-import защищено — см.
-паттерн "manual-protected" уже применённый к Places 437/5389/895).
+паттерн "manual-protected" уже применённый к Places 437/5389/895/43023);
+lineage hash остаётся legacy, backfill для него преднамеренно не
+выполнялся (source недоступен для проверки).
 
 #### Следующие открытые пункты Events
 
-- [ ] Docker Build & Push SUCCESS на exact SHA
+- [x] Docker Build & Push SUCCESS на exact SHA
       `c56cbd8c24be9a9edb4be4a7832fb49097ecffaf` (PR #62).
-- [ ] Ledger-aware read-only preview оставшихся 5 CREATE Event (`56062`,
-      `62977`, `63510`, `64159`, `64505`) с правильными materialized
-      session counts (после PR #62).
-- [ ] Controlled targeted commit `56062`/`62977`/`63510`/`64159`/`64505`
-      с media policy `METADATA`.
-- [ ] Idempotency replay всех пяти — `SKIP_UNCHANGED`, zero
-      domain/media/lineage delta.
+- [x] Ledger-aware read-only preview оставшихся 5 CREATE Event.
+- [x] Controlled targeted commit `56062`/`62977`/`63510`/`64159`/`64505`
+      с media policy `METADATA` — совпал с preview-oracle.
+- [x] Idempotency replay всех девяти — `SKIP_UNCHANGED`, zero
+      domain/media/lineage delta (после canonical hash v2 + backfill).
+- [x] Canonical source hash v2 (PR #64) + reconciliation + guarded
+      hash-only backfill (83 + 4 lineage) — закрыто.
+- [x] Безопасный media-only replay mechanism для Event (PR #65,
+      `--force-media-reprocess`) — закрыто, смержено.
+- [ ] **Выполнить** `--force-media-reprocess` для `56062` (cover
+      attachment `64511`) — capability готова (PR #65), сам backfill ещё
+      не запускался; некритичный gap, одна картинка, не блокирует MVP.
 - [ ] Editorial review: category/place/organizer matching для всех
       импортированных Event (`EVENT_CATEGORY_UNMATCHED`/
       `EVENT_PLACE_UNMATCHED`/`EVENT_ORGANIZER_REQUIRES_REVIEW` —
@@ -1250,6 +1347,13 @@ Protected Event `55980` не входит в текущую WP publish selection
       Event на источнике) — не запускался.
 - [ ] Production FULL media — только после успешного local/dev batch и
       отдельного Go-решения, **не запускался**.
+- [ ] Backlog (не блокирует Events, зафиксировано reconciliation'ом
+      выше): `ArticleCommitRunner`/`RouteCommitRunner`'s UPDATE-ветка
+      никогда не обновляет lineage `lastImportedAt` (в отличие от
+      `PlaceCommitRunner`) — из-за этого 100% Article/Route lineage не
+      проходят "target modified after import" safety check
+      автоматически; актуально перед их собственным canonical hash v2
+      backfill.
 
 ### Offers (services / hb-programs, 90+ publish)
 
@@ -2342,3 +2446,68 @@ dispatcher-branch, ни CLI-flag).
   `64505`) с правильными materialized session counts (итоговый ожидаемый
   pending count — 67 sessions), и только после этого — controlled
   targeted commit с media policy `METADATA`.
+- **2026-07-20/21 — Claude Code** — **Events MVP закрыт (9/9 eligible).**
+  Контролируемый targeted commit оставшихся пяти `CREATE` Event
+  (`56062`/`62977`/`63510`/`64159`/`64505`, media policy `METADATA`)
+  выполнен, результат полностью совпал с preview-oracle. Последующая
+  idempotency-проверка вскрыла ложный `UPDATE` (delete+recreate
+  `ActivitySession`) на одном Event из-за drift в `lastSourceHash` —
+  форензика (без DB writes) доказала: `post_modified` не менялся, все
+  domain-поля совпадали, hash менялся из-за плагинных/технических
+  postmeta-полей (`rank_math_internal_links_processed`,
+  `voxel:view_counts`, `_edit_lock`) — старый `sourceHash` хешировал весь
+  raw bundle без allowlist. Корневая причина устранена **PR #64**
+  (canonical `wordpress-db-domain-v2` hash, entity-specific allowlist per
+  Event/Place/Article/Route, 3 раунда review — Place coordinates из
+  `placeIndex` вместо raw row presence, Route hash без непрочитанных
+  `post_content`/`post_excerpt`, Article hash через семантические
+  `contentFlags` вместо raw Elementor/Web Story JSON). Merge SHA
+  `d1193175c069e50b4221f75df627e04630ebb2ca`, Docker Build & Push run
+  `29743475087` — SUCCESS.
+
+  После merge потребовался отдельный read-only reconciliation (107
+  активных lineage: ACTIVITY 10, PLACE 82, ARTICLE 1, ROUTE 14) и
+  guarded hash-only backfill в два захода (83 lineage сразу, ещё 4
+  ACTIVITY после отдельного field-level review, доказавшего, что
+  `target.updatedAt > lastImportedAt` было ложным сигналом — та же
+  false-UPDATE история, не ручная правка). Итог: **9 из 10 ACTIVITY
+  lineage на canonical v2**, 1 (`55980`) остаётся legacy/protected
+  (source вне текущей WP publish selection). Idempotency всех 9
+  подтверждена read-only preview — `9 × SKIP_UNCHANGED`, zero mutation.
+  Побочная находка (backlog, не блокирует Events): `ArticleCommitRunner`/
+  `RouteCommitRunner`'s UPDATE-ветка никогда не обновляет lineage
+  `lastImportedAt` (в отличие от `PlaceCommitRunner`) — 100% Article/Route
+  lineage сейчас не проходят "target modified after import" safety check
+  автоматически.
+
+  Отдельно найден и закрыт реальный gap: Event `56062`'s cover attachment
+  `64511` был корректно пропущен при исходном импорте под media policy
+  `METADATA` (`EVENT_MEDIA_POLICY_METADATA_COVER_SKIPPED` в
+  `MigrationRecord.validationSummary`), но после hash v2 backfill обычный
+  planner навсегда вернёт `SKIP_UNCHANGED`, а существующий
+  `--force-reprocess` не поддерживает Event (Event `UPDATE` разрушает
+  `ActivitySession`/`EventVenue`). **PR #65** добавил отдельный, узкий
+  `--force-media-reprocess` (`--entity event --source-record-key <key>
+  --media-policy FULL`), который никогда не вызывает
+  `EventCommitRunner`/domain writer. Пять раундов review закрыты: (1)
+  базовый CLI + guards; (2) fail-closed вместо destructive-replace через
+  выделенный `EventMediaSyncer.resolveAndImportAttachments()`; (3)
+  read-only preflight по существующей lineage ДО любого импорта +
+  атомарный apply в одной Prisma-транзакции с concurrency guard; (4)
+  нормализация gallery (исключение cover id, дедупликация, missing
+  outcome = `FAILED`, убраны unsafe касты); (5) past-only Event
+  eligibility через точный warning-код `EVENT_PAST_ONLY_EXCLUDED` (тот
+  же, что использует `core/orchestrator.ts`). Merge commit
+  `88a0696c70ac4a41871c10de8ac160f04e4aef80` (head
+  `690cce067812d799a44ddd5fc302e7668c7830a5`). Docker Build & Push #223 и
+  CI #266 — SUCCESS на exact merge SHA.
+
+  Незавершённое: сам `--force-media-reprocess` для `56062` (backfill
+  cover `64511`) ещё не запускался — capability готова, но replay не
+  выполнялся; некритичный gap (одна картинка), не блокирует объявление
+  Events MVP COMPLETE. Article/Route `lastImportedAt` backlog-находка
+  выше тоже не выполнялась (не блокирует Events, актуальна перед их
+  собственным hash v2 backfill). Ветка `docs/event-migration-mvp-
+  complete` — docs-only, PR открыт, merge за Алексеем. Следующий шаг:
+  **Article read-only inventory** (см. §1 "Article media" — следующий
+  трек после Events).
