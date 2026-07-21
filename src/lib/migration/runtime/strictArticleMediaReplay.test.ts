@@ -9,6 +9,7 @@
  * callback resolves without throwing.
  */
 import assert from "node:assert/strict";
+import { isDeepStrictEqual } from "node:util";
 
 import { ArticleMediaReplaySyncer, type ArticleMediaReplaySyncerPrismaClient } from "../commit/article/ArticleMediaReplaySyncer";
 import type { WordPressAttachmentRow } from "../adapters/wordpress-db/types";
@@ -56,6 +57,10 @@ function attachment(id: number, overrides: Partial<WordPressAttachmentRow> = {})
     attached_file: null,
     ...overrides,
   };
+}
+
+function persistedContentJson(contentJson: ArticleContentPayload): ArticleContentPayload {
+  return JSON.parse(JSON.stringify(contentJson)) as ArticleContentPayload;
 }
 
 interface HarnessOptions {
@@ -127,32 +132,39 @@ function createHarness(options: HarnessOptions = {}) {
   });
 
   let articleState = {
-    contentJson: options.initialContentJson ?? CURRENT_TEXT_ONLY_CONTENT,
+    contentJson: persistedContentJson(options.initialContentJson ?? CURRENT_TEXT_ONLY_CONTENT),
     coverImageId: options.initialCoverImageId ?? null,
   };
   const updateCalls: { data: Record<string, unknown> }[] = [];
+  const updateManyAttempts: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
 
   const txClient: StrictArticleMediaReplayTxClient = {
     article: {
-      findUnique: (async () =>
-        ({ contentJson: articleState.contentJson, coverImageId: articleState.coverImageId })) as unknown as StrictArticleMediaReplayTxClient["article"]["findUnique"],
-      update: (async (args: { data: { contentJson: ArticleContentPayload; coverImageId: string | null } }) => {
+      updateMany: (async (args: {
+        where: { id: string; coverImageId: string | null; contentJson: { equals: ArticleContentPayload } };
+        data: { contentJson: ArticleContentPayload; coverImageId: string | null };
+      }) => {
+        updateManyAttempts.push({ where: args.where, data: args.data });
+        const matches =
+          args.where.id === ARTICLE_ID &&
+          args.where.coverImageId === articleState.coverImageId &&
+          isDeepStrictEqual(args.where.contentJson.equals, articleState.contentJson);
+        if (!matches) return { count: 0 };
         updateCalls.push({ data: args.data });
         articleState = {
-          contentJson: args.data.contentJson,
+          contentJson: persistedContentJson(args.data.contentJson),
           coverImageId: args.data.coverImageId,
         };
-        return { id: ARTICLE_ID };
-      }) as unknown as StrictArticleMediaReplayTxClient["article"]["update"],
+        return { count: 1 };
+      }) as unknown as StrictArticleMediaReplayTxClient["article"]["updateMany"],
     },
   };
 
   const prismaWithTx: StrictArticleMediaReplayPrismaClient = {
     ...txClient,
     $transaction: async <T>(fn: (tx: StrictArticleMediaReplayTxClient) => Promise<T>): Promise<T> => {
-      // Real staged-commit semantics: run against the same mutable txClient;
-      // if fn throws, articleState was never mutated (update() is the only
-      // mutator and it's only called from inside fn).
+      // The fake updateMany performs the same predicate-and-write atomically
+      // against articleState; a zero-count CAS never mutates it.
       return fn(txClient);
     },
   };
@@ -162,9 +174,13 @@ function createHarness(options: HarnessOptions = {}) {
     prismaWithTx,
     importCalls,
     getArticleState: () => articleState,
+    setArticleState: (next: { contentJson: ArticleContentPayload; coverImageId: string | null }) => {
+      articleState = { contentJson: persistedContentJson(next.contentJson), coverImageId: next.coverImageId };
+    },
     getMediaAssetCount: () => mediaAssets.size,
     getLineageCount: () => lineages.size,
     updateCalls,
+    updateManyAttempts,
   };
 }
 
@@ -254,6 +270,7 @@ async function testIdempotentReplayIsNoop() {
   assert.equal(second.status, "NOOP_ALREADY_SYNCED");
   assert.equal(harness.importCalls.length, importCallsAfterFirst, "zero new downloads on repeat replay");
   assert.equal(harness.updateCalls.length, 1, "no second Article update — still just the one from the first run");
+  assert.equal(harness.updateManyAttempts.length, 1, "NOOP replay never attempts a second CAS update");
 }
 
 async function testUnexpectedAttachmentOutsideAllowlistRefuses() {
@@ -307,6 +324,7 @@ async function testDownloadFailureLeavesArticleUntouched() {
   if (result.status !== "FAILED") return;
   assert.equal(result.failures[0].code, "ARTICLE_MEDIA_DOWNLOAD_FAILED");
   assert.equal(harness.updateCalls.length, 0);
+  assert.equal(harness.updateManyAttempts.length, 0, "failed media import never reaches Article CAS");
   assert.deepEqual(harness.getArticleState().contentJson, CURRENT_TEXT_ONLY_CONTENT, "Article contentJson unchanged after a failed replay");
 }
 
@@ -505,6 +523,7 @@ async function testDanglingLineageTargetIsNotSilentlyReused() {
   assert.equal(danglingHarness.getMediaAssetCount() - initialMediaAssetCount, 0, "no MediaAsset created");
   assert.equal(danglingHarness.getLineageCount() - initialLineageCount, 0, "no MEDIA_ASSET lineage created");
   assert.equal(danglingHarness.updateCalls.length, 0, "Article is never touched");
+  assert.equal(danglingHarness.updateManyAttempts.length, 0, "dangling-lineage preflight never reaches Article CAS");
   assert.deepEqual(danglingHarness.getArticleState(), initialArticleState, "Article contentJson and coverImageId remain unchanged");
 }
 
@@ -544,24 +563,62 @@ async function testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailur
 // Self-review: E. Concurrency
 // ---------------------------------------------------------------------------
 
-async function testConcurrentArticleChangeDuringReplayRefusesAndRollsBack() {
+async function testConcurrentArticleChangeInCasWindowIsNotOverwritten() {
   const harness = createHarness();
-  // Simulate an external write landing between preflight and the atomic
-  // apply: the transaction's own findUnique() sees a different cover than
-  // what `current` (captured at preflight time) says.
-  const txAny = harness.prismaWithTx as unknown as { article: { findUnique: () => Promise<{ contentJson: ArticleContentPayload; coverImageId: string | null }> } };
-  const originalFindUnique = txAny.article.findUnique;
-  txAny.article.findUnique = async () => {
-    const live = await originalFindUnique();
-    return { ...live, coverImageId: "concurrently-changed-by-someone-else" };
+  const editorContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [{ id: "editor-block", type: "text", text: "Manual edit committed in the CAS race window." }],
   };
+  const editorCoverImageId = "editor-cover-media-id";
+  const article = harness.prismaWithTx.article as unknown as {
+    updateMany: StrictArticleMediaReplayTxClient["article"]["updateMany"];
+  };
+  const originalUpdateMany = article.updateMany;
+  article.updateMany = (async (...args: Parameters<typeof originalUpdateMany>) => {
+    // The replay has completed preflight and media import and is now about
+    // to issue its CAS. Commit the editor's state immediately before the
+    // predicate is evaluated to model the exact lost-update race window.
+    harness.setArticleState({ contentJson: editorContent, coverImageId: editorCoverImageId });
+    return originalUpdateMany(...args);
+  }) as unknown as typeof originalUpdateMany;
 
   const result = await runStrictArticleMediaReplay(baseInput(harness));
 
   assert.equal(result.status, "REFUSED");
   if (result.status !== "REFUSED") return;
   assert.equal(result.code, "ARTICLE_MEDIA_REPLAY_TARGET_CHANGED_DURING_REPLAY");
-  assert.equal(harness.updateCalls.length, 0, "the transaction never actually commits an update when the concurrency guard fires — the replay's own write is what's rolled back, not the concurrent change");
+  assert.equal(harness.updateManyAttempts.length, 1, "the replay attempts exactly one conditional CAS");
+  assert.equal(harness.updateCalls.length, 0, "zero successful Article CAS updates");
+  assert.deepEqual(
+    harness.getArticleState(),
+    { contentJson: editorContent, coverImageId: editorCoverImageId },
+    "the editor's contentJson and coverImageId survive; replay payload is not applied",
+  );
+}
+
+async function testConcurrentContentOnlyChangeFailsCas() {
+  const harness = createHarness();
+  const editorContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [{ id: "editor-content-only", type: "text", text: "Content changed while cover stayed the same." }],
+  };
+  const article = harness.prismaWithTx.article as unknown as {
+    updateMany: StrictArticleMediaReplayTxClient["article"]["updateMany"];
+  };
+  const originalUpdateMany = article.updateMany;
+  article.updateMany = (async (...args: Parameters<typeof originalUpdateMany>) => {
+    harness.setArticleState({ contentJson: editorContent, coverImageId: null });
+    return originalUpdateMany(...args);
+  }) as unknown as typeof originalUpdateMany;
+
+  const result = await runStrictArticleMediaReplay(baseInput(harness));
+
+  assert.equal(result.status, "REFUSED");
+  if (result.status !== "REFUSED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_REPLAY_TARGET_CHANGED_DURING_REPLAY");
+  assert.equal(harness.updateManyAttempts.length, 1);
+  assert.equal(harness.updateCalls.length, 0);
+  assert.deepEqual(harness.getArticleState(), { contentJson: editorContent, coverImageId: null });
 }
 
 async function main() {
@@ -581,7 +638,8 @@ async function main() {
   await testCoverMismatchPreventsNoopAndFixesCover();
   await testDanglingLineageTargetIsNotSilentlyReused();
   await testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailure();
-  await testConcurrentArticleChangeDuringReplayRefusesAndRollsBack();
+  await testConcurrentArticleChangeInCasWindowIsNotOverwritten();
+  await testConcurrentContentOnlyChangeFailsCas();
 }
 
 main()

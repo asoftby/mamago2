@@ -42,7 +42,7 @@
  * `TargetChangedDuringReplayError` pattern). No other `Article` column is
  * ever part of the update.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { ArticleBlockMvp, ArticleContentPayload } from "@/lib/publications/articleMvp";
 import { serializeArticleContent } from "@/lib/publications/articleMvp";
 import {
@@ -67,7 +67,7 @@ export interface StrictArticleMediaImporter {
 
 /** The narrow slice of Prisma needed for the final atomic apply — shape-compatible with both a real `PrismaClient` and its `$transaction` callback argument. */
 export interface StrictArticleMediaReplayTxClient {
-  article: Pick<PrismaClient["article"], "update" | "findUnique">;
+  article: Pick<PrismaClient["article"], "updateMany">;
 }
 
 export interface StrictArticleMediaReplayPrismaClient extends StrictArticleMediaReplayTxClient {
@@ -355,28 +355,28 @@ export async function runStrictArticleMediaReplay(
     return { mediaId: resolved.mediaId, alt: block.alt };
   }).contentJson;
 
-  // --- Atomic apply, with a concurrency guard re-proving the target
-  // hasn't changed since preflight (e.g. a concurrent manual edit). File
-  // downloads already happened above, outside this transaction — only the
-  // final DB write is transactional. ---
+  // --- Atomic compare-and-swap apply. The expected snapshot is part of the
+  // update predicate itself, so an edit committed at any point after
+  // preflight cannot be overwritten by a later unconditional write. File
+  // downloads already happened above, outside this transaction. ---
   try {
     await input.prisma.$transaction(async (tx) => {
-      const live = await tx.article.findUnique({ where: { id: input.articleId }, select: { contentJson: true, coverImageId: true } });
-      const liveContentJson = (live?.contentJson ?? { version: 1, blocks: [] }) as ArticleContentPayload;
-      if (
-        (live?.coverImageId ?? null) !== input.current.coverImageId ||
-        !deepEqualIgnoreKeyOrder(liveContentJson.blocks, input.current.contentJson.blocks)
-      ) {
-        throw new TargetChangedDuringReplayError();
-      }
-
-      await tx.article.update({
-        where: { id: input.articleId },
+      const expectedContentJson = serializeArticleContent(input.current.contentJson) as Prisma.InputJsonValue;
+      const nextContentJson = serializeArticleContent(finalContentJson) as Prisma.InputJsonValue;
+      const applyResult = await tx.article.updateMany({
+        where: {
+          id: input.articleId,
+          coverImageId: input.current.coverImageId,
+          contentJson: { equals: expectedContentJson },
+        },
         data: {
-          contentJson: serializeArticleContent(finalContentJson) as object,
+          contentJson: nextContentJson,
           coverImageId: resolvedCoverMediaId,
         },
       });
+      if (applyResult.count !== 1) {
+        throw new TargetChangedDuringReplayError();
+      }
     });
   } catch (error) {
     if (error instanceof TargetChangedDuringReplayError) {
