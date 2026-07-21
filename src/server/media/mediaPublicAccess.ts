@@ -747,7 +747,13 @@ export async function canLoadMediaAnonymously(media: MediaAsset): Promise<boolea
   if (isMediaAssetSanityBlocked(media)) {
     return false;
   }
-  if (await isBrandingAsset(media.id)) {
+  // Branding assets bypass the published-linkage check below, but only while
+  // ACTIVE/ORPHANED — an ARCHIVED branding asset (e.g. a replaced logo whose
+  // BrandingConfig FK hasn't been cleared yet) must stay private; archiving
+  // is a deliberate admin decision the branding exception must never undo.
+  const isBrandingEligibleStatus =
+    media.status === MediaAssetStatus.ACTIVE || media.status === MediaAssetStatus.ORPHANED;
+  if (isBrandingEligibleStatus && (await isBrandingAsset(media.id))) {
     return true;
   }
   if (media.status !== MediaAssetStatus.ACTIVE) {

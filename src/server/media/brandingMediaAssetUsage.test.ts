@@ -34,58 +34,96 @@ async function createMediaAsset(status: MediaAssetStatus) {
   });
 }
 
+/** Creates a BrandingConfig row (test-only id, never the real "singleton" row) referencing the given asset as logo. */
+async function createBrandingConfigFor(mediaId: string) {
+  return prisma.brandingConfig.create({
+    data: { id: `test-branding-config-${randomUUID()}`, logoAssetId: mediaId },
+  });
+}
+
 async function main() {
   console.log("Starting branding media asset usage tests...");
 
-  const brandingAsset = await createMediaAsset(MediaAssetStatus.ORPHANED);
-  const brandingConfig = await prisma.brandingConfig.create({
-    data: { id: `test-branding-config-${randomUUID()}`, logoAssetId: brandingAsset.id },
-  });
-  const regularAssetNoUsage = await createMediaAsset(MediaAssetStatus.ACTIVE);
-  const regularAssetWithUsage = await createMediaAsset(MediaAssetStatus.ORPHANED);
-  const usage = await prisma.mediaUsage.create({
-    data: {
-      mediaId: regularAssetWithUsage.id,
-      entityType: "ARTICLE",
-      entityId: `test-entity-${randomUUID()}`,
-      field: "coverImageId",
-    },
-  });
+  const cleanupMediaIds: string[] = [];
+  const cleanupBrandingConfigIds: string[] = [];
+  const cleanupUsageIds: string[] = [];
 
   try {
-    // 1. Branding asset stays publicly loadable even without ACTIVE status
-    //    or any published linkage — the whole point of the fix.
-    const brandingLoadable = await canLoadMediaAnonymously(brandingAsset);
-    assert.strictEqual(brandingLoadable, true, "Branding asset (ORPHANED, no linkage) must remain publicly loadable");
+    // 1. ORPHANED branding asset, still linked via BrandingConfig:
+    //    anonymous load allowed; recalculation corrects it to ACTIVE.
+    const orphanedBranding = await createMediaAsset(MediaAssetStatus.ORPHANED);
+    cleanupMediaIds.push(orphanedBranding.id);
+    const orphanedBrandingConfig = await createBrandingConfigFor(orphanedBranding.id);
+    cleanupBrandingConfigIds.push(orphanedBrandingConfig.id);
 
-    // 2. Branding asset must never be flipped to ORPHANED by usage-based
-    //    recalculation, and must be corrected back to ACTIVE if it drifted.
-    const recalculatedBranding = await recalculateMediaUsageStatus(brandingAsset.id);
     assert.strictEqual(
-      recalculatedBranding.status,
+      await canLoadMediaAnonymously(orphanedBranding),
+      true,
+      "ORPHANED branding asset must remain publicly loadable",
+    );
+    const recalculatedOrphanedBranding = await recalculateMediaUsageStatus(orphanedBranding.id);
+    assert.strictEqual(
+      recalculatedOrphanedBranding.status,
       MediaAssetStatus.ACTIVE,
-      "Branding asset must be corrected to ACTIVE, never left/set to ORPHANED",
+      "ORPHANED branding asset must be corrected to ACTIVE by recalculation",
     );
 
-    const alreadyActiveBranding = await createMediaAsset(MediaAssetStatus.ACTIVE);
-    const brandingConfig2 = await prisma.brandingConfig.create({
-      data: { id: `test-branding-config-${randomUUID()}`, faviconAssetId: alreadyActiveBranding.id },
-    });
-    try {
-      const recalculatedActiveBranding = await recalculateMediaUsageStatus(alreadyActiveBranding.id);
-      assert.strictEqual(
-        recalculatedActiveBranding.status,
-        MediaAssetStatus.ACTIVE,
-        "Already-ACTIVE branding asset with zero usages must stay ACTIVE, not become ORPHANED",
-      );
-    } finally {
-      await prisma.brandingConfig.delete({ where: { id: brandingConfig2.id } });
-      await prisma.mediaAsset.delete({ where: { id: alreadyActiveBranding.id } });
-    }
+    // 2. ARCHIVED branding asset, still linked via BrandingConfig:
+    //    anonymous load denied; recalculation leaves status=ARCHIVED.
+    //    (P1 regression caught by review on this PR — archiving is a
+    //    deliberate admin decision the branding exception must never undo.)
+    const archivedBranding = await createMediaAsset(MediaAssetStatus.ARCHIVED);
+    cleanupMediaIds.push(archivedBranding.id);
+    const archivedBrandingConfig = await createBrandingConfigFor(archivedBranding.id);
+    cleanupBrandingConfigIds.push(archivedBrandingConfig.id);
 
-    // 3. Regular (non-branding) media assets keep their prior behavior:
+    assert.strictEqual(
+      await canLoadMediaAnonymously(archivedBranding),
+      false,
+      "ARCHIVED branding asset must stay private despite the BrandingConfig FK",
+    );
+    const recalculatedArchivedBranding = await recalculateMediaUsageStatus(archivedBranding.id);
+    assert.strictEqual(
+      recalculatedArchivedBranding.status,
+      MediaAssetStatus.ARCHIVED,
+      "Recalculation must never move an ARCHIVED branding asset back to ACTIVE",
+    );
+
+    // 3. ACTIVE branding asset: anonymous load allowed (unchanged happy path).
+    const activeBranding = await createMediaAsset(MediaAssetStatus.ACTIVE);
+    cleanupMediaIds.push(activeBranding.id);
+    const activeBrandingConfig = await createBrandingConfigFor(activeBranding.id);
+    cleanupBrandingConfigIds.push(activeBrandingConfig.id);
+
+    assert.strictEqual(
+      await canLoadMediaAnonymously(activeBranding),
+      true,
+      "ACTIVE branding asset must be publicly loadable",
+    );
+    const recalculatedActiveBranding = await recalculateMediaUsageStatus(activeBranding.id);
+    assert.strictEqual(
+      recalculatedActiveBranding.status,
+      MediaAssetStatus.ACTIVE,
+      "Already-ACTIVE branding asset with zero usages must stay ACTIVE",
+    );
+
+    // 4. Regular (non-branding) media assets keep their prior behavior:
     //    zero usages -> ORPHANED, has usage -> ACTIVE, and no free pass on
     //    canLoadMediaAnonymously without ACTIVE status + published linkage.
+    const regularAssetNoUsage = await createMediaAsset(MediaAssetStatus.ACTIVE);
+    cleanupMediaIds.push(regularAssetNoUsage.id);
+    const regularAssetWithUsage = await createMediaAsset(MediaAssetStatus.ORPHANED);
+    cleanupMediaIds.push(regularAssetWithUsage.id);
+    const usage = await prisma.mediaUsage.create({
+      data: {
+        mediaId: regularAssetWithUsage.id,
+        entityType: "ARTICLE",
+        entityId: `test-entity-${randomUUID()}`,
+        field: "coverImageId",
+      },
+    });
+    cleanupUsageIds.push(usage.id);
+
     const recalculatedNoUsage = await recalculateMediaUsageStatus(regularAssetNoUsage.id);
     assert.strictEqual(
       recalculatedNoUsage.status,
@@ -109,11 +147,15 @@ async function main() {
 
     console.log("All branding media asset usage tests passed.");
   } finally {
-    await prisma.mediaUsage.delete({ where: { id: usage.id } }).catch(() => {});
-    await prisma.brandingConfig.delete({ where: { id: brandingConfig.id } }).catch(() => {});
-    await prisma.mediaAsset.deleteMany({
-      where: { id: { in: [brandingAsset.id, regularAssetNoUsage.id, regularAssetWithUsage.id] } },
-    });
+    if (cleanupUsageIds.length > 0) {
+      await prisma.mediaUsage.deleteMany({ where: { id: { in: cleanupUsageIds } } }).catch(() => {});
+    }
+    if (cleanupBrandingConfigIds.length > 0) {
+      await prisma.brandingConfig.deleteMany({ where: { id: { in: cleanupBrandingConfigIds } } }).catch(() => {});
+    }
+    if (cleanupMediaIds.length > 0) {
+      await prisma.mediaAsset.deleteMany({ where: { id: { in: cleanupMediaIds } } });
+    }
   }
 }
 
