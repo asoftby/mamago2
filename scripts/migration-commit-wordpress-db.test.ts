@@ -39,6 +39,7 @@ function testParsesValidFlags() {
     limit: 5,
     sourceRecordKey: undefined,
     forceReprocess: false,
+    forceMediaReprocess: false,
     allowRemoteReadonly: true,
     out: "report.json",
     profileName: undefined,
@@ -163,6 +164,119 @@ function testForceReprocessDisallowsMassModeLimit() {
         ...REQUIRED_FLAGS,
       ]),
     /mass mode is not allowed/,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// --force-media-reprocess — narrow media-only Event replay flag. Guard
+// logic itself lives in `validateEventMediaOnlyReprocessArgs()`
+// (eventMediaOnlyReprocess.test.ts covers it directly); these tests only
+// confirm `parseArgs()` wires argv into that guard correctly.
+// ---------------------------------------------------------------------------
+
+const FORCE_MEDIA_REPROCESS_BASE_FLAGS = [
+  "--entity",
+  "event",
+  "--source-record-key",
+  "wordpress-db:events:56062",
+  "--media-policy",
+  "FULL",
+  "--force-media-reprocess",
+];
+
+function testForceMediaReprocessAcceptsEventSourceKeyFull() {
+  const args = parseArgs([...FORCE_MEDIA_REPROCESS_BASE_FLAGS, ...REQUIRED_FLAGS]);
+  assert.equal(args.forceMediaReprocess, true);
+  assert.equal(args.sourceRecordKey, "wordpress-db:events:56062");
+  assert.equal(args.mediaPolicyName, "FULL");
+}
+
+function testForceMediaReprocessRejectsMissingSourceKey() {
+  assert.throws(
+    () => parseArgs(["--entity", "event", "--media-policy", "FULL", "--force-media-reprocess", ...REQUIRED_FLAGS]),
+    /exactly one --source-record-key/,
+  );
+}
+
+function testForceMediaReprocessRejectsMultipleSourceKeys() {
+  assert.throws(
+    () =>
+      parseArgs([
+        "--entity",
+        "event",
+        "--source-record-key",
+        "wordpress-db:events:56062",
+        "--source-record-key",
+        "wordpress-db:events:56226",
+        "--media-policy",
+        "FULL",
+        "--force-media-reprocess",
+        ...REQUIRED_FLAGS,
+      ]),
+    /exactly one --source-record-key/,
+  );
+}
+
+function testForceMediaReprocessRejectsNonEventEntities() {
+  for (const entity of ["article", "place", "route"]) {
+    assert.throws(
+      () =>
+        parseArgs([
+          "--entity",
+          entity,
+          "--source-record-key",
+          "wordpress-db:events:56062",
+          "--media-policy",
+          "FULL",
+          "--force-media-reprocess",
+          ...REQUIRED_FLAGS,
+        ]),
+      /--entity event/,
+      `entity "${entity}" must be rejected`,
+    );
+  }
+}
+
+function testForceMediaReprocessRejectsNonFullMediaPolicy() {
+  for (const mediaPolicy of ["METADATA", "NONE"]) {
+    assert.throws(
+      () =>
+        parseArgs([
+          "--entity",
+          "event",
+          "--source-record-key",
+          "wordpress-db:events:56062",
+          "--media-policy",
+          mediaPolicy,
+          "--force-media-reprocess",
+          ...REQUIRED_FLAGS,
+        ]),
+      /--media-policy FULL/,
+      `media policy "${mediaPolicy}" must be rejected`,
+    );
+  }
+  assert.throws(
+    () => parseArgs(["--entity", "event", "--source-record-key", "wordpress-db:events:56062", "--force-media-reprocess", ...REQUIRED_FLAGS]),
+    /--media-policy FULL/,
+    "omitting --media-policy entirely must also be rejected",
+  );
+}
+
+function testForceMediaReprocessRejectsCombinationWithForceReprocess() {
+  // The pre-existing `--force-reprocess` guard (entity must be article|place)
+  // fires first here since `--entity event` never passes it — the
+  // combination is still correctly rejected, just via that guard rather
+  // than `validateEventMediaOnlyReprocessArgs()`'s own "cannot be combined"
+  // branch. That branch is exercised directly (with a fabricated input that
+  // bypasses this CLI-level ordering) in eventMediaOnlyReprocess.test.ts.
+  assert.throws(
+    () =>
+      parseArgs([
+        ...FORCE_MEDIA_REPROCESS_BASE_FLAGS,
+        "--force-reprocess",
+        ...REQUIRED_FLAGS,
+      ]),
+    /--force-reprocess/,
   );
 }
 
@@ -543,6 +657,12 @@ async function main() {
   testValidEntityValuesAllParse();
   testForceReprocessAllowsArticleAndPlaceRejectsOtherEntities();
   testForceReprocessDisallowsMassModeLimit();
+  testForceMediaReprocessAcceptsEventSourceKeyFull();
+  testForceMediaReprocessRejectsMissingSourceKey();
+  testForceMediaReprocessRejectsMultipleSourceKeys();
+  testForceMediaReprocessRejectsNonEventEntities();
+  testForceMediaReprocessRejectsNonFullMediaPolicy();
+  testForceMediaReprocessRejectsCombinationWithForceReprocess();
   testProfileFlagParsesValidValues();
   testInvalidProfileFails();
   testMediaPolicyFlagParsesValidValues();

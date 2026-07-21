@@ -39,6 +39,34 @@ type ImportedEventMedia = {
   publicUrl: string;
 };
 
+/**
+ * One outcome per requested attachment id — always present, success or
+ * failure, never silently dropped. Shared by `sync()` (which converts a
+ * failure into a `WARNING` and continues — existing, unchanged commit-path
+ * behavior) and any stricter caller (e.g. a standalone media-only replay)
+ * that instead needs to treat a failure as fatal before touching anything.
+ * Extracted so both call sites share exactly one resolve/import/reuse
+ * implementation — never two copies of this logic.
+ */
+export type AttachmentImportOutcome =
+  | ({ ok: true; reused: boolean } & ImportedEventMedia)
+  | {
+      ok: false;
+      code: "EVENT_MEDIA_ATTACHMENT_MISSING" | "EVENT_MEDIA_URL_INVALID" | "EVENT_MEDIA_DOWNLOAD_FAILED";
+      message: string;
+      details?: Record<string, unknown>;
+    };
+
+export interface ResolveAndImportAttachmentsInput {
+  ids: readonly number[];
+  ownerUserId: string;
+  sourceId: string;
+  sourceHash: string;
+  runId: string | null;
+  recordId: string | null;
+  featuredAttachmentId: number | null;
+}
+
 function warning(
   sourceRecordKey: string,
   code: string,
@@ -49,7 +77,7 @@ function warning(
   return { code, message, severity, sourceRecordKey, ...(details ? { details } : {}) };
 }
 
-function uniqueAttachmentIds(candidate: NormalizedEventCandidate): number[] {
+export function uniqueAttachmentIds(candidate: NormalizedEventCandidate): number[] {
   const media = candidate.media;
   if (!media) return [];
   return [
@@ -111,44 +139,33 @@ export class EventMediaSyncer {
       return { warnings };
     }
 
-    const attachments = await this.deps.attachmentResolver.getAttachmentsByIds(ids);
+    const outcomes = await this.resolveAndImportAttachments({
+      ids,
+      ownerUserId,
+      sourceId: input.sourceId,
+      sourceHash: input.sourceHash ?? input.sourceRecordKey,
+      runId: input.runId ?? null,
+      recordId: input.recordId ?? null,
+      featuredAttachmentId: input.candidate.media?.featuredAttachmentId ?? null,
+    });
+
     const imported = new Map<number, ImportedEventMedia>();
-    const importer = this.deps.mediaImporterFactory(ownerUserId);
-
-    for (const id of ids) {
-      const attachment = attachments.get(id);
-      if (!attachment) {
-        warnings.push(
-          warning(input.sourceRecordKey, "EVENT_MEDIA_ATTACHMENT_MISSING", "WordPress attachment row was not found.", {
-            attachmentId: id,
-          }),
-        );
-        continue;
-      }
-      if (!isUsableHttpUrl(attachment.guid)) {
-        warnings.push(
-          warning(input.sourceRecordKey, "EVENT_MEDIA_URL_INVALID", "WordPress attachment guid is not a valid http(s) URL.", {
-            attachmentId: id,
-            guid: attachment.guid,
-          }),
-        );
-        continue;
-      }
-
-      const importedMedia = await this.importOrReuseAttachment({
-        attachmentId: id,
-        attachment,
-        importer,
-        sourceId: input.sourceId,
-        sourceHash: input.sourceHash ?? input.sourceRecordKey,
-        runId: input.runId ?? null,
-        recordId: input.recordId ?? null,
-        targetRole: id === input.candidate.media?.featuredAttachmentId ? "cover" : "gallery",
-        sourceRecordKey: input.sourceRecordKey,
-        warnings,
-      });
-      if (importedMedia) {
-        imported.set(id, importedMedia);
+    for (const [id, outcome] of outcomes) {
+      if (outcome.ok) {
+        imported.set(id, { mediaId: outcome.mediaId, publicUrl: outcome.publicUrl });
+        if (outcome.reused) {
+          warnings.push(
+            warning(
+              input.sourceRecordKey,
+              "EVENT_MEDIA_DEDUP_REUSED",
+              "Existing imported MediaAsset lineage was reused for event media.",
+              { attachmentId: id, mediaAssetId: outcome.mediaId },
+              "INFO",
+            ),
+          );
+        }
+      } else {
+        warnings.push(warning(input.sourceRecordKey, outcome.code, outcome.message, outcome.details));
       }
     }
 
@@ -200,22 +217,86 @@ export class EventMediaSyncer {
     return { warnings };
   }
 
-  private async importOrReuseAttachment(input: {
-    attachmentId: number;
-    attachment: WordPressAttachmentRow;
-    importer: MediaImporterLike;
-    sourceId: string;
-    sourceHash: string;
-    runId: string | null;
-    recordId: string | null;
-    targetRole: string;
-    sourceRecordKey: string;
-    warnings: MigrationWarning[];
-  }): Promise<ImportedEventMedia | null> {
-    const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
+  /**
+   * Resolves attachment rows and imports-or-reuses each requested id — the
+   * entire attachment-level logic, shared verbatim by `sync()` (which
+   * degrades a failure to a `WARNING` and continues) and by a stricter
+   * caller that needs to know about a failure *before* touching `Activity`/
+   * `ActivityImage` at all. This method itself never writes to `Activity`/
+   * `ActivityImage` — only `MediaAsset`/`MigrationLineage(MEDIA_ASSET)` via
+   * the existing dedup-or-import path, exactly as before.
+   */
+  async resolveAndImportAttachments(
+    input: ResolveAndImportAttachmentsInput,
+  ): Promise<Map<number, AttachmentImportOutcome>> {
+    const outcomes = new Map<number, AttachmentImportOutcome>();
+    if (input.ids.length === 0) return outcomes;
+
+    const attachments = await this.deps.attachmentResolver.getAttachmentsByIds(input.ids);
+    const importer = this.deps.mediaImporterFactory(input.ownerUserId);
+
+    for (const id of input.ids) {
+      const attachment = attachments.get(id);
+      if (!attachment) {
+        outcomes.set(id, {
+          ok: false,
+          code: "EVENT_MEDIA_ATTACHMENT_MISSING",
+          message: "WordPress attachment row was not found.",
+          details: { attachmentId: id },
+        });
+        continue;
+      }
+      if (!isUsableHttpUrl(attachment.guid)) {
+        outcomes.set(id, {
+          ok: false,
+          code: "EVENT_MEDIA_URL_INVALID",
+          message: "WordPress attachment guid is not a valid http(s) URL.",
+          details: { attachmentId: id, guid: attachment.guid },
+        });
+        continue;
+      }
+
+      outcomes.set(
+        id,
+        await this.importOrReuseAttachment({
+          attachmentId: id,
+          attachment,
+          importer,
+          sourceId: input.sourceId,
+          sourceHash: input.sourceHash,
+          runId: input.runId,
+          recordId: input.recordId,
+          targetRole: id === input.featuredAttachmentId ? "cover" : "gallery",
+        }),
+      );
+    }
+
+    return outcomes;
+  }
+
+  /**
+   * Read-only existing-lineage lookup, extracted out of
+   * `importOrReuseAttachment()`'s own dedup check so a caller can ask "is
+   * this attachment already imported?" without risking a download attempt
+   * for the ones that aren't — used by `strictEventMediaReplay.ts`'s
+   * preflight, which must prove existing target media's origin using only
+   * already-committed lineage, never a fresh (and therefore write-causing)
+   * import attempt.
+   */
+  async findExistingMediaAssets(input: { ids: readonly number[]; sourceId: string }): Promise<Map<number, ImportedEventMedia>> {
+    const found = new Map<number, ImportedEventMedia>();
+    for (const id of input.ids) {
+      const existing = await this.findExistingMediaAssetForAttachment(input.sourceId, id);
+      if (existing) found.set(id, existing);
+    }
+    return found;
+  }
+
+  private async findExistingMediaAssetForAttachment(sourceId: string, attachmentId: number): Promise<ImportedEventMedia | null> {
+    const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(attachmentId);
     const existingLineage = await this.deps.prisma.migrationLineage.findFirst({
       where: {
-        sourceId: input.sourceId,
+        sourceId,
         sourceRecordKey: attachmentSourceRecordKey,
         targetType: "MEDIA_ASSET",
         isActive: true,
@@ -228,19 +309,28 @@ export class EventMediaSyncer {
         select: { id: true, publicUrl: true },
       });
       if (asset?.publicUrl?.trim()) {
-        input.warnings.push(
-          warning(
-            input.sourceRecordKey,
-            "EVENT_MEDIA_DEDUP_REUSED",
-            "Existing imported MediaAsset lineage was reused for event media.",
-            { attachmentId: input.attachmentId, mediaAssetId: asset.id },
-            "INFO",
-          ),
-        );
         return { mediaId: asset.id, publicUrl: asset.publicUrl.trim() };
       }
     }
+    return null;
+  }
 
+  private async importOrReuseAttachment(input: {
+    attachmentId: number;
+    attachment: WordPressAttachmentRow;
+    importer: MediaImporterLike;
+    sourceId: string;
+    sourceHash: string;
+    runId: string | null;
+    recordId: string | null;
+    targetRole: string;
+  }): Promise<AttachmentImportOutcome> {
+    const existing = await this.findExistingMediaAssetForAttachment(input.sourceId, input.attachmentId);
+    if (existing) {
+      return { ok: true, reused: true, mediaId: existing.mediaId, publicUrl: existing.publicUrl };
+    }
+
+    const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
     try {
       const writer = new MediaImportWriter({
         mediaImporter: input.importer,
@@ -257,20 +347,17 @@ export class EventMediaSyncer {
         runId: input.runId,
         recordId: input.recordId,
       });
-      return { mediaId: result.mediaId, publicUrl: result.publicUrl };
+      return { ok: true, reused: false, mediaId: result.mediaId, publicUrl: result.publicUrl };
     } catch (error) {
-      input.warnings.push(
-        warning(
-          input.sourceRecordKey,
-          "EVENT_MEDIA_DOWNLOAD_FAILED",
-          "Event media import failed; the event commit remains successful.",
-          {
-            attachmentId: input.attachmentId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        ),
-      );
-      return null;
+      return {
+        ok: false,
+        code: "EVENT_MEDIA_DOWNLOAD_FAILED",
+        message: "Event media import failed; the event commit remains successful.",
+        details: {
+          attachmentId: input.attachmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
     }
   }
 }
