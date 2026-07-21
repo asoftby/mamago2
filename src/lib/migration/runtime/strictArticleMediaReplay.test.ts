@@ -64,11 +64,13 @@ interface HarnessOptions {
   existingMediaIds?: readonly number[];
   initialCoverImageId?: string | null;
   initialContentJson?: ArticleContentPayload;
+  /** Attachment ids beyond ALLOWLIST the harness's WordPress attachment resolver should also know about — e.g. a featured/cover image that never appears inline in the content. */
+  extraAttachmentIds?: readonly number[];
 }
 
 function createHarness(options: HarnessOptions = {}) {
   const attachments = new Map<number, WordPressAttachmentRow>();
-  for (const id of ALLOWLIST) {
+  for (const id of [...ALLOWLIST, ...(options.extraAttachmentIds ?? [])]) {
     if (!options.missingAttachmentIds?.includes(id)) attachments.set(id, attachment(id));
   }
 
@@ -168,13 +170,47 @@ function baseInput(
     sourceHash: SOURCE_HASH,
     rawContent: RAW_HTML,
     featuredAttachmentId: FEATURED_ID,
-    attachmentAllowlist: ALLOWLIST,
+    inlineAttachmentAllowlist: ALLOWLIST,
     ownerUserId: OWNER_USER_ID,
     current: { contentJson: harness.getArticleState().contentJson, coverImageId: harness.getArticleState().coverImageId },
     mediaImporter: harness.syncer,
     prisma: harness.prismaWithTx,
     ...overrides,
   };
+}
+
+async function testFeaturedCoverAbsentFromContentStillSucceeds() {
+  // PR #68 review, P1 #1: a featured/cover image (999) that never appears
+  // inline in post_content at all — a very common real-world case (the old,
+  // merged allowlist would have wrongly refused this as `allowedNotFound`;
+  // the golden fixture only avoided that by coincidence).
+  const rawContentWithoutFeaturedInline = [
+    "<p>Intro paragraph.</p>",
+    '<img src="https://wp.example.com/a-576x1024.jpg" alt="" class="wp-image-111"/>',
+    "<p>Final paragraph.</p>",
+  ].join("\n");
+  const currentForThisContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "a", type: "intro", text: "Intro paragraph." },
+      { id: "b", type: "text", text: "Final paragraph." },
+    ],
+  };
+  const harness = createHarness({ extraAttachmentIds: [999], initialContentJson: currentForThisContent });
+  const result = await runStrictArticleMediaReplay(
+    baseInput(harness, {
+      rawContent: rawContentWithoutFeaturedInline,
+      featuredAttachmentId: 999,
+      inlineAttachmentAllowlist: [111],
+      current: { contentJson: currentForThisContent, coverImageId: null },
+    }),
+  );
+
+  assert.equal(result.status, "APPLIED");
+  if (result.status !== "APPLIED") return;
+  assert.ok(result.coverMediaId, "the featured attachment was still resolved and imported, despite never appearing inline");
+  assert.deepEqual([...result.importedAttachmentIds].sort(), [111, 999]);
+  assert.equal(result.imageBlockCount, 1, "only the one genuinely inline image becomes a contentJson image block");
 }
 
 async function testSuccessfulReplayAppliesOnlyContentJsonAndCover() {
@@ -378,7 +414,7 @@ async function testDuplicateAttachmentOccurrenceImportsOnce() {
     baseInput(harness, {
       rawContent: htmlWithDuplicateOccurrence,
       featuredAttachmentId: 111,
-      attachmentAllowlist: [111],
+      inlineAttachmentAllowlist: [111],
       current: { contentJson: currentForThisContent, coverImageId: null },
     }),
   );
@@ -428,13 +464,38 @@ async function testCoverMismatchPreventsNoopAndFixesCover() {
 }
 
 async function testDanglingLineageTargetIsNotSilentlyReused() {
-  // Lineage row exists (isActive) for attachment 111, but its target
-  // MediaAsset no longer exists (e.g. deleted) — provenance must not claim
-  // this as reusable; a fresh import must be attempted instead.
+  // PR #68 review, P1 #3: lineage row exists (isActive) for attachment 111,
+  // but its target MediaAsset no longer exists (e.g. deleted) — this is a
+  // distinct DANGLING_ACTIVE_LINEAGE state, never conflated with either
+  // "no lineage" (which would trigger a fresh import) or "reusable"
+  // (which would silently trust a broken reference). It must fail closed
+  // *before* the importer is ever called — zero downloads, zero new
+  // MediaAsset, zero new lineage, zero Article update. Auto-recovery
+  // (reactivating or deactivating the stale row) is a separate concern,
+  // not attempted by this replay.
+  // Single-attachment scenario on purpose (not the base two-attachment
+  // ALLOWLIST): with attachment 222 also in play, 222's own — entirely
+  // unrelated — fresh import would already happen (sequentially, before
+  // 111's dangling state is even reached) and confound the "zero side
+  // effects" assertions below. Isolating to exactly one attachment is what
+  // makes `importCalls.length === 0` a meaningful proof, not an artifact
+  // of import ordering.
+  const rawContentSingleImage = [
+    "<p>Intro paragraph.</p>",
+    '<img src="https://wp.example.com/a-576x1024.jpg" alt="" class="wp-image-111"/>',
+    "<p>Final paragraph.</p>",
+  ].join("\n");
+  const currentForThisContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "a", type: "intro", text: "Intro paragraph." },
+      { id: "b", type: "text", text: "Final paragraph." },
+    ],
+  };
   // Manually poke a dangling lineage row the harness's normal
   // `existingMediaIds` option wouldn't produce (that option always creates
   // a matching MediaAsset too).
-  const danglingHarness = createHarness();
+  const danglingHarness = createHarness({ initialContentJson: currentForThisContent });
   const originalPrisma = (danglingHarness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } } } }).deps;
   const priorFindFirst = originalPrisma.prisma.migrationLineage.findFirst;
   originalPrisma.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
@@ -444,29 +505,42 @@ async function testDanglingLineageTargetIsNotSilentlyReused() {
     return priorFindFirst(args);
   }) as typeof priorFindFirst;
 
-  const result = await runStrictArticleMediaReplay(baseInput(danglingHarness));
+  const result = await runStrictArticleMediaReplay(
+    baseInput(danglingHarness, {
+      rawContent: rawContentSingleImage,
+      featuredAttachmentId: null,
+      inlineAttachmentAllowlist: [111],
+      current: { contentJson: currentForThisContent, coverImageId: null },
+    }),
+  );
 
-  assert.equal(result.status, "APPLIED");
-  if (result.status !== "APPLIED") return;
-  assert.ok(!result.reusedAttachmentIds.includes(111), "attachment 111 must NOT be reported as reused — its lineage target was dangling");
-  assert.ok(result.importedAttachmentIds.includes(111), "a fresh import was attempted instead of trusting the dangling reference");
+  assert.equal(result.status, "FAILED");
+  if (result.status !== "FAILED") return;
+  assert.equal(result.failures.length, 1);
+  assert.equal(result.failures[0].attachmentId, 111);
+  assert.equal(result.failures[0].code, "ARTICLE_MEDIA_DANGLING_LINEAGE");
+  // importCalls is the only place either a new MediaAsset or a new
+  // lineage row is ever created in this harness (see mediaImporterFactory/
+  // lineageWriter above) — zero import calls transitively proves zero new
+  // MediaAsset and zero new lineage, not just zero downloads.
+  assert.equal(danglingHarness.importCalls.length, 0, "the importer must never be called for a dangling-lineage attachment — no download, no new MediaAsset, no new lineage");
+  assert.equal(danglingHarness.updateCalls.length, 0, "Article is never touched");
 }
 
-async function testActiveLineageConflictOnFreshImportSurfacesAsFailureNotSilentSuccess() {
-  // The real MigrationLineageWriter throws a deterministic conflict when an
-  // *active* lineage row already exists for the exact same natural key and
-  // a plain create() is attempted again (see MigrationLineageWriter.ts's
-  // doc comment) — this must surface as an explicit FAILED outcome for
-  // that attachment, never a silently-assumed success.
+async function testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailure() {
+  // Distinct from the dangling-lineage case above (which is now caught
+  // *before* any importer call, via `getExistingAttachmentLineageState()`
+  // itself): this is a genuine *race* — `findFirst()` sees no lineage row
+  // at all (state NO_LINEAGE, correctly proceeds to a fresh import), but
+  // by the time `MediaImportWriter`'s `createLineage()` call actually runs,
+  // some other concurrent process has already inserted a conflicting
+  // active row — the real `MigrationLineageWriter` throws a deterministic
+  // conflict for exactly this (see its doc comment). Even though this
+  // wasn't detectable in the upfront preflight, it must still surface as
+  // an explicit FAILED outcome for that attachment, never a silently-
+  // assumed success.
   const harness = createHarness();
-  const deps = (harness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } }; lineageWriter: { createLineage: (...a: unknown[]) => unknown } } }).deps;
-  const priorFindFirst = deps.prisma.migrationLineage.findFirst;
-  deps.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
-    if (args.where.sourceRecordKey === "wordpress-db:attachment:222") {
-      return { targetId: "deleted-media-asset-id" }; // dangling: findFirst on mediaAsset will miss
-    }
-    return priorFindFirst(args);
-  }) as typeof priorFindFirst;
+  const deps = (harness.syncer as unknown as { deps: { lineageWriter: { createLineage: (...a: unknown[]) => unknown } } }).deps;
   const priorCreateLineage = deps.lineageWriter.createLineage;
   deps.lineageWriter.createLineage = (async (input: { sourceRecordKey: string }) => {
     if (input.sourceRecordKey === "wordpress-db:attachment:222") {
@@ -510,6 +584,7 @@ async function testConcurrentArticleChangeDuringReplayRefusesAndRollsBack() {
 }
 
 async function main() {
+  await testFeaturedCoverAbsentFromContentStillSucceeds();
   await testSuccessfulReplayAppliesOnlyContentJsonAndCover();
   await testIdempotentReplayIsNoop();
   await testUnexpectedAttachmentOutsideAllowlistRefuses();
@@ -524,7 +599,7 @@ async function main() {
   await testDuplicateAttachmentOccurrenceImportsOnce();
   await testCoverMismatchPreventsNoopAndFixesCover();
   await testDanglingLineageTargetIsNotSilentlyReused();
-  await testActiveLineageConflictOnFreshImportSurfacesAsFailureNotSilentSuccess();
+  await testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailure();
   await testConcurrentArticleChangeDuringReplayRefusesAndRollsBack();
 }
 

@@ -7,12 +7,20 @@
  *
  * Three read-only preflight layers run *before* any import or write, so a
  * `REFUSED` result here always has zero side effects:
- * 1. **Attachment allowlist** — every image found by the position-
+ * 1. **Attachment allowlist** — every image found *inline* by the position-
  *    preserving content pipeline must have a `wp-image-<id>` attachment id
- *    that is in the caller-supplied allowlist, and the allowlist must be
- *    fully accounted for (no extra, no missing) — an image without an id
- *    at all (not WordPress-class-tagged) is "ambiguous" and refuses the
- *    whole replay, never silently dropped or guessed at.
+ *    that is in the caller-supplied `inlineAttachmentAllowlist`, and that
+ *    allowlist must be fully accounted for (no extra, no missing) — an
+ *    image without an id at all (not WordPress-class-tagged) is
+ *    "ambiguous" and refuses the whole replay, never silently dropped or
+ *    guessed at. `featuredAttachmentId` is deliberately validated and
+ *    imported *separately* from this exact-match check (review finding,
+ *    PR #68 P1 #1): a featured/cover image frequently never appears inline
+ *    in `post_content` at all (confirmed on real source data — the golden
+ *    fixture only passes the old, merged check by coincidence, because its
+ *    cover happens to also be embedded inline), so requiring it to be a
+ *    member of the inline set would wrongly refuse an entire, very common
+ *    class of otherwise-valid Articles.
  * 2. **Content divergence** — the non-image block projection reconstructed
  *    from the live source must exactly match the Article's *current*
  *    stored `contentJson` (image blocks filtered out of both sides before
@@ -72,8 +80,13 @@ export interface RunStrictArticleMediaReplayInput {
   /** Raw WordPress `post_content` HTML — `NormalizedArticleCandidate.content`. */
   rawContent: string;
   featuredAttachmentId: number | null;
-  /** Exact, caller-supplied set of attachment ids this replay is allowed to touch — see module doc comment, guard 1. */
-  attachmentAllowlist: readonly number[];
+  /**
+   * Exact, caller-supplied set of *inline* attachment ids this replay is
+   * allowed to touch — see module doc comment, guard 1. Deliberately
+   * excludes `featuredAttachmentId`, which is validated/imported on its
+   * own and is not required to also appear inline.
+   */
+  inlineAttachmentAllowlist: readonly number[];
   ownerUserId: string;
   current: StrictArticleMediaReplayCurrentState;
   mediaImporter: StrictArticleMediaImporter;
@@ -167,18 +180,16 @@ class TargetChangedDuringReplayError extends Error {}
 export async function runStrictArticleMediaReplay(
   input: RunStrictArticleMediaReplayInput,
 ): Promise<StrictArticleMediaReplayResult> {
-  const allowlist = uniqueInOrder(input.attachmentAllowlist);
-  if (allowlist.length === 0) {
+  const inlineAllowlist = uniqueInOrder(input.inlineAttachmentAllowlist);
+  const importAttachmentIds = uniqueInOrder(
+    input.featuredAttachmentId !== null ? [input.featuredAttachmentId, ...inlineAllowlist] : inlineAllowlist,
+  );
+  if (importAttachmentIds.length === 0) {
     return {
       status: "REFUSED",
       code: "ARTICLE_MEDIA_REPLAY_ALLOWLIST_EMPTY",
-      message: "attachmentAllowlist is empty — there is no media this replay is allowed to touch.",
+      message: "Neither featuredAttachmentId nor inlineAttachmentAllowlist name any attachment — there is no media this replay is allowed to touch.",
     };
-  }
-  if (input.featuredAttachmentId !== null && !allowlist.includes(input.featuredAttachmentId)) {
-    throw new Error(
-      `Programmer error: featuredAttachmentId ${input.featuredAttachmentId} is not present in attachmentAllowlist.`,
-    );
   }
 
   // --- Guard 1: reconstruct with image positions, check every found image
@@ -202,16 +213,16 @@ export async function runStrictArticleMediaReplay(
     };
   }
 
-  const foundIds = new Set(imageBlocks.map((block) => block.attachmentId as number));
-  const allowlistSet = new Set(allowlist);
-  if (!setsEqual(foundIds, allowlistSet)) {
+  const foundInlineIds = new Set(imageBlocks.map((block) => block.attachmentId as number));
+  const inlineAllowlistSet = new Set(inlineAllowlist);
+  if (!setsEqual(foundInlineIds, inlineAllowlistSet)) {
     return {
       status: "REFUSED",
       code: "ARTICLE_MEDIA_REPLAY_ALLOWLIST_MISMATCH",
-      message: "The attachment ids found in the live source do not exactly match attachmentAllowlist — refusing before any import.",
+      message: "The inline attachment ids found in the live source do not exactly match inlineAttachmentAllowlist — refusing before any import.",
       details: {
-        foundNotAllowed: [...foundIds].filter((id) => !allowlistSet.has(id)),
-        allowedNotFound: [...allowlistSet].filter((id) => !foundIds.has(id)),
+        foundNotAllowed: [...foundInlineIds].filter((id) => !inlineAllowlistSet.has(id)),
+        allowedNotFound: [...inlineAllowlistSet].filter((id) => !foundInlineIds.has(id)),
       },
     };
   }
@@ -232,8 +243,8 @@ export async function runStrictArticleMediaReplay(
 
   // --- Guard 3 / NOOP short-circuit: read-only proof from existing lineage
   // only, no import attempt. ---
-  const provenMap = await input.mediaImporter.findExistingMediaAssets({ ids: allowlist, sourceId: input.sourceId });
-  const fullyProven = allowlist.every((id) => provenMap.has(id));
+  const provenMap = await input.mediaImporter.findExistingMediaAssets({ ids: importAttachmentIds, sourceId: input.sourceId });
+  const fullyProven = importAttachmentIds.every((id) => provenMap.has(id));
   if (fullyProven) {
     const provenCoverMediaId = input.featuredAttachmentId !== null ? provenMap.get(input.featuredAttachmentId)!.mediaId : null;
     const prospective = normalizedContentToArticleContentJsonWithMedia(reconstructed, (block) => {
@@ -255,7 +266,7 @@ export async function runStrictArticleMediaReplay(
 
   // --- Import phase: only reached once every read-only guard has passed. ---
   const outcomes = await input.mediaImporter.resolveAndImportAttachments({
-    ids: allowlist,
+    ids: importAttachmentIds,
     ownerUserId: input.ownerUserId,
     sourceId: input.sourceId,
     sourceHash: input.sourceHash,
@@ -264,7 +275,7 @@ export async function runStrictArticleMediaReplay(
   });
 
   const failures: AttachmentFailure[] = [];
-  for (const attachmentId of allowlist) {
+  for (const attachmentId of importAttachmentIds) {
     const outcome = outcomes.get(attachmentId);
     if (!outcome) {
       failures.push({
@@ -335,11 +346,11 @@ export async function runStrictArticleMediaReplay(
     throw error;
   }
 
-  const reusedAttachmentIds = allowlist.filter((id) => {
+  const reusedAttachmentIds = importAttachmentIds.filter((id) => {
     const outcome = outcomes.get(id);
     return outcome && isOk(outcome) && outcome.reused;
   });
-  const importedAttachmentIds = allowlist.filter((id) => {
+  const importedAttachmentIds = importAttachmentIds.filter((id) => {
     const outcome = outcomes.get(id);
     return outcome && isOk(outcome) && !outcome.reused;
   });

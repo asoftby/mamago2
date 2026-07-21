@@ -91,6 +91,17 @@ export interface ArticleMediaReplayRuntimeGuardInput {
   /** Whether more than one active ARTICLE lineage row exists for this sourceRecordKey — always an unconditional refusal regardless of what `lineage` itself contains. */
   activeLineageCount: number;
   targetExists: boolean;
+  /**
+   * Review finding (PR #68, P1 #2): `--media-owner-user-id` was previously
+   * only checked for being a non-empty string, never that it names a real
+   * `User`. The real `MediaImporterLike` downloads and processes the file
+   * and writes it to storage *before* `registerUploadedMedia()` is ever
+   * called with `uploadedById` — so an invalid owner id would only be
+   * discovered after those writes already happened, leaving orphaned
+   * files behind on every retry. Caller is expected to have already
+   * checked this with a read-only `prisma.user.findUnique()` lookup.
+   */
+  ownerUserExists: boolean;
 }
 
 export type ArticleMediaReplayRuntimeGuardResult =
@@ -104,6 +115,12 @@ export type ArticleMediaReplayRuntimeGuardResult =
  * through a real, reviewed UPDATE, never through this path.
  */
 export function validateArticleMediaReplayRuntime(input: ArticleMediaReplayRuntimeGuardInput): ArticleMediaReplayRuntimeGuardResult {
+  if (!input.ownerUserExists) {
+    return {
+      ok: false,
+      reason: "--media-owner-user-id does not match any existing User — refusing before any media download/storage write.",
+    };
+  }
   if (input.activeLineageCount !== 1) {
     return {
       ok: false,

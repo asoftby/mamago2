@@ -751,6 +751,13 @@ async function main(): Promise<void> {
             select: { id: true, contentJson: true, coverImageId: true },
           })
         : null;
+      // Read-only existence check — see articleMediaOnlyReplay.ts's doc
+      // comment on `ownerUserExists` (PR #68 review, P1 #2): must happen
+      // before any media download/storage write is even attempted.
+      const ownerUser = await prisma.user.findUnique({
+        where: { id: args.mediaOwnerUserId! },
+        select: { id: true },
+      });
 
       const runtimeGuard = validateArticleMediaReplayRuntime({
         bundle,
@@ -759,19 +766,18 @@ async function main(): Promise<void> {
           : null,
         activeLineageCount,
         targetExists: target !== null,
+        ownerUserExists: ownerUser !== null,
       });
       if (!runtimeGuard.ok) {
         throw new Error(`--force-article-media-replay refused: ${runtimeGuard.reason}`);
       }
 
       const candidate = runtimeGuard.candidate;
-      const attachmentAllowlist = [
-        ...new Set(
-          candidate.featuredImageAttachmentId !== null
-            ? [candidate.featuredImageAttachmentId, ...candidate.inlineImageAttachmentIds]
-            : candidate.inlineImageAttachmentIds,
-        ),
-      ];
+      // Deliberately kept separate from featuredAttachmentId — see
+      // strictArticleMediaReplay.ts's doc comment (PR #68 review, P1 #1):
+      // the featured/cover image is frequently absent from post_content
+      // entirely, so it must never be required to also appear inline.
+      const inlineAttachmentAllowlist = [...new Set(candidate.inlineImageAttachmentIds)];
 
       const articleMediaSyncer = new ArticleMediaReplaySyncer({
         prisma,
@@ -786,7 +792,7 @@ async function main(): Promise<void> {
         sourceHash: runtimeGuard.freshHash,
         rawContent: candidate.content,
         featuredAttachmentId: candidate.featuredImageAttachmentId,
-        attachmentAllowlist,
+        inlineAttachmentAllowlist,
         ownerUserId: args.mediaOwnerUserId!,
         current: {
           contentJson: target!.contentJson as never,
@@ -801,11 +807,19 @@ async function main(): Promise<void> {
       console.log(`sourceRecordKey: ${args.sourceRecordKey}`);
       console.log(`articleId: ${target!.id}`);
       console.log(`hash (unchanged): ${runtimeGuard.freshHash}`);
-      console.log(`attachmentAllowlist: ${JSON.stringify(attachmentAllowlist)}`);
+      console.log(`featuredAttachmentId: ${candidate.featuredImageAttachmentId ?? "(none)"}`);
+      console.log(`inlineAttachmentAllowlist: ${JSON.stringify(inlineAttachmentAllowlist)}`);
       console.log(`result: ${result.status}`);
 
       if (args.out) {
-        writeFileSync(args.out, JSON.stringify({ sourceRecordKey: args.sourceRecordKey, articleId: target!.id, attachmentAllowlist, result }, null, 2));
+        writeFileSync(
+          args.out,
+          JSON.stringify(
+            { sourceRecordKey: args.sourceRecordKey, articleId: target!.id, featuredAttachmentId: candidate.featuredImageAttachmentId, inlineAttachmentAllowlist, result },
+            null,
+            2,
+          ),
+        );
         console.log(`\nJSON report written to ${args.out}`);
       }
 

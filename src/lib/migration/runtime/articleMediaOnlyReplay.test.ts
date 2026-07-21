@@ -110,6 +110,7 @@ function testRuntimeRequiresActiveLineageCountExactlyOne() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 2,
     targetExists: true,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
 }
@@ -120,6 +121,7 @@ function testRuntimeRequiresBundle() {
     lineage: null,
     activeLineageCount: 1,
     targetExists: false,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
 }
@@ -131,6 +133,7 @@ function testRuntimeRequiresActiveLineage() {
     lineage: null,
     activeLineageCount: 0,
     targetExists: false,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
 }
@@ -143,6 +146,7 @@ function testRuntimeRequiresTargetExists() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: false,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
 }
@@ -154,6 +158,7 @@ function testRuntimeRequiresCanonicalHashFormat() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: "legacy-hash-abc" },
     activeLineageCount: 1,
     targetExists: true,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
 }
@@ -166,6 +171,7 @@ function testRuntimeRefusesOnHashMismatch() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: staleHash },
     activeLineageCount: 1,
     targetExists: true,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -181,6 +187,7 @@ function testRuntimeRefusesElementorContent() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -196,6 +203,7 @@ function testRuntimeRefusesWebStoryContent() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -211,11 +219,32 @@ function testRuntimeSucceedsOnExactHashMatch() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    ownerUserExists: true,
   });
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.freshHash, hash);
     assert.equal(result.candidate.title, "Тае 10 лет");
+  }
+}
+
+function testRuntimeRefusesNonexistentOwnerBeforeAnyOtherCheck() {
+  // PR #68 review, P1 #2: a non-existent media owner must refuse before
+  // any download/storage write — checked first, ahead of lineage/hash/
+  // content checks, so this fires even when everything else about the
+  // request is otherwise perfectly valid.
+  const b = bundle();
+  const hash = hashArticleBundle(b);
+  const result = validateArticleMediaReplayRuntime({
+    bundle: b,
+    lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
+    activeLineageCount: 1,
+    targetExists: true,
+    ownerUserExists: false,
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.reason, /--media-owner-user-id/);
   }
 }
 
@@ -238,6 +267,7 @@ function main() {
   testRuntimeRefusesElementorContent();
   testRuntimeRefusesWebStoryContent();
   testRuntimeSucceedsOnExactHashMatch();
+  testRuntimeRefusesNonexistentOwnerBeforeAnyOtherCheck();
 }
 
 main();

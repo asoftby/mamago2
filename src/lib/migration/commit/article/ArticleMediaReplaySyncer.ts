@@ -43,10 +43,33 @@ export type ArticleAttachmentImportOutcome =
   | ({ ok: true; reused: boolean } & ImportedArticleMedia)
   | {
       ok: false;
-      code: "ARTICLE_MEDIA_ATTACHMENT_MISSING" | "ARTICLE_MEDIA_URL_INVALID" | "ARTICLE_MEDIA_DOWNLOAD_FAILED" | "ARTICLE_MEDIA_UNSUPPORTED_MIME";
+      code:
+        | "ARTICLE_MEDIA_ATTACHMENT_MISSING"
+        | "ARTICLE_MEDIA_URL_INVALID"
+        | "ARTICLE_MEDIA_DOWNLOAD_FAILED"
+        | "ARTICLE_MEDIA_UNSUPPORTED_MIME"
+        | "ARTICLE_MEDIA_DANGLING_LINEAGE";
       message: string;
       details?: Record<string, unknown>;
     };
+
+/**
+ * Review finding (PR #68, P1 #3): a plain `existing ? reuse : import` binary
+ * silently conflated "no lineage row at all" with "an active lineage row
+ * exists but its target MediaAsset is gone" — the latter fell through to a
+ * fresh import, which (a) downloads/writes a file before ever knowing
+ * `MediaImportWriter`'s `createLineage()` will then throw on the still-active
+ * conflicting row (see `MigrationLineageWriter.ts`'s doc comment: an active
+ * row for the same natural key always throws, never silently overwritten),
+ * and (b) can leave an orphaned file/MediaAsset behind with no lineage
+ * pointing at it, breaking idempotency on retry. `DANGLING_ACTIVE_LINEAGE`
+ * is now its own state, checked *before* any importer call — never a
+ * download attempt for a case this class already knows is unsafe.
+ */
+export type ExistingAttachmentLineageState =
+  | { state: "NO_LINEAGE" }
+  | ({ state: "USABLE_LINEAGE" } & ImportedArticleMedia)
+  | { state: "DANGLING_ACTIVE_LINEAGE"; lineageTargetId: string };
 
 export interface ResolveAndImportArticleAttachmentsInput {
   ids: readonly number[];
@@ -86,8 +109,15 @@ export class ArticleMediaReplaySyncer {
   async findExistingMediaAssets(input: { ids: readonly number[]; sourceId: string }): Promise<Map<number, ImportedArticleMedia>> {
     const found = new Map<number, ImportedArticleMedia>();
     for (const id of input.ids) {
-      const existing = await this.findExistingMediaAssetForAttachment(input.sourceId, id);
-      if (existing) found.set(id, existing);
+      const existing = await this.getExistingAttachmentLineageState(input.sourceId, id);
+      if (existing.state === "USABLE_LINEAGE") {
+        found.set(id, { mediaId: existing.mediaId, publicUrl: existing.publicUrl });
+      }
+      // NO_LINEAGE and DANGLING_ACTIVE_LINEAGE both stay absent from this
+      // map — this method only ever reports what's *provably* reusable
+      // (used for the read-only NOOP-vs-apply preflight decision); a
+      // dangling row is caught explicitly, and fail-closed, in
+      // `importOrReuseAttachment()` before any importer call.
     }
     return found;
   }
@@ -148,7 +178,7 @@ export class ArticleMediaReplaySyncer {
     return outcomes;
   }
 
-  private async findExistingMediaAssetForAttachment(sourceId: string, attachmentId: number): Promise<ImportedArticleMedia | null> {
+  private async getExistingAttachmentLineageState(sourceId: string, attachmentId: number): Promise<ExistingAttachmentLineageState> {
     const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(attachmentId);
     const existingLineage = await this.deps.prisma.migrationLineage.findFirst({
       where: {
@@ -159,16 +189,20 @@ export class ArticleMediaReplaySyncer {
       },
       select: { targetId: true },
     });
-    if (existingLineage?.targetId) {
-      const asset = await this.deps.prisma.mediaAsset.findFirst({
-        where: { id: existingLineage.targetId, deletedAt: null },
-        select: { id: true, publicUrl: true },
-      });
-      if (asset?.publicUrl?.trim()) {
-        return { mediaId: asset.id, publicUrl: asset.publicUrl.trim() };
-      }
+    if (!existingLineage?.targetId) {
+      return { state: "NO_LINEAGE" };
     }
-    return null;
+    const asset = await this.deps.prisma.mediaAsset.findFirst({
+      where: { id: existingLineage.targetId, deletedAt: null },
+      select: { id: true, publicUrl: true },
+    });
+    if (asset?.publicUrl?.trim()) {
+      return { state: "USABLE_LINEAGE", mediaId: asset.id, publicUrl: asset.publicUrl.trim() };
+    }
+    // An active lineage row exists (isActive: true, unique per sourceId +
+    // sourceRecordKey + targetType + targetRole) but its target is gone or
+    // unusable — never treat this as "no lineage" and silently re-import.
+    return { state: "DANGLING_ACTIVE_LINEAGE", lineageTargetId: existingLineage.targetId };
   }
 
   private async importOrReuseAttachment(input: {
@@ -180,9 +214,21 @@ export class ArticleMediaReplaySyncer {
     runId: string | null;
     recordId: string | null;
   }): Promise<ArticleAttachmentImportOutcome> {
-    const existing = await this.findExistingMediaAssetForAttachment(input.sourceId, input.attachmentId);
-    if (existing) {
+    const existing = await this.getExistingAttachmentLineageState(input.sourceId, input.attachmentId);
+    if (existing.state === "USABLE_LINEAGE") {
       return { ok: true, reused: true, mediaId: existing.mediaId, publicUrl: existing.publicUrl };
+    }
+    if (existing.state === "DANGLING_ACTIVE_LINEAGE") {
+      // Fail closed *before* touching the importer — no download, no
+      // storage write, no MediaAsset/lineage row. Auto-recovery (reactivate
+      // or deactivate the stale row) is a deliberately separate concern,
+      // not attempted here.
+      return {
+        ok: false,
+        code: "ARTICLE_MEDIA_DANGLING_LINEAGE",
+        message: "An active MEDIA_ASSET lineage row exists for this attachment but its target is missing/deleted — refusing to import before this is resolved.",
+        details: { attachmentId: input.attachmentId, lineageTargetId: existing.lineageTargetId },
+      };
     }
 
     const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
