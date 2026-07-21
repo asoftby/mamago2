@@ -116,7 +116,7 @@ export type ArticleAttachmentImportOutcome =
 export type ExistingAttachmentLineageState =
   | { state: "NO_LINEAGE" }
   | ({ state: "USABLE_LINEAGE" } & ImportedArticleMedia)
-  | { state: "DANGLING_ACTIVE_LINEAGE"; lineageTargetId: string };
+  | { state: "DANGLING_ACTIVE_LINEAGE"; lineageTargetId: string | null };
 
 export interface ResolveAndImportArticleAttachmentsInput {
   ids: readonly number[];
@@ -235,11 +235,15 @@ export class ArticleMediaReplaySyncer {
       },
       select: { targetId: true },
     });
-    if (!existingLineage?.targetId) {
+    if (!existingLineage) {
       return { state: "NO_LINEAGE" };
     }
+    if (!existingLineage.targetId?.trim()) {
+      return { state: "DANGLING_ACTIVE_LINEAGE", lineageTargetId: existingLineage.targetId };
+    }
+    const lineageTargetId = existingLineage.targetId.trim();
     const asset = await this.deps.prisma.mediaAsset.findFirst({
-      where: { id: existingLineage.targetId, deletedAt: null },
+      where: { id: lineageTargetId, deletedAt: null },
       select: { id: true, publicUrl: true },
     });
     if (asset?.publicUrl?.trim()) {
@@ -248,7 +252,7 @@ export class ArticleMediaReplaySyncer {
     // An active lineage row exists (isActive: true, unique per sourceId +
     // sourceRecordKey + targetType + targetRole) but its target is gone or
     // unusable — never treat this as "no lineage" and silently re-import.
-    return { state: "DANGLING_ACTIVE_LINEAGE", lineageTargetId: existingLineage.targetId };
+    return { state: "DANGLING_ACTIVE_LINEAGE", lineageTargetId };
   }
 
   private async importOrReuseAttachment(input: {

@@ -553,6 +553,72 @@ async function testDanglingLineageTargetIsNotSilentlyReused() {
   assert.deepEqual(danglingHarness.getArticleState(), initialArticleState, "Article contentJson and coverImageId remain unchanged");
 }
 
+async function testNullTargetLineageFailsWholeBatchPreflight() {
+  const harness = createHarness();
+  const deps = (harness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } } } }).deps;
+  const priorFindFirst = deps.prisma.migrationLineage.findFirst;
+  deps.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
+    if (args.where.sourceRecordKey === "wordpress-db:attachment:222") return { targetId: null };
+    return priorFindFirst(args);
+  }) as typeof priorFindFirst;
+  const initialState = structuredClone(harness.getArticleState());
+  const initialMediaAssetCount = harness.getMediaAssetCount();
+  const initialLineageCount = harness.getLineageCount();
+
+  const result = await runStrictArticleMediaReplay(baseInput(harness));
+
+  assert.equal(result.status, "FAILED");
+  if (result.status !== "FAILED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_DANGLING_LINEAGE");
+  assert.equal(result.failures.length, 1);
+  assert.equal(result.failures[0].attachmentId, 222);
+  assert.equal(result.failures[0].code, "ARTICLE_MEDIA_DANGLING_LINEAGE");
+  assert.deepEqual(result.failures[0].details, { attachmentId: 222, lineageTargetId: null });
+  assert.equal(harness.getImporterFactoryCalls(), 0);
+  assert.equal(harness.importCalls.length, 0);
+  assert.equal(harness.getMediaAssetCount() - initialMediaAssetCount, 0);
+  assert.equal(harness.getLineageCount() - initialLineageCount, 0);
+  assert.equal(harness.updateManyAttempts.length, 0);
+  assert.deepEqual(harness.getArticleState(), initialState);
+}
+
+async function testNullTargetLineageFoundUnderClaimDoesNotImport() {
+  const harness = createHarness();
+  const deps = (harness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } } } }).deps;
+  const priorFindFirst = deps.prisma.migrationLineage.findFirst;
+  let attachmentLookupCount = 0;
+  deps.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
+    if (args.where.sourceRecordKey === "wordpress-db:attachment:222") {
+      attachmentLookupCount += 1;
+      return attachmentLookupCount === 1 ? null : { targetId: null };
+    }
+    return priorFindFirst(args);
+  }) as typeof priorFindFirst;
+
+  const preflight = await harness.syncer.checkAttachmentLineageStates({ ids: [222], sourceId: SOURCE_ID });
+  assert.deepEqual(preflight.get(222), { state: "NO_LINEAGE" });
+  const outcome = (
+    await harness.syncer.resolveAndImportAttachments({
+      ids: [222],
+      ownerUserId: OWNER_USER_ID,
+      sourceId: SOURCE_ID,
+      sourceHash: SOURCE_HASH,
+      runId: null,
+      recordId: null,
+    })
+  ).get(222);
+
+  assert.equal(outcome?.ok, false);
+  if (outcome?.ok === false) {
+    assert.equal(outcome.code, "ARTICLE_MEDIA_DANGLING_LINEAGE");
+    assert.deepEqual(outcome.details, { attachmentId: 222, lineageTargetId: null });
+  }
+  assert.equal(harness.getImporterFactoryCalls(), 0);
+  assert.equal(harness.importCalls.length, 0);
+  assert.equal(harness.getMediaAssetCount(), 0);
+  assert.equal(harness.getLineageCount(), 0);
+}
+
 async function testConcurrentAttachmentImportIsSerializedWithoutOrphan() {
   const harness = createHarness();
   let markImportEntered!: () => void;
@@ -738,6 +804,8 @@ async function main() {
   await testDuplicateAttachmentOccurrenceImportsOnce();
   await testCoverMismatchPreventsNoopAndFixesCover();
   await testDanglingLineageTargetIsNotSilentlyReused();
+  await testNullTargetLineageFailsWholeBatchPreflight();
+  await testNullTargetLineageFoundUnderClaimDoesNotImport();
   await testConcurrentAttachmentImportIsSerializedWithoutOrphan();
   await testAttachmentClaimsAreKeyedAndReleasedAfterFailure();
   await testConcurrentArticleChangeInCasWindowIsNotOverwritten();
