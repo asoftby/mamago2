@@ -121,7 +121,10 @@ import {
   validateArticleMediaReplayRuntime,
 } from "../src/lib/migration/runtime/articleMediaOnlyReplay";
 import { runStrictArticleMediaReplay } from "../src/lib/migration/runtime/strictArticleMediaReplay";
-import { ArticleMediaReplaySyncer } from "../src/lib/migration/commit/article/ArticleMediaReplaySyncer";
+import {
+  ArticleMediaReplaySyncer,
+  PrismaArticleMediaAttachmentImportCoordinator,
+} from "../src/lib/migration/commit/article/ArticleMediaReplaySyncer";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
 import { MediaPolicyGatedPlaceMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedPlaceMediaSyncer";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
@@ -785,6 +788,7 @@ async function main(): Promise<void> {
         attachmentResolver: wordpressRepository,
         mediaImporterFactory,
         lineageWriter,
+        attachmentImportCoordinator: new PrismaArticleMediaAttachmentImportCoordinator(prisma),
       });
 
       const result = await runStrictArticleMediaReplay({

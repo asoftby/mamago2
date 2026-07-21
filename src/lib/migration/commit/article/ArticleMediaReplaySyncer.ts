@@ -24,6 +24,52 @@ import type { MediaImporterLike, MediaLineageWriterLike } from "../../media/type
  * across roles, not just across Articles, exactly like Place.
  */
 export const ARTICLE_MEDIA_TARGET_ROLE = "article-media";
+const ARTICLE_MEDIA_ATTACHMENT_IMPORT_TRANSACTION_TIMEOUT_MS = 120_000;
+
+export interface ArticleMediaAttachmentImportClaimIdentity {
+  sourceId: string;
+  sourceRecordKey: string;
+  targetRole: typeof ARTICLE_MEDIA_TARGET_ROLE;
+}
+
+export type ArticleMediaAttachmentImportClaimResult<T> =
+  | { acquired: false }
+  | { acquired: true; value: T };
+
+export interface ArticleMediaAttachmentImportCoordinator {
+  withClaim<T>(
+    identity: ArticleMediaAttachmentImportClaimIdentity,
+    operation: () => Promise<T>,
+  ): Promise<ArticleMediaAttachmentImportClaimResult<T>>;
+}
+
+/**
+ * Fail-fast, cross-process coordination for one source attachment. The
+ * advisory transaction lock is held while the callback performs the
+ * authoritative lineage recheck, upload, MediaAsset registration, and
+ * lineage creation. A hash collision can only produce a conservative BUSY
+ * refusal for an unrelated import; it cannot permit a duplicate upload.
+ */
+export class PrismaArticleMediaAttachmentImportCoordinator implements ArticleMediaAttachmentImportCoordinator {
+  constructor(private readonly prisma: Pick<PrismaClient, "$transaction">) {}
+
+  async withClaim<T>(
+    identity: ArticleMediaAttachmentImportClaimIdentity,
+    operation: () => Promise<T>,
+  ): Promise<ArticleMediaAttachmentImportClaimResult<T>> {
+    const lockKey = JSON.stringify([identity.sourceId, identity.targetRole, identity.sourceRecordKey]);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
+          SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS acquired
+        `;
+        if (rows[0]?.acquired !== true) return { acquired: false };
+        return { acquired: true, value: await operation() };
+      },
+      { timeout: ARTICLE_MEDIA_ATTACHMENT_IMPORT_TRANSACTION_TIMEOUT_MS },
+    );
+  }
+}
 
 export interface ArticleMediaAttachmentResolver {
   getAttachmentsByIds(ids: readonly number[]): Promise<Map<number, WordPressAttachmentRow>>;
@@ -48,7 +94,8 @@ export type ArticleAttachmentImportOutcome =
         | "ARTICLE_MEDIA_URL_INVALID"
         | "ARTICLE_MEDIA_DOWNLOAD_FAILED"
         | "ARTICLE_MEDIA_UNSUPPORTED_MIME"
-        | "ARTICLE_MEDIA_DANGLING_LINEAGE";
+        | "ARTICLE_MEDIA_DANGLING_LINEAGE"
+        | "ARTICLE_MEDIA_ATTACHMENT_IMPORT_BUSY";
       message: string;
       details?: Record<string, unknown>;
     };
@@ -97,6 +144,7 @@ export class ArticleMediaReplaySyncer {
       attachmentResolver: ArticleMediaAttachmentResolver;
       mediaImporterFactory: (ownerUserId: string) => MediaImporterLike;
       lineageWriter: MediaLineageWriterLike;
+      attachmentImportCoordinator: ArticleMediaAttachmentImportCoordinator;
     },
   ) {}
 
@@ -126,7 +174,8 @@ export class ArticleMediaReplaySyncer {
     if (input.ids.length === 0) return outcomes;
 
     const attachments = await this.deps.attachmentResolver.getAttachmentsByIds(input.ids);
-    const importer = this.deps.mediaImporterFactory(input.ownerUserId);
+    let importer: MediaImporterLike | null = null;
+    const getImporter = () => (importer ??= this.deps.mediaImporterFactory(input.ownerUserId));
 
     for (const id of input.ids) {
       const attachment = attachments.get(id);
@@ -163,7 +212,7 @@ export class ArticleMediaReplaySyncer {
         await this.importOrReuseAttachment({
           attachmentId: id,
           attachment,
-          importer,
+          getImporter,
           sourceId: input.sourceId,
           sourceHash: input.sourceHash,
           runId: input.runId,
@@ -205,57 +254,75 @@ export class ArticleMediaReplaySyncer {
   private async importOrReuseAttachment(input: {
     attachmentId: number;
     attachment: WordPressAttachmentRow;
-    importer: MediaImporterLike;
+    getImporter: () => MediaImporterLike;
     sourceId: string;
     sourceHash: string;
     runId: string | null;
     recordId: string | null;
   }): Promise<ArticleAttachmentImportOutcome> {
-    const existing = await this.getExistingAttachmentLineageState(input.sourceId, input.attachmentId);
-    if (existing.state === "USABLE_LINEAGE") {
-      return { ok: true, reused: true, mediaId: existing.mediaId, publicUrl: existing.publicUrl };
-    }
-    if (existing.state === "DANGLING_ACTIVE_LINEAGE") {
-      // Fail closed *before* touching the importer — no download, no
-      // storage write, no MediaAsset/lineage row. Auto-recovery (reactivate
-      // or deactivate the stale row) is a deliberately separate concern,
-      // not attempted here.
-      return {
-        ok: false,
-        code: "ARTICLE_MEDIA_DANGLING_LINEAGE",
-        message: "An active MEDIA_ASSET lineage row exists for this attachment but its target is missing/deleted — refusing to import before this is resolved.",
-        details: { attachmentId: input.attachmentId, lineageTargetId: existing.lineageTargetId },
-      };
-    }
-
     const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
-    try {
-      const writer = new MediaImportWriter({
-        mediaImporter: input.importer,
-        lineageWriter: this.deps.lineageWriter,
-      });
-      const result = await writer.importWordPressAttachment({
-        attachment: input.attachment,
+    const claim = await this.deps.attachmentImportCoordinator.withClaim(
+      {
         sourceId: input.sourceId,
         sourceRecordKey: attachmentSourceRecordKey,
-        sourceEntityType: "wordpress-db:attachment",
-        sourceStableKey: `attachment:${input.attachmentId}`,
-        sourceHash: input.sourceHash,
         targetRole: ARTICLE_MEDIA_TARGET_ROLE,
-        runId: input.runId,
-        recordId: input.recordId,
-      });
-      return { ok: true, reused: false, mediaId: result.mediaId, publicUrl: result.publicUrl };
-    } catch (error) {
+      },
+      async () => {
+        // This is the authoritative race-sensitive recheck. The earlier
+        // whole-batch pass remains useful for fail-closed preflight, but only
+        // this check is protected against another replay importing the same
+        // attachment concurrently.
+        const existing = await this.getExistingAttachmentLineageState(input.sourceId, input.attachmentId);
+        if (existing.state === "USABLE_LINEAGE") {
+          return { ok: true, reused: true, mediaId: existing.mediaId, publicUrl: existing.publicUrl } satisfies ArticleAttachmentImportOutcome;
+        }
+        if (existing.state === "DANGLING_ACTIVE_LINEAGE") {
+          return {
+            ok: false,
+            code: "ARTICLE_MEDIA_DANGLING_LINEAGE",
+            message: "An active MEDIA_ASSET lineage row exists for this attachment but its target is missing/deleted — refusing to import before this is resolved.",
+            details: { attachmentId: input.attachmentId, lineageTargetId: existing.lineageTargetId },
+          } satisfies ArticleAttachmentImportOutcome;
+        }
+
+        try {
+          const writer = new MediaImportWriter({
+            mediaImporter: input.getImporter(),
+            lineageWriter: this.deps.lineageWriter,
+          });
+          const result = await writer.importWordPressAttachment({
+            attachment: input.attachment,
+            sourceId: input.sourceId,
+            sourceRecordKey: attachmentSourceRecordKey,
+            sourceEntityType: "wordpress-db:attachment",
+            sourceStableKey: `attachment:${input.attachmentId}`,
+            sourceHash: input.sourceHash,
+            targetRole: ARTICLE_MEDIA_TARGET_ROLE,
+            runId: input.runId,
+            recordId: input.recordId,
+          });
+          return { ok: true, reused: false, mediaId: result.mediaId, publicUrl: result.publicUrl } satisfies ArticleAttachmentImportOutcome;
+        } catch (error) {
+          return {
+            ok: false,
+            code: "ARTICLE_MEDIA_DOWNLOAD_FAILED",
+            message: "Article media import failed.",
+            details: {
+              attachmentId: input.attachmentId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          } satisfies ArticleAttachmentImportOutcome;
+        }
+      },
+    );
+    if (!claim.acquired) {
       return {
         ok: false,
-        code: "ARTICLE_MEDIA_DOWNLOAD_FAILED",
-        message: "Article media import failed.",
-        details: {
-          attachmentId: input.attachmentId,
-          error: error instanceof Error ? error.message : String(error),
-        },
+        code: "ARTICLE_MEDIA_ATTACHMENT_IMPORT_BUSY",
+        message: "Another Article replay is already importing this attachment — retry safely after it finishes to reuse the winner's lineage.",
+        details: { attachmentId: input.attachmentId, sourceRecordKey: attachmentSourceRecordKey },
       };
     }
+    return claim.value;
   }
 }

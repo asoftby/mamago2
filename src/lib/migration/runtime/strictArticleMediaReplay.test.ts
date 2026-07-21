@@ -11,7 +11,12 @@
 import assert from "node:assert/strict";
 import { isDeepStrictEqual } from "node:util";
 
-import { ArticleMediaReplaySyncer, type ArticleMediaReplaySyncerPrismaClient } from "../commit/article/ArticleMediaReplaySyncer";
+import {
+  ARTICLE_MEDIA_TARGET_ROLE,
+  ArticleMediaReplaySyncer,
+  type ArticleMediaAttachmentImportCoordinator,
+  type ArticleMediaReplaySyncerPrismaClient,
+} from "../commit/article/ArticleMediaReplaySyncer";
 import type { WordPressAttachmentRow } from "../adapters/wordpress-db/types";
 import type { MediaImporterLike, MediaLineageWriterLike } from "../media/types";
 import {
@@ -82,6 +87,7 @@ function createHarness(options: HarnessOptions = {}) {
   const mediaAssets = new Map<string, { id: string; publicUrl: string; deletedAt: null }>();
   const lineages = new Map<string, string>(); // sourceRecordKey -> mediaAssetId
   const importCalls: string[] = [];
+  let importerFactoryCalls = 0;
   let nextMediaId = 1;
 
   for (const id of options.existingMediaIds ?? []) {
@@ -102,7 +108,9 @@ function createHarness(options: HarnessOptions = {}) {
     },
   };
 
-  const mediaImporterFactory = (): MediaImporterLike => ({
+  const mediaImporterFactory = (): MediaImporterLike => {
+    importerFactoryCalls += 1;
+    return {
     importFromUrl: async (input) => {
       importCalls.push(input.sourceRecordKey);
       const idMatch = /attachment:(\d+)$/.exec(input.sourceRecordKey);
@@ -115,7 +123,8 @@ function createHarness(options: HarnessOptions = {}) {
       mediaAssets.set(mediaId, { id: mediaId, publicUrl, deletedAt: null });
       return { mediaId, storageKey: `${mediaId}/file.jpg`, publicUrl };
     },
-  });
+    };
+  };
 
   const lineageWriter: MediaLineageWriterLike = {
     createLineage: async (input) => {
@@ -124,11 +133,26 @@ function createHarness(options: HarnessOptions = {}) {
     },
   };
 
+  const activeClaims = new Set<string>();
+  const attachmentImportCoordinator: ArticleMediaAttachmentImportCoordinator = {
+    withClaim: async (identity, operation) => {
+      const key = JSON.stringify([identity.sourceId, identity.targetRole, identity.sourceRecordKey]);
+      if (activeClaims.has(key)) return { acquired: false };
+      activeClaims.add(key);
+      try {
+        return { acquired: true, value: await operation() };
+      } finally {
+        activeClaims.delete(key);
+      }
+    },
+  };
+
   const syncer = new ArticleMediaReplaySyncer({
     prisma,
     attachmentResolver: { getAttachmentsByIds: async (ids) => new Map(ids.filter((id) => attachments.has(id)).map((id) => [id, attachments.get(id)!])) },
     mediaImporterFactory,
     lineageWriter,
+    attachmentImportCoordinator,
   });
 
   let articleState = {
@@ -173,6 +197,7 @@ function createHarness(options: HarnessOptions = {}) {
     syncer,
     prismaWithTx,
     importCalls,
+    getImporterFactoryCalls: () => importerFactoryCalls,
     getArticleState: () => articleState,
     setArticleState: (next: { contentJson: ArticleContentPayload; coverImageId: string | null }) => {
       articleState = { contentJson: persistedContentJson(next.contentJson), coverImageId: next.coverImageId };
@@ -181,6 +206,7 @@ function createHarness(options: HarnessOptions = {}) {
     getLineageCount: () => lineages.size,
     updateCalls,
     updateManyAttempts,
+    attachmentImportCoordinator,
   };
 }
 
@@ -527,36 +553,111 @@ async function testDanglingLineageTargetIsNotSilentlyReused() {
   assert.deepEqual(danglingHarness.getArticleState(), initialArticleState, "Article contentJson and coverImageId remain unchanged");
 }
 
-async function testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailure() {
-  // Distinct from the dangling-lineage case above (which is now caught
-  // *before* any importer call, via `getExistingAttachmentLineageState()`
-  // itself): this is a genuine *race* — `findFirst()` sees no lineage row
-  // at all (state NO_LINEAGE, correctly proceeds to a fresh import), but
-  // by the time `MediaImportWriter`'s `createLineage()` call actually runs,
-  // some other concurrent process has already inserted a conflicting
-  // active row — the real `MigrationLineageWriter` throws a deterministic
-  // conflict for exactly this (see its doc comment). Even though this
-  // wasn't detectable in the upfront preflight, it must still surface as
-  // an explicit FAILED outcome for that attachment, never a silently-
-  // assumed success.
+async function testConcurrentAttachmentImportIsSerializedWithoutOrphan() {
   const harness = createHarness();
-  const deps = (harness.syncer as unknown as { deps: { lineageWriter: { createLineage: (...a: unknown[]) => unknown } } }).deps;
-  const priorCreateLineage = deps.lineageWriter.createLineage;
-  deps.lineageWriter.createLineage = (async (input: { sourceRecordKey: string }) => {
-    if (input.sourceRecordKey === "wordpress-db:attachment:222") {
-      throw new Error("Unique constraint violation: an active MigrationLineage row already exists for this key.");
-    }
-    return priorCreateLineage(input);
-  }) as typeof deps.lineageWriter.createLineage;
+  let markImportEntered!: () => void;
+  let releaseImport!: () => void;
+  const importEntered = new Promise<void>((resolve) => {
+    markImportEntered = resolve;
+  });
+  const importRelease = new Promise<void>((resolve) => {
+    releaseImport = resolve;
+  });
+  const deps = (harness.syncer as unknown as { deps: { mediaImporterFactory: (ownerUserId: string) => MediaImporterLike } }).deps;
+  const originalFactory = deps.mediaImporterFactory;
+  deps.mediaImporterFactory = (ownerUserId) => {
+    const importer = originalFactory(ownerUserId);
+    const originalImport = importer.importFromUrl.bind(importer);
+    return {
+      ...importer,
+      importFromUrl: async (input) => {
+        if (input.sourceRecordKey === "wordpress-db:attachment:111") {
+          markImportEntered();
+          await importRelease;
+        }
+        return originalImport(input);
+      },
+    };
+  };
+  const input = {
+    ids: [111],
+    ownerUserId: OWNER_USER_ID,
+    sourceId: SOURCE_ID,
+    sourceHash: SOURCE_HASH,
+    runId: null,
+    recordId: null,
+  };
+  const initialMediaAssetCount = harness.getMediaAssetCount();
+  const initialLineageCount = harness.getLineageCount();
 
-  const result = await runStrictArticleMediaReplay(baseInput(harness));
+  const invocationA = harness.syncer.resolveAndImportAttachments(input);
+  await importEntered;
+  const invocationB = await harness.syncer.resolveAndImportAttachments(input);
+  const busy = invocationB.get(111);
+  assert.equal(busy?.ok, false);
+  if (busy?.ok === false) assert.equal(busy.code, "ARTICLE_MEDIA_ATTACHMENT_IMPORT_BUSY");
+  assert.equal(harness.importCalls.length, 0, "loser returns BUSY before a second importer call; winner is paused before its one call");
+  assert.equal(harness.getImporterFactoryCalls(), 1, "loser does not create an importer");
 
-  assert.equal(result.status, "FAILED");
-  if (result.status !== "FAILED") return;
-  assert.equal(result.failures.length, 1);
-  assert.equal(result.failures[0].attachmentId, 222);
-  assert.equal(result.failures[0].code, "ARTICLE_MEDIA_DOWNLOAD_FAILED");
-  assert.equal(harness.updateCalls.length, 0, "Article is never touched — the conflict is surfaced, not silently swallowed");
+  releaseImport();
+  const winner = (await invocationA).get(111);
+  assert.equal(winner?.ok, true);
+  if (winner?.ok === true) assert.equal(winner.reused, false);
+
+  const retry = (await harness.syncer.resolveAndImportAttachments(input)).get(111);
+  assert.equal(retry?.ok, true);
+  if (retry?.ok === true) {
+    assert.equal(retry.reused, true);
+    assert.equal(retry.mediaId, winner?.ok === true ? winner.mediaId : null);
+  }
+  const mediaAssetDelta = harness.getMediaAssetCount() - initialMediaAssetCount;
+  const lineageDelta = harness.getLineageCount() - initialLineageCount;
+  assert.equal(harness.importCalls.length, 1, "exactly one upload across winner, loser, and retry");
+  assert.equal(mediaAssetDelta, 1);
+  assert.equal(lineageDelta, 1);
+  assert.equal(mediaAssetDelta - lineageDelta, 0, "no orphan MediaAsset delta");
+}
+
+async function testAttachmentClaimsAreKeyedAndReleasedAfterFailure() {
+  const harness = createHarness({ failImportIds: [111] });
+  let releaseFirst!: () => void;
+  const holdFirst = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let markFirstEntered!: () => void;
+  const firstEntered = new Promise<void>((resolve) => {
+    markFirstEntered = resolve;
+  });
+  const firstClaim = harness.attachmentImportCoordinator.withClaim(
+    { sourceId: SOURCE_ID, targetRole: ARTICLE_MEDIA_TARGET_ROLE, sourceRecordKey: "wordpress-db:attachment:111" },
+    async () => {
+      markFirstEntered();
+      await holdFirst;
+      return "first";
+    },
+  );
+  await firstEntered;
+  const differentAttachment = await harness.attachmentImportCoordinator.withClaim(
+    { sourceId: SOURCE_ID, targetRole: ARTICLE_MEDIA_TARGET_ROLE, sourceRecordKey: "wordpress-db:attachment:222" },
+    async () => "second",
+  );
+  assert.deepEqual(differentAttachment, { acquired: true, value: "second" }, "different attachment id is not blocked by a global lock");
+  releaseFirst();
+  await firstClaim;
+
+  const input = {
+    ids: [111],
+    ownerUserId: OWNER_USER_ID,
+    sourceId: SOURCE_ID,
+    sourceHash: SOURCE_HASH,
+    runId: null,
+    recordId: null,
+  };
+  const firstFailure = (await harness.syncer.resolveAndImportAttachments(input)).get(111);
+  const retryFailure = (await harness.syncer.resolveAndImportAttachments(input)).get(111);
+  assert.equal(firstFailure?.ok, false);
+  assert.equal(retryFailure?.ok, false);
+  if (retryFailure?.ok === false) assert.notEqual(retryFailure.code, "ARTICLE_MEDIA_ATTACHMENT_IMPORT_BUSY", "failed import releases its claim for retry");
 }
 
 // ---------------------------------------------------------------------------
@@ -637,7 +738,8 @@ async function main() {
   await testDuplicateAttachmentOccurrenceImportsOnce();
   await testCoverMismatchPreventsNoopAndFixesCover();
   await testDanglingLineageTargetIsNotSilentlyReused();
-  await testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailure();
+  await testConcurrentAttachmentImportIsSerializedWithoutOrphan();
+  await testAttachmentClaimsAreKeyedAndReleasedAfterFailure();
   await testConcurrentArticleChangeInCasWindowIsNotOverwritten();
   await testConcurrentContentOnlyChangeFailsCas();
 }
