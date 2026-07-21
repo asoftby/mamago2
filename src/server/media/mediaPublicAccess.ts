@@ -616,7 +616,7 @@ async function hasPublishedPublicLinkage(media: MediaAsset): Promise<boolean> {
   return false;
 }
 
-async function isBrandingAsset(mediaId: string): Promise<boolean> {
+export async function isBrandingAsset(mediaId: string): Promise<boolean> {
   const branding = await prisma.brandingConfig.findFirst({
     where: {
       OR: [{ logoAssetId: mediaId }, { faviconAssetId: mediaId }],
@@ -747,11 +747,17 @@ export async function canLoadMediaAnonymously(media: MediaAsset): Promise<boolea
   if (isMediaAssetSanityBlocked(media)) {
     return false;
   }
+  // Branding assets bypass the published-linkage check below, but only while
+  // ACTIVE/ORPHANED — an ARCHIVED branding asset (e.g. a replaced logo whose
+  // BrandingConfig FK hasn't been cleared yet) must stay private; archiving
+  // is a deliberate admin decision the branding exception must never undo.
+  const isBrandingEligibleStatus =
+    media.status === MediaAssetStatus.ACTIVE || media.status === MediaAssetStatus.ORPHANED;
+  if (isBrandingEligibleStatus && (await isBrandingAsset(media.id))) {
+    return true;
+  }
   if (media.status !== MediaAssetStatus.ACTIVE) {
     return false;
-  }
-  if (await isBrandingAsset(media.id)) {
-    return true;
   }
   if (!(await hasPublishedPublicLinkage(media))) {
     return false;
