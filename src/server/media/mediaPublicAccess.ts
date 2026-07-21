@@ -616,7 +616,7 @@ async function hasPublishedPublicLinkage(media: MediaAsset): Promise<boolean> {
   return false;
 }
 
-async function isBrandingAsset(mediaId: string): Promise<boolean> {
+export async function isBrandingAsset(mediaId: string): Promise<boolean> {
   const branding = await prisma.brandingConfig.findFirst({
     where: {
       OR: [{ logoAssetId: mediaId }, { faviconAssetId: mediaId }],
@@ -747,11 +747,11 @@ export async function canLoadMediaAnonymously(media: MediaAsset): Promise<boolea
   if (isMediaAssetSanityBlocked(media)) {
     return false;
   }
-  if (media.status !== MediaAssetStatus.ACTIVE) {
-    return false;
-  }
   if (await isBrandingAsset(media.id)) {
     return true;
+  }
+  if (media.status !== MediaAssetStatus.ACTIVE) {
+    return false;
   }
   if (!(await hasPublishedPublicLinkage(media))) {
     return false;

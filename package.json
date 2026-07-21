@@ -83,6 +83,7 @@
     "test:wp-catch-all": "tsx src/lib/routing/wpLegacyCatchAll.test.ts",
     "test:rate-limit": "tsx src/lib/security/rateLimit.test.ts",
     "test:offer-published-edit-gate": "tsx src/lib/offers/offerPublishedEditGate.test.ts",
+    "test:branding-media-asset-usage": "NODE_OPTIONS=--conditions=react-server tsx src/server/media/brandingMediaAssetUsage.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "prepare": "husky",
     "check:push": "pnpm build",

@@ -9,6 +9,7 @@ import { existsSync } from "fs";
 import { unlink } from "fs/promises";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
+import { isBrandingAsset } from "@/server/media/mediaPublicAccess";
 import {
   resolveLegacyPublicUploadPath,
   resolveStoredMediaPath,
@@ -297,7 +298,19 @@ export async function recalculateMediaUsageStatus(id: string) {
     return media;
   }
 
-  const newStatus = usageCount > 0 
+  // Branding assets (logo/favicon) are referenced via BrandingConfig FKs, not
+  // MediaUsage rows, so usage-based recalculation must not orphan them.
+  if (await isBrandingAsset(id)) {
+    if (media.status !== MediaAssetStatus.ACTIVE) {
+      return prisma.mediaAsset.update({
+        where: { id },
+        data: { status: MediaAssetStatus.ACTIVE },
+      });
+    }
+    return media;
+  }
+
+  const newStatus = usageCount > 0
     ? MediaAssetStatus.ACTIVE 
     : MediaAssetStatus.ORPHANED;
 
