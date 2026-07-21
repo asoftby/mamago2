@@ -11,7 +11,7 @@ import type { MediaImporterLike, MediaLineageWriterLike } from "../../media/type
  * CREATE/UPDATE commit path (that path never touches media at all today,
  * by design; see `buildArticleCreateDraft.ts`). Deliberately narrow, built
  * for `strictArticleMediaReplay.ts` only, mirroring `EventMediaSyncer`'s
- * attachment-level methods (`findExistingMediaAssets`/
+ * attachment-level methods (`checkAttachmentLineageStates`/
  * `resolveAndImportAttachments`) so the resolve/import/dedup logic isn't
  * reinvented — just the entity-specific plumbing around it.
  *
@@ -101,25 +101,22 @@ export class ArticleMediaReplaySyncer {
   ) {}
 
   /**
-   * Read-only — never imports. Used by the replay's preflight to check
-   * which requested attachments are already backed by a proven
-   * `MigrationLineage(MEDIA_ASSET)` row, without risking a download attempt
-   * for the ones that aren't.
+   * Read-only — never imports. The single source of truth for every
+   * requested attachment's lineage state, checked *before*
+   * `resolveAndImportAttachments()` is ever called (see
+   * `strictArticleMediaReplay.ts`'s upfront batch preflight, review
+   * finding PR #68 follow-up): a per-attachment check *inside* the
+   * sequential import loop is not enough — attachment N being
+   * `DANGLING_ACTIVE_LINEAGE` must block attachment 1..N-1 from having
+   * already been downloaded, which only a single whole-batch read-only
+   * pass before any import call can guarantee.
    */
-  async findExistingMediaAssets(input: { ids: readonly number[]; sourceId: string }): Promise<Map<number, ImportedArticleMedia>> {
-    const found = new Map<number, ImportedArticleMedia>();
+  async checkAttachmentLineageStates(input: { ids: readonly number[]; sourceId: string }): Promise<Map<number, ExistingAttachmentLineageState>> {
+    const states = new Map<number, ExistingAttachmentLineageState>();
     for (const id of input.ids) {
-      const existing = await this.getExistingAttachmentLineageState(input.sourceId, id);
-      if (existing.state === "USABLE_LINEAGE") {
-        found.set(id, { mediaId: existing.mediaId, publicUrl: existing.publicUrl });
-      }
-      // NO_LINEAGE and DANGLING_ACTIVE_LINEAGE both stay absent from this
-      // map — this method only ever reports what's *provably* reusable
-      // (used for the read-only NOOP-vs-apply preflight decision); a
-      // dangling row is caught explicitly, and fail-closed, in
-      // `importOrReuseAttachment()` before any importer call.
+      states.set(id, await this.getExistingAttachmentLineageState(input.sourceId, id));
     }
-    return found;
+    return states;
   }
 
   async resolveAndImportAttachments(

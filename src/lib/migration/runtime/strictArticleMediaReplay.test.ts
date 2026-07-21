@@ -157,7 +157,15 @@ function createHarness(options: HarnessOptions = {}) {
     },
   };
 
-  return { syncer, prismaWithTx, importCalls, getArticleState: () => articleState, updateCalls };
+  return {
+    syncer,
+    prismaWithTx,
+    importCalls,
+    getArticleState: () => articleState,
+    getMediaAssetCount: () => mediaAssets.size,
+    getLineageCount: () => lineages.size,
+    updateCalls,
+  };
 }
 
 function baseInput(
@@ -464,67 +472,40 @@ async function testCoverMismatchPreventsNoopAndFixesCover() {
 }
 
 async function testDanglingLineageTargetIsNotSilentlyReused() {
-  // PR #68 review, P1 #3: lineage row exists (isActive) for attachment 111,
-  // but its target MediaAsset no longer exists (e.g. deleted) — this is a
-  // distinct DANGLING_ACTIVE_LINEAGE state, never conflated with either
-  // "no lineage" (which would trigger a fresh import) or "reusable"
-  // (which would silently trust a broken reference). It must fail closed
-  // *before* the importer is ever called — zero downloads, zero new
-  // MediaAsset, zero new lineage, zero Article update. Auto-recovery
-  // (reactivating or deactivating the stale row) is a separate concern,
-  // not attempted by this replay.
-  // Single-attachment scenario on purpose (not the base two-attachment
-  // ALLOWLIST): with attachment 222 also in play, 222's own — entirely
-  // unrelated — fresh import would already happen (sequentially, before
-  // 111's dangling state is even reached) and confound the "zero side
-  // effects" assertions below. Isolating to exactly one attachment is what
-  // makes `importCalls.length === 0` a meaningful proof, not an artifact
-  // of import ordering.
-  const rawContentSingleImage = [
-    "<p>Intro paragraph.</p>",
-    '<img src="https://wp.example.com/a-576x1024.jpg" alt="" class="wp-image-111"/>',
-    "<p>Final paragraph.</p>",
-  ].join("\n");
-  const currentForThisContent: ArticleContentPayload = {
-    version: 1,
-    blocks: [
-      { id: "a", type: "intro", text: "Intro paragraph." },
-      { id: "b", type: "text", text: "Final paragraph." },
-    ],
-  };
+  // PR #68 review, P1 #3: attachment 111 has no lineage and appears first,
+  // while attachment 222 has an active lineage whose target MediaAsset no
+  // longer exists. The whole batch must fail its read-only preflight before
+  // the fresh attachment can be imported.
   // Manually poke a dangling lineage row the harness's normal
   // `existingMediaIds` option wouldn't produce (that option always creates
   // a matching MediaAsset too).
-  const danglingHarness = createHarness({ initialContentJson: currentForThisContent });
+  const danglingHarness = createHarness();
   const originalPrisma = (danglingHarness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } } } }).deps;
   const priorFindFirst = originalPrisma.prisma.migrationLineage.findFirst;
   originalPrisma.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
-    if (args.where.sourceRecordKey === "wordpress-db:attachment:111") {
+    if (args.where.sourceRecordKey === "wordpress-db:attachment:222") {
       return { targetId: "deleted-media-asset-id" };
     }
     return priorFindFirst(args);
   }) as typeof priorFindFirst;
 
-  const result = await runStrictArticleMediaReplay(
-    baseInput(danglingHarness, {
-      rawContent: rawContentSingleImage,
-      featuredAttachmentId: null,
-      inlineAttachmentAllowlist: [111],
-      current: { contentJson: currentForThisContent, coverImageId: null },
-    }),
-  );
+  const initialArticleState = structuredClone(danglingHarness.getArticleState());
+  const initialMediaAssetCount = danglingHarness.getMediaAssetCount();
+  const initialLineageCount = danglingHarness.getLineageCount();
+  const result = await runStrictArticleMediaReplay(baseInput(danglingHarness));
 
   assert.equal(result.status, "FAILED");
   if (result.status !== "FAILED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_DANGLING_LINEAGE");
   assert.equal(result.failures.length, 1);
-  assert.equal(result.failures[0].attachmentId, 111);
+  assert.equal(result.failures[0].attachmentId, 222);
   assert.equal(result.failures[0].code, "ARTICLE_MEDIA_DANGLING_LINEAGE");
-  // importCalls is the only place either a new MediaAsset or a new
-  // lineage row is ever created in this harness (see mediaImporterFactory/
-  // lineageWriter above) — zero import calls transitively proves zero new
-  // MediaAsset and zero new lineage, not just zero downloads.
-  assert.equal(danglingHarness.importCalls.length, 0, "the importer must never be called for a dangling-lineage attachment — no download, no new MediaAsset, no new lineage");
+  assert.deepEqual(result.failures[0].details, { attachmentId: 222, lineageTargetId: "deleted-media-asset-id" });
+  assert.equal(danglingHarness.importCalls.length, 0, "the fresh attachment before the dangling attachment must not be imported");
+  assert.equal(danglingHarness.getMediaAssetCount() - initialMediaAssetCount, 0, "no MediaAsset created");
+  assert.equal(danglingHarness.getLineageCount() - initialLineageCount, 0, "no MEDIA_ASSET lineage created");
   assert.equal(danglingHarness.updateCalls.length, 0, "Article is never touched");
+  assert.deepEqual(danglingHarness.getArticleState(), initialArticleState, "Article contentJson and coverImageId remain unchanged");
 }
 
 async function testGenuineConcurrentLineageConflictOnFreshImportSurfacesAsFailure() {

@@ -28,10 +28,10 @@
  *    idempotent re-run after a prior successful replay) — any mismatch
  *    means the text content diverged from what this replay is allowed to
  *    touch, most likely a manual edit, and refuses before any import.
- * 3. **Existing-media provenance** (`findExistingMediaAssets()`) — a
- *    read-only check of what's already backed by `MigrationLineage
- *    (MEDIA_ASSET)`, used only to detect a already-fully-synced NOOP
- *    without importing anything.
+ * 3. **Existing-media provenance** (`checkAttachmentLineageStates()`) — a
+ *    whole-replay read-only check that classifies every requested attachment
+ *    before import. Any dangling active lineage fails the entire replay;
+ *    usable lineage states also power the already-fully-synced NOOP check.
  *
  * Only once all three pass does this import (dedup-or-reuse per unique
  * attachment id — a duplicate reference in the content is a single import
@@ -51,10 +51,17 @@ import {
   normalizedContentToArticleContentJsonWithMedia,
 } from "../content";
 import type { NormalizedContentBlock } from "../content";
-import type { ArticleAttachmentImportOutcome, ResolveAndImportArticleAttachmentsInput } from "../commit/article/ArticleMediaReplaySyncer";
+import type {
+  ArticleAttachmentImportOutcome,
+  ExistingAttachmentLineageState,
+  ResolveAndImportArticleAttachmentsInput,
+} from "../commit/article/ArticleMediaReplaySyncer";
 
 export interface StrictArticleMediaImporter {
-  findExistingMediaAssets(input: { ids: readonly number[]; sourceId: string }): Promise<Map<number, { mediaId: string; publicUrl: string }>>;
+  checkAttachmentLineageStates(input: {
+    ids: readonly number[];
+    sourceId: string;
+  }): Promise<Map<number, ExistingAttachmentLineageState>>;
   resolveAndImportAttachments(input: ResolveAndImportArticleAttachmentsInput): Promise<Map<number, ArticleAttachmentImportOutcome>>;
 }
 
@@ -241,9 +248,45 @@ export async function runStrictArticleMediaReplay(
     };
   }
 
-  // --- Guard 3 / NOOP short-circuit: read-only proof from existing lineage
-  // only, no import attempt. ---
-  const provenMap = await input.mediaImporter.findExistingMediaAssets({ ids: importAttachmentIds, sourceId: input.sourceId });
+  // --- Guard 3: whole-replay read-only lineage preflight. Every requested
+  // attachment is classified before resolve/import can create an importer
+  // or cause any download/write. ---
+  const lineageStates = await input.mediaImporter.checkAttachmentLineageStates({ ids: importAttachmentIds, sourceId: input.sourceId });
+  const lineageFailures: AttachmentFailure[] = [];
+  for (const attachmentId of importAttachmentIds) {
+    const lineageState = lineageStates.get(attachmentId);
+    if (!lineageState) {
+      lineageFailures.push({
+        attachmentId,
+        code: "ARTICLE_MEDIA_LINEAGE_STATE_MISSING",
+        message: "No lineage preflight state was returned for this attachment id.",
+      });
+    } else if (lineageState.state === "DANGLING_ACTIVE_LINEAGE") {
+      lineageFailures.push({
+        attachmentId,
+        code: "ARTICLE_MEDIA_DANGLING_LINEAGE",
+        message: "An active MEDIA_ASSET lineage row exists for this attachment but its target is missing/deleted.",
+        details: { attachmentId, lineageTargetId: lineageState.lineageTargetId },
+      });
+    }
+  }
+  if (lineageFailures.length > 0) {
+    const hasDanglingLineage = lineageFailures.some((failure) => failure.code === "ARTICLE_MEDIA_DANGLING_LINEAGE");
+    return {
+      status: "FAILED",
+      code: hasDanglingLineage ? "ARTICLE_MEDIA_DANGLING_LINEAGE" : "ARTICLE_MEDIA_REPLAY_LINEAGE_PREFLIGHT_INCOMPLETE",
+      message: "Article media lineage preflight failed — the entire replay was stopped before import and Article was left untouched.",
+      failures: lineageFailures,
+    };
+  }
+
+  // --- NOOP short-circuit from the same preflight result. ---
+  const provenMap = new Map<number, { mediaId: string; publicUrl: string }>();
+  for (const [attachmentId, lineageState] of lineageStates) {
+    if (lineageState.state === "USABLE_LINEAGE") {
+      provenMap.set(attachmentId, { mediaId: lineageState.mediaId, publicUrl: lineageState.publicUrl });
+    }
+  }
   const fullyProven = importAttachmentIds.every((id) => provenMap.has(id));
   if (fullyProven) {
     const provenCoverMediaId = input.featuredAttachmentId !== null ? provenMap.get(input.featuredAttachmentId)!.mediaId : null;
