@@ -1,6 +1,7 @@
 export {
   normalizeMigrationContent,
   normalizedContentToArticleContentJson,
+  normalizedContentToArticleContentJsonWithMedia,
 } from "./ContentNormalizationPipeline";
 export type {
   ContentNormalizationInput,
@@ -9,4 +10,5 @@ export type {
   ContentNormalizationWarningCode,
   MigrationContentSourceKind,
   NormalizedContentBlock,
+  ResolvedArticleImageBlock,
 } from "./ContentNormalizationPipeline";
