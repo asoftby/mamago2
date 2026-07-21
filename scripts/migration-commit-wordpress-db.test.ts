@@ -309,6 +309,45 @@ function testForceArticleMediaReplayAcceptsArticleSourceKeyFullOwner() {
   assert.equal(args.mediaOwnerUserId, "user-1");
 }
 
+function testForceArticleMediaReplayRejectsMultipleSourceKeys() {
+  // Self-review risk F: multi-record/batch replay must be impossible.
+  assert.throws(
+    () =>
+      parseArgs([
+        "--entity",
+        "article",
+        "--source-record-key",
+        "wordpress-db:post:24774",
+        "--source-record-key",
+        "wordpress-db:post:39844",
+        "--media-policy",
+        "FULL",
+        "--media-owner-user-id",
+        "user-1",
+        "--force-article-media-replay",
+        ...REQUIRED_FLAGS,
+      ]),
+    /exactly one --source-record-key/,
+  );
+}
+
+function testForceArticleMediaReplayRejectsMissingSourceKey() {
+  assert.throws(
+    () =>
+      parseArgs([
+        "--entity",
+        "article",
+        "--media-policy",
+        "FULL",
+        "--media-owner-user-id",
+        "user-1",
+        "--force-article-media-replay",
+        ...REQUIRED_FLAGS,
+      ]),
+    /exactly one --source-record-key/,
+  );
+}
+
 function testForceArticleMediaReplayRejectsMissingOwner() {
   assert.throws(
     () =>
@@ -772,6 +811,8 @@ async function main() {
   testForceMediaReprocessRejectsNonFullMediaPolicy();
   testForceMediaReprocessRejectsCombinationWithForceReprocess();
   testForceArticleMediaReplayAcceptsArticleSourceKeyFullOwner();
+  testForceArticleMediaReplayRejectsMultipleSourceKeys();
+  testForceArticleMediaReplayRejectsMissingSourceKey();
   testForceArticleMediaReplayRejectsMissingOwner();
   testForceArticleMediaReplayRejectsNonArticleEntities();
   testForceArticleMediaReplayRejectsNonFullMediaPolicy();

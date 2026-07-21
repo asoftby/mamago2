@@ -208,6 +208,75 @@ function testAnchorWrappedImageIsNotDestroyed() {
   assert.equal(images.length, 3, "all three images survive, including the anchor-wrapped one");
 }
 
+function testAnchorFixDoesNotChangeDefaultTextBlocks() {
+  // Self-review risk A: prove the anchor unwrap fix has zero effect on the
+  // *text* blocks a default (non-image) normalization produces — only
+  // whether the <img> itself survives changed, nothing about surrounding
+  // text splitting/heading/bullet detection.
+  const withAnchorWrappedImage = GALLERY_SAMPLE_HTML;
+  const withoutThatImageAtAll = GALLERY_SAMPLE_HTML.replace(
+    '<figure class="wp-block-image"><a href="https://mamago.by/a.jpg"><img src="https://mamago.by/b-576x1024.jpg" alt="" class="wp-image-222"/></a></figure>',
+    "",
+  );
+
+  const textBlocksWith = normalizeMigrationContent({ sourceKind: "wordpress", raw: withAnchorWrappedImage }).blocks.filter(
+    (b) => b.type !== "image",
+  );
+  const textBlocksWithout = normalizeMigrationContent({ sourceKind: "wordpress", raw: withoutThatImageAtAll }).blocks.filter(
+    (b) => b.type !== "image",
+  );
+
+  assert.deepEqual(textBlocksWith, textBlocksWithout, "removing/keeping the anchor-wrapped image never changes any text block");
+}
+
+function testAnchorWithMixedImageAndTextIsUnaffectedByFix() {
+  // Self-review risk A: an anchor whose body has *both* an <img> and real
+  // text is untouched by the fix (the `!text` guard only fires when the
+  // anchor body is image-only) — this exact scenario's behavior (image
+  // dropped, text preserved as a link-with-visible-text) is pre-existing,
+  // not something this fix changed.
+  const html = '<p>Before.</p><a href="https://mamago.by/x.jpg">See photo <img src="https://mamago.by/x-thumb.jpg" class="wp-image-77"/></a><p>After.</p>';
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: html });
+  assert.equal(result.blocks.filter((b) => b.type === "image").length, 0, "an image mixed with real anchor text is still dropped, unchanged");
+  assert.ok(textOf(result).includes("See photo"), "the anchor's visible text is preserved");
+}
+
+function testOrdinaryTextAnchorsAreUnaffectedByFix() {
+  // Self-review risk A: a normal <a>text</a> link (no <img> in its body at
+  // all) never touches the new `!text && /<img\b/i.test(body)` branch —
+  // same UNSAFE_LINK_REMOVED / "(href)" behavior as before.
+  const html = '<p>Read more on <a href="https://mamago.by/article">our site</a>.</p>';
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: html });
+  assert.equal(textOf(result), "Read more on our site (https://mamago.by/article).");
+}
+
+function testSrcsetDoesNotCreateFalseAdditionalAttachmentIds() {
+  // Self-review risk C: a single <img> with a multi-entry srcset (very
+  // common in real WordPress output) must still correlate to exactly one
+  // image block / one attachment id — srcset URLs are never parsed as
+  // separate <img> occurrences.
+  const html =
+    '<p>Before.</p>' +
+    '<img src="https://mamago.by/a-1024.jpg" srcset="https://mamago.by/a-300.jpg 300w, https://mamago.by/a-600.jpg 600w, https://mamago.by/a-1024.jpg 1024w" class="wp-image-555"/>' +
+    "<p>After.</p>";
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: html, preserveImagePositions: true });
+  const images = result.blocks.filter((b) => b.type === "image");
+  assert.equal(images.length, 1, "one <img> tag, regardless of how many URLs its srcset lists, is exactly one image block");
+  assert.equal(images[0].type === "image" ? images[0].attachmentId : undefined, 555);
+}
+
+function testImageWithoutWpImageClassHasNoAttachmentId() {
+  // Self-review risk C: an <img> with no wp-image-<id> class at all (e.g.
+  // an externally embedded image) must come through with `attachmentId:
+  // undefined` — never a guessed/fallback id — so the strict replay's
+  // allowlist guard can correctly treat it as ambiguous and refuse.
+  const html = '<img src="https://example.com/external.jpg" alt="no wp class here"/>';
+  const result = normalizeMigrationContent({ sourceKind: "wordpress", raw: html, preserveImagePositions: true });
+  const images = result.blocks.filter((b) => b.type === "image");
+  assert.equal(images.length, 1);
+  assert.equal(images[0].type === "image" ? images[0].attachmentId : "MISSING", undefined);
+}
+
 function testReplayModePreservesImagePositionsAndAttachmentIds() {
   const result = normalizeMigrationContent({
     sourceKind: "wordpress",
@@ -327,6 +396,11 @@ function main() {
   testArticleContentJsonHasNoLiteralBackslashN();
   testDefaultModeStillDropsImageBlocks();
   testAnchorWrappedImageIsNotDestroyed();
+  testAnchorFixDoesNotChangeDefaultTextBlocks();
+  testAnchorWithMixedImageAndTextIsUnaffectedByFix();
+  testOrdinaryTextAnchorsAreUnaffectedByFix();
+  testSrcsetDoesNotCreateFalseAdditionalAttachmentIds();
+  testImageWithoutWpImageClassHasNoAttachmentId();
   testReplayModePreservesImagePositionsAndAttachmentIds();
   testReplayNonImageProjectionMatchesDefault();
   testMediaAwareDownconversionResolvesImageBlocks();

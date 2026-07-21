@@ -19,7 +19,7 @@ import {
   type StrictArticleMediaReplayPrismaClient,
   type StrictArticleMediaReplayTxClient,
 } from "./strictArticleMediaReplay";
-import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
+import type { ArticleBlockMvp, ArticleContentPayload } from "@/lib/publications/articleMvp";
 
 const OWNER_USER_ID = "user-1";
 const SOURCE_ID = "source-1";
@@ -280,6 +280,235 @@ async function testExistingLineageIsReusedWithoutNewDownload() {
   assert.equal(harness.importCalls.length, 0, "zero downloads — both attachments were already backed by MigrationLineage");
 }
 
+// ---------------------------------------------------------------------------
+// Self-review: B. Divergence comparator
+// ---------------------------------------------------------------------------
+
+async function testDivergenceDetectsReorderedBlocks() {
+  // Same two text blocks as CURRENT_TEXT_ONLY_CONTENT, but swapped order —
+  // must NOT be treated as equal to the reconstructed (intro, text) order.
+  const reordered: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "normalized-content-block-1", type: "text", text: "Final paragraph." },
+      { id: "normalized-content-block-2", type: "intro", text: "Intro paragraph." },
+    ],
+  };
+  const harness = createHarness({ initialContentJson: reordered });
+  const result = await runStrictArticleMediaReplay(baseInput(harness, { current: { contentJson: reordered, coverImageId: null } }));
+  assert.equal(result.status, "REFUSED");
+  if (result.status !== "REFUSED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_REPLAY_CONTENT_DIVERGENCE");
+}
+
+async function testDivergenceDetectsChangedSemanticField() {
+  // Changing a heading's level (a real semantic field, not id/undefined)
+  // must still be caught — only `id` and JSON-undefined keys are ignored.
+  const htmlWithHeading = `${RAW_HTML}\n<h2>A heading</h2>`;
+  const currentWithWrongLevel: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "a", type: "intro", text: "Intro paragraph." },
+      { id: "b", type: "text", text: "Final paragraph." },
+      { id: "c", type: "heading", level: 3, text: "A heading" }, // reconstruction will produce level 2
+    ],
+  };
+  const harness = createHarness({ initialContentJson: currentWithWrongLevel });
+  const result = await runStrictArticleMediaReplay(
+    baseInput(harness, { rawContent: htmlWithHeading, current: { contentJson: currentWithWrongLevel, coverImageId: null } }),
+  );
+  assert.equal(result.status, "REFUSED");
+  if (result.status !== "REFUSED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_REPLAY_CONTENT_DIVERGENCE");
+}
+
+async function testDivergenceIgnoresOnlyIdAndUndefinedKeys() {
+  // Different `id` strings and an explicit `alt: undefined` key (vs. the
+  // key being absent) must NOT cause a false-positive divergence — only
+  // `id` and JSON-undefined-equivalent differences are ignored.
+  const currentWithDifferentIdsAndExplicitUndefined = {
+    version: 1,
+    blocks: [
+      { id: "totally-different-id-1", type: "intro", text: "Intro paragraph.", subtitle: undefined },
+      { id: "totally-different-id-2", type: "text", text: "Final paragraph." },
+    ],
+  } as unknown as ArticleContentPayload;
+  const harness = createHarness({ initialContentJson: currentWithDifferentIdsAndExplicitUndefined });
+  const result = await runStrictArticleMediaReplay(
+    baseInput(harness, { current: { contentJson: currentWithDifferentIdsAndExplicitUndefined, coverImageId: null } }),
+  );
+  assert.notEqual(result.status, "REFUSED", `expected no false-positive divergence, got: ${JSON.stringify(result)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Self-review: C. Attachment correlation (remaining, at the full-replay level)
+// ---------------------------------------------------------------------------
+
+async function testAmbiguousImageWithoutAttachmentIdRefusesBeforeImport() {
+  const htmlWithAmbiguousImage = RAW_HTML.replace(
+    "<p>Final paragraph.</p>",
+    '<img src="https://example.com/external-no-wp-class.jpg" alt=""/>\n<p>Final paragraph.</p>',
+  );
+  const harness = createHarness();
+  const result = await runStrictArticleMediaReplay(baseInput(harness, { rawContent: htmlWithAmbiguousImage }));
+  assert.equal(result.status, "REFUSED");
+  if (result.status !== "REFUSED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_REPLAY_AMBIGUOUS_IMAGE");
+  assert.equal(harness.importCalls.length, 0, "no import attempted before the ambiguous-image guard");
+}
+
+async function testDuplicateAttachmentOccurrenceImportsOnce() {
+  const htmlWithDuplicateOccurrence = [
+    "<p>Intro paragraph.</p>",
+    '<img src="https://wp.example.com/a-576x1024.jpg" alt="" class="wp-image-111"/>',
+    "<p>Middle.</p>",
+    '<img src="https://wp.example.com/a-576x1024.jpg" alt="" class="wp-image-111"/>',
+    "<p>Final paragraph.</p>",
+  ].join("\n");
+  const currentForThisContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "a", type: "intro", text: "Intro paragraph." },
+      { id: "b", type: "text", text: "Middle." },
+      { id: "c", type: "text", text: "Final paragraph." },
+    ],
+  };
+  const harness = createHarness({ initialContentJson: currentForThisContent });
+  const result = await runStrictArticleMediaReplay(
+    baseInput(harness, {
+      rawContent: htmlWithDuplicateOccurrence,
+      featuredAttachmentId: 111,
+      attachmentAllowlist: [111],
+      current: { contentJson: currentForThisContent, coverImageId: null },
+    }),
+  );
+
+  assert.equal(result.status, "APPLIED");
+  if (result.status !== "APPLIED") return;
+  assert.equal(harness.importCalls.length, 1, "one occurrence's worth of download calls — the duplicate is never re-downloaded");
+  assert.deepEqual(result.importedAttachmentIds, [111]);
+
+  const finalBlocks = (harness.getArticleState().contentJson as ArticleContentPayload).blocks;
+  const imageBlocks = finalBlocks.filter((b): b is Extract<ArticleBlockMvp, { type: "image" }> => b.type === "image");
+  assert.equal(imageBlocks.length, 2, "both occurrences are preserved as separate image blocks in contentJson");
+  assert.ok(imageBlocks.every((b) => b.mediaId === imageBlocks[0].mediaId), "both occurrences reference the same single imported MediaAsset id");
+}
+
+// ---------------------------------------------------------------------------
+// Self-review: D. Idempotency edge cases
+// ---------------------------------------------------------------------------
+
+async function testCoverMismatchPreventsNoopAndFixesCover() {
+  // Both attachments already proven and contentJson already matches, but
+  // the stored cover points at some other (stale/wrong) MediaAsset id —
+  // must NOT be treated as NOOP; must proceed to correct the cover.
+  const alreadySyncedContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "normalized-content-block-1", type: "intro", text: "Intro paragraph." },
+      { id: "normalized-content-block-2", type: "image", mediaId: "existing-media-111" },
+      { id: "normalized-content-block-3", type: "image", mediaId: "existing-media-222" },
+      { id: "normalized-content-block-4", type: "text", text: "Final paragraph." },
+    ],
+  };
+  // The harness's own internal state (what the fake transaction's
+  // findUnique() re-reads) must actually carry the stale cover too, or the
+  // *concurrency* guard fires instead of exercising the NOOP-vs-APPLIED
+  // decision this test is about.
+  const harness = createHarness({ existingMediaIds: [111, 222], initialContentJson: alreadySyncedContent, initialCoverImageId: "some-stale-cover-id" });
+  const result = await runStrictArticleMediaReplay(
+    baseInput(harness, { current: { contentJson: alreadySyncedContent, coverImageId: "some-stale-cover-id" } }),
+  );
+
+  assert.notEqual(result.status, "NOOP_ALREADY_SYNCED", "a cover mismatch must never short-circuit to NOOP");
+  assert.equal(result.status, "APPLIED");
+  if (result.status !== "APPLIED") return;
+  assert.equal(result.coverMediaId, "existing-media-111", "cover is corrected to the proven attachment's MediaAsset id");
+  assert.equal(harness.importCalls.length, 0, "still zero downloads — everything was already proven, only the cover field itself needed fixing");
+}
+
+async function testDanglingLineageTargetIsNotSilentlyReused() {
+  // Lineage row exists (isActive) for attachment 111, but its target
+  // MediaAsset no longer exists (e.g. deleted) — provenance must not claim
+  // this as reusable; a fresh import must be attempted instead.
+  // Manually poke a dangling lineage row the harness's normal
+  // `existingMediaIds` option wouldn't produce (that option always creates
+  // a matching MediaAsset too).
+  const danglingHarness = createHarness();
+  const originalPrisma = (danglingHarness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } } } }).deps;
+  const priorFindFirst = originalPrisma.prisma.migrationLineage.findFirst;
+  originalPrisma.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
+    if (args.where.sourceRecordKey === "wordpress-db:attachment:111") {
+      return { targetId: "deleted-media-asset-id" };
+    }
+    return priorFindFirst(args);
+  }) as typeof priorFindFirst;
+
+  const result = await runStrictArticleMediaReplay(baseInput(danglingHarness));
+
+  assert.equal(result.status, "APPLIED");
+  if (result.status !== "APPLIED") return;
+  assert.ok(!result.reusedAttachmentIds.includes(111), "attachment 111 must NOT be reported as reused — its lineage target was dangling");
+  assert.ok(result.importedAttachmentIds.includes(111), "a fresh import was attempted instead of trusting the dangling reference");
+}
+
+async function testActiveLineageConflictOnFreshImportSurfacesAsFailureNotSilentSuccess() {
+  // The real MigrationLineageWriter throws a deterministic conflict when an
+  // *active* lineage row already exists for the exact same natural key and
+  // a plain create() is attempted again (see MigrationLineageWriter.ts's
+  // doc comment) — this must surface as an explicit FAILED outcome for
+  // that attachment, never a silently-assumed success.
+  const harness = createHarness();
+  const deps = (harness.syncer as unknown as { deps: { prisma: { migrationLineage: { findFirst: (...a: unknown[]) => unknown } }; lineageWriter: { createLineage: (...a: unknown[]) => unknown } } }).deps;
+  const priorFindFirst = deps.prisma.migrationLineage.findFirst;
+  deps.prisma.migrationLineage.findFirst = (async (args: { where: { sourceRecordKey: string } }) => {
+    if (args.where.sourceRecordKey === "wordpress-db:attachment:222") {
+      return { targetId: "deleted-media-asset-id" }; // dangling: findFirst on mediaAsset will miss
+    }
+    return priorFindFirst(args);
+  }) as typeof priorFindFirst;
+  const priorCreateLineage = deps.lineageWriter.createLineage;
+  deps.lineageWriter.createLineage = (async (input: { sourceRecordKey: string }) => {
+    if (input.sourceRecordKey === "wordpress-db:attachment:222") {
+      throw new Error("Unique constraint violation: an active MigrationLineage row already exists for this key.");
+    }
+    return priorCreateLineage(input);
+  }) as typeof deps.lineageWriter.createLineage;
+
+  const result = await runStrictArticleMediaReplay(baseInput(harness));
+
+  assert.equal(result.status, "FAILED");
+  if (result.status !== "FAILED") return;
+  assert.equal(result.failures.length, 1);
+  assert.equal(result.failures[0].attachmentId, 222);
+  assert.equal(result.failures[0].code, "ARTICLE_MEDIA_DOWNLOAD_FAILED");
+  assert.equal(harness.updateCalls.length, 0, "Article is never touched — the conflict is surfaced, not silently swallowed");
+}
+
+// ---------------------------------------------------------------------------
+// Self-review: E. Concurrency
+// ---------------------------------------------------------------------------
+
+async function testConcurrentArticleChangeDuringReplayRefusesAndRollsBack() {
+  const harness = createHarness();
+  // Simulate an external write landing between preflight and the atomic
+  // apply: the transaction's own findUnique() sees a different cover than
+  // what `current` (captured at preflight time) says.
+  const txAny = harness.prismaWithTx as unknown as { article: { findUnique: () => Promise<{ contentJson: ArticleContentPayload; coverImageId: string | null }> } };
+  const originalFindUnique = txAny.article.findUnique;
+  txAny.article.findUnique = async () => {
+    const live = await originalFindUnique();
+    return { ...live, coverImageId: "concurrently-changed-by-someone-else" };
+  };
+
+  const result = await runStrictArticleMediaReplay(baseInput(harness));
+
+  assert.equal(result.status, "REFUSED");
+  if (result.status !== "REFUSED") return;
+  assert.equal(result.code, "ARTICLE_MEDIA_REPLAY_TARGET_CHANGED_DURING_REPLAY");
+  assert.equal(harness.updateCalls.length, 0, "the transaction never actually commits an update when the concurrency guard fires — the replay's own write is what's rolled back, not the concurrent change");
+}
+
 async function main() {
   await testSuccessfulReplayAppliesOnlyContentJsonAndCover();
   await testIdempotentReplayIsNoop();
@@ -288,6 +517,15 @@ async function main() {
   await testMissingAttachmentFailsBeforeArticleUpdate();
   await testDownloadFailureLeavesArticleUntouched();
   await testExistingLineageIsReusedWithoutNewDownload();
+  await testDivergenceDetectsReorderedBlocks();
+  await testDivergenceDetectsChangedSemanticField();
+  await testDivergenceIgnoresOnlyIdAndUndefinedKeys();
+  await testAmbiguousImageWithoutAttachmentIdRefusesBeforeImport();
+  await testDuplicateAttachmentOccurrenceImportsOnce();
+  await testCoverMismatchPreventsNoopAndFixesCover();
+  await testDanglingLineageTargetIsNotSilentlyReused();
+  await testActiveLineageConflictOnFreshImportSurfacesAsFailureNotSilentSuccess();
+  await testConcurrentArticleChangeDuringReplayRefusesAndRollsBack();
 }
 
 main()
