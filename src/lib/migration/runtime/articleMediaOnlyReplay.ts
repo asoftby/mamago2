@@ -28,6 +28,7 @@ import { normalizeArticle } from "../adapters/wordpress-db/normalizeArticle";
 import type { NormalizedArticleCandidate } from "../commit/article/buildArticleCreateDraft";
 import type { WordPressArticleBundle } from "../adapters/wordpress-db/types";
 import type { MediaPolicyName } from "./MigrationProfile";
+import { ArticleContentPayloadSchema, type ArticleContentPayload } from "@/lib/publications/articleMvp";
 
 const ARTICLE_SOURCE_RECORD_KEY_PATTERN = /^wordpress-db:post:(\d+)$/;
 
@@ -91,6 +92,8 @@ export interface ArticleMediaReplayRuntimeGuardInput {
   /** Whether more than one active ARTICLE lineage row exists for this sourceRecordKey — always an unconditional refusal regardless of what `lineage` itself contains. */
   activeLineageCount: number;
   targetExists: boolean;
+  /** Raw nullable Prisma `Article.contentJson` snapshot; strictly validated here rather than normalized through the application's fallback parser. */
+  targetContentJson: unknown;
   /**
    * Review finding (PR #68, P1 #2): `--media-owner-user-id` was previously
    * only checked for being a non-empty string, never that it names a real
@@ -105,7 +108,7 @@ export interface ArticleMediaReplayRuntimeGuardInput {
 }
 
 export type ArticleMediaReplayRuntimeGuardResult =
-  | { ok: true; freshHash: string; candidate: NormalizedArticleCandidate }
+  | { ok: true; freshHash: string; candidate: NormalizedArticleCandidate; targetContentJson: ArticleContentPayload }
   | { ok: false; reason: string };
 
 /**
@@ -136,6 +139,13 @@ export function validateArticleMediaReplayRuntime(input: ArticleMediaReplayRunti
   if (!input.lineage.targetId || !input.targetExists) {
     return { ok: false, reason: "Target Article not found for this lineage." };
   }
+  const targetContentResult = ArticleContentPayloadSchema.safeParse(input.targetContentJson);
+  if (!targetContentResult.success) {
+    return {
+      ok: false,
+      reason: "Target Article contentJson is null or does not match ArticleContentPayload schema — media replay refused.",
+    };
+  }
   const storedHash = input.lineage.lastSourceHash;
   if (!storedHash || !storedHash.startsWith(`${CANONICAL_SOURCE_HASH_VERSION}:`)) {
     return {
@@ -158,5 +168,5 @@ export function validateArticleMediaReplayRuntime(input: ArticleMediaReplayRunti
   if (candidate.hasWebStoryContent) {
     return { ok: false, reason: "Source Article has Web Story content — not representable by the position-preserving content pipeline; media replay refused." };
   }
-  return { ok: true, freshHash, candidate };
+  return { ok: true, freshHash, candidate, targetContentJson: targetContentResult.data };
 }

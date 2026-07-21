@@ -766,6 +766,7 @@ async function main(): Promise<void> {
           : null,
         activeLineageCount,
         targetExists: target !== null,
+        targetContentJson: target?.contentJson,
         ownerUserExists: ownerUser !== null,
       });
       if (!runtimeGuard.ok) {
@@ -795,7 +796,7 @@ async function main(): Promise<void> {
         inlineAttachmentAllowlist,
         ownerUserId: args.mediaOwnerUserId!,
         current: {
-          contentJson: target!.contentJson as never,
+          contentJson: runtimeGuard.targetContentJson,
           coverImageId: target!.coverImageId,
         },
         mediaImporter: articleMediaSyncer,

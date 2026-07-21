@@ -39,6 +39,11 @@ function bundle(overrides: Partial<WordPressArticleBundle> = {}, postOverrides: 
   };
 }
 
+const VALID_TARGET_CONTENT = {
+  version: 1 as const,
+  blocks: [{ id: "block-1", type: "text" as const, text: "Valid" }],
+};
+
 // ---------------------------------------------------------------------------
 // parseArticlePostIdFromSourceRecordKey
 // ---------------------------------------------------------------------------
@@ -110,6 +115,7 @@ function testRuntimeRequiresActiveLineageCountExactlyOne() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 2,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -121,6 +127,7 @@ function testRuntimeRequiresBundle() {
     lineage: null,
     activeLineageCount: 1,
     targetExists: false,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -133,6 +140,7 @@ function testRuntimeRequiresActiveLineage() {
     lineage: null,
     activeLineageCount: 0,
     targetExists: false,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -146,6 +154,7 @@ function testRuntimeRequiresTargetExists() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: false,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -158,6 +167,7 @@ function testRuntimeRequiresCanonicalHashFormat() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: "legacy-hash-abc" },
     activeLineageCount: 1,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -171,6 +181,7 @@ function testRuntimeRefusesOnHashMismatch() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: staleHash },
     activeLineageCount: 1,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -187,6 +198,7 @@ function testRuntimeRefusesElementorContent() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -203,6 +215,7 @@ function testRuntimeRefusesWebStoryContent() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, false);
@@ -219,13 +232,48 @@ function testRuntimeSucceedsOnExactHashMatch() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.freshHash, hash);
     assert.equal(result.candidate.title, "Тае 10 лет");
+    assert.deepEqual(result.targetContentJson, VALID_TARGET_CONTENT);
   }
+}
+
+function testRuntimeRefusesNullTargetContentJson() {
+  const b = bundle();
+  const result = validateArticleMediaReplayRuntime({
+    bundle: b,
+    lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hashArticleBundle(b) },
+    activeLineageCount: 1,
+    targetExists: true,
+    targetContentJson: null,
+    ownerUserExists: true,
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /contentJson.*schema/i);
+}
+
+function testRuntimeRefusesMalformedTargetContentJson() {
+  const b = bundle();
+  const base = {
+    bundle: b,
+    lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hashArticleBundle(b) },
+    activeLineageCount: 1,
+    targetExists: true,
+    ownerUserExists: true,
+  };
+  assert.equal(validateArticleMediaReplayRuntime({ ...base, targetContentJson: {} }).ok, false);
+  assert.equal(
+    validateArticleMediaReplayRuntime({
+      ...base,
+      targetContentJson: { version: 1, blocks: [{ type: "text" }] },
+    }).ok,
+    false,
+  );
 }
 
 function testRuntimeRefusesNonexistentOwnerBeforeAnyOtherCheck() {
@@ -240,6 +288,7 @@ function testRuntimeRefusesNonexistentOwnerBeforeAnyOtherCheck() {
     lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
     activeLineageCount: 1,
     targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: false,
   });
   assert.equal(result.ok, false);
@@ -267,6 +316,8 @@ function main() {
   testRuntimeRefusesElementorContent();
   testRuntimeRefusesWebStoryContent();
   testRuntimeSucceedsOnExactHashMatch();
+  testRuntimeRefusesNullTargetContentJson();
+  testRuntimeRefusesMalformedTargetContentJson();
   testRuntimeRefusesNonexistentOwnerBeforeAnyOtherCheck();
 }
 
