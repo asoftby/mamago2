@@ -2,8 +2,8 @@
 
 **Статус:** актуальный рабочий чек-лист до полного завершения миграции WordPress → mamaGo 2.0 и production cutover.
 
-**Обновлено:** 2026-07-22  
-**Текущая ветка следующей фазы:** `codex/users-auth-foundation`  
+**Обновлено:** 2026-07-22
+**Текущая ветка следующей фазы:** `codex/users-auth-foundation`
 **Base:** `dev` @ `a2dd28a0eef93cf1cbb70dbae5132201b220879e`
 
 > Подробный исторический журнал предыдущей версии чек-листа сохранён в Git
@@ -42,7 +42,7 @@
 | Events | PARTIAL | 5 eligible CREATE и 67 sessions, затем общий proof |
 | Offers | SAFE CANONICAL COMPLETE 63/63 | Только отдельные future gates для media и backlog H/I |
 | Users source planning | COMPLETE | Ничего повторно не исследовать |
-| Users activation architecture | COMPLETE | Реализовать Prisma/auth foundation |
+| Users activation architecture | COMPLETE | Slice 1 foundation завершён; следующий gate — Slice 2 token service |
 | Users migration | NOT STARTED | Vertical slice, golden samples, batches, rerun |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
@@ -205,11 +205,11 @@ Primary local evidence:
 
 ---
 
-## 4. Следующий этап — USERS Slice 1
+## 4. USERS Slice 1 — завершён
 
 ### 4.1 Prisma/auth foundation
 
-**Статус:** NEXT.
+**Статус:** COMPLETE.
 
 Рабочая ветка:
 
@@ -221,22 +221,41 @@ base: dev @ a2dd28a0eef93cf1cbb70dbae5132201b220879e
 Обязательный scope Slice 1 определяется architecture decision и должен включать
 только минимальную foundation для безопасного pending/activation flow.
 
-- [ ] Перенести утверждённое architecture decision в repository docs.
-- [ ] Реализовать минимальные Prisma schema changes.
-- [ ] Создать reviewable Prisma migration по правилам `CLAUDE.md`.
-- [ ] Добавить backward-compatible backfill/default для 15 существующих users.
-- [ ] Сохранить работоспособность 5 существующих sessions.
-- [ ] Реализовать безопасную password/pending-state semantics.
-- [ ] Добавить status gates в credentials login и session creation.
-- [ ] Не создавать activation tokens и не отправлять email в Slice 1, если это
+- [x] Architecture decision отражён в schema/auth implementation и checklist.
+- [x] Реализованы минимальные Prisma schema changes.
+- [x] Создана reviewable Prisma migration без unrelated local drift.
+- [x] Backfill не требуется: 15 существующих users сохранили status/hash.
+- [x] Работоспособность 5 существующих sessions сохранена.
+- [x] Реализована безопасная nullable-password/pending-state semantics.
+- [x] Добавлены fail-closed gates в оба credentials login path, session creation и validation.
+- [x] Activation token records и email в Slice 1 не создавались; schema table —
       отдельный следующий slice по architecture decision.
-- [ ] Не начинать User migration runner в Slice 1.
-- [ ] Добавить schema/auth unit tests и regressions.
-- [ ] Проверить registration, login, reset, phone stubs и business access.
-- [ ] `tsc --noEmit` PASS.
-- [ ] Production build PASS.
-- [ ] Adversarial auth/security review PASS.
-- [ ] Один Draft PR против `dev`.
+- [x] User migration runner не начинался.
+- [x] Добавлены schema/auth unit и integration regressions.
+- [x] Проверены registration, login, reset gate, phone-stub compatibility,
+      admin/business access boundary.
+- [x] `tsc --noEmit` PASS.
+- [x] Production build PASS.
+- [x] Adversarial auth/security review PASS.
+- [ ] Draft PR против `dev` — открыть после commits/push этой финализации.
+
+Local proof boundary:
+
+```text
+USERS Slice 1: COMPLETE
+Prisma/auth foundation: implemented
+local migration: applied; status UP TO DATE
+existing users before/after: 15 / 15
+existing sessions before/after: 5 / 5
+UserActionToken records before/after: 0 / 0
+pending createSession: DENIED
+ACTIVE and LIMITED session policy: PASS
+ACTIVE → PENDING session revocation: PASS
+concurrent invalidation: PASS
+pending password reset bypass: DENIED
+activation endpoints: NOT STARTED
+User migration: NOT STARTED
+```
 
 Slice 1 запрещено смешивать с:
 
@@ -283,7 +302,7 @@ profile media handled by separate manifest/gate
 
 ### 5.1 USERS + activation
 
-- [ ] Prisma/auth foundation.
+- [x] Prisma/auth foundation.
 - [ ] Activation tokens and endpoints.
 - [ ] User migration vertical slice.
 - [ ] 564 clean users: batches + one common rerun.
@@ -407,19 +426,19 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 1 Prisma/auth foundation
+Phase: USERS — Slice 2 activation token service
 Branch: codex/users-auth-foundation
 Base SHA: a2dd28a0eef93cf1cbb70dbae5132201b220879e
 Source/architecture discovery: COMPLETE — не повторять
-DB/WordPress writes for Users: NOT AUTHORIZED
+Slice 1: COMPLETE — Draft PR finalization in progress
+DB/WordPress writes for migrated Users: NOT AUTHORIZED
 ```
 
 Следующее одно действие:
 
-> Реализовать только утверждённую Prisma/auth foundation из
-> `/tmp/scratchpad/users/architecture/users-activation-architecture-decision.md`,
-> с backward compatibility, тестами и Draft PR. Не начинать User migration
-> vertical slice до merge и review Slice 1.
+> После review и merge Slice 1 отдельно реализовать Slice 2 activation token
+> service: hash-only storage, purpose scope, TTL, invalidation и atomic consume.
+> Не начинать endpoints, email или User migration vertical slice.
 
 ---
 
@@ -434,5 +453,8 @@ DB/WordPress writes for Users: NOT AUTHORIZED
 - USERS activation architecture: COMPLETE.
 - Architecture decision: `READY_FOR_PRISMA_AUTH_FOUNDATION_IMPLEMENTATION`.
 - Новая ветка: `codex/users-auth-foundation`.
+- USERS Slice 1 Prisma/auth foundation: COMPLETE, local proof PASS.
+- Existing users/sessions at proof boundary: 15 / 5; action tokens: 0.
+- Activation endpoints и User migration: NOT STARTED.
 - В этой docs-операции DB, WordPress, storage, media и network writes не
   выполнялись.
