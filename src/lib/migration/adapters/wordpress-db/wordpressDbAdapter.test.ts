@@ -342,9 +342,10 @@ async function testMetadata() {
   assert.equal(wordpressDbAdapter.metadata.key, WORDPRESS_DB_ADAPTER_KEY);
   assert.deepEqual(
     [...wordpressDbAdapter.metadata.supportedSourceEntityTypes],
-    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE],
+    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE, "wordpress-db:hb-programs", "wordpress-db:services"],
   );
   assert.ok(wordpressDbAdapter.metadata.supportedTargetTypes.includes("ROUTE"));
+  assert.ok(wordpressDbAdapter.metadata.supportedTargetTypes.includes("OFFER"));
 }
 
 async function main() {

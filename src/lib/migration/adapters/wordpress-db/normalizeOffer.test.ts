@@ -458,6 +458,13 @@ function testAlreadyUnescapedValuesPassThroughUnchanged() {
   assert.equal(payload.shortDescription, "Contains a literal backslash: \\ and a real newline:\nend");
 }
 
+function testGoldenWhitespaceTitleNormalization() {
+  const record = normalizeOffer(buildBundle({ post: { ...hbProgramPost, ID: 18932, post_title: "Пакет:\u00a0 «Комфорт»" } }));
+  const title = payloadOf(record).title;
+  assert.equal(title, "Пакет: «Комфорт»");
+  assert.deepEqual([...title].map(character => character.codePointAt(0)), [1055,1072,1082,1077,1090,58,32,171,1050,1086,1084,1092,1086,1088,1090,187]);
+}
+
 async function main() {
   testFullHbProgramCandidate();
   testServicesCandidateGetsManualReviewMarker();
@@ -479,6 +486,7 @@ async function main() {
   testStableSourceRecordKey();
   testDeterministicResult();
   testAlreadyUnescapedValuesPassThroughUnchanged();
+  testGoldenWhitespaceTitleNormalization();
 }
 
 main()

@@ -264,7 +264,7 @@ async function testFailureResultNormalizedFromArticleStringResult() {
 async function testUnknownTargetTypeReturnsUnknownTargetType() {
   const result = await dispatchCommitRunner(
     baseInput({
-      executionCandidate: executionCandidateFixture({ planItem: planItemFixture({ targetType: "OFFER" }) }),
+      executionCandidate: executionCandidateFixture({ planItem: planItemFixture({ targetType: "USER" as never }) }),
     }),
   );
 

@@ -11,12 +11,14 @@ import {
   hashEventBundle,
   hashPlaceBundle,
   hashRouteBundle,
+  hashOfferBundle,
 } from "./canonicalSourceHash";
 import { registerMigrationAdapter } from "../registry";
 import { normalizeArticle } from "./normalizeArticle";
 import { normalizeEvent } from "./normalizeEvent";
 import { normalizePlace } from "./normalizePlace";
 import { normalizeRoute } from "./normalizeRoute";
+import { normalizeOffer } from "./normalizeOffer";
 import { WordPressRepository } from "./WordPressRepository";
 import type { WordPressQueryExecutor } from "./WordPressRepository";
 import type {
@@ -24,6 +26,7 @@ import type {
   WordPressEventBundle,
   WordPressPlaceBundle,
   WordPressRouteBundle,
+  WordPressOfferBundle,
 } from "./types";
 import type {
   MigrationAdapterContext,
@@ -36,8 +39,10 @@ export const ARTICLE_ENTITY_TYPE = "wordpress-db:post";
 export const PLACE_ENTITY_TYPE = "wordpress-db:places";
 export const EVENT_ENTITY_TYPE = "wordpress-db:events";
 export const ROUTE_ENTITY_TYPE = "wordpress-db:routes";
+export const OFFER_PROGRAMS_ENTITY_TYPE = "wordpress-db:hb-programs";
+export const OFFER_SERVICES_ENTITY_TYPE = "wordpress-db:services";
 
-type WordPressEntityFilter = "article" | "place" | "event" | "route" | "all";
+type WordPressEntityFilter = "article" | "place" | "event" | "route" | "offer" | "all";
 
 function getExecutorFromContext(context: MigrationAdapterContext): WordPressQueryExecutor {
   const executor = context.config?.executor;
@@ -59,6 +64,7 @@ function resolveEntityFilter(context: MigrationAdapterContext): WordPressEntityF
     place: entityTypes.includes(PLACE_ENTITY_TYPE),
     event: entityTypes.includes(EVENT_ENTITY_TYPE),
     route: entityTypes.includes(ROUTE_ENTITY_TYPE),
+    offer: entityTypes.includes(OFFER_PROGRAMS_ENTITY_TYPE) || entityTypes.includes(OFFER_SERVICES_ENTITY_TYPE),
   };
   const wantedKeys = (Object.keys(wanted) as (keyof typeof wanted)[]).filter((key) => wanted[key]);
   return wantedKeys.length === 1 ? wantedKeys[0] : "all";
@@ -111,6 +117,10 @@ function toRouteEnvelope(bundle: WordPressRouteBundle): SourceRecordEnvelope {
     rawPayload: bundle,
   };
 }
+function toOfferEnvelope(bundle: WordPressOfferBundle): SourceRecordEnvelope {
+  const sourceRecordKey = `wordpress-db:${bundle.post.post_type}:${bundle.post.ID}`;
+  return { sourceEntityType: `wordpress-db:${bundle.post.post_type}`, sourceStableKey: sourceRecordKey, sourceRecordKey, sourceUpdatedAt: bundle.post.post_modified, sourceHash: hashOfferBundle(bundle), rawPayload: bundle };
+}
 
 async function discoverRecords(
   context: MigrationAdapterContext,
@@ -141,6 +151,10 @@ async function discoverRecords(
     const routes = await repository.getPublishedRoutes(limit);
     envelopes.push(...routes.map(toRouteEnvelope));
   }
+  if (entityFilter === "offer") {
+    const offers = await repository.getPublishedOffers(limit);
+    envelopes.push(...offers.map(toOfferEnvelope));
+  }
 
   return envelopes;
 }
@@ -164,6 +178,7 @@ async function normalizeRecord(record: SourceRecordEnvelope, context?: Migration
   if (record.sourceEntityType === ROUTE_ENTITY_TYPE) {
     return normalizeRoute(record.rawPayload as WordPressRouteBundle);
   }
+  if (record.sourceEntityType === OFFER_PROGRAMS_ENTITY_TYPE || record.sourceEntityType === OFFER_SERVICES_ENTITY_TYPE) return normalizeOffer(record.rawPayload as WordPressOfferBundle);
   throw new Error(`wordpress-db adapter cannot normalize sourceEntityType "${record.sourceEntityType}"`);
 }
 
@@ -172,8 +187,8 @@ export const wordpressDbAdapter = {
     key: WORDPRESS_DB_ADAPTER_KEY,
     version: "1.0.0",
     displayName: "WordPress DB (read-only)",
-    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE],
-    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY", "ROUTE"] as const,
+    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE, OFFER_PROGRAMS_ENTITY_TYPE, OFFER_SERVICES_ENTITY_TYPE],
+    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY", "ROUTE", "OFFER"] as const,
     capabilities: ["DISCOVERY", "NORMALIZATION"] as const,
     stableIdPolicy: "WordPress post ID, namespaced by post_type (post/places/events)",
     hashPolicy:
@@ -189,6 +204,14 @@ export const wordpressDbAdapter = {
 /** No auto-connect and no auto-registration on import — the caller opts in explicitly. */
 export function registerWordPressDbAdapter(): void {
   registerMigrationAdapter(wordpressDbAdapter);
+}
+
+export async function fetchPublishedOfferEnvelopeBySourceRecordKey(executor: WordPressQueryExecutor, sourceRecordKey: string): Promise<SourceRecordEnvelope> {
+  const match = /^wordpress-db:(hb-programs|services):([1-9]\d*)$/.exec(sourceRecordKey.trim());
+  if (!match) throw new Error(`Invalid canonical Offer sourceRecordKey "${sourceRecordKey}".`);
+  const bundle = await new WordPressRepository(executor).getPublishedOfferById(match[1], Number(match[2]));
+  if (!bundle) throw new Error(`No published canonical WordPress Offer found for "${sourceRecordKey}".`);
+  return toOfferEnvelope(bundle);
 }
 
 /**

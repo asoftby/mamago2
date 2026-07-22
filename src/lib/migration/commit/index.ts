@@ -1,4 +1,5 @@
 export { buildCommitExecutionPlan } from "./buildCommitExecutionPlan";
+export * from "./offer";
 export type {
   BlockedCommitRecord,
   BlockedReasonCode,

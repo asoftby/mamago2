@@ -232,7 +232,7 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | Places | DONE |
 | Routes | IMPORTED 14/14; manual review, publish и redirects pending |
 | Events | 4/9 eligible imported; 5 CREATE и 67 sessions pending |
-| Offers | NOT STARTED |
+| Offers | SAFE CANONICAL COMPLETE 63/63; all-63 idempotency proof passed |
 | Users + activation | NOT STARTED |
 | Profiles/ownership/media | NOT STARTED |
 | Reviews | NOT STARTED |
@@ -1253,9 +1253,8 @@ Protected Event `55980` не входит в текущую WP publish selection
 
 ### Offers (services / hb-programs, 90+ publish)
 
-**Статус: AUDITED → SOURCE REPOSITORY READY → NORMALIZER READY.**
-**Отдельно (не меняется этим статусом): `BLOCKED_FOR_COMMIT` до Place batch
-+ активного `PLACE` lineage для relation-связанных source Place ID.**
+**Статус: AUDITED → SOURCE REPOSITORY READY → NORMALIZER READY → GUARDED
+GOLDEN PROOF PASSED → BATCH 1 IDEMPOTENCY PROOF PASSED (20 Offers).**
 
 Read-only source/target аудит завершён 2026-07-14 (см. журнал сессий).
 Source: `hb-programs` publish=90/draft=2, `services` publish=1. Target на
@@ -1332,15 +1331,73 @@ dispatcher-branch, ни CLI-flag).
       входит** — `wordpressDbAdapter.ts`'s `supportedTargetTypes` явно
       исключает `OFFER`, менять adapter capability вне scope PR 2; вместо
       этого — исчерпывающие fixture-based unit tests (20 тестов).
-- [ ] PR 3 — `buildOfferCreateDraft` + `OfferCommitWriter/Orchestrator/
-      Runner` — **requires**: Place batch закоммичен (частично/полностью)
-      + активный `PLACE` lineage для relation-связанных source Place ID.
-- [ ] PR 4 — dispatcher/CLI wiring (`--entity offer`).
-- [ ] PR 5 — media (`OfferMediaSyncer`, паттерн Route, scopes
-      `OFFER_SERVICES`/`OFFER_PROGRAMS` уже зарезервированы).
+- [x] PR 3 — `buildOfferCreateDraft` + `OfferCommitWriter/Orchestrator/
+      Runner`, включая title-only CAS remediation UPDATE (2026-07-22).
+- [x] PR 4 — guarded dispatcher/CLI wiring (`--entity offer`, один targeted
+      source key; Batch 1 пока запрещён) + immutable local snapshot mode.
+- [x] PR 5 — `OfferMediaSyncer`: `NONE`/`METADATA` не вызывают importer;
+      `FULL` требует отдельного execution gate.
 - [ ] PR 6 — editorial review workflow (CAMP/PARTY, 27 no-Place записей,
       `org-capacity` кураторская карта).
-- [ ] PR 7 — docs/checklist закрытие после реального импорта.
+- [x] PR 7 — docs/checklist закрытие после реального Batch 1 импорта и
+      idempotency proof (2026-07-22).
+
+**Golden proof, LOCAL, 2026-07-22.** Source
+`wordpress-db:hb-programs:18932` связан с Offer
+`cmrvxhmnf0006wsizxm7v38oc` и lineage
+`cmrvxhmno0008wsiz47affeqf`. CREATE дал `Offer +1`, `lineage +1`; rerun —
+`SKIP_UNCHANGED`. Затем whitespace remediation нормализовал title
+`"Пакет:\u00A0 «Комфорт»"` → `"Пакет: «Комфорт»"` одним CAS UPDATE;
+canonical hash изменился с `offer-commit-v1:b05e22e…c9d6ce` на
+`offer-commit-v1:27ce4833…2b246c`; remediation rerun — `SKIP_UNCHANGED`.
+Offer/lineage IDs и counts стабильны. `MediaAsset`, Offer media, Place,
+Business, User, City и category tables — delta 0. Ownership проверяется
+через `Offer.placeId → Place.ownerBusiness.ownerUserId`, fallback —
+`Place.createdByUserId`; поля `Offer.createdByUserId` в Prisma нет и не
+требуется. Execution manifest SHA-256:
+`74983cbea14fd78885a351e0160811773c71a6a79b47183c1c8a7901d72859e0`.
+Audit artifacts находятся вне Git в `/tmp/scratchpad/offers/execution/`.
+
+**Batch 1 proof, LOCAL, 2026-07-22.** Immutable execution manifest
+SHA-256 `ca2a7347d860ff57c7003abb119912fb65d67a3d4c9ab9ce4e268f76d88edba1`
+выполнен строго последовательно с media policy `NONE`. Первый run:
+`19 CREATE`, golden control `18932` — `1 SKIP_UNCHANGED`, ошибок нет;
+итог `Offer=20`, batch lineage `=20`, batch MigrationRecord `=24`.
+Единственный разрешённый общий rerun: `20 SKIP_UNCHANGED`, `0 CREATE`,
+`0 UPDATE`, `0 BLOCKED`, `0 ERROR`; добавлено 20 штатных audit records,
+итог batch MigrationRecord `=44`. Все Offer ID, `Offer.updatedAt`, поля,
+Place mappings, canonical hashes, lineage ID/hash неизменны; duplicates,
+media importer calls, storage writes и forbidden-table deltas отсутствуют.
+Rerun manifest SHA-256:
+`bf35ecb2a6a3630e6eda7f97e1ed6e2610417512a89055eff4463bc4873cf779`.
+Evidence находится вне Git в `/tmp/scratchpad/offers/batch-1-execution/`
+и `/tmp/scratchpad/offers/batch-1-rerun/`. Batch 1 больше не запускать.
+Следующая фаза: planning оставшихся 43 safe canonical Offer records;
+их execution не разрешён.
+
+**Remaining safe progress, LOCAL, 2026-07-22.** Batch 2 и Batch 3
+выполнены по immutable manifests: каждый дал `20 CREATE`, без ошибок,
+media/storage/forbidden-table deltas равны нулю. Текущее состояние:
+`Offer=60`, safe canonical lineage `=60`. Для трёх class D records
+(`15941`, `16403`, `16458`) добавлен общий guarded relation-collapse
+helper: несколько rows/keys допустимы только при exact collapse к одному
+legacy Place; missing/invalid/multiple Places блокируются. Single-row A/C
+hashes сохранены byte-for-byte. Двойные read-only previews всех трёх D
+дают `CREATE`, stable permutation/duplicate hashes и один exact local
+Place. Isolated Batch 4 выполнен: `3 CREATE`, после чего состояние достигло
+`Offer=63`, safe canonical lineage `=63`. Единственный общий rerun всех
+63 записей дал `63 SKIP_UNCHANGED`, `0 CREATE`, `0 UPDATE`, `0 BLOCKED`,
+`0 ERROR`; добавлено 63 штатных audit records. Все Offer IDs/fields/
+`updatedAt`, Place и ownership mappings, canonical hashes и lineage
+остались неизменны; дубликаты, media/storage и forbidden-table deltas
+отсутствуют. All-63 plan v2 SHA-256:
+`1e43ef43c2012328fa587249380b7bb0f7805c508d6e8ed05e5b0293a46454fa`;
+run manifest SHA-256:
+`d1718d6f62cfa0586641388ac42479630f0cd2b82d606fda32b54f1867a3c137`.
+Safe canonical OFFERS scope завершён и больше не должен запускаться.
+Вне clean scope остаются class H `28` (нет обязательной Place relation)
+и noncanonical class I `8` (`offers` alias). Media не импортировались;
+для них требуется отдельный будущий gate.
 
 ### Users (579) — P0 (§0.6)
 
@@ -2342,3 +2399,20 @@ dispatcher-branch, ни CLI-flag).
   `64505`) с правильными materialized session counts (итоговый ожидаемый
   pending count — 67 sessions), и только после этого — controlled
   targeted commit с media policy `METADATA`.
+- **2026-07-22 — Codex** — OFFERS guarded golden proof закрыт на LOCAL DB.
+  `wordpress-db:hb-programs:18932` создан как Offer
+  `cmrvxhmnf0006wsizxm7v38oc`, title whitespace затем исправлен одним
+  CAS-guarded UPDATE; CREATE, remediation UPDATE и оба разрешённых rerun
+  подтверждены audit-артефактами вне Git. Финальный hash
+  `offer-commit-v1:27ce48338902ba9a7c15cd17c2df4b6dfa0395d1c82652196a5692bd2b2b246c`;
+  оба rerun дали `SKIP_UNCHANGED`, дубликатов Offer/lineage нет, media и
+  запрещённые таблицы не менялись. SSH/WordPress/storage не использовались,
+  VPN/network не менялись.
+- **2026-07-22 — Codex** — OFFERS guarded Batch 1 и общий idempotency
+  rerun закрыты на LOCAL DB. Первый run дал `19 CREATE + 1
+  SKIP_UNCHANGED`; единственный общий rerun дал `20 SKIP_UNCHANGED`.
+  Итог: `Offer=20`, batch lineage `=20`, batch MigrationRecord `=44`;
+  Offer/lineage и все запрещённые доменные таблицы при rerun неизменны,
+  media/storage/SSH/WordPress не использовались, VPN/network не менялись.
+  Batch 1 больше не запускать. Следующая фаза — read-only planning
+  оставшихся 43 safe canonical Offer records; execution не разрешён.

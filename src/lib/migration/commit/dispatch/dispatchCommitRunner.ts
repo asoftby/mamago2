@@ -17,6 +17,9 @@ import type { ExecutePlaceCommitRunInput, ExecutePlaceCommitRunResult } from "..
 import type { PlaceCommitContext } from "../place/types";
 import type { NormalizedRouteCandidate, RouteCommitContext } from "../route/buildRouteCreateDraft";
 import type { ExecuteRouteCommitRunInput, ExecuteRouteCommitRunResult } from "../route/RouteCommitRunner";
+import type { NormalizedOfferCandidate } from "../../adapters/wordpress-db/normalizeOffer";
+import type { OfferCommitContext } from "../offer/types";
+import type { ExecuteOfferCommitRunInput, ExecuteOfferCommitRunResult } from "../offer/OfferCommitRunner";
 
 /** Narrow enough that the real `PlaceCommitRunner` (PR12) satisfies this unchanged. */
 export interface PlaceCommitRunnerLike {
@@ -37,8 +40,9 @@ export interface ArticleCommitRunnerLike {
 export interface RouteCommitRunnerLike {
   execute(input: ExecuteRouteCommitRunInput): Promise<ExecuteRouteCommitRunResult>;
 }
+export interface OfferCommitRunnerLike { execute(input: ExecuteOfferCommitRunInput): Promise<ExecuteOfferCommitRunResult> }
 
-export type CommitDispatchTargetType = "PLACE" | "ACTIVITY" | "ARTICLE" | "ROUTE";
+export type CommitDispatchTargetType = "PLACE" | "ACTIVITY" | "ARTICLE" | "ROUTE" | "OFFER";
 
 export interface DispatchCommitRunnerInput {
   executionCandidate: MigrationExecutionCandidate;
@@ -51,13 +55,14 @@ export interface DispatchCommitRunnerInput {
    * not two values that could disagree; this dispatcher never calls the
    * PR26 resolver itself.
    */
-  resolvedContext: PlaceCommitContext | EventCommitContext | ArticleCommitContext | RouteCommitContext;
+  resolvedContext: PlaceCommitContext | EventCommitContext | ArticleCommitContext | RouteCommitContext | OfferCommitContext;
   migrationRecord: MigrationRecord;
   runners: {
     place?: PlaceCommitRunnerLike;
     event?: EventCommitRunnerLike;
     article?: ArticleCommitRunnerLike;
     route?: RouteCommitRunnerLike;
+    offer?: OfferCommitRunnerLike;
   };
 }
 
@@ -249,6 +254,13 @@ export async function dispatchCommitRunner(input: DispatchCommitRunnerInput): Pr
       context: resolvedContext as RouteCommitContext,
     });
     return normalizeRouteResult(result);
+  }
+
+  if (targetType === "OFFER") {
+    if (!runners.offer) return missingRunnerResult("OFFER");
+    const result = await runners.offer.execute({ operation: buildCommitOperation(executionCandidate.planItem, migrationRecord), candidate: executionCandidate.candidate as NormalizedOfferCandidate, context: resolvedContext as OfferCommitContext, migrationRecord });
+    if (result.ok) return { ok: true, targetType: "OFFER", targetId: result.offerId, lineageId: result.lineageId, status: "LINKED" };
+    return { ok: false, targetType: "OFFER", status: "FAILED", errorCode: result.errorCode, errorMessage: result.errorMessage };
   }
 
   return {

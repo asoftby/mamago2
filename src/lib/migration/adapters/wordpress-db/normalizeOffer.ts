@@ -1,4 +1,5 @@
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { normalizeSingleLineText } from "../../text/normalizeSingleLineText";
 
 import type { MigrationWarning, NormalizedRecord } from "../../types";
 import type { WordPressOfferBundle, WordPressOfferPlaceRelationRow, WordPressTermRow } from "./types";
@@ -359,7 +360,8 @@ export function normalizeOffer(bundle: WordPressOfferBundle): NormalizedRecord {
   const sourceEntityType = `${SOURCE_ENTITY_TYPE_PREFIX}:${sourcePostType}`;
   const warnings: MigrationWarning[] = [];
 
-  if (post.post_title.trim() === "") {
+  const normalizedTitle = normalizeSingleLineText(post.post_title);
+  if (normalizedTitle === "") {
     warnings.push({
       code: "OFFER_MISSING_TITLE",
       message: "post_title is empty.",
@@ -477,7 +479,7 @@ export function normalizeOffer(bundle: WordPressOfferBundle): NormalizedRecord {
     publishedAt: post.post_date,
     modifiedAt: post.post_modified,
 
-    title: post.post_title,
+    title: normalizedTitle,
     slug: post.post_name,
     content: post.post_content,
     excerpt: post.post_excerpt,
