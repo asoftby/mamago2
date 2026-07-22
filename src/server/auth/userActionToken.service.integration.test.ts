@@ -313,6 +313,14 @@ async function main(): Promise<void> {
       1,
     );
   } finally {
+    if (createdUserIds.length > 0) {
+      await prisma.adminAuditLog.deleteMany({
+        where: {
+          entityId: { in: createdUserIds },
+          action: "MIGRATED_ACCOUNT_ACTIVATION_TOKEN_ISSUED",
+        },
+      });
+    }
     for (const userId of createdUserIds) {
       await prisma.user.delete({ where: { id: userId } });
     }

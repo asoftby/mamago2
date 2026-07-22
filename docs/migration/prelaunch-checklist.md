@@ -3,8 +3,8 @@
 **Статус:** актуальный рабочий чек-лист до полного завершения миграции WordPress → mamaGo 2.0 и production cutover.
 
 **Обновлено:** 2026-07-23
-**Текущая ветка следующей фазы:** `codex/users-activation-token-service`
-**Base:** `dev` @ `76504ef15781927d27dafcce6863609f52ccfdfc`
+**Текущая ветка следующей фазы:** `codex/users-activation-endpoints`
+**Base:** `dev` @ `289ec055baa908258a5957292593a9313ca6eafa`
 
 > Подробный исторический журнал предыдущей версии чек-листа сохранён в Git
 > в merge-коммите `a2dd28a0eef93cf1cbb70dbae5132201b220879e` и его предках.
@@ -42,7 +42,7 @@
 | Events | PARTIAL | 5 eligible CREATE и 67 sessions, затем общий proof |
 | Offers | SAFE CANONICAL COMPLETE 63/63 | Только отдельные future gates для media и backlog H/I |
 | Users source planning | COMPLETE | Ничего повторно не исследовать |
-| Users activation architecture | COMPLETE | Slice 1 foundation и Slice 2 token service реализованы |
+| Users activation architecture | COMPLETE | Slices 1–3 реализованы; Slice 3 review/PR pending |
 | Users migration | NOT STARTED | Vertical slice, golden samples, batches, rerun |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
@@ -270,7 +270,7 @@ Slice 1 запрещено смешивать с:
 
 - [x] Slice 2 — activation token service: hash-only storage, purpose scope,
       TTL, single use, invalidation, concurrency safety.
-- [ ] Slice 3 — activation request/complete endpoints, generic public responses,
+- [x] Slice 3 — activation request/complete endpoints, generic public responses,
       rate limits, password setup and audit.
 - [ ] Slice 4 — User migration source/normalize/draft/validate/writer/lineage.
 - [ ] Slice 5 — ordinary-user golden CREATE + rerun.
@@ -281,7 +281,7 @@ Slice 1 запрещено смешивать с:
 - [ ] Slice 10 — privileged/manual class H resolution policy/tooling.
 - [ ] Profile media — отдельный later gate, не смешивать с first User proof.
 
-Slice 2 proof:
+Slice 2 proof boundary:
 
 ```text
 USERS Slice 1: COMPLETE — merged via PR #70
@@ -300,12 +300,35 @@ activation endpoints: NOT STARTED
 User migration: NOT STARTED
 ```
 
-Future Slice 3 email safety policy:
+Slice 3 email safety policy:
 
 ```text
 LOCAL: external email delivery forbidden
 DEV: external email delivery forbidden
 PRODUCTION: delivery only after explicit Go/No-Go and production-only flag
+```
+
+Slice 3 local proof:
+
+```text
+request endpoint: generic 202 for pending/unknown/ineligible
+public response: no delivery status, token, hash, User id or internal state
+request body: strict JSON, byte-limited, normalized email
+client IP: trusted proxy headers only behind explicit TRUST_PROXY_HEADERS policy
+complete endpoint: atomic passwordHash + ACTIVE + emailVerifiedAt + token usedAt
+sibling tokens: invalidated
+sessions: revoked
+request/completion audit: recorded without raw token/password
+rate limits: IP + normalized-email/token keys, fail closed
+LOCAL/DEV external provider calls: 0; result DELIVERY_DISABLED
+PRODUCTION gate: NODE_ENV + APP_ENV + enable flag + approval flag required;
+all gates still return PROVIDER_UNAVAILABLE until a later provider review
+external email provider integration/production delivery: NOT STARTED
+WordPress User migration: NOT STARTED
+mass email campaign: NOT STARTED
+ownership/profile media: NOT STARTED
+final cleanup: users 15, sessions 5, action tokens 0, pending 0,
+activation audit fixtures 0, activation rate-limit rows 0, provider calls 0
 ```
 
 USERS completion criteria:
@@ -330,7 +353,7 @@ profile media handled by separate manifest/gate
 ### 5.1 USERS + activation
 
 - [x] Prisma/auth foundation.
-- [ ] Activation tokens and endpoints.
+- [x] Activation tokens and endpoints.
 - [ ] User migration vertical slice.
 - [ ] 564 clean users: batches + one common rerun.
 - [ ] 15 privileged/manual users: explicit disposition, без auto ADMIN.
@@ -453,24 +476,24 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 2 adversarial review and Draft PR
-Branch: codex/users-activation-token-service
-Base SHA: 76504ef15781927d27dafcce6863609f52ccfdfc
+Phase: USERS — Slice 3 activation endpoints
+Branch: codex/users-activation-endpoints
+Base SHA: 289ec055baa908258a5957292593a9313ca6eafa
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
-Slice 2: COMPLETE — Draft PR finalization in progress
+Slice 2: COMPLETE — PR #71 merged
+Slice 3: COMPLETE — Draft PR finalization in progress
 DB/WordPress writes for migrated Users: NOT AUTHORIZED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 2 начать отдельный Slice 3 activation endpoints
-> and production-only email gate. До merge не начинать endpoints, email или
-> User migration vertical slice.
+> После review и merge Slice 3 начать отдельный Slice 4 User migration vertical
+> slice. Не начинать external email delivery, mass campaign, ownership или media.
 
 ---
 
-## 8. Краткий handoff — 2026-07-22
+## 8. Краткий handoff — 2026-07-23
 
 - PR #69 переведён из Draft и смержен в `dev`.
 - Merge SHA: `a2dd28a0eef93cf1cbb70dbae5132201b220879e`.
@@ -484,12 +507,16 @@ DB/WordPress writes for migrated Users: NOT AUTHORIZED
 - USERS Slice 1 Prisma/auth foundation: COMPLETE, local proof PASS.
 - PR #70 merge commit: `76504ef15781927d27dafcce6863609f52ccfdfc`.
 - Existing users/sessions at proof boundary: 15 / 5; action tokens: 0.
-- USERS Slice 2 token service: COMPLETE; Draft PR finalization in progress.
+- USERS Slice 2 token service: COMPLETE — merged via PR #71.
 - Token policy: SHA-256 hash of 32 random bytes, 60-minute TTL, purpose scope,
   invalidation and atomic one-time consume.
 - Final proof fixtures cleaned: users 15, sessions 5, action tokens 0, pending 0.
 - Future email policy: LOCAL/DEV external delivery forbidden; PRODUCTION only
   after explicit Go/No-Go and a production-only flag.
-- Activation endpoints и User migration: NOT STARTED.
+- PR #71 merge commit: `289ec055baa908258a5957292593a9313ca6eafa`.
+- USERS Slice 3 activation request/complete endpoints: COMPLETE; Draft PR
+  finalization in progress;
+  external provider integration and production delivery remain NOT STARTED.
+- External email delivery и User migration: NOT STARTED.
 - В этой docs-операции DB, WordPress, storage, media и network writes не
   выполнялись.
