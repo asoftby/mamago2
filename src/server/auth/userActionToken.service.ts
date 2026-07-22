@@ -119,6 +119,20 @@ export async function issueUserActionToken(
               expiresAt,
             },
           });
+
+          await tx.adminAuditLog.create({
+            data: {
+              actorId: null,
+              actorRole: "SYSTEM",
+              action: "MIGRATED_ACCOUNT_ACTIVATION_TOKEN_ISSUED",
+              entityType: "USER",
+              entityId: params.userId,
+              metadata: {
+                purpose: params.purpose,
+                expiresAt: expiresAt.toISOString(),
+              },
+            },
+          });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
