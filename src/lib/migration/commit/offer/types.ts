@@ -9,6 +9,6 @@ export interface OfferCreateDraft {
   sourceMediaAttachmentIds: readonly number[];
   ownership: { ownerUserId: string; businessId: string | null; cityId: string };
 }
-export type OfferCommitBlockReasonCode = "UNSUPPORTED_SOURCE_POST_TYPE" | "NONCANONICAL_SOURCE_ALIAS" | "MISSING_TITLE" | "MISSING_PLACE_RELATION" | "AMBIGUOUS_PLACE_RELATION" | "MISSING_LOCAL_PLACE" | "PLACE_RELATION_MISMATCH" | "MISSING_OWNER" | "MISSING_CITY";
+export type OfferCommitBlockReasonCode = "UNSUPPORTED_SOURCE_POST_TYPE" | "NONCANONICAL_SOURCE_ALIAS" | "MISSING_TITLE" | "MISSING_PLACE_RELATION" | "AMBIGUOUS_PLACE_RELATION" | "INVALID_PLACE_RELATION" | "MISSING_LOCAL_PLACE" | "PLACE_RELATION_MISMATCH" | "MISSING_OWNER" | "MISSING_CITY";
 export interface OfferCommitBlockReason { code: OfferCommitBlockReasonCode; message: string; details?: Record<string, unknown> }
 export interface OfferCommitWarning { code: string; message: string; details?: Record<string, unknown> }

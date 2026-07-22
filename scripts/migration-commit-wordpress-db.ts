@@ -456,7 +456,6 @@ function loadCommitContextConfig(path: string): MigrationCommitContextConfig {
 export function prepareTargetedOfferRecord(input: { record: SourceRecordEnvelope; sourceRecordKey: string; contextConfig: MigrationCommitContextConfig; mediaPolicyName: MediaPolicyName }): void {
   const normalized = normalizeOffer(input.record.rawPayload as WordPressOfferBundle);
   const candidate = normalized.normalizedPayload as import("../src/lib/migration/adapters/wordpress-db/normalizeOffer").NormalizedOfferCandidate;
-  if (candidate.placeRelation.relations.length !== 1) throw new Error(`Initial Offer write scope supports exactly one relation row (A/C); got ${candidate.placeRelation.relations.length}.`);
   const configured = { ...(input.contextConfig.defaults?.offer ?? {}), ...(input.contextConfig.overridesBySourceRecordKey?.[input.sourceRecordKey]?.offer ?? {}), mediaPolicy: input.mediaPolicyName } as OfferCommitContext;
   const built = buildOfferCreateDraft({ candidate, context: configured });
   if (!built.ok) throw new Error(`Offer pre-plan validation blocked: ${built.reasons.map(reason => reason.code).join(", ")}`);

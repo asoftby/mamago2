@@ -28,6 +28,7 @@ const noLocal=buildOfferCreateDraft({candidate:candidate(),context:{...context,p
 const noOwner=buildOfferCreateDraft({candidate:candidate(),context:{...context,ownerUserId:""}});assert.equal(noOwner.ok,false);if(!noOwner.ok)assert.ok(noOwner.reasons.some(r=>r.code==="MISSING_OWNER"));
 const alias=buildOfferCreateDraft({candidate:candidate({sourcePostType:"offers" as NormalizedOfferCandidate["sourcePostType"]}),context});assert.equal(alias.ok,false);if(!alias.ok)assert.ok(alias.reasons.some(r=>r.code==="NONCANONICAL_SOURCE_ALIAS"));
 const dedup=buildOfferCreateDraft({candidate:candidate({placeRelation:{status:"MULTIPLE_PLACE_RELATIONS",placeSourcePostIds:[100,100],relations:[relation(100),relation(100,"select-hb-program")]}}),context});assert.equal(dedup.ok,true);if(dedup.ok)assert.ok(dedup.warnings.some(w=>w.code==="OFFER_PLACE_RELATIONS_DEDUPLICATED"));
+const invalidRelation=buildOfferCreateDraft({candidate:candidate({placeRelation:{status:"SINGLE_PLACE_RELATION",placeSourcePostIds:[100],relations:[{...relation(100),post_id:2}]}}),context});assert.equal(invalidRelation.ok,false);if(!invalidRelation.ok)assert.ok(invalidRelation.reasons.some(r=>r.code==="INVALID_PLACE_RELATION"));
 
 let fullCalls=0; const media=new OfferMediaSyncer({async sync(input){fullCalls++;assert.deepEqual(input.attachmentIds,[10,11]);return{importedCount:2}}});
 assert.equal((await media.sync({offerId:"o",ownerUserId:"u",attachmentIds:[10,11],mediaPolicy:"NONE",sourceRecordKey:"k"})).status,"SKIPPED_POLICY");
