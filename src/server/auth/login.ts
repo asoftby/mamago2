@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/lib/auth/crypto";
+import { verifyLoginPassword } from "@/lib/auth/credentials";
 import { createSession } from "@/lib/auth/session";
 import type { User } from "@prisma/client";
 import { AuthError } from "./register";
@@ -35,14 +35,9 @@ export async function loginUser(
     },
   });
 
-  if (!user) {
-    throw new AuthError("Invalid email or password", "INVALID_CREDENTIALS");
-  }
+  const isValid = await verifyLoginPassword(validated.password, user);
 
-  // Verify password
-  const isValid = await verifyPassword(validated.password, user.passwordHash);
-
-  if (!isValid) {
+  if (!user || !isValid) {
     throw new AuthError("Invalid email or password", "INVALID_CREDENTIALS");
   }
 

@@ -2,6 +2,7 @@
 // These mirror Prisma enums but are safe to use in client components
 
 export enum UserStatus {
+  PENDING_ACTIVATION = "PENDING_ACTIVATION",
   ACTIVE = "ACTIVE",
   LIMITED = "LIMITED",
   SUSPENDED = "SUSPENDED",
