@@ -3,6 +3,7 @@ import type { ArticleCommitContext } from "../article/buildArticleCreateDraft";
 import type { EventCommitContext } from "../event/types";
 import type { PlaceCommitContext } from "../place/types";
 import type { RouteCommitContext } from "../route/buildRouteCreateDraft";
+import type { OfferCommitContext } from "../offer/types";
 
 /**
  * Per-`targetType` manual context, layered `defaults` -> per-record
@@ -20,6 +21,7 @@ export interface MigrationCommitContextConfig {
     event?: Partial<EventCommitContext>;
     article?: Partial<ArticleCommitContext>;
     route?: Partial<RouteCommitContext>;
+    offer?: Partial<OfferCommitContext>;
   };
   overridesBySourceRecordKey?: Record<
     string,
@@ -28,6 +30,7 @@ export interface MigrationCommitContextConfig {
       event?: Partial<EventCommitContext>;
       article?: Partial<ArticleCommitContext>;
       route?: Partial<RouteCommitContext>;
+      offer?: Partial<OfferCommitContext>;
     }
   >;
 }
@@ -44,6 +47,7 @@ export type ResolveCommitContextResult =
   | { ok: true; targetType: "ACTIVITY"; context: EventCommitContext }
   | { ok: true; targetType: "ARTICLE"; context: ArticleCommitContext }
   | { ok: true; targetType: "ROUTE"; context: RouteCommitContext }
+  | { ok: true; targetType: "OFFER"; context: OfferCommitContext }
   | { ok: false; errorCode: ResolveCommitContextErrorCode; errorMessage: string };
 
 function shallowMerge<T extends object>(
@@ -114,6 +118,15 @@ export function resolveCommitContextForExecutionCandidate(
   if (targetType === "ROUTE") {
     const context = shallowMerge(config.defaults?.route, override?.route) as RouteCommitContext;
     return { ok: true, targetType: "ROUTE", context };
+  }
+
+  if (targetType === "OFFER") {
+    const context = shallowMerge(config.defaults?.offer, override?.offer) as OfferCommitContext;
+    const required = [context.placeId, context.ownerUserId, context.cityId];
+    if (required.some(value => !value?.trim()) || !Number.isInteger(context.legacyPlaceId) || !context.mediaPolicy) {
+      return { ok: false, errorCode: "MISSING_REQUIRED_CONTEXT_FIELD", errorMessage: `OfferCommitContext placeId/legacyPlaceId/ownerUserId/cityId/mediaPolicy is incomplete for "${sourceRecordKey}".` };
+    }
+    return { ok: true, targetType: "OFFER", context };
   }
 
   return {

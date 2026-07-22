@@ -190,7 +190,7 @@ function testArticleWithEmptyContextStillResolves() {
 function testUnknownTargetTypeReturnsOkFalse() {
   const result = resolveCommitContextForExecutionCandidate({
     executionCandidate: executionCandidateFixture({
-      planItem: planItemFixture({ targetType: "OFFER" }),
+      planItem: planItemFixture({ targetType: "USER" as never }),
     }),
     config: {},
   });

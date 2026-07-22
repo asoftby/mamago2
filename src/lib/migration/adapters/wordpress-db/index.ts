@@ -11,6 +11,9 @@ export type {
   NormalizedEventSourceTerm,
 } from "./normalizeEvent";
 export { normalizeRoute } from "./normalizeRoute";
+export { normalizeOffer } from "./normalizeOffer";
+export type { NormalizedOfferCandidate } from "./normalizeOffer";
+export { loadOfferSnapshotEnvelope } from "./loadOfferSnapshotEnvelope";
 export type {
   NormalizedRouteCandidate,
   NormalizedRouteLocation,
@@ -24,9 +27,12 @@ export {
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
   ROUTE_ENTITY_TYPE,
+  OFFER_PROGRAMS_ENTITY_TYPE,
+  OFFER_SERVICES_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedEventEnvelopeBySourceRecordKey,
   fetchPublishedRouteEnvelopeBySourceRecordKey,
+  fetchPublishedOfferEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
   wordpressDbAdapter,
 } from "./wordpressDbAdapter";
@@ -57,6 +63,7 @@ export type {
   WordPressPostRow,
   WordPressRedirectRow,
   WordPressRouteBundle,
+  WordPressOfferBundle,
   WordPressTermRow,
   WordPressUserRow,
 } from "./types";

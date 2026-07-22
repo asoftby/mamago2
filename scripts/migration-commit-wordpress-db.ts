@@ -72,15 +72,21 @@ import {
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
   ROUTE_ENTITY_TYPE,
+  OFFER_PROGRAMS_ENTITY_TYPE,
+  OFFER_SERVICES_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
   fetchPublishedEventEnvelopeBySourceRecordKey,
   fetchPublishedPlaceEnvelopeBySourceRecordKey,
   fetchPublishedRouteEnvelopeBySourceRecordKey,
+  fetchPublishedOfferEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { WordPressRepository, type WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
 import type { SourceRecordEnvelope } from "../src/lib/migration/types";
+import type { WordPressOfferBundle } from "../src/lib/migration/adapters/wordpress-db/types";
+import { normalizeOffer } from "../src/lib/migration/adapters/wordpress-db/normalizeOffer";
+import { loadOfferSnapshotEnvelope } from "../src/lib/migration/adapters/wordpress-db/loadOfferSnapshotEnvelope";
 import { ArticleCommitOrchestrator } from "../src/lib/migration/commit/article/ArticleCommitOrchestrator";
 import { ArticleCommitRunner } from "../src/lib/migration/commit/article/ArticleCommitRunner";
 import { ArticleCommitWriter } from "../src/lib/migration/commit/article/ArticleCommitWriter";
@@ -104,6 +110,7 @@ import { RouteCommitOrchestrator } from "../src/lib/migration/commit/route/Route
 import { RouteCommitRunner } from "../src/lib/migration/commit/route/RouteCommitRunner";
 import { RouteCommitWriter } from "../src/lib/migration/commit/route/RouteCommitWriter";
 import { RouteStopMediaSyncer } from "../src/lib/migration/commit/route/RouteStopMediaSyncer";
+import { OfferCommitWriter, OfferCommitOrchestrator, OfferCommitRunner, OfferMediaSyncer, buildOfferCreateDraft, type OfferCommitContext } from "../src/lib/migration/commit/offer";
 import { createMigrationRunExecutionPlan } from "../src/lib/migration/core/orchestrator";
 import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/migration/core/orchestrator";
 import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
@@ -147,7 +154,7 @@ import type {
 } from "../src/lib/migration/runtime/MigrationProfile";
 import { assertProductionMigrationGuard } from "../src/lib/migration/runtime/ProductionMigrationGuard";
 
-export type CommitEntity = "article" | "place" | "event" | "route" | "all";
+export type CommitEntity = "article" | "place" | "event" | "route" | "offer" | "all";
 
 export interface CommitCliArgs {
   entity: CommitEntity;
@@ -166,15 +173,16 @@ export interface CommitCliArgs {
   seoPolicyName?: SeoPolicyName;
   redirectPolicyName?: RedirectPolicyName;
   confirmProduction: boolean;
+  snapshotRoot?: string;
 }
 
-const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "route", "all"];
+const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "route", "offer", "all"];
 
 export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const entityIndex = argv.indexOf("--entity");
   const rawEntity = entityIndex !== -1 ? argv[entityIndex + 1] : undefined;
   if (rawEntity !== undefined && !VALID_ENTITIES.includes(rawEntity as CommitEntity)) {
-    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|route|all.`);
+    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|route|offer|all.`);
   }
   const entity: CommitEntity = (rawEntity as CommitEntity | undefined) ?? "all";
 
@@ -218,6 +226,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     throw new Error("Missing value for --source-record-key.");
   }
   const sourceRecordKeyCount = argv.filter((token) => token === "--source-record-key").length;
+  if (entity === "offer" && (!sourceRecordKey || sourceRecordKeyCount !== 1 || limit !== undefined)) throw new Error("--entity offer requires exactly one --source-record-key and forbids --limit; Batch 1 is not enabled.");
 
   if (forceReprocess) {
     if (entity !== "article" && entity !== "place") {
@@ -249,6 +258,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   if (rawMediaPolicy !== undefined && mediaPolicyName === null) {
     throw new Error(`Invalid --media-policy value "${rawMediaPolicy}". Expected FULL|METADATA|NONE.`);
   }
+  if (entity === "offer" && mediaPolicyName === "FULL") throw new Error("Offer FULL media commit requires a separate media execution gate; use METADATA or NONE for the initial golden.");
 
   if (forceMediaReprocess) {
     const guard = validateEventMediaOnlyReprocessArgs({
@@ -292,6 +302,10 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   }
 
   const confirmProduction = argv.includes("--confirm-production");
+  const snapshotRootIndex = argv.indexOf("--snapshot-root");
+  const snapshotRoot = snapshotRootIndex !== -1 ? argv[snapshotRootIndex + 1] : undefined;
+  if (snapshotRootIndex !== -1 && !snapshotRoot) throw new Error("Missing value for --snapshot-root.");
+  if (snapshotRoot && entity !== "offer") throw new Error("--snapshot-root is currently supported only with --entity offer.");
 
   return {
     entity,
@@ -310,6 +324,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     seoPolicyName: seoPolicyName ?? undefined,
     redirectPolicyName: redirectPolicyName ?? undefined,
     confirmProduction,
+    snapshotRoot,
   };
 }
 
@@ -361,6 +376,7 @@ function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
   if (entity === "place") return [PLACE_ENTITY_TYPE];
   if (entity === "event") return [EVENT_ENTITY_TYPE];
   if (entity === "route") return [ROUTE_ENTITY_TYPE];
+  if (entity === "offer") return [OFFER_PROGRAMS_ENTITY_TYPE, OFFER_SERVICES_ENTITY_TYPE];
   return undefined;
 }
 
@@ -435,6 +451,18 @@ function loadCommitContextConfig(path: string): MigrationCommitContextConfig {
     );
   }
   return parseCommitContextConfig(raw, path);
+}
+
+export function prepareTargetedOfferRecord(input: { record: SourceRecordEnvelope; sourceRecordKey: string; contextConfig: MigrationCommitContextConfig; mediaPolicyName: MediaPolicyName }): void {
+  const normalized = normalizeOffer(input.record.rawPayload as WordPressOfferBundle);
+  const candidate = normalized.normalizedPayload as import("../src/lib/migration/adapters/wordpress-db/normalizeOffer").NormalizedOfferCandidate;
+  if (candidate.placeRelation.relations.length !== 1) throw new Error(`Initial Offer write scope supports exactly one relation row (A/C); got ${candidate.placeRelation.relations.length}.`);
+  const configured = { ...(input.contextConfig.defaults?.offer ?? {}), ...(input.contextConfig.overridesBySourceRecordKey?.[input.sourceRecordKey]?.offer ?? {}), mediaPolicy: input.mediaPolicyName } as OfferCommitContext;
+  const built = buildOfferCreateDraft({ candidate, context: configured });
+  if (!built.ok) throw new Error(`Offer pre-plan validation blocked: ${built.reasons.map(reason => reason.code).join(", ")}`);
+  input.record.sourceHash = built.canonicalHash;
+  input.contextConfig.overridesBySourceRecordKey ??= {};
+  input.contextConfig.overridesBySourceRecordKey[input.sourceRecordKey] = { ...(input.contextConfig.overridesBySourceRecordKey[input.sourceRecordKey] ?? {}), offer: configured };
 }
 
 function printSummary(summary: RunCommitExecutionPlanSummary, args: CommitCliArgs): void {
@@ -517,6 +545,7 @@ async function main(): Promise<void> {
     seoPolicyName: args.seoPolicyName,
     redirectPolicyName: args.redirectPolicyName,
   });
+  if (args.entity === "offer" && profile.mediaPolicy.name === "FULL") throw new Error("Initial targeted Offer commit requires --media-policy METADATA or NONE; FULL media needs a separate execution gate.");
   console.log(formatMigrationProfileForCli(profile));
   console.log();
 
@@ -524,14 +553,14 @@ async function main(): Promise<void> {
 
   const contextConfig = loadCommitContextConfig(args.contextConfigPath);
 
-  const wpConfig = readWordPressDbConfigFromEnv(process.env);
-  assertRemoteAccessAllowed(wpConfig, args.allowRemoteReadonly);
+  const wpConfig = args.snapshotRoot ? null : readWordPressDbConfigFromEnv(process.env);
+  if (wpConfig) assertRemoteAccessAllowed(wpConfig, args.allowRemoteReadonly);
 
   if (!getMigrationAdapter(WORDPRESS_DB_ADAPTER_KEY)) {
     registerWordPressDbAdapter();
   }
 
-  const executor = createWordPressSshMysqlExecutor(wpConfig);
+  const executor: WordPressQueryExecutor = wpConfig ? createWordPressSshMysqlExecutor(wpConfig) : async () => { throw new Error("Remote WordPress executor is disabled in --snapshot-root mode.") };
 
   const prisma = new PrismaClient();
   try {
@@ -539,7 +568,9 @@ async function main(): Promise<void> {
 
     let records: readonly SourceRecordEnvelope[] | undefined;
     if (args.sourceRecordKey) {
-      if (args.entity === "article") {
+      if (args.entity === "offer" && args.snapshotRoot) {
+        records = [loadOfferSnapshotEnvelope({ snapshotRoot: args.snapshotRoot, sourceRecordKey: args.sourceRecordKey })];
+      } else if (args.entity === "article") {
         records = [await fetchPublishedArticleEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else if (args.entity === "place") {
         records = [await fetchPublishedPlaceEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
@@ -547,12 +578,15 @@ async function main(): Promise<void> {
         records = [await fetchPublishedEventEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else if (args.entity === "route") {
         records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
+      } else if (args.entity === "offer") {
+        records = [await fetchPublishedOfferEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else {
         throw new Error(
-          "--source-record-key is only supported with --entity article|place|event|route for golden-sample runs.",
+          "--source-record-key is only supported with --entity article|place|event|route|offer for golden-sample runs.",
         );
       }
     }
+    if (args.entity === "offer" && args.sourceRecordKey && records?.[0]) prepareTargetedOfferRecord({ record: records[0], sourceRecordKey: args.sourceRecordKey, contextConfig, mediaPolicyName: profile.mediaPolicy.name });
 
     const executionPlan = await createMigrationRunExecutionPlan(
       buildExecutionPlanInput({
@@ -892,6 +926,12 @@ async function main(): Promise<void> {
         lineageWriter,
         prisma,
         mediaSyncer: routeStopMediaSyncer,
+      }),
+      offer: new OfferCommitRunner({
+        orchestrator: new OfferCommitOrchestrator(new OfferCommitWriter(prisma)),
+        lineageWriter,
+        prisma,
+        mediaSyncer: new OfferMediaSyncer(),
       }),
     };
 

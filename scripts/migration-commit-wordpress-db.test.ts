@@ -49,6 +49,7 @@ function testParsesValidFlags() {
     seoPolicyName: undefined,
     redirectPolicyName: undefined,
     confirmProduction: false,
+    snapshotRoot: undefined,
   });
 }
 
@@ -80,8 +81,8 @@ function testMissingContextConfigBlocksBeforeConnection() {
 
 function testInvalidEntityFails() {
   assert.throws(
-    () => parseArgs(["--entity", "offer", ...REQUIRED_FLAGS]),
-    /Invalid --entity value "offer"/,
+    () => parseArgs(["--entity", "user", ...REQUIRED_FLAGS]),
+    /Invalid --entity value "user"/,
   );
 }
 

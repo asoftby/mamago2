@@ -7,6 +7,7 @@ import type {
   WordPressPostMetaByKey,
   WordPressPostRow,
   WordPressRouteBundle,
+  WordPressOfferBundle,
   WordPressTermRow,
 } from "./types";
 
@@ -243,6 +244,19 @@ export function buildPlaceCanonicalSourceHashInput(bundle: WordPressPlaceBundle)
 export function hashPlaceBundle(bundle: WordPressPlaceBundle): string {
   return versionedHash(buildPlaceCanonicalSourceHashInput(bundle));
 }
+
+const OFFER_POST_FIELDS: readonly (keyof WordPressPostRow)[] = ["post_title", "post_content", "post_excerpt", "post_status", "post_name", "post_date", "post_author", "post_type"];
+const OFFER_POSTMETA_ALLOWLIST = ["short-description", "short-description-service", "program-cost", "average-check-program", "hb-program-duration", "max-guests-program", "program-booking-settings", "gallery", "logo", "main-image-service", "phone", "phone-service", "program-phone", "website", "website-service", "program-website", "external-url", "rank_math_title", "rank_math_description", "rank_math_focus_keyword", "rank_math_canonical_url", "rank_math_robots", "rank_math_facebook_title", "rank_math_facebook_description", "_wp_old_slug"] as const;
+export function buildOfferCanonicalSourceHashInput(bundle: WordPressOfferBundle): unknown {
+  return {
+    version: CANONICAL_SOURCE_HASH_VERSION,
+    post: pickPostFields(bundle.post, OFFER_POST_FIELDS),
+    postMeta: pickPostMeta(bundle.postMeta, OFFER_POSTMETA_ALLOWLIST),
+    terms: canonicalTerms(bundle.terms),
+    placeRelations: [...bundle.placeRelations].map(r => ({ relatedPostId: r.related_post_id, relatedPostType: r.related_post_type, relationKey: r.relation_key, relationSide: r.relation_side })).sort((a,b) => stableStringify(a).localeCompare(stableStringify(b))),
+  };
+}
+export function hashOfferBundle(bundle: WordPressOfferBundle): string { return versionedHash(buildOfferCanonicalSourceHashInput(bundle)) }
 
 const EVENT_POST_FIELDS: readonly (keyof WordPressPostRow)[] = [
   "post_title",
