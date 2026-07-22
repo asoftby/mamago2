@@ -2,9 +2,9 @@
 
 **Статус:** актуальный рабочий чек-лист до полного завершения миграции WordPress → mamaGo 2.0 и production cutover.
 
-**Обновлено:** 2026-07-22
-**Текущая ветка следующей фазы:** `codex/users-auth-foundation`
-**Base:** `dev` @ `a2dd28a0eef93cf1cbb70dbae5132201b220879e`
+**Обновлено:** 2026-07-23
+**Текущая ветка следующей фазы:** `codex/users-activation-token-service`
+**Base:** `dev` @ `76504ef15781927d27dafcce6863609f52ccfdfc`
 
 > Подробный исторический журнал предыдущей версии чек-листа сохранён в Git
 > в merge-коммите `a2dd28a0eef93cf1cbb70dbae5132201b220879e` и его предках.
@@ -42,7 +42,7 @@
 | Events | PARTIAL | 5 eligible CREATE и 67 sessions, затем общий proof |
 | Offers | SAFE CANONICAL COMPLETE 63/63 | Только отдельные future gates для media и backlog H/I |
 | Users source planning | COMPLETE | Ничего повторно не исследовать |
-| Users activation architecture | COMPLETE | Slice 1 foundation завершён; следующий gate — Slice 2 token service |
+| Users activation architecture | COMPLETE | Slice 1 foundation и Slice 2 token service реализованы |
 | Users migration | NOT STARTED | Vertical slice, golden samples, batches, rerun |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
@@ -237,7 +237,7 @@ base: dev @ a2dd28a0eef93cf1cbb70dbae5132201b220879e
 - [x] `tsc --noEmit` PASS.
 - [x] Production build PASS.
 - [x] Adversarial auth/security review PASS.
-- [ ] Draft PR против `dev` — открыть после commits/push этой финализации.
+- [x] PR #70 смержен в `dev`.
 
 Local proof boundary:
 
@@ -268,7 +268,7 @@ Slice 1 запрещено смешивать с:
 
 ### 4.2 Следующие USERS slices
 
-- [ ] Slice 2 — activation token service: hash-only storage, purpose scope,
+- [x] Slice 2 — activation token service: hash-only storage, purpose scope,
       TTL, single use, invalidation, concurrency safety.
 - [ ] Slice 3 — activation request/complete endpoints, generic public responses,
       rate limits, password setup and audit.
@@ -280,6 +280,33 @@ Slice 1 запрещено смешивать с:
 - [ ] Slice 9 — one common clean-scope idempotency rerun.
 - [ ] Slice 10 — privileged/manual class H resolution policy/tooling.
 - [ ] Profile media — отдельный later gate, не смешивать с first User proof.
+
+Slice 2 proof:
+
+```text
+USERS Slice 1: COMPLETE — merged via PR #70
+USERS Slice 2: COMPLETE
+token storage: SHA-256 hash only
+raw token storage: none
+purpose: MIGRATED_ACCOUNT_ACTIVATION
+TTL: 60 minutes; expiresAt > now is valid, expiresAt <= now is expired
+issuance eligibility: PENDING_ACTIVATION and deletedAt IS NULL only
+unresolved: usedAt IS NULL and invalidatedAt IS NULL
+concurrent issuance: one unresolved winner
+atomic consumption: one winner; User eligibility included in conditional UPDATE
+final proof fixtures: temporary only, cleaned
+email delivery: NOT STARTED
+activation endpoints: NOT STARTED
+User migration: NOT STARTED
+```
+
+Future Slice 3 email safety policy:
+
+```text
+LOCAL: external email delivery forbidden
+DEV: external email delivery forbidden
+PRODUCTION: delivery only after explicit Go/No-Go and production-only flag
+```
 
 USERS completion criteria:
 
@@ -426,19 +453,20 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 2 activation token service
-Branch: codex/users-auth-foundation
-Base SHA: a2dd28a0eef93cf1cbb70dbae5132201b220879e
+Phase: USERS — Slice 2 adversarial review and Draft PR
+Branch: codex/users-activation-token-service
+Base SHA: 76504ef15781927d27dafcce6863609f52ccfdfc
 Source/architecture discovery: COMPLETE — не повторять
-Slice 1: COMPLETE — Draft PR finalization in progress
+Slice 1: COMPLETE — PR #70 merged
+Slice 2: COMPLETE — Draft PR finalization in progress
 DB/WordPress writes for migrated Users: NOT AUTHORIZED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 1 отдельно реализовать Slice 2 activation token
-> service: hash-only storage, purpose scope, TTL, invalidation и atomic consume.
-> Не начинать endpoints, email или User migration vertical slice.
+> После review и merge Slice 2 начать отдельный Slice 3 activation endpoints
+> and production-only email gate. До merge не начинать endpoints, email или
+> User migration vertical slice.
 
 ---
 
@@ -454,7 +482,14 @@ DB/WordPress writes for migrated Users: NOT AUTHORIZED
 - Architecture decision: `READY_FOR_PRISMA_AUTH_FOUNDATION_IMPLEMENTATION`.
 - Новая ветка: `codex/users-auth-foundation`.
 - USERS Slice 1 Prisma/auth foundation: COMPLETE, local proof PASS.
+- PR #70 merge commit: `76504ef15781927d27dafcce6863609f52ccfdfc`.
 - Existing users/sessions at proof boundary: 15 / 5; action tokens: 0.
+- USERS Slice 2 token service: COMPLETE; Draft PR finalization in progress.
+- Token policy: SHA-256 hash of 32 random bytes, 60-minute TTL, purpose scope,
+  invalidation and atomic one-time consume.
+- Final proof fixtures cleaned: users 15, sessions 5, action tokens 0, pending 0.
+- Future email policy: LOCAL/DEV external delivery forbidden; PRODUCTION only
+  after explicit Go/No-Go and a production-only flag.
 - Activation endpoints и User migration: NOT STARTED.
 - В этой docs-операции DB, WordPress, storage, media и network writes не
   выполнялись.
