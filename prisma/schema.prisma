@@ -15,7 +15,7 @@ model Healthcheck {
 model User {
   id                                String                           @id @default(cuid())
   email                             String                           @unique
-  passwordHash                      String
+  passwordHash                      String?
   role                              Role                             @default(USER)
   createdAt                         DateTime                         @default(now())
   updatedAt                         DateTime                         @updatedAt
@@ -110,6 +110,7 @@ model User {
   moderationActions                 UserModerationAction[]           @relation("TargetUser")
   notificationPreferences           UserNotificationPreference[]
   unsubscribeTokens                 UnsubscribeToken[]               @relation("UnsubscribeTokens")
+  actionTokens                      UserActionToken[]
   createdBroadcasts                 AdminBroadcast[]                 @relation("AdminBroadcastCreator")
   editedBroadcastRevisions          AdminBroadcastRevision[]         @relation("AdminBroadcastRevisionEditor")
   devTelegramBusinessApplications   DevTelegramBusinessApplication[]
@@ -197,6 +198,22 @@ model Session {
   @@index([userId])
   @@index([tokenHash])
   @@index([expiresAt])
+}
+
+/// Purpose-scoped, one-time user action tokens. Only a cryptographic hash is stored.
+model UserActionToken {
+  id            String                 @id @default(cuid())
+  userId        String
+  purpose       UserActionTokenPurpose
+  tokenHash     String                 @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime               @default(now())
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt])
+  @@index([purpose, expiresAt])
 }
 
 model PhoneOtp {
@@ -2879,10 +2896,15 @@ enum SeoCanonicalSource {
 }
 
 enum UserStatus {
+  PENDING_ACTIVATION
   ACTIVE
   LIMITED
   SUSPENDED
   BANNED
+}
+
+enum UserActionTokenPurpose {
+  MIGRATED_ACCOUNT_ACTIVATION
 }
 
 enum UserModerationActionType {

@@ -5,6 +5,7 @@ import { generateRawToken, hashToken } from "@/lib/auth/tokenHash";
 import { emailService } from "@/features/email/server/email-service";
 import { AuthError } from "./register";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
+import { isSessionEligibleAccount } from "@/lib/auth/accountEligibility";
 
 const requestResetSchema = z.object({
   email: z.string().email("Некорректный email"),
@@ -29,11 +30,12 @@ export async function requestPasswordReset(email: string): Promise<void> {
   // Find user
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
+    select: { id: true, status: true, deletedAt: true },
   });
 
-  // If user not found, silently succeed (don't reveal if email exists)
-  if (!user) {
-    console.log(`[Password Reset] Email not found: ${normalizedEmail}`);
+  // Unknown and ineligible accounts are indistinguishable publicly. Pending
+  // migrated users must activate instead of establishing a password via reset.
+  if (!user || !isSessionEligibleAccount(user)) {
     return;
   }
 
@@ -85,32 +87,39 @@ export async function resetPassword(
   // Hash the incoming token before looking it up
   const hashedToken = hashToken(validated.token);
 
-  // Find user by hashed token
-  const user = await prisma.user.findFirst({
-    where: {
-      resetToken: hashedToken,
-    },
-  });
-
-  if (!user) {
-    throw new AuthError("Invalid or expired reset token", "INVALID_TOKEN");
-  }
-
-  // Check expiration
-  if (!user.resetTokenExpires || user.resetTokenExpires < new Date()) {
-    throw new AuthError("Invalid or expired reset token", "INVALID_TOKEN");
-  }
-
   // Hash new password
   const passwordHash = await hashPassword(validated.password);
 
-  // Update user: set new password and clear reset token
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordHash,
-      resetToken: null,
-      resetTokenExpires: null,
+  await prisma.$transaction(
+    async (tx) => {
+      const user = await tx.user.findFirst({
+        where: { resetToken: hashedToken },
+        select: {
+          id: true,
+          status: true,
+          deletedAt: true,
+          resetTokenExpires: true,
+        },
+      });
+
+      if (
+        !user ||
+        !isSessionEligibleAccount(user) ||
+        !user.resetTokenExpires ||
+        user.resetTokenExpires < new Date()
+      ) {
+        throw new AuthError("Invalid or expired reset token", "INVALID_TOKEN");
+      }
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          resetToken: null,
+          resetTokenExpires: null,
+        },
+      });
     },
-  });
+    { isolationLevel: "Serializable" },
+  );
 }

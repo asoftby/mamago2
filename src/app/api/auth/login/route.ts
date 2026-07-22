@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/lib/auth/crypto";
+import { verifyLoginPassword } from "@/lib/auth/credentials";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
 import { acceptBusinessInvite } from "@/server/business/businessInvite.service";
@@ -63,22 +63,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-
-    // Verify password
-    if (!user.passwordHash) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-    const isValid = await verifyPassword(password, user.passwordHash);
-    if (!isValid) {
+    // Unknown, ineligible, and wrong-password accounts share the same response
+    // and perform a bcrypt comparison through the timing-safe helper.
+    const isValid = await verifyLoginPassword(password, user);
+    if (!user || !isValid) {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }

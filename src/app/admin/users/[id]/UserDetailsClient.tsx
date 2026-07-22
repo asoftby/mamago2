@@ -66,6 +66,7 @@ interface UserDetails {
 }
 
 const STATUS_COLORS: Record<UserStatus, string> = {
+  PENDING_ACTIVATION: "bg-sky-100 text-sky-800",
   ACTIVE: "bg-green-100 text-green-800",
   LIMITED: "bg-yellow-100 text-yellow-800",
   SUSPENDED: "bg-orange-100 text-orange-800",
@@ -73,6 +74,7 @@ const STATUS_COLORS: Record<UserStatus, string> = {
 };
 
 const STATUS_LABELS: Record<UserStatus, string> = {
+  PENDING_ACTIVATION: "Ожидает активации",
   ACTIVE: "Активен",
   LIMITED: "Ограничен",
   SUSPENDED: "Приостановлен",

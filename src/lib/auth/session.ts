@@ -4,10 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "./crypto";
 import { SESSION_COOKIE_NAME, getAuthCookieOptions } from "./cookie";
 import { SESSION_USER_SELECT, type SessionUserRecord } from "./safeUser";
+import { isSessionEligibleAccount, isSessionEligibleStatus } from "./accountEligibility";
 
 export type SessionUser = SessionUserRecord;
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+async function invalidateSessionById(sessionId: string): Promise<void> {
+  // Idempotent under concurrent validations of the same now-ineligible session.
+  await prisma.session.deleteMany({ where: { id: sessionId } });
+}
 
 /**
  * Create a new session for a user
@@ -17,13 +23,27 @@ export async function createSession(userId: string): Promise<string> {
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + SESSION_DURATION);
 
-  await prisma.session.create({
-    data: {
-      userId,
-      tokenHash,
-      expiresAt,
+  await prisma.$transaction(
+    async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { status: true, deletedAt: true },
+      });
+
+      if (!user || !isSessionEligibleAccount(user)) {
+        throw new Error("ACCOUNT_NOT_SESSION_ELIGIBLE");
+      }
+
+      await tx.session.create({
+        data: {
+          userId,
+          tokenHash,
+          expiresAt,
+        },
+      });
     },
-  });
+    { isolationLevel: "Serializable" },
+  );
 
   return token;
 }
@@ -135,7 +155,7 @@ export async function validateSession(
   // Check if session is expired
   if (session.expiresAt < new Date()) {
     const deleteStart = performance.now();
-    await prisma.session.delete({ where: { id: session.id } });
+    await invalidateSessionById(session.id);
     if (process.env.NODE_ENV === "development") {
       console.debug(`[auth] validateSession deleteExpired: ${(performance.now() - deleteStart).toFixed(0)}ms`);
     }
@@ -146,7 +166,7 @@ export async function validateSession(
 
   if (user.deletedAt) {
     const deleteStart = performance.now();
-    await prisma.session.delete({ where: { id: session.id } });
+    await invalidateSessionById(session.id);
     if (process.env.NODE_ENV === "development") {
       console.debug(`[auth] validateSession deleteDeleted: ${(performance.now() - deleteStart).toFixed(0)}ms`);
     }
@@ -156,7 +176,7 @@ export async function validateSession(
   // Check user status
   if (user.status === "BANNED") {
     const deleteStart = performance.now();
-    await prisma.session.delete({ where: { id: session.id } });
+    await invalidateSessionById(session.id);
     if (process.env.NODE_ENV === "development") {
       console.debug(`[auth] validateSession deleteBanned: ${(performance.now() - deleteStart).toFixed(0)}ms`);
     }
@@ -167,7 +187,7 @@ export async function validateSession(
     if (user.suspendedUntil && user.suspendedUntil > new Date()) {
       // Still suspended
       const deleteStart = performance.now();
-      await prisma.session.delete({ where: { id: session.id } });
+      await invalidateSessionById(session.id);
       if (process.env.NODE_ENV === "development") {
         console.debug(`[auth] validateSession deleteSuspended: ${(performance.now() - deleteStart).toFixed(0)}ms`);
       }
@@ -189,6 +209,12 @@ export async function validateSession(
       user.status = "ACTIVE";
       user.suspendedUntil = null;
     }
+  }
+
+  // Deny pending activation and any future non-session status by default.
+  if (!isSessionEligibleStatus(user.status)) {
+    await invalidateSessionById(session.id);
+    return null;
   }
 
   // Update lastLoginAt (throttled to once per hour to avoid excessive writes)
