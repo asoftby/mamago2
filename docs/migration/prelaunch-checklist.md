@@ -42,8 +42,8 @@
 | Events | PARTIAL | 5 eligible CREATE и 67 sessions, затем общий proof |
 | Offers | SAFE CANONICAL COMPLETE 63/63 | Только отдельные future gates для media и backlog H/I |
 | Users source planning | COMPLETE | Ничего повторно не исследовать |
-| Users activation architecture | COMPLETE | Slices 1–3 реализованы; Slice 3 review/PR pending |
-| Users migration | NOT STARTED | Vertical slice, golden samples, batches, rerun |
+| Users activation architecture | COMPLETE | Slices 1–3 merged via PR #70–#72 |
+| Users migration | VERTICAL SLICE COMPLETE | Slice 5 clean local batch; mass/production import not started |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -272,9 +272,10 @@ Slice 1 запрещено смешивать с:
       TTL, single use, invalidation, concurrency safety.
 - [x] Slice 3 — activation request/complete endpoints, generic public responses,
       rate limits, password setup and audit.
-- [ ] Slice 4 — User migration source/normalize/draft/validate/writer/lineage.
-- [ ] Slice 5 — ordinary-user golden CREATE + rerun.
-- [ ] Slice 6 — business-owner golden + ownership access proof.
+- [x] Slice 4 — User migration source/normalize/draft/validate/writer/lineage;
+      local golden proof: two CREATE, one privileged BLOCKED, one common rerun.
+- [ ] Slice 5 — clean local User batch import.
+- [ ] Business ownership access proof — separate later slice.
 - [ ] Slice 7 — clean Batch 1 (20 records) + audit.
 - [ ] Slice 8 — remaining clean users in sequential batches.
 - [ ] Slice 9 — one common clean-scope idempotency rerun.
@@ -324,7 +325,7 @@ LOCAL/DEV external provider calls: 0; result DELIVERY_DISABLED
 PRODUCTION gate: NODE_ENV + APP_ENV + enable flag + approval flag required;
 all gates still return PROVIDER_UNAVAILABLE until a later provider review
 external email provider integration/production delivery: NOT STARTED
-WordPress User migration: NOT STARTED
+WordPress User mass migration: NOT STARTED
 mass email campaign: NOT STARTED
 ownership/profile media: NOT STARTED
 final cleanup: users 15, sessions 5, action tokens 0, pending 0,
@@ -354,7 +355,7 @@ profile media handled by separate manifest/gate
 
 - [x] Prisma/auth foundation.
 - [x] Activation tokens and endpoints.
-- [ ] User migration vertical slice.
+- [x] User migration vertical slice (local golden scope only).
 - [ ] 564 clean users: batches + one common rerun.
 - [ ] 15 privileged/manual users: explicit disposition, без auto ADMIN.
 - [ ] Ownership access proof.
@@ -476,20 +477,21 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 3 activation endpoints
-Branch: codex/users-activation-endpoints
-Base SHA: 289ec055baa908258a5957292593a9313ca6eafa
+Phase: USERS — Slice 4 User migration vertical slice
+Branch: codex/users-migration-vertical-slice
+Base SHA: 82350ade626ae09968a8e1b30a51e9f46db47432
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
-Slice 3: COMPLETE — Draft PR finalization in progress
-DB/WordPress writes for migrated Users: NOT AUTHORIZED
+Slice 3: COMPLETE — PR #72 merged
+Slice 4: COMPLETE — local golden proof
+Mass/production User writes: NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 3 начать отдельный Slice 4 User migration vertical
-> slice. Не начинать external email delivery, mass campaign, ownership или media.
+> После review и merge Slice 4 начать отдельный Slice 5 clean local User batch
+> import. Не начинать production writes, email delivery, ownership или media.
 
 ---
 
@@ -514,9 +516,21 @@ DB/WordPress writes for migrated Users: NOT AUTHORIZED
 - Future email policy: LOCAL/DEV external delivery forbidden; PRODUCTION only
   after explicit Go/No-Go and a production-only flag.
 - PR #71 merge commit: `289ec055baa908258a5957292593a9313ca6eafa`.
-- USERS Slice 3 activation request/complete endpoints: COMPLETE; Draft PR
-  finalization in progress;
+- USERS Slice 3 activation request/complete endpoints: COMPLETE — PR #72 merged,
+  merge SHA `82350ade626ae09968a8e1b30a51e9f46db47432`;
   external provider integration and production delivery remain NOT STARTED.
-- External email delivery и User migration: NOT STARTED.
+- USERS Slice 4 local golden vertical slice: COMPLETE.
+- `wordpress-db:user:7`: CREATE, rerun SKIP_UNCHANGED.
+- `wordpress-db:user:38`: CREATE as role USER, rerun SKIP_UNCHANGED;
+  business ownership deferred.
+- `wordpress-db:user:1`: BLOCKED / PRIVILEGED_ACCOUNT_COLLISION on both runs;
+  privileged account fingerprint unchanged.
+- Migrated security defaults: PENDING_ACTIVATION, passwordHash null,
+  emailVerifiedAt null, role USER; sessions/action tokens/provider calls 0.
+- Golden cumulative delta: Users +2, MigrationLineage +2,
+  MigrationRecord +6 (three first-run attempts + three rerun attempts);
+  Business/Place/Offer/MediaAsset 0.
+- Full/mass/production User migration, external email delivery, ownership and
+  profile media: NOT STARTED.
 - В этой docs-операции DB, WordPress, storage, media и network writes не
   выполнялись.
