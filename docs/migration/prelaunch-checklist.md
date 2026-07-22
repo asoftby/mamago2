@@ -232,7 +232,7 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | Places | DONE |
 | Routes | IMPORTED 14/14; manual review, publish и redirects pending |
 | Events | 4/9 eligible imported; 5 CREATE и 67 sessions pending |
-| Offers | NOT STARTED |
+| Offers | GOLDEN PROOF PASSED 1/91; Batch 1 pending |
 | Users + activation | NOT STARTED |
 | Profiles/ownership/media | NOT STARTED |
 | Reviews | NOT STARTED |
@@ -1253,9 +1253,8 @@ Protected Event `55980` не входит в текущую WP publish selection
 
 ### Offers (services / hb-programs, 90+ publish)
 
-**Статус: AUDITED → SOURCE REPOSITORY READY → NORMALIZER READY.**
-**Отдельно (не меняется этим статусом): `BLOCKED_FOR_COMMIT` до Place batch
-+ активного `PLACE` lineage для relation-связанных source Place ID.**
+**Статус: AUDITED → SOURCE REPOSITORY READY → NORMALIZER READY → GUARDED
+GOLDEN PROOF PASSED (1 Offer). Batch 1 не запускался.**
 
 Read-only source/target аудит завершён 2026-07-14 (см. журнал сессий).
 Source: `hb-programs` publish=90/draft=2, `services` publish=1. Target на
@@ -1332,15 +1331,31 @@ dispatcher-branch, ни CLI-flag).
       входит** — `wordpressDbAdapter.ts`'s `supportedTargetTypes` явно
       исключает `OFFER`, менять adapter capability вне scope PR 2; вместо
       этого — исчерпывающие fixture-based unit tests (20 тестов).
-- [ ] PR 3 — `buildOfferCreateDraft` + `OfferCommitWriter/Orchestrator/
-      Runner` — **requires**: Place batch закоммичен (частично/полностью)
-      + активный `PLACE` lineage для relation-связанных source Place ID.
-- [ ] PR 4 — dispatcher/CLI wiring (`--entity offer`).
-- [ ] PR 5 — media (`OfferMediaSyncer`, паттерн Route, scopes
-      `OFFER_SERVICES`/`OFFER_PROGRAMS` уже зарезервированы).
+- [x] PR 3 — `buildOfferCreateDraft` + `OfferCommitWriter/Orchestrator/
+      Runner`, включая title-only CAS remediation UPDATE (2026-07-22).
+- [x] PR 4 — guarded dispatcher/CLI wiring (`--entity offer`, один targeted
+      source key; Batch 1 пока запрещён) + immutable local snapshot mode.
+- [x] PR 5 — `OfferMediaSyncer`: `NONE`/`METADATA` не вызывают importer;
+      `FULL` требует отдельного execution gate.
 - [ ] PR 6 — editorial review workflow (CAMP/PARTY, 27 no-Place записей,
       `org-capacity` кураторская карта).
 - [ ] PR 7 — docs/checklist закрытие после реального импорта.
+
+**Golden proof, LOCAL, 2026-07-22.** Source
+`wordpress-db:hb-programs:18932` связан с Offer
+`cmrvxhmnf0006wsizxm7v38oc` и lineage
+`cmrvxhmno0008wsiz47affeqf`. CREATE дал `Offer +1`, `lineage +1`; rerun —
+`SKIP_UNCHANGED`. Затем whitespace remediation нормализовал title
+`"Пакет:\u00A0 «Комфорт»"` → `"Пакет: «Комфорт»"` одним CAS UPDATE;
+canonical hash изменился с `offer-commit-v1:b05e22e…c9d6ce` на
+`offer-commit-v1:27ce4833…2b246c`; remediation rerun — `SKIP_UNCHANGED`.
+Offer/lineage IDs и counts стабильны. `MediaAsset`, Offer media, Place,
+Business, User, City и category tables — delta 0. Ownership проверяется
+через `Offer.placeId → Place.ownerBusiness.ownerUserId`, fallback —
+`Place.createdByUserId`; поля `Offer.createdByUserId` в Prisma нет и не
+требуется. Execution manifest SHA-256:
+`74983cbea14fd78885a351e0160811773c71a6a79b47183c1c8a7901d72859e0`.
+Audit artifacts находятся вне Git в `/tmp/scratchpad/offers/execution/`.
 
 ### Users (579) — P0 (§0.6)
 
@@ -2342,3 +2357,14 @@ dispatcher-branch, ни CLI-flag).
   `64505`) с правильными materialized session counts (итоговый ожидаемый
   pending count — 67 sessions), и только после этого — controlled
   targeted commit с media policy `METADATA`.
+- **2026-07-22 — Codex** — OFFERS guarded golden proof закрыт на LOCAL DB.
+  `wordpress-db:hb-programs:18932` создан как Offer
+  `cmrvxhmnf0006wsizxm7v38oc`, title whitespace затем исправлен одним
+  CAS-guarded UPDATE; CREATE, remediation UPDATE и оба разрешённых rerun
+  подтверждены audit-артефактами вне Git. Финальный hash
+  `offer-commit-v1:27ce48338902ba9a7c15cd17c2df4b6dfa0395d1c82652196a5692bd2b2b246c`;
+  оба rerun дали `SKIP_UNCHANGED`, дубликатов Offer/lineage нет, media и
+  запрещённые таблицы не менялись. SSH/WordPress/storage не использовались,
+  VPN/network не менялись. Следующий шаг после review/merge текущей
+  реализации — отдельная подготовка Batch 1 из 20 записей; Batch 1 в этой
+  сессии не запускался.
