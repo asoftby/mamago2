@@ -232,7 +232,7 @@ Read-only аудит существующей auth-модели (`src/lib/auth/*
 | Places | DONE |
 | Routes | IMPORTED 14/14; manual review, publish и redirects pending |
 | Events | 4/9 eligible imported; 5 CREATE и 67 sessions pending |
-| Offers | GOLDEN PROOF PASSED 1/91; Batch 1 pending |
+| Offers | SAFE CANONICAL COMPLETE 63/63; all-63 idempotency proof passed |
 | Users + activation | NOT STARTED |
 | Profiles/ownership/media | NOT STARTED |
 | Reviews | NOT STARTED |
@@ -1254,7 +1254,7 @@ Protected Event `55980` не входит в текущую WP publish selection
 ### Offers (services / hb-programs, 90+ publish)
 
 **Статус: AUDITED → SOURCE REPOSITORY READY → NORMALIZER READY → GUARDED
-GOLDEN PROOF PASSED (1 Offer). Batch 1 не запускался.**
+GOLDEN PROOF PASSED → BATCH 1 IDEMPOTENCY PROOF PASSED (20 Offers).**
 
 Read-only source/target аудит завершён 2026-07-14 (см. журнал сессий).
 Source: `hb-programs` publish=90/draft=2, `services` publish=1. Target на
@@ -1339,7 +1339,8 @@ dispatcher-branch, ни CLI-flag).
       `FULL` требует отдельного execution gate.
 - [ ] PR 6 — editorial review workflow (CAMP/PARTY, 27 no-Place записей,
       `org-capacity` кураторская карта).
-- [ ] PR 7 — docs/checklist закрытие после реального импорта.
+- [x] PR 7 — docs/checklist закрытие после реального Batch 1 импорта и
+      idempotency proof (2026-07-22).
 
 **Golden proof, LOCAL, 2026-07-22.** Source
 `wordpress-db:hb-programs:18932` связан с Offer
@@ -1356,6 +1357,47 @@ Business, User, City и category tables — delta 0. Ownership проверяе�
 требуется. Execution manifest SHA-256:
 `74983cbea14fd78885a351e0160811773c71a6a79b47183c1c8a7901d72859e0`.
 Audit artifacts находятся вне Git в `/tmp/scratchpad/offers/execution/`.
+
+**Batch 1 proof, LOCAL, 2026-07-22.** Immutable execution manifest
+SHA-256 `ca2a7347d860ff57c7003abb119912fb65d67a3d4c9ab9ce4e268f76d88edba1`
+выполнен строго последовательно с media policy `NONE`. Первый run:
+`19 CREATE`, golden control `18932` — `1 SKIP_UNCHANGED`, ошибок нет;
+итог `Offer=20`, batch lineage `=20`, batch MigrationRecord `=24`.
+Единственный разрешённый общий rerun: `20 SKIP_UNCHANGED`, `0 CREATE`,
+`0 UPDATE`, `0 BLOCKED`, `0 ERROR`; добавлено 20 штатных audit records,
+итог batch MigrationRecord `=44`. Все Offer ID, `Offer.updatedAt`, поля,
+Place mappings, canonical hashes, lineage ID/hash неизменны; duplicates,
+media importer calls, storage writes и forbidden-table deltas отсутствуют.
+Rerun manifest SHA-256:
+`bf35ecb2a6a3630e6eda7f97e1ed6e2610417512a89055eff4463bc4873cf779`.
+Evidence находится вне Git в `/tmp/scratchpad/offers/batch-1-execution/`
+и `/tmp/scratchpad/offers/batch-1-rerun/`. Batch 1 больше не запускать.
+Следующая фаза: planning оставшихся 43 safe canonical Offer records;
+их execution не разрешён.
+
+**Remaining safe progress, LOCAL, 2026-07-22.** Batch 2 и Batch 3
+выполнены по immutable manifests: каждый дал `20 CREATE`, без ошибок,
+media/storage/forbidden-table deltas равны нулю. Текущее состояние:
+`Offer=60`, safe canonical lineage `=60`. Для трёх class D records
+(`15941`, `16403`, `16458`) добавлен общий guarded relation-collapse
+helper: несколько rows/keys допустимы только при exact collapse к одному
+legacy Place; missing/invalid/multiple Places блокируются. Single-row A/C
+hashes сохранены byte-for-byte. Двойные read-only previews всех трёх D
+дают `CREATE`, stable permutation/duplicate hashes и один exact local
+Place. Isolated Batch 4 выполнен: `3 CREATE`, после чего состояние достигло
+`Offer=63`, safe canonical lineage `=63`. Единственный общий rerun всех
+63 записей дал `63 SKIP_UNCHANGED`, `0 CREATE`, `0 UPDATE`, `0 BLOCKED`,
+`0 ERROR`; добавлено 63 штатных audit records. Все Offer IDs/fields/
+`updatedAt`, Place и ownership mappings, canonical hashes и lineage
+остались неизменны; дубликаты, media/storage и forbidden-table deltas
+отсутствуют. All-63 plan v2 SHA-256:
+`1e43ef43c2012328fa587249380b7bb0f7805c508d6e8ed05e5b0293a46454fa`;
+run manifest SHA-256:
+`d1718d6f62cfa0586641388ac42479630f0cd2b82d606fda32b54f1867a3c137`.
+Safe canonical OFFERS scope завершён и больше не должен запускаться.
+Вне clean scope остаются class H `28` (нет обязательной Place relation)
+и noncanonical class I `8` (`offers` alias). Media не импортировались;
+для них требуется отдельный будущий gate.
 
 ### Users (579) — P0 (§0.6)
 
@@ -2365,6 +2407,12 @@ Audit artifacts находятся вне Git в `/tmp/scratchpad/offers/executi
   `offer-commit-v1:27ce48338902ba9a7c15cd17c2df4b6dfa0395d1c82652196a5692bd2b2b246c`;
   оба rerun дали `SKIP_UNCHANGED`, дубликатов Offer/lineage нет, media и
   запрещённые таблицы не менялись. SSH/WordPress/storage не использовались,
-  VPN/network не менялись. Следующий шаг после review/merge текущей
-  реализации — отдельная подготовка Batch 1 из 20 записей; Batch 1 в этой
-  сессии не запускался.
+  VPN/network не менялись.
+- **2026-07-22 — Codex** — OFFERS guarded Batch 1 и общий idempotency
+  rerun закрыты на LOCAL DB. Первый run дал `19 CREATE + 1
+  SKIP_UNCHANGED`; единственный общий rerun дал `20 SKIP_UNCHANGED`.
+  Итог: `Offer=20`, batch lineage `=20`, batch MigrationRecord `=44`;
+  Offer/lineage и все запрещённые доменные таблицы при rerun неизменны,
+  media/storage/SSH/WordPress не использовались, VPN/network не менялись.
+  Batch 1 больше не запускать. Следующая фаза — read-only planning
+  оставшихся 43 safe canonical Offer records; execution не разрешён.
