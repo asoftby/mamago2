@@ -65,6 +65,7 @@
     "migration:users:business-ownership-batch": "tsx scripts/migration-business-ownership-batch.ts",
     "migration:users:role-elevation-golden": "tsx scripts/migration-role-elevation-golden.ts",
     "migration:users:role-elevation-batch": "tsx scripts/migration-role-elevation-batch.ts",
+    "migration:users:business-linked-tail-reconciliation": "tsx scripts/migration-business-linked-tail-reconciliation.ts",
     "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",
