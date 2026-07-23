@@ -45,6 +45,7 @@
 | Users activation architecture | COMPLETE | Slices 1–3 merged via PR #70–#72 |
 | Users migration | CLEAN LOCAL SCOPE COMPLETE | Slice 5: 564/564 local, production import not started |
 | Users manual/ownership planning | READ-ONLY PLANNING COMPLETE | Slice 6: manual backlog + ownership/authorship plans; no writes yet |
+| Users ownership golden proof | GOLDEN PROOF COMPLETE | Slice 7: 1/38 Business+Place link written; remaining 35, role elevation, media NOT STARTED |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -479,25 +480,29 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 6 manual/privileged backlog and ownership planning
-Branch: codex/users-manual-ownership-planning
-Base SHA: 2e67adc7bfabbd1054f7fe1e125ea6c8bc3934e6
+Phase: USERS — Slice 7 ownership vertical slice golden proof
+Branch: codex/users-business-ownership-golden
+Base SHA: 2756dab0f049362b98b80e3c83f0c22fb9a2542e (dev, PR #75 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
 Slice 3: COMPLETE — PR #72 merged
 Slice 4: COMPLETE — local golden proof
 Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
-Slice 6: COMPLETE — read-only planning (this Draft PR)
+Slice 6: COMPLETE — read-only planning, merged via PR #75
+Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof
 Mass/production User writes: NOT STARTED
+Role elevation (USER -> BUSINESS_OWNER): NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 6 начать отдельный Slice 7 ownership vertical
-> slice golden proof (первый реальный ownership/authorship write для одного
-> golden-примера). Не начинать production writes, email delivery, bulk
-> ownership transfer или media import.
+> После review и merge Slice 7 решить отдельно: (a) role elevation slice
+> (USER → BUSINESS_OWNER) с собственным authorization/rollback/idempotency
+> proof, или (b) расширение ownership write на оставшиеся 35
+> EXACT_LINK_CANDIDATE. Не начинать production writes, email delivery, bulk
+> ownership transfer, content authorship writes или media import без
+> отдельного явного разрешения.
 
 ---
 
@@ -613,3 +618,58 @@ production User migration: NOT STARTED
   не потребовалось.
 - Email delivery, provider calls, profile media import, production User
   migration: NOT STARTED.
+
+## 9. Краткий handoff — 2026-07-23 (Slice 7)
+
+```text
+USERS Slice 7: COMPLETE — ownership vertical slice golden proof
+
+golden candidate: wordpress-db:user:38 (1 of 38 business-linked users)
+selection: single exact Place, no conflict, no partial lineage
+first run: CREATE — Business +1, Place ownership linked, BUSINESS lineage +1
+rerun: SKIP_UNCHANGED — zero further mutation
+role changes: 0 (target User stays role=USER, status=PENDING_ACTIVATION)
+
+deferred:
+  remaining exact candidates: 35
+  partial-lineage candidates: wordpress-db:user:89, wordpress-db:user:130
+  manual/privileged users: 15
+  content authorship: 12
+  role elevation USER -> BUSINESS_OWNER: NOT STARTED
+  profile media, activation/email delivery: NOT STARTED
+```
+
+- USERS Slice 7 ownership vertical slice golden proof: COMPLETE — first
+  DB-write slice of the ownership workstream, scoped to exactly one of the
+  36 `EXACT_LINK_CANDIDATE` entries from Slice 6's plan
+  (`docs/migration/business-ownership-plan.json`), chosen by explicit
+  criteria: single unambiguous owned Place, full lineage coverage, no
+  existing Business conflict.
+- New module `src/lib/migration/commit/business-ownership/
+  BusinessOwnershipGoldenRunner.ts`: atomic (Serializable) transaction —
+  create `Business` for the migrated User, link `Place.ownerBusinessId`,
+  write `MigrationLineage` (targetType `BUSINESS`) and `MigrationRecord`
+  bookkeeping. Every precondition (User/Place lineage active, Place
+  currently unowned, User has no existing Business, User role still
+  `USER`) is re-verified from a fresh read inside the transaction, not
+  trusted from the outer plan.
+- The golden candidate (`wordpress-db:user:38`) is hardcoded in
+  `scripts/migration-business-ownership-golden.ts` rather than accepted as
+  a CLI argument, so the script cannot be pointed at any other candidate,
+  the manual/privileged backlog, content authorship, or role elevation —
+  all of those remain out of scope for this slice.
+- First run: `CREATE` — deltas: Business +1, MigrationLineage +1,
+  MigrationRecord +1; User/Session/UserActionToken/Place/Offer/Article/
+  Route/Activity/MediaAsset counts and the User role/status distribution
+  hash unchanged; target User role/status/passwordHash/emailVerifiedAt
+  unchanged.
+- Rerun: `SKIP_UNCHANGED` — identical Business id returned, zero further
+  writes.
+- Role is intentionally left at `USER` — Slice 6 already separated the
+  ownership action from the role recommendation
+  (`ELIGIBLE_FOR_BUSINESS_OWNER_AFTER_OWNERSHIP_WRITE`); the actual
+  `USER → BUSINESS_OWNER` elevation is deferred to its own future slice
+  with independent authorization, rollback, and idempotency proof.
+- Remaining 35 exact candidates, the 2 partial-lineage cases (users 89,
+  130), all 15 manual/privileged users, all 12 content-author users,
+  profile media, and activation/email delivery: NOT STARTED.
