@@ -49,6 +49,7 @@
 | Users ownership batch write | 36/38 EXACT CANDIDATES WRITTEN | Slice 8: 35 more written; 2 partial-lineage (89, 130) + role elevation NOT STARTED |
 | Users role elevation golden proof | GOLDEN PROOF COMPLETE | Slice 9: 1/36 USER->BUSINESS_OWNER written; remaining 35 role elevations NOT STARTED |
 | Users role elevation batch | 36/36 ELIGIBLE OWNERS ELEVATED | Slice 10: all remaining 35 elevated; users 89/130 + authorship/media/email NOT STARTED |
+| Users business-linked tail reconciliation | READ-ONLY FINDINGS COMPLETE | Slice 11: both 89/130 = TARGET_PLACE_NOT_MIGRATED (draft/unpublished scope), no writes |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -483,9 +484,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 10 BUSINESS_OWNER batch role elevation
-Branch: codex/users-business-owner-role-elevation-batch
-Base SHA: d9dffe438fb6cab80aeeefc7f552cbb75b432d35 (dev, PR #78 merged)
+Phase: USERS — Slice 11 targeted read-only reconciliation (users 89/130)
+Branch: codex/users-business-linked-tail-reconciliation
+Base SHA: f2004de9b669c33c4b59981660dd62d42b61d626 (dev, PR #79 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -496,18 +497,20 @@ Slice 6: COMPLETE — read-only planning, merged via PR #75
 Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof, merged via PR #76
 Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof, merged via PR #77
 Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof, merged via PR #78
-Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof
+Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof, merged via PR #79
+Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes
 Mass/production User writes: NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 10 решить отдельно: (a) manual review двух
-> partial-lineage случаев (wordpress-db:user:89, wordpress-db:user:130),
-> или (b) content authorship planning->write vertical slice (12 users). Не
-> начинать production writes, email delivery, bulk ownership transfer для
-> оставшихся случаев, content authorship writes или media import без
-> отдельного явного разрешения.
+> После review и merge Slice 11 решить отдельно: (a) расширить Place
+> migration scope на draft/unpublished content для users 89/130 (отдельное
+> product-решение, ранее уже помечено вне текущего scope), или (b) начать
+> content authorship planning->write vertical slice (12 users). Не
+> начинать production writes, email delivery, Place migration scope
+> expansion, content authorship writes или media import без отдельного
+> явного разрешения.
 
 ---
 
@@ -836,4 +839,58 @@ combined role elevation progress: 36/36 eligible Business owners elevated
   never got a Business in the first place, so they are not part of this
   count and remain deferred pending manual review.
 - Manual/privileged users (15), content authorship (12), profile media,
+  and activation/email delivery: NOT STARTED.
+
+## 13. Краткий handoff — 2026-07-24 (Slice 11)
+
+```text
+USERS Slice 11: COMPLETE — read-only reconciliation for users 89/130
+
+wordpress-db:user:89:  214 owned Places, 19 migrated, 195 missing
+                        missing breakdown: unpublished 187, draft 8
+                        migrated subset: 0 conflicts
+                        verdict: TARGET_PLACE_NOT_MIGRATED
+
+wordpress-db:user:130: 2 owned Places, 1 migrated, 1 missing (draft)
+                        migrated subset: 0 conflicts
+                        verdict: TARGET_PLACE_NOT_MIGRATED
+
+root cause (both): Place migration to date has only imported publish-status
+  Places (82/83 migrated Places = exactly the 82 publish-status Places in
+  the source snapshot). Draft/unpublished content is an already-documented
+  scope exclusion (checklist section 6), not a migration bug. No missing
+  Place was ever attempted (0 MigrationRecord history) — never
+  attempted-and-failed.
+
+database writes: 0
+```
+
+- USERS Slice 11 targeted read-only reconciliation: COMPLETE — new
+  read-only module `src/lib/migration/planning/business-linked-tail/`
+  investigates exactly the 2 business-linked users excluded from Slice
+  7/8's exact-candidate batch, reusing the Slice 6 read-only Prisma
+  extension guard (no write method reachable, enforced before any DB
+  call).
+- Every owned Place is resolved through its exact
+  `MigrationLineage.sourceRecordKey` — no title/slug/name/email
+  similarity used anywhere. "Already attempted" is read from real
+  `MigrationRecord` history, not inferred.
+- Root cause for both users: 100% of missing Place coverage is
+  attributable to WordPress `post_status` (`unpublished`/`draft`) —
+  confirmed against the immutable snapshot's own `content_authorship`
+  section, cross-checked against the live DB (82/83 migrated Places
+  match exactly the 82 `publish`-status Places in the source). This is
+  the same draft/unpublished exclusion already documented as out of
+  scope elsewhere in this checklist, not a new problem.
+- Both users classified `TARGET_PLACE_NOT_MIGRATED`: no ambiguity, no
+  conflict — the already-migrated subset (19 Places for user 89, 1 for
+  user 130) has zero existing ownership conflicts.
+- No action taken on either user — this slice is read-only investigation
+  only. Two options remain for a future, separately-authorized slice:
+  extend Place migration scope to draft/unpublished content, or write
+  partial ownership using only the already-migrated subset. Both are
+  product decisions, not made by this analyzer.
+- Database writes: 0 (verified before/after counts and role/status
+  distribution hash identical).
+- Content authorship (12), manual/privileged users (15), profile media,
   and activation/email delivery: NOT STARTED.

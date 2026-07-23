@@ -1,0 +1,48 @@
+{
+  "phase": "USERS Slice 11 targeted read-only reconciliation for the business-linked tail",
+  "scope": "exactly wordpress-db:user:89 and wordpress-db:user:130 — no other candidate, no writes",
+  "readOnly": true,
+  "reconciliationManifestFile": "users-slice11-business-linked-tail-reconciliation.json",
+  "findings": {
+    "wordpress-db:user:89": {
+      "userLineagePresent": true,
+      "totalOwnedPlaces": 214,
+      "migratedPlaces": 19,
+      "missingPlaces": 195,
+      "missingPlacesBySourceStatus": { "unpublished": 187, "draft": 8 },
+      "migratedPlacesConflictFree": true,
+      "anyMissingPlaceEverAttempted": false,
+      "verdict": "TARGET_PLACE_NOT_MIGRATED",
+      "evidenceHash": "8bb2dd95c25a1d63041d3c811edf491474ebd46e8e2f19812c68ac3415417684"
+    },
+    "wordpress-db:user:130": {
+      "userLineagePresent": true,
+      "totalOwnedPlaces": 2,
+      "migratedPlaces": 1,
+      "missingPlaces": 1,
+      "missingPlacesBySourceStatus": { "draft": 1 },
+      "migratedPlacesConflictFree": true,
+      "anyMissingPlaceEverAttempted": false,
+      "verdict": "TARGET_PLACE_NOT_MIGRATED",
+      "evidenceHash": "054333f6d5703b8be4ecd5bb767f3b7cfcb13391e95361e6d97683efd7e40f34"
+    }
+  },
+  "rootCauseSummary": "For both users, every missing owned Place is fully attributable to WordPress post_status (unpublished/draft) — Place migration to date has only imported publish-status Places (82/83 migrated Places in the DB are exactly the 82 publish-status Places in the source snapshot; this matches the project's already-documented scope exclusion of draft/unpublished long-tail content, not a migration bug or oversight). No missing Place has any prior MigrationRecord history (never attempted, not attempted-and-failed). The already-migrated subset for both users has zero ownership conflicts — no Place is currently owned by any other Business.",
+  "evidenceMethod": "exact MigrationLineage.sourceRecordKey matching only — no title/slug/name/email similarity used anywhere",
+  "readOnlyProof": {
+    "databaseWrites": 0,
+    "beforeAfterCountsIdentical": true,
+    "roleStatusDistributionUnchanged": true
+  },
+  "deferredScope": {
+    "actionOnTheseTwoUsers": "none taken — this slice is read-only investigation only",
+    "possibleFutureOptions": [
+      "extend Place migration scope to include draft/unpublished content (a separate, already-flagged product decision), then re-run the proven Slice 7/8/9/10 ownership+role-elevation write path for these 2 users",
+      "write partial ownership now using only the already-migrated (published) Place subset, deferring the rest — a product decision, not made by this analyzer"
+    ],
+    "contentAuthorship": 12,
+    "manualPrivilegedUsers": 15,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED"
+  }
+}
