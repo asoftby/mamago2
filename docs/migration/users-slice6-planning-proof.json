@@ -1,0 +1,84 @@
+{
+  "phase": "USERS Slice 6 manual/privileged backlog and ownership planning",
+  "sourceSnapshotSha256": "569c59f2e0d0a277a98ff5f7fe418170b123c77901c5c42064cecbaa2338f5a4",
+  "readOnly": true,
+  "sourceUsers": 579,
+  "cleanUsers": 564,
+  "manualPrivilegedUsers": 15,
+  "businessLinkedUsers": 38,
+  "contentAuthorUsers": 12,
+  "manualBacklog": {
+    "manifestFile": "manual-user-backlog.json",
+    "canonicalSha256": "5f4d3bf4dd37710ef8dd09319248445c9e0c000b0910656163f475598bc56c1d",
+    "entries": 15,
+    "automaticActions": 0,
+    "dispositionCounts": {
+      "KEEP_EXISTING_TARGET_UNCHANGED": 1,
+      "MANUAL_LINK_AFTER_IDENTITY_VERIFICATION": 0,
+      "MANUAL_CREATE_PENDING_ACCOUNT": 0,
+      "EXCLUDE_FROM_MIGRATION": 9,
+      "REQUIRES_FOUNDER_DECISION": 5
+    },
+    "wordpressDbUser1": {
+      "present": true,
+      "imported": false,
+      "lineage": false,
+      "recommendedDisposition": "KEEP_EXISTING_TARGET_UNCHANGED",
+      "automaticRoleChange": "FORBIDDEN"
+    }
+  },
+  "businessOwnershipPlan": {
+    "manifestFile": "business-ownership-plan.json",
+    "canonicalSha256": "3f370e39dd489cc4125bdfdd5a08ace8120a441760b367caf82fb17e8e2822e6",
+    "users": 38,
+    "reconciledUserLineages": 38,
+    "exactCandidates": 36,
+    "alreadySatisfied": 0,
+    "missingTarget": 0,
+    "conflicts": 0,
+    "ambiguousOrManual": 2,
+    "unsupported": 0,
+    "ownershipWrites": 0,
+    "roleChanges": 0
+  },
+  "contentAuthorshipPlan": {
+    "manifestFile": "content-authorship-plan.json",
+    "canonicalSha256": "9f8d61d1b72211c670b3efb0fa6dbb8bf5bff49fc0851ea01845c8fddf2cbea3",
+    "users": 12,
+    "reconciledUserLineages": 12,
+    "exactCandidates": 0,
+    "alreadySatisfied": 0,
+    "missingTarget": 10,
+    "conflicts": 1,
+    "ambiguousOrManual": 1,
+    "unsupported": 0,
+    "authorshipWrites": 0
+  },
+  "readOnlyProof": {
+    "userDelta": 0,
+    "sessionDelta": 0,
+    "userActionTokenDelta": 0,
+    "businessDelta": 0,
+    "placeDelta": 0,
+    "offerDelta": 0,
+    "articleDelta": 0,
+    "routeDelta": 0,
+    "activityDelta": 0,
+    "mediaAssetDelta": 0,
+    "migrationLineageDelta": 0,
+    "migrationRecordDelta": 0,
+    "roleStatusDistributionUnchanged": true
+  },
+  "security": {
+    "manualPrivilegedImported": 0,
+    "automaticRoleChanges": 0,
+    "ownershipWrites": 0,
+    "authorshipWrites": 0,
+    "emailsSent": 0,
+    "providerCalls": 0,
+    "mediaChanges": 0,
+    "prismaMigrations": 0
+  },
+  "canonicalHashNote": "canonicalSha256 values are the SHA-256 of the compact, key-sorted JSON serialisation of each manifest array (see canonicalJson.ts) — independent of file pretty-printing, generation timestamp, absolute paths, or input row order.",
+  "note": "manifest files may contain a trailing newline / 2-space indentation for readability; that formatting is not part of the canonical hash above."
+}

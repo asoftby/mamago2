@@ -44,6 +44,7 @@
 | Users source planning | COMPLETE | Ничего повторно не исследовать |
 | Users activation architecture | COMPLETE | Slices 1–3 merged via PR #70–#72 |
 | Users migration | CLEAN LOCAL SCOPE COMPLETE | Slice 5: 564/564 local, production import not started |
+| Users manual/ownership planning | READ-ONLY PLANNING COMPLETE | Slice 6: manual backlog + ownership/authorship plans; no writes yet |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -478,22 +479,24 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 5 clean local User batch import
-Branch: codex/users-clean-local-batch
-Base SHA: 4cd165e74fe249ae228a541066f3296f4c6d6ecb
+Phase: USERS — Slice 6 manual/privileged backlog and ownership planning
+Branch: codex/users-manual-ownership-planning
+Base SHA: 2e67adc7bfabbd1054f7fe1e125ea6c8bc3934e6
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
 Slice 3: COMPLETE — PR #72 merged
 Slice 4: COMPLETE — local golden proof
 Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
+Slice 6: COMPLETE — read-only planning (this Draft PR)
 Mass/production User writes: NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 5 начать отдельный Slice 6 manual/privileged
-> backlog and ownership planning. Не начинать production writes, email delivery,
+> После review и merge Slice 6 начать отдельный Slice 7 ownership vertical
+> slice golden proof (первый реальный ownership/authorship write для одного
+> golden-примера). Не начинать production writes, email delivery, bulk
 > ownership transfer или media import.
 
 ---
@@ -548,3 +551,65 @@ Mass/production User writes: NOT STARTED
   profile media: NOT STARTED.
 - В этой docs-операции DB, WordPress, storage, media и network writes не
   выполнялись.
+
+```text
+USERS Slice 6: COMPLETE — read-only planning
+
+manual/privileged:
+  source users: 15
+  imported: 0
+  automatic mutations: 0
+  backlog manifest: created
+  manual decisions: required
+
+business ownership:
+  business-linked users: 38
+  ownership writes: 0
+  role changes: 0
+  planning manifest: created
+
+content authorship:
+  content-author users: 12
+  authorship writes: 0
+  planning manifest: created
+
+email delivery: 0
+provider calls: 0
+profile media: NOT STARTED
+production User migration: NOT STARTED
+```
+
+- USERS Slice 6 manual/privileged backlog and ownership planning: COMPLETE —
+  полностью read-only; analyzer использует read-only Prisma-расширение,
+  блокирующее любые write-операции и `$executeRaw*` до обращения к БД, плюс
+  узкий read-only repository interface без write-методов.
+- Manual/privileged backlog: 15/15 sourceRecordKey, дубликаты и пропуски
+  запрещены типами; `wordpress-db:user:1` присутствует,
+  imported/lineage: NO, recommendedDisposition `KEEP_EXISTING_TARGET_UNCHANGED`
+  (existing ADMIN target), automaticRoleChange `FORBIDDEN`.
+- Manual dispositions: KEEP_EXISTING_TARGET_UNCHANGED 1,
+  MANUAL_LINK_AFTER_IDENTITY_VERIFICATION 0, MANUAL_CREATE_PENDING_ACCOUNT 0,
+  EXCLUDE_FROM_MIGRATION 9, REQUIRES_FOUNDER_DECISION 5 (сумма 15).
+- Business ownership plan (38 users, сопоставление только через точную
+  `MigrationLineage`): reconciled User lineages 38/38; exact candidates 36;
+  already satisfied 0; missing target 0; conflicts 0; ambiguous/manual 2
+  (partial Place-lineage coverage); unsupported 0. Ownership writes 0,
+  role changes 0.
+- Content authorship plan (12 users): reconciled User lineages 12/12; exact
+  candidates 0; already satisfied 0; missing target 10; conflicts 1
+  (Activity.ownerUserId уже указывает на другого пользователя — required,
+  non-null поле); ambiguous/manual 1 (partial Article/Route coverage);
+  unsupported 0. Authorship writes 0.
+- Sanitised manifests: `docs/migration/manual-user-backlog.json`,
+  `docs/migration/business-ownership-plan.json`,
+  `docs/migration/content-authorship-plan.json`; canonical (order/timestamp/
+  path-independent) SHA-256 hashes recorded in
+  `docs/migration/users-slice6-planning-proof.json`.
+- No-write proof: User/Session/UserActionToken/Business/Place/Offer/Article/
+  Route/Activity/MediaAsset/MigrationLineage/MigrationRecord delta 0;
+  ownership/authorship relation hash unchanged; role/status distribution hash
+  unchanged; passwordHash/emailVerifiedAt non-null counts delta 0.
+- Adversarial review (17 сценариев): дефектов не найдено, batch-исправлений
+  не потребовалось.
+- Email delivery, provider calls, profile media import, production User
+  migration: NOT STARTED.
