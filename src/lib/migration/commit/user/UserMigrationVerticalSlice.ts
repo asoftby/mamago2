@@ -10,8 +10,9 @@ export const USER_SOURCE_ENTITY_TYPE = "wordpress-db:user";
 export const USER_SNAPSHOT_SHA256 = "569c59f2e0d0a277a98ff5f7fe418170b123c77901c5c42064cecbaa2338f5a4";
 export const USER_GOLDEN_KEYS = ["wordpress-db:user:7", "wordpress-db:user:38", "wordpress-db:user:1"] as const;
 
+export type UserSourceRecordKey = `wordpress-db:user:${number}`;
 export type UserGoldenSourceRecordKey = (typeof USER_GOLDEN_KEYS)[number];
-export type UserClassification = "ORDINARY" | "BUSINESS_LINKED" | "PRIVILEGED_COLLISION";
+export type UserClassification = "ORDINARY" | "BUSINESS_LINKED" | "CONTENT_AUTHOR" | "PRIVILEGED_COLLISION";
 export type UserMigrationAction = "CREATE" | "SKIP_UNCHANGED" | "BLOCKED";
 export type UserMigrationReason =
   | "PRIVILEGED_ACCOUNT_COLLISION"
@@ -21,7 +22,7 @@ export type UserMigrationReason =
   | "UNSUPPORTED_ROLE_ELEVATION";
 
 export interface UserSourceCandidate {
-  sourceRecordKey: UserGoldenSourceRecordKey;
+  sourceRecordKey: UserSourceRecordKey;
   sourceSystem: "wordpress-db";
   legacyUserId: number;
   email: string;
@@ -40,7 +41,7 @@ export interface UserSourceCandidate {
 }
 
 export interface NormalizedUserCandidate {
-  sourceRecordKey: UserGoldenSourceRecordKey;
+  sourceRecordKey: UserSourceRecordKey;
   sourceSystem: "wordpress-db";
   legacyUserId: number;
   normalizedEmail: string | null;
@@ -70,7 +71,7 @@ export interface UserCreateDraft {
 }
 
 export interface UserMigrationPlan {
-  sourceRecordKey: UserGoldenSourceRecordKey;
+  sourceRecordKey: UserSourceRecordKey;
   action: UserMigrationAction;
   reason: UserMigrationReason | null;
   canonicalHash: string;
@@ -90,6 +91,7 @@ type InventoryUser = {
   profileFields?: Record<string, string | null>;
   profileMedia?: unknown[];
   ownership?: { exactBusinessOwnership?: boolean; placePostIds?: string[] };
+  primaryClass?: string;
 };
 
 function sha256(value: string | Buffer): string {
@@ -124,6 +126,8 @@ export function normalizeUserCandidate(source: UserSourceCandidate): NormalizedU
     ? "PRIVILEGED_COLLISION"
     : source.businessLinked
       ? "BUSINESS_LINKED"
+      : source.legacyRoles.includes("content-author-evidence")
+        ? "CONTENT_AUTHOR"
       : "ORDINARY";
   const warnings: string[] = [];
   if (!source.displayName && !source.firstName && !source.lastName) warnings.push("MISSING_DISPLAY_NAME");
@@ -145,6 +149,8 @@ export function normalizeUserCandidate(source: UserSourceCandidate): NormalizedU
       ? ["LEGACY_PRIVILEGED_ROLE", "EXISTING_LOCAL_ACCOUNT"]
       : source.businessLinked
         ? ["EXACT_AUTHORED_PLACE_EVIDENCE"]
+        : classification === "CONTENT_AUTHOR"
+          ? ["CONTENT_AUTHOR_EVIDENCE"]
         : ["VALID_UNIQUE_EMAIL"],
     businessLinked: source.businessLinked,
     businessEvidence: source.businessEvidence,
@@ -270,35 +276,52 @@ export function maskEmail(email: string | null): string | null {
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
-function readSnapshotUserRow(raw: string, legacyUserId: number): Record<string, string> {
+function readAllSnapshotUserRows(raw: string): Map<number, Record<string, string>> {
   const lines = raw.split(/\r?\n/);
   const start = lines.indexOf("SECTION users");
   if (start < 0) throw new Error("Snapshot has no users section.");
   const header = lines[start + 1].split("\t");
+  const rows = new Map<number, Record<string, string>>();
   for (let index = start + 2; index < lines.length && !lines[index].startsWith("SECTION "); index += 1) {
     const parts = lines[index].split("\t", header.length);
-    if (Number(parts[0]) === legacyUserId) return Object.fromEntries(header.map((key, offset) => [key, parts[offset] ?? ""]));
+    const id = Number(parts[0]);
+    if (Number.isInteger(id)) rows.set(id, Object.fromEntries(header.map((key, offset) => [key, parts[offset] ?? ""])));
   }
-  throw new Error(`Source candidate ${legacyUserId} is absent from immutable snapshot.`);
+  return rows;
+}
+
+const snapshotCache = new Map<string, { rowsById: Map<number, Record<string, string>>; inventory: InventoryUser[] }>();
+
+function loadSnapshotArtifacts(snapshotRoot: string): { rowsById: Map<number, Record<string, string>>; inventory: InventoryUser[] } {
+  const cached = snapshotCache.get(snapshotRoot);
+  if (cached) return cached;
+  const rawBuffer = readFileSync(`${snapshotRoot}/raw/users-source-capture.tsv`);
+  if (sha256(rawBuffer) !== USER_SNAPSHOT_SHA256) throw new Error("BLOCKED_SOURCE_SNAPSHOT_UNAVAILABLE: raw snapshot hash mismatch.");
+  const inventory = JSON.parse(readFileSync(`${snapshotRoot}/analysis/users-inventory.json`, "utf8")) as { users: InventoryUser[] };
+  const raw = rawBuffer.toString("utf8");
+  const rowsById = readAllSnapshotUserRows(raw);
+  const artifacts = { rowsById, inventory: inventory.users };
+  snapshotCache.set(snapshotRoot, artifacts);
+  return artifacts;
 }
 
 export function loadUserSourceCandidate(snapshotRoot: string, sourceRecordKey: string): UserSourceCandidate {
-  if (!USER_GOLDEN_KEYS.includes(sourceRecordKey as UserGoldenSourceRecordKey)) throw new Error("Slice 4 accepts only the three approved golden sourceRecordKeys.");
-  const rawPath = `${snapshotRoot}/raw/users-source-capture.tsv`;
-  const raw = readFileSync(rawPath);
-  if (sha256(raw) !== USER_SNAPSHOT_SHA256) throw new Error("BLOCKED_SOURCE_SNAPSHOT_UNAVAILABLE: raw snapshot hash mismatch.");
+  if (!/^wordpress-db:user:\d+$/.test(sourceRecordKey)) throw new Error("Invalid User sourceRecordKey.");
+  const artifacts = loadSnapshotArtifacts(snapshotRoot);
   const legacyUserId = Number(sourceRecordKey.split(":").at(-1));
-  const row = readSnapshotUserRow(raw.toString("utf8"), legacyUserId);
-  const inventory = JSON.parse(readFileSync(`${snapshotRoot}/analysis/users-inventory.json`, "utf8")) as { users: InventoryUser[] };
-  const mapped = inventory.users.find(user => user.sourceRecordKey === sourceRecordKey);
+  const row = artifacts.rowsById.get(legacyUserId);
+  if (!row) throw new Error(`Source candidate ${legacyUserId} is absent from immutable snapshot.`);
+  const mapped = artifacts.inventory.find(user => user.sourceRecordKey === sourceRecordKey);
   if (!mapped) throw new Error(`Planning artifact missing ${sourceRecordKey}.`);
-  const privileged = sourceRecordKey === "wordpress-db:user:1";
-  const businessLinked = sourceRecordKey === "wordpress-db:user:38";
+  if (!mapped.primaryClass || !["A", "C", "D", "H"].includes(mapped.primaryClass)) throw new Error(`Unsupported planning class for ${sourceRecordKey}.`);
+  const privileged = mapped.primaryClass === "H";
+  const businessLinked = mapped.primaryClass === "C";
+  const legacyRoles = mapped.primaryClass === "D" ? ["content-author-evidence"] : mapped.roles ?? [];
   return {
-    sourceRecordKey: sourceRecordKey as UserGoldenSourceRecordKey, sourceSystem: "wordpress-db", legacyUserId,
+    sourceRecordKey: sourceRecordKey as UserSourceRecordKey, sourceSystem: "wordpress-db", legacyUserId,
     email: row.user_email ?? mapped.normalizedEmail ?? "", displayName: mapped.displayName ?? null,
     firstName: mapped.profileFields?.first_name ?? null, lastName: mapped.profileFields?.last_name ?? null, phone: null,
-    sourceCreatedAt: mapped.registrationDate ?? row.user_registered ?? null, legacyRoles: mapped.roles ?? [], legacyPasswordPresent: false,
+    sourceCreatedAt: mapped.registrationDate ?? row.user_registered ?? null, legacyRoles, legacyPasswordPresent: false,
     businessLinked, businessEvidence: { exactOwnership: Boolean(mapped.ownership?.exactBusinessOwnership), placeCount: mapped.ownership?.placePostIds?.length ?? 0 },
     privilegedCollision: privileged, profileMediaReferencePresent: Boolean(mapped.profileMedia?.length), sourceHash: USER_SNAPSHOT_SHA256,
   };
