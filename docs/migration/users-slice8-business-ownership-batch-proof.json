@@ -1,0 +1,69 @@
+{
+  "phase": "USERS Slice 8 business ownership batch write",
+  "scope": "remaining 35 EXACT_LINK_CANDIDATE entries from docs/migration/business-ownership-plan.json (36 total minus wordpress-db:user:38, already written in Slice 7)",
+  "excludedFromScope": {
+    "alreadyDoneInSlice7": ["wordpress-db:user:38"],
+    "partialLineageDeferred": ["wordpress-db:user:89", "wordpress-db:user:130"],
+    "manualPrivilegedUsers": 15,
+    "contentAuthorUsers": 12
+  },
+  "batchMode": "sequential, stop-on-first-error — no batching into chunks, no automatic retry or rollback",
+  "firstRun": {
+    "total": 35,
+    "processed": 35,
+    "create": 35,
+    "skipUnchanged": 0,
+    "blocked": 0,
+    "stoppedEarly": false,
+    "perStepAuditFailures": 0
+  },
+  "rerun": {
+    "total": 35,
+    "processed": 35,
+    "create": 0,
+    "skipUnchanged": 35,
+    "blocked": 0,
+    "stoppedEarly": false
+  },
+  "deltas": {
+    "userDelta": 0,
+    "sessionDelta": 0,
+    "userActionTokenDelta": 0,
+    "businessDelta": 35,
+    "placeDelta": 0,
+    "offerDelta": 0,
+    "articleDelta": 0,
+    "routeDelta": 0,
+    "activityDelta": 0,
+    "mediaAssetDelta": 0,
+    "migrationLineageDelta": 35,
+    "migrationRecordDelta": 35,
+    "roleStatusDistributionChanged": false
+  },
+  "security": {
+    "roleChanges": 0,
+    "allThirtyFiveOwnersStillRoleUser": true,
+    "businessNameSource": "each owning User's existing displayName field (no new PII introduced)",
+    "emailsSent": 0,
+    "providerCalls": 0,
+    "activationTokensCreated": 0,
+    "sessionsCreated": 0
+  },
+  "combinedOwnershipProgress": {
+    "businessLinkedUsers": 38,
+    "exactCandidatesWritten": 36,
+    "writtenInSlice7": 1,
+    "writtenInSlice8": 35,
+    "remainingUnwritten": 2,
+    "remainingSourceRecordKeys": ["wordpress-db:user:89", "wordpress-db:user:130"],
+    "remainingReason": "partial Place-lineage coverage (not all owned Places migrated yet) — requires manual review, not a batch write"
+  },
+  "deferredScope": {
+    "roleElevationUserToBusinessOwner": "NOT_STARTED — separate future slice with its own authorization/rollback/idempotency proof",
+    "partialLineageCandidates": ["wordpress-db:user:89", "wordpress-db:user:130"],
+    "manualPrivilegedUsers": 15,
+    "contentAuthorship": 12,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED"
+  }
+}

@@ -46,6 +46,7 @@
 | Users migration | CLEAN LOCAL SCOPE COMPLETE | Slice 5: 564/564 local, production import not started |
 | Users manual/ownership planning | READ-ONLY PLANNING COMPLETE | Slice 6: manual backlog + ownership/authorship plans; no writes yet |
 | Users ownership golden proof | GOLDEN PROOF COMPLETE | Slice 7: 1/38 Business+Place link written; remaining 35, role elevation, media NOT STARTED |
+| Users ownership batch write | 36/38 EXACT CANDIDATES WRITTEN | Slice 8: 35 more written; 2 partial-lineage (89, 130) + role elevation NOT STARTED |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -480,9 +481,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 7 ownership vertical slice golden proof
-Branch: codex/users-business-ownership-golden
-Base SHA: 2756dab0f049362b98b80e3c83f0c22fb9a2542e (dev, PR #75 merged)
+Phase: USERS — Slice 8 business ownership batch write
+Branch: codex/users-business-ownership-batch
+Base SHA: de258accb944f1e1065939811dc8cf7c0d8b9b3f (dev, PR #76 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -490,19 +491,21 @@ Slice 3: COMPLETE — PR #72 merged
 Slice 4: COMPLETE — local golden proof
 Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
 Slice 6: COMPLETE — read-only planning, merged via PR #75
-Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof
+Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof, merged via PR #76
+Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof
 Mass/production User writes: NOT STARTED
 Role elevation (USER -> BUSINESS_OWNER): NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 7 решить отдельно: (a) role elevation slice
+> После review и merge Slice 8 решить отдельно: (a) role elevation slice
 > (USER → BUSINESS_OWNER) с собственным authorization/rollback/idempotency
-> proof, или (b) расширение ownership write на оставшиеся 35
-> EXACT_LINK_CANDIDATE. Не начинать production writes, email delivery, bulk
-> ownership transfer, content authorship writes или media import без
-> отдельного явного разрешения.
+> proof для уже написанных 36 Business, или (b) manual review двух
+> partial-lineage случаев (wordpress-db:user:89, wordpress-db:user:130). Не
+> начинать production writes, email delivery, bulk ownership transfer,
+> content authorship writes или media import без отдельного явного
+> разрешения.
 
 ---
 
@@ -673,3 +676,58 @@ deferred:
 - Remaining 35 exact candidates, the 2 partial-lineage cases (users 89,
   130), all 15 manual/privileged users, all 12 content-author users,
   profile media, and activation/email delivery: NOT STARTED.
+
+## 10. Краткий handoff — 2026-07-23 (Slice 8)
+
+```text
+USERS Slice 8: COMPLETE — business ownership batch write
+
+scope: remaining 35 EXACT_LINK_CANDIDATE (36 total minus user:38, done in Slice 7)
+excluded: users 89/130 (partial lineage), manual/privileged (15), content authorship (12)
+mode: sequential, stop-on-first-error, no batching/retry/rollback
+
+first run: 35/35 CREATE — Business +35, Place ownership linked x35,
+           BUSINESS lineage +35, MigrationRecord +35, per-step audit clean
+rerun:     35/35 SKIP_UNCHANGED — zero further writes
+role changes: 0 (all 35 owners remain role=USER)
+
+combined ownership progress: 36/38 business-linked users written
+remaining: wordpress-db:user:89, wordpress-db:user:130 (manual review)
+```
+
+- USERS Slice 8 business ownership batch write: COMPLETE — reused the
+  exact Slice 7 write path (`BusinessOwnershipGoldenRunner`) per candidate
+  via a new sequential `BusinessOwnershipBatchRunner`, with no relaxed
+  guards and no new write logic. The batch manifest is rebuilt live from
+  the immutable snapshot + current DB state (reusing the tested Slice 6
+  `planBusinessOwnership` reconciliation) rather than trusted from the
+  static committed plan file, so it naturally excludes anything already
+  written or reclassified since Slice 6.
+- First run: 35/35 `CREATE`, 0 `BLOCKED`, `stoppedEarly: false`. Deltas:
+  Business +35, MigrationLineage +35, MigrationRecord +35;
+  User/Session/UserActionToken/Place/Offer/Article/Route/Activity/
+  MediaAsset counts and the User role/status distribution hash: unchanged.
+  A per-step audit callback re-verified these invariants after every
+  single candidate, not just at the end.
+- Rerun proof: re-processing the same fixed 35-candidate list (bypassing
+  the live "already satisfied" filter, which — correctly — excludes
+  completed work from the production CLI's own manifest) confirms all 35
+  now resolve to `SKIP_UNCHANGED` with zero further writes.
+- Role stays `USER` for all 35 owners — verified individually, not just by
+  an aggregate distribution hash.
+- Combined ownership progress: 36 of the 38 business-linked users now have
+  a real Business + Place link (1 from Slice 7, 35 from Slice 8). The
+  remaining 2 (`wordpress-db:user:89`, `wordpress-db:user:130`) stay
+  deferred — partial Place-lineage coverage, requires manual review, not a
+  batch write.
+- Adversarial note: an earlier draft of the batch integration test wrote
+  its fixtures under the shared production `MigrationSource`
+  (`users-immutable-snapshot`) instead of an isolated per-test namespace,
+  leaking 4 orphaned `MigrationRecord`/`MigrationRun` rows into real
+  migration bookkeeping (caught before this PR, before any push). Fixed by
+  isolating the test under its own namespace (mirroring the Slice 7
+  integration test's convention) and deleting the 4 leaked rows; verified
+  DB state returned to the exact expected baseline before proceeding.
+- Role elevation `USER → BUSINESS_OWNER`, the 2 partial-lineage cases,
+  manual/privileged users (15), content authorship (12), profile media,
+  and activation/email delivery: NOT STARTED.

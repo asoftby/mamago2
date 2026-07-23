@@ -62,6 +62,7 @@
     "migration:user:batch": "tsx scripts/migration-user-clean-batch.ts",
     "migration:users:plan-ownership": "tsx scripts/migration-user-plan-ownership.ts",
     "migration:users:business-ownership-golden": "tsx scripts/migration-business-ownership-golden.ts",
+    "migration:users:business-ownership-batch": "tsx scripts/migration-business-ownership-batch.ts",
     "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",
