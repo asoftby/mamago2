@@ -48,6 +48,7 @@
 | Users ownership golden proof | GOLDEN PROOF COMPLETE | Slice 7: 1/38 Business+Place link written; remaining 35, role elevation, media NOT STARTED |
 | Users ownership batch write | 36/38 EXACT CANDIDATES WRITTEN | Slice 8: 35 more written; 2 partial-lineage (89, 130) + role elevation NOT STARTED |
 | Users role elevation golden proof | GOLDEN PROOF COMPLETE | Slice 9: 1/36 USER->BUSINESS_OWNER written; remaining 35 role elevations NOT STARTED |
+| Users role elevation batch | 36/36 ELIGIBLE OWNERS ELEVATED | Slice 10: all remaining 35 elevated; users 89/130 + authorship/media/email NOT STARTED |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -482,9 +483,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 9 BUSINESS_OWNER role elevation golden proof
-Branch: codex/users-business-owner-role-elevation-golden
-Base SHA: 009ac21b7cfb433d3f48925e5cd8c5d99f55c6dc (dev, PR #77 merged)
+Phase: USERS — Slice 10 BUSINESS_OWNER batch role elevation
+Branch: codex/users-business-owner-role-elevation-batch
+Base SHA: d9dffe438fb6cab80aeeefc7f552cbb75b432d35 (dev, PR #78 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -494,19 +495,19 @@ Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
 Slice 6: COMPLETE — read-only planning, merged via PR #75
 Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof, merged via PR #76
 Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof, merged via PR #77
-Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof
+Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof, merged via PR #78
+Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof
 Mass/production User writes: NOT STARTED
-Remaining role elevations (35): NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 9 решить отдельно: (a) batch role elevation
-> для остальных 35 Business owners (по доказанному в Slice 9 write path),
-> или (b) manual review двух partial-lineage случаев
-> (wordpress-db:user:89, wordpress-db:user:130). Не начинать production
-> writes, email delivery, bulk ownership transfer, content authorship
-> writes или media import без отдельного явного разрешения.
+> После review и merge Slice 10 решить отдельно: (a) manual review двух
+> partial-lineage случаев (wordpress-db:user:89, wordpress-db:user:130),
+> или (b) content authorship planning->write vertical slice (12 users). Не
+> начинать production writes, email delivery, bulk ownership transfer для
+> оставшихся случаев, content authorship writes или media import без
+> отдельного явного разрешения.
 
 ---
 
@@ -787,3 +788,52 @@ deferred: remaining 35 role elevations, users 89/130, manual/privileged (15),
   the 2 partial-lineage cases, manual/privileged users (15), content
   authorship (12), profile media, and activation/email delivery:
   NOT STARTED.
+
+## 12. Краткий handoff — 2026-07-23 (Slice 10)
+
+```text
+USERS Slice 10: COMPLETE — BUSINESS_OWNER batch role elevation
+
+scope: remaining 35 Users with proven Business+Place ownership link
+        (Slices 7/8), excluding wordpress-db:user:38 (Slice 9)
+excluded: users 89/130 (partial lineage), manual/privileged (15), content authorship (12)
+mode: sequential, stop-on-first-error, no batching/retry/rollback
+manifest: live query of active BUSINESS MigrationLineage — no snapshot read needed
+
+first run: 35/35 ELEVATE — role changed USER -> BUSINESS_OWNER, per-step audit clean
+rerun:     35/35 SKIP_UNCHANGED — zero further writes
+
+field-level proof: Business rows and Place ownership byte-for-byte
+  unchanged (content hash match); all 36 business owners (1 Slice 9 + 35
+  Slice 10) verified role=BUSINESS_OWNER, status=PENDING_ACTIVATION,
+  passwordHash null, emailVerifiedAt null, 0 sessions, 0 action tokens
+all 12 tracked table counts: 0 delta
+
+combined role elevation progress: 36/36 eligible Business owners elevated
+```
+
+- USERS Slice 10 BUSINESS_OWNER batch role elevation: COMPLETE — reused
+  the exact Slice 9 write path (`RoleElevationGoldenRunner`) per
+  candidate via a new sequential `RoleElevationBatchRunner`, with no
+  relaxed guards and no new write logic. The batch manifest is built live
+  from active `BUSINESS` `MigrationLineage` rows (no snapshot read
+  needed) — role eligibility is fully determined by lineage + User state
+  already in the DB.
+- First run: 35/35 `ELEVATE`, 0 `BLOCKED`, `stoppedEarly: false`. A
+  per-step audit callback re-verified after every single candidate that
+  every table except `User` stayed exactly flat.
+- Rerun: 35/35 `SKIP_UNCHANGED`, zero further writes.
+- Field-level proof (not just aggregate counts): a content hash of all 39
+  `Business` rows and their linked `Place` rows was taken before and
+  after the batch and found identical; all 36 Users who now own a
+  Business (1 from Slice 9, 35 from Slice 10) were individually verified
+  to have `role=BUSINESS_OWNER`, `status=PENDING_ACTIVATION`,
+  `passwordHash=null`, `emailVerifiedAt=null`, 0 sessions, 0 action
+  tokens.
+- Combined role elevation progress: all 36 Users with a proven
+  Business+Place ownership link now hold `BUSINESS_OWNER`. The 2
+  partial-lineage cases (`wordpress-db:user:89`, `wordpress-db:user:130`)
+  never got a Business in the first place, so they are not part of this
+  count and remain deferred pending manual review.
+- Manual/privileged users (15), content authorship (12), profile media,
+  and activation/email delivery: NOT STARTED.
