@@ -1,0 +1,35 @@
+[
+  {
+    "anyMissingPlaceEverAttempted": false,
+    "evidenceHash": "054333f6d5703b8be4ecd5bb767f3b7cfcb13391e95361e6d97683efd7e40f34",
+    "migratedPlacesConflictFree": true,
+    "placeCoverage": {
+      "migratedPlaces": 1,
+      "missingPlaces": 1,
+      "missingPlacesBySourceStatus": {
+        "draft": 1
+      },
+      "totalOwnedPlaces": 2
+    },
+    "sourceRecordKey": "wordpress-db:user:130",
+    "userLineagePresent": true,
+    "verdict": "TARGET_PLACE_NOT_MIGRATED"
+  },
+  {
+    "anyMissingPlaceEverAttempted": false,
+    "evidenceHash": "8bb2dd95c25a1d63041d3c811edf491474ebd46e8e2f19812c68ac3415417684",
+    "migratedPlacesConflictFree": true,
+    "placeCoverage": {
+      "migratedPlaces": 19,
+      "missingPlaces": 195,
+      "missingPlacesBySourceStatus": {
+        "draft": 8,
+        "unpublished": 187
+      },
+      "totalOwnedPlaces": 214
+    },
+    "sourceRecordKey": "wordpress-db:user:89",
+    "userLineagePresent": true,
+    "verdict": "TARGET_PLACE_NOT_MIGRATED"
+  }
+]
