@@ -50,6 +50,7 @@
 | Users role elevation golden proof | GOLDEN PROOF COMPLETE | Slice 9: 1/36 USER->BUSINESS_OWNER written; remaining 35 role elevations NOT STARTED |
 | Users role elevation batch | 36/36 ELIGIBLE OWNERS ELEVATED | Slice 10: all remaining 35 elevated; users 89/130 + authorship/media/email NOT STARTED |
 | Users business-linked tail reconciliation | READ-ONLY FINDINGS COMPLETE | Slice 11: both 89/130 = TARGET_PLACE_NOT_MIGRATED (draft/unpublished scope), no writes |
+| Users partial-coverage ownership golden | GOLDEN PROOF COMPLETE (1/2) | Slice 12: user:130 published-Place-only ownership written; user:89 + role elevation NOT STARTED |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -484,9 +485,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 11 targeted read-only reconciliation (users 89/130)
-Branch: codex/users-business-linked-tail-reconciliation
-Base SHA: f2004de9b669c33c4b59981660dd62d42b61d626 (dev, PR #79 merged)
+Phase: USERS — Slice 12 partial-coverage ownership golden proof (user:130)
+Branch: codex/users-partial-coverage-ownership-golden
+Base SHA: 1a683ede4946fd73330790881139a5c60497c406 (dev, PR #80 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -498,19 +499,21 @@ Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof, merged
 Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof, merged via PR #77
 Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof, merged via PR #78
 Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof, merged via PR #79
-Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes
+Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes, merged via PR #80
+Slice 12: COMPLETE — user:130 ownership written (published Place only, draft excluded) + rerun proof
 Mass/production User writes: NOT STARTED
+Place migration scope expansion (draft/unpublished): explicitly NOT undertaken
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 11 решить отдельно: (a) расширить Place
-> migration scope на draft/unpublished content для users 89/130 (отдельное
-> product-решение, ранее уже помечено вне текущего scope), или (b) начать
-> content authorship planning->write vertical slice (12 users). Не
-> начинать production writes, email delivery, Place migration scope
-> expansion, content authorship writes или media import без отдельного
-> явного разрешения.
+> После review и merge Slice 12 провести отдельный Slice 13 для
+> `wordpress-db:user:89` тем же доказанным write path (fixed manifest: 19
+> included migrated Places, 195 excluded unpublished/draft Places). После
+> успешной ownership-связи ОБОИХ пользователей (89 и 130) — отдельный
+> slice на повышение их ролей до `BUSINESS_OWNER`. Не начинать production
+> writes, email delivery, Place migration scope expansion, content
+> authorship writes или media import без отдельного явного разрешения.
 
 ---
 
@@ -894,3 +897,55 @@ database writes: 0
   distribution hash identical).
 - Content authorship (12), manual/privileged users (15), profile media,
   and activation/email delivery: NOT STARTED.
+
+## 14. Краткий handoff — 2026-07-24 (Slice 12)
+
+```text
+USERS Slice 12: COMPLETE — partial-coverage ownership golden proof (user:130)
+
+candidate: wordpress-db:user:130
+fixed manifest: included migrated Place wordpress-db:places:18886 (publish),
+                excluded draft Place wordpress-db:places:30605 (never imported)
+write path: BusinessOwnershipGoldenRunner (Slice 7) — completely unchanged
+
+first run: CREATE — Business +1, Place ownership linked, BUSINESS lineage +1,
+           MigrationRecord +1, role changes 0
+rerun:     SKIP_UNCHANGED — zero further mutation
+
+verified: draft Place 30605 has no MigrationLineage or MigrationRecord,
+          before and after this run — never imported, never referenced
+target User role/status: unchanged (USER / PENDING_ACTIVATION)
+
+deferred: wordpress-db:user:89 (separate, larger partial-coverage case),
+          role elevation for both 89 and 130 (only after both ownership
+          links exist), manual/privileged, authorship, media, email
+```
+
+- USERS Slice 12 partial-coverage ownership golden proof: COMPLETE — the
+  first of the 2 partial-coverage business-linked users identified in
+  Slice 11. Reused `BusinessOwnershipGoldenRunner` from Slice 7
+  completely unchanged; the only difference is that the candidate's
+  `placeSourcePostIds` is a deliberately fixed, reduced manifest
+  containing only the one already-migrated (`publish`-status) Place —
+  the still-draft Place is intentionally excluded and never referenced.
+- The golden candidate (with its fixed 1-place manifest) is hardcoded in
+  `scripts/migration-partial-coverage-ownership-golden.ts`, so the
+  script cannot accidentally pull in the excluded draft Place or any
+  other candidate.
+- First run: `CREATE` — deltas: Business +1, MigrationLineage +1,
+  MigrationRecord +1; all other tracked counts unchanged; target User
+  role/status/passwordHash/emailVerifiedAt unchanged (`USER` /
+  `PENDING_ACTIVATION`).
+- Verified explicitly: the excluded draft Place
+  (`wordpress-db:places:30605`) has no `MigrationLineage` and no
+  `MigrationRecord`, both before and after this run — it was never
+  imported and never touched by this write.
+- Rerun: `SKIP_UNCHANGED` — identical Business id, zero further writes.
+- `wordpress-db:user:89` (19 migrated / 195 excluded Places) is a
+  separate, much larger partial-coverage case and stays out of scope for
+  this slice — planned as its own next step, using the same proven write
+  path with its own fixed manifest.
+- Role elevation `USER → BUSINESS_OWNER` for both 89 and 130 is
+  explicitly deferred until both users' ownership links exist; Place
+  migration scope expansion to draft/unpublished content was explicitly
+  not undertaken.
