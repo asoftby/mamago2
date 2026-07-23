@@ -60,7 +60,11 @@ export async function reconcileBusinessLinkedTail(
 
     const migratedTargetIds = placeLineages.filter(row => row.targetId).map(row => row.targetId!);
     const migratedPlaces = migratedTargetIds.length > 0 ? await client.place.findMany({ where: { id: { in: migratedTargetIds } }, select: { ownerBusinessId: true } }) : [];
-    const migratedPlacesConflictFree = migratedPlaces.every(place => place.ownerBusinessId === null);
+    const ownedBusinessIds = migratedPlaces.map(place => place.ownerBusinessId).filter((id): id is string => id !== null);
+    const owningBusinesses = ownedBusinessIds.length > 0 ? await client.business.findMany({ where: { id: { in: ownedBusinessIds } }, select: { id: true, ownerUserId: true } }) : [];
+    const businessOwnerById = new Map(owningBusinesses.map(business => [business.id, business.ownerUserId]));
+    // A Place already linked to a Business owned by this same target User is not a conflict — it's the intended state (e.g. written by an earlier golden-proof slice).
+    const migratedPlacesConflictFree = migratedPlaces.every(place => place.ownerBusinessId === null || businessOwnerById.get(place.ownerBusinessId) === userLineage?.targetId);
 
     const missingSourceRecordKeys = missingPostIds.map(placeSourceRecordKey);
     const missingRecords = missingSourceRecordKeys.length > 0 ? await client.migrationRecord.findMany({ where: { sourceRecordKey: { in: missingSourceRecordKeys } }, select: { id: true } }) : [];
