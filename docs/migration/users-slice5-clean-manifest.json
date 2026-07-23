@@ -1,0 +1,3958 @@
+{
+  "version": 1,
+  "sourceSnapshotSha256": "569c59f2e0d0a277a98ff5f7fe418170b123c77901c5c42064cecbaa2338f5a4",
+  "candidateCount": 564,
+  "excludedCount": 15,
+  "batchSize": 50,
+  "entries": [
+    {
+      "sourceRecordKey": "wordpress-db:user:2",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2245bc25accae63c8c48188ed99aac4eb4c7e9e185f3f981a65b362043dde485",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:7",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a7310b38660de18921d6fc8b12ce4742036cc11381815cedc23ffaff58ba22bf",
+      "expectedFirstAction": "SKIP_UNCHANGED",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:9",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "27eb31859b5bc69a36c045f26e1b9f9569d1646a3ef05b17f1b7317e03ad8f5e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:10",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bfee83a783046de6b531951f6d51e494680deb691265f12bd393d16db1d302de",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:11",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "50d1d709ce5ebfc1f8084df8b031cfbf97112b9c40d7aadf8ca8fc0be95874c1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:12",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0d961dabd0f638af82049cc8cb2f0dc01a6e49e02fdf3d4f526acd832892a5eb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:13",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "12e7fab21e411268d17ddeac626a189b16d812de2ee3fb91ae0cdd153db0672c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:17",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "971ed00ba72078195fc6ed7bbf1e96472f36b8b81191032447544afe0ae29db8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:18",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "23265edcba2fb11618569e1035f8e84e5dc6fa322643f819867298c9e7d8ebee",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:20",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "44784a070acccf8a3560f2fb64ba09c0a76b72c0688cd65006c442336f1fa840",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:22",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bf37fe66bf5a4966feecdabb71fdabd2331190ae950dc5a4d9b473a66caf8892",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:23",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "32215261994c515f35a98cb8f139fdad7f337f6451dc69bdc6056a4a85e412df",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:24",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "63b614fcf8dc6f5d876274dabb491b3b5b2574d81c358f59b8aa61cb020764fe",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:25",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "56f4f561ddaa9554a5479585b6af5f0f4e8b690a0f1e02c84511b502eea7d6e8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:26",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "97fb5d93e91c0f48fd1be0a3142368fac0fcb8304a75fa0886ab6f2d9821565a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:28",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3541107ffcc8dacd1d8f4980362d7e200e671061791d89ab32db5826313760c1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:29",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5851fcfc03e762e2b9952f631cbe1142e2b2102304a250374a763a68038ff326",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:35",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "824d21ffa78a4f4910e86bacd95aac3d65126dc836906b568988f9c1e7dbbfe0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:36",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3d9d8ef2987c29c81f65d544b390d23a720953cdff566a3a534bdd27387e16dd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:37",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "695c1f2bdfcd10b585a2f60a64adbeb9f06a68555fb4eac44054edc1783191d2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:38",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "326f8efcc30b8a68932e5ffca02b0ba16ba7a960dd6a50da0b0615b2d7614792",
+      "expectedFirstAction": "SKIP_UNCHANGED",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:39",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a434177f81bd2e33178054bf7cd976b97b85231b58fcfcdd987c7da7a8781338",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:40",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "52628e5d72038a509bb496cf6f1ee9a019e96cecfc045da381b2b702ec7ae322",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:41",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4ae001c933092b9b73f64c592d8fd95df96cb579e7c8af9e4cf2691deed99d0d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:42",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "8c8b57b94c5dbe0e99034b6bb5a64287c5072b1c9063d41b7ea0cbb54afb0e9a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:43",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "78802418a31b3554d77bca566cede8d64c11ee691385fbfa103141424cdc9919",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:44",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dc21d19774dfbc0866d5734e61e0d8d3b7f37884f4a25ee34dcdbce65491cf67",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:45",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "189e1056eb5541c50ede09bd5cd5467714234a473549923151f27a17665420be",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:46",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "08679a8ee640f416d2c88583573b0e60cc9f5b497ebb71f114881838fe736bb8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:47",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "6f61ad964be50d7ed51bf8593d3c6ba7c54e454244b3d0156e0b8a6a7c8632f1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:48",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1f9f6a42315cea15ab534eed8672110cebc186fa9e1312eb10eaab2a294f3c9c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:49",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fdb7d19a42a0b176311f8fc63ec9ce569ba86078a6af5e826a15f5baa21f8cf2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:50",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ceec3df6b5286ef9367b50b1bac54d7cc5b43ba778672481f74ec6bf36037f72",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:53",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "1cf6c7d90039d0652fd46673d1b56d70c23b1affd32af2bc84d7f64333859da4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:54",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6c5011936ea6f195e6c978744b4e2e802a490d3d13d1325b3808dd9d82ab6ab0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:55",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "29a2cf4cf39e2059889e31f7d47660ce41a4bbace0dd499db93931230043637c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:56",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "908146dafbcb2dee6e73d40a9d4b1681e6dfb668aa565bb82d4d87d19c0ffc12",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:57",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc60d3e41816d6d5c7f4307881914b8567063ac409464e0430b668117a80013e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:58",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c0f4367daa03e82fb110440bf6ecaf5dc03cd83f73bfe2ef822012c25c482846",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:59",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "15ad8866dc62c329b48e136852176a26144fc139b1d73772c530e181f830d3aa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:60",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "be5eea9674dbddcddd0011528ea5697f7c411896eaee7a8b504d44f96294c318",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:61",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aeb46e78eda124455c06b2a12ace1531e2a8dc351309fe5214146b32a3353776",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:62",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b0218a9d97fa5b173ba66b5d10a33acdb7246441b66a10d844728a2fdeb2abba",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:63",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "3635fa677289c836f9aade137b774fb1394c98cd1a9ce468f5e6c70a5fbe52c9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:64",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "80900f320b19cab3b9343d5bb1863fb8c22a38ec6f1af6fe350495e69b9855e6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:65",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f0f4212d700fab5335cf59255abd29b1b87339309ff90629e4aafdb30227ffac",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:66",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "d8d917d166db2b12d793b7146a7fc48cd50014fc8ac9c0fdc54b4f4855976170",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:67",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a64680a0e9ae0e01f4922ab8415f5f93169346abf0d11bd3cbb500c6e9e263a1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:69",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d6ffcd009bdcac0b66d62513a274503d10b14b04dcec17af14eb17f04bfe8f63",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:70",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f13b26eeb84193a5ec50a01580be85d10a2259a57188fd925e11a75081e8ee9c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:71",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "61bba3ae7c473c085182527a7c3dfc0741af9b9d1a4846ad2c8e73b2c95771fb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:72",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "929085ec2a5039a238ec858369d84b1aca77a8b2f78bc6b6417bbb652f2323c2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:73",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "87b7840b458429b762930555098145c3df1a1910ad3e04970f479dc6d65b52b2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:74",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b764f59ec4116aa0fd7c122421ef6e821a5aeae9ed4d4619461d5cd8fd65d7b3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:75",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b23974454c54b22ce6c496653d4d6c8d3d86f8cbc17bbc01944faae50507931f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:76",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "94413d546d7b9092e920a85ccc9646e38bf170b666697c8a6bd72a23e7443a4e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:77",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e29ca4a30187368b74cb177ed82eee8f02ea466567ae381f6e963729a16fd0e3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:78",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc46149011ffb3a0019d53322552f83a0471095d32e7ae85c17ad227cfb9adb3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:79",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6aad53ebf127a5a052be87a86b5809fb99d7c16322bf33c8527f2f1387343222",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:80",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9639f1e0fc87b3d0103762126a8d5021b0bbc80c8529e2007cc3a9eeda927bfd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:81",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3c8bf847fd0ac007acfdd466c25dbe616084b3af36dabd6f8593d8330a979e44",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:82",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "47e34ad8424145d13b5f96d97708f6ce4ac8e2828ec2977623e038827e267af1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:83",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4bb0ea21c61d2df06c7352d424f54c69947c30ebc675fe59cc7b19e54ad3d3db",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:84",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e2226ab6a98f8774cfafad2b6ec58a9a5b90035445208090926b4b2766ccd796",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:85",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a7766b37c253cb96b42b780b18d1a42df3a80abd5ea8f49075b68a48e1345dd6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:89",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "408d50c909a7e88a147e15ad8393b853ec7524f04ce7b0e9809802abb8a38ffb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:90",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d2babe35e9ae4632af89c6eed8bad723280b2c45d2e60629b81df88e33e6a27a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:91",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "cce1d21650a14ec2510901d37de7d0742b5c6ee2978d6f9977c9462cb0bc3719",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:92",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e76fda86a71e1ef12d395e3e6d560453bc526e695dae991486be3095879e3b5d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:93",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a8aed8fbe3be4a21d93db8c159251b44e554f6fde9f502238f5ba3a6bef23bc0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:94",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2b2e430c1ac0f7d312ea38dbfacf389f157433112ba2b7e1852a358fc7485471",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:95",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "98353ebc71662eb3566fed821e1d2c00551ebe01d4bf99ace3e92d9bce563422",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:96",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "07ae4f9ad4ff6540c9b7f9f6d44b3108a0badd021c9eb12b6e5c5419569eadb8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:97",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ad36bb90b10b58ed9663d31bbf426c35b727b7c9d9cc92c3672475ed3ee6f84e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:98",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c988950c87e306b3f815a0b4bd851d10025fb801957457498510d47ecc6dbeb4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:99",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "cccf8fbe595160e05aab179bf63571623e645f45e388487f1001d823f3dd4877",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:100",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "be9f5e6638f19bd9dbf81894a9d96131b05fc5ec7d010e057d05f6fbceac9643",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:101",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3f7bb68a51cdf5dbfc618431d076938b6bc84ec82f30a959f01620d50c36f2e9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:102",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3caeb54967eafe6e55cdb86669a7f160be09e8e754ed1c12b15484f5b8135480",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:103",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0fd1f7a81f0e6d6303f285d106cb9619113adfa832fb8a4395720795dcc0891d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:104",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c19f8af949f58aa6ae1ecb91316512c2f017da7fc2c4dd2afbbe78cb6d9e51dc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:105",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "3dca24c1bce8677176662f534f9175aae0b8c064446439610a5ccfead3c91819",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:106",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f301ad293f8a75bd728ca13c4e797027b50e2523eb40b0b53839b648bdb44b53",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:107",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e5a14c190f85a1f7ea21f42608fb082eed384449e3a2e46f0bf0b0dadd074f8e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:109",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "92fd08578f15804ca85a612168fc2b0e8f9a964574cec2c594564fbc3b94d323",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:110",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "76995cfbc8ab40636977a6cf9a4532ee855dd71e170dd4b08d1060e53afb80ae",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:111",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6e04c6ea4e1512b27ade6fbed051293be05253f3742b8c6389ff8369d298fde3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:112",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bc4aa486214ac722883bfb58d8cc7a39d3c3a20d6acfbb368bf53b5120abf8a2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:113",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fa2318082d30d8405d4976c68f5a30f4240cb6a71cc951cdf2a3f1f49410af62",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:114",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0f44c7dac10e045e4a70f2b22c3513b435ef7f4b84172a87aacdb41272ad2920",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:115",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "49442bf01371b14840a5e221ef1f167fa070e71e8a56b488af3ef971ce313cfa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:116",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "4b654c96160fffaca767d4f20602603c007102a915d4b6f403943d0e01311096",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:117",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3586ec77c8e89b1ffe2170db9de7db075c4d41542c742017d250f6b20b8921f0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:118",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "38809a5b1d596bea432b7ffb771518cd3cb5bff60979d1296200e96e2e14a682",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:119",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "97bdf58dde4f5e052fc982db0e4bed934eb08a3f76e557cb8a4f1bf9bf56d54b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:120",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "62279814d649c5990a8255908606fbac9ed22054f2d5ba7c799c647a8a4b5953",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:124",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6b39d22e36ddc7212e7818f763e0f9c33613e7cc58410928ad8f7b6226a38135",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:128",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f3818e42c50171c194be2e6d6520d9846fd2df26fd49604b650d80086b7458cd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:130",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "a4d0cfea28acff7cd849a0fcfd378d881b8b9da866ba5d1f6c8d4ab0da3c9390",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:131",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c204a1a5e53ea7cf76af51703d23475ab536c36dc8179f4c9ffac8bb9c114042",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:132",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "302a5bb80c6e4adb498d4485842be0ba0cb65514dc0f5128b6175900e49fcde6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:133",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "82d70d0b0e8a4199bd537b26796c4e3206d8041dd98d5f48539b4370babe31ef",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:135",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3f8d3f594d4084736da1adf427f708f430fc753ba959777f27badd22f9680801",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:136",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "65dc33c4a54bb22b15373461896e29fd404cc99e7d223fa6a6768a755c1525c8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:137",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "14fd1fa6ec1899f973f9b9c9d15866420a3d5bbf9fa2a3473192cff68e6e71bc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:138",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "97c98d5bc6b71e2c1a24579af8a237dcfbd1b691eb76fdcf4fd7444270e5f042",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:139",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2a421bece9c86f32d805a36f97ddf13bf72794ef65ed7244a8e0d3d90f6f0597",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:140",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "8f2e445de6c14629cd1c41d2b89e96ba0d9b7ad7c5bae1c3437fc1fa7f965395",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:141",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "676355f1d949a93f94a19ad1b4092b634686aae369139528a710f1b5c06e4ccf",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:142",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "fdcb8c3e0aaf001936a1b58fa3b7296a9cbf0b54f2679f203a0a02b6d5194a62",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:143",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6cd6f10d69ca3c9f9fe4c237778d424d8e13a7c9117ccb8d0917f21a1e4fce6b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:144",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "135c1c0b68d4a585c43fee320f3222a1d5ac2fb2e626013935d4428fcb71c470",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:145",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "1e42ff75be4d2c94a368c3295bb2d569ecb56ebaf114c9c6e01b40f82f4870ec",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:146",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ea3ffc1a64d62fc18bd443b1e1b922da53ac1d1578109c90229e5b701b107d53",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:147",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "46a8b8a7546fea9cd965672af8f9bc7d98e33abffb2b8ce939d52f6023d8a8d5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:148",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a6e135e637cc4ca7f8a0b6bc8f31df81c2baef2565ce306e1f9faa73fd2b13d8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:149",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "539eae8eec11dc45b050878b16a0711316e4c8dbe90d4b604f907f9c44a44857",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:150",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e1888791daa9080a7ef500afaf3552ed091250fb1b9a346968361d3f410994b0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:151",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3f70f4ab5a8361f14d2efe86c6ca4aa9618356fc6c69944308984e6765836a94",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:152",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f5523a425c8a6bd484813c8c8240251469b4d01a588bdb13c55d7b8ea8cd561d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:153",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1c2813731a5f6a96077c6d41084ed3bd155b7432eb01c3ff86803b5ae2c95c16",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:154",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fbb1af787d3cd411dced4b4c94a396131b30c65272ccfe32a8466e3c3599fd48",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:155",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8445ddca14887ba015a155ffcc1dd02d504cb412c66f66c2d6de15a6438d457d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:156",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "09a457c3c797238f9e4259524ff9a2c4e121d7f986550009e756e3f5b4e499aa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:157",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cbf8abaf24b5d6f8c5afe6aeb4696a7f3a3843d211594adcbf3d7576236cb0b9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:158",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d9aec54048d4961e0d7fb1ab0d94670615510fc837167d2f0cbae0ad816c4aa2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:159",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aca87c193f4035546e40a8c9bc858ab6cd160b9a742e4ac59efa1a4d6865de82",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:160",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6d6394565e4f1234ab578a51d8f3daf5c8d30f978dda971256d43e06dff10240",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:161",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "28485ecf60615a76902a83acbf90b275c3ebf2658abd373ec4010a6c6b5ee8e9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:162",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "29421d77d73ba533480feda6e6b77972343d2ceb70f6e70693dbaee2156a20b0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:163",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d04e39ae3b66a95f4fadb29e204978e7bc6965dd40ee389f0bd7a9daa5685a51",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:164",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0d022254393417ebd5630c652ebbc066acd7ad9e6320f465a45623332e56b5b3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:165",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dc3b271f2e790a5ac046374353a5d17ce2c7646cf9a6f4b204e7fc7fc641e01c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:166",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bf47eb12a08992b3294734bc048091dd61394cd4388e50d4cb0658033df78018",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:167",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a5e6d949ccc7b2e6430a81e6ad94733c074240cf99c5d2e423817bd69862188a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:168",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9caa266a0b173c962ad74b50bcf8fabc066dfab7711dabc869b8baffc4112708",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:169",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c267ba72648b25c0aa076d82dfe815d3614ba7cd7dc1647754fb4d48114e7e07",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:170",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b3e263e730f9664c5ca35868d4c9657cd8eaf08ac2e2c07d671c8504a9575d67",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:171",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e45cfc86e8523e921eede31a97c38f5e756e177e99cfbb08cac21fa55b7dae41",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:172",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "00c984fa4f286b119bb7fa851fc2181c3b91d7efb591483b17e4934c819e0e8f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:173",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9e05101dc5a8a0555e3b92dfc132bdbcd9c9b2c4091bba2b6f4ba10127eeebff",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:174",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5407da990c6170b2b7caed1139bf50d9552729538d2fed554929a19427264f98",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:175",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "29ea3ac469f3559de26aad9b90c673740777dad1420f0a687db6f8f183c0c5e8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:176",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "907e39b8ca368c3008cfd8e60b06c78ec1dfc4c4f8ed80be09045a97218b352f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:177",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aab77a9676a781049c5d0d2dc82ada9bff8676d7c14b7d393d03346a0fbb3cd5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:178",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1bbb8ac0567d7dd8416d39775380d557fa3c5438af2ef2ef9e0e202e8dfc6adc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:179",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7eb962b7c22257c863a60a1012e0c5d50c635f9d4ebc9dfc023d66df2aad785e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:180",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ee428a3dd81db01e77325ad45d432b1c7c64ed2f28ead9839d1bbe374b4c2476",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:181",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c9d0f54acb32e844de93875e68098b98cd18ec0e6f4c10aa2416435aa6d0cabd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:182",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c9c56f355ba841628927df5f223a6452ccdc9f0a63112990d100e22dbe3f20ee",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:183",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "20bf2897edcecda83f37f44ebe90656142f4f561c9b7747d251611215ccd53b8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:184",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8419e8609582ad95f244c6ef95869d193d8ca3138b05dfbe242d12272410b9be",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:185",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "53da3ed091bb15866d001d99a90099d0edfeddc7d2b353516d65279143c82748",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:186",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "763515a90d8fedd1f660c3f9c16da3763a158fa628f47a06cb9bea04a7b1442c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:187",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d4fa8bc7013d10e54e07e76ddf548510266b3681156e67a4464f8b06942b7b85",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:188",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9e79cd77162facecc931f7fc23229dc998a7bdbf884822ed157547c092e5c48b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:189",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b4bf10af599e021c40312db78fb66cb8fef2aebbfd9dafc470c5a7e0ebced04b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:190",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8731bc064141ff47b5b4d2c778c248c2ca8ac796244897b49ca8444105db376a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:191",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0f8f6173d4a88336c3b3ae59190190a012dc80d0fadd5f0f0406ce9d2cfba399",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:192",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a1f3ab051c6c2f02da8029c7b4c09349148d14bf894f0caf7b8731bfb25ea080",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:193",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a3e2bd774260c70b58f86c8b1dc550c83e8de3ea0f5c4c710284ebf753130851",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:194",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fc4468bcb09641a0f3087dda07182011b7ea7954c282048ec8dee675c990057f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:195",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ddb3235ec2a5e62dd3d80b800e0980b51f0b352306e19b00e019455cfe12e820",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:196",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a40488bbd8e00d1a8a586fe92a7658dbce05a757fa0b6cb15e7707e2e733fba2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:197",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7f94566326e713ffa804377ef8a904cbc086949e56e122d3357bbdf8277c99e3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:198",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "acafd457b591e255a92551251a6296aa03c5bdcae34f3cefbbcadee875d94a3a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:199",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f9372689f13efc6f966b3a7febb03a95c126ef3d0fee77516aa82d72bc8071fa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:200",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f4087862310ad3b82517b25a9b85f89231c9889b19844aed84ef56a44aab7ba4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:201",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2b756286014add69d6540bde90813082239330709dc81f06c04d7ec1a58e5262",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:202",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "421422736a28d0d6fe8e8c75ec6fa9543de600f5067023b83d8db505c4bb24cb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:203",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "37a502e28be0b14d4d034a062b6a2271e250fe0166760a319c987614ce16ef59",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:204",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "eb5a87284b083bf4ef918d74af7cdb17a53d5e0614de77c25e7da8943588bfc6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:205",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2b29639cfe2568ec88db05536a4e3006d4d557273b24f17bbcb9980e6a7b455a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:206",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a0eb15c500b2432a17d60d961b1e82f5a99bdd259b00e761e8523aec3ace7192",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:207",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b44b723b939dd0431e05844d6ed837a051d31152db651b5e73f2164ad66361ed",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:208",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "da2856c6bde7af85ad6f9cd68d3c9a27bfefce27ce158e9de5c4b9f315f8188f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:209",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f5a48be418fe94a2a4fe3588a479186f40dcf673bf799b5ae2638f5b3a2a2935",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:210",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "81ff91c340668664faa06bf1a047cd0ab1e008478137496244eceed814f282c9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:211",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8b99f3087176fd9330eb711bcef7dbdaeffe7ae5fc6ab522f29cf983c14b68fc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:212",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fd670fb53dcc78df6393ab044998f8c3307610b9322891b970448b13cbdf75e6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:213",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "77bb6f073bf1aad3645309add00f77a73f34f9542a2d35c22346b2e5df0869a9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:214",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "84722bce158be373c3ce040bb01b92e22e4f4cb1e971dae99f887f79f19886be",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:215",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1022b93e13b0e255803ff0a8a7ac6f7bcdb5ab02214f62429024ec25e345ee4e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:216",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3efa769c4df517cb7455c42a5298b88d84c9b2e90d78715d70bb3e8efd14ca66",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:217",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "af23cc3c1198b8731b69cc713a7f083bcfca0d682dd638b25073e981dc70e88d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:218",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fabb0a85393b1e684091665822c1252d382e43e91b7c6c1b36f3e1f54c9596e1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:219",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "36021dd3b2561cb8af279820d3f89371b5dc7111c2dc4e72d13dafe936bc95c6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:220",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0927a8facef99168763bf9426ddf4e2100a4aa484a0dc195baed816722626692",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:221",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "629f9536edbd0f3595b7be0720875883075ec71f1cc3abe3f009eed4b68e762b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:222",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7edc54706cfd0502db0dc82057d05f725f3c3bff4bfa603b697c7ae443f8036a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:223",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8e65ef646be55b3931c7652b1d276e1950acf6830f600850955e528a7a2806c7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:224",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "21a07fd34efe174a87f4c07fa59aa4a4a36daec44657c1893367bcf3a7c9eda3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:225",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d521e2fc46526c101cb620e1454d8a4923894727f2b26dcbee2fd1fcb304274d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:226",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e604488123a5dc4bcc33f0928d97589eaf7e897c4b5b756ea22bb4aa0afa5892",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:227",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d57223ad559612963bf7685d3fed8787e8fda0e9a68bf86550aababe93a7ee2d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:228",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a2f21fcf7c6d284b3f74e92c6cd4f08204771fbfa9080db0a969fbd8a52c2d0e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:229",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c68dc2b5af231ad07c00adff686c0f2f87c0d15fe46242318cf6fcb4477ce011",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:230",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fe4174062b5069aa6f5da1d9b5ccf945cde6fa077899f855bb916bad2b81565b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:231",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ad29ace2a522bc22fccc8688a5a6cb7d41eee024661bf3711cccb92bb8a93432",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:232",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b557458c329de12c3f0e6d1839556e51b1af307e46d97bf8ba5029e14c835246",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:233",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "16b2feba9d6feabf98b054bd27147f34fced60c3a2634439b9b7fd13bd39eab4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:234",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2194f45b29bdaee5803e98a4bf3b59d4bb0cf9b5dad7e18bd9bc841bed8328eb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:235",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "03b5fd204852ddd964a8cae9fd3fd6e1ab92da2b89cf040adc0d660392d1fb57",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:236",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c289797cca8729aacebcf786b3169eec9c2db3b363c2cb23a286dd7575eb9350",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:237",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b8866a49f3f4ee72c147c87b4162fc2eb69712a4ddecc0a1567f89d384f80049",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:238",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f3438c7508f0cf177763cd1afba1687fcf3bd5981374dc4825a9ba14c514d5ef",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:239",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "173ae8c70bdbad8748544390acb078dbdb4fc115e730aac63350d09c19f9d180",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:240",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a9ff1894b9c1b2a6138dc2821406085c315fef4f64c2cdb93722c885abce94f6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:241",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "06a9227e47b29b0d993d758693e91b55ed68742ca7837bf15547087bc766f06b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:242",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a292d3594dad35618797870281565faa00c305750f1f92b93681a1f97cf9c3be",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:243",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7150287b8ecac9d7ced661f381d8d13798c798d43408ff5b1e4a17d951aef204",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:244",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e55ef5b6f08ed55573f74431c88066c38569f3315779d0cc6ab9d54e0920becf",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:245",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ca82d88cdb87e7476ff7178653294f441438099c8efb8989a9eab8a007457261",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:246",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "49669754122a54deac41bd6f53adb01d50ab31b3dcf5e17777eab0a5f25ab092",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:247",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3195ab187c990254f3d0f5e88064910d19758620624ddae7a5643ed59714b444",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:248",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cdace25fa542be3fcd207e83a49b34d60d24561831ab62effaab2f40b5478bd7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:249",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bd200d35ae77b94f28c15e89b5866657d209bd10b1713d54d6b2ebac2567114b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:250",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b350f45b9646a336708bc3eb5037ab51e59787c5b16e65fcc3e93d7b9496577b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:251",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "12c507bafdfce521c0c97a7c1535d10a74496e0968600bb27018c98c502a1d36",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:252",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b6e86727f4be7a14da0480181dc60cd613a12611015e3e6d0bb96cc65651b9ca",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:253",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9f48f311cf518d6dc26ba05031d31457f39f5a0c53c9c782b0240bfe1d22a0bc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:254",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "878376fb0e6a075def2c690176fab8b4a33edd01f0d9dc099a4d480af2ed841f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:255",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8124830ab91ddbf000890f3f43d6c94266296b4009e16a2e9ba69cae4751e4a4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:256",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f5e268b1a429237f6bccac57347d2139eeec29be0cff1953f166bca37ea1a244",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:257",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f3a390d9dfc55dbdc0c85b30c8c78d2bdcb882990ae70ea5fffdbee6face486f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:258",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0550c1a33266ad204ce005981521d305a0a78294296cd8971ef28ab6612b20a1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:259",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "629e29b5f04606321f41a0226755d3f7b522e2e0c87032f329d5ed7ec09fa636",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:260",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "750304e1fcc3fc6ce5d9d0c46850920e1a9f7f439c250e504d92c108d15eb41b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:261",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bdfbfd3fec721cf8e7434212b42d0a9d1b0c82962b2a08e953bc00aad0df585b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:262",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cf854f0ea04d331412a9f58449cf5d726b7291e896458be3678929377662ccda",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:263",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c4eb0da8d283836c113855ccbcb81e3c472f497a71f77dcb99bbe0e2880cf58c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:264",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e209a75fd0f7445827ee0d878ce1514572a9250d8258965a4f513e33f1d2fac4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:265",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1ab47249640ef4aac7c8f19aa279b1ef89147888c5d2dd530b7550051da1b064",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:266",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1ef789eef5d4fa2991b9a95f5cdcc1f6683469a50df1079b2b6c1e77ce5fc88d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:267",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "15cfab178285385c9d2c73b130bf4fa4468826269fc96bfe2e47a861814b9041",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:268",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "95c7e436b46479438266870d22ac9fd2a52722b3256fe6a39abec525e85f009a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:269",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9d75a2b705b6d332092b457bf11c4fee6177f3fcb7d59a85361f01ab79f9a8c9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:270",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "474eba88576d2c11a1c799592fc806f63938924498de692fcba5c1ae1e5c73ca",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:271",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8abd99a94aea9364536edf835e410e1a9e8bbbac0d425d86e326b72e9fd9a755",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:272",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c4b1da0b8a2892015c8535f48d4f3d7b7d8e564b4cb17a3ed0e654677dcaed68",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:273",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a3cefe7f128fb572de13afad300a625956dce24e8643b33ecad057d2b2045266",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:274",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "87ae117c6a90fcb72b2046822ec15dadf4827307cf0bf8a4fb0c6684fc9d3201",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:275",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a93e877f020f058d520a12e8e6cfed02b6055a7b54ac22f94c085eaff8f7289c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:276",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "84dca012ba309e455e6f8a84c02084eafcb9fd5796da0117740b0f6afdc3a54f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:277",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "afdba8b20479ae254ffaa49d5db56ad5da45afc24a0af5da632267252f1aa040",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:278",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1c28f8208e08861a3c28d43fac0b0cbfb10390172de05c3f965f8d0f84008ea8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:279",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9197941ce2dbb58ba8c1b04d007040b1a7982379b73efc28283c8cdec16432c3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:280",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc198b1da13e332f184f4783f547d845ac9fe909712f15df9adc155710b908db",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:281",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e492c256108736fc0c06890b5555833a323e98dc3ce6f78e143e9ae66852f7e8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:282",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f8d89ae055bba3a2b8f23dbb824ea12946715a795f6d1eaaaba40dd4446ef7c9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:283",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "38d52c872799db0aef8ff3b3205287d9bac71847de630ee973b7d3cd2880b742",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:284",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7bee9980f2317568c9383f9603a1ed110b0404a7fb2efd0e6a5af3b360758280",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:285",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0eadd2a066da3829ea2f05a4586f823af5b988c73b06b2bc1803bce55f789d2a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:286",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6ed01f6c16ba5d015f0584e65581cdc35c42453df46da5436fcbb80f919bbb80",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:287",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4054663aa0031c9cf9f1bb4f43a2b72c3320c201bc318bfa70db4919492ecdc0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:288",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "607757341d452f24c8df79a635931712a661622afa00a3a5ff7607776aed4883",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:289",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "52842c0d7bb2a8fbbb5c8151963dd5720a0b4b139ceb7ffec9193d315de32745",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:290",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "56f20e7ac955b7bbfacfd3922912b683b19c9f2dc98d5c182ac57804184b3210",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:291",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2d2b376dba0dafe1d57ca320f64d4740fdf9b4c12d1ed317ea6f8f9f43a3e42d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:292",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f695e537d86a8070827fad1513bc3d65ab293119c6fb32a5df82e3f869fa0483",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:293",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aeb1a0678a00105007e4dcc64d2914f914dcfc9ef1b7a60b497ba0a778add5e5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:294",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ce08cfc0e204d4ba433c2434507fff5dcaa9331080a860d664d4bd08930d4883",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:295",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ea273eeb6548e563b0399cce51c640bd8e870088163343f56ce3e583d0afbef0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:296",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "35c3ac1c6ddfd4b95a3309eec4fd5f66090d120e13cb71d851ed8a4b32ebb27b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:297",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5d998db59df359aed458911c7bbb2eccf78f019766d2232b7f9f93317c2993c8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:298",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ecca9fe86a311d8114d29dddbda8c639b620b86e5c386d4503a97eb4d847c0fd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:299",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "10003c7b3f244bc2cd127eeb3304b29f4f4788d910b506123f992858e6c6e029",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:300",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b9382833a9075fc9db889bd9453a849beba8d5b636e274150016c95f33a5d105",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:301",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c791ec754c9992c6a2f1cf861ddaa21371ef8d639f1c19dff38270af2864faf9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:302",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dd5ebf58f9d9408a93fa6e6dead7b9f60defc99cca89d6d82e14f2cf12e8da89",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:303",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b08e686f1cb31d86ec37b63347cf15a2bcc25b7db9483cb0089bdb7dfdacc129",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:304",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1a8a64fe9683cb765023bc8342f663bf99c82166083d501744d61469b2ab86c2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:305",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5b934c9e4356421e5b2b6695f9ca5f2d98aa73feae0d2b920b3586cea1675007",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:306",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ddec4b8746bb8fe3ac9252a8f4bde1113235fa77852b02b2853f46af791e7f7d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:307",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a67ddc2218435c6444df999d0ff691cbd009ccc8208a9ea5684e3be6b2313f50",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:308",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "30cf294a52eb4dc167d811d963b727db13e4aab70f08594934439440c92be23f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:309",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dda4ceb1c630c9a8cc0f9ae83e14c8ad457c63acf5539170ae97804f9e989cc0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:310",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a3302223c44716586de09adb273067d59b6d2c8f6776a32aed13bd4b0b0b576d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:311",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ee4cdca3fb475385a0bda26c52ddb634015b489b0b7a90a74c5ea207bf532e8f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:312",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "882f396af818f0eb2b8509d0920722a2ccb5f837c5aa5c1dfb466c4e1c862df6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:313",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc00a7f9aba5d26286dca3b0fee948bad5bb96590da71fe1674e11b97c22ff65",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:314",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c3750454174e659b61aae624ab28ca22ae379de8b35eb42a3db8445436b5ed88",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:315",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3a781252aa36f67a42537aa4d26d666ff2651bac5d6ea96c4d965e2fccb2f50d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:316",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dcef8dbd2200811d2ff558dc3466701af7c84f73b051dc1ad7b19ce9acd48ed0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:317",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e5303777214d699286fd9bcc34cde1bb0ae94e6cfb26e9cf0513885a4e71579c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:318",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6c1451219ea845d57b58ccd6bf8f75c9f3efcb67bd125238d1cc6a8500c2b5de",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:319",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc71b8ee11da07f59198acf25c3bfe11210bb25e02486d0ca7103f8ca6b1a76d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:320",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e6e33068d0c68780a9269f75cd3a879fd606a8b3a156ead6b6b87daca6250890",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:321",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "855f16f7a50c0f1a9ba526a3058175fbe9d692506c471d97904755a76f75bf89",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:322",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "41210b53063c9db4a58bddba12d78637ab409295aaf7a7f8a2b54ee4300be2eb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:323",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d6db932b7e32cc9f41103833daa101975976b2963bfab5b16005c08927f19226",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:324",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e81e4103cab9dbd0042cead8c71a56dc80e12a4a6693dc44de467ba98eefaf97",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:325",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "36437b5e2bae24eefe89e74cb7d9851e4d7613545186b94219320071ecacb8db",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:326",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "eaf58088d6d2a13fa946567a81949f50458b92ba872157932c74455bd26e91df",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:327",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6391ce17e6793d69a1da0340b23eace324637368735581e25b05de028d2afb01",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:328",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "87fd158b97ca32da54d9371833331eeb506ef6d8c9286a7c01fac351c4de1905",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:329",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6ac81279e52ae5904003ba13dbfb7adc8a98e01c2e15c9a3f73582f359237edf",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:330",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ab1df52defccf5926e0fcd736e97ff405426682fbbb0c35da1f3575c754364f5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:331",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1eaa7baa7519ac4fda9f991148152b20e040a4c31f0e5676a9445d12693e9771",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:332",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a3bb85aa1376366fbc3f271111fa712c2df44778d0b0d06a5de37126232fe387",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:333",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2ecd4d7b1c0bcc187e1c6a0ec55511bfc624a08487f4d35a1738c952e32b4c0c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:334",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9d65eab249042758de4887c15d75fcd252ee8a8489d092d5adce914bb583b276",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:335",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "017a740b6dd7b26a5a9ab79d86ee89f9279b631961afa12d6f40f24c0669b7fb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:336",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "22b2d705dadc56bc5906ad9e43c3cd6a4ee92ebdc6c1a8875bcfd570126a66e2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:337",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0f7066171c94dd1f95bcb4959237661571d213280f1e7d17377e7096e26c7af4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:338",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "215c5aa84ae2915933a080332bdd6f0581e7585d076cdbf0b0c7f8da944e6022",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:339",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "da8ff78136f3be48607dc43667ecbdd87b56da64f8484e6a9bb5fb957ae6534e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:340",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2567d81308dc672e053272bce8874f4f62b82e55ecd7896349f300625d88477d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:341",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "dcc84f5411acf1f1b8ea2fc1f38befafc1d7820c704c3c4e24e44e67d6540656",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:342",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5323ffce400c21a50e49411e08e8756a77c3bcd9ea835f9e8d6c6ebb16c552bd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:343",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8a8268d1202d489f7175951fdc3b0078fb3301e2f6e983d62046bed1089e829a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:344",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3a43f0c2a218b7ac9b404d226bffd15e86f3b92f3cae791f3949e62c4d2e4565",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:345",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "587ba9b4beea9ff8881332fc3bbd0e4a8c7ea65498eee31acf9e57e8aaa59369",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:346",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f522bdcf6d18b8f201a46d7c75256aa469d2f3a69efd2ecd632faa76b38e3171",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:347",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "17e510c6ca52de4ed80740b3383fee5fccd46218c27c53ee0cc9120b74d6f8ba",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:348",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "023a9cf0c9e335960b5e319cc4fbb0fb75191ff33e9eeece463f445b7756ab1c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:349",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1a48528cad1598aa5d99956b0b37f67387a2e84022ee94d900d3ce1b659fab1d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:350",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e4aa18fff68b7609286bbebcb8b1c7441e1b3e19d546a690e51765120b65a82e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:351",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "738b0d9b7a95fde2609e8f137cf78bfca3c205d74d6ffd0a9314e93449980481",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:352",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dee4422253e4eac69462a183c8267c4de30b56707a1b52706f838eae611823a9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:353",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "da35eccee7302a9801ce49b56d56bfb3a3a8047b7783998a589115179a64ebc2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:354",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8d3ec4ccfd5e35fa06db72c1f61d26183bb1d8f8dc1edf4e4dab7fe77c5ca355",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:355",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e27c18ef8ea0c3c72fe8316d4c0f5aec5ad03a0349e3f6870075d23ff2b12f9c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:356",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d0ff45463285d21caa474fe8cf2a0ce9c68f7bd99f95ff25d22c0f9810e55ba2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:357",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aa1758d951c489629a48218ee86c4f60d4437cf13b6b91380438f48d03762da6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:358",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "af3bbffbd3b31212b2416df9574810bb517aa623f0c643c34d72d96518e9165f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:359",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c55a803b6c0f5c78c7556dd2fb7f1c2dc1d512751ecd59f7c36d8e153f5d9ecd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:360",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "969acede4c08973d14a59216f05c583a7217fc5089e7991a4b3daa6d64da2b5e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:361",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "464945e3353e64c7f7ff46a2c2c35d6fcbe609f4270de66bc53125637c5f7481",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:362",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "12f0cf39cb2c967374b3386d077677d8576d41fc3d2f5b160af215987ee98dc7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:363",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "31510549c979567b3b33525ddef8b66d073267ef72916e31ef4a57f660d046a8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:364",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6e8be0272f0fe63d98e1e2ebf47b803369258ad6154e5f346a7704ec182de004",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:365",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a5cc7ed15ef6f160868fc7507d6625a20c144ce14921c95dfaed2f763715a255",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:366",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ef411beb57f9b7c53a3b7824330070d3415ff13555ed55b485a2d637fd286b10",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:367",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc9fa326ebd5ac3d543e3834f082d79c684ff7583034e520df67c1f1ce0d2c95",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:368",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "82610d5d67095d76f1150c054c96c9dd43ac1094e71d5d87988eca784f842ee0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:369",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ad0245402037e9b0246a1b96c3121c07206bbeca4e1f46e9b0e9e9a1b8e97e41",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:370",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a8d8e5f49103467659d0600e1fd7728506bc25d4ec4d9d12dbc17ad25780a94e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:371",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "11d0c4e18601401801449e0713337c3190a0b35da4ef967d2f94afba4dd501d5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:372",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "227c67f854eb4e2434016cbc3c99a73641d932a3f118b4caf13269edb61ba752",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:373",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ed0e0d7ee2d4908fad55f0f8714cd698570df4d56e9f546e71be0b93e7b4bd8f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:374",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e76b2f1ff25bdccc57429c2f85da2e16fa1bc34a5b60c59c2c7ea36c9634251b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:375",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "93dca10e5bb98779c7d49071e3f2de3e201a941a3f1feedffe379ffbac2a00a9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:376",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "63be63a2cb7538f74f4116f9f005600d31abd43f7aef2e9c1fceb8d0e948e0e8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:377",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "822b0388233eb4b669cd0dfeccb55c4f2a3826a4989645e120386eabd4c4700c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:378",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b3e0ab4abbfc7712676e8ab08e46998adf0ee493faef258ba51f668f0a6f25a4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:379",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8917fa221bbf2edf0148a3abf8b2a49350df0bfe2e8d4c2c81c0426e2313273a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:380",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "edb52808378764be9db10c38a4e0d6185cce26af46f88bd161a11d60530bb19d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:381",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0ed954633093385f29aefb3d4d46e3b16540edd4d1f74b906a6d9b27aa5d0c26",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:382",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "049d9ebe2c78f50a8b205bb451ba83f3d8cc346f7815462d7202dbe03e2e0707",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:383",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "61c55a578cedb6239c7f6d7557ae4fa3f78b12e5cce51fea86d1973c7e3a38b5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:384",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "13c57ac98bf7c3c18be189d56ccf94e058bfb5531e4fb7efc60915aa977311c0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:385",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9def940500baa6e2f4ca165810df51e7e0932fb9d5d30c38089869b9b4055ae5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:386",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e08616a6ca30390993f9a4c556a0c98f756e6458157958abfbc4195b611796db",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:387",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "76a0f45eada6c4bcff93d1d9404b0d256cf428cbc0ec6fe5c21ff6a9ba7489bf",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:388",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2ca247b43310360d12c01bf72ab4604206c09b1307c653a788a5d375932a7084",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:389",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "24b5f0d3a53a13a3a25664a3f185a9fa5cb2d97f3432eed716f95e075e671abb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:390",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "66ea4fca7e52dd8e8a54b41c7ff0a0cd8b66ad74241ce72fecb6eec2f40200a7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:391",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "114e7808a042231aa242f975ba198a60140b1f14b734698cd05f92c2413fecb8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:392",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1d32e14cbd2fddc05df447f41bddab05a78a06ab92b1735634005de9caddb30a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:393",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0448c49d442d8eb3a765882dc547ee821f02743e0adc2d2f9d13258698189466",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:394",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b7a9ae6fd9676c6fc762dcfb6b9e4b656f76fe9fc8c02cd1bb6abd952746b79d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:395",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0c69cf1a4a03937631e38bd144e13a176896a012add1bb827363c842dc100997",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:396",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c9b7c8d842ca8e4b79d7eb3ce08b5ba477b50b1d1ca8bc27a32491791f347fb2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:397",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "232e49fa5746c238c39b35c6ebe6db4bd0eb55df63ba5b89b3d5130d0feb44c2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:398",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "37efbbfd6ac951464c76d136278d503401213c932c89c321b7c853f936072e1e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:399",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1f42602c6e850b699c41ca2427ff83180b3482588cffb55d12ee3c76fbf168d3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:400",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bf533020fc65cde857e632529dbbbb3c9068d90e3ad92e9a60bb335e07a335f5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:401",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8c2185c30f82eb5863476348b37d4326eebbb5cceb077125f0332675c191dd5a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:402",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9ad627068684e2e946ed5b18929c7bbe095d6b14c02cef987fc99a5d91118715",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:403",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b37573de064b58c85df7d79f39c5f2ec925bb9f3cc0302ec0aa10d0f205afb95",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:404",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4a391cbd28ada48a7e3a61e93788f4f676a635a7ab733eb20a48ceb097869024",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:405",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "8d9906184af294d78b5d2d3dae34808563588fc5901cabc62aac269187ebad9a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:406",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "475df0c39bfc629557c21d4dcc8e9d185211662ce0bbdeaa825aed9b7452ac3c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:407",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "39c17636ef3da2a1934066d99d24afb33f340f5d9c65ec37cf35873bab4ddb69",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:408",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fa409f13707e3f956e0793b526ce541f6fa3d5e4086fb6858e74b757b43d8da8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:409",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "abecf8fbc42a5995bd8b6f7a7c19573991a8a0cd0d009d5776cb2ea2b9f277ad",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:410",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5eb65d44cd423ce645b652c2e7a596d90ad4ab1dd33ac9727406c8877171762d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:411",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3cfcae19df672b2603580b8838ddf3a12a84f84a893b085505d1037e9b59a611",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:412",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a58e44c99bfcd31757710342b25e15141b2ee481d2b8649d85e73197fe64ff04",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:413",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "85ea4f40b73a1003bf2edf738643ca7b93b422880f42ee97fe69248d167eab2e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:414",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "43265a77b728a6179b0681fca79a444ce49c6bbaa8f7515ee2c9a90207911176",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:415",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "951fef7a6bbd862aacec508f87cef28a3bc8e1b9e62711b99cad17ba6f36b33a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:416",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "69e85c0c482597762f17d81155a45c94b032b0e8de104eca1d8f9ff42c7b6289",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:417",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e4055bd50ec338dd6ed0d94946a897882727eb7bfe80aeb6e4d373c053ff2efa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:418",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a5518fb46eff726da2a00c285555ac6bc681c4cf952b4cdb91992325282abe59",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:419",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d82b95e1a8f2558b787473d4d2dcb011d6ad8057924c02b03a439cc1484b7ca9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:420",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f3fc1cb2fad37403a275a53fa43ff172123506c3f354a8232a902647d8f940f6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:421",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c95e5484b343bfbb702a3f872cd405dde3aae628bf7f1375466745ba1da9821a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:422",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bf05b1303e546776aeacadb3749d2afe98624662da58ab1aed9d5d69aa59392f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:423",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "ac1db75f6892d7d1083b61cd6282bfc7fecb5c132270689057641ee8a6b7c02e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:424",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f43fbf2c1780d962939063185f119ce0399d9c38a9c6ad8cec0a242af4d71188",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:425",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "570515fd16793b05659a77fff3f5f5b77115c5c324b7a7ba0012e184418527fc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:426",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2abd1009ca8db1345abfdf5dcf57e1d5dff474795065f32c8bd2fdf2674cdfbb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:427",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "bc336ae22416b83be599fa5d8f8cdfc01ad2c7eaac8a6e3c102a4ff2861e4fa1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:428",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8b8993079c28433f937e53ecefc4a590eb452f894df612e5e6d644cc7dd2fab2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:429",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "84065d18290d3bea489baafa110ec7cddc2ac76f0dabf85652baa55278dfda8f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:430",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "aa2c9ba1ba01bd4216e1af64e65d02a1d29cdeb703e63bfb2967af452cf4de4e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:431",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "2ac9f24183ffec2c886e4a76d158d5bd1ccd72729593521a48a099dbc61f3d04",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:432",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "3d938a050b5a0b49bc34577e84e5457a20d13dc9659a4bfaf436ae6cf87b9d07",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:433",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "38c3a2f3992e72bc4b02040d39d6b5896672c97de6894c26acdf7e6c566871ad",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:434",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bb267cf52f9d5ef8274f321eb933d4ea68d97fed6f07d1451720a93b03655d37",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:435",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e08a7673cf205f845f02930506fc164bfa87d6573b17faf05a457bf309bb9050",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:436",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "68886136379d9c6188c05cc88ea915be1454477fc480cca926b92d3b2eacdbe5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:437",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "883693d5a74cb4a9ff158c17ace0bc57bc3b6dce4052e40272c1547ab44f5ac6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:440",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0dec5b678f246f693cea15ebe9525965f918d5d9dee3b4e0191889b19eac9624",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:441",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cc44671d99b91124751ca4fec75c4e8b6456dc8b7f024f462dd2745eea01a650",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:442",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "98427ca15b28e9caf7427c064219665901f5f25224edddfed4c5d3be2bac7429",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:443",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8551f998c56a7e1c91670e9cb80347216d6a81e5a7b172ad5451e64a110fb538",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:444",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "78719848f70766a247d1b40ba7b9508e2f0bb878a7cf07a1dcc5a941e7028048",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:445",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "746b267bf176c7b4838c8aeb5761daab778b7d312f5f80a0f4a34d0150c58da1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:446",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "26eed5c95265a6eb65483135ec366d252c0d5eaebcaf12820796acc6aa07a2c9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:447",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f9fcf7edb0f0dc8ff96469642a286dfd081f11d630d88a13e0051ce3143ed125",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:448",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "423de193b324d3455db240643045f9a07333b813264cdd86ad6f23e0b7cba2aa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:449",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7d6243b5160ad9b609f0664001ef3275133e816a6340023e93dc4fc4beee5754",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:450",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "0e7cd0d55eb61027b5b7e33efe75baed56c1012dcfe191accfc365481d20bbfc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:451",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "79797b1cd6b81bbdd16fe0e007a97f18a49065bd9aeed1fc723db1bb684fa8ef",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:452",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a98024a9fa83aa3948797d5413cac997cfc869b72f3e7c0139b050ec461bb49d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:453",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7051b95f9aaf662ed9e6146993c2f360ccabe8deeea90032fa896ce98c862c28",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:454",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c12da09ff29bb896d46baec9bbdac12863f379913fabe00f4e5fab36577dabcc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:455",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ef2c343a6f9f2d4278430a8dc8c8b00a3b36ec97f3e1090989d732cfee949749",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:456",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1328eb9b45ad776de2546cc9bcec24a157cdfd09b7f21309ff43838e069d8ba7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:457",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "17bed46bc7adce11b6cc9ea1888fb7ff9e09ebf075b41b165ff2b92e832ae943",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:458",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b8072d0adb3b5a45436e8a7b509b02477ce5682b6e2287e3b34a1fd184248fe8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:459",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "7247b5c74f43f29c2bdf8f2fd50bff94f4167271ef54f2a78b4f9eb92383db4e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:461",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "142f7ffbfee6b081eca66d3bc36b7c6e53334715d65933ecbec668239f97fc87",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:462",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "894e397004de933e56c08d812260789e5f43a57618ecc14daa8b179ccc327d5d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:463",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6e3cf330c00d0fd290e92e004906db2f2cdd01f28402bea10d2f64629b965053",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:464",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1ac047c7b67c9904f34cdd6f765a2f4282604298fd78819d7982a5e920ce4509",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:465",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e3e248651193f73066357c16f5d0b8ba5d8752923a1c36adab0c6bd63b8b16cc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:466",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "18db9f4e751c65d66da1341edcf6f3573ff668db5c03794f01f38ed57d20992b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:467",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1706f56168a9c55ae84dd6d17b33f921542798156bde24a46c1403367a2022d0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:468",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "97efd290195ed4f5b524f4aaae8b37f1f4392d65dab2e0a870eee78926b7aec6",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:469",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "28b3c6bbe8ba3c54be7892a65a1912feb584b0c4dfaef1e2709c0440989e97d4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:470",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f2fff9b454fb6a884d140b6a4dc6240551a5fb9fed49f7dc9154f529d58617c8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:471",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5ccf828dc898027e96f428c62e29eb37ef40b9e158fbd21cdd0f08ce9f0e6169",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:472",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a2b6f0b964ea6a592ac4f45c6906027f1cd2c915c399b2bbb19970bd51158b34",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:473",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c89317eb58cd2c51b8bb4d35989434a15e61c90686446bc780a365808c28d91f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:474",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ffbc5031df208d75724cb92edd1e19a649d79a316788cd931327c44618b189a0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:475",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d117ed0add33358d0abefd386c727a399c51ce316d6376961a4edf8124581cae",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:476",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5171ec9db02eaa880576282ebb4746536576f80f183cc200c7e3667b8d5da43b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:477",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "37da6f1e4c51b49c53879bc9151d732aeb221689bdc54ae3dffda351fc592312",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:478",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aed58394a93b2689e22ed984a60b841fdeef5027e973351af709f69d73d909db",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:479",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5204c3535dd450119d52a70cdfcf43e48f5ca27b2c90eed015353f2a0679f24c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:480",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fe0e96723a7a9316a89ff108bda83c7eafd8bde41d3b07ab5903b94483682076",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:481",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6a042693ee08302161bb09197cdc9173cd1489780c9ae6bc857f507938d4ac73",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:482",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "698a085cc8b194fc46bb73889132dfdc08cf93068f2874854f70eeb7ed088d48",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:483",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4cb8643e5f5075d74185fdee6e33ef276c93b320f092ce23b721e8bc21cb7ea4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:484",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f097b1742d22ee92c50149ed3a0a58d3abfe28cc1d35330fd72786e9deb0341b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:485",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fc22e9edabb523cf85f83528976dceafd07f452cab04db20fd13242651bd014f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:486",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ee3827580d92f029b00167981a0a280a1b042ff1e6e6fa4adf1c61cb946e434e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:487",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c3655b65b946775c790a3929c3ca57c24cca3cf59f6d22977276aad34ca0bbe0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:488",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3f5862897f69aced16347af4a66f3ebbb03acb09ed242aaa1391ba9bfcd2b262",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:489",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ac68f48449352678a5e319977f235230cab6ffa2fcea9ca1caac9189fe9a23b9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:490",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "04a8d0067b7c42d571a57ccaa51643291b9541b55517b1bee5e1f64544732b8a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:491",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "05270167d129144b0d5d6666a4187456721f2bf2c2871e0016d73ac3291e998f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:492",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "438408fa15995c68d11a25d0b7be1e66eca4e85546b6788bbe0060f8ab90d75d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:493",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c85a7e98f399ba6c9d628e0ce73783766a6a4fc4d6ccff319fa5cf4d2c306c97",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:494",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2022f529e702695f90447deb3cac42821f63a9eecc0beeee97599382fb13913a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:495",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "80e77917cb1f8e02d3e3c74f0ba37fcfb68636f7b829d1b4c0a2d8f3af2298da",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:496",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3a6a9bb0f4c0e87378460a4a25dbda4ae5083e65bae1e0fba2a12f2752a4ade9",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:497",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0dae6722a9cbe61084e7a843b779c2696d6ef30be47b4cff33c4b9a0a59457d3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:498",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b75bf6ca4f3207f287aa8bd55a12a35a272269a40730e925e2d998e67408dc14",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:499",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a158ecf1e12be88149d2805cdb81681852fc6ced6848ebf68f9903ed1c2bfad0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:500",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ed8cb3e22d2a795648fdbdcc2b225ed95e4941701aac434daf235c257dd5a6a4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:501",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "59ee07889b5185948ff1332fe1a26a37d3487f887eadc42eaa6f406c294946e4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:502",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8919b37f143f48cf5a02abf15b3889264d1b8776a4fc93f43136d2cfc6c4de45",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:503",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "c1e1a9517fc290aa890155ba6c2f24a255bc73a60865913096df5070d981812f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:504",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f3020be1b4ea1eb13555913be4b52ae1b22975677c04fc93affa6dc38c730c3c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:505",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2169704efa0f3239099473f2fe056c297bd37e7675534a44abf8931d81a5daac",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:506",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "141cdf9137838e992db0e3a78a072f5e48a2220ea1d050880389bdbd5d5bb0cd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:507",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a68f5b793e5e4f7f9b4c625c3d718a0d34c66cbfcc572a3fdee8870154829814",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:508",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8dc32ee570eb4c8a14ac2bbac59e64435483f1f002d22fd83e6c05c2471e4a5c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:509",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d6101164213e067c7e3b2534ab91ccba64c2c70c47af216075a094a92e4840f5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:510",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "af9554c83226bbc85e5d5d731fd85b50eee4bf253ffe7af0a04d4b07edb564ee",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:511",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ee6ea1ba9fbbf1cf436503270664986ca24130130f18362d87ecc7b86dc94adb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:512",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "61662d58f113ad60a6b32ca1401a3648a5f535cfa7c0f0837f9b97b66f899f48",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:513",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "efbf097bbc3186c030cecfa4a45681bd5e0fbb6675e13ab3f050bb29820152e2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:514",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f5d0fdc60a384af90ba9db2bf6d57731369403918d7c96eb35c6cc29fac9c6aa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:515",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "dd3f44fc1fb217e75a293315db5e535dcb5d5140b373f12718a233e39bd4bce7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:516",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0562ebac88810276c1b138327fd3baa95040ffd05b36d23ff20cbe6829e24ca3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:517",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "79cc4034257649fa9187496f47c69ae9431b245188b1e5bde0e653f367a68631",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:518",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1904b29c55fe4405fdfadcf551ac82873ec13b666b8f9e334fb401613cb4a0d0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:519",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e8dd76e6660514c6623d3dc7900f6ea7cfe14c1bc94e4d00afc263c192cae893",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:520",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "a97c688683c1992f04bb2830961f725c19eb93aef37051b3b30f309663889cbc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:521",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "e2c2bce0eee6bb2e19936d4878d9c9495daa1271b58a1ce174bacd9a5f8e3cb4",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:522",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "2952bdffd957fc9b58cbd5cb11af58d75e80fc6c1b97fda5016aae795d3ae106",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:523",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0eb78e53fd277eb0a77f2afcce11df78126cade6b2960da1a6c5a2b8bc473710",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:524",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8186e2c48a7150775080f6d4511c8d98c7e6405359ca8b99ccfa0c31f9fdc1d2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:525",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "ee9e4879e74ad9178a68c07717f2eea4f1ab69ffeb2a119c8d8ecf589cb73df1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:526",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "5964fdf094344ddb82033973e541c3e57bc2dc4e2a3734ea3922fd23665593f7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:527",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "224a74f213125240c71beb34ae6c9b090583c5df754a337939a70b21bcde9ccc",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:528",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "1d5786480b4cff707241134e2307f9845667a3ef465488ebd33a02872405e4c7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:529",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "294dbddb7040a7d81af0200b2c9bd400e9013f19dfe4b879a90bb04abedd8c81",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:530",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "77971dadb5b58129e0a9ee4e37eefee286b597f31d6722d666dc72ac30923a7b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:531",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "75e6e32a726c5b9de3879b0f42687e0b16ab6c35fd4abebd0dac33d6b3025939",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:532",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f65537328e6dead9d57d62bf2176d3c79d0146191e6e302e118996c19d1c8581",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:533",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "400c5cc92f6c61c549202ce6a2cdb3321085b171bdefe46bbe9d1a9c52c56a53",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:534",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e99e1d128b43e7ced156f8d382e13cba7591d3d49ccdcb0b831d1861a8cd8c0f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:535",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "abd1ca0d88129e4961cafbbbc29780547a8bf2e92272e3cc5877a4771b365f44",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:536",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "3ca7e003948b62b0d6e7760e97d2fb4c314109a7f3fa356938a7bc6e6bd36412",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:537",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bc5b813787f2f0d93bcf712e557632788a205123bcea6ca94c8fa1fa569dadcb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:538",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "12f931d807efba5de2ac5fe26f206827101cb98a9978a84b4d928b1605195473",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:539",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8e59a0e57cd50910265244191327899b335532d922ea8ee83aac1af77fd95e3e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:540",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "191bd20342ff597ed6c9e7b5fc96af5479abebece56fb42723a3977740003b2e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:541",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "9c55ff35eea59c7bd159294d294b4c7b9179424acaf69910502a839218628929",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:542",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "afff0ad4c0b2e6012ef0ac1f683a072eaf4e0b0756741286ecdf2ec37aee9367",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:543",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "fb513f3d7f0de7ed86d41dd6c481caddf0df363532d731bfa94510bd51d9ab3b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:544",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "a6ebe7a8972b400d90b2fdad8e2fbfd7d6ec1485072d08f8ead954dc6e113411",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:545",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "86216a077a5103ab05ae8d741b8713c4365111f8ddfdd9d9fcb871ec8f96aafa",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:546",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "5ff4347136645e00e002e30a12fed4ff5776dcbc776094ff12175513bf124aec",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:547",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "58ffefa3ced28126dd0b0ce0087768f6826efb8cfea4de5180679c153e605920",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:548",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "b7d68453962e7a452899e643e3d728fb5a885ac9dfdaaf85bd6a657ce24bb08b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:549",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "8f4d008c1e5cd3d912c3beceec55f463a36314fa08505ab91e81ec3eb5e4a3ca",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:550",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "312e464f74cdb807a20c66d68095c9d561af9b493258348b884a4868ec502991",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:551",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "28675f170d313a79fdd0aa7fc3c3225c2eb04025496b41cbea9af099c464c8a5",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:552",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cef879e7e7c2b691b34ec0a19c2190c3dad7b6772b91813af024ef2d9743d750",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:553",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "534d470c44c552f9e6bf0e2ef16fe1e670c00ce3daf1b72120f3c5918410ba54",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:554",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ede67258bf9a1a48b84105f840a2a86b4b78a6ca70fc4882706acd19a92630cb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:555",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e69b4213d6a2b2ae4b5178177c9133dddc9ae44440ec46b9b08f7f0cf92e95a1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:556",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "1e754c77a83f2ddc5329552cae6e47e6a81d4cbf8e7a8381128778b66fc9c092",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:557",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d58f736286e7fd31ce956e39639e1c480ee0766aa086e6459d8770542fc6107c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:558",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "26542714b937c179782ab3ae41a472c7f440e2c486043369a3f3109ed4c5905c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:559",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4f9656b710b27449aa236aa28a5ed98be763d1f3d31e46c31795073231aa85e8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:560",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "882bb06b6c88f9ec20a09e86c0cbfd9bec9dead5776c0f058e3a4b2489b61f53",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:561",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "f4dd98f9256523fc04eb483505b7d8423d0ce6bbce7751382ecb0a20574c88c2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:562",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "bf0e8523473b8dfb23b0b2a28cd2fc83b0c170633604b2f43af8560c36085c67",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:563",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "03e6590ac21c2c43b112336538a10411eb36a9cdc576256e72a9bdf1188d94dd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:564",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "ce6304c93915f566ae0c5f46f8863e1546b6d1b40b88f2f0c8fe87dfe0b36e06",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:565",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "26ae9af5499eabf42ab3055a93f5c03cb038ea93490d1f32af80694b6415fad1",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:566",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "3953bd517d2d7705f5d3c4904b3509d65bf7a112883a26753fb3d046907ec48e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:567",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "496526bd32d713c90216328b5719c4d9064285c9b0c54e15efa0e8b8883830cd",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:568",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "dd72df529c3fcc3c63652a3587381418631f7417566483424a44c809ddf91163",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:569",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ee5d6c9ce25f6fe1bacece6cc2236510331aa2381ea0846f2b990b3a2325064c",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:570",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0c86cff921164225f0956b632fe29668cab244d51f1c155bd32db92df0a25e10",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:571",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "3fc51899f10ca769b603af356e316b20530c6fca81a0adeb7071f02f2d9f1660",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:572",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "d6dbc7015e26ebc70cb91f05cb7e9387a315199b5b1eeb20dd0811fc5534eb9b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:573",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "cd5ed460f4ace7599dbb61724873f49a2dee82a545a254230051d9d7e73ec214",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:574",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d6823a58d596ae600629ce08c647fa45869e68183672190034728ef47136785d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:575",
+      "classification": "CONTENT_AUTHOR",
+      "canonicalCandidateHash": "a95a26326f01a875aa76a02eef929a42edabcf06a452baebf7e4b0d61339daf3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:576",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "ec356c6c057391dd1db951cb30d45f45e1b1b6af2c0229374595bffe40c3311d",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:577",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "ae420ca0d69253c6e8b9beaca1391ce8e2886c99309cfcfc3d798844b9fddd7a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:579",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "16b3f610f9721c3587a0f3dd0e53fe34f0392ea4e20b164d52f6a68e80f7281b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:580",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "30ffa11cb9b1059330bf2fd00422ef6b402a675ce9a8e3b80dd1936a93d59548",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:581",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "75dcae42522db2544de3ffd25a531674fa07fd5d5c67c6f1871e978bcd453d3e",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:582",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4e31157e4b21e3d33359a8e9cf9647c9164b6bd25515eababfe7b4ce58291352",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:583",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6af119337b063c6de5f70e6240ba272bc0ffb279714ce984112545dcf0734deb",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:584",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "e5fc7f61eee3cb007b01c139d1fed72bb8a46768dcc7ccaa05afdf6879d72ad7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:585",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "267cf9d0b4f781f40f86f122c428e0ef44f35d541a8e52d35eab1642584dd914",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:586",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "3654ff93a5586d04f0ce122d2389b0c5a7e1d15e44d32662044d00389f1b8f6f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:587",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "4d45e66f797afaa6aa585f1e71078a379a730c6d4595540d765f92e00ca095f0",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:588",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "38554cc178dffbc3914ac14e1b1609c7e6a012f091da64beff39ff7b31c54ba2",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:589",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "64f09215374d8025c2833e06189d16a5ff3316124cfb6cc648ae0e2acc20690b",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:590",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "703a53641f6bd69fdf090fb8a38588dcfa819f9b42b124a89d3b22d015906627",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:591",
+      "classification": "BUSINESS_LINKED",
+      "canonicalCandidateHash": "507fbe996d8516f448a3b4badbd1adc92e237701a6872369fb734fb3f16ebc61",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:592",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "387143b3c6e3857da03b12ceb2745e56148575868118cb7e524ec0ad38e9fe20",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:593",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "d12a7b0c377fd4b19a1253682c4e6670505a33f22487f0d204829b5b983b44c8",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:594",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "bfde63fe837df71351755977206332675a654850c28b8fbc1422630e3c06b9c7",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:595",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "f5bff2b31d2d56b62c0f2bd9e79c1afd84537e305e341768b6b5005ae2e9867a",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:596",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "95d927a60bd331290ae4f363a6c0ebb135a418f78e14e342723414624c829991",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:597",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "aedf87a742fb4d63388dda5dc7a02a2a6a6a090237d23cf2ea6faf7d9d0f3746",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:598",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "6e3435ff9a2590f53c5ba008bcd543982d5f0166e07db9d4e488540219edc70f",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:599",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "0ebd13b5f00ef855c5457d8751738c0305b9206fd7c6481887f3736e8c5a16f3",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:600",
+      "classification": "ORDINARY",
+      "canonicalCandidateHash": "00972875f803b1f94686ffd57fc297b5fe179f2eff6b90d502329f5cd9160d27",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED"
+    }
+  ],
+  "manifestHash": "2534234d977044f262dad5345d54c967bff308e7006463ac9ac91031c99f9c2b"
+}

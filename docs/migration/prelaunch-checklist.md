@@ -43,7 +43,7 @@
 | Offers | SAFE CANONICAL COMPLETE 63/63 | Только отдельные future gates для media и backlog H/I |
 | Users source planning | COMPLETE | Ничего повторно не исследовать |
 | Users activation architecture | COMPLETE | Slices 1–3 merged via PR #70–#72 |
-| Users migration | VERTICAL SLICE COMPLETE | Slice 5 clean local batch; mass/production import not started |
+| Users migration | CLEAN LOCAL SCOPE COMPLETE | Slice 5: 564/564 local, production import not started |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -274,7 +274,8 @@ Slice 1 запрещено смешивать с:
       rate limits, password setup and audit.
 - [x] Slice 4 — User migration source/normalize/draft/validate/writer/lineage;
       local golden proof: two CREATE, one privileged BLOCKED, one common rerun.
-- [ ] Slice 5 — clean local User batch import.
+- [x] Slice 5 — clean local User batch import: 562 CREATE + 2 existing golden
+      SKIP_UNCHANGED; one rerun 564 SKIP_UNCHANGED.
 - [ ] Business ownership access proof — separate later slice.
 - [ ] Slice 7 — clean Batch 1 (20 records) + audit.
 - [ ] Slice 8 — remaining clean users in sequential batches.
@@ -477,21 +478,23 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 4 User migration vertical slice
-Branch: codex/users-migration-vertical-slice
-Base SHA: 82350ade626ae09968a8e1b30a51e9f46db47432
+Phase: USERS — Slice 5 clean local User batch import
+Branch: codex/users-clean-local-batch
+Base SHA: 4cd165e74fe249ae228a541066f3296f4c6d6ecb
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
 Slice 3: COMPLETE — PR #72 merged
 Slice 4: COMPLETE — local golden proof
+Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
 Mass/production User writes: NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 4 начать отдельный Slice 5 clean local User batch
-> import. Не начинать production writes, email delivery, ownership или media.
+> После review и merge Slice 5 начать отдельный Slice 6 manual/privileged
+> backlog and ownership planning. Не начинать production writes, email delivery,
+> ownership transfer или media import.
 
 ---
 
@@ -531,6 +534,17 @@ Mass/production User writes: NOT STARTED
   MigrationRecord +6 (three first-run attempts + three rerun attempts);
   Business/Place/Offer/MediaAsset 0.
 - Full/mass/production User migration, external email delivery, ownership and
+  profile media: NOT STARTED.
+- USERS Slice 5 clean local batch: COMPLETE.
+- Clean scope: 564; manual/privileged excluded: 15; imported manual: 0.
+- First run: CREATE 562, SKIP_UNCHANGED 2, BLOCKED 0, ERROR 0.
+- Exactly one common rerun: SKIP_UNCHANGED 564; additional reruns 0.
+- Slice 5 deltas: Users +562, MigrationLineage +562,
+  MigrationRecord +1128; Session/UserActionToken/Business/Place/Offer/
+  Article/Route/MediaAsset 0.
+- All 564 migrated Users remain PENDING_ACTIVATION with passwordHash null,
+  emailVerifiedAt null and role USER; emails/provider calls 0.
+- Production User migration, production email delivery, ownership transfer and
   profile media: NOT STARTED.
 - В этой docs-операции DB, WordPress, storage, media и network writes не
   выполнялись.
