@@ -47,6 +47,7 @@
 | Users manual/ownership planning | READ-ONLY PLANNING COMPLETE | Slice 6: manual backlog + ownership/authorship plans; no writes yet |
 | Users ownership golden proof | GOLDEN PROOF COMPLETE | Slice 7: 1/38 Business+Place link written; remaining 35, role elevation, media NOT STARTED |
 | Users ownership batch write | 36/38 EXACT CANDIDATES WRITTEN | Slice 8: 35 more written; 2 partial-lineage (89, 130) + role elevation NOT STARTED |
+| Users role elevation golden proof | GOLDEN PROOF COMPLETE | Slice 9: 1/36 USER->BUSINESS_OWNER written; remaining 35 role elevations NOT STARTED |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -481,9 +482,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 8 business ownership batch write
-Branch: codex/users-business-ownership-batch
-Base SHA: de258accb944f1e1065939811dc8cf7c0d8b9b3f (dev, PR #76 merged)
+Phase: USERS — Slice 9 BUSINESS_OWNER role elevation golden proof
+Branch: codex/users-business-owner-role-elevation-golden
+Base SHA: 009ac21b7cfb433d3f48925e5cd8c5d99f55c6dc (dev, PR #77 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -492,20 +493,20 @@ Slice 4: COMPLETE — local golden proof
 Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
 Slice 6: COMPLETE — read-only planning, merged via PR #75
 Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof, merged via PR #76
-Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof
+Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof, merged via PR #77
+Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof
 Mass/production User writes: NOT STARTED
-Role elevation (USER -> BUSINESS_OWNER): NOT STARTED
+Remaining role elevations (35): NOT STARTED
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 8 решить отдельно: (a) role elevation slice
-> (USER → BUSINESS_OWNER) с собственным authorization/rollback/idempotency
-> proof для уже написанных 36 Business, или (b) manual review двух
-> partial-lineage случаев (wordpress-db:user:89, wordpress-db:user:130). Не
-> начинать production writes, email delivery, bulk ownership transfer,
-> content authorship writes или media import без отдельного явного
-> разрешения.
+> После review и merge Slice 9 решить отдельно: (a) batch role elevation
+> для остальных 35 Business owners (по доказанному в Slice 9 write path),
+> или (b) manual review двух partial-lineage случаев
+> (wordpress-db:user:89, wordpress-db:user:130). Не начинать production
+> writes, email delivery, bulk ownership transfer, content authorship
+> writes или media import без отдельного явного разрешения.
 
 ---
 
@@ -731,3 +732,58 @@ remaining: wordpress-db:user:89, wordpress-db:user:130 (manual review)
 - Role elevation `USER → BUSINESS_OWNER`, the 2 partial-lineage cases,
   manual/privileged users (15), content authorship (12), profile media,
   and activation/email delivery: NOT STARTED.
+
+## 11. Краткий handoff — 2026-07-23 (Slice 9)
+
+```text
+USERS Slice 9: COMPLETE — BUSINESS_OWNER role elevation golden proof
+
+candidate: wordpress-db:user:38 (Business+Place link written in Slice 7)
+prerequisites verified: User lineage, Business lineage, Business.ownerUserId
+                         match, >=1 Place linked via ownerBusinessId
+
+first run: ELEVATE — role USER -> BUSINESS_OWNER (only field changed)
+rerun:     SKIP_UNCHANGED — zero further mutation
+
+untouched, verified byte-for-byte: status (PENDING_ACTIVATION), passwordHash,
+  emailVerifiedAt, email, Business row, Place.ownerBusinessId, sessions (0),
+  action tokens (0)
+all table counts: 0 delta (no new MigrationLineage/MigrationRecord —
+  role elevation is a single-field mutation of an already-migrated User,
+  not a new migrated entity)
+
+deferred: remaining 35 role elevations, users 89/130, manual/privileged (15),
+          authorship (12), media, activation/email
+```
+
+- USERS Slice 9 BUSINESS_OWNER role elevation golden proof: COMPLETE —
+  first privilege-elevation write in the ownership workstream, scoped to
+  exactly one candidate (`wordpress-db:user:38`), the same User whose
+  Business + Place ownership link was written in Slice 7.
+- New module `src/lib/migration/commit/business-ownership/
+  RoleElevationGoldenRunner.ts`: guards on the User/Business
+  `MigrationLineage` already existing, `Business.ownerUserId` matching the
+  target User, and at least one `Place` already linked via
+  `ownerBusinessId` — i.e. this slice only ever elevates a User whose
+  ownership was already proven by a prior migration write, never based on
+  title/name/similarity. The write itself changes exactly one field
+  (`User.role`) inside an atomic, serializable transaction that
+  re-verifies every precondition from a fresh read first.
+- The golden candidate is hardcoded in
+  `scripts/migration-role-elevation-golden.ts` rather than accepted as a
+  CLI argument, so the script cannot be pointed at any of the other 35
+  newly-owned Businesses or any other User.
+- First run: `ELEVATE` — `role: USER -> BUSINESS_OWNER`. Verified
+  byte-for-byte unchanged: `status` (`PENDING_ACTIVATION`), `passwordHash`,
+  `emailVerifiedAt`, `email`, the entire `Business` row, `Place.
+  ownerBusinessId`, sessions (0), action tokens (0). All twelve tracked
+  entity counts (User, Session, UserActionToken, Business, Place, Offer,
+  Article, Route, Activity, MediaAsset, MigrationLineage, MigrationRecord)
+  show a delta of 0 — role elevation intentionally creates no new
+  migration bookkeeping, since it mutates an already-migrated User rather
+  than migrating a new entity.
+- Rerun: `SKIP_UNCHANGED` — zero further mutation.
+- Remaining 35 role elevations (for the Businesses written in Slice 8),
+  the 2 partial-lineage cases, manual/privileged users (15), content
+  authorship (12), profile media, and activation/email delivery:
+  NOT STARTED.
