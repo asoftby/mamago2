@@ -1,0 +1,298 @@
+[
+  {
+    "authorshipEvidenceCount": 357,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "EMAIL_COLLISION_PRIVILEGED_TARGET",
+    "evidenceHash": "51e05f8dee31dfe365608159fc2158e9b2db887ee1916683f5e0b4a30113f9a1",
+    "ownershipEvidenceCount": 42,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH",
+      "EXISTING_USER_EMAIL_COLLISION",
+      "PRIVILEGED_TARGET_COLLISION",
+      "AMBIGUOUS_IDENTITY",
+      "OWNERSHIP_REQUIRES_MANUAL_REVIEW",
+      "AUTHORSHIP_REQUIRES_MANUAL_REVIEW"
+    ],
+    "recommendedDisposition": "KEEP_EXISTING_TARGET_UNCHANGED",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:1",
+    "targetStateCategory": "EXISTING_PRIVILEGED_TARGET_ACCOUNT"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "ec6a6a5c451aa74ff4e868bd9e04df2d1057a8b05e5dbc6c102a156c1e40b9c3",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:108",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "3eddc9847b94218eb0fd92770afad4d7bdb92f460394d83b8d0ea926bbe8ca4f",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:123",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 1439,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "969d3e36567f5db4ab1654d3e8827c4c697f7248c0d90aefa7943d7b62ac16e8",
+    "ownershipEvidenceCount": 9,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH",
+      "OWNERSHIP_REQUIRES_MANUAL_REVIEW",
+      "AUTHORSHIP_REQUIRES_MANUAL_REVIEW"
+    ],
+    "recommendedDisposition": "REQUIRES_FOUNDER_DECISION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:129",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "8ea0fc4d89b96d89fbf3185f726a6efe72075dae7f803bfb7adc0011d780173d",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:134",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 1,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "a8f7a9eab1e12d89a8dc1afe66ed462bcd08d20edd1c6418b6d194facb2ed35f",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH",
+      "AUTHORSHIP_REQUIRES_MANUAL_REVIEW"
+    ],
+    "recommendedDisposition": "REQUIRES_FOUNDER_DECISION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:14",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 65,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "7946482728b18d829320a751a3512967d2bc5b1663678b447a82ef3ca064e008",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH",
+      "AUTHORSHIP_REQUIRES_MANUAL_REVIEW"
+    ],
+    "recommendedDisposition": "REQUIRES_FOUNDER_DECISION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:16",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "2420709412ca2a93787d4560c328dd04c3aaab6c5edc6c45b4dc0f383916151b",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:21",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 1037,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "0c99e70be1f500e800f117bfd99319b90c29e4ea2cfd0aa4d7c70e953e36d045",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH",
+      "AUTHORSHIP_REQUIRES_MANUAL_REVIEW"
+    ],
+    "recommendedDisposition": "REQUIRES_FOUNDER_DECISION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:27",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 4,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "c67b7de40171c0f4b44b8a74f657e5c0c48a77d9b40a66d2727e6e5cff25bb01",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH",
+      "AUTHORSHIP_REQUIRES_MANUAL_REVIEW"
+    ],
+    "recommendedDisposition": "REQUIRES_FOUNDER_DECISION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:4",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "8a5f419cc29191afae17a326242a69fd938b71681e786a285a2f52435ff86005",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:438",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "a0d5272379dcef10e80068d60e4d566fa1d8561f26c27cd4b4008ecb63d33214",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:439",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "290c69becbfcfdd1bfab73deeaf3c13c6d0614f77ba731f9a2f2d9964593438b",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:51",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "bc5917302fb9122b82f0c57b8158daa6074ddc8b0cd24a4d3d3da31343da58aa",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:52",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  },
+  {
+    "authorshipEvidenceCount": 0,
+    "automaticRoleChange": "FORBIDDEN",
+    "classification": "MANUAL_PRIVILEGED",
+    "collisionType": "NONE",
+    "evidenceHash": "f774aeead0b8375a80a61c1d5b15d97730791506b0296c22404b3fbadf8297fc",
+    "ownershipEvidenceCount": 0,
+    "privilegeSignalTypes": [
+      "LEGACY_ADMINISTRATOR_ROLE"
+    ],
+    "reasonCodes": [
+      "PRIVILEGED_SOURCE_ACCOUNT",
+      "MISSING_SAFE_AUTO_MIGRATION_PATH"
+    ],
+    "recommendedDisposition": "EXCLUDE_FROM_MIGRATION",
+    "requiresHumanDecision": true,
+    "sourceRecordKey": "wordpress-db:user:6",
+    "targetStateCategory": "NO_TARGET_ACCOUNT_EXISTS"
+  }
+]
