@@ -53,6 +53,7 @@
 | Users partial-coverage ownership golden | GOLDEN PROOF COMPLETE (1/2) | Slice 12: user:130 published-Place-only ownership written; user:89 + role elevation NOT STARTED |
 | Users partial-coverage ownership (user:89) | COMPLETE (2/2) | Slice 13: 19 published Places atomically linked; 38/38 business-linked ownership done; role elevation NOT STARTED |
 | Business-linked USERS workstream | **FULLY CLOSED (38/38 ownership + 38/38 roles)** | Slice 14: users 89/130 elevated to BUSINESS_OWNER; workstream complete |
+| Content authorship reconciliation | RE-VERIFIED, READ-ONLY | Slice 15: 0 exact candidates, 10 target-not-migrated, 1 conflict, 1 partial — no golden write possible yet |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -487,9 +488,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 14 role elevation for partial-coverage owners
-Branch: codex/users-role-elevation-partial-coverage
-Base SHA: 0f083d19e2aa80780684d7144b5be7589a74828b (dev, PR #82 merged)
+Phase: USERS — Slice 15 content authorship targeted read-only reconciliation
+Branch: codex/users-content-authorship-reconciliation
+Base SHA: 7e4b3b13bcf07b472dfa7ebd9f1df00cae20a42d (dev, PR #83 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -504,20 +505,24 @@ Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof,
 Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes, merged via PR #80
 Slice 12: COMPLETE — user:130 ownership written (published Place only, draft excluded) + rerun proof, merged via PR #81
 Slice 13: COMPLETE — user:89 ownership written (19 published Places, 195 excluded) + rerun proof, merged via PR #82
-Slice 14: COMPLETE — users 89/130 elevated to BUSINESS_OWNER + rerun proof
+Slice 14: COMPLETE — users 89/130 elevated to BUSINESS_OWNER + rerun proof, merged via PR #83
 BUSINESS-LINKED USERS WORKSTREAM: FULLY CLOSED — 38/38 ownership, 38/38 correct roles
+Slice 15: COMPLETE — content authorship re-verified read-only: 0 exact, 10 not-migrated, 1 conflict, 1 partial (byte-identical to Slice 6)
 Mass/production User writes: NOT STARTED
 Place migration scope expansion (draft/unpublished): explicitly NOT undertaken
+Content authorship golden write: BLOCKED — no exact/conflict-free candidate exists yet
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 14 начать отдельный независимый трек: content
-> authorship planning->write vertical slice для 12 пользователей
-> (`docs/migration/content-authorship-plan.json` из Slice 6). Не начинать
-> production writes, email delivery, Place migration scope expansion,
-> manual/privileged user resolution или media import без отдельного
-> явного разрешения.
+> Content authorship имеет 0 EXACT_LINK_CANDIDATE среди текущих 12 —
+> golden write пока невозможен без отдельного product-решения:
+> (a) расширить Activity/Article/Route migration scope, чтобы у хотя бы
+> одного из 10 target-not-migrated случаев появился target, или (b)
+> отдельно разобрать conflict user:521 (5 Activities уже привязаны к
+> другому владельцу) до golden write. Не начинать authorship writes, role
+> changes, Place/Activity migration scope expansion, manual/privileged
+> user resolution или media import без отдельного явного разрешения.
 
 ---
 
@@ -1064,3 +1069,65 @@ BUSINESS-LINKED USERS WORKSTREAM: FULLY CLOSED
   activation/email delivery, and Place migration scope expansion to
   draft/unpublished content: all remain NOT STARTED / explicitly not
   undertaken.
+
+## 17. Краткий handoff — 2026-07-24 (Slice 15)
+
+```text
+USERS Slice 15: COMPLETE — content authorship read-only reconciliation
+
+scope: exactly 12 content-author users (Slice 6's plan) — pure
+       re-verification, no new users, no writes
+
+confirmed target fields: Article.authorUserId (nullable),
+  Route.authorId (nullable), Activity.ownerUserId (required, non-null)
+
+result: byte-identical to Slice 6's original content-authorship-plan.json
+  — proves nothing drifted for Article/Route/Activity across Slice 7-14
+  (which only touched User.role, Business, Place.ownerBusinessId)
+
+totals (12 users):
+  TARGET_NOT_MIGRATED:     10
+  EXISTING_AUTHOR_CONFLICT: 1  (wordpress-db:user:521)
+  PARTIAL_LINEAGE:          1  (wordpress-db:user:91)
+  EXACT_LINK_CANDIDATE:     0
+  ALREADY_SATISFIED:        0
+  UNSUPPORTED_TARGET:       0
+
+database writes: 0
+```
+
+- USERS Slice 15 content authorship targeted read-only reconciliation:
+  COMPLETE — re-verified the Slice 6 content authorship plan for the 12
+  content-author users against current DB state (post Slice 7-14),
+  reusing `planContentAuthorship` (Slice 6) completely unchanged — no new
+  classification logic, no authorship writes.
+- Confirmed the actual target fields per entity type before trusting any
+  count: `Article.authorUserId` (nullable), `Route.authorId` (nullable),
+  `Activity.ownerUserId` (required, non-null — a migrated Activity always
+  already has *some* owner, so a mismatch there is a real conflict, never
+  an absence).
+- **Result: the regenerated manifest is byte-identical (same SHA-256) to
+  Slice 6's original `content-authorship-plan.json`** — definitive proof
+  that nothing changed for Article/Route/Activity data across Slices
+  7-14, which is expected since none of those slices touched those
+  tables, but was verified fresh rather than assumed.
+- Confirmed totals across the 12 users: 10 `TARGET_NOT_MIGRATED`
+  (authored Activities/Article never reached the DB, no prior
+  `MigrationRecord` attempt), 1 `EXISTING_AUTHOR_CONFLICT`
+  (`wordpress-db:user:521` — 5 of 43 authored Activities are migrated,
+  all already owned by a different User via the required
+  `Activity.ownerUserId` column), 1 `PARTIAL_LINEAGE`
+  (`wordpress-db:user:91` — 15 of 53 authored Article/Route items
+  migrated, no conflict on those 15, but coverage incomplete).
+- **Important finding: there are currently 0 `EXACT_LINK_CANDIDATE` and 0
+  `ALREADY_SATISFIED` among the 12 users** — unlike the ownership
+  workstream (which started with 36 ready exact candidates), content
+  authorship has no immediately safe golden-write candidate. A golden
+  authorship write cannot proceed without a separate decision: either
+  extending Activity/Article/Route migration scope so at least one
+  `TARGET_NOT_MIGRATED` case gets a target, or specifically resolving the
+  `user:521` conflict.
+- Database writes: 0 (verified before/after counts identical).
+- Manual/privileged users (15), profile media, activation/email
+  delivery, and Place/Activity migration scope expansion: all remain NOT
+  STARTED / explicitly not undertaken.
