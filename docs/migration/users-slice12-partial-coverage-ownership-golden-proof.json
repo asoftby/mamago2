@@ -1,0 +1,66 @@
+{
+  "phase": "USERS Slice 12 partial-coverage ownership golden proof",
+  "scope": "exactly wordpress-db:user:130 — the smaller of the 2 partial-coverage business-linked users found in Slice 11",
+  "fixedManifest": {
+    "includedMigratedPlace": {
+      "sourcePostId": "18886",
+      "sourceStatus": "publish",
+      "sourceRecordKey": "wordpress-db:places:18886"
+    },
+    "excludedDraftPlace": {
+      "sourcePostId": "30605",
+      "sourceStatus": "draft",
+      "sourceRecordKey": "wordpress-db:places:30605",
+      "note": "never imported, never referenced by the write path — confirmed absent from MigrationLineage and MigrationRecord both before and after this run"
+    }
+  },
+  "writePathReused": "BusinessOwnershipGoldenRunner (Slice 7) — completely unchanged; only the candidate's placeSourcePostIds is a deliberately fixed, reduced manifest",
+  "firstRun": {
+    "action": "CREATE",
+    "businessCreated": 1,
+    "placeOwnershipLinked": 1,
+    "businessLineageCreated": 1,
+    "migrationRecordCreated": 1,
+    "roleChanges": 0
+  },
+  "rerun": {
+    "action": "SKIP_UNCHANGED",
+    "businessCreated": 0,
+    "placeOwnershipLinked": 0,
+    "businessLineageCreated": 0,
+    "roleChanges": 0
+  },
+  "deltas": {
+    "userDelta": 0,
+    "sessionDelta": 0,
+    "userActionTokenDelta": 0,
+    "businessDelta": 1,
+    "placeDelta": 0,
+    "offerDelta": 0,
+    "articleDelta": 0,
+    "routeDelta": 0,
+    "activityDelta": 0,
+    "mediaAssetDelta": 0,
+    "migrationLineageDelta": 1,
+    "migrationRecordDelta": 1
+  },
+  "security": {
+    "targetUserRoleBefore": "USER",
+    "targetUserRoleAfter": "USER",
+    "targetUserStatus": "PENDING_ACTIVATION",
+    "draftPlaceImported": false,
+    "draftPlaceLineageCreated": false,
+    "draftPlaceMigrationRecordCreated": false,
+    "emailsSent": 0,
+    "providerCalls": 0
+  },
+  "deferredScope": {
+    "wordpressDbUser89": "separate, much larger partial-coverage case (19 migrated / 195 excluded Places) — NOT_STARTED, planned as its own next step",
+    "roleElevationUserToBusinessOwner": "NOT_STARTED for both 89 and 130 — planned only after both users' ownership links are written",
+    "manualPrivilegedUsers": 15,
+    "contentAuthorship": 12,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED",
+    "placeMigrationScopeExpansion": "explicitly NOT undertaken — draft/unpublished Places remain out of migration scope"
+  }
+}
