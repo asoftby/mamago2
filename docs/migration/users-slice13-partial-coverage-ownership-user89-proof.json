@@ -1,0 +1,74 @@
+{
+  "phase": "USERS Slice 13 partial-coverage ownership write for wordpress-db:user:89",
+  "scope": "exactly wordpress-db:user:89 — the second and larger of the 2 partial-coverage business-linked users found in Slice 11",
+  "fixedManifest": {
+    "includedMigratedPlaceCount": 19,
+    "includedPlaceSourcePostIds": ["437", "5457", "5492", "5515", "5528", "5579", "12447", "12923", "13311", "13317", "13322", "13323", "13324", "13327", "13331", "45846", "48372", "49952", "49977"],
+    "excludedPlaceCount": 195,
+    "excludedBreakdown": { "unpublished": 187, "draft": 8 },
+    "note": "excluded Places were never imported, never referenced by the write path — confirmed absent from MigrationLineage and MigrationRecord both before and after this run"
+  },
+  "writePathReused": "BusinessOwnershipGoldenRunner (Slice 7, also used unchanged in Slice 12) — no new write logic",
+  "guardsEnforced": [
+    "all 19 Place MigrationLineage rows verified active before CREATE",
+    "no Place owned by a different Business (checked fresh inside the transaction)",
+    "exact 19-Place set fixed in the CLI script's hardcoded candidate, not derived at runtime",
+    "conditional Place.updateMany guarded on ownerBusinessId: null (CAS), aborts if any Place was claimed concurrently",
+    "single Serializable transaction for the whole candidate — Business create + all 19 Place links + BUSINESS lineage + bookkeeping happen atomically or not at all",
+    "any precondition mismatch anywhere in the transaction throws and rolls back the entire write, leaving 0 changes"
+  ],
+  "firstRun": {
+    "action": "CREATE",
+    "businessCreated": 1,
+    "placeOwnershipLinked": 19,
+    "businessLineageCreated": 1,
+    "migrationRecordCreated": 1,
+    "roleChanges": 0,
+    "excludedPlaceLineageCreated": 0,
+    "excludedPlaceRecordCreated": 0
+  },
+  "rerun": {
+    "action": "SKIP_UNCHANGED",
+    "businessCreated": 0,
+    "placeOwnershipLinked": 0,
+    "businessLineageCreated": 0,
+    "roleChanges": 0
+  },
+  "deltas": {
+    "userDelta": 0,
+    "sessionDelta": 0,
+    "userActionTokenDelta": 0,
+    "businessDelta": 1,
+    "placeDelta": 0,
+    "offerDelta": 0,
+    "articleDelta": 0,
+    "routeDelta": 0,
+    "activityDelta": 0,
+    "mediaAssetDelta": 0,
+    "migrationLineageDelta": 1,
+    "migrationRecordDelta": 1
+  },
+  "security": {
+    "targetUserRoleBefore": "USER",
+    "targetUserRoleAfter": "USER",
+    "targetUserStatus": "PENDING_ACTIVATION",
+    "excludedPlacesImported": 0,
+    "emailsSent": 0,
+    "providerCalls": 0
+  },
+  "combinedPartialCoverageProgress": {
+    "businessLinkedUsers": 38,
+    "exactCandidatesWritten": 36,
+    "partialCoverageWritten": 2,
+    "totalOwnershipWritten": 38,
+    "note": "all 38 business-linked users now have a real Business + Place ownership link (36 exact via Slice 7/8, 2 partial via Slice 12/13)"
+  },
+  "deferredScope": {
+    "roleElevationUserToBusinessOwner": "NOT_STARTED for both wordpress-db:user:89 and wordpress-db:user:130 — planned as Slice 14, only after both users' ownership links exist (now true)",
+    "manualPrivilegedUsers": 15,
+    "contentAuthorship": 12,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED",
+    "placeMigrationScopeExpansion": "explicitly NOT undertaken — the 195 excluded unpublished/draft Places remain out of migration scope"
+  }
+}
