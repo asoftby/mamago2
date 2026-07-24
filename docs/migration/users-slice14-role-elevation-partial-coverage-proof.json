@@ -1,0 +1,77 @@
+{
+  "phase": "USERS Slice 14 role elevation for partial-coverage owners",
+  "scope": "exactly wordpress-db:user:89 and wordpress-db:user:130 — the final 2 of the 38 business-linked users",
+  "writePathReused": "RoleElevationBatchRunner (Slice 10), which itself reuses RoleElevationGoldenRunner (Slice 9) unchanged — hardcoded 2-candidate manifest, no live query",
+  "prerequisitesVerifiedPerCandidate": [
+    "active User MigrationLineage",
+    "active BUSINESS MigrationLineage",
+    "Business.ownerUserId points to this User",
+    "at least one Place linked via ownerBusinessId (19 for user:89, 1 for user:130)",
+    "role strictly USER before the write",
+    "status strictly PENDING_ACTIVATION before the write"
+  ],
+  "firstRun": {
+    "total": 2,
+    "processed": 2,
+    "elevate": 2,
+    "skipUnchanged": 0,
+    "blocked": 0,
+    "stoppedEarly": false,
+    "sequence": ["wordpress-db:user:89: USER -> BUSINESS_OWNER", "wordpress-db:user:130: USER -> BUSINESS_OWNER"]
+  },
+  "rerun": {
+    "total": 2,
+    "processed": 2,
+    "elevate": 0,
+    "skipUnchanged": 2,
+    "blocked": 0,
+    "stoppedEarly": false
+  },
+  "deltas": {
+    "userDelta": 0,
+    "sessionDelta": 0,
+    "userActionTokenDelta": 0,
+    "businessDelta": 0,
+    "placeDelta": 0,
+    "offerDelta": 0,
+    "articleDelta": 0,
+    "routeDelta": 0,
+    "activityDelta": 0,
+    "mediaAssetDelta": 0,
+    "migrationLineageDelta": 0,
+    "migrationRecordDelta": 0
+  },
+  "fieldLevelProof": {
+    "businessRowsByteForByteUnchanged": true,
+    "placeOwnershipByteForByteUnchanged": true,
+    "bothTargets": {
+      "roleChanged": "USER -> BUSINESS_OWNER",
+      "statusUnchanged": true,
+      "passwordHashUnchanged": true,
+      "emailVerifiedAtUnchanged": true,
+      "emailUnchanged": true,
+      "sessionsAfter": 0,
+      "actionTokensAfter": 0
+    }
+  },
+  "security": {
+    "emailsSent": 0,
+    "providerCalls": 0,
+    "otherUsersAffected": 0
+  },
+  "workstreamClosure": {
+    "businessLinkedUsers": 38,
+    "ownershipWritten": 38,
+    "correctRolesElevated": 38,
+    "verifiedViaMigrationLineage": "38 Users with role=BUSINESS_OWNER and an active BUSINESS lineage row — exact match, no more, no less",
+    "note": "1 additional pre-existing BUSINESS_OWNER user (business@mamago.local, a dev/seed account created before this workstream began) also exists in the DB but is unrelated to migration and was correctly excluded from this count via MigrationLineage cross-reference",
+    "status": "BUSINESS-LINKED USERS WORKSTREAM FULLY CLOSED"
+  },
+  "deferredScope": {
+    "manualPrivilegedUsers": 15,
+    "contentAuthorship": 12,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED",
+    "placeMigrationScopeExpansion": "explicitly NOT undertaken — 195 excluded unpublished/draft Places for user:89, 1 for user:130 remain untouched"
+  }
+}

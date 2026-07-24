@@ -52,6 +52,7 @@
 | Users business-linked tail reconciliation | READ-ONLY FINDINGS COMPLETE | Slice 11: both 89/130 = TARGET_PLACE_NOT_MIGRATED (draft/unpublished scope), no writes |
 | Users partial-coverage ownership golden | GOLDEN PROOF COMPLETE (1/2) | Slice 12: user:130 published-Place-only ownership written; user:89 + role elevation NOT STARTED |
 | Users partial-coverage ownership (user:89) | COMPLETE (2/2) | Slice 13: 19 published Places atomically linked; 38/38 business-linked ownership done; role elevation NOT STARTED |
+| Business-linked USERS workstream | **FULLY CLOSED (38/38 ownership + 38/38 roles)** | Slice 14: users 89/130 elevated to BUSINESS_OWNER; workstream complete |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -486,9 +487,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 13 partial-coverage ownership write (user:89)
-Branch: codex/users-partial-coverage-ownership-user89
-Base SHA: 0da3c3832e6af36c5eaae046a2fa85e0f840a78f (dev, PR #81 merged)
+Phase: USERS — Slice 14 role elevation for partial-coverage owners
+Branch: codex/users-role-elevation-partial-coverage
+Base SHA: 0f083d19e2aa80780684d7144b5be7589a74828b (dev, PR #82 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -502,22 +503,21 @@ Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun pr
 Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof, merged via PR #79
 Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes, merged via PR #80
 Slice 12: COMPLETE — user:130 ownership written (published Place only, draft excluded) + rerun proof, merged via PR #81
-Slice 13: COMPLETE — user:89 ownership written (19 published Places, 195 excluded) + rerun proof — 38/38 business-linked ownership done
+Slice 13: COMPLETE — user:89 ownership written (19 published Places, 195 excluded) + rerun proof, merged via PR #82
+Slice 14: COMPLETE — users 89/130 elevated to BUSINESS_OWNER + rerun proof
+BUSINESS-LINKED USERS WORKSTREAM: FULLY CLOSED — 38/38 ownership, 38/38 correct roles
 Mass/production User writes: NOT STARTED
 Place migration scope expansion (draft/unpublished): explicitly NOT undertaken
-Role elevation for users 89/130: NOT STARTED (planned as Slice 14)
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 13 провести отдельный Slice 14: повысить
-> ТОЛЬКО `wordpress-db:user:89` и `wordpress-db:user:130` до
-> `BUSINESS_OWNER` тем же доказанным write path (Slice 9/10), с
-> сохранением `status: PENDING_ACTIVATION` и rerun `SKIP_UNCHANGED`. После
-> этого business-linked USERS workstream будет закрыт полностью: 38/38
-> ownership и 38/38 корректных ролей. Не начинать production writes,
-> email delivery, Place migration scope expansion, content authorship
-> writes или media import без отдельного явного разрешения.
+> После review и merge Slice 14 начать отдельный независимый трек: content
+> authorship planning->write vertical slice для 12 пользователей
+> (`docs/migration/content-authorship-plan.json` из Slice 6). Не начинать
+> production writes, email delivery, Place migration scope expansion,
+> manual/privileged user resolution или media import без отдельного
+> явного разрешения.
 
 ---
 
@@ -1010,3 +1010,57 @@ business-linked ownership workstream: 38/38 users now have a real
   next step (Slice 14) — deliberately not done in this slice. Place
   migration scope expansion to draft/unpublished content was explicitly
   not undertaken.
+
+## 16. Краткий handoff — 2026-07-24 (Slice 14)
+
+```text
+USERS Slice 14: COMPLETE — role elevation for partial-coverage owners
+
+candidates: wordpress-db:user:89, wordpress-db:user:130 (exactly these 2)
+write path: RoleElevationBatchRunner (Slice 10) — completely unchanged,
+            hardcoded 2-candidate manifest, no live query
+
+first run: 2/2 ELEVATE — role USER -> BUSINESS_OWNER for both, sequential
+rerun:     2/2 SKIP_UNCHANGED — zero further mutation
+
+untouched, verified byte-for-byte for both: status (PENDING_ACTIVATION),
+  passwordHash, emailVerifiedAt, email, sessions (0), action tokens (0)
+Business rows and Place ownership: content-hash identical before/after
+all 12 tracked table counts: 0 delta
+
+BUSINESS-LINKED USERS WORKSTREAM: FULLY CLOSED
+  ownership: 38/38 (36 exact candidates + 2 partial-coverage)
+  correct roles: 38/38 BUSINESS_OWNER (verified via MigrationLineage
+    cross-reference, excluding 1 unrelated pre-existing dev/seed account)
+```
+
+- USERS Slice 14 role elevation for partial-coverage owners: COMPLETE —
+  the final 2 of the 38 business-linked users. Reused
+  `RoleElevationBatchRunner` (Slice 10), which itself reuses
+  `RoleElevationGoldenRunner` (Slice 9) unchanged, with a hardcoded
+  2-candidate manifest rather than a live query — the script cannot
+  accidentally touch any of the 36 users already elevated in Slice 9/10.
+- Prerequisites verified per candidate before the write: active User
+  lineage, active BUSINESS lineage, `Business.ownerUserId` matching the
+  target User, at least one Place linked via `ownerBusinessId` (19 for
+  user:89, 1 for user:130), role strictly `USER`, status strictly
+  `PENDING_ACTIVATION`.
+- First run: 2/2 `ELEVATE`, sequential (`user:89` then `user:130`), 0
+  `BLOCKED`. Verified byte-for-byte unchanged for both: `status`
+  (`PENDING_ACTIVATION`), `passwordHash`, `emailVerifiedAt`, `email`,
+  sessions (0), action tokens (0). A content hash of every `Business` row
+  and its linked `Place` rows was identical before and after. All 12
+  tracked entity counts: 0 delta.
+- Rerun: 2/2 `SKIP_UNCHANGED`, zero further writes.
+- Final tally verified via `MigrationLineage` cross-reference (not just a
+  raw count): exactly 38 Users have `role=BUSINESS_OWNER` backed by an
+  active `BUSINESS` lineage row — no more, no less. One additional
+  `BUSINESS_OWNER` user in the DB (`business@mamago.local`) is an
+  unrelated pre-existing dev/seed account created before this workstream
+  began and was correctly excluded from the count.
+- **Business-linked USERS workstream is now fully closed**: 38/38
+  ownership links and 38/38 correct roles.
+- Manual/privileged users (15), content authorship (12), profile media,
+  activation/email delivery, and Place migration scope expansion to
+  draft/unpublished content: all remain NOT STARTED / explicitly not
+  undertaken.
