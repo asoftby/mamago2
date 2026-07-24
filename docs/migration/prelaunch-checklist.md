@@ -51,6 +51,7 @@
 | Users role elevation batch | 36/36 ELIGIBLE OWNERS ELEVATED | Slice 10: all remaining 35 elevated; users 89/130 + authorship/media/email NOT STARTED |
 | Users business-linked tail reconciliation | READ-ONLY FINDINGS COMPLETE | Slice 11: both 89/130 = TARGET_PLACE_NOT_MIGRATED (draft/unpublished scope), no writes |
 | Users partial-coverage ownership golden | GOLDEN PROOF COMPLETE (1/2) | Slice 12: user:130 published-Place-only ownership written; user:89 + role elevation NOT STARTED |
+| Users partial-coverage ownership (user:89) | COMPLETE (2/2) | Slice 13: 19 published Places atomically linked; 38/38 business-linked ownership done; role elevation NOT STARTED |
 | Profiles/ownership/media | NOT STARTED | После Users identity foundation |
 | Reviews | NOT STARTED | После Users + Places identity mappings |
 | Article media | NOT STARTED | Cover + inline media remap |
@@ -485,9 +486,9 @@ Place phone E.164 issue уже исправлен.
 ## 7. Текущий следующий шаг
 
 ```text
-Phase: USERS — Slice 12 partial-coverage ownership golden proof (user:130)
-Branch: codex/users-partial-coverage-ownership-golden
-Base SHA: 1a683ede4946fd73330790881139a5c60497c406 (dev, PR #80 merged)
+Phase: USERS — Slice 13 partial-coverage ownership write (user:89)
+Branch: codex/users-partial-coverage-ownership-user89
+Base SHA: 0da3c3832e6af36c5eaae046a2fa85e0f840a78f (dev, PR #81 merged)
 Source/architecture discovery: COMPLETE — не повторять
 Slice 1: COMPLETE — PR #70 merged
 Slice 2: COMPLETE — PR #71 merged
@@ -500,20 +501,23 @@ Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun
 Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof, merged via PR #78
 Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof, merged via PR #79
 Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes, merged via PR #80
-Slice 12: COMPLETE — user:130 ownership written (published Place only, draft excluded) + rerun proof
+Slice 12: COMPLETE — user:130 ownership written (published Place only, draft excluded) + rerun proof, merged via PR #81
+Slice 13: COMPLETE — user:89 ownership written (19 published Places, 195 excluded) + rerun proof — 38/38 business-linked ownership done
 Mass/production User writes: NOT STARTED
 Place migration scope expansion (draft/unpublished): explicitly NOT undertaken
+Role elevation for users 89/130: NOT STARTED (planned as Slice 14)
 ```
 
 Следующее одно действие:
 
-> После review и merge Slice 12 провести отдельный Slice 13 для
-> `wordpress-db:user:89` тем же доказанным write path (fixed manifest: 19
-> included migrated Places, 195 excluded unpublished/draft Places). После
-> успешной ownership-связи ОБОИХ пользователей (89 и 130) — отдельный
-> slice на повышение их ролей до `BUSINESS_OWNER`. Не начинать production
-> writes, email delivery, Place migration scope expansion, content
-> authorship writes или media import без отдельного явного разрешения.
+> После review и merge Slice 13 провести отдельный Slice 14: повысить
+> ТОЛЬКО `wordpress-db:user:89` и `wordpress-db:user:130` до
+> `BUSINESS_OWNER` тем же доказанным write path (Slice 9/10), с
+> сохранением `status: PENDING_ACTIVATION` и rerun `SKIP_UNCHANGED`. После
+> этого business-linked USERS workstream будет закрыт полностью: 38/38
+> ownership и 38/38 корректных ролей. Не начинать production writes,
+> email delivery, Place migration scope expansion, content authorship
+> writes или media import без отдельного явного разрешения.
 
 ---
 
@@ -947,5 +951,62 @@ deferred: wordpress-db:user:89 (separate, larger partial-coverage case),
   path with its own fixed manifest.
 - Role elevation `USER → BUSINESS_OWNER` for both 89 and 130 is
   explicitly deferred until both users' ownership links exist; Place
+  migration scope expansion to draft/unpublished content was explicitly
+  not undertaken.
+
+## 15. Краткий handoff — 2026-07-24 (Slice 13)
+
+```text
+USERS Slice 13: COMPLETE — partial-coverage ownership write (user:89)
+
+candidate: wordpress-db:user:89
+fixed manifest: 19 included publish-status Places, 195 excluded
+                 (187 unpublished, 8 draft) — never imported
+write path: BusinessOwnershipGoldenRunner (Slice 7/12) — completely unchanged
+
+first run: CREATE — Business +1, 19 Places linked atomically,
+           BUSINESS lineage +1, MigrationRecord +1, role changes 0
+rerun:     SKIP_UNCHANGED — zero further mutation
+
+verified: all 195 excluded Places have zero MigrationLineage and zero
+          MigrationRecord, before and after this run
+target User role/status: unchanged (USER / PENDING_ACTIVATION)
+
+business-linked ownership workstream: 38/38 users now have a real
+  Business + Place ownership link (36 exact candidates via Slice 7/8,
+  2 partial-coverage via Slice 12/13)
+```
+
+- USERS Slice 13 partial-coverage ownership write: COMPLETE — the
+  second and larger of the 2 partial-coverage business-linked users
+  identified in Slice 11. Reused `BusinessOwnershipGoldenRunner`
+  (Slice 7, also used unchanged in Slice 12) with zero new write logic —
+  the runner's existing preconditions (exact lineage match for every
+  entry in `placeSourcePostIds`, conditional `updateMany` guarded on
+  `ownerBusinessId: null`, single Serializable transaction) already
+  guarantee atomic all-or-nothing behaviour for a 19-Place set exactly as
+  they did for the single-Place candidates in Slice 7/8/12.
+- The fixed 19-Place manifest is hardcoded in
+  `scripts/migration-partial-coverage-ownership-user89.ts`, so the
+  script cannot accidentally pull in any of the 195 excluded
+  unpublished/draft Places.
+- Verified before the write: Place `437` (flagged in an earlier session
+  as manually content-edited post-import) was unowned and had active
+  lineage like the other 18 — the manual edit concerned content fields,
+  not ownership, so it did not block or complicate this write.
+- First run: `CREATE` — deltas: Business +1, MigrationLineage +1 (the
+  one BUSINESS lineage row — Place lineage already existed for all 19),
+  MigrationRecord +1; all other tracked counts unchanged; target User
+  role/status/passwordHash/emailVerifiedAt unchanged (`USER` /
+  `PENDING_ACTIVATION`).
+- Verified explicitly: all 195 excluded Places have zero
+  `MigrationLineage` and zero `MigrationRecord`, both before and after
+  this run.
+- Rerun: `SKIP_UNCHANGED` — identical Business id, zero further writes.
+- **Business-linked ownership workstream now complete: 38/38 users**
+  have a real Business + Place link (36 exact candidates from Slice 7/8,
+  2 partial-coverage from Slice 12/13).
+- Role elevation `USER → BUSINESS_OWNER` for both 89 and 130 remains the
+  next step (Slice 14) — deliberately not done in this slice. Place
   migration scope expansion to draft/unpublished content was explicitly
   not undertaken.
