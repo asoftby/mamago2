@@ -1,0 +1,106 @@
+{
+  "phase": "ARTICLES Slice 20 authorship assignment for wordpress-db:user:575",
+  "baseSha": "b50c22fcb9c804c30e50718d4ab72716b55f00b1",
+  "scope": [
+    "wordpress-db:post:56250",
+    "wordpress-db:post:57731"
+  ],
+  "environmentGate": {
+    "repository": "/Users/shapovalovalexey/dev/mamago2",
+    "branch": "codex/articles-user575-authorship-assignment",
+    "environment": "LOCAL",
+    "database": "localhost:5433/mamago2",
+    "targetUserId": "cmrwr37tw03brws1jjh672ph3",
+    "stashPreserved": true,
+    "nextEnvUntouched": true
+  },
+  "writeContract": {
+    "order": [
+      "wordpress-db:post:56250",
+      "wordpress-db:post:57731"
+    ],
+    "stopOnFirstError": true,
+    "cas": "Article.updateMany WHERE id = expectedArticleId AND authorUserId IS NULL",
+    "preconditionsRepeatedBeforeEachWrite": [
+      "LOCAL database gate",
+      "exactly one active USER lineage for wordpress-db:user:575",
+      "target User exists and is not deleted",
+      "exactly one active ARTICLE lineage",
+      "no other active lineage for the source key",
+      "exact target Article exists",
+      "authorUserId is null"
+    ]
+  },
+  "firstRun": [
+    {
+      "sourceRecordKey": "wordpress-db:post:56250",
+      "articleId": "cms37q1ca0006ws27z75ug52h",
+      "action": "ASSIGNED",
+      "authorUserIdBefore": null,
+      "authorUserIdAfter": "cmrwr37tw03brws1jjh672ph3"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:57731",
+      "articleId": "cms39185o0006ws0kt9lxp6t7",
+      "action": "ASSIGNED",
+      "authorUserIdBefore": null,
+      "authorUserIdAfter": "cmrwr37tw03brws1jjh672ph3"
+    }
+  ],
+  "commonRerun": [
+    {
+      "sourceRecordKey": "wordpress-db:post:56250",
+      "action": "ALREADY_SATISFIED",
+      "articleWrites": 0
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:57731",
+      "action": "ALREADY_SATISFIED",
+      "articleWrites": 0
+    }
+  ],
+  "deltas": {
+    "ArticleRowsUpdated": 2,
+    "AuthorUserIdRelations": 2,
+    "ArticleCreates": 0,
+    "MigrationLineage": 0,
+    "MigrationRecord": 0,
+    "User": 0,
+    "Session": 0,
+    "UserActionToken": 0,
+    "Business": 0,
+    "Place": 0,
+    "Offer": 0,
+    "Route": 0,
+    "Activity": 0,
+    "MediaAsset": 0,
+    "StorageWrites": 0
+  },
+  "finalCounts": {
+    "User": 579,
+    "Session": 5,
+    "UserActionToken": 0,
+    "Business": 41,
+    "Place": 83,
+    "Offer": 63,
+    "Article": 26,
+    "Route": 14,
+    "Activity": 10,
+    "MediaAsset": 125,
+    "MigrationLineage": 912,
+    "MigrationRecord": 1580
+  },
+  "unchangedHashes": {
+    "userRoleStatus": "a4f2bbda1e70353f7dc27d56b11a6b2296b332257feb3aa7f4e57c733caa4c54",
+    "businessPlaceOwnership": "6a799ab95e283fd90f0a763f9c2b28233d5d74ccaa95f7490e8021eb2690a0ec",
+    "mediaAssets": "45c621757ab9e30ad4fecf0389d61d1202ce1ddfeef2497ee7be5fc168d69cc0"
+  },
+  "forbiddenFieldsUnchanged": {
+    "status": "PENDING",
+    "cityId": null,
+    "geoScope": null,
+    "coverImageId": null
+  },
+  "decision": "AUTHORSHIP_USER575_COMPLETE",
+  "nextExactStep": "Editorial closure for the two Articles: city/geo, approved publication flow, blog visibility, and separate cover/media decision."
+}
