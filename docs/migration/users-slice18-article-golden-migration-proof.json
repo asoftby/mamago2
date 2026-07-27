@@ -1,0 +1,67 @@
+{
+  "phase": "ARTICLES Slice 18 golden migration",
+  "scope": "exactly the golden candidate wordpress-db:post:56250 (selected in Slice 17)",
+  "sourceGap": {
+    "problem": "Slice 16's durable Activity snapshot deliberately excluded post_content/post_title/post_excerpt and only captured a narrow Activity-relevant postmeta allowlist. There is no fixture/JSON-input path for Article (only Place has one). Building a valid Article draft (title is required, non-null) was impossible from the sources this slice was originally scoped to.",
+    "resolution": "Explicitly authorized: one scoped, exact-sourceRecordKey, read-only SSH fetch via the already-existing fetchPublishedArticleEnvelopeBySourceRecordKey — the same mechanism migration-commit-wordpress-db.ts already uses for every Article import. Not a new snapshot, not a broad capture, not new discovery.",
+    "sshProbes": 1,
+    "wordPressQueriesScope": "exactly wordpress-db:post:56250, no other record"
+  },
+  "preconditionsVerified": {
+    "sourceKeyExact": "wordpress-db:post:56250",
+    "sourceStatus": "publish",
+    "userLineageActive": true,
+    "targetUserId": "cmrwr37tw03brws1jjh672ph3",
+    "existingArticleLineageBeforeWrite": null,
+    "existingMigrationRecordHistoryBeforeWrite": 0,
+    "slugCollision": "none (chem-zanyatsya-na-novogodnih-kanikulah, no existing Article with this slug)",
+    "environment": "LOCAL"
+  },
+  "writePath": "existing migration-commit-wordpress-db.ts --entity article vertical slice (fetch -> normalizeArticle -> buildArticleCreateDraft -> ArticleCommitOrchestrator -> ArticleCommitWriter -> MigrationLineageWriter -> MigrationRecord), zero new code, zero writer/context extension",
+  "firstRun": {
+    "outcome": "LINKED",
+    "action": "CREATE",
+    "articleId": "cms37q1ca0006ws27z75ug52h",
+    "lineageId": "cms37q1cr0008ws27g718gva8",
+    "deltas": { "article": "+1 (24->25)", "migrationLineage": "+1 (910->911)", "migrationRecord": "+1 (1575->1576)" },
+    "unchangedTables": ["user (579)", "session (5)", "userActionToken (0)", "business (41)", "place (83)", "offer (63)", "route (14)", "activity (10)", "mediaAsset (125)"],
+    "mediaImporterCalls": 0
+  },
+  "writtenArticleFields": {
+    "title": "(real published title, verbatim from WordPress)",
+    "slug": "chem-zanyatsya-na-novogodnih-kanikulah",
+    "status": "PENDING",
+    "authorUserId": null,
+    "cityId": null,
+    "geoScope": null,
+    "coverImageId": null
+  },
+  "authorshipDecision": {
+    "chosen": "authorUserId left null",
+    "note": "ArticleCommitContext.authorUserId already supports a direct author assignment (no writer extension would have been needed to set it to user:575's target id), but authorship is deliberately kept as its own separately-authorized step (Slice 20/21) — mirrors the same ownership/role-elevation split already used in Slices 7-14."
+  },
+  "rerun": {
+    "outcome": "SKIPPED",
+    "articleRowUnchanged": true,
+    "duplicateLineageRows": 0,
+    "deltas": { "article": "0 (still 25)", "migrationLineage": "0 (still 911)", "migrationRecord": "+1 (fresh per-invocation bookkeeping row, not a re-CREATE)" },
+    "mediaImporterCalls": 0
+  },
+  "auditProof": {
+    "tablesChecked": ["User", "Session", "UserActionToken", "Business", "Place", "Offer", "Article", "Route", "Activity", "MediaAsset", "MigrationLineage", "MigrationRecord"],
+    "userRoleStatusUnchanged": true,
+    "businessPlaceOwnershipUnchanged": true,
+    "activityUnchanged": true,
+    "routeUnchanged": true,
+    "mediaAssetUnchanged": true
+  },
+  "decision": "ARTICLE_GOLDEN_COMPLETE_FOR_POST_56250",
+  "deferredScope": {
+    "remainingArticle": "wordpress-db:post:57731 — Slice 19",
+    "authorshipReconciliation": "Slice 20 — read-only, after both Articles migrated",
+    "authorshipWrite": "Slice 21 — only if an EXACT_AUTHORSHIP_CANDIDATE appears",
+    "expiredActivityRelations": "P1_HISTORICAL_EXPIRED_ACTIVITY (Slice 16) — unchanged",
+    "user521Conflict": "deferred — unrelated to this slice",
+    "user91PartialLineage": "deferred — unrelated to this slice"
+  }
+}

@@ -3,12 +3,12 @@
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
 **Обновлено:** 2026-07-27  
-**Base:** `dev` @ `7ce3c8cadc71ccbd166a82ef2190bc02609c9507` — PR #88 merged  
-**Текущая фаза:** `ARTICLES — Slice 18 published Article golden migration`  
-**Текущий кандидат:** `wordpress-db:post:56250`  
-**Текущий gate:** `READY_FOR_SLICE_18`; Article/author/media writes ещё не выполнялись
+**Base:** `dev` @ `c8a3f9aa0c2940aeb57dc5fb015937630f407036` — PR #89 merged  
+**Текущая фаза:** `ARTICLES — Slice 18 golden migration COMPLETE (post:56250)`  
+**Текущий кандидат для следующего шага:** `wordpress-db:post:57731` (Slice 19)  
+**Текущий gate:** `READY_FOR_SLICE_19`
 
-> Подробная история Slices 1–17 сохранена в Git и профильных proof-документах.
+> Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
 > путь до запуска.
 
@@ -38,6 +38,7 @@
 Permissions: `0700` для директорий, `0600` для файлов. Raw snapshots в Git не коммитятся.
 
 15. Тесты не зависят от `/tmp` или приватных home-directory snapshots: только committed sanitized fixtures либо self-generated temporary fixtures.
+16. Content-bearing entities (Article/Place/Event/Route/Offer) не могут быть полностью смигрированы из lightweight dependency-snapshot'ов — их SSH-based vertical slice (exact `--source-record-key`, один exact-key read) остаётся единственным источником `title`/`content`/postmeta/terms и разрешён без отдельного нового "snapshot capture" gate.
 
 ---
 
@@ -55,7 +56,7 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
 | Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
 | Activities | P0 CLOSED | 63 expired Events → `P1_HISTORICAL_EXPIRED_ACTIVITY` |
-| Content authorship | ARTICLE PATH IDENTIFIED | Мигрировать 2 published Articles user:575, затем exact authorship proof/write |
+| Content authorship | SLICE 18 COMPLETE 1/2 | `post:56250` migrated (`authorUserId: null`); Slice 19 migrates `post:57731`, затем authorship reconciliation/write |
 | User/Business profile media | NOT STARTED | P0/P1 decision, manifest, proof, production gate |
 | Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
 | Reviews | NOT STARTED | Реализовать либо явно defer в P1 |
@@ -151,16 +152,49 @@ Golden candidate:        wordpress-db:post:56250
 - [ ] Два `UserCleanBatch.test.ts` остаются explicit skip: требуют утерянный полный 579-user raw snapshot и production invariant hash.
 - [ ] Не перезахватывать USERS snapshot только ради этих тестов.
 
+### 3.8 Slice 18 — Article golden migration (post:56250)
+
+```text
+candidate:        wordpress-db:post:56250
+source gap:       Slice 16 snapshot has no post_content/title/excerpt;
+                  no JSON-fixture path exists for Article (only Place has one)
+authorized fix:   one scoped, exact-key, read-only SSH fetch via the
+                  already-existing fetchPublishedArticleEnvelopeBySourceRecordKey
+                  (same mechanism every Article import already uses)
+first run:        LINKED (CREATE) — Article +1 (24->25), ARTICLE lineage +1
+                  (910->911), MigrationRecord +1, media writes: 0
+rerun:            SKIPPED — byte-identical, 0 duplicate lineage,
+                  MigrationRecord +1 (fresh bookkeeping row, not a re-CREATE)
+written Article:  status PENDING, cityId null, geoScope null,
+                  coverImageId null, authorUserId null
+```
+
+- [x] Preconditions verified: exact source key, `publish` status, active
+      User lineage, no prior Article lineage/MigrationRecord, no slug
+      collision.
+- [x] Zero new code — reused `migration-commit-wordpress-db.ts --entity
+      article` unchanged; `ArticleCommitContext.authorUserId` was
+      available but deliberately left unset (authorship stays a
+      separate, later-authorized step — Slice 20/21).
+- [x] Full 12-table before/after audit: only `Article`/`MigrationLineage`/
+      `MigrationRecord` moved; User/Session/UserActionToken/Business/
+      Place/Offer/Route/Activity/MediaAsset unchanged.
+- [x] Not publicly visible yet — no city/geo scope assigned (out of
+      scope for this MVP writer, same as every other entity's first
+      golden write).
+
 ---
 
 ## 4. Текущий Articles/authorship critical path
 
-### Slice 18 — Article golden migration
+Slice 18 закрыт: `wordpress-db:post:56250` смигрирован (см. §3.8).
+
+### Slice 19 — второй Article golden migration
 
 Только:
 
 ```text
-wordpress-db:post:56250
+wordpress-db:post:57731
 ```
 
 Ожидается:
@@ -171,26 +205,25 @@ Article: +1
 ARTICLE MigrationLineage: +1
 MigrationRecord: expected bookkeeping only
 media importer calls: 0
-rerun: SKIP_UNCHANGED
+rerun: common 2-Article rerun (both post:56250 and post:57731) -> SKIP_UNCHANGED
 ```
 
-Запрещено в Slice 18:
+Источник: тот же один scoped exact-key read-only SSH fetch (Rule 16) —
+не новый snapshot capture, не broad discovery.
 
-- мигрировать `wordpress-db:post:57731`;
+Запрещено в Slice 19:
+
 - выполнять отдельный authorship write;
 - импортировать media;
-- трогать expired Activities, user:521 или user:91;
-- выполнять SSH/WordPress reads или новый snapshot.
+- трогать expired Activities, user:521 или user:91.
 
-### После Slice 18
+### После Slice 19
 
 ```text
-Slice 19: migrate wordpress-db:post:57731 + common 2-Article rerun
 Slice 20: targeted read-only authorship reconciliation for user:575
+          (both post:56250 and post:57731 now have ARTICLE lineage)
 Slice 21: authorship golden/batch only for exact conflict-free candidates
 ```
-
-Если существующий Article writer уже безопасно назначит доказанного автора, это фиксируется как результат; специально расширять writer ради authorship в Slice 18 запрещено.
 
 ---
 
@@ -198,7 +231,7 @@ Slice 21: authorship golden/batch only for exact conflict-free candidates
 
 ### 5.1 Articles и content authorship
 
-- [ ] Slice 18: golden Article `wordpress-db:post:56250` + rerun.
+- [x] Slice 18: golden Article `wordpress-db:post:56250` + rerun.
 - [ ] Slice 19: второй published Article `wordpress-db:post:57731` + общий rerun 2/2.
 - [ ] Slice 20: повторная read-only authorship reconciliation user:575.
 - [ ] Slice 21: exact authorship write только при безопасном кандидате.
@@ -321,7 +354,7 @@ Event images остаются вне frozen P0 scope.
 
 ```text
 Core migration mechanics:       ~82% complete
-Local clean data work:           ~72% complete
+Local clean data work:           ~73% complete
 Production/cutover readiness:    ~30% complete
 Overall strict prelaunch:        ~62–66% complete
 Remaining strict P0 work:        ~34–38%
@@ -331,7 +364,7 @@ Remaining strict P0 work:        ~34–38%
 
 Крупных P0-блоков остаётся **9**:
 
-1. Две published Articles + authorship closure user:575.
+1. Оставшийся published Article (`post:57731`) + authorship closure user:575.
 2. Users production activation и manual dispositions.
 3. Events tail.
 4. Routes review/publish.
@@ -354,15 +387,17 @@ Remaining strict P0 work:        ~34–38%
 ## 8. Следующее одно действие
 
 ```text
-Phase: ARTICLES — Slice 18 published Article golden migration
-Base: dev @ 7ce3c8cadc71ccbd166a82ef2190bc02609c9507 (PR #88 merged)
-Candidate: wordpress-db:post:56250
-Source: existing durable Slice 16 snapshot + committed Slice 17 manifest
-SSH probes: 0
-WordPress queries: 0
+Phase: ARTICLES — Slice 19 golden migration for wordpress-db:post:57731
+Base: dev @ c8a3f9aa0c2940aeb57dc5fb015937630f407036 (PR #89 merged)
+Prerequisite (Slice 18, COMPLETE): wordpress-db:post:56250 migrated,
+  LINKED + rerun SKIPPED, authorUserId null, 0 media writes
+Candidate: wordpress-db:post:57731
+Source: one scoped exact-key read-only SSH fetch (Rule 16) — same
+  mechanism as Slice 18, not a new snapshot capture
+SSH probes: 1 (exact-key only)
 New snapshots: 0
 Expected first action: CREATE
-Expected rerun: SKIP_UNCHANGED
+Expected rerun: common rerun across both migrated Articles -> SKIP_UNCHANGED
 Media writes: 0
-Separate authorship write: forbidden in Slice 18
+Separate authorship write: forbidden in Slice 19
 ```
