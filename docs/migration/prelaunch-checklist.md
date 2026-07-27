@@ -189,7 +189,7 @@ written Article:  status PENDING, cityId null, geoScope null,
 
 Slice 18 закрыт: `wordpress-db:post:56250` смигрирован (см. §3.8).
 
-### Slice 19 — второй Article golden migration
+### Slice 19 — второй Article + общий rerun + authorship reconciliation
 
 Только:
 
@@ -197,15 +197,16 @@ Slice 18 закрыт: `wordpress-db:post:56250` смигрирован (см. �
 wordpress-db:post:57731
 ```
 
-Ожидается:
+Выполнено:
 
 ```text
-first run: CREATE
-Article: +1
-ARTICLE MigrationLineage: +1
-MigrationRecord: expected bookkeeping only
-media importer calls: 0
-rerun: common 2-Article rerun (both post:56250 and post:57731) -> SKIP_UNCHANGED
+first run: LINKED / CREATE
+Article: +1 (25->26)
+ARTICLE MigrationLineage: +1 (911->912)
+MigrationRecord: +1, затем +2 на общий rerun
+media importer calls / MediaAsset / storage writes: 0
+rerun: post:56250 SKIPPED; post:57731 SKIPPED; rows byte-identical
+authorship reconciliation: 2 × EXACT_AUTHORSHIP_CANDIDATE; writes 0
 ```
 
 Источник: тот же один scoped exact-key read-only SSH fetch (Rule 16) —
@@ -220,9 +221,8 @@ rerun: common 2-Article rerun (both post:56250 and post:57731) -> SKIP_UNCHANGED
 ### После Slice 19
 
 ```text
-Slice 20: targeted read-only authorship reconciliation for user:575
-          (both post:56250 and post:57731 now have ARTICLE lineage)
-Slice 21: authorship golden/batch only for exact conflict-free candidates
+Next slice: targeted authorship assignment for user:575 across both Articles,
+            sequential first write + common rerun -> SKIP_UNCHANGED
 ```
 
 ---
@@ -232,9 +232,9 @@ Slice 21: authorship golden/batch only for exact conflict-free candidates
 ### 5.1 Articles и content authorship
 
 - [x] Slice 18: golden Article `wordpress-db:post:56250` + rerun.
-- [ ] Slice 19: второй published Article `wordpress-db:post:57731` + общий rerun 2/2.
-- [ ] Slice 20: повторная read-only authorship reconciliation user:575.
-- [ ] Slice 21: exact authorship write только при безопасном кандидате.
+- [x] Slice 19: второй published Article `wordpress-db:post:57731` + общий rerun 2/2 + read-only authorship reconciliation.
+- [x] Read-only authorship reconciliation user:575 объединён со Slice 19: 2 exact candidates.
+- [ ] Следующий slice: exact authorship write для обеих Article + общий rerun.
 - [ ] `user:521` — founder/manual conflict decision либо явный P1 defer.
 - [ ] `user:91` — lineage review либо явный P1 defer.
 
@@ -364,7 +364,7 @@ Remaining strict P0 work:        ~34–38%
 
 Крупных P0-блоков остаётся **9**:
 
-1. Оставшийся published Article (`post:57731`) + authorship closure user:575.
+1. Authorship write closure user:575 для двух migrated Articles.
 2. Users production activation и manual dispositions.
 3. Events tail.
 4. Routes review/publish.
@@ -387,17 +387,12 @@ Remaining strict P0 work:        ~34–38%
 ## 8. Следующее одно действие
 
 ```text
-Phase: ARTICLES — Slice 19 golden migration for wordpress-db:post:57731
-Base: dev @ c8a3f9aa0c2940aeb57dc5fb015937630f407036 (PR #89 merged)
-Prerequisite (Slice 18, COMPLETE): wordpress-db:post:56250 migrated,
-  LINKED + rerun SKIPPED, authorUserId null, 0 media writes
-Candidate: wordpress-db:post:57731
-Source: one scoped exact-key read-only SSH fetch (Rule 16) — same
-  mechanism as Slice 18, not a new snapshot capture
-SSH probes: 1 (exact-key only)
-New snapshots: 0
-Expected first action: CREATE
-Expected rerun: common rerun across both migrated Articles -> SKIP_UNCHANGED
-Media writes: 0
-Separate authorship write: forbidden in Slice 19
+Phase: ARTICLES — authorship assignment for wordpress-db:user:575
+Prerequisite (Slice 19, COMPLETE): both Articles migrated; common rerun
+  SKIPPED 2/2; reconciliation = 2 × EXACT_AUTHORSHIP_CANDIDATE
+Targets: wordpress-db:post:56250 and wordpress-db:post:57731 only
+Expected write: authorUserId null -> cmrwr37tw03brws1jjh672ph3
+Execution: sequential first write, stop on first error
+Expected rerun: common rerun -> SKIP_UNCHANGED 2/2
+Article content/publication/city/media writes: forbidden
 ```
