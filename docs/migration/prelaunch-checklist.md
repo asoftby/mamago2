@@ -234,7 +234,7 @@ Next slice: targeted authorship assignment for user:575 across both Articles,
 - [x] Slice 18: golden Article `wordpress-db:post:56250` + rerun.
 - [x] Slice 19: второй published Article `wordpress-db:post:57731` + общий rerun 2/2 + read-only authorship reconciliation.
 - [x] Read-only authorship reconciliation user:575 объединён со Slice 19: 2 exact candidates.
-- [ ] Следующий slice: exact authorship write для обеих Article + общий rerun.
+- [x] Slice 20: exact CAS authorship write для обеих Article + общий rerun `ALREADY_SATISFIED` 2/2.
 - [ ] `user:521` — founder/manual conflict decision либо явный P1 defer.
 - [ ] `user:91` — lineage review либо явный P1 defer.
 
@@ -364,7 +364,7 @@ Remaining strict P0 work:        ~34–38%
 
 Крупных P0-блоков остаётся **9**:
 
-1. Authorship write closure user:575 для двух migrated Articles.
+1. Editorial closure двух Articles: city/geo, publication, blog visibility и cover/media decision.
 2. Users production activation и manual dispositions.
 3. Events tail.
 4. Routes review/publish.
@@ -387,12 +387,11 @@ Remaining strict P0 work:        ~34–38%
 ## 8. Следующее одно действие
 
 ```text
-Phase: ARTICLES — authorship assignment for wordpress-db:user:575
-Prerequisite (Slice 19, COMPLETE): both Articles migrated; common rerun
-  SKIPPED 2/2; reconciliation = 2 × EXACT_AUTHORSHIP_CANDIDATE
+Phase: ARTICLES — editorial closure for two migrated Articles
+Prerequisite (Slice 20, COMPLETE): both authorUserId relations assigned to
+  user:575 by exact CAS; common rerun ALREADY_SATISFIED 2/2
 Targets: wordpress-db:post:56250 and wordpress-db:post:57731 only
-Expected write: authorUserId null -> cmrwr37tw03brws1jjh672ph3
-Execution: sequential first write, stop on first error
-Expected rerun: common rerun -> SKIP_UNCHANGED 2/2
-Article content/publication/city/media writes: forbidden
+Scope to authorize separately: cityId / geoScope, approved publication flow,
+  selected/default city blog visibility, public URLs, cover/media P0/P1 decision
+Migration writer/authorship changes: forbidden
 ```
