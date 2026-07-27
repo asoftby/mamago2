@@ -72,6 +72,7 @@
     "migration:users:content-authorship-reconciliation": "tsx scripts/migration-content-authorship-reconciliation.ts",
     "migration:capture:activity-snapshot": "tsx scripts/migration-capture-activity-snapshot.ts",
     "migration:users:activity-dependency-inventory": "tsx scripts/migration-activity-dependency-inventory.ts",
+    "migration:users:article-authorship-proof": "tsx scripts/migration-article-authorship-proof.ts",
     "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",

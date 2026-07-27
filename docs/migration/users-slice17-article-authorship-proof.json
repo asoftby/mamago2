@@ -1,0 +1,26 @@
+[
+  {
+    "articleLineageState": "ABSENT",
+    "classification": "ARTICLE_TARGET_NOT_MIGRATED",
+    "currentAuthorUserId": null,
+    "evidenceHash": "bf652f24f1ea8eb1b2780b60087682deaf6cd980f492a462ffe9fd0045a49f8b",
+    "reasonCode": "NEVER_ATTEMPTED",
+    "recommendedNextAction": "SELECT_FOR_ARTICLE_GOLDEN_MIGRATION",
+    "sourcePostStatus": "publish",
+    "sourceRecordKey": "wordpress-db:post:56250",
+    "targetArticleId": null,
+    "targetUserId": "cmrwr37tw03brws1jjh672ph3"
+  },
+  {
+    "articleLineageState": "ABSENT",
+    "classification": "ARTICLE_TARGET_NOT_MIGRATED",
+    "currentAuthorUserId": null,
+    "evidenceHash": "df8d816e599f95c45878e288966c9725248e28274adb71cc74e3dccd035a1b13",
+    "reasonCode": "NEVER_ATTEMPTED",
+    "recommendedNextAction": "SELECT_FOR_ARTICLE_GOLDEN_MIGRATION",
+    "sourcePostStatus": "publish",
+    "sourceRecordKey": "wordpress-db:post:57731",
+    "targetArticleId": null,
+    "targetUserId": "cmrwr37tw03brws1jjh672ph3"
+  }
+]

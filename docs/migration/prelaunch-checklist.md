@@ -60,7 +60,7 @@
 | Users activation architecture | COMPLETE | Production email provider и delivery Go/No-Go |
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`; backlog 0 |
 | Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
-| Content authorship | READ-ONLY RECONCILED | 9/10 users → P1 (expired-only Activities); user:575 → Slice 17 Article proof |
+| Content authorship | SLICE 17 COMPLETE | 9/10 users → P1 (expired-only Activities); user:575 → `ARTICLE_GOLDEN_REQUIRED`, golden candidate `wordpress-db:post:56250` |
 | Activities | SLICE 16 COMPLETE | 0/63 authored events P0-eligible (all expired) → reclassified `P1_HISTORICAL_EXPIRED_ACTIVITY` |
 | User/Business profile media | NOT STARTED | Manifest, local proof, production gate |
 | Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
@@ -214,6 +214,27 @@ transient Serializable write-conflict failures in unrelated integration
 tests sharing the local DB — a concurrency artifact of the test run, not a
 regression; each of those files passes cleanly in isolation.)
 
+### 3.8 Articles — Slice 17 published Article dependency proof
+
+- [x] Read-only proof for exactly the 2 published Articles authored by
+      `wordpress-db:user:575` (`wordpress-db:post:56250`,
+      `wordpress-db:post:57731`), sourced from Slice 16's durable Activity
+      snapshot and the committed Slice 16 manifest — no new SSH probe, no
+      new WordPress query, no new source snapshot.
+- [x] Both classified `ARTICLE_TARGET_NOT_MIGRATED` (no Article lineage,
+      no MigrationRecord history for either key); user:575's own USER
+      lineage confirmed active.
+- [x] Decision: **`ARTICLE_GOLDEN_REQUIRED`**. Golden candidate selected
+      deterministically: `wordpress-db:post:56250`.
+- [x] New fully self-contained test suite (28 tests: pure classification,
+      synthetic-fixture orchestration, real-DB integration with synthetic
+      950xxx IDs) — no dependency on `/tmp` or the durable home-directory
+      snapshot in any test.
+- [x] Database writes: 0 (Article/authorship/User-role/media all 0).
+
+Canonical manifest hash: `833e67d396300bd42d67a7218a0340770b7ff9544b68535d90e453c036710b8b`
+(`docs/migration/users-slice17-article-authorship-proof.json`).
+
 ---
 
 ## 4. Текущее решение — ACTIVITIES / AUTHORSHIP scope
@@ -222,14 +243,14 @@ Slice 16 закрыл неопределённость по Activities: расш
 expired Events не нужно. Все 63 expired Activities и связанная с ними authorship
 переносятся в `P1_HISTORICAL_EXPIRED_ACTIVITY` — это не launch blocker.
 
-Единственный реальный, конкретный P0-кандидат по authorship — 2 опубликованные
-статьи `wordpress-db:user:575`, через уже существующий Article write path.
-
-Следующий шаг — **Slice 17** (см. §8): подтвердить, входят ли эти 2 статьи в
-canonical Article launch scope, проверить текущие Article lineages, при
-необходимости выполнить golden Article write, и только затем повторить
-authorship reconciliation и (если появится `EXACT_LINK_CANDIDATE`) authorship
-write для user:575.
+Slice 17 (read-only) подтвердил: обе опубликованные статьи `wordpress-db:user:575`
+(`wordpress-db:post:56250`, `wordpress-db:post:57731`) — **`ARTICLE_TARGET_NOT_MIGRATED`**,
+без единого lineage-конфликта. Ни одна ещё не мигрирована как Article; USER
+lineage для user:575 активна и присутствует. Решение: **`ARTICLE_GOLDEN_REQUIRED`**
+— нужен отдельный Article golden migration slice до authorship write. Golden
+candidate выбран детерминированно: `wordpress-db:post:56250` (обе статьи
+одинаково минимальны — по одному `_thumbnail_id`, без gallery; выбор по меньшему
+legacy post ID).
 
 `user:521` (existing author conflict) остаётся manual conflict до отдельного
 founder decision. `user:91` (partial lineage) остаётся backlog после полного
@@ -244,10 +265,11 @@ Article/Route lineage review. Expired Activities не трогать.
 - [x] Завершить Slice 16 durable snapshot + dependency inventory.
 - [x] Принять product-решение: expired Activities → `P1_HISTORICAL_EXPIRED_ACTIVITY`,
       не входят в launch P0.
-- [ ] Slice 17: проверить, входят ли 2 опубликованные статьи user:575 в
+- [x] Slice 17: проверить, входят ли 2 опубликованные статьи user:575 в
       canonical Article launch scope; проверить текущие Article lineages.
-- [ ] Если target Article отсутствует — выбрать одну статью для Article golden
-      migration (переиспользуя существующий Article write path).
+      Результат: обе `ARTICLE_TARGET_NOT_MIGRATED`, decision `ARTICLE_GOLDEN_REQUIRED`.
+- [ ] Article golden migration slice: смигрировать golden candidate
+      `wordpress-db:post:56250` (переиспользуя существующий Article write path).
 - [ ] После Article migration повторить read-only authorship reconciliation.
 - [ ] Выполнить golden authorship write только для появившегося exact
       candidate (user:575).
@@ -414,16 +436,19 @@ SEO/regressions и весь RC/cutover цикл ещё не закрыты.
 ## 8. Следующее одно действие
 
 ```text
-Phase: USERS — Slice 17 published Article dependency proof (user:575)
-Base: dev @ f9791a45679dfcb77065329c2a918d56fde2a761 (PR #86 merged)
-Scope:
-  - только 2 опубликованные статьи wordpress-db:user:575
-  - подтвердить, входят ли они в canonical Article launch scope
-  - проверить текущие Article MigrationLineage
-  - если target Article отсутствует — выбрать одну статью для golden write
-  - после Article migration повторить authorship reconciliation
-  - authorship write выполнить только при появлении точного EXACT_LINK_CANDIDATE
+Phase: ARTICLES — golden migration slice for wordpress-db:post:56250
+Base: dev @ a98616f0dbf4066cdbbc73593359620fff181edf (PR #87 merged)
+Prerequisite (Slice 17, COMPLETE, read-only):
+  both published Articles for wordpress-db:user:575 are ARTICLE_TARGET_NOT_MIGRATED
+  decision: ARTICLE_GOLDEN_REQUIRED
+  golden candidate selected: wordpress-db:post:56250 (deterministic tie-break)
+Scope for the next slice:
+  - Article golden vertical slice for wordpress-db:post:56250 only
+  - reuse the existing Article write path (Gate 9's ArticleCommitRunner family)
+  - after import, re-run authorship reconciliation
+  - authorship write for user:575 only once an EXACT_AUTHORSHIP_CANDIDATE exists
 Explicitly out of scope:
+  - the second article (wordpress-db:post:57731) — separate future step
   - expired Activities (63) — P1_HISTORICAL_EXPIRED_ACTIVITY, не трогать
   - user:521 — manual conflict, отдельный founder decision
   - user:91 — partial-lineage backlog
