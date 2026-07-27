@@ -261,3 +261,39 @@ export function buildUsersQuery(limit: number): SqlQuery {
     params: [limit],
   };
 }
+
+/**
+ * `post_status` breakdown for a single `post_type`, with no row-level
+ * data — used for a full-scope inventory count (e.g. `events`) without
+ * pulling every row. No filtering by author or status: this is
+ * deliberately the whole table's shape.
+ */
+export function buildPostTypeStatusBreakdownQuery(postType: string): SqlQuery {
+  return {
+    sql: `SELECT post_status, COUNT(*) AS count
+      FROM wp_posts
+      WHERE post_type = ?
+      GROUP BY post_status
+      ORDER BY post_status`,
+    params: [postType],
+  };
+}
+
+/**
+ * Row-level posts for specific authors and post types, any status — unlike
+ * `buildPublished*Query` above, this intentionally does not filter by
+ * `post_status`, since the caller needs to see draft/expired/pending rows
+ * too (to classify why a Place/Activity/Article hasn't been migrated).
+ * Excludes `post_content`/`post_title`/`post_excerpt` — not needed for
+ * dependency/status inventory, and kept out of the capture to minimize
+ * what's pulled from the source database.
+ */
+export function buildPostsByAuthorsAndTypesQuery(authorIds: readonly number[], postTypes: readonly string[]): SqlQuery {
+  return {
+    sql: `SELECT ID, post_author, post_date, post_status, post_name, post_modified, post_parent, guid, post_type
+      FROM wp_posts
+      WHERE post_author IN (${placeholders(authorIds.length)}) AND post_type IN (${placeholders(postTypes.length)})
+      ORDER BY post_author, post_type, ID`,
+    params: [...authorIds, ...postTypes],
+  };
+}

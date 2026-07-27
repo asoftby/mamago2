@@ -1,0 +1,54 @@
+{
+  "phase": "USERS Slice 16 Activity migration dependency inventory",
+  "scope": "the 10 TARGET_NOT_MIGRATED content-author users (Slice 15): exact source Activity/Article records, publication status, Place/media dependency evidence, classification",
+  "readOnly": true,
+  "sourceSnapshot": {
+    "entity": "activity",
+    "isFirstStandaloneSnapshotForThisEntity": true,
+    "notARepeatOfUsersSnapshot": true,
+    "storedAt": "~/.mamago2/migration-snapshots/activities/ (private, non-Git, outside /tmp)",
+    "sshProbeCount": 1,
+    "queryVersion": "activity-snapshot-v1",
+    "capturedFrom": ["wp_posts", "wp_postmeta (filtered to a fixed relevant-key allowlist)", "wp_term_relationships/wp_term_taxonomy/wp_terms"],
+    "neverQueried": ["wp_users"],
+    "excludedFromCapture": ["email", "password hashes", "phone", "sessions/tokens", "post_content/post_title/post_excerpt", "any postmeta key outside the relevant-key allowlist"]
+  },
+  "aggregateFindings": {
+    "totalCapturedForThese10Users": 65,
+    "byPostType": { "events": 63, "post": 2 },
+    "byPostStatus": { "expired": 63, "publish": 2 },
+    "byVerdict": { "CREATE": 2, "EXCLUDED": 63, "MANUAL": 0, "BLOCKED": 0 },
+    "fullActivityInventorySiteWide": { "draft": 538, "expired": 2884, "publish": 9 }
+  },
+  "keyFinding": "All 63 events authored by the 9 Activity-blocked users are post_status='expired' — none are 'publish'. Phoenix v1's Activity migration policy has always been publish-only (see src/lib/migration/adapters/wordpress-db/sql.ts's buildPublishedEventsQuery comment, pre-existing and unrelated to this slice). Site-wide, there are only 9 'publish' events in all of WordPress, and none of them belong to these 9 users. This means none of the 63 events can become a CREATE candidate without a separate, explicit product decision to extend migration scope beyond 'publish' status — that decision is not made by this analyzer.",
+  "dependencyMatrix": {
+    "userLineage": "all 10 users confirmed present (already established in Slice 4/5) — never a blocker for any of the 65 entries",
+    "structuredPlaceLink": { "present": 0, "of": 65, "note": "no captured event has a Voxel Place-post-id reference (event_place/event-place/event_place_id/place_id) — but Activity.placeId is nullable in the schema, so this is not a hard blocker for CREATE" },
+    "freeTextLocationEvidence": { "present": 62, "of": 65, "note": "location/event-place-name/adress-event-place/event_city postmeta — would require separate text-based venue resolution to link a Place, not exact lineage; existing project code (resolveEventCommitContextWithMatching.ts) already has some matching capability for this" },
+    "mediaEvidence": { "present": 45, "of": 65 },
+    "scheduleEvidence": { "present": 63, "of": 63, "note": "all events (100%) have event_date postmeta present — schedule is not a blocker for any of them" }
+  },
+  "goldenCandidateSelection": {
+    "requestedScope": "Activity",
+    "actualFinding": "No Activity (events) entry is CREATE-eligible under the current publish-only policy — 0 of 63",
+    "selectedCandidate": "wordpress-db:post:56250 (an ARTICLE, wordpress-db:user:575) — the only CREATE-eligible entry among all 65, and the minimal-complexity choice (single article, publish status, media present, no known blocker)",
+    "note": "This is an honest read-only finding, not a forced substitute: there is currently no viable Activity golden candidate for the 9 Activity-blocked users. The one CREATE-eligible entry happens to be Article-type, already covered by the existing Article write path from Gate 9's content-authorship workstream, not a new Activity write path."
+  },
+  "readOnlyProof": {
+    "databaseWrites": 0,
+    "activityWrites": 0,
+    "authorshipWrites": 0,
+    "userRoleWrites": 0,
+    "mediaWrites": 0,
+    "beforeAfterCountsIdentical": true
+  },
+  "deferredScope": {
+    "activityGoldenWrite": "BLOCKED — no eligible candidate exists without a separate product decision on Activity migration scope (extend beyond publish-only, or accept that these 9 users' authorship stays unresolved)",
+    "activityBatchWrite": "NOT_STARTED",
+    "authorshipWriteForUser575": "possible next step — the 2 CREATE-eligible articles reuse the existing Article write path, not a new Activity capability",
+    "user521ConflictResolution": "deferred, unrelated to this slice",
+    "manualPrivilegedUsers": 15,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED"
+  }
+}

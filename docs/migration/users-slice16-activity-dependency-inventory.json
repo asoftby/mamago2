@@ -1,0 +1,1040 @@
+[
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:42",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:10789",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:105",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:14661",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:116",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:16999",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:142",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:20941",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:23685",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:142",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:29205",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:142",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:29207",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:142",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:29210",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:33760",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:34000",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:450",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:35623",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:38043",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:38218",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:38487",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:39531",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:39706",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:40292",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:41909",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:43271",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:43371",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:44271",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:44352",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:44631",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:45389",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:46622",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:47379",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:47924",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:568",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:51173",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:53132",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:54494",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:54497",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:54500",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:54509",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:341",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:56339",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:60570",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:60573",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:60896",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": false,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:60900",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:61243",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:62623",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:62632",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:62928",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:62931",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:62934",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:62999",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:63003",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:63905",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:63990",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64007",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64037",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64040",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64043",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64084",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": false,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64087",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64090",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64096",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64137",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64195",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64198",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:567",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64201",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64220",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64272",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": true,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": true,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:462",
+    "postStatus": "expired",
+    "postType": "events",
+    "reasonCodes": [
+      "EXCLUDED_BY_EXISTING_PUBLISH_ONLY_POLICY",
+      "SOURCE_STATUS_EXPIRED"
+    ],
+    "sourceRecordKey": "wordpress-db:events:64306",
+    "verdict": "EXCLUDED"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": false,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": false,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:575",
+    "postStatus": "publish",
+    "postType": "post",
+    "reasonCodes": [
+      "STATUS_PUBLISH_ELIGIBLE"
+    ],
+    "sourceRecordKey": "wordpress-db:post:56250",
+    "verdict": "CREATE"
+  },
+  {
+    "alreadyMigrated": false,
+    "hasFreeTextLocationEvidence": false,
+    "hasMediaEvidence": true,
+    "hasScheduleEvidence": false,
+    "hasStructuredPlaceLink": false,
+    "legacyAuthorSourceRecordKey": "wordpress-db:user:575",
+    "postStatus": "publish",
+    "postType": "post",
+    "reasonCodes": [
+      "STATUS_PUBLISH_ELIGIBLE"
+    ],
+    "sourceRecordKey": "wordpress-db:post:57731",
+    "verdict": "CREATE"
+  }
+]

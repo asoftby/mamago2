@@ -3,11 +3,11 @@
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
 **Обновлено:** 2026-07-27  
-**Base:** `dev` @ `da243212ae661fb384f4abf762fa4f076347efcb` — PR #84 merged  
-**Текущая фаза:** `ACTIVITIES — Slice 16 dependency inventory`  
-**Текущий gate:** `BLOCKED_SOURCE_SNAPSHOT_UNAVAILABLE`
+**Base:** `dev` @ `f9791a45679dfcb77065329c2a918d56fde2a761` — PR #86 merged  
+**Текущая фаза:** `USERS — Slice 17 published Article dependency proof (user:575)`  
+**Текущий gate:** `READY`
 
-> Подробная история Slices 1–15 сохранена в Git и в профильных proof-документах.
+> Подробная история Slices 1–16 сохранена в Git и в профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и оставшийся
 > критический путь до запуска.
 
@@ -15,28 +15,35 @@
 
 ## 1. Неподвижные правила
 
-1. Перед Prisma/auth/migration работой читать `CLAUDE.md` и профильные runbooks.
-2. Запрещены `prisma migrate dev`, `prisma db push`, reset и destructive cleanup.
-3. WordPress — строго read-only source. Разрешены только заранее определённые `SELECT`.
-4. Для каждой новой сущности: один environment gate, один SSH probe и один
-   агрегированный immutable source capture.
-5. Первый полный write-run выполняется последовательно с `stop-on-first-error`,
-   без автоматических retry, cleanup и rollback уже записанного prefix.
-6. Snapshot, manifest и canonical hashes фиксируются до первого write.
-7. После batch обязателен cumulative DB/storage audit и один общий idempotency rerun.
-8. Аномалии не исправляются внутри clean batch: они переносятся в документированный backlog.
-9. Media выполняются только по заранее подготовленному manifest и отдельному gate.
-10. Один связный vertical slice → одна ветка → один Draft PR.
-11. Production разрешён только после local golden, local batch, idempotency proof и Go/No-Go.
-12. Raw immutable snapshots запрещено хранить только в `/tmp`.
-13. Source-of-truth snapshots хранятся в долговечном приватном non-Git пути:
-
-```text
-/Users/shapovalovalexey/.mamago2/migration-snapshots/<entity>/
-```
-
-`/tmp` разрешён только для производных временных файлов. Raw snapshot никогда не
-коммитится в Git.
+1. Этот файл — источник истины по текущему состоянию prelaunch-миграции.
+2. Перед Prisma/auth/migration работой читать `CLAUDE.md` и профильные runbooks.
+3. Запрещены `prisma migrate dev`, `prisma db push`, reset и destructive cleanup.
+4. Первый полный write-run каждой сущности выполняется последовательно с
+   `stop-on-first-error`, без автоматических retry, cleanup и rollback.
+5. WordPress — только read-only source. Production writes разрешаются отдельным
+   Go/No-Go gate.
+6. Immutable source snapshot, manifest и canonical hashes фиксируются до write.
+7. После batch — cumulative DB/storage audit и один общий idempotency rerun.
+8. Аномалии не чинятся по ходу batch: они переносятся в документированный backlog.
+9. VPN и сетевые маршруты автоматически не меняются. Маршрут — informational signal.
+10. Media выполняются только по заранее подготовленному manifest и отдельному gate.
+11. Ветки сущностей не смешиваются. Один связный vertical slice → один Draft PR.
+12. Production разрешён только после local golden, local batch и idempotency proof.
+13. **Immutable source snapshots запрещено хранить только в `/tmp`.** `/tmp`
+    допускается лишь для производных временных файлов (промежуточные
+    выгрузки, диагностика), не для source-of-truth. Snapshot должен
+    храниться в долговечном приватном non-Git пути
+    (`~/.mamago2/migration-snapshots/<entity>/`), с ограниченными
+    permissions (0700 на директории, 0600 на файлах). Причина: USERS
+    snapshot в `/tmp/scratchpad/users/` был потерян между сессиями
+    (`/tmp` не переживает reboot), что заблокировало Slice 16 до создания
+    отдельного Activity snapshot по новому, долговечному пути.
+14. Юнит/интеграционные тесты не должны зависеть от внешних immutable
+    snapshot-путей (например `/tmp/scratchpad/users/`). Тесты либо
+    используют уже закоммиченные sanitized fixtures
+    (`docs/migration/*.json`), либо создают собственные временные fixtures
+    внутри теста. Production-анализаторы (CLI-скрипты) продолжают
+    принимать внешний snapshot-путь как параметр без изменений.
 
 ---
 
@@ -53,8 +60,8 @@
 | Users activation architecture | COMPLETE | Production email provider и delivery Go/No-Go |
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`; backlog 0 |
 | Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
-| Content authorship | READ-ONLY RECONCILED | 0 exact, 10 targets absent, 1 conflict, 1 partial |
-| Activities | NOT STARTED / BLOCKED | Durable Activity snapshot и Slice 16 inventory |
+| Content authorship | READ-ONLY RECONCILED | 9/10 users → P1 (expired-only Activities); user:575 → Slice 17 Article proof |
+| Activities | SLICE 16 COMPLETE | 0/63 authored events P0-eligible (all expired) → reclassified `P1_HISTORICAL_EXPIRED_ACTIVITY` |
 | User/Business profile media | NOT STARTED | Manifest, local proof, production gate |
 | Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
 | Reviews | NOT STARTED | Scope, vertical slice, batch, aggregates |
@@ -149,35 +156,84 @@ UNSUPPORTED_TARGET:         0
 
 Authorship write запрещён до появления хотя бы одного exact/conflict-free target.
 
+### 3.6 Activities — Slice 16 dependency inventory
+
+- [x] First standalone immutable Activity snapshot (not a USERS re-capture),
+      stored at `~/.mamago2/migration-snapshots/activities/`.
+- [x] 1 SSH probe, 1 aggregated read-only session; `wp_users` never queried.
+- [x] Full dependency inventory for the 10 `TARGET_NOT_MIGRATED` content-author
+      users: 65 authored records classified.
+- [x] Database writes: 0.
+
+Findings:
+
+```text
+Authored events:   63 — ALL post_status=expired -> EXCLUDED
+                   (Phoenix v1 Activity migration has always been
+                    publish-only; site-wide only 9 publish events exist,
+                    none belong to these users)
+Authored articles:  2 (wordpress-db:user:575) — both publish -> CREATE
+MANUAL / BLOCKED:   0 / 0
+
+Decision: the 63 expired events are P1_HISTORICAL_EXPIRED_ACTIVITY —
+  explicitly NOT extended into launch P0. Importing 63 historical expired
+  events would not create meaningful prelaunch value and contradicts the
+  frozen scope. This does not block launch.
+
+Only remaining P0-relevant authorship path: wordpress-db:user:575's 2
+  published Articles, via the existing Article write path (Gate 9) — see
+  Slice 17 below. user:521 (existing author conflict) and user:91
+  (partial lineage) stay deferred, unrelated to the Activity decision.
+```
+
+### 3.7 Test suite snapshot-independence (adversarial fix)
+
+A full local regression sweep surfaced 4 test files quietly depending on the
+lost `/tmp/scratchpad/users/` path (Rule 13/14):
+
+- [x] `planning/user-ownership/buildPlanningManifests.test.ts` — switched to a
+      self-generated synthetic snapshot fixture (ephemeral temp dir).
+- [x] `planning/user-ownership/readOnlyIntegration.test.ts` — switched to
+      `committedClassificationFixture.ts`, sourced from the already-committed
+      sanitised Slice 6 manifests (real 15/38/12 sourceRecordKeys, no data
+      lost).
+- [x] `planning/business-linked-tail/reconcileBusinessLinkedTail.integration.test.ts`
+      — switched to a dedicated test-only DB namespace + synthetic snapshot
+      fixture (mirrors the `BusinessOwnershipGoldenRunner` integration test
+      convention).
+- [x] `commit/user/UserCleanBatch.test.ts` (2 tests) — genuinely
+      unfixable without either the full lost 579-user raw snapshot or
+      weakening hardcoded production invariants (`USER_SNAPSHOT_SHA256`,
+      `CLEAN_USER_COUNT`, golden users 7/38). Explicitly `test.skip()`'d with
+      an inline comment; not silently deleted. Founder decision: skip and
+      merge, do not recapture USERS for this.
+
+Full `src/lib/migration` suite (sequential, `--test-concurrency=1`): **155
+pass, 2 skipped, 0 fail.** (Running the same suite fully parallel produces
+transient Serializable write-conflict failures in unrelated integration
+tests sharing the local DB — a concurrency artifact of the test run, not a
+regression; each of those files passes cleanly in isolation.)
+
 ---
 
-## 4. Текущий blocker — ACTIVITIES Slice 16
+## 4. Текущее решение — ACTIVITIES / AUTHORSHIP scope
 
-Старый raw Users snapshot находился только в `/tmp` и был удалён системой между
-2026-07-23 и 2026-07-27. Его запрещено молча перегенерировать или подменять
-санитизированными manifests.
+Slice 16 закрыл неопределённость по Activities: расширять launch P0 на historical
+expired Events не нужно. Все 63 expired Activities и связанная с ними authorship
+переносятся в `P1_HISTORICAL_EXPIRED_ACTIVITY` — это не launch blocker.
 
-Принятое решение: не восстанавливать Users snapshot. Создать первый отдельный
-immutable snapshot сущности Activity в долговечном приватном пути.
+Единственный реальный, конкретный P0-кандидат по authorship — 2 опубликованные
+статьи `wordpress-db:user:575`, через уже существующий Article write path.
 
-### Разрешённый Slice 16 scope
+Следующий шаг — **Slice 17** (см. §8): подтвердить, входят ли эти 2 статьи в
+canonical Article launch scope, проверить текущие Article lineages, при
+необходимости выполнить golden Article write, и только затем повторить
+authorship reconciliation и (если появится `EXACT_LINK_CANDIDATE`) authorship
+write для user:575.
 
-- [ ] Подтвердить `environment = LOCAL`, clean branch и exact base.
-- [ ] Выполнить ровно один SSH probe.
-- [ ] Создать один агрегированный read-only Activity snapshot.
-- [ ] Сохранить snapshot вне `/tmp` и вне Git.
-- [ ] Зафиксировать file manifest, размеры, SHA-256 и общий canonical hash.
-- [ ] Зафиксировать masked source fingerprint и версию capture query.
-- [ ] Посчитать source records по post type/status.
-- [ ] Выделить exact Activity dependencies для 10 `TARGET_NOT_MIGRATED` users.
-- [ ] Построить User/Place/media dependency matrix.
-- [ ] Классифицировать Activity records: `CREATE`, `EXCLUDED`, `MANUAL`, `BLOCKED`.
-- [ ] Выбрать один минимальный golden Activity candidate.
-- [ ] Доказать нулевые DB/storage/media/authorship writes.
-- [ ] Обновить runbook о долговечном хранении snapshots.
-
-Slice 16 заканчивается planning/proof. Activity golden write и authorship write в
-этом slice запрещены.
+`user:521` (existing author conflict) остаётся manual conflict до отдельного
+founder decision. `user:91` (partial lineage) остаётся backlog после полного
+Article/Route lineage review. Expired Activities не трогать.
 
 ---
 
@@ -185,17 +241,19 @@ Slice 16 заканчивается planning/proof. Activity golden write и aut
 
 ### 5.1 Activities и content authorship
 
-- [ ] Завершить Slice 16 durable snapshot + dependency inventory.
-- [ ] Принять product-решение: Activity migration входит в launch P0 или authorship
-      формально переносится в P1.
-- [ ] Если Activity входит в P0: реализовать golden vertical slice.
-- [ ] Выполнить clean Activity batch последовательно.
-- [ ] Выполнить один общий Activity rerun.
-- [ ] Повторить read-only authorship reconciliation после Activity migration.
-- [ ] Выполнить golden authorship write только для появившегося exact candidate.
-- [ ] Выполнить batch только для exact/conflict-free authorship relations.
+- [x] Завершить Slice 16 durable snapshot + dependency inventory.
+- [x] Принять product-решение: expired Activities → `P1_HISTORICAL_EXPIRED_ACTIVITY`,
+      не входят в launch P0.
+- [ ] Slice 17: проверить, входят ли 2 опубликованные статьи user:575 в
+      canonical Article launch scope; проверить текущие Article lineages.
+- [ ] Если target Article отсутствует — выбрать одну статью для Article golden
+      migration (переиспользуя существующий Article write path).
+- [ ] После Article migration повторить read-only authorship reconciliation.
+- [ ] Выполнить golden authorship write только для появившегося exact
+      candidate (user:575).
 - [ ] `user:521` оставить manual conflict до отдельного founder decision.
 - [ ] `user:91` разобрать после полного Article/Route lineage review.
+- [ ] Expired Activities (63) не мигрировать в рамках P0.
 
 ### 5.2 Users production и activation
 
@@ -284,7 +342,7 @@ Founder decision допускает перенос Reviews в P1 только с
 - [ ] Business cabinet smoke test.
 - [ ] Admin lifecycle smoke test.
 - [ ] Public Places/Offers/Events/Articles/Routes smoke test.
-- [ ] Mobile/desktop critical navigation smoke test.
+- [ ] Mobile/desktop критический navigation smoke test.
 
 ### 5.9 Release candidate и production cutover
 
@@ -310,6 +368,8 @@ Founder decision допускает перенос Reviews в P1 только с
 ## 6. Не входит в обязательный P0 без отдельного решения
 
 - Past Events и Event images.
+- **63 expired Activities и связанная authorship (Slice 16) —
+  `P1_HISTORICAL_EXPIRED_ACTIVITY`.**
 - Noncanonical Offer class I.
 - Offer class H без Place relation.
 - Draft/unpublished long-tail bulk publication.
@@ -333,12 +393,13 @@ Remaining strict P0 work:        ~35–40%
 ```
 
 Почему остаток всё ещё значительный: самые рискованные Users identity/ownership
-операции завершены, но production provider, Activities decision, Events tail,
-Routes review, media, SEO/regressions и весь RC/cutover цикл ещё не закрыты.
+операции завершены, но production provider, Events tail, Routes review, media,
+SEO/regressions и весь RC/cutover цикл ещё не закрыты.
 
 Крупных P0 блоков осталось **9**:
 
-1. Activity snapshot/inventory и authorship decision.
+1. Article dependency proof для user:575 (Slice 17) — единственный оставшийся
+   authorship P0-путь; expired Activities вынесены в P1.
 2. Users production activation и manual dispositions.
 3. Events tail.
 4. Routes review/publish.
@@ -353,14 +414,18 @@ Routes review, media, SEO/regressions и весь RC/cutover цикл ещё н�
 ## 8. Следующее одно действие
 
 ```text
-Phase: ACTIVITIES — Slice 16 dependency inventory
-Base: dev @ da243212ae661fb384f4abf762fa4f076347efcb
-Current decision: BLOCKED_SOURCE_SNAPSHOT_UNAVAILABLE
-Authorized resolution: first durable Activity immutable snapshot
-Database writes: forbidden
-Activity/authorship writes: forbidden
+Phase: USERS — Slice 17 published Article dependency proof (user:575)
+Base: dev @ f9791a45679dfcb77065329c2a918d56fde2a761 (PR #86 merged)
+Scope:
+  - только 2 опубликованные статьи wordpress-db:user:575
+  - подтвердить, входят ли они в canonical Article launch scope
+  - проверить текущие Article MigrationLineage
+  - если target Article отсутствует — выбрать одну статью для golden write
+  - после Article migration повторить authorship reconciliation
+  - authorship write выполнить только при появлении точного EXACT_LINK_CANDIDATE
+Explicitly out of scope:
+  - expired Activities (63) — P1_HISTORICAL_EXPIRED_ACTIVITY, не трогать
+  - user:521 — manual conflict, отдельный founder decision
+  - user:91 — partial-lineage backlog
+Database writes: forbidden until this scope is explicitly authorized
 ```
-
-Выполнить environment gate → один SSH probe → один Activity capture в
-`~/.mamago2/migration-snapshots/activities/` → все дальнейшие inventory и planning
-операции выполнять локально без повторных WordPress reads.
