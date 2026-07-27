@@ -3,14 +3,12 @@
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
 **Обновлено:** 2026-07-27  
-**Base:** `dev` @ `c8a3f9aa0c2940aeb57dc5fb015937630f407036` — PR #89 merged  
-**Текущая фаза:** `ARTICLES — Slice 18 golden migration COMPLETE (post:56250)`  
-**Текущий кандидат для следующего шага:** `wordpress-db:post:57731` (Slice 19)  
-**Текущий gate:** `READY_FOR_SLICE_19`
+**Base:** `dev` @ `b50c22fcb9c804c30e50718d4ab72716b55f00b1` — PR #91 merged  
+**Текущая фаза:** `ARTICLES — Slice 20 authorship assignment for user:575`  
+**Текущий gate:** `READY_FOR_SLICE_20`
 
-> Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
-> Этот файл содержит только актуальное состояние, обязательные gates и критический
-> путь до запуска.
+> Подробная история Slices 1–19 сохранена в Git и профильных proof-документах.
+> Здесь находятся только актуальные правила, доказанный прогресс и обязательный путь до запуска.
 
 ---
 
@@ -19,26 +17,28 @@
 1. Перед Prisma/auth/migration работой читать `CLAUDE.md` и профильные runbooks.
 2. Запрещены `prisma migrate dev`, `prisma db push`, reset и destructive cleanup.
 3. WordPress — строго read-only source. Production writes разрешаются только отдельным Go/No-Go.
-4. Для каждой новой сущности: один environment gate, один SSH probe и один агрегированный immutable capture.
-5. После source capture дальнейшие inventory/classification/planning выполняются локально.
-6. Первый полный write-run каждой сущности — последовательный, `stop-on-first-error`, без автоматических retry, cleanup и rollback записанного prefix.
-7. Snapshot, fixed manifest, canonical hashes и expected actions фиксируются до первого write.
-8. Writes используют exact lineage/sourceRecordKey, CAS/conditional updates и fail-closed guards.
-9. После batch обязателен cumulative DB/storage audit и один общий idempotency rerun.
-10. Аномалии не исправляются внутри clean batch: они переносятся в documented backlog.
-11. Media выполняются только по заранее подготовленному manifest и отдельному gate.
-12. Один связный vertical slice → одна ветка → один Draft PR → один adversarial review → один fix batch → финальный CI/review cycle.
-13. Production разрешён только после local golden, local batch, idempotency proof, rehearsal и Go/No-Go.
-14. Raw immutable snapshots запрещено хранить только в `/tmp`. Source-of-truth хранится в приватном non-Git пути:
+4. Для новой сущности: один environment gate, один SSH probe и один агрегированный immutable capture.
+5. После capture дальнейшие inventory/classification/planning выполняются локально.
+6. Для content-bearing exact records разрешён один scoped exact-key read через существующий vetted fetcher; broad discovery запрещён.
+7. Первый write каждой сущности или нового relation-типа выполняется последовательно, `stop-on-first-error`.
+8. После partial write запрещены автоматические cleanup, rollback записанного prefix и скрытые retry.
+9. Fixed manifest, canonical hashes и expected actions фиксируются до write.
+10. Writes используют exact `sourceRecordKey`, active lineage, CAS/conditional update и fail-closed guards.
+11. После clean scope обязателен cumulative DB/storage audit и один общий idempotency rerun.
+12. Аномалии не исправляются внутри batch: они переносятся в documented backlog.
+13. Media выполняются только по заранее подготовленному manifest и отдельному gate.
+14. Один связный vertical slice → одна ветка → один Draft PR → один adversarial review → один fix batch → финальный CI cycle.
+15. Production разрешён только после local golden, local batch, idempotency proof, rehearsal и Go/No-Go.
+16. Raw immutable snapshots хранятся вне Git и вне `/tmp`:
 
 ```text
 /Users/shapovalovalexey/.mamago2/migration-snapshots/<entity>/
 ```
 
-Permissions: `0700` для директорий, `0600` для файлов. Raw snapshots в Git не коммитятся.
+Permissions: `0700` для директорий, `0600` для файлов.
 
-15. Тесты не зависят от `/tmp` или приватных home-directory snapshots: только committed sanitized fixtures либо self-generated temporary fixtures.
-16. Content-bearing entities (Article/Place/Event/Route/Offer) не могут быть полностью смигрированы из lightweight dependency-snapshot'ов — их SSH-based vertical slice (exact `--source-record-key`, один exact-key read) остаётся единственным источником `title`/`content`/postmeta/terms и разрешён без отдельного нового "snapshot capture" gate.
+17. Тесты не зависят от `/tmp`, live WordPress или приватных home-directory snapshots: только committed sanitized fixtures либо self-generated temporary fixtures.
+18. Оптимизация разработки допустима только объединением связанных операций с одним fixed scope. Параллельные DB-write потоки запрещены.
 
 ---
 
@@ -48,199 +48,173 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | --- | --- | --- |
 | Migration engine | COMPLETE | Regression и production validation |
 | Places | CORE COMPLETE | Media, production validation, public/city audit |
-| Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution, media, backlog H/I |
+| Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution; media/P1 decision; backlog H/I |
 | Routes | IMPORTED 14/14 | Review, publish, slug history, redirects, public validation |
 | Events | PARTIAL 4/9 | 5 CREATE, 67 sessions, rerun, city/date/URL validation |
 | Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
 | Users activation architecture | COMPLETE | Production email provider, rehearsal и delivery Go/No-Go |
-| Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
-| Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
+| Business-linked Users | FULLY CLOSED | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
+| Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 ADMIN unchanged |
 | Activities | P0 CLOSED | 63 expired Events → `P1_HISTORICAL_EXPIRED_ACTIVITY` |
-| Content authorship | SLICE 18 COMPLETE 1/2 | `post:56250` migrated (`authorUserId: null`); Slice 19 migrates `post:57731`, затем authorship reconciliation/write |
-| User/Business profile media | NOT STARTED | P0/P1 decision, manifest, proof, production gate |
-| Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
+| Articles user:575 | MIGRATED 2/2 | Authorship assignment, city/publication/visibility, media decision |
+| Content authorship user:575 | READY | 2 exact candidates; guarded write + common rerun |
+| User/Business profile media | NOT STARTED | P0/P1 decision; manifest only if P0 |
+| Article media | NOT STARTED | Cover/inline policy, storage/dedup proof |
 | Reviews | NOT STARTED | Реализовать либо явно defer в P1 |
 | Redirects/pages/SEO | PARTIAL | Exact redirects, pages, canonical/sitemap/robots/noindex audit |
 | Product regressions | PARTIAL | Event discovery/404, Article city visibility, full smoke |
-| RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, production migration, DNS |
+| RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, migration, DNS |
 
 ---
 
 ## 3. Завершено и не должно повторяться
 
-### 3.1 Migration foundation
+### 3.1 Foundation
 
 - [x] `MigrationRun`, `MigrationRecord`, `MigrationLineage`.
-- [x] Canonical hashes, unique lineage, idempotent classification.
+- [x] Canonical hashes, unique lineage и idempotent classification.
 - [x] Local/dev/prod profiles и production cutover runbook.
-- [x] Sequential first-write safety, CAS/conditional updates, no auto cleanup.
+- [x] Sequential first-write safety, CAS/conditional updates, cumulative audits.
 
 ### 3.2 Offers
 
-- [x] Source inventory: 99 published records.
-- [x] Canonical scope: 91; safe canonical scope: 63.
-- [x] Full source → normalize → draft → validate → write → lineage flow.
-- [x] Local import: 63/63.
-- [x] Common rerun: `63 SKIP_UNCHANGED`.
-- [x] Duplicate Offer/lineage и forbidden-table deltas: 0.
+```text
+Published source inventory: 99
+Canonical scope:           91
+Local safe scope:          63
+Imported locally:          63/63
+Common rerun:              63 SKIP_UNCHANGED
+Duplicate Offer/lineage:   0
+```
 
 Deferred:
 
 ```text
 class H: 28 — missing required Place relation
-class I: 8 — noncanonical alias
-Offer media: separate gate
-production Offer execution: not started
+class I: 8  — noncanonical alias
+Offer media: separate P0/P1 decision
+Production execution: not started
 ```
 
-### 3.3 Users identity and activation foundation
-
-- [x] 579 source Users planned; legacy password hashes excluded.
-- [x] Automatic ADMIN inheritance forbidden.
-- [x] Pending-activation Prisma/auth foundation.
-- [x] Hash-only activation token service.
-- [x] Activation request/complete endpoints and security proofs.
-- [x] Clean local scope: 564/564.
-- [x] Common rerun: 564 `SKIP_UNCHANGED`.
-- [x] Migrated Users remain `PENDING_ACTIVATION`, without password/session/token/provider writes.
-
-### 3.4 Business-linked Users — fully closed
+### 3.3 Users identity and business ownership
 
 ```text
-Business ownership:       38/38 COMPLETE
-BUSINESS_OWNER elevation: 38/38 COMPLETE
-Business-linked backlog:  0
-Excluded draft/unpublished Places: untouched
+Clean Users local import:       564/564
+Common rerun:                   564 SKIP_UNCHANGED
+Business ownership:             38/38 COMPLETE
+BUSINESS_OWNER elevation:       38/38 COMPLETE
+Business-linked backlog:        0
+Activation state after import:  PENDING_ACTIVATION
+Migration sessions/tokens/mail: 0
 ```
 
-Slices 6–14 закрыли planning, golden/batch ownership, partial-coverage users 89/130 и role elevation.
+- [x] Legacy password hashes excluded.
+- [x] Automatic ADMIN inheritance forbidden.
+- [x] Hash-only activation token architecture implemented.
+- [x] Existing ADMIN remains a separate manual/privileged disposition.
 
-### 3.5 Authorship and Activity decisions
+### 3.4 Activities and authorship scope decision
 
-- [x] Slice 15: 12 content-author users reconciled read-only.
-- [x] Slice 16: standalone durable Activity snapshot and dependency inventory.
+- [x] Slice 15: content-author users reconciled read-only.
+- [x] Slice 16: durable standalone Activity snapshot and dependency inventory.
 - [x] Все 63 authored Events у 9 пользователей имеют `post_status=expired`.
-- [x] Product decision: не расширять launch P0 на historical expired Events.
-- [x] Эти 63 Events и связанная authorship классифицированы как `P1_HISTORICAL_EXPIRED_ACTIVITY`.
-- [x] `user:521` остаётся manual existing-author conflict.
+- [x] Product decision: historical expired Events не входят в launch P0.
+- [x] Classification: `P1_HISTORICAL_EXPIRED_ACTIVITY`.
+- [x] `user:521` остаётся existing-author conflict.
 - [x] `user:91` остаётся partial-lineage backlog.
 
-### 3.6 Slice 17 — published Articles user:575
-
-PR #88 merged, merge SHA `7ce3c8cadc71ccbd166a82ef2190bc02609c9507`.
+### 3.5 Slice 17 — Article dependency proof
 
 ```text
 wordpress-db:post:56250  publish  ARTICLE_TARGET_NOT_MIGRATED
 wordpress-db:post:57731  publish  ARTICLE_TARGET_NOT_MIGRATED
 User lineage user:575:   active
 Article lineage:         absent for both
-MigrationRecord history: absent for both
 Decision:                ARTICLE_GOLDEN_REQUIRED
-Golden candidate:        wordpress-db:post:56250
 ```
 
 - [x] Count gate: ровно 2 published Articles.
-- [x] Durable Activity snapshot и committed Slice 16 manifest совпали.
-- [x] Read-only proof, DB/storage/media/author writes: 0.
-- [x] 28 autonomous tests; targeted planning regression: 86/86.
-- [x] Canonical manifest hash: `833e67d396300bd42d67a7218a0340770b7ff9544b68535d90e453c036710b8b`.
+- [x] Golden candidate: `wordpress-db:post:56250`.
+- [x] Database/media/authorship writes: 0.
 
-### 3.7 Документированный test debt
-
-- [x] Три ранее snapshot-dependent test files переведены на autonomous fixtures.
-- [x] Full migration suite sequential: 155 pass, 2 skipped, 0 fail на границе PR #87.
-- [ ] Два `UserCleanBatch.test.ts` остаются explicit skip: требуют утерянный полный 579-user raw snapshot и production invariant hash.
-- [ ] Не перезахватывать USERS snapshot только ради этих тестов.
-
-### 3.8 Slice 18 — Article golden migration (post:56250)
+### 3.6 Slice 18 — first Article golden migration
 
 ```text
-candidate:        wordpress-db:post:56250
-source gap:       Slice 16 snapshot has no post_content/title/excerpt;
-                  no JSON-fixture path exists for Article (only Place has one)
-authorized fix:   one scoped, exact-key, read-only SSH fetch via the
-                  already-existing fetchPublishedArticleEnvelopeBySourceRecordKey
-                  (same mechanism every Article import already uses)
-first run:        LINKED (CREATE) — Article +1 (24->25), ARTICLE lineage +1
-                  (910->911), MigrationRecord +1, media writes: 0
-rerun:            SKIPPED — byte-identical, 0 duplicate lineage,
-                  MigrationRecord +1 (fresh bookkeeping row, not a re-CREATE)
-written Article:  status PENDING, cityId null, geoScope null,
-                  coverImageId null, authorUserId null
+sourceRecordKey:  wordpress-db:post:56250
+first run:        LINKED / CREATE
+rerun:            SKIPPED
+Article delta:    +1
+ARTICLE lineage:  +1
+MediaAsset:       0
+written fields:   status=PENDING, cityId=null, geoScope=null,
+                  coverImageId=null, authorUserId=null
 ```
 
-- [x] Preconditions verified: exact source key, `publish` status, active
-      User lineage, no prior Article lineage/MigrationRecord, no slug
-      collision.
-- [x] Zero new code — reused `migration-commit-wordpress-db.ts --entity
-      article` unchanged; `ArticleCommitContext.authorUserId` was
-      available but deliberately left unset (authorship stays a
-      separate, later-authorized step — Slice 20/21).
-- [x] Full 12-table before/after audit: only `Article`/`MigrationLineage`/
-      `MigrationRecord` moved; User/Session/UserActionToken/Business/
-      Place/Offer/Route/Activity/MediaAsset unchanged.
-- [x] Not publicly visible yet — no city/geo scope assigned (out of
-      scope for this MVP writer, same as every other entity's first
-      golden write).
+- [x] PR #90 merged as `0603e54ca8afdcd0b92623ac01a30e4db03a1eac`.
+- [x] Existing Article writer reused unchanged.
+- [x] No city, publication, media or authorship write mixed into golden migration.
+
+### 3.7 Slice 19 — second Article + common rerun + reconciliation
+
+```text
+sourceRecordKey:  wordpress-db:post:57731
+source read:      1 exact-key read-only fetch
+first run:        LINKED / CREATE
+Article delta:    +1 (25 -> 26)
+ARTICLE lineage:  +1 (911 -> 912)
+MediaAsset:       0
+```
+
+Common rerun:
+
+```text
+wordpress-db:post:56250 -> SKIPPED
+wordpress-db:post:57731 -> SKIPPED
+Article CREATE/UPDATE: 0
+Duplicate lineage:     0
+```
+
+Read-only authorship reconciliation:
+
+```text
+wordpress-db:post:56250 -> EXACT_AUTHORSHIP_CANDIDATE
+wordpress-db:post:57731 -> EXACT_AUTHORSHIP_CANDIDATE
+target user lineage:     active for wordpress-db:user:575
+authorship writes:       0
+Decision:                AUTHORSHIP_GOLDEN_READY
+```
+
+- [x] Publication recovery did not repeat source reads, runners or DB/media/storage writes.
+- [x] PR #91 merged as `b50c22fcb9c804c30e50718d4ab72716b55f00b1`.
+
+### 3.8 Документированный test debt
+
+- [x] Snapshot-dependent planning tests переведены на autonomous fixtures.
+- [x] Migration suite boundary after PR #87: 155 pass, 2 skipped, 0 fail sequentially.
+- [ ] Два `UserCleanBatch.test.ts` остаются explicit skip из-за утерянного полного raw USERS snapshot.
+- [ ] Не перезахватывать USERS snapshot только ради этих двух тестов.
 
 ---
 
-## 4. Текущий Articles/authorship critical path
+## 4. Обязательный P0 остаток до запуска
 
-Slice 18 закрыт: `wordpress-db:post:56250` смигрирован (см. §3.8).
+### 4.1 Articles и content authorship
 
-### Slice 19 — второй Article + общий rerun + authorship reconciliation
-
-Только:
-
-```text
-wordpress-db:post:57731
-```
-
-Выполнено:
-
-```text
-first run: LINKED / CREATE
-Article: +1 (25->26)
-ARTICLE MigrationLineage: +1 (911->912)
-MigrationRecord: +1, затем +2 на общий rerun
-media importer calls / MediaAsset / storage writes: 0
-rerun: post:56250 SKIPPED; post:57731 SKIPPED; rows byte-identical
-authorship reconciliation: 2 × EXACT_AUTHORSHIP_CANDIDATE; writes 0
-```
-
-Источник: тот же один scoped exact-key read-only SSH fetch (Rule 16) —
-не новый snapshot capture, не broad discovery.
-
-Запрещено в Slice 19:
-
-- выполнять отдельный authorship write;
-- импортировать media;
-- трогать expired Activities, user:521 или user:91.
-
-### После Slice 19
-
-```text
-Next slice: targeted authorship assignment for user:575 across both Articles,
-            sequential first write + common rerun -> SKIP_UNCHANGED
-```
-
----
-
-## 5. Обязательный P0 остаток до запуска
-
-### 5.1 Articles и content authorship
-
-- [x] Slice 18: golden Article `wordpress-db:post:56250` + rerun.
-- [x] Slice 19: второй published Article `wordpress-db:post:57731` + общий rerun 2/2 + read-only authorship reconciliation.
-- [x] Read-only authorship reconciliation user:575 объединён со Slice 19: 2 exact candidates.
-- [ ] Следующий slice: exact authorship write для обеих Article + общий rerun.
+- [ ] Guarded authorship assignment для двух Article user:575:
+  - `post:56250 authorUserId null → target user:575`;
+  - `post:57731 authorUserId null → target user:575`.
+- [ ] Выполнить sequential first write с CAS `WHERE authorUserId IS NULL`.
+- [ ] Один общий rerun: обе Article → `ALREADY_SATISFIED` / `SKIP_UNCHANGED`.
+- [ ] Решить city/geoScope для двух `PENDING` Articles.
+- [ ] Провести редакционный review и publish через штатный lifecycle.
+- [ ] Проверить selected/default city blog visibility и public URLs.
+- [ ] Принять P0/P1 решение по cover и inline historical media.
 - [ ] `user:521` — founder/manual conflict decision либо явный P1 defer.
 - [ ] `user:91` — lineage review либо явный P1 defer.
 
-### 5.2 Users production и activation
+### 4.2 Users production и activation
 
-- [ ] Подтвердить dispositions для 15 manual/privileged users:
+- [ ] Зафиксировать dispositions для 15 manual/privileged users:
   - 1 existing ADMIN оставить неизменным;
   - 9 exclusions подтвердить;
   - 5 `REQUIRES_FOUNDER_DECISION` решить.
@@ -248,10 +222,10 @@ Next slice: targeted authorship assignment for user:575 across both Articles,
 - [ ] Сохранить LOCAL/DEV external delivery hard-disabled.
 - [ ] Подготовить production User manifest и checksums.
 - [ ] Провести production-like rehearsal Users + activation.
-- [ ] Подготовить controlled activation delivery после Go/No-Go.
+- [ ] Controlled activation delivery только после Go/No-Go.
 - [ ] Решить P0/P1 для User/Business avatars и logos.
 
-### 5.3 Events
+### 4.3 Events
 
 ```text
 eligible imported:             4/9
@@ -260,42 +234,35 @@ pending materialized sessions: 67
 ```
 
 - [ ] Exact Docker/CI environment gate.
-- [ ] Preview 5 remaining Events.
-- [ ] Sequential targeted commits.
+- [ ] Preview и sequential commit 5 remaining Events.
 - [ ] Session/cumulative delta validation.
-- [ ] Common rerun.
+- [ ] Один общий rerun.
 - [ ] City/date discovery и отсутствие 404.
 
 Event images остаются вне frozen P0 scope.
 
-### 5.4 Routes
+### 4.4 Routes
 
 - [ ] Ручной review 14/14.
-- [ ] Stops, descriptions, RouteStop images и city mappings.
+- [ ] Проверить stops, descriptions, RouteStop images и city mappings.
 - [ ] Publish approved Routes.
 - [ ] Slug history и redirect map.
 - [ ] Public URL validation.
 
-### 5.5 Places, Offers, Articles и media
+### 4.5 Places, Offers и media
 
 - [ ] Финальная production validation Places.
-- [ ] Place media manifest, storage и dedup audit.
+- [ ] Place media manifest, storage и dedup audit либо явный P1 defer некритичного media.
 - [ ] Production execution Offers safe scope 63/63.
 - [ ] Offer media gate либо явный P1 defer.
-- [ ] Исправить Article visibility по selected/default city.
-- [ ] Article cover manifest и inline `wp-content/uploads` remap.
-- [ ] Local FULL, dev metadata-only и production FULL media proofs.
+- [ ] Local FULL, dev metadata-only и production FULL proofs для media, оставленного в P0.
 
-### 5.6 Reviews
+### 4.6 Reviews
 
-- [ ] Подтвердить approved source scope.
-- [ ] Users + Places dependency gate.
-- [ ] Review vertical slice, golden sample, small batch и rerun.
-- [ ] Public rating aggregates validation.
+- [ ] Принять founder decision: launch P0 или P1 defer.
+- [ ] Если P0: approved source scope, dependency gate, vertical slice, golden/batch/rerun, aggregate validation.
 
-Допустимо перенести Reviews в P1 только явным founder decision.
-
-### 5.7 Redirects, mandatory pages и SEO
+### 4.7 Redirects, mandatory pages и SEO
 
 - [ ] RankMath `exact` redirects subset.
 - [ ] Redirects на `/` вручную перемапить на релевантные hubs.
@@ -307,7 +274,7 @@ Event images остаются вне frozen P0 scope.
 
 `start`/`contains` redirects остаются P1.
 
-### 5.8 Product regressions — launch blockers
+### 4.8 Product regressions — launch blockers
 
 - [ ] Event появляется в правильном городе и на правильной дате.
 - [ ] Event public URL не отдаёт 404.
@@ -317,14 +284,14 @@ Event images остаются вне frozen P0 scope.
 - [ ] Public Places/Offers/Events/Articles/Routes smoke.
 - [ ] Mobile/desktop critical navigation smoke.
 
-### 5.9 Release candidate и production cutover
+### 4.9 Release candidate и production cutover
 
 - [ ] Freeze production source snapshots.
 - [ ] Production manifests и checksums.
 - [ ] Fresh production backup и подтверждённый restore procedure.
 - [ ] Full local production-like rehearsal.
 - [ ] Dev metadata-only rehearsal.
-- [ ] Cumulative DB/storage delta и forbidden fields/tables audits.
+- [ ] Cumulative DB/storage и forbidden fields/tables audits.
 - [ ] Redirect/SEO validation report.
 - [ ] Docker Build & Push exact RC SHA — GREEN.
 - [ ] Финальный Go/No-Go.
@@ -334,7 +301,7 @@ Event images остаются вне frozen P0 scope.
 
 ---
 
-## 6. Не входит в обязательный P0 без отдельного решения
+## 5. Не входит в обязательный P0 без отдельного решения
 
 - Past Events и Event images.
 - 63 expired Activities и связанная authorship — `P1_HISTORICAL_EXPIRED_ACTIVITY`.
@@ -345,54 +312,59 @@ Event images остаются вне frozen P0 scope.
 - RankMath `start`/`contains` redirects.
 - Historical bookings, WooCommerce/LatePoint и social feeds.
 - Collections и редкие custom post types.
+- Reviews, если founder явно фиксирует P1 defer.
+- Некритичные avatars/logos/covers/inline historical media после явного P1 решения.
 
 ---
 
-## 7. Сколько осталось до конца
+## 6. Сколько осталось до конца
 
 Это операционная оценка, не календарное обещание:
 
 ```text
-Core migration mechanics:       ~82% complete
-Local clean data work:           ~73% complete
+Core migration mechanics:       ~84% complete
+Local clean data work:           ~76% complete
 Production/cutover readiness:    ~30% complete
-Overall strict prelaunch:        ~62–66% complete
-Remaining strict P0 work:        ~34–38%
+Overall strict prelaunch:        ~64–68% complete
+Remaining strict P0 work:        ~32–36%
 ```
 
-Почему остаток всё ещё крупный: самые рискованные Users identity/ownership writes уже закрыты, но впереди production activation provider, Events tail, Routes review, media, SEO/regressions и весь RC/cutover цикл.
+Самые рискованные identity/ownership и Article CREATE-механики уже доказаны. Основной остаток теперь находится не в migration engine, а в production activation, content publication closure, Events/Routes tail, media decisions, SEO/regressions и RC/cutover.
 
 Крупных P0-блоков остаётся **9**:
 
-1. Authorship write closure user:575 для двух migrated Articles.
+1. Authorship и public/editorial closure двух Articles user:575.
 2. Users production activation и manual dispositions.
 3. Events tail.
 4. Routes review/publish.
-5. Places/Offers/Article content и media closure.
+5. Places/Offers и P0 media closure.
 6. Reviews либо явный P1 defer.
 7. Redirects/pages/SEO.
 8. Product regression suite.
 9. RC rehearsal и production cutover.
 
-Ориентир по объёму работы:
+Ориентир при оптимизированном, но безопасном процессе:
 
 ```text
-примерно 12–18 связных slices/PR до cutover,
-если Reviews и часть media будут явно перенесены в P1;
-больше — если весь перечисленный media/reviews scope остаётся обязательным P0.
+примерно 9–14 связных slices/PR до cutover,
+если Reviews и некритичная часть media явно перенесены в P1;
+больше — если полный media/reviews scope остаётся обязательным P0.
 ```
 
 ---
 
-## 8. Следующее одно действие
+## 7. Следующее одно действие
 
 ```text
-Phase: ARTICLES — authorship assignment for wordpress-db:user:575
-Prerequisite (Slice 19, COMPLETE): both Articles migrated; common rerun
-  SKIPPED 2/2; reconciliation = 2 × EXACT_AUTHORSHIP_CANDIDATE
+Phase: ARTICLES — Slice 20 authorship assignment for wordpress-db:user:575
+Branch: codex/articles-user575-authorship-assignment
+Base: dev @ b50c22fcb9c804c30e50718d4ab72716b55f00b1
 Targets: wordpress-db:post:56250 and wordpress-db:post:57731 only
-Expected write: authorUserId null -> cmrwr37tw03brws1jjh672ph3
-Execution: sequential first write, stop on first error
-Expected rerun: common rerun -> SKIP_UNCHANGED 2/2
-Article content/publication/city/media writes: forbidden
+Expected write: authorUserId null -> target user:575
+Guard: exact active USER/ARTICLE lineages, current authorUserId IS NULL,
+       CAS/conditional update, stop on first error
+Execution: sequential first write for 2 records
+Expected rerun: both ALREADY_SATISFIED / SKIP_UNCHANGED
+Forbidden: content, status, cityId, geoScope, media, roles, ownership,
+           sessions/tokens, user:521, user:91, expired Activities
 ```
