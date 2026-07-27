@@ -7,6 +7,10 @@ export const USER_575_ARTICLE_SOURCE_RECORD_KEYS = [
 ] as const;
 
 export type User575ArticleSourceRecordKey = (typeof USER_575_ARTICLE_SOURCE_RECORD_KEYS)[number];
+export const USER_575_EXPECTED_ARTICLE_IDS: Record<User575ArticleSourceRecordKey, string> = {
+  "wordpress-db:post:56250": "cms37q1ca0006ws27z75ug52h",
+  "wordpress-db:post:57731": "cms39185o0006ws0kt9lxp6t7",
+};
 export type ArticleAuthorshipAssignmentAction = "ASSIGNED" | "ALREADY_SATISFIED";
 
 type TransactionClient = Pick<PrismaClient, "migrationLineage" | "user" | "article">;
@@ -65,6 +69,10 @@ async function assertAndAssignOne(
   const articleId = activeArticleLineages[0]?.targetId;
   if (!articleId) {
     blocked("AUTHORSHIP_ARTICLE_TARGET_MISSING", sourceRecordKey);
+  }
+  const expectedArticleId = USER_575_EXPECTED_ARTICLE_IDS[sourceRecordKey];
+  if (articleId !== expectedArticleId) {
+    blocked("AUTHORSHIP_ARTICLE_TARGET_ID_MISMATCH", `${sourceRecordKey}:${articleId}:${expectedArticleId}`);
   }
   const article = await tx.article.findUnique({
     where: { id: articleId },
