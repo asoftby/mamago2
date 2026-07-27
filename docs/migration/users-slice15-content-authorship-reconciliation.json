@@ -1,0 +1,135 @@
+[
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 1,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "ec959d224abdbe5cd8cc44e43d48df79e713c5cdadf0d87134e498a7df9efbc7",
+    "sourceRecordKey": "wordpress-db:user:105",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 1,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "a52dcc2ea90ce2a6dc3865f40a3c2fab0c77a5bde2a7a06a359b938d746c20f1",
+    "sourceRecordKey": "wordpress-db:user:116",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 4,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "e8f0bf22fb2c3d7519eb6eb6c4dee6df23e86a2b074267ae212f9d34254d1540",
+    "sourceRecordKey": "wordpress-db:user:142",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 11,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "aee0db16b52137d68f1bf190b182ddc0fc3bc95f04197e081765d267541472f6",
+    "sourceRecordKey": "wordpress-db:user:341",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 1,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "48f9021354fa7bee83930b22116c9b4229c284dca7b1d63854346df4aaae3780",
+    "sourceRecordKey": "wordpress-db:user:42",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 1,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "9c18b935f7b1514edcb2947b7e2c7e484442cb2882643b454527c645af89cff6",
+    "sourceRecordKey": "wordpress-db:user:450",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 22,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "4f65c415e6e8b68ca712de68ceba6bb665da7a494bc9d0f0b6a6da0b125c1d6b",
+    "sourceRecordKey": "wordpress-db:user:462",
+    "userLineagePresent": true
+  },
+  {
+    "action": "CURRENT_AUTHOR_CONFLICT",
+    "authoredContentCount": 43,
+    "authoredContentLineagePresentCount": 5,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "ea3d1ed5467a9b4d68ae85da389d3a6c7e4e392d01a0ae1db33ff0f4cd81999f",
+    "sourceRecordKey": "wordpress-db:user:521",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 21,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "4477f3847c05c5e5b5c8f85890b2003c72c5a7c76e40e96b2ca9e259845df937",
+    "sourceRecordKey": "wordpress-db:user:567",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 1,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ACTIVITY"
+    ],
+    "evidenceHash": "17a8785794d5213c2e9600181e48b6ca15441f6d76c49f6eb645d3d39790bdfa",
+    "sourceRecordKey": "wordpress-db:user:568",
+    "userLineagePresent": true
+  },
+  {
+    "action": "TARGET_CONTENT_NOT_MIGRATED",
+    "authoredContentCount": 2,
+    "authoredContentLineagePresentCount": 0,
+    "authoredContentTypes": [
+      "ARTICLE"
+    ],
+    "evidenceHash": "088634cd3c1585cf38bf493d9949dc7341d47f1feec54531b838e551364ffe11",
+    "sourceRecordKey": "wordpress-db:user:575",
+    "userLineagePresent": true
+  },
+  {
+    "action": "MANUAL_REVIEW",
+    "authoredContentCount": 53,
+    "authoredContentLineagePresentCount": 15,
+    "authoredContentTypes": [
+      "ARTICLE",
+      "ROUTE"
+    ],
+    "evidenceHash": "30a6efe097b3a11ec88aad76193c59ab4955372132978a79591cb24a07d94e89",
+    "sourceRecordKey": "wordpress-db:user:91",
+    "userLineagePresent": true
+  }
+]

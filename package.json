@@ -69,6 +69,7 @@
     "migration:users:partial-coverage-ownership-golden": "tsx scripts/migration-partial-coverage-ownership-golden.ts",
     "migration:users:partial-coverage-ownership-user89": "tsx scripts/migration-partial-coverage-ownership-user89.ts",
     "migration:users:role-elevation-partial-coverage": "tsx scripts/migration-role-elevation-partial-coverage.ts",
+    "migration:users:content-authorship-reconciliation": "tsx scripts/migration-content-authorship-reconciliation.ts",
     "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",
