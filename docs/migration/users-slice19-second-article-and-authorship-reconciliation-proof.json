@@ -1,0 +1,107 @@
+{
+  "phase": "ARTICLES Slice 19 second published Article + common rerun + read-only authorship reconciliation",
+  "baseSha": "0603e54ca8afdcd0b92623ac01a30e4db03a1eac",
+  "scope": {
+    "sourceRecordKey": "wordpress-db:post:57731",
+    "commonRerun": ["wordpress-db:post:56250", "wordpress-db:post:57731"],
+    "authorshipUser": "wordpress-db:user:575"
+  },
+  "environmentGate": {
+    "repository": "/Users/shapovalovalexey/dev/mamago2",
+    "branch": "codex/articles-second-published-article-and-authorship-reconciliation",
+    "environment": "LOCAL",
+    "database": "localhost:5433/mamago2",
+    "workingTreeBeforeWrite": "clean",
+    "stashPreserved": true,
+    "nextEnvUntouched": true
+  },
+  "sourceRead": {
+    "count": 1,
+    "sourceRecordKey": "wordpress-db:post:57731",
+    "returnedRecords": 1,
+    "additionalSourceRecords": 0,
+    "status": "publish",
+    "queryPath": "fetchPublishedArticleEnvelopeBySourceRecordKey",
+    "queryBuilderVersion": "wordpress-db-domain-v2",
+    "canonicalSourceEnvelopeHash": "wordpress-db-domain-v2:658a1ac7be5aa46461f3901e6b31268110ac54ab1f2d512404aef1d65390ef1b",
+    "sourceDatabaseWrites": 0
+  },
+  "firstRun": {
+    "outcome": "LINKED",
+    "action": "CREATE",
+    "articleId": "cms39185o0006ws0kt9lxp6t7",
+    "lineageId": "cms3918650008ws0kuk6a557z",
+    "recordId": "cms3918540004ws0knclzo98h",
+    "deltas": {
+      "Article": "+1 (25->26)",
+      "MigrationLineage": "+1 (911->912)",
+      "MigrationRecord": "+1 (1577->1578)",
+      "MediaAsset": "0 (125->125)"
+    }
+  },
+  "writtenArticle": {
+    "slug": "uyutnye-kanikuly-vsej-semej-chem-zanyatsya-i-kak-provesti-zimnie-vechera-doma",
+    "status": "PENDING",
+    "cityId": null,
+    "geoScope": null,
+    "coverImageId": null,
+    "authorUserId": null
+  },
+  "commonRerun": {
+    "sourceReads": 0,
+    "results": {
+      "wordpress-db:post:56250": "SKIPPED",
+      "wordpress-db:post:57731": "SKIPPED"
+    },
+    "articleRowsByteIdentical": true,
+    "updatedAtUnchanged": true,
+    "articleCreateOrUpdateWrites": 0,
+    "activeArticleLineages": 2,
+    "duplicateLineages": 0,
+    "MigrationRecord": "+2 (one per scoped invocation)"
+  },
+  "authorshipReconciliation": {
+    "databaseWrites": 0,
+    "wordpress-db:post:56250": {
+      "classification": "EXACT_AUTHORSHIP_CANDIDATE",
+      "currentAuthorUserId": null,
+      "targetUserId": "cmrwr37tw03brws1jjh672ph3",
+      "targetArticleId": "cms37q1ca0006ws27z75ug52h",
+      "evidenceHash": "08e5c0960069e49d8a3e8c08c5b2a3977ea820956c3a28eb0fea1e24145ff4e0"
+    },
+    "wordpress-db:post:57731": {
+      "classification": "EXACT_AUTHORSHIP_CANDIDATE",
+      "currentAuthorUserId": null,
+      "targetUserId": "cmrwr37tw03brws1jjh672ph3",
+      "targetArticleId": "cms39185o0006ws0kt9lxp6t7",
+      "evidenceHash": "dcbe0be9b93965762227917271e329c9863f50b7516d729b5a88ad379722c358"
+    }
+  },
+  "audit": {
+    "finalCounts": {
+      "User": 579,
+      "Session": 5,
+      "UserActionToken": 0,
+      "Business": 41,
+      "Place": 83,
+      "Offer": 63,
+      "Article": 26,
+      "Route": 14,
+      "Activity": 10,
+      "MediaAsset": 125,
+      "MigrationLineage": 912,
+      "MigrationRecord": 1580
+    },
+    "unchangedHashes": {
+      "userRoleStatus": "a4f2bbda1e70353f7dc27d56b11a6b2296b332257feb3aa7f4e57c733caa4c54",
+      "businessPlaceOwnership": "6a799ab95e283fd90f0a763f9c2b28233d5d74ccaa95f7490e8021eb2690a0ec",
+      "post56250Article": "f419341aef2e08c050716334d1f76eb8131bb8ab174665cc70806cdc1da5f4b7",
+      "mediaAssets": "45c621757ab9e30ad4fecf0389d61d1202ce1ddfeef2497ee7be5fc168d69cc0"
+    },
+    "mediaImporterCalls": 0,
+    "storageWrites": 0,
+    "authorshipWrites": 0
+  },
+  "decision": "AUTHORSHIP_GOLDEN_READY",
+  "nextExactStep": "ARTICLES authorship assignment for wordpress-db:user:575: sequentially set authorUserId on post:56250 and post:57731, then common rerun -> SKIP_UNCHANGED"
+}
