@@ -1,34 +1,42 @@
 # Project Phoenix: Prelaunch Checklist
 
-**Статус:** актуальный рабочий чек-лист до полного завершения миграции WordPress → mamaGo 2.0 и production cutover.
+**Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-23
-**Текущая ветка следующей фазы:** `codex/users-activation-endpoints`
-**Base:** `dev` @ `289ec055baa908258a5957292593a9313ca6eafa`
+**Обновлено:** 2026-07-27  
+**Base:** `dev` @ `da243212ae661fb384f4abf762fa4f076347efcb` — PR #84 merged  
+**Текущая фаза:** `ACTIVITIES — Slice 16 dependency inventory`  
+**Текущий gate:** `BLOCKED_SOURCE_SNAPSHOT_UNAVAILABLE`
 
-> Подробный исторический журнал предыдущей версии чек-листа сохранён в Git
-> в merge-коммите `a2dd28a0eef93cf1cbb70dbae5132201b220879e` и его предках.
-> Этот файл теперь содержит только актуальное состояние, обязательные gates и
-> оставшиеся работы.
+> Подробная история Slices 1–15 сохранена в Git и в профильных proof-документах.
+> Этот файл содержит только актуальное состояние, обязательные gates и оставшийся
+> критический путь до запуска.
 
 ---
 
 ## 1. Неподвижные правила
 
-1. Этот файл — источник истины по текущему состоянию prelaunch-миграции.
-2. Перед Prisma/auth/migration работой читать `CLAUDE.md` и профильные runbooks.
-3. Запрещены `prisma migrate dev`, `prisma db push`, reset и destructive cleanup.
-4. Первый полный write-run каждой сущности выполняется последовательно с
-   `stop-on-first-error`, без автоматических retry, cleanup и rollback.
-5. WordPress — только read-only source. Production writes разрешаются отдельным
-   Go/No-Go gate.
-6. Immutable source snapshot, manifest и canonical hashes фиксируются до write.
-7. После batch — cumulative DB/storage audit и один общий idempotency rerun.
-8. Аномалии не чинятся по ходу batch: они переносятся в документированный backlog.
-9. VPN и сетевые маршруты автоматически не меняются. Маршрут — informational signal.
-10. Media выполняются только по заранее подготовленному manifest и отдельному gate.
-11. Ветки сущностей не смешиваются. Один связный vertical slice → один Draft PR.
-12. Production разрешён только после local golden, local batch и idempotency proof.
+1. Перед Prisma/auth/migration работой читать `CLAUDE.md` и профильные runbooks.
+2. Запрещены `prisma migrate dev`, `prisma db push`, reset и destructive cleanup.
+3. WordPress — строго read-only source. Разрешены только заранее определённые `SELECT`.
+4. Для каждой новой сущности: один environment gate, один SSH probe и один
+   агрегированный immutable source capture.
+5. Первый полный write-run выполняется последовательно с `stop-on-first-error`,
+   без автоматических retry, cleanup и rollback уже записанного prefix.
+6. Snapshot, manifest и canonical hashes фиксируются до первого write.
+7. После batch обязателен cumulative DB/storage audit и один общий idempotency rerun.
+8. Аномалии не исправляются внутри clean batch: они переносятся в документированный backlog.
+9. Media выполняются только по заранее подготовленному manifest и отдельному gate.
+10. Один связный vertical slice → одна ветка → один Draft PR.
+11. Production разрешён только после local golden, local batch, idempotency proof и Go/No-Go.
+12. Raw immutable snapshots запрещено хранить только в `/tmp`.
+13. Source-of-truth snapshots хранятся в долговечном приватном non-Git пути:
+
+```text
+/Users/shapovalovalexey/.mamago2/migration-snapshots/<entity>/
+```
+
+`/tmp` разрешён только для производных временных файлов. Raw snapshot никогда не
+коммитится в Git.
 
 ---
 
@@ -36,345 +44,176 @@
 
 | Трек | Статус | Что остаётся |
 | --- | --- | --- |
-| Migration engine | COMPLETE | Только regression/production validation |
-| Places | CORE COMPLETE | Финальная production validation и media/cutover checks |
-| Routes | IMPORTED 14/14 | Ручной review, publish, slug history и redirects |
-| Events | PARTIAL | 5 eligible CREATE и 67 sessions, затем общий proof |
-| Offers | SAFE CANONICAL COMPLETE 63/63 | Только отдельные future gates для media и backlog H/I |
-| Users source planning | COMPLETE | Ничего повторно не исследовать |
-| Users activation architecture | COMPLETE | Slices 1–3 merged via PR #70–#72 |
-| Users migration | CLEAN LOCAL SCOPE COMPLETE | Slice 5: 564/564 local, production import not started |
-| Users manual/ownership planning | READ-ONLY PLANNING COMPLETE | Slice 6: manual backlog + ownership/authorship plans; no writes yet |
-| Users ownership golden proof | GOLDEN PROOF COMPLETE | Slice 7: 1/38 Business+Place link written; remaining 35, role elevation, media NOT STARTED |
-| Users ownership batch write | 36/38 EXACT CANDIDATES WRITTEN | Slice 8: 35 more written; 2 partial-lineage (89, 130) + role elevation NOT STARTED |
-| Users role elevation golden proof | GOLDEN PROOF COMPLETE | Slice 9: 1/36 USER->BUSINESS_OWNER written; remaining 35 role elevations NOT STARTED |
-| Users role elevation batch | 36/36 ELIGIBLE OWNERS ELEVATED | Slice 10: all remaining 35 elevated; users 89/130 + authorship/media/email NOT STARTED |
-| Users business-linked tail reconciliation | READ-ONLY FINDINGS COMPLETE | Slice 11: both 89/130 = TARGET_PLACE_NOT_MIGRATED (draft/unpublished scope), no writes |
-| Users partial-coverage ownership golden | GOLDEN PROOF COMPLETE (1/2) | Slice 12: user:130 published-Place-only ownership written; user:89 + role elevation NOT STARTED |
-| Users partial-coverage ownership (user:89) | COMPLETE (2/2) | Slice 13: 19 published Places atomically linked; 38/38 business-linked ownership done; role elevation NOT STARTED |
-| Business-linked USERS workstream | **FULLY CLOSED (38/38 ownership + 38/38 roles)** | Slice 14: users 89/130 elevated to BUSINESS_OWNER; workstream complete |
-| Content authorship reconciliation | RE-VERIFIED, READ-ONLY | Slice 15: 0 exact candidates, 10 target-not-migrated, 1 conflict, 1 partial — no golden write possible yet |
-| Profiles/ownership/media | NOT STARTED | После Users identity foundation |
-| Reviews | NOT STARTED | После Users + Places identity mappings |
-| Article media | NOT STARTED | Cover + inline media remap |
-| Redirects/pages/SEO | PARTIAL | Exact redirects, mandatory pages, final SEO audit |
-| Product regressions | PARTIAL | Event city discovery и Article blog-city visibility |
-| RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, validation, Go/No-Go |
+| Migration engine | COMPLETE | Только regression и production validation |
+| Places | CORE COMPLETE | Media, production validation, public/city audit |
+| Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution, media, backlog H/I |
+| Routes | IMPORTED 14/14 | Ручной review, publish, slug history, redirects, public validation |
+| Events | PARTIAL 4/9 | 5 CREATE, 67 sessions, общий rerun, city/public validation |
+| Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
+| Users activation architecture | COMPLETE | Production email provider и delivery Go/No-Go |
+| Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`; backlog 0 |
+| Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
+| Content authorship | READ-ONLY RECONCILED | 0 exact, 10 targets absent, 1 conflict, 1 partial |
+| Activities | NOT STARTED / BLOCKED | Durable Activity snapshot и Slice 16 inventory |
+| User/Business profile media | NOT STARTED | Manifest, local proof, production gate |
+| Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
+| Reviews | NOT STARTED | Scope, vertical slice, batch, aggregates |
+| Redirects/pages/SEO | PARTIAL | Exact redirects, pages, canonical/sitemap/robots/noindex audit |
+| Product regressions | PARTIAL | Event discovery/404, Article city visibility, full smoke |
+| RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, migration, DNS |
 
 ---
 
-## 3. Завершено
+## 3. Завершено и не должно повторяться
 
-### 3.1 Migration foundation
+### 3.1 Foundation
 
-- [x] `MigrationRun`, `MigrationRecord`, `MigrationLineage` и idempotent commit flow.
-- [x] Targeted `--source-record-key` для реализованных сущностей.
-- [x] Immutable source snapshot pattern.
-- [x] Canonical hash, lineage uniqueness и rerun classification.
-- [x] Local/dev/prod migration profiles.
-- [x] Production cutover runbook.
-- [x] Safety policy: sequential first write, stop-on-first-error, no auto cleanup.
+- [x] `MigrationRun`, `MigrationRecord`, `MigrationLineage`.
+- [x] Canonical hashes, lineage uniqueness, idempotent classification.
+- [x] Local/dev/prod profiles и production cutover runbook.
+- [x] Safety policy: sequential first write, CAS/conditional updates,
+      stop-on-first-error, no automatic cleanup after partial batch.
 
-### 3.2 Places / Articles / Events / Routes foundation
+### 3.2 Offers
 
-- [x] Place adapter/normalizer/draft/writer/runner foundation.
-- [x] Article adapter/normalizer/draft/writer/runner foundation.
-- [x] Event adapter/normalizer/draft/writer/runner foundation.
-- [x] Route adapter/normalizer/draft/writer/runner foundation.
-- [x] Route local import: 14/14.
-- [x] Place phone E.164 normalization and guarded update safety.
-- [x] Place opening-hours parsing/import support.
-- [x] Route admin lifecycle section.
+- [x] 99 published source records inventoried.
+- [x] Canonical scope 91; safe canonical scope 63.
+- [x] Full source → normalize → draft → validate → write → lineage flow.
+- [x] 63/63 imported locally.
+- [x] Final rerun: `63 SKIP_UNCHANGED`.
+- [x] Duplicate lineage/offers: 0.
+- [x] Forbidden-table and media-call audit: clean.
 
-### 3.3 OFFERS — завершено
-
-- [x] Source inventory and classification: 99 published source records.
-- [x] Canonical scope: 91.
-- [x] Safe canonical scope: 63.
-- [x] Offer vertical slice: source → normalize → draft → validate → write →
-      lineage → idempotency.
-- [x] Unicode whitespace normalization for single-line fields.
-- [x] Guarded relation collapse for multiple rows resolving to one Place.
-- [x] Golden CREATE and guarded title remediation.
-- [x] Batch 1: 20 records + idempotency rerun.
-- [x] Batch 2: 20 CREATE.
-- [x] Batch 3: 20 CREATE.
-- [x] Batch 4: 3 CREATE.
-- [x] Final all-63 rerun: `63 SKIP_UNCHANGED`, `0 CREATE`, `0 UPDATE`.
-- [x] Duplicate Offers: 0.
-- [x] Duplicate lineage: 0.
-- [x] Forbidden-table deltas: 0.
-- [x] Media importer calls: 0 (`media policy: NONE`).
-- [x] PR #69 merged into `dev`.
-
-Merge proof:
+Deferred:
 
 ```text
-PR: #69
-head: 1fca8c8bd7c74f3523e55e43f39cab3f88ffda4a
-merge commit: a2dd28a0eef93cf1cbb70dbae5132201b220879e
-CI before merge: SUCCESS
+class H: 28 — missing required Place relation
+class I: 8 — noncanonical alias
+Offer media: separate gate
+production Offer execution: not started
 ```
 
-OFFERS больше не запускать повторно.
+### 3.3 Users identity and activation foundation
 
-Оставшийся OFFERS backlog:
+- [x] Immutable Users planning capture completed from 579 source users.
+- [x] Legacy password hashes excluded.
+- [x] Automatic ADMIN inheritance forbidden.
+- [x] Prisma/auth pending-activation foundation.
+- [x] Hash-only activation token service.
+- [x] Activation request/complete endpoints and security proofs.
+- [x] Clean local User scope imported: 564/564.
+- [x] One common rerun: 564 `SKIP_UNCHANGED`.
+- [x] Migrated users remain `PENDING_ACTIVATION`, nullable password,
+      no sessions/tokens/provider calls during migration.
+
+### 3.4 Business-linked Users — fully closed
+
+- [x] Slice 6: ownership planning for 38 users.
+- [x] Slices 7–8: 36 exact ownership writes and rerun proof.
+- [x] Slices 9–10: role elevation for the same 36 users and rerun proof.
+- [x] Slice 11: read-only reconciliation of users 89/130.
+- [x] Slices 12–13: partial-coverage ownership writes using only migrated
+      published Places; excluded draft/unpublished Places untouched.
+- [x] Slice 14: users 89/130 elevated to `BUSINESS_OWNER`.
+
+Final proof:
 
 ```text
-class H: 28 — отсутствует обязательная Place relation
-class I: 8 — noncanonical `offers` alias, исключён
-Offer media: deferred, требует отдельного manifest/write gate
-production Offer execution: не выполнялся
+Business ownership:       38/38 COMPLETE
+BUSINESS_OWNER elevation: 38/38 COMPLETE
+Business-linked backlog:  0
+Excluded unpublished/draft Places: untouched
 ```
 
-### 3.4 USERS — source planning завершён
+### 3.5 Content authorship reconciliation
 
-- [x] Один environment gate.
-- [x] Один SSH probe.
-- [x] Один агрегированный read-only source capture.
-- [x] Immutable Users snapshot.
-- [x] Inventory, identity, ownership и role classification.
-- [x] Activation/reactivation policy planning.
-- [x] Profile-media inventory.
-- [x] Golden samples.
-- [x] Deterministic Batch 1 planning.
-- [x] Implementation gap analysis.
+- [x] Slice 15 merged via PR #84, merge SHA
+      `da243212ae661fb384f4abf762fa4f076347efcb`.
+- [x] Read-only manifest regenerated and byte-identical to Slice 6.
+- [x] Actual target fields confirmed:
+  - `Article.authorUserId` — nullable;
+  - `Route.authorId` — nullable;
+  - `Activity.ownerUserId` — required/non-null.
+- [x] Database writes: 0.
 
-Source summary:
+Current classification:
 
 ```text
-source users: 579
-usermeta rows: 10,829
-content/authorship rows: 21,595
-comments/reviews: 1
-Voxel relations: 1,129
-profile-media references: 94
-ownership evidence rows: 21,781
-raw snapshot SHA-256:
-569c59f2e0d0a277a98ff5f7fe418170b123c77901c5c42064cecbaa2338f5a4
+TARGET_NOT_MIGRATED:       10
+EXISTING_AUTHOR_CONFLICT:   1 — wordpress-db:user:521
+PARTIAL_LINEAGE:            1 — wordpress-db:user:91
+EXACT_LINK_CANDIDATE:       0
+ALREADY_SATISFIED:          0
+UNSUPPORTED_TARGET:         0
 ```
 
-Classification:
-
-```text
-A — clean new user:              514
-B — exact existing-user link:      0
-C — exact business ownership:     38
-D — content author:               12
-E — duplicated legacy email:       0
-F — conflicting local collision:   0
-G — invalid/missing email:          0
-H — privileged/manual review:     15
-I — suspicious identity:           0
-J — technical anomaly:             0
---------------------------------------
-total:                            579
-clean scope:                      564
-manual/blocked scope:              15
-```
-
-Fixed policy:
-
-- WordPress password hashes не захватываются и не импортируются.
-- Автоматическое наследование `ADMIN` запрещено.
-- Один exact local-email match остаётся в privileged class H.
-- Existing local User не перезаписывается автоматически.
-- Profile media на planning-фазе: `NONE`.
-- Batch 1: 20 class A records, deterministic order, expected `CREATE`.
-
-Golden samples:
-
-```text
-ordinary user: wordpress-db:user:7
-business owner: wordpress-db:user:38
-privileged/local collision: wordpress-db:user:1
-```
-
-Повторные SSH/WordPress reads и перегенерация Users snapshot не нужны.
-
-### 3.5 USERS — architecture gate завершён
-
-- [x] 12 architecture outputs созданы.
-- [x] Manifest checksums проверены.
-- [x] Current credentials/auth paths проинвентаризированы.
-- [x] Activation state/password/token/login/session/ownership architecture решена.
-- [x] Threat model и test plan подготовлены.
-- [x] Implementation slices определены.
-- [x] Decision: `READY_FOR_PRISMA_AUTH_FOUNDATION_IMPLEMENTATION`.
-- [x] Repository и DB не изменялись во время architecture gate.
-
-Primary local evidence:
-
-```text
-/tmp/scratchpad/users/architecture/users-activation-architecture-decision.md
-/tmp/scratchpad/users/architecture/users-architecture.manifest.json
-```
-
-Не повторять architecture analysis. Реализация должна следовать проверенному
-решению из указанных artifacts.
+Authorship write запрещён до появления хотя бы одного exact/conflict-free target.
 
 ---
 
-## 4. USERS Slice 1 — завершён
+## 4. Текущий blocker — ACTIVITIES Slice 16
 
-### 4.1 Prisma/auth foundation
+Старый raw Users snapshot находился только в `/tmp` и был удалён системой между
+2026-07-23 и 2026-07-27. Его запрещено молча перегенерировать или подменять
+санитизированными manifests.
 
-**Статус:** COMPLETE.
+Принятое решение: не восстанавливать Users snapshot. Создать первый отдельный
+immutable snapshot сущности Activity в долговечном приватном пути.
 
-Рабочая ветка:
+### Разрешённый Slice 16 scope
 
-```text
-codex/users-auth-foundation
-base: dev @ a2dd28a0eef93cf1cbb70dbae5132201b220879e
-```
+- [ ] Подтвердить `environment = LOCAL`, clean branch и exact base.
+- [ ] Выполнить ровно один SSH probe.
+- [ ] Создать один агрегированный read-only Activity snapshot.
+- [ ] Сохранить snapshot вне `/tmp` и вне Git.
+- [ ] Зафиксировать file manifest, размеры, SHA-256 и общий canonical hash.
+- [ ] Зафиксировать masked source fingerprint и версию capture query.
+- [ ] Посчитать source records по post type/status.
+- [ ] Выделить exact Activity dependencies для 10 `TARGET_NOT_MIGRATED` users.
+- [ ] Построить User/Place/media dependency matrix.
+- [ ] Классифицировать Activity records: `CREATE`, `EXCLUDED`, `MANUAL`, `BLOCKED`.
+- [ ] Выбрать один минимальный golden Activity candidate.
+- [ ] Доказать нулевые DB/storage/media/authorship writes.
+- [ ] Обновить runbook о долговечном хранении snapshots.
 
-Обязательный scope Slice 1 определяется architecture decision и должен включать
-только минимальную foundation для безопасного pending/activation flow.
-
-- [x] Architecture decision отражён в schema/auth implementation и checklist.
-- [x] Реализованы минимальные Prisma schema changes.
-- [x] Создана reviewable Prisma migration без unrelated local drift.
-- [x] Backfill не требуется: 15 существующих users сохранили status/hash.
-- [x] Работоспособность 5 существующих sessions сохранена.
-- [x] Реализована безопасная nullable-password/pending-state semantics.
-- [x] Добавлены fail-closed gates в оба credentials login path, session creation и validation.
-- [x] Activation token records и email в Slice 1 не создавались; schema table —
-      отдельный следующий slice по architecture decision.
-- [x] User migration runner не начинался.
-- [x] Добавлены schema/auth unit и integration regressions.
-- [x] Проверены registration, login, reset gate, phone-stub compatibility,
-      admin/business access boundary.
-- [x] `tsc --noEmit` PASS.
-- [x] Production build PASS.
-- [x] Adversarial auth/security review PASS.
-- [x] PR #70 смержен в `dev`.
-
-Local proof boundary:
-
-```text
-USERS Slice 1: COMPLETE
-Prisma/auth foundation: implemented
-local migration: applied; status UP TO DATE
-existing users before/after: 15 / 15
-existing sessions before/after: 5 / 5
-UserActionToken records before/after: 0 / 0
-pending createSession: DENIED
-ACTIVE and LIMITED session policy: PASS
-ACTIVE → PENDING session revocation: PASS
-concurrent invalidation: PASS
-pending password reset bypass: DENIED
-activation endpoints: NOT STARTED
-User migration: NOT STARTED
-```
-
-Slice 1 запрещено смешивать с:
-
-- WordPress User CREATE;
-- activation email delivery;
-- profile media;
-- full ownership transfer;
-- Batch 1;
-- production execution.
-
-### 4.2 Следующие USERS slices
-
-- [x] Slice 2 — activation token service: hash-only storage, purpose scope,
-      TTL, single use, invalidation, concurrency safety.
-- [x] Slice 3 — activation request/complete endpoints, generic public responses,
-      rate limits, password setup and audit.
-- [x] Slice 4 — User migration source/normalize/draft/validate/writer/lineage;
-      local golden proof: two CREATE, one privileged BLOCKED, one common rerun.
-- [x] Slice 5 — clean local User batch import: 562 CREATE + 2 existing golden
-      SKIP_UNCHANGED; one rerun 564 SKIP_UNCHANGED.
-- [ ] Business ownership access proof — separate later slice.
-- [ ] Slice 7 — clean Batch 1 (20 records) + audit.
-- [ ] Slice 8 — remaining clean users in sequential batches.
-- [ ] Slice 9 — one common clean-scope idempotency rerun.
-- [ ] Slice 10 — privileged/manual class H resolution policy/tooling.
-- [ ] Profile media — отдельный later gate, не смешивать с first User proof.
-
-Slice 2 proof boundary:
-
-```text
-USERS Slice 1: COMPLETE — merged via PR #70
-USERS Slice 2: COMPLETE
-token storage: SHA-256 hash only
-raw token storage: none
-purpose: MIGRATED_ACCOUNT_ACTIVATION
-TTL: 60 minutes; expiresAt > now is valid, expiresAt <= now is expired
-issuance eligibility: PENDING_ACTIVATION and deletedAt IS NULL only
-unresolved: usedAt IS NULL and invalidatedAt IS NULL
-concurrent issuance: one unresolved winner
-atomic consumption: one winner; User eligibility included in conditional UPDATE
-final proof fixtures: temporary only, cleaned
-email delivery: NOT STARTED
-activation endpoints: NOT STARTED
-User migration: NOT STARTED
-```
-
-Slice 3 email safety policy:
-
-```text
-LOCAL: external email delivery forbidden
-DEV: external email delivery forbidden
-PRODUCTION: delivery only after explicit Go/No-Go and production-only flag
-```
-
-Slice 3 local proof:
-
-```text
-request endpoint: generic 202 for pending/unknown/ineligible
-public response: no delivery status, token, hash, User id or internal state
-request body: strict JSON, byte-limited, normalized email
-client IP: trusted proxy headers only behind explicit TRUST_PROXY_HEADERS policy
-complete endpoint: atomic passwordHash + ACTIVE + emailVerifiedAt + token usedAt
-sibling tokens: invalidated
-sessions: revoked
-request/completion audit: recorded without raw token/password
-rate limits: IP + normalized-email/token keys, fail closed
-LOCAL/DEV external provider calls: 0; result DELIVERY_DISABLED
-PRODUCTION gate: NODE_ENV + APP_ENV + enable flag + approval flag required;
-all gates still return PROVIDER_UNAVAILABLE until a later provider review
-external email provider integration/production delivery: NOT STARTED
-WordPress User mass migration: NOT STARTED
-mass email campaign: NOT STARTED
-ownership/profile media: NOT STARTED
-final cleanup: users 15, sessions 5, action tokens 0, pending 0,
-activation audit fixtures 0, activation rate-limit rows 0, provider calls 0
-```
-
-USERS completion criteria:
-
-```text
-clean scope imported or explicitly dispositioned
-no legacy password hashes imported
-no automatic ADMIN grants
-unique email/lineage proven
-activation flow security proven
-ownership access gated correctly
-one common idempotency rerun passed
-profile media handled by separate manifest/gate
-```
+Slice 16 заканчивается planning/proof. Activity golden write и authorship write в
+этом slice запрещены.
 
 ---
 
-## 5. Осталось до технического cutover
+## 5. Обязательный P0 остаток до запуска
 
-Ниже — обязательный P0 остаток в рекомендуемом порядке.
+### 5.1 Activities и content authorship
 
-### 5.1 USERS + activation
+- [ ] Завершить Slice 16 durable snapshot + dependency inventory.
+- [ ] Принять product-решение: Activity migration входит в launch P0 или authorship
+      формально переносится в P1.
+- [ ] Если Activity входит в P0: реализовать golden vertical slice.
+- [ ] Выполнить clean Activity batch последовательно.
+- [ ] Выполнить один общий Activity rerun.
+- [ ] Повторить read-only authorship reconciliation после Activity migration.
+- [ ] Выполнить golden authorship write только для появившегося exact candidate.
+- [ ] Выполнить batch только для exact/conflict-free authorship relations.
+- [ ] `user:521` оставить manual conflict до отдельного founder decision.
+- [ ] `user:91` разобрать после полного Article/Route lineage review.
 
-- [x] Prisma/auth foundation.
-- [x] Activation tokens and endpoints.
-- [x] User migration vertical slice (local golden scope only).
-- [ ] 564 clean users: batches + one common rerun.
-- [ ] 15 privileged/manual users: explicit disposition, без auto ADMIN.
-- [ ] Ownership access proof.
-- [ ] User/profile media gate.
+### 5.2 Users production и activation
 
-### 5.2 EVENTS
+- [ ] Зафиксировать dispositions для 15 manual/privileged users:
+  - 1 existing ADMIN — оставить неизменным;
+  - 9 exclusions — подтвердить;
+  - 5 `REQUIRES_FOUNDER_DECISION` — принять решения.
+- [ ] Интегрировать и проверить production email provider.
+- [ ] Сохранить LOCAL/DEV delivery hard-disabled.
+- [ ] Подготовить production User manifest и checksums.
+- [ ] Провести production-like rehearsal Users + activation.
+- [ ] Подготовить controlled activation delivery после migration Go/No-Go.
+- [ ] Решить P0/P1 для User/Business avatars и logos.
+- [ ] Если media остаётся P0 — выполнить отдельный manifest/golden/batch/rerun.
 
-Текущий известный статус:
+### 5.3 Events
+
+Текущий известный scope:
 
 ```text
 eligible imported: 4/9
@@ -382,752 +221,146 @@ remaining CREATE: 5
 pending materialized sessions: 67
 ```
 
-- [ ] Проверить актуальный Docker/CI gate перед write.
-- [ ] Final preview оставшихся eligible records.
-- [ ] Sequential targeted commits.
-- [ ] Session count validation.
-- [ ] Common idempotency rerun.
-- [ ] Public URL/city visibility verification.
+- [ ] Проверить exact Docker/CI environment gate.
+- [ ] Preview 5 оставшихся eligible Events.
+- [ ] Выполнить sequential targeted commits.
+- [ ] Проверить 67 sessions и cumulative deltas.
+- [ ] Выполнить один общий rerun.
+- [ ] Проверить city/date discovery и отсутствие 404.
 
-Event images остаются excluded согласно frozen scope.
+Event images остаются вне P0 frozen scope.
 
-### 5.3 ROUTES
+### 5.4 Routes
 
-- [ ] Ручной review 14/14 импортированных маршрутов.
-- [ ] Проверить stops, descriptions, images и city mappings.
-- [ ] Publish approved routes.
-- [ ] Slug history и redirect map.
-- [ ] Public URL validation.
+- [ ] Ручной review 14/14 импортированных Routes.
+- [ ] Проверить stops, descriptions, RouteStop images и city mappings.
+- [ ] Publish approved Routes.
+- [ ] Зафиксировать slug history и redirect map.
+- [ ] Выполнить public URL validation.
 
-### 5.4 ARTICLE MEDIA
+### 5.5 Places, Offers, Articles и media
 
-- [ ] ArticleMediaSyncer.
-- [ ] Cover media manifest.
-- [ ] Inline `wp-content/uploads` remap.
-- [ ] Local FULL proof.
-- [ ] Dev metadata-only policy proof.
+- [ ] Финальная production validation Places.
+- [ ] Place media manifest, storage и dedup audit.
+- [ ] Production execution Offers safe scope 63/63.
+- [ ] Offer media gate либо явный перенос в P1.
+- [ ] Исправить Article visibility по selected/default city.
+- [ ] Реализовать Article cover manifest.
+- [ ] Выполнить inline `wp-content/uploads` remap.
+- [ ] Local FULL media proof.
+- [ ] Dev metadata-only proof.
 - [ ] Production FULL manifest/gate.
-- [ ] Storage and dedup audit.
 
-### 5.5 PROFILES / OWNERSHIP / MEDIA
+### 5.6 Reviews
 
-- [ ] User identity mapping завершить через USERS runner.
-- [ ] Business/Organizer exact ownership links.
-- [ ] User and Business avatars/logos.
-- [ ] Неоднозначные profile posts → quarantine/ledger.
-- [ ] Public profile content classification оставить P1, если не требуется P0.
+- [ ] Подтвердить approved source scope.
+- [ ] Проверить Users + Places dependency gate.
+- [ ] Реализовать Review vertical slice.
+- [ ] Выполнить golden sample, small batch и rerun.
+- [ ] Проверить public rating aggregates.
 
-### 5.6 REVIEWS
+Founder decision допускает перенос Reviews в P1 только с явной фиксацией, что
+старые рейтинги/отзывы не являются launch blocker.
 
-- [ ] Подтвердить точный approved source scope.
-- [ ] Users + Places dependency gate.
-- [ ] Review adapter/normalizer/draft/writer/lineage.
-- [ ] Golden sample.
-- [ ] Full small batch.
-- [ ] Idempotency rerun.
-- [ ] Public rating aggregates validation.
+### 5.7 Redirects, mandatory pages и SEO
 
-### 5.7 REDIRECTS / PAGES / SEO
-
-- [ ] RankMath `exact` redirects subset.
+- [ ] Импортировать RankMath `exact` redirects subset.
 - [ ] Все redirects на `/` вручную перемапить на релевантные hubs.
-- [ ] Legal/about/contact mandatory pages.
-- [ ] WordPress catch-all validation.
-- [ ] Canonical/no-trailing-slash validation.
-- [ ] City-scoped slugs and canonical URLs.
-- [ ] Sitemap/robots/noindex launch gate.
-- [ ] Redirect manifest minimum and collision audit.
+- [ ] Подготовить legal/about/contact pages.
+- [ ] Проверить WordPress catch-all.
+- [ ] Проверить canonical и no-trailing-slash.
+- [ ] Проверить city-scoped slugs и canonical URLs.
+- [ ] Проверить sitemap/robots/noindex launch gate.
+- [ ] Проверить redirect manifest minimum и collisions.
 
 `start`/`contains` redirects остаются P1 после conflict review.
 
-### 5.8 PRODUCT REGRESSIONS — P0
+### 5.8 Product regressions — launch blockers
 
-- [ ] Event visibility and city discovery: созданное событие должно появляться
-      в правильном городе, на нужной дате и не отдавать 404.
-- [ ] Article admin/blog city visibility: опубликованная статья должна
-      отображаться в блоге выбранного/default города.
-- [ ] Полный smoke test auth, business cabinet, admin lifecycle и public pages.
+- [ ] Event появляется в правильном городе и на правильной дате.
+- [ ] Event public URL не отдаёт 404.
+- [ ] Published Article отображается в блоге selected/default city.
+- [ ] Auth и migrated-account activation smoke test.
+- [ ] Business cabinet smoke test.
+- [ ] Admin lifecycle smoke test.
+- [ ] Public Places/Offers/Events/Articles/Routes smoke test.
+- [ ] Mobile/desktop critical navigation smoke test.
 
-Place phone E.164 issue уже исправлен.
+### 5.9 Release candidate и production cutover
 
-### 5.9 RELEASE CANDIDATE / PRODUCTION
-
-- [ ] Freeze source snapshot for production.
-- [ ] Зафиксировать production migration manifests и checksums.
-- [ ] Fresh production backup.
-- [ ] Проверить restore procedure без destructive rehearsal на production.
-- [ ] Full local rehearsal на production-like data.
-- [ ] Dev metadata-only rehearsal.
-- [ ] Cumulative DB/storage delta report.
-- [ ] Forbidden tables/fields audit.
-- [ ] Redirect and SEO validation report.
+- [ ] Freeze production source snapshots.
+- [ ] Зафиксировать production manifests и checksums.
+- [ ] Сделать fresh production backup.
+- [ ] Подтвердить restore procedure без destructive production rehearsal.
+- [ ] Выполнить full local rehearsal на production-like data.
+- [ ] Выполнить dev metadata-only rehearsal.
+- [ ] Подготовить cumulative DB/storage delta report.
+- [ ] Выполнить forbidden tables/fields audit.
+- [ ] Подготовить redirect/SEO validation report.
 - [ ] Docker Build & Push на exact RC SHA — GREEN.
-- [ ] Go/No-Go checklist.
-- [ ] Sequential production migration.
+- [ ] Финальный Go/No-Go.
+- [ ] Последовательная production migration.
 - [ ] Post-migration validation.
-- [ ] One allowed production idempotency rerun where explicitly planned.
-- [ ] DNS/cutover/noindex switch.
-- [ ] Monitoring and rollback decision window.
+- [ ] Разрешённые production idempotency reruns.
+- [ ] DNS cutover и noindex switch.
+- [ ] Monitoring и rollback decision window.
 
 ---
 
-## 6. Что сознательно не входит в P0
+## 6. Не входит в обязательный P0 без отдельного решения
 
-- Past Events и их изображения.
-- Event images.
+- Past Events и Event images.
 - Noncanonical Offer class I.
-- Offer class H без Place — до отдельного editorial/mapping решения.
+- Offer class H без Place relation.
+- Draft/unpublished long-tail bulk publication.
 - Full public profile content classification.
 - RankMath `start`/`contains` redirects.
-- Draft/unpublished long-tail content bulk publication.
 - Historical bookings, WooCommerce/LatePoint и social feeds.
-- Collections и редкие custom post types без отдельного business decision.
+- Collections и редкие custom post types.
 
 ---
 
-## 7. Текущий следующий шаг
+## 7. Оценка готовности к запуску
+
+Это операционная оценка, а не календарный прогноз:
 
 ```text
-Phase: USERS — Slice 15 content authorship targeted read-only reconciliation
-Branch: codex/users-content-authorship-reconciliation
-Base SHA: 7e4b3b13bcf07b472dfa7ebd9f1df00cae20a42d (dev, PR #83 merged)
-Source/architecture discovery: COMPLETE — не повторять
-Slice 1: COMPLETE — PR #70 merged
-Slice 2: COMPLETE — PR #71 merged
-Slice 3: COMPLETE — PR #72 merged
-Slice 4: COMPLETE — local golden proof
-Slice 5: COMPLETE — 564/564 clean local scope + one common rerun
-Slice 6: COMPLETE — read-only planning, merged via PR #75
-Slice 7: COMPLETE — 1/38 business-ownership golden write + rerun proof, merged via PR #76
-Slice 8: COMPLETE — 35/38 more business-ownership writes (36/38 total) + rerun proof, merged via PR #77
-Slice 9: COMPLETE — 1/36 USER->BUSINESS_OWNER golden role elevation + rerun proof, merged via PR #78
-Slice 10: COMPLETE — remaining 35 role elevations (36/36 total) + rerun proof, merged via PR #79
-Slice 11: COMPLETE — read-only reconciliation: both 89/130 = TARGET_PLACE_NOT_MIGRATED, 0 writes, merged via PR #80
-Slice 12: COMPLETE — user:130 ownership written (published Place only, draft excluded) + rerun proof, merged via PR #81
-Slice 13: COMPLETE — user:89 ownership written (19 published Places, 195 excluded) + rerun proof, merged via PR #82
-Slice 14: COMPLETE — users 89/130 elevated to BUSINESS_OWNER + rerun proof, merged via PR #83
-BUSINESS-LINKED USERS WORKSTREAM: FULLY CLOSED — 38/38 ownership, 38/38 correct roles
-Slice 15: COMPLETE — content authorship re-verified read-only: 0 exact, 10 not-migrated, 1 conflict, 1 partial (byte-identical to Slice 6)
-Mass/production User writes: NOT STARTED
-Place migration scope expansion (draft/unpublished): explicitly NOT undertaken
-Content authorship golden write: BLOCKED — no exact/conflict-free candidate exists yet
+Core migration mechanics:       ~80% complete
+Local clean data work:           ~70% complete
+Production/cutover readiness:    ~30% complete
+Overall strict prelaunch:        ~60–65% complete
+Remaining strict P0 work:        ~35–40%
 ```
 
-Следующее одно действие:
+Почему остаток всё ещё значительный: самые рискованные Users identity/ownership
+операции завершены, но production provider, Activities decision, Events tail,
+Routes review, media, SEO/regressions и весь RC/cutover цикл ещё не закрыты.
 
-> Content authorship имеет 0 EXACT_LINK_CANDIDATE среди текущих 12 —
-> golden write пока невозможен без отдельного product-решения:
-> (a) расширить Activity/Article/Route migration scope, чтобы у хотя бы
-> одного из 10 target-not-migrated случаев появился target, или (b)
-> отдельно разобрать conflict user:521 (5 Activities уже привязаны к
-> другому владельцу) до golden write. Не начинать authorship writes, role
-> changes, Place/Activity migration scope expansion, manual/privileged
-> user resolution или media import без отдельного явного разрешения.
+Крупных P0 блоков осталось **9**:
+
+1. Activity snapshot/inventory и authorship decision.
+2. Users production activation и manual dispositions.
+3. Events tail.
+4. Routes review/publish.
+5. Places/Offers/Article production media/content closure.
+6. Reviews либо явный P1 defer.
+7. Redirects/pages/SEO.
+8. Product regression suite.
+9. RC rehearsal и production cutover.
 
 ---
 
-## 8. Краткий handoff — 2026-07-23
-
-- PR #69 переведён из Draft и смержен в `dev`.
-- Merge SHA: `a2dd28a0eef93cf1cbb70dbae5132201b220879e`.
-- OFFERS safe canonical: 63/63 COMPLETE.
-- All-63 rerun: PASS.
-- OFFERS production/media: не выполнялись.
-- USERS immutable snapshot и planning: COMPLETE.
-- USERS activation architecture: COMPLETE.
-- Architecture decision: `READY_FOR_PRISMA_AUTH_FOUNDATION_IMPLEMENTATION`.
-- Новая ветка: `codex/users-auth-foundation`.
-- USERS Slice 1 Prisma/auth foundation: COMPLETE, local proof PASS.
-- PR #70 merge commit: `76504ef15781927d27dafcce6863609f52ccfdfc`.
-- Existing users/sessions at proof boundary: 15 / 5; action tokens: 0.
-- USERS Slice 2 token service: COMPLETE — merged via PR #71.
-- Token policy: SHA-256 hash of 32 random bytes, 60-minute TTL, purpose scope,
-  invalidation and atomic one-time consume.
-- Final proof fixtures cleaned: users 15, sessions 5, action tokens 0, pending 0.
-- Future email policy: LOCAL/DEV external delivery forbidden; PRODUCTION only
-  after explicit Go/No-Go and a production-only flag.
-- PR #71 merge commit: `289ec055baa908258a5957292593a9313ca6eafa`.
-- USERS Slice 3 activation request/complete endpoints: COMPLETE — PR #72 merged,
-  merge SHA `82350ade626ae09968a8e1b30a51e9f46db47432`;
-  external provider integration and production delivery remain NOT STARTED.
-- USERS Slice 4 local golden vertical slice: COMPLETE.
-- `wordpress-db:user:7`: CREATE, rerun SKIP_UNCHANGED.
-- `wordpress-db:user:38`: CREATE as role USER, rerun SKIP_UNCHANGED;
-  business ownership deferred.
-- `wordpress-db:user:1`: BLOCKED / PRIVILEGED_ACCOUNT_COLLISION on both runs;
-  privileged account fingerprint unchanged.
-- Migrated security defaults: PENDING_ACTIVATION, passwordHash null,
-  emailVerifiedAt null, role USER; sessions/action tokens/provider calls 0.
-- Golden cumulative delta: Users +2, MigrationLineage +2,
-  MigrationRecord +6 (three first-run attempts + three rerun attempts);
-  Business/Place/Offer/MediaAsset 0.
-- Full/mass/production User migration, external email delivery, ownership and
-  profile media: NOT STARTED.
-- USERS Slice 5 clean local batch: COMPLETE.
-- Clean scope: 564; manual/privileged excluded: 15; imported manual: 0.
-- First run: CREATE 562, SKIP_UNCHANGED 2, BLOCKED 0, ERROR 0.
-- Exactly one common rerun: SKIP_UNCHANGED 564; additional reruns 0.
-- Slice 5 deltas: Users +562, MigrationLineage +562,
-  MigrationRecord +1128; Session/UserActionToken/Business/Place/Offer/
-  Article/Route/MediaAsset 0.
-- All 564 migrated Users remain PENDING_ACTIVATION with passwordHash null,
-  emailVerifiedAt null and role USER; emails/provider calls 0.
-- Production User migration, production email delivery, ownership transfer and
-  profile media: NOT STARTED.
-- В этой docs-операции DB, WordPress, storage, media и network writes не
-  выполнялись.
+## 8. Следующее одно действие
 
 ```text
-USERS Slice 6: COMPLETE — read-only planning
-
-manual/privileged:
-  source users: 15
-  imported: 0
-  automatic mutations: 0
-  backlog manifest: created
-  manual decisions: required
-
-business ownership:
-  business-linked users: 38
-  ownership writes: 0
-  role changes: 0
-  planning manifest: created
-
-content authorship:
-  content-author users: 12
-  authorship writes: 0
-  planning manifest: created
-
-email delivery: 0
-provider calls: 0
-profile media: NOT STARTED
-production User migration: NOT STARTED
+Phase: ACTIVITIES — Slice 16 dependency inventory
+Base: dev @ da243212ae661fb384f4abf762fa4f076347efcb
+Current decision: BLOCKED_SOURCE_SNAPSHOT_UNAVAILABLE
+Authorized resolution: first durable Activity immutable snapshot
+Database writes: forbidden
+Activity/authorship writes: forbidden
 ```
 
-- USERS Slice 6 manual/privileged backlog and ownership planning: COMPLETE —
-  полностью read-only; analyzer использует read-only Prisma-расширение,
-  блокирующее любые write-операции и `$executeRaw*` до обращения к БД, плюс
-  узкий read-only repository interface без write-методов.
-- Manual/privileged backlog: 15/15 sourceRecordKey, дубликаты и пропуски
-  запрещены типами; `wordpress-db:user:1` присутствует,
-  imported/lineage: NO, recommendedDisposition `KEEP_EXISTING_TARGET_UNCHANGED`
-  (existing ADMIN target), automaticRoleChange `FORBIDDEN`.
-- Manual dispositions: KEEP_EXISTING_TARGET_UNCHANGED 1,
-  MANUAL_LINK_AFTER_IDENTITY_VERIFICATION 0, MANUAL_CREATE_PENDING_ACCOUNT 0,
-  EXCLUDE_FROM_MIGRATION 9, REQUIRES_FOUNDER_DECISION 5 (сумма 15).
-- Business ownership plan (38 users, сопоставление только через точную
-  `MigrationLineage`): reconciled User lineages 38/38; exact candidates 36;
-  already satisfied 0; missing target 0; conflicts 0; ambiguous/manual 2
-  (partial Place-lineage coverage); unsupported 0. Ownership writes 0,
-  role changes 0.
-- Content authorship plan (12 users): reconciled User lineages 12/12; exact
-  candidates 0; already satisfied 0; missing target 10; conflicts 1
-  (Activity.ownerUserId уже указывает на другого пользователя — required,
-  non-null поле); ambiguous/manual 1 (partial Article/Route coverage);
-  unsupported 0. Authorship writes 0.
-- Sanitised manifests: `docs/migration/manual-user-backlog.json`,
-  `docs/migration/business-ownership-plan.json`,
-  `docs/migration/content-authorship-plan.json`; canonical (order/timestamp/
-  path-independent) SHA-256 hashes recorded in
-  `docs/migration/users-slice6-planning-proof.json`.
-- No-write proof: User/Session/UserActionToken/Business/Place/Offer/Article/
-  Route/Activity/MediaAsset/MigrationLineage/MigrationRecord delta 0;
-  ownership/authorship relation hash unchanged; role/status distribution hash
-  unchanged; passwordHash/emailVerifiedAt non-null counts delta 0.
-- Adversarial review (17 сценариев): дефектов не найдено, batch-исправлений
-  не потребовалось.
-- Email delivery, provider calls, profile media import, production User
-  migration: NOT STARTED.
-
-## 9. Краткий handoff — 2026-07-23 (Slice 7)
-
-```text
-USERS Slice 7: COMPLETE — ownership vertical slice golden proof
-
-golden candidate: wordpress-db:user:38 (1 of 38 business-linked users)
-selection: single exact Place, no conflict, no partial lineage
-first run: CREATE — Business +1, Place ownership linked, BUSINESS lineage +1
-rerun: SKIP_UNCHANGED — zero further mutation
-role changes: 0 (target User stays role=USER, status=PENDING_ACTIVATION)
-
-deferred:
-  remaining exact candidates: 35
-  partial-lineage candidates: wordpress-db:user:89, wordpress-db:user:130
-  manual/privileged users: 15
-  content authorship: 12
-  role elevation USER -> BUSINESS_OWNER: NOT STARTED
-  profile media, activation/email delivery: NOT STARTED
-```
-
-- USERS Slice 7 ownership vertical slice golden proof: COMPLETE — first
-  DB-write slice of the ownership workstream, scoped to exactly one of the
-  36 `EXACT_LINK_CANDIDATE` entries from Slice 6's plan
-  (`docs/migration/business-ownership-plan.json`), chosen by explicit
-  criteria: single unambiguous owned Place, full lineage coverage, no
-  existing Business conflict.
-- New module `src/lib/migration/commit/business-ownership/
-  BusinessOwnershipGoldenRunner.ts`: atomic (Serializable) transaction —
-  create `Business` for the migrated User, link `Place.ownerBusinessId`,
-  write `MigrationLineage` (targetType `BUSINESS`) and `MigrationRecord`
-  bookkeeping. Every precondition (User/Place lineage active, Place
-  currently unowned, User has no existing Business, User role still
-  `USER`) is re-verified from a fresh read inside the transaction, not
-  trusted from the outer plan.
-- The golden candidate (`wordpress-db:user:38`) is hardcoded in
-  `scripts/migration-business-ownership-golden.ts` rather than accepted as
-  a CLI argument, so the script cannot be pointed at any other candidate,
-  the manual/privileged backlog, content authorship, or role elevation —
-  all of those remain out of scope for this slice.
-- First run: `CREATE` — deltas: Business +1, MigrationLineage +1,
-  MigrationRecord +1; User/Session/UserActionToken/Place/Offer/Article/
-  Route/Activity/MediaAsset counts and the User role/status distribution
-  hash unchanged; target User role/status/passwordHash/emailVerifiedAt
-  unchanged.
-- Rerun: `SKIP_UNCHANGED` — identical Business id returned, zero further
-  writes.
-- Role is intentionally left at `USER` — Slice 6 already separated the
-  ownership action from the role recommendation
-  (`ELIGIBLE_FOR_BUSINESS_OWNER_AFTER_OWNERSHIP_WRITE`); the actual
-  `USER → BUSINESS_OWNER` elevation is deferred to its own future slice
-  with independent authorization, rollback, and idempotency proof.
-- Remaining 35 exact candidates, the 2 partial-lineage cases (users 89,
-  130), all 15 manual/privileged users, all 12 content-author users,
-  profile media, and activation/email delivery: NOT STARTED.
-
-## 10. Краткий handoff — 2026-07-23 (Slice 8)
-
-```text
-USERS Slice 8: COMPLETE — business ownership batch write
-
-scope: remaining 35 EXACT_LINK_CANDIDATE (36 total minus user:38, done in Slice 7)
-excluded: users 89/130 (partial lineage), manual/privileged (15), content authorship (12)
-mode: sequential, stop-on-first-error, no batching/retry/rollback
-
-first run: 35/35 CREATE — Business +35, Place ownership linked x35,
-           BUSINESS lineage +35, MigrationRecord +35, per-step audit clean
-rerun:     35/35 SKIP_UNCHANGED — zero further writes
-role changes: 0 (all 35 owners remain role=USER)
-
-combined ownership progress: 36/38 business-linked users written
-remaining: wordpress-db:user:89, wordpress-db:user:130 (manual review)
-```
-
-- USERS Slice 8 business ownership batch write: COMPLETE — reused the
-  exact Slice 7 write path (`BusinessOwnershipGoldenRunner`) per candidate
-  via a new sequential `BusinessOwnershipBatchRunner`, with no relaxed
-  guards and no new write logic. The batch manifest is rebuilt live from
-  the immutable snapshot + current DB state (reusing the tested Slice 6
-  `planBusinessOwnership` reconciliation) rather than trusted from the
-  static committed plan file, so it naturally excludes anything already
-  written or reclassified since Slice 6.
-- First run: 35/35 `CREATE`, 0 `BLOCKED`, `stoppedEarly: false`. Deltas:
-  Business +35, MigrationLineage +35, MigrationRecord +35;
-  User/Session/UserActionToken/Place/Offer/Article/Route/Activity/
-  MediaAsset counts and the User role/status distribution hash: unchanged.
-  A per-step audit callback re-verified these invariants after every
-  single candidate, not just at the end.
-- Rerun proof: re-processing the same fixed 35-candidate list (bypassing
-  the live "already satisfied" filter, which — correctly — excludes
-  completed work from the production CLI's own manifest) confirms all 35
-  now resolve to `SKIP_UNCHANGED` with zero further writes.
-- Role stays `USER` for all 35 owners — verified individually, not just by
-  an aggregate distribution hash.
-- Combined ownership progress: 36 of the 38 business-linked users now have
-  a real Business + Place link (1 from Slice 7, 35 from Slice 8). The
-  remaining 2 (`wordpress-db:user:89`, `wordpress-db:user:130`) stay
-  deferred — partial Place-lineage coverage, requires manual review, not a
-  batch write.
-- Adversarial note: an earlier draft of the batch integration test wrote
-  its fixtures under the shared production `MigrationSource`
-  (`users-immutable-snapshot`) instead of an isolated per-test namespace,
-  leaking 4 orphaned `MigrationRecord`/`MigrationRun` rows into real
-  migration bookkeeping (caught before this PR, before any push). Fixed by
-  isolating the test under its own namespace (mirroring the Slice 7
-  integration test's convention) and deleting the 4 leaked rows; verified
-  DB state returned to the exact expected baseline before proceeding.
-- Role elevation `USER → BUSINESS_OWNER`, the 2 partial-lineage cases,
-  manual/privileged users (15), content authorship (12), profile media,
-  and activation/email delivery: NOT STARTED.
-
-## 11. Краткий handoff — 2026-07-23 (Slice 9)
-
-```text
-USERS Slice 9: COMPLETE — BUSINESS_OWNER role elevation golden proof
-
-candidate: wordpress-db:user:38 (Business+Place link written in Slice 7)
-prerequisites verified: User lineage, Business lineage, Business.ownerUserId
-                         match, >=1 Place linked via ownerBusinessId
-
-first run: ELEVATE — role USER -> BUSINESS_OWNER (only field changed)
-rerun:     SKIP_UNCHANGED — zero further mutation
-
-untouched, verified byte-for-byte: status (PENDING_ACTIVATION), passwordHash,
-  emailVerifiedAt, email, Business row, Place.ownerBusinessId, sessions (0),
-  action tokens (0)
-all table counts: 0 delta (no new MigrationLineage/MigrationRecord —
-  role elevation is a single-field mutation of an already-migrated User,
-  not a new migrated entity)
-
-deferred: remaining 35 role elevations, users 89/130, manual/privileged (15),
-          authorship (12), media, activation/email
-```
-
-- USERS Slice 9 BUSINESS_OWNER role elevation golden proof: COMPLETE —
-  first privilege-elevation write in the ownership workstream, scoped to
-  exactly one candidate (`wordpress-db:user:38`), the same User whose
-  Business + Place ownership link was written in Slice 7.
-- New module `src/lib/migration/commit/business-ownership/
-  RoleElevationGoldenRunner.ts`: guards on the User/Business
-  `MigrationLineage` already existing, `Business.ownerUserId` matching the
-  target User, and at least one `Place` already linked via
-  `ownerBusinessId` — i.e. this slice only ever elevates a User whose
-  ownership was already proven by a prior migration write, never based on
-  title/name/similarity. The write itself changes exactly one field
-  (`User.role`) inside an atomic, serializable transaction that
-  re-verifies every precondition from a fresh read first.
-- The golden candidate is hardcoded in
-  `scripts/migration-role-elevation-golden.ts` rather than accepted as a
-  CLI argument, so the script cannot be pointed at any of the other 35
-  newly-owned Businesses or any other User.
-- First run: `ELEVATE` — `role: USER -> BUSINESS_OWNER`. Verified
-  byte-for-byte unchanged: `status` (`PENDING_ACTIVATION`), `passwordHash`,
-  `emailVerifiedAt`, `email`, the entire `Business` row, `Place.
-  ownerBusinessId`, sessions (0), action tokens (0). All twelve tracked
-  entity counts (User, Session, UserActionToken, Business, Place, Offer,
-  Article, Route, Activity, MediaAsset, MigrationLineage, MigrationRecord)
-  show a delta of 0 — role elevation intentionally creates no new
-  migration bookkeeping, since it mutates an already-migrated User rather
-  than migrating a new entity.
-- Rerun: `SKIP_UNCHANGED` — zero further mutation.
-- Remaining 35 role elevations (for the Businesses written in Slice 8),
-  the 2 partial-lineage cases, manual/privileged users (15), content
-  authorship (12), profile media, and activation/email delivery:
-  NOT STARTED.
-
-## 12. Краткий handoff — 2026-07-23 (Slice 10)
-
-```text
-USERS Slice 10: COMPLETE — BUSINESS_OWNER batch role elevation
-
-scope: remaining 35 Users with proven Business+Place ownership link
-        (Slices 7/8), excluding wordpress-db:user:38 (Slice 9)
-excluded: users 89/130 (partial lineage), manual/privileged (15), content authorship (12)
-mode: sequential, stop-on-first-error, no batching/retry/rollback
-manifest: live query of active BUSINESS MigrationLineage — no snapshot read needed
-
-first run: 35/35 ELEVATE — role changed USER -> BUSINESS_OWNER, per-step audit clean
-rerun:     35/35 SKIP_UNCHANGED — zero further writes
-
-field-level proof: Business rows and Place ownership byte-for-byte
-  unchanged (content hash match); all 36 business owners (1 Slice 9 + 35
-  Slice 10) verified role=BUSINESS_OWNER, status=PENDING_ACTIVATION,
-  passwordHash null, emailVerifiedAt null, 0 sessions, 0 action tokens
-all 12 tracked table counts: 0 delta
-
-combined role elevation progress: 36/36 eligible Business owners elevated
-```
-
-- USERS Slice 10 BUSINESS_OWNER batch role elevation: COMPLETE — reused
-  the exact Slice 9 write path (`RoleElevationGoldenRunner`) per
-  candidate via a new sequential `RoleElevationBatchRunner`, with no
-  relaxed guards and no new write logic. The batch manifest is built live
-  from active `BUSINESS` `MigrationLineage` rows (no snapshot read
-  needed) — role eligibility is fully determined by lineage + User state
-  already in the DB.
-- First run: 35/35 `ELEVATE`, 0 `BLOCKED`, `stoppedEarly: false`. A
-  per-step audit callback re-verified after every single candidate that
-  every table except `User` stayed exactly flat.
-- Rerun: 35/35 `SKIP_UNCHANGED`, zero further writes.
-- Field-level proof (not just aggregate counts): a content hash of all 39
-  `Business` rows and their linked `Place` rows was taken before and
-  after the batch and found identical; all 36 Users who now own a
-  Business (1 from Slice 9, 35 from Slice 10) were individually verified
-  to have `role=BUSINESS_OWNER`, `status=PENDING_ACTIVATION`,
-  `passwordHash=null`, `emailVerifiedAt=null`, 0 sessions, 0 action
-  tokens.
-- Combined role elevation progress: all 36 Users with a proven
-  Business+Place ownership link now hold `BUSINESS_OWNER`. The 2
-  partial-lineage cases (`wordpress-db:user:89`, `wordpress-db:user:130`)
-  never got a Business in the first place, so they are not part of this
-  count and remain deferred pending manual review.
-- Manual/privileged users (15), content authorship (12), profile media,
-  and activation/email delivery: NOT STARTED.
-
-## 13. Краткий handoff — 2026-07-24 (Slice 11)
-
-```text
-USERS Slice 11: COMPLETE — read-only reconciliation for users 89/130
-
-wordpress-db:user:89:  214 owned Places, 19 migrated, 195 missing
-                        missing breakdown: unpublished 187, draft 8
-                        migrated subset: 0 conflicts
-                        verdict: TARGET_PLACE_NOT_MIGRATED
-
-wordpress-db:user:130: 2 owned Places, 1 migrated, 1 missing (draft)
-                        migrated subset: 0 conflicts
-                        verdict: TARGET_PLACE_NOT_MIGRATED
-
-root cause (both): Place migration to date has only imported publish-status
-  Places (82/83 migrated Places = exactly the 82 publish-status Places in
-  the source snapshot). Draft/unpublished content is an already-documented
-  scope exclusion (checklist section 6), not a migration bug. No missing
-  Place was ever attempted (0 MigrationRecord history) — never
-  attempted-and-failed.
-
-database writes: 0
-```
-
-- USERS Slice 11 targeted read-only reconciliation: COMPLETE — new
-  read-only module `src/lib/migration/planning/business-linked-tail/`
-  investigates exactly the 2 business-linked users excluded from Slice
-  7/8's exact-candidate batch, reusing the Slice 6 read-only Prisma
-  extension guard (no write method reachable, enforced before any DB
-  call).
-- Every owned Place is resolved through its exact
-  `MigrationLineage.sourceRecordKey` — no title/slug/name/email
-  similarity used anywhere. "Already attempted" is read from real
-  `MigrationRecord` history, not inferred.
-- Root cause for both users: 100% of missing Place coverage is
-  attributable to WordPress `post_status` (`unpublished`/`draft`) —
-  confirmed against the immutable snapshot's own `content_authorship`
-  section, cross-checked against the live DB (82/83 migrated Places
-  match exactly the 82 `publish`-status Places in the source). This is
-  the same draft/unpublished exclusion already documented as out of
-  scope elsewhere in this checklist, not a new problem.
-- Both users classified `TARGET_PLACE_NOT_MIGRATED`: no ambiguity, no
-  conflict — the already-migrated subset (19 Places for user 89, 1 for
-  user 130) has zero existing ownership conflicts.
-- No action taken on either user — this slice is read-only investigation
-  only. Two options remain for a future, separately-authorized slice:
-  extend Place migration scope to draft/unpublished content, or write
-  partial ownership using only the already-migrated subset. Both are
-  product decisions, not made by this analyzer.
-- Database writes: 0 (verified before/after counts and role/status
-  distribution hash identical).
-- Content authorship (12), manual/privileged users (15), profile media,
-  and activation/email delivery: NOT STARTED.
-
-## 14. Краткий handoff — 2026-07-24 (Slice 12)
-
-```text
-USERS Slice 12: COMPLETE — partial-coverage ownership golden proof (user:130)
-
-candidate: wordpress-db:user:130
-fixed manifest: included migrated Place wordpress-db:places:18886 (publish),
-                excluded draft Place wordpress-db:places:30605 (never imported)
-write path: BusinessOwnershipGoldenRunner (Slice 7) — completely unchanged
-
-first run: CREATE — Business +1, Place ownership linked, BUSINESS lineage +1,
-           MigrationRecord +1, role changes 0
-rerun:     SKIP_UNCHANGED — zero further mutation
-
-verified: draft Place 30605 has no MigrationLineage or MigrationRecord,
-          before and after this run — never imported, never referenced
-target User role/status: unchanged (USER / PENDING_ACTIVATION)
-
-deferred: wordpress-db:user:89 (separate, larger partial-coverage case),
-          role elevation for both 89 and 130 (only after both ownership
-          links exist), manual/privileged, authorship, media, email
-```
-
-- USERS Slice 12 partial-coverage ownership golden proof: COMPLETE — the
-  first of the 2 partial-coverage business-linked users identified in
-  Slice 11. Reused `BusinessOwnershipGoldenRunner` from Slice 7
-  completely unchanged; the only difference is that the candidate's
-  `placeSourcePostIds` is a deliberately fixed, reduced manifest
-  containing only the one already-migrated (`publish`-status) Place —
-  the still-draft Place is intentionally excluded and never referenced.
-- The golden candidate (with its fixed 1-place manifest) is hardcoded in
-  `scripts/migration-partial-coverage-ownership-golden.ts`, so the
-  script cannot accidentally pull in the excluded draft Place or any
-  other candidate.
-- First run: `CREATE` — deltas: Business +1, MigrationLineage +1,
-  MigrationRecord +1; all other tracked counts unchanged; target User
-  role/status/passwordHash/emailVerifiedAt unchanged (`USER` /
-  `PENDING_ACTIVATION`).
-- Verified explicitly: the excluded draft Place
-  (`wordpress-db:places:30605`) has no `MigrationLineage` and no
-  `MigrationRecord`, both before and after this run — it was never
-  imported and never touched by this write.
-- Rerun: `SKIP_UNCHANGED` — identical Business id, zero further writes.
-- `wordpress-db:user:89` (19 migrated / 195 excluded Places) is a
-  separate, much larger partial-coverage case and stays out of scope for
-  this slice — planned as its own next step, using the same proven write
-  path with its own fixed manifest.
-- Role elevation `USER → BUSINESS_OWNER` for both 89 and 130 is
-  explicitly deferred until both users' ownership links exist; Place
-  migration scope expansion to draft/unpublished content was explicitly
-  not undertaken.
-
-## 15. Краткий handoff — 2026-07-24 (Slice 13)
-
-```text
-USERS Slice 13: COMPLETE — partial-coverage ownership write (user:89)
-
-candidate: wordpress-db:user:89
-fixed manifest: 19 included publish-status Places, 195 excluded
-                 (187 unpublished, 8 draft) — never imported
-write path: BusinessOwnershipGoldenRunner (Slice 7/12) — completely unchanged
-
-first run: CREATE — Business +1, 19 Places linked atomically,
-           BUSINESS lineage +1, MigrationRecord +1, role changes 0
-rerun:     SKIP_UNCHANGED — zero further mutation
-
-verified: all 195 excluded Places have zero MigrationLineage and zero
-          MigrationRecord, before and after this run
-target User role/status: unchanged (USER / PENDING_ACTIVATION)
-
-business-linked ownership workstream: 38/38 users now have a real
-  Business + Place ownership link (36 exact candidates via Slice 7/8,
-  2 partial-coverage via Slice 12/13)
-```
-
-- USERS Slice 13 partial-coverage ownership write: COMPLETE — the
-  second and larger of the 2 partial-coverage business-linked users
-  identified in Slice 11. Reused `BusinessOwnershipGoldenRunner`
-  (Slice 7, also used unchanged in Slice 12) with zero new write logic —
-  the runner's existing preconditions (exact lineage match for every
-  entry in `placeSourcePostIds`, conditional `updateMany` guarded on
-  `ownerBusinessId: null`, single Serializable transaction) already
-  guarantee atomic all-or-nothing behaviour for a 19-Place set exactly as
-  they did for the single-Place candidates in Slice 7/8/12.
-- The fixed 19-Place manifest is hardcoded in
-  `scripts/migration-partial-coverage-ownership-user89.ts`, so the
-  script cannot accidentally pull in any of the 195 excluded
-  unpublished/draft Places.
-- Verified before the write: Place `437` (flagged in an earlier session
-  as manually content-edited post-import) was unowned and had active
-  lineage like the other 18 — the manual edit concerned content fields,
-  not ownership, so it did not block or complicate this write.
-- First run: `CREATE` — deltas: Business +1, MigrationLineage +1 (the
-  one BUSINESS lineage row — Place lineage already existed for all 19),
-  MigrationRecord +1; all other tracked counts unchanged; target User
-  role/status/passwordHash/emailVerifiedAt unchanged (`USER` /
-  `PENDING_ACTIVATION`).
-- Verified explicitly: all 195 excluded Places have zero
-  `MigrationLineage` and zero `MigrationRecord`, both before and after
-  this run.
-- Rerun: `SKIP_UNCHANGED` — identical Business id, zero further writes.
-- **Business-linked ownership workstream now complete: 38/38 users**
-  have a real Business + Place link (36 exact candidates from Slice 7/8,
-  2 partial-coverage from Slice 12/13).
-- Role elevation `USER → BUSINESS_OWNER` for both 89 and 130 remains the
-  next step (Slice 14) — deliberately not done in this slice. Place
-  migration scope expansion to draft/unpublished content was explicitly
-  not undertaken.
-
-## 16. Краткий handoff — 2026-07-24 (Slice 14)
-
-```text
-USERS Slice 14: COMPLETE — role elevation for partial-coverage owners
-
-candidates: wordpress-db:user:89, wordpress-db:user:130 (exactly these 2)
-write path: RoleElevationBatchRunner (Slice 10) — completely unchanged,
-            hardcoded 2-candidate manifest, no live query
-
-first run: 2/2 ELEVATE — role USER -> BUSINESS_OWNER for both, sequential
-rerun:     2/2 SKIP_UNCHANGED — zero further mutation
-
-untouched, verified byte-for-byte for both: status (PENDING_ACTIVATION),
-  passwordHash, emailVerifiedAt, email, sessions (0), action tokens (0)
-Business rows and Place ownership: content-hash identical before/after
-all 12 tracked table counts: 0 delta
-
-BUSINESS-LINKED USERS WORKSTREAM: FULLY CLOSED
-  ownership: 38/38 (36 exact candidates + 2 partial-coverage)
-  correct roles: 38/38 BUSINESS_OWNER (verified via MigrationLineage
-    cross-reference, excluding 1 unrelated pre-existing dev/seed account)
-```
-
-- USERS Slice 14 role elevation for partial-coverage owners: COMPLETE —
-  the final 2 of the 38 business-linked users. Reused
-  `RoleElevationBatchRunner` (Slice 10), which itself reuses
-  `RoleElevationGoldenRunner` (Slice 9) unchanged, with a hardcoded
-  2-candidate manifest rather than a live query — the script cannot
-  accidentally touch any of the 36 users already elevated in Slice 9/10.
-- Prerequisites verified per candidate before the write: active User
-  lineage, active BUSINESS lineage, `Business.ownerUserId` matching the
-  target User, at least one Place linked via `ownerBusinessId` (19 for
-  user:89, 1 for user:130), role strictly `USER`, status strictly
-  `PENDING_ACTIVATION`.
-- First run: 2/2 `ELEVATE`, sequential (`user:89` then `user:130`), 0
-  `BLOCKED`. Verified byte-for-byte unchanged for both: `status`
-  (`PENDING_ACTIVATION`), `passwordHash`, `emailVerifiedAt`, `email`,
-  sessions (0), action tokens (0). A content hash of every `Business` row
-  and its linked `Place` rows was identical before and after. All 12
-  tracked entity counts: 0 delta.
-- Rerun: 2/2 `SKIP_UNCHANGED`, zero further writes.
-- Final tally verified via `MigrationLineage` cross-reference (not just a
-  raw count): exactly 38 Users have `role=BUSINESS_OWNER` backed by an
-  active `BUSINESS` lineage row — no more, no less. One additional
-  `BUSINESS_OWNER` user in the DB (`business@mamago.local`) is an
-  unrelated pre-existing dev/seed account created before this workstream
-  began and was correctly excluded from the count.
-- **Business-linked USERS workstream is now fully closed**: 38/38
-  ownership links and 38/38 correct roles.
-- Manual/privileged users (15), content authorship (12), profile media,
-  activation/email delivery, and Place migration scope expansion to
-  draft/unpublished content: all remain NOT STARTED / explicitly not
-  undertaken.
-
-## 17. Краткий handoff — 2026-07-24 (Slice 15)
-
-```text
-USERS Slice 15: COMPLETE — content authorship read-only reconciliation
-
-scope: exactly 12 content-author users (Slice 6's plan) — pure
-       re-verification, no new users, no writes
-
-confirmed target fields: Article.authorUserId (nullable),
-  Route.authorId (nullable), Activity.ownerUserId (required, non-null)
-
-result: byte-identical to Slice 6's original content-authorship-plan.json
-  — proves nothing drifted for Article/Route/Activity across Slice 7-14
-  (which only touched User.role, Business, Place.ownerBusinessId)
-
-totals (12 users):
-  TARGET_NOT_MIGRATED:     10
-  EXISTING_AUTHOR_CONFLICT: 1  (wordpress-db:user:521)
-  PARTIAL_LINEAGE:          1  (wordpress-db:user:91)
-  EXACT_LINK_CANDIDATE:     0
-  ALREADY_SATISFIED:        0
-  UNSUPPORTED_TARGET:       0
-
-database writes: 0
-```
-
-- USERS Slice 15 content authorship targeted read-only reconciliation:
-  COMPLETE — re-verified the Slice 6 content authorship plan for the 12
-  content-author users against current DB state (post Slice 7-14),
-  reusing `planContentAuthorship` (Slice 6) completely unchanged — no new
-  classification logic, no authorship writes.
-- Confirmed the actual target fields per entity type before trusting any
-  count: `Article.authorUserId` (nullable), `Route.authorId` (nullable),
-  `Activity.ownerUserId` (required, non-null — a migrated Activity always
-  already has *some* owner, so a mismatch there is a real conflict, never
-  an absence).
-- **Result: the regenerated manifest is byte-identical (same SHA-256) to
-  Slice 6's original `content-authorship-plan.json`** — definitive proof
-  that nothing changed for Article/Route/Activity data across Slices
-  7-14, which is expected since none of those slices touched those
-  tables, but was verified fresh rather than assumed.
-- Confirmed totals across the 12 users: 10 `TARGET_NOT_MIGRATED`
-  (authored Activities/Article never reached the DB, no prior
-  `MigrationRecord` attempt), 1 `EXISTING_AUTHOR_CONFLICT`
-  (`wordpress-db:user:521` — 5 of 43 authored Activities are migrated,
-  all already owned by a different User via the required
-  `Activity.ownerUserId` column), 1 `PARTIAL_LINEAGE`
-  (`wordpress-db:user:91` — 15 of 53 authored Article/Route items
-  migrated, no conflict on those 15, but coverage incomplete).
-- **Important finding: there are currently 0 `EXACT_LINK_CANDIDATE` and 0
-  `ALREADY_SATISFIED` among the 12 users** — unlike the ownership
-  workstream (which started with 36 ready exact candidates), content
-  authorship has no immediately safe golden-write candidate. A golden
-  authorship write cannot proceed without a separate decision: either
-  extending Activity/Article/Route migration scope so at least one
-  `TARGET_NOT_MIGRATED` case gets a target, or specifically resolving the
-  `user:521` conflict.
-- Database writes: 0 (verified before/after counts identical).
-- Manual/privileged users (15), profile media, activation/email
-  delivery, and Place/Activity migration scope expansion: all remain NOT
-  STARTED / explicitly not undertaken.
+Выполнить environment gate → один SSH probe → один Activity capture в
+`~/.mamago2/migration-snapshots/activities/` → все дальнейшие inventory и planning
+операции выполнять локально без повторных WordPress reads.
