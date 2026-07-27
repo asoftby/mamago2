@@ -235,6 +235,48 @@ assert.deepEqual(
   { kind: "next" },
 );
 
+// Article editorial preview lives in the public route group but must remain
+// reachable on the admin host. Keep this exact-format only: no blanket
+// /preview/* bypass and no automatic business-host allowance.
+for (const host of ["admin.mamago.local", "admin.mamago.by"]) {
+  assert.deepEqual(
+    resolveSubdomainMiddlewareDecision({
+      host,
+      protocol: host.endsWith(".local") ? "http:" : "https:",
+      pathname: "/preview/articles/article-id",
+      search: "",
+    }),
+    { kind: "next" },
+  );
+}
+
+for (const pathname of [
+  "/preview/articles",
+  "/preview/articles/",
+  "/preview/articles/id/extra",
+  "/preview/other/id",
+]) {
+  assert.deepEqual(
+    resolveSubdomainMiddlewareDecision({
+      host: "admin.mamago.local",
+      protocol: "http:",
+      pathname,
+      search: "",
+    }),
+    { kind: "rewrite", pathname: `/admin${pathname}` },
+  );
+}
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.mamago.by",
+    protocol: "https:",
+    pathname: "/preview/articles/article-id",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/business/preview/articles/article-id" },
+);
+
 // Deliberately narrow — not a blanket /me/* bypass. Ordinary /me/... routes
 // (dashboard, settings, anything not matching the exact preview format)
 // must keep going through the normal admin/business rewrite.
