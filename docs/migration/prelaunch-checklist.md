@@ -186,6 +186,34 @@ Only remaining P0-relevant authorship path: wordpress-db:user:575's 2
   (partial lineage) stay deferred, unrelated to the Activity decision.
 ```
 
+### 3.7 Test suite snapshot-independence (adversarial fix)
+
+A full local regression sweep surfaced 4 test files quietly depending on the
+lost `/tmp/scratchpad/users/` path (Rule 13/14):
+
+- [x] `planning/user-ownership/buildPlanningManifests.test.ts` — switched to a
+      self-generated synthetic snapshot fixture (ephemeral temp dir).
+- [x] `planning/user-ownership/readOnlyIntegration.test.ts` — switched to
+      `committedClassificationFixture.ts`, sourced from the already-committed
+      sanitised Slice 6 manifests (real 15/38/12 sourceRecordKeys, no data
+      lost).
+- [x] `planning/business-linked-tail/reconcileBusinessLinkedTail.integration.test.ts`
+      — switched to a dedicated test-only DB namespace + synthetic snapshot
+      fixture (mirrors the `BusinessOwnershipGoldenRunner` integration test
+      convention).
+- [x] `commit/user/UserCleanBatch.test.ts` (2 tests) — genuinely
+      unfixable without either the full lost 579-user raw snapshot or
+      weakening hardcoded production invariants (`USER_SNAPSHOT_SHA256`,
+      `CLEAN_USER_COUNT`, golden users 7/38). Explicitly `test.skip()`'d with
+      an inline comment; not silently deleted. Founder decision: skip and
+      merge, do not recapture USERS for this.
+
+Full `src/lib/migration` suite (sequential, `--test-concurrency=1`): **155
+pass, 2 skipped, 0 fail.** (Running the same suite fully parallel produces
+transient Serializable write-conflict failures in unrelated integration
+tests sharing the local DB — a concurrency artifact of the test run, not a
+regression; each of those files passes cleanly in isolation.)
+
 ---
 
 ## 4. Текущее решение — ACTIVITIES / AUTHORSHIP scope
