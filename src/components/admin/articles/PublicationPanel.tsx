@@ -21,6 +21,7 @@ import {
 } from "@/components/admin/publications/PublicationGeoScopeField";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
+import { resolveArticlePublicationActionPolicy } from "./articlePublicationActionPolicy";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,14 +94,15 @@ export interface PublicationPanelProps {
   onAuthorLabelChange?: (v: string) => void;
 
   // Action state
-  isAdminEditor: boolean;
+  canModerate: boolean;
+  hasUnsavedChanges: boolean;
   actionsBusy: boolean;
   submitting: boolean;
   saving: boolean;
   moderating?: boolean;
 
   // Action callbacks
-  onPublish: () => void;
+  onSubmitForModeration: () => void;
   onSaveDraft: () => void;
   onApprove?: () => void;
   onReject?: () => void;
@@ -142,12 +144,13 @@ export function PublicationPanel({
   authorError,
   authorLabel,
   onAuthorLabelChange,
-  isAdminEditor,
+  canModerate,
+  hasUnsavedChanges,
   actionsBusy,
   submitting,
   saving,
   moderating = false,
-  onPublish,
+  onSubmitForModeration,
   onSaveDraft,
   onApprove,
   onReject,
@@ -163,6 +166,12 @@ export function PublicationPanel({
 }: PublicationPanelProps) {
   const hydrated = useHydrated();
   const showGeoScopeField = onGeoScopeChange != null;
+  const actionPolicy = resolveArticlePublicationActionPolicy({
+    status,
+    canModerate,
+    hasUnsavedChanges,
+    hasPublicUrl: publicUrl != null,
+  });
 
   const metaParts: string[] = [];
   if (views != null) metaParts.push(`Просмотры: ${views}`);
@@ -270,59 +279,59 @@ export function PublicationPanel({
           </div>
         </div>
 
-        {/* ── Кнопки действий ── */}
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2 pt-2">
-          {/* Левая группа: главные действия */}
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
-            <Button
-              type="button"
-              variant="default"
-              onClick={onPublish}
-              disabled={actionsBusy}
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              {isAdminEditor ? "Опубликовать" : "Отправить на модерацию"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={onSaveDraft}
-              disabled={actionsBusy}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              Сохранить черновик
-            </Button>
-            {status === "PENDING" && onApprove && onReject ? (
+        {/* ── Контекстные действия ── */}
+        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            {actionPolicy.primary?.kind === "submit" ? (
+              <Button type="button" onClick={onSubmitForModeration} disabled={actionsBusy}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                {actionPolicy.primary.label}
+              </Button>
+            ) : null}
+
+            {actionPolicy.primary?.kind === "approve" && onApprove && onReject ? (
               <>
-                <Button
-                  type="button"
-                  variant="default"
-                  onClick={onApprove}
-                  disabled={actionsBusy}
-                >
+                <Button type="button" onClick={onApprove} disabled={actionsBusy}>
                   {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                  Одобрить (опубликовать)
+                  {actionPolicy.primary.label}
                 </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={onReject}
-                  disabled={actionsBusy}
-                >
+                <Button type="button" variant="destructive" onClick={onReject} disabled={actionsBusy}>
                   {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                   Отклонить
                 </Button>
               </>
             ) : null}
+
+            {actionPolicy.primary?.kind === "save" ? (
+              <Button
+                type="button"
+                onClick={onSaveDraft}
+                disabled={actionsBusy || actionPolicy.primary.disabled}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                {actionPolicy.primary.label}
+              </Button>
+            ) : null}
+
+            {actionPolicy.showQuietSave ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={onSaveDraft}
+                disabled={actionsBusy || !hasUnsavedChanges}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                Сохранить
+              </Button>
+            ) : null}
           </div>
 
-          {/* Правая группа: ссылки */}
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {previewHref != null ? (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 className="text-muted-foreground hover:text-foreground"
                 asChild
               >
@@ -333,7 +342,7 @@ export function PublicationPanel({
             ) : (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 className="text-muted-foreground"
                 disabled
                 title="Сохраните запись, чтобы открыть предпросмотр."
@@ -342,7 +351,7 @@ export function PublicationPanel({
               </Button>
             )}
 
-            {publicUrl != null ? (
+            {actionPolicy.showPublicLink && publicUrl != null ? (
               <Button
                 type="button"
                 variant="outline"
@@ -351,21 +360,10 @@ export function PublicationPanel({
               >
                 <Link href={publicUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                  Смотреть на сайте
+                  Открыть на сайте
                 </Link>
               </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                className="text-muted-foreground"
-                disabled
-                title="Публичная ссылка появится после публикации."
-              >
-                <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                Смотреть на сайте
-              </Button>
-            )}
+            ) : null}
           </div>
         </div>
       </CardContent>
