@@ -2,11 +2,11 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-27  
+**Обновлено:** 2026-07-28  
 **Base:** `dev` @ `c8a3f9aa0c2940aeb57dc5fb015937630f407036` — PR #89 merged  
-**Текущая фаза:** `ARTICLES — Slice 18 golden migration COMPLETE (post:56250)`  
-**Текущий кандидат для следующего шага:** `wordpress-db:post:57731` (Slice 19)  
-**Текущий gate:** `READY_FOR_SLICE_19`
+**Текущая фаза:** `USERS — dispositions + full activation flow (login detection, /activate, delivery audit) COMPLETE; EVENTS tail next`  
+**Текущий кандидат для следующего шага:** 5 remaining Events + 67 pending sessions  
+**Текущий gate:** `USERS_ACTIVATION_PRODUCT_COMPLETE`
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -52,9 +52,9 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Routes | IMPORTED 14/14 | Review, publish, slug history, redirects, public validation |
 | Events | PARTIAL 4/9 | 5 CREATE, 67 sessions, rerun, city/date/URL validation |
 | Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
-| Users activation architecture | COMPLETE | Production email provider, rehearsal и delivery Go/No-Go |
+| Users activation architecture | **PRODUCT-COMPLETE** | Login detection, `/activate` page, delivery audit persistence все реализованы и протестированы; real bulk send остаётся gated финальным Go/No-Go (см. §5.2) |
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
-| Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
+| Users manual/privileged | **COMPLETE 14/14** | 1 existing ADMIN unchanged, 13 `USER`, 1 `BUSINESS_OWNER` (user:129, exact 9-Place ownership); rerun 14×`SKIP_UNCHANGED`, 0 deltas |
 | Activities | P0 CLOSED | 63 expired Events → `P1_HISTORICAL_EXPIRED_ACTIVITY` |
 | Content authorship | SLICE 18 COMPLETE 1/2 | `post:56250` migrated (`authorUserId: null`); Slice 19 migrates `post:57731`, затем authorship reconciliation/write |
 | User/Business profile media | NOT STARTED | P0/P1 decision, manifest, proof, production gate |
@@ -103,6 +103,39 @@ production Offer execution: not started
 - [x] Clean local scope: 564/564.
 - [x] Common rerun: 564 `SKIP_UNCHANGED`.
 - [x] Migrated Users remain `PENDING_ACTIVATION`, without password/session/token/provider writes.
+
+### 3.4a Users manual/privileged — founder-final disposition, fully closed
+
+Founder rule (final, overrides all prior manual/privileged dispositions that
+excluded or deferred purely on legacy WordPress role): Administrator/
+Editor/Author capabilities are never inherited; the only kept ADMIN is the
+existing founder account; every other legacy user migrates as `USER` unless
+a fresh, exact, proven Place ownership resolves `BUSINESS_OWNER`.
+
+```text
+kept unchanged:     wordpress-db:user:1 (existing ADMIN, no lineage, untouched)
+                    wordpress-db:user:521, wordpress-db:user:91 (already USER/PENDING_ACTIVATION)
+migrated:           14/14 — wordpress-db:user:{4,6,14,16,21,27,51,52,108,123,129,134,438,439}
+new snapshot:       bounded, exact-key, read-only WP capture (14 users only) —
+                    the original 579-user raw snapshot is lost (see §3.7);
+                    fixed manifest: docs/migration/users-manual-privileged-14-manifest.json
+role outcome:       13 × USER/PENDING_ACTIVATION; 1 × BUSINESS_OWNER (user:129)
+ownership evidence: only user:129 had published `places` authorship (9 posts,
+                    all exact, full lineage coverage) — reused the existing
+                    Slice 7/9 golden mechanisms unmodified
+                    (planBusinessOwnershipGolden/writeBusinessOwnershipGolden,
+                    planRoleElevationGolden/writeRoleElevationGolden)
+first run deltas:   User +14, Business +1, MigrationLineage +15, MigrationRecord +15,
+                    ADMIN +0, Session +0, UserActionToken +0, Place row count +0
+                    (existing Place rows re-owned, none created/deleted)
+rerun:              14 × SKIP_UNCHANGED; ownership/role re-check: 0 deltas everywhere
+```
+
+- [x] No legacy WordPress role ever consulted for classification or exclusion.
+- [x] `wordpress-db:user:1` left with zero lineage, zero writes — founder's
+      real ADMIN account (`asoftby@gmail.com`) untouched.
+- [x] No password, session, token, or activation email ever written.
+- [x] No content authorship touched in this slice.
 
 ### 3.4 Business-linked Users — fully closed
 
@@ -183,6 +216,120 @@ written Article:  status PENDING, cityId null, geoScope null,
       scope for this MVP writer, same as every other entity's first
       golden write).
 
+### 3.9 Users production activation readiness (email delivery)
+
+No production email sent. Reused 100% of the existing foundation (request/
+complete endpoints, hash-only `UserActionToken`, pending-activation
+lifecycle, rate limiting, `activationEmailGate.ts`'s env gate) — no second
+activation flow.
+
+```text
+provider:          Resend, via existing emailService — new adapter is
+                   src/server/auth/activationEmailDelivery.ts
+                   (deliverMigratedAccountActivationEmail), wired into
+                   POST /api/auth/activation/request (previously discarded
+                   both the issued raw token and the gate result)
+gate:              resolveActivationEmailDelivery() — renamed its
+                   always-returned "PROVIDER_UNAVAILABLE" placeholder to
+                   "DELIVERY_ALLOWED" now that a provider exists; requires
+                   NODE_ENV=production AND APP_ENV=production AND
+                   MIGRATED_USER_ACTIVATION_EMAIL_ENABLED=true AND
+                   MIGRATED_USER_ACTIVATION_EMAIL_PRODUCTION_APPROVED=true
+kill switch:       either flag back to false, effective next request
+manifest:          578/578 eligible, 0 exclusions, hash
+                   56c0a18295d8aacf155bfb98182cd26cf1f8064c868e9d578e743627623a49a1
+                   (docs/migration/users-production-activation-manifest.json)
+rehearsal:         fake/sandbox transport + injected gate-environment —
+                   proved LOCAL/DEV hard-disable (incl. against this shell's
+                   real env), production-approved send path, token secrecy,
+                   one-time-use, expiry, invalid token, already-activated
+                   rejection, rate limiting, ADMIN/roles untouched; 0 real
+                   sends, 0 DB residue after cleanup
+tests:             existing userActionToken.service.integration.test.ts +
+                   activationEndpoints.integration.test.ts re-run unchanged
+                   (both pass; one string literal updated for the gate
+                   rename); new activationEmailDelivery.rehearsal.test.ts
+tsc --noEmit:      clean
+```
+
+- [x] No password/session/token/provider write in this pass.
+- [x] `ADMIN` count and every migrated User's role confirmed unchanged.
+
+### 3.9a Migrated-user login detection, `/activate` page, delivery audit — product-complete
+
+Closed all three remaining product blockers from §3.9. No commit/push.
+
+```text
+login detection:   src/app/api/auth/login/route.ts — after the existing
+                   constant-time verifyLoginPassword() call (never skipped,
+                   preserves timing safety: a PENDING_ACTIVATION account
+                   costs exactly as much time as wrong-password/unknown-
+                   email), a PENDING_ACTIVATION account with isValid=false
+                   triggers requestMigratedAccountActivationByEmail(source:
+                   LOGIN_FLOW) and returns 200 {pendingActivation:true,
+                   message} instead of the generic 401. Zero visual/field/
+                   button changes — both call sites (useAuthCredentialsFlow,
+                   CompactSaveAuthPanel) reuse the existing error-message
+                   slot for the neutral text. No manifest scan, no WP call —
+                   only the already-fetched User.status.
+shared flow:       src/server/auth/activationRequestFlow.ts
+                   (requestMigratedAccountActivationByEmail) — extracted so
+                   /api/auth/activation/request and the login branch share
+                   one rate-limited lookup+issue+deliver+audit path; token
+                   issuance always happens regardless of delivery-gate
+                   state (fixed a bug caught by re-running the existing
+                   token-count assertion: an early version skipped issuance
+                   entirely in LOCAL/DEV).
+/activate page:    src/app/(auth)/activate/ — reads token from the URL into
+                   local state once (never re-read, never logged), calls a
+                   new read-only POST /api/auth/activation/status (hash
+                   lookup only, never consumes the token) to resolve
+                   VALID/EXPIRED/USED/INVALID/ALREADY_ACTIVE before showing
+                   the password form, then calls the existing POST
+                   /api/auth/activation/complete unchanged. States: loading,
+                   blocked (4 variants with distinct copy), form, success
+                   (offers login, does not auto-sign-in). Added "activate"
+                   to KNOWN_ROOT_SEGMENTS (wpLegacyCatchAll routing) — the
+                   page 404'd via the WP-legacy catch-all redirect until
+                   this was added; wpLegacyCatchAll.test.ts still passes.
+                   Name/terms-consent step skipped: no backend field exists
+                   for either, and normal registration doesn't collect them
+                   either — same static terms/privacy notice as AuthForm's
+                   register mode.
+delivery audit:    ActivationDeliveryAudit model + manual migration
+                   20260728090000_add_activation_delivery_audit — userId,
+                   sourceRecordKey (MigrationLineage lookup, best-effort),
+                   provider, recipientMask, template, requestedAt/
+                   attemptedAt/sentAt, providerMessageId, status
+                   (BLOCKED_ENVIRONMENT/BLOCKED_KILL_SWITCH/QUEUED/SENT/
+                   FAILED), errorCode, activationTokenId (FK to
+                   UserActionToken — hash reference, never the raw token),
+                   source (LOGIN_FLOW/MANUAL_REQUEST/PRODUCTION_BATCH). No
+                   raw token, no activation URL, no email body, no provider
+                   secret ever stored. Cascade-deletes with the User/token.
+tests:             new activationActivatePage.integration.test.ts (status +
+                   complete over real HTTP handlers: valid->complete->used,
+                   already-active, expired) and login/
+                   pendingActivation.integration.test.ts (PENDING_ACTIVATION
+                   branch, ACTIVE unaffected, wrong-password/unknown-email
+                   still identical generic 401); all pre-existing activation
+                   tests re-run unchanged and pass.
+verification:      real organic traffic on the shared local dev server
+                   (not my own test) exercised the login branch for two
+                   real migrated accounts and produced correctly-shaped
+                   BLOCKED_ENVIRONMENT audit rows (masked recipient, no raw
+                   token) — left untouched, not test residue.
+tsc --noEmit / git diff --check: clean.
+```
+
+- [x] Migrated-user login detection COMPLETE.
+- [x] `/activate` frontend COMPLETE.
+- [x] Delivery audit persistence COMPLETE.
+- [x] End-to-end activation flow rehearsal COMPLETE (no real email sent).
+- [ ] Production bulk delivery остаётся gated финальным Go/No-Go (только
+      RC SHA freeze, backup, canary, provider bounce-webhook wiring и
+      явное решение founder — см. delivery plan §4).
+
 ---
 
 ## 4. Текущий Articles/authorship critical path
@@ -240,15 +387,17 @@ Next slice: targeted authorship assignment for user:575 across both Articles,
 
 ### 5.2 Users production и activation
 
-- [ ] Подтвердить dispositions для 15 manual/privileged users:
-  - 1 existing ADMIN оставить неизменным;
-  - 9 exclusions подтвердить;
-  - 5 `REQUIRES_FOUNDER_DECISION` решить.
-- [ ] Интегрировать и проверить production email provider.
-- [ ] Сохранить LOCAL/DEV external delivery hard-disabled.
-- [ ] Подготовить production User manifest и checksums.
-- [ ] Провести production-like rehearsal Users + activation.
-- [ ] Подготовить controlled activation delivery после Go/No-Go.
+- [x] Manual/privileged Users dispositions — founder decisions COMPLETE (см. §3.4a):
+  - 1 existing ADMIN (`user:1`) unchanged;
+  - 14/14 остальных migrated: 13 `USER`, 1 `BUSINESS_OWNER` (`user:129`, exact ownership);
+  - `user:521`/`user:91` остаются USER/PENDING_ACTIVATION без изменений (P1 defer, см. §5.1).
+- [x] Production email provider integration COMPLETE — см. §3.9.
+- [x] LOCAL/DEV delivery hard-disable VERIFIED (re-checked against real shell env + rehearsal).
+- [x] Activation manifest PREPARED — 578/578 eligible, hash `56c0a18...49a1`.
+- [x] Production-like rehearsal COMPLETE — fake/sandbox transport, 0 real sends, 0 DB residue.
+- [x] Controlled delivery plan READY — [users-production-activation-delivery-plan.md](users-production-activation-delivery-plan.md).
+- [x] Migrated-user login detection, `/activate` frontend, delivery audit persistence — все COMPLETE (см. §3.9a). Оба прежних блокера закрыты.
+- [ ] Реальная production delivery остаётся gated финальным Go/No-Go — оставшиеся пункты: RC SHA freeze, production backup, canary batch, provider bounce/failure webhook (см. delivery plan §1/§4).
 - [ ] Решить P0/P1 для User/Business avatars и logos.
 
 ### 5.3 Events
@@ -365,7 +514,7 @@ Remaining strict P0 work:        ~34–38%
 Крупных P0-блоков остаётся **9**:
 
 1. Editorial closure двух Articles: city/geo, publication, blog visibility и cover/media decision.
-2. Users production activation и manual dispositions.
+2. Users production activation (dispositions + delivery readiness COMPLETE, см. §3.4a/§3.9; real send gated on final Go/No-Go).
 3. Events tail.
 4. Routes review/publish.
 5. Places/Offers/Article content и media closure.
@@ -387,11 +536,17 @@ Remaining strict P0 work:        ~34–38%
 ## 8. Следующее одно действие
 
 ```text
-Phase: ARTICLES — editorial closure for two migrated Articles
-Prerequisite (Slice 20, COMPLETE): both authorUserId relations assigned to
-  user:575 by exact CAS; common rerun ALREADY_SATISFIED 2/2
-Targets: wordpress-db:post:56250 and wordpress-db:post:57731 only
-Scope to authorize separately: cityId / geoScope, approved publication flow,
-  selected/default city blog visibility, public URLs, cover/media P0/P1 decision
-Migration writer/authorship changes: forbidden
+Phase: EVENTS tail
+Prerequisite (COMPLETE): Users fully resolved locally — manual/privileged
+  dispositions 14/14 (§3.4a) + full activation product flow (§3.9a): login
+  detection, /activate page, delivery audit persistence, all tested.
+  Real bulk activation email send stays gated on a separate Go/No-Go
+  (RC SHA freeze, backup, canary, bounce webhook — see delivery plan).
+Targets: 5 remaining Events (CREATE) + 67 pending materialized sessions
+Scope: exact Docker/CI environment gate, preview 5 remaining Events,
+  sequential targeted commits, session/cumulative delta validation, common
+  rerun, city/date discovery and absence of 404 (см. §5.3)
+Out of scope here: Articles (editorial closure already complete — do not
+  revisit), Users activation real send, Routes review, media, Reviews,
+  redirects/SEO, RC/cutover
 ```
