@@ -86,6 +86,12 @@ export class EventCommitWriter {
     return { activityId: activity.id, status: "CREATED" };
   }
 
+  /**
+   * `status` and `cityId` are deliberately never unconditionally overwritten
+   * here — see the two dedicated helpers below for why. A migration UPDATE
+   * re-normalizes source content, not moderation/editorial decisions already
+   * layered on top of a previously-linked Activity.
+   */
   async updateEventFromDraft(activityId: string, draft: EventCreateDraft): Promise<EventCommitResult> {
     assertDraftIsUsable(draft);
     if (!activityId.trim()) {
@@ -98,8 +104,7 @@ export class EventCommitWriter {
         title: draft.title,
         shortDesc: draft.shortDesc,
         description: draft.description,
-        status: draft.status,
-        cityId: draft.cityId,
+        ...cityIdUpdateField(draft.cityId),
         placeId: draft.placeId,
         organizerId: draft.organizerId,
         eventCategoryId: draft.eventCategoryId,
@@ -135,15 +140,19 @@ export class EventCommitWriter {
    * `EventVenue` row on UPDATE just because this run's candidate happened to
    * carry no evidence. Otherwise `upsert` on the unique `activityId` keeps
    * repeated runs idempotent: one row per Activity, never duplicated.
+   *
+   * `cityId` on the `update` branch follows the same never-clear-on-absent-
+   * evidence rule as `Activity.cityId` (see `cityIdUpdateField`) — a brand
+   * new venue (`create`) has nothing to preserve, so it always takes
+   * whatever the draft carries, including `null`.
    */
   private async syncEventVenue(activityId: string, venue: EventCreateDraft["venue"]): Promise<void> {
     if (!venue) return;
-    const data = {
+    const shared = {
       kind: venue.kind,
       placeId: venue.placeId,
       title: venue.title,
       addressLine: venue.addressLine,
-      cityId: venue.cityId,
       lat: venue.lat,
       lng: venue.lng,
       note: venue.note,
@@ -151,8 +160,28 @@ export class EventCommitWriter {
     };
     await this.prisma.eventVenue.upsert({
       where: { activityId },
-      create: { activityId, ...data },
-      update: data,
+      create: { activityId, ...shared, cityId: venue.cityId },
+      update: { ...shared, ...cityIdUpdateField(venue.cityId) },
     });
   }
+}
+
+/**
+ * `Activity.cityId`/`EventVenue.cityId` UPDATE regression fix: the migration
+ * normalizer (`buildEventCreateDraft`) is a pure function with no knowledge
+ * of any existing row — `context.cityId` absent/unmatched always produces
+ * `draft.cityId: null`, indistinguishable from "the operator proved there is
+ * no city." Unconditionally writing that `null` on UPDATE silently erases a
+ * city an earlier run (or a human) already established, purely because
+ * *this* run's source evidence (or its context config) didn't happen to
+ * repeat it — exactly what nulled `wordpress-db:events:60404`'s city in the
+ * 2026-07-28 session.
+ *
+ * A proven non-null `cityId` is real evidence and always applies. A `null`
+ * is absence of evidence, not proof of absence — it must never overwrite
+ * whatever is already on the row. Deliberate removal of a city is a
+ * separate, explicit operation this method does not perform.
+ */
+function cityIdUpdateField(cityId: string | null): { cityId: string } | Record<string, never> {
+  return cityId !== null ? { cityId } : {};
 }

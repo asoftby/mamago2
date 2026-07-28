@@ -556,6 +556,135 @@ async function testCreateWithPlaceVenueSetsKindPlace() {
   assert.equal(call.create.lng, null);
 }
 
+/**
+ * Regression for the 2026-07-28 incident: a real UPDATE (source content
+ * genuinely changed, hash mismatch) must never reset a PUBLISHED/other
+ * lifecycle status back to the normalizer's CREATE-only "PENDING" default.
+ * `buildEventCreateDraft()` always produces `status: "PENDING"` — the fix
+ * lives here, in the writer, by never sending a `status` key at all on
+ * UPDATE, so Prisma leaves whatever is already on the row untouched
+ * regardless of its value (PUBLISHED, PENDING, or anything else).
+ */
+async function testUpdateNeverIncludesStatusKey() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-99", status: "PUBLISHED" }));
+  const writer = new EventCommitWriter(client);
+  await writer.updateEventFromDraft("activity-99", draftFixture());
+
+  const updateCall = findCall(calls, "activity", "update").args as { data: Record<string, unknown> };
+  assert.equal("status" in updateCall.data, false, "UPDATE must never send a status key");
+}
+
+/**
+ * Regression for the same incident: `wordpress-db:events:60404`'s cityId
+ * was nulled because the draft's `cityId` (absence of source city evidence)
+ * was written unconditionally. A `null` draft cityId must never appear as a
+ * `cityId` key in the UPDATE call at all — Prisma then leaves the existing
+ * `Activity.cityId` exactly as it was.
+ */
+async function testUpdatePreservesCityWhenDraftCityIdNull() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-99", cityId: "city-1" }));
+  const writer = new EventCommitWriter(client);
+  await writer.updateEventFromDraft("activity-99", draftFixture({ cityId: null }));
+
+  const updateCall = findCall(calls, "activity", "update").args as { data: Record<string, unknown> };
+  assert.equal("cityId" in updateCall.data, false, "UPDATE must never null out an existing cityId");
+}
+
+/** A proven, non-null cityId is real evidence and must still apply on UPDATE. */
+async function testUpdateAppliesCityIdWhenDraftProvesOne() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-99", cityId: null }));
+  const writer = new EventCommitWriter(client);
+  await writer.updateEventFromDraft("activity-99", draftFixture({ cityId: "city-9" }));
+
+  const updateCall = findCall(calls, "activity", "update").args as { data: Record<string, unknown> };
+  assert.equal(updateCall.data.cityId, "city-9");
+}
+
+/** CREATE is unaffected by the UPDATE-only fix: status/cityId are always written as-is. */
+async function testCreateStillWritesStatusAndCityIdUnconditionally() {
+  const { client, calls } = createFakeClient();
+  const writer = new EventCommitWriter(client);
+  await writer.createEventFromDraft(draftFixture({ cityId: null }));
+
+  const call = calls[0]?.args as { data: Record<string, unknown> };
+  assert.equal(call.data.status, "PENDING");
+  assert.equal(call.data.cityId, null);
+}
+
+/** Same never-clear-on-absent-evidence rule applies to `EventVenue.cityId` on UPDATE. */
+async function testUpdateVenuePreservesCityWhenDraftVenueCityIdNull() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-99" }));
+  const writer = new EventCommitWriter(client);
+  await writer.updateEventFromDraft(
+    "activity-99",
+    draftFixture({
+      venue: {
+        kind: "MANUAL",
+        placeId: null,
+        title: "Клуб приключений",
+        addressLine: "ул. Вокзальная",
+        cityId: null,
+        lat: 53.95067,
+        lng: 27.41714,
+        note: null,
+        source: "wordpress-db",
+      },
+    }),
+  );
+
+  const call = findCall(calls, "eventVenue", "upsert").args as { update: Record<string, unknown> };
+  assert.equal("cityId" in call.update, false, "venue UPDATE must never null out an existing cityId");
+}
+
+/** A brand-new `EventVenue` row (create branch) has nothing to preserve, so `null` is written as-is. */
+async function testCreateVenueWritesNullCityIdAsIs() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-1" }));
+  const writer = new EventCommitWriter(client);
+  await writer.createEventFromDraft(
+    draftFixture({
+      venue: {
+        kind: "MANUAL",
+        placeId: null,
+        title: "Клуб приключений",
+        addressLine: "ул. Вокзальная",
+        cityId: null,
+        lat: 53.95067,
+        lng: 27.41714,
+        note: null,
+        source: "wordpress-db",
+      },
+    }),
+  );
+
+  const call = findCall(calls, "eventVenue", "upsert").args as { create: Record<string, unknown> };
+  assert.equal(call.create.cityId, null);
+}
+
+/** A proven venue cityId still applies on UPDATE. */
+async function testUpdateVenueAppliesCityIdWhenProvided() {
+  const { client, calls } = createFakeClient(activityFixture({ id: "activity-99" }));
+  const writer = new EventCommitWriter(client);
+  await writer.updateEventFromDraft(
+    "activity-99",
+    draftFixture({
+      venue: {
+        kind: "MANUAL",
+        placeId: null,
+        title: "Central Park",
+        addressLine: "ul. Central, 1",
+        cityId: "city-9",
+        lat: null,
+        lng: null,
+        note: null,
+        source: "wordpress-db",
+      },
+    }),
+  );
+
+  const call = findCall(calls, "eventVenue", "upsert").args as { update: Record<string, unknown> };
+  assert.equal(call.update.cityId, "city-9");
+}
+
 async function testUpdateWithVenueUpsertsSameActivityId() {
   const { client, calls } = createFakeClient(activityFixture({ id: "activity-99" }));
   const writer = new EventCommitWriter(client);
@@ -602,6 +731,13 @@ async function main() {
   await testReturnsActivityIdAndCreatedStatus();
   await testUpdateUsesUpdateAndReturnsUpdatedStatus();
   await testUpdateReplacesSessions();
+  await testUpdateNeverIncludesStatusKey();
+  await testUpdatePreservesCityWhenDraftCityIdNull();
+  await testUpdateAppliesCityIdWhenDraftProvesOne();
+  await testCreateStillWritesStatusAndCityIdUnconditionally();
+  await testUpdateVenuePreservesCityWhenDraftVenueCityIdNull();
+  await testCreateVenueWritesNullCityIdAsIs();
+  await testUpdateVenueAppliesCityIdWhenProvided();
   await testCreateWithNoVenueNeverCallsUpsert();
   await testCreateWithManualVenueUpsertsByActivityId();
   await testCreateWithPlaceVenueSetsKindPlace();
