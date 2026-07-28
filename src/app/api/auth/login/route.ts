@@ -7,6 +7,8 @@ import { normalizeEmail } from "@/lib/auth/email";
 import { acceptBusinessInvite } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
+import { maskEmail, requestMigratedAccountActivationByEmail } from "@/server/auth/activationRequestFlow";
+import { trustedClientIp } from "@/server/auth/activationHttpSecurity";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -63,9 +65,33 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Unknown, ineligible, and wrong-password accounts share the same response
-    // and perform a bcrypt comparison through the timing-safe helper.
+    // Unknown, ineligible, and wrong-password accounts share the same timing
+    // profile — verifyLoginPassword always runs a real bcrypt comparison
+    // (against a dummy hash when there's nothing real to check), so a
+    // migrated PENDING_ACTIVATION account (passwordHash: null, therefore
+    // never eligible/matching here) costs exactly as much time as a wrong
+    // password or an unknown email. Only AFTER that constant-time check do
+    // migrated accounts get a distinct (still non-revealing-of-password)
+    // response.
     const isValid = await verifyLoginPassword(password, user);
+
+    if (user && !isValid && user.status === "PENDING_ACTIVATION") {
+      const outcome = await requestMigratedAccountActivationByEmail({
+        email: user.email,
+        ip: trustedClientIp(request),
+        source: "LOGIN_FLOW",
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          pendingActivation: true,
+          delivered: outcome.delivered,
+          maskedEmail: maskEmail(user.email),
+        },
+        { status: 200 },
+      );
+    }
+
     if (!user || !isValid) {
       return NextResponse.json(
         { error: "Invalid email or password" },

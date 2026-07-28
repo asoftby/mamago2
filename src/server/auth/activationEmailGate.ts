@@ -1,6 +1,6 @@
 export type ActivationEmailDeliveryResult =
   | { status: "DELIVERY_DISABLED" }
-  | { status: "PROVIDER_UNAVAILABLE" };
+  | { status: "DELIVERY_ALLOWED" };
 
 export type ActivationEmailEnvironment = {
   nodeEnv: string | undefined;
@@ -8,6 +8,8 @@ export type ActivationEmailEnvironment = {
   productionEnabled: string | undefined;
   productionApproved: string | undefined;
 };
+
+export type ActivationEmailBlockReason = "ENVIRONMENT" | "KILL_SWITCH";
 
 function currentEnvironment(): ActivationEmailEnvironment {
   return {
@@ -18,18 +20,32 @@ function currentEnvironment(): ActivationEmailEnvironment {
   };
 }
 
+/**
+ * Same decision as `resolveActivationEmailDelivery`, split into its two
+ * distinct "why not" reasons — for delivery-audit persistence, which needs
+ * to tell "wrong environment entirely" (`ENVIRONMENT`, e.g. LOCAL/DEV) apart
+ * from "in production but the explicit approval flags are off"
+ * (`KILL_SWITCH`). `null` means delivery is allowed.
+ */
+export function classifyActivationEmailBlock(
+  environment = currentEnvironment(),
+): ActivationEmailBlockReason | null {
+  if (environment.nodeEnv !== "production" || environment.appEnvironment !== "production") {
+    return "ENVIRONMENT";
+  }
+  if (environment.productionEnabled !== "true" || environment.productionApproved !== "true") {
+    return "KILL_SWITCH";
+  }
+  return null;
+}
+
 export function resolveActivationEmailDelivery(
   environment = currentEnvironment(),
 ): ActivationEmailDeliveryResult {
-  const deliveryAllowed =
-    environment.nodeEnv === "production" &&
-    environment.appEnvironment === "production" &&
-    environment.productionEnabled === "true" &&
-    environment.productionApproved === "true";
-
-  if (!deliveryAllowed) {
+  if (classifyActivationEmailBlock(environment) !== null) {
     return { status: "DELIVERY_DISABLED" };
   }
-  // Provider connection is intentionally outside Slice 3.
-  return { status: "PROVIDER_UNAVAILABLE" };
+  // Provider itself lives in activationEmailDelivery.ts (deliverMigratedAccountActivationEmail);
+  // this gate only ever decides whether that provider call is reachable at all.
+  return { status: "DELIVERY_ALLOWED" };
 }

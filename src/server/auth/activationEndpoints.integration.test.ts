@@ -54,7 +54,7 @@ async function main(): Promise<void> {
       ["production", "development", "true", "true", "DELIVERY_DISABLED"],
       ["production", "production", "false", "true", "DELIVERY_DISABLED"],
       ["production", "production", "true", "false", "DELIVERY_DISABLED"],
-      ["production", "production", "true", "true", "PROVIDER_UNAVAILABLE"],
+      ["production", "production", "true", "true", "DELIVERY_ALLOWED"],
     ] as const;
     for (const [nodeEnv, appEnvironment, productionEnabled, productionApproved, status] of matrix) {
       assert.deepEqual(

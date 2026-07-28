@@ -111,6 +111,7 @@ model User {
   notificationPreferences           UserNotificationPreference[]
   unsubscribeTokens                 UnsubscribeToken[]               @relation("UnsubscribeTokens")
   actionTokens                      UserActionToken[]
+  activationDeliveryAudits          ActivationDeliveryAudit[]
   createdBroadcasts                 AdminBroadcast[]                 @relation("AdminBroadcastCreator")
   editedBroadcastRevisions          AdminBroadcastRevision[]         @relation("AdminBroadcastRevisionEditor")
   devTelegramBusinessApplications   DevTelegramBusinessApplication[]
@@ -202,18 +203,46 @@ model Session {
 
 /// Purpose-scoped, one-time user action tokens. Only a cryptographic hash is stored.
 model UserActionToken {
-  id            String                 @id @default(cuid())
-  userId        String
-  purpose       UserActionTokenPurpose
-  tokenHash     String                 @unique
-  expiresAt     DateTime
-  usedAt        DateTime?
-  invalidatedAt DateTime?
-  createdAt     DateTime               @default(now())
-  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                       String                    @id @default(cuid())
+  userId                   String
+  purpose                  UserActionTokenPurpose
+  tokenHash                String                    @unique
+  expiresAt                DateTime
+  usedAt                   DateTime?
+  invalidatedAt            DateTime?
+  createdAt                DateTime                  @default(now())
+  user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activationDeliveryAudits ActivationDeliveryAudit[]
 
   @@index([userId, purpose, createdAt])
   @@index([purpose, expiresAt])
+}
+
+/// Delivery audit for migrated-account activation emails only — never the raw
+/// token, the full activation URL, the full email body, or any provider
+/// secret. `activationTokenId` links to the exact UserActionToken row (its
+/// hash, not the raw value) when one was issued for this attempt.
+model ActivationDeliveryAudit {
+  id                String                   @id @default(cuid())
+  userId            String
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceRecordKey   String?
+  provider          String
+  recipientMask     String
+  template          String
+  requestedAt       DateTime                 @default(now())
+  attemptedAt       DateTime?
+  sentAt            DateTime?
+  providerMessageId String?
+  status            ActivationDeliveryStatus
+  errorCode         String?
+  activationTokenId String?
+  activationToken   UserActionToken?         @relation(fields: [activationTokenId], references: [id], onDelete: SetNull)
+  source            ActivationDeliverySource
+
+  @@index([userId])
+  @@index([status])
+  @@index([requestedAt])
 }
 
 model PhoneOtp {
@@ -2907,6 +2936,20 @@ enum UserActionTokenPurpose {
   MIGRATED_ACCOUNT_ACTIVATION
 }
 
+enum ActivationDeliveryStatus {
+  BLOCKED_ENVIRONMENT
+  BLOCKED_KILL_SWITCH
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum ActivationDeliverySource {
+  LOGIN_FLOW
+  MANUAL_REQUEST
+  PRODUCTION_BATCH
+}
+
 enum UserModerationActionType {
   WARN
   LIMIT
@@ -3897,11 +3940,11 @@ model MigrationLineage {
 }
 
 model MigrationMediaAsset {
-  id                    String              @id @default(cuid())
+  id                    String               @id @default(cuid())
   sourceId              String
   runId                 String?
   recordId              String?
-  status                MigrationPlanStatus @default(PLANNED)
+  status                MigrationPlanStatus  @default(PLANNED)
   sourceMediaKey        String
   sourceMediaExternalId String?
   sourceUrl             String?
@@ -3923,8 +3966,8 @@ model MigrationMediaAsset {
   bindingPlan           Json?
   bindingResult         Json?
   lastErrorMessage      String?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   run    MigrationRun?    @relation(fields: [runId], references: [id])
@@ -3940,12 +3983,12 @@ model MigrationMediaAsset {
 }
 
 model MigrationRelation {
-  id                       String              @id @default(cuid())
+  id                       String               @id @default(cuid())
   sourceId                 String
   runId                    String?
   fromRecordId             String?
   toRecordId               String?
-  status                   MigrationPlanStatus @default(PLANNED)
+  status                   MigrationPlanStatus  @default(PLANNED)
   sourceRelationKey        String
   sourceRelationType       String
   sourceRelationExternalId String?
@@ -3959,8 +4002,8 @@ model MigrationRelation {
   planSummary              Json?
   applyResult              Json?
   lastErrorMessage         String?
-  createdAt                DateTime            @default(now())
-  updatedAt                DateTime            @updatedAt
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 
   source     MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   run        MigrationRun?    @relation(fields: [runId], references: [id])
@@ -3977,11 +4020,11 @@ model MigrationRelation {
 }
 
 model MigrationRedirect {
-  id                       String              @id @default(cuid())
+  id                       String               @id @default(cuid())
   sourceId                 String
   runId                    String?
   recordId                 String?
-  status                   MigrationPlanStatus @default(PLANNED)
+  status                   MigrationPlanStatus  @default(PLANNED)
   sourceRedirectKey        String
   sourceRedirectExternalId String?
   sourceUrl                String?
@@ -3992,13 +4035,13 @@ model MigrationRedirect {
   targetId                 String?
   targetUrl                String?
   httpStatus               Int?
-  priority                 Int                 @default(0)
+  priority                 Int                  @default(0)
   conflictGroupKey         String?
   planSummary              Json?
   applyResult              Json?
   lastErrorMessage         String?
-  createdAt                DateTime            @default(now())
-  updatedAt                DateTime            @updatedAt
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 
   source MigrationSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   run    MigrationRun?    @relation(fields: [runId], references: [id])
