@@ -77,6 +77,7 @@
     "migration:commit:wordpress-db-from-json": "tsx scripts/migration-commit-wordpress-db-from-json.ts",
     "migration:inspect:wordpress-db": "tsx scripts/migration-inspect-wordpress-db.ts",
     "migration:preview:wordpress-db": "tsx scripts/migration-preview-wordpress-db.ts",
+    "migration:events:sessions-resync": "tsx scripts/migration-event-sessions-resync.ts",
     "migration:preview:offer-snapshot": "tsx scripts/migration-preview-offer-snapshot.ts",
     "migration:preview:offer-remediation": "tsx scripts/migration-preview-offer-remediation.ts",
     "migration:route-review": "tsx scripts/migration-route-review.ts",
