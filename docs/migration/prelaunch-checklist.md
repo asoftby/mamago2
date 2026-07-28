@@ -2,11 +2,17 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-27  
-**Base:** `dev` @ `c8a3f9aa0c2940aeb57dc5fb015937630f407036` — PR #89 merged  
-**Текущая фаза:** `ARTICLES — Slice 18 golden migration COMPLETE (post:56250)`  
-**Текущий кандидат для следующего шага:** `wordpress-db:post:57731` (Slice 19)  
-**Текущий gate:** `READY_FOR_SLICE_19`
+**Обновлено:** 2026-07-28  
+**Base:** `dev` @ `b30325f5` — PR #93 merged  
+**Текущая фаза:** `EVENTS tail COMPLETE — 10/10 lineage records accounted for: 1 protected legacy + 8/8 publishable eligible PUBLISHED + 1 expired-source retained PENDING; Event UPDATE lifecycle/cityId regressions fixed + regression-tested; new schedule-resync capability built and used; Routes review next`  
+**Текущий кандидат для следующего шага:** Routes review 14/14 (см. §5.4); separately, founder decision on `wordpress-db:events:64159` disposition (source gone — hard-exclude vs. leave pending)  
+**Текущий gate:** `EVENTS_TAIL_COMPLETE`
+
+> Note: этот файл написан из ветки `feat/events-tail-import` (branched off
+> `dev`). Отдельная ветка `fix/admin-article-preview-routing` независимо
+> содержит ещё не смерженные обновления по Users manual/privileged closure
+> и production activation delivery readiness (§3.4a/§3.9/§3.9a там) — при
+> мерже обеих веток в `dev` эту шапку и §2/§5/§7/§8 нужно свести вручную.
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -50,7 +56,7 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Places | CORE COMPLETE | Media, production validation, public/city audit |
 | Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution, media, backlog H/I |
 | Routes | IMPORTED 14/14 | Review, publish, slug history, redirects, public validation |
-| Events | PARTIAL 4/9 | 5 CREATE, 67 sessions, rerun, city/date/URL validation |
+| Events | **COMPLETE** — 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED + 1 protected legacy PUBLISHED | Founder disposition for 1 EXPIRED source (`64159`, left PENDING); `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0, backlogged, see §5.3); Event images (P1, frozen out-of-scope) |
 | Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
 | Users activation architecture | COMPLETE | Production email provider, rehearsal и delivery Go/No-Go |
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
@@ -251,20 +257,218 @@ Next slice: targeted authorship assignment for user:575 across both Articles,
 - [ ] Подготовить controlled activation delivery после Go/No-Go.
 - [ ] Решить P0/P1 для User/Business avatars и logos.
 
-### 5.3 Events
+### 5.3 Events — COMPLETE: 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED
+
+The prior "4/9 imported, 5 CREATE remaining, 67 pending sessions" snapshot was
+stale: an earlier, never-merged session (`docs/event-migration-mvp-complete`,
+2026-07-21, never merged to `dev`) had already CREATE'd all 9 eligible Events
+plus canonicalized their lineage hash to v2 (PR #64/#65, both on `dev`) — the
+checklist just never reflected it. All 9 eligible + the 1 legacy/protected
+(`wordpress-db:events:55980`) already had `Activity` rows with active
+lineage. There was **no remaining CREATE work** — confirmed twice, by direct
+DB read and again structurally: the new resync tool below refuses to CREATE
+under any circumstance (`BLOCKED_LINEAGE_MISSING`, no write, if lineage is
+ever absent).
+
+**Session 1 (initial audit + partial publish):** read-only audit
+(`migration:preview:wordpress-db --entity event`, exact-key + full scan)
+classified all 9: `VALID_FUTURE` no-drift (56226, 56062, 64505), 5 events
+with materialized sessions gone stale since their 07-19/20 creation
+(56479, 60404, 62977, 63510, 64251), 1 fully expired at the source
+(64159 — WP post no longer published at all), plus one brand-new,
+already-past-only discovery (49842, auto `SKIP_POLICY`, no action). Trying
+to fix the drift via the ordinary `migration-commit-wordpress-db.ts` UPDATE
+path worked for 2 of the 5 (56479, 60404 — their lineage hash was still
+pre-canonical-v2, so a real UPDATE ran) but exposed two real defects in
+`EventCommitWriter` for the other 3 (already on canonical v2 hash →
+`SKIP_UNCHANGED`, so no rebuild happened at all) and, worse, actively
+regressed two already-published Events when used to "verify idempotency."
+
+**Two regressions found, root-caused, and fixed in code this session**
+(`src/lib/migration/commit/event/EventCommitWriter.ts`):
+1. **cityId clobber** — `buildEventCreateDraft()` is a pure function with no
+   knowledge of any existing row; `context.cityId` absent/unmatched always
+   produces `draft.cityId: null`. `updateEventFromDraft()` wrote that `null`
+   to `Activity.cityId`/`EventVenue.cityId` unconditionally, with no
+   preserve-existing-if-unresolved guard (unlike `EventVenue`'s own
+   never-clear-on-no-evidence rule for every *other* field). This nulled
+   `wordpress-db:events:60404`'s city mid-session.
+2. **status reset** — `EventCreateDraft.status` is hardcoded `"PENDING"`
+   (the CREATE-only default); `updateEventFromDraft()` wrote it
+   unconditionally on every UPDATE too, silently reverting any
+   already-`PUBLISHED` Event back to `PENDING` the moment its content hash
+   ever changes (or, as happened here, the first time it's ever actually
+   re-committed). Unpublished `56226`/`56062`.
+
+**Fix**: `updateEventFromDraft()` now never sends a `status` key at all
+(lifecycle is exclusively an approval-flow concern, never a migration-UPDATE
+concern), and only sends `cityId` when the draft has a proven non-null
+value — absence of city evidence no longer overwrites a city already on the
+row, on both `Activity` and `EventVenue`. 8 new regression tests
+(`EventCommitWriter.test.ts`) cover both directions (preserve-on-null,
+still-applies-when-proven) for both fields, plus confirm CREATE is
+unaffected. Both incidents were also corrected in the live DB before the
+fix landed (scoped, precondition-checked, transactional).
+
+**New capability**: `scripts/migration-event-sessions-resync.ts`
+(`pnpm migration:events:sessions-resync`) — the actual gap that caused the
+3 SKIP_UNCHANGED events to get stuck. A canonical content hash correctly
+proves "the WordPress post is unchanged"; it says nothing about whether a
+multi-date schedule's *materialized* `ActivitySession` rows still match
+what today's date would produce from that same unchanged content (past
+sessions get pruned as calendar days pass, independent of any content
+edit). This tool computes a second, independent, deterministic fingerprint
+(`computeEventScheduleResyncPlan.ts`, reusing the existing
+`eventSessionScheduleFingerprint`/`eventSessionFingerprintFromStoredSessions`
+helpers) and — only when it detects real drift — rewrites *exclusively*
+`ActivitySession` rows and `Activity.nextOccurrenceAt` inside one
+transaction per Event (`EventScheduleResyncWriter.ts`), through a Prisma
+client type with no `status`/`cityId`/`slug`/`title`/`ownerUserId`/venue/
+media/lineage delegates reachable at all — structurally, not just by
+convention. Never CREATEs (`BLOCKED_LINEAGE_MISSING`/`_AMBIGUOUS` if
+lineage isn't exactly one active row); never touches an unpublishable
+source (`BLOCKED_EXPIRED_SOURCE` if the WP post is gone or fully
+past-dated). `--preview`/`--commit`, exact `--source-record-key` only, no
+mass scan mode. Every commit re-reads and asserts protected fields
+byte-identical before and after, and re-verifies the post-write fingerprint
+matches the desired one — either failure aborts the batch (stop-on-first-
+error) rather than silently continuing. 17 tests across 3 files (pure plan
+logic, writer, CLI arg parsing).
+
+**Session 2 (close-out, same day)**: ran the new resync tool against the 3
+stuck keys — all `RESYNC` (62977: 29→23 sessions, 63510: 35→27, 64251:
+34→25, all now spanning today→their real end date), all protected fields
+verified byte-identical before/after, all fingerprints verified matching
+post-write. Published all 3 via the unchanged `scripts/approve-event.ts`
+lifecycle path. Re-ran the resync tool in `--preview` against all 8 eligible
++ published keys (the 3 just-fixed plus the 5 from session 1): **8/8
+`NOOP_ALREADY_SYNCED`, 0 writes** — proves both the fix and the new tool's
+own idempotency, through the tool that's actually safe to use for this
+(never resets status/city, unlike the old commit CLI).
+
+**Final accounting (2026-07-28, local `mamago2`, direct DB read — do not
+recompute from earlier session logs)** — this replaces every prior "X/Y
+published" framing in this section, which conflated *eligible* with
+*publishable* and made an intentionally-excluded expired source look like
+unfinished work:
 
 ```text
-eligible imported:             4/9
-remaining CREATE:              5
-pending materialized sessions: 67
+Total Event MigrationLineage records (targetType=ACTIVITY, active):  10
+Total ActivitySession rows across those 10 Activities:              109
+Duplicate sourceRecordKey / Activity linkage / slug / session rows:  0 / 0 / 0 / 0
+Orphan ActivitySession rows (no matching Activity):                 0
+
+Protected legacy (wordpress-db:events:55980):     1 — PUBLISHED (untouched, out of scope)
+Eligible migrated Events (the 9 from the WP tail): 9/9 accounted for
+  Future-valid, publishable:                       8/8 — all PUBLISHED
+  Expired source (wordpress-db:events:64159):       1 — retained PENDING, excluded from publication
+
+Events migration is considered complete: all 8 future-valid eligible
+Events are published; the expired source (64159) is a deliberate
+exclusion, not an unfinished CREATE or a blocked publish.
 ```
 
-- [ ] Exact Docker/CI environment gate.
-- [ ] Preview 5 remaining Events.
-- [ ] Sequential targeted commits.
-- [ ] Session/cumulative delta validation.
-- [ ] Common rerun.
-- [ ] City/date discovery и отсутствие 404.
+Classification table (all 10 lineage records):
+
+| sourceRecordKey | Activity id | classification | status | sessions | nextOccurrenceAt | city | public URL |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `...:55980` | `cmrb48y2q...` | PROTECTED_LEGACY_PUBLISHED | PUBLISHED | 1 | 2026-07-12 | Минск | `/minsk/events/interaktivnyy-kvest-mir-naoschup` |
+| `...:56226` | `cmrs53a6u...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 1 | 2026-08-01 | Минск | `/minsk/events/igra-zvuki-temnoty` |
+| `...:56479` | `cmrsdnl2d...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 1 | 2026-08-09 | Минск | `/minsk/events/semeynyy-kvest-priklyucheniya-v-hogvartse` |
+| `...:60404` | `cmrsduuwv...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 28 | 2026-07-29 | Минск | `/minsk/events/letnyaya-aktivnaya-razvlekatelnaya-zagorodnaya-programma-2026-aktiv-polis-na-baze-sanatoriya` |
+| `...:56062` | `cmrt4fhmq...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 1 | 2026-08-06 | Минск | `/minsk/events/psihologicheskiy-trening-aromamagiya` |
+| `...:64505` | `cmrt4ibs5...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 1 | 2026-09-12 | Минск | `/minsk/events/s-kibirova-balet-tri-porosenka` |
+| `...:62977` | `cmrt4k8ec...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 23 | 2026-07-29 | Минск | `/minsk/events/letniy-gorodskoy-otdyh-v-minske-dlya-detey-6-13-let` |
+| `...:63510` | `cmrt4ltsz...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 27 | 2026-07-29 | Минск | `/minsk/events/immersivnaya-vystavka-neboreka-planeta-posle-shuma` |
+| `...:64251` | `cmrrljj8c...` | FUTURE_VALID_PUBLISHED | PUBLISHED | 25 | 2026-07-29 | Минск | `/minsk/events/letniy-klub-dlya-detey-na-angliyskom` |
+| `...:64159` | `cmrt4gvoz...` | EXPIRED_SOURCE_PENDING | PENDING | 1 (stale, 07-25) | — | Минск | none (no slug, not public — reconfirmed live: WP source still returns no published post) |
+
+`PROTECTED_LEGACY_PUBLISHED: 1`, `FUTURE_VALID_PUBLISHED: 8`,
+`EXPIRED_SOURCE_PENDING: 1` — matches the expected split exactly, no
+discrepancy found.
+
+All 5 originally-published + 3 resynced-then-published + the 1 legacy URL
+(9 total) verified live: correct title/city/date, appear in
+`/minsk/events` discovery, 0 console errors, mobile smoke clean. 0
+`MediaAsset`/`MigrationMediaAsset` writes across any session.
+
+Backlog — the only remaining non-published record:
+
+```text
+64159  EXPIRED_SOURCE_PENDING — WP post no longer published
+       (post_type=events, post_status=publish returns nothing, reconfirmed
+       live via the resync tool's --preview). DB's own materialized
+       session was already past (2026-07-25) anyway. Left PENDING, not
+       counted against "publishable" — this is a deliberate exclusion,
+       not unfinished CREATE work. Founder decision still open:
+       hard-exclude permanently vs. leave PENDING indefinitely — not a
+       blocker for Routes or anything else.
+```
+
+**Known defect — backlogged, not fixed in this slice (found during
+publication, unrelated to the Event UPDATE/resync code above):**
+
+```text
+EVENT_SEARCH_INDEX_PUBLICATION_RACE
+
+Severity: P0 (reproduced twice under ordinary use; produces a genuinely
+incorrect, non-canonical public-facing URL — see reproduction below).
+
+Root cause: publishing an Event performs two separate Activity.update()
+calls in sequence — approve-event.ts's own status:PUBLISHED update, then
+a second update (slug + slugUpdatedAt) inside
+assignActivitySlugIfMissing()'s own transaction, called via
+ensurePublishedActivityHasSlug(). Prisma's search-indexing extension
+(extendPrismaWithSearchIndexing, wired in src/lib/prisma.ts) fires an
+independent, unawaited SearchIndexerService.upsertActivity(id) after
+*every* Activity.update() call ("fire-and-forget", src/lib/search/
+prismaSearchExtension.ts). Each dispatch independently re-reads the
+Activity fresh (buildActivityDocument) and upserts SearchDocument — there
+is no ordering or deduplication between the two dispatches from the same
+publish. Whichever of the two async chains' upsert reaches the DB last
+wins, regardless of which one has the complete (post-slug-assignment)
+state. buildActivityDocument falls back to the raw Activity id for
+urlPath when slug is still null at read time (publicActivityPath()), so
+the losing race leaves SearchDocument.urlPath as
+"/minsk/events/{activityId}" instead of the canonical slug path.
+
+Reproduction (real, not synthetic): observed on 2/9 Events published this
+session (wordpress-db:events:62977 and :56479, from two different
+approve-event.ts invocations in two different sessions) — i.e. roughly
+1-in-4-5 publishes hit it in practice. Both were repaired with a manual
+`new SearchIndexerService(prisma).upsertActivity(id)` re-index (data
+repair only, no code change) and reconfirmed correct; all 9 published
+Events' SearchDocument.urlPath now match their canonical slug path
+exactly (verified 2026-07-28).
+
+User impact: the affected page itself does NOT 404 — [city]/events/
+[slugOrId]/page.tsx's dynamic route accepts either the slug or the raw id
+(confirmed: /minsk/events/cmrt4k8ec0006wswzelvt2e5d returned 200 OK with
+the correct event rendered) — so this is a site-search/SEO/canonical-URL
+correctness defect, not a hard broken-link defect. Classified P0 anyway
+per the "reproducible + incorrect URL" bar, since it was empirically hit
+twice under completely ordinary publish actions, not contrived.
+
+Fix (not implemented here — out of scope for the Events migration slice,
+touches shared search-indexing infrastructure used by Places/Articles/
+Offers/Routes too, not just Events): a single deterministic reindex call
+after the full publish lifecycle transaction completes, replacing the two
+independent fire-and-forget dispatches — or an ordering/deduplication
+queue in the indexer itself. Needs its own scoped review before any
+implementation.
+```
+
+- [x] Exact Docker/CI environment gate — LOCAL, `mamago2`, this worktree.
+- [x] Read-only audit of all 9 eligible + 1 legacy Event.
+- [x] Sequential targeted commits/resyncs, stop-on-first-error (none hit).
+- [x] Session/cumulative delta validation, duplicate check, media-write check, orphan-session check.
+- [x] City/date discovery и отсутствие 404 — all 9 published URLs verified.
+- [x] Event UPDATE lifecycle/cityId regressions fixed in code + regression-tested.
+- [x] Event schedule resync capability built, tested, used to close all 3 stuck records.
+- [x] Common resync-tool rerun — 8/8 `NOOP_ALREADY_SYNCED`, 0 writes.
+- [x] Search-index race root-caused, reproduced, documented as P0 backlog, current data repaired.
+- [ ] Decide 64159's fate (source gone — hard-exclude vs. leave pending indefinitely).
+- [ ] `EVENT_SEARCH_INDEX_PUBLICATION_RACE` fix — separate scoped slice, touches shared search infra.
 
 Event images остаются вне frozen P0 scope.
 
@@ -387,11 +591,28 @@ Remaining strict P0 work:        ~34–38%
 ## 8. Следующее одно действие
 
 ```text
-Phase: ARTICLES — editorial closure for two migrated Articles
-Prerequisite (Slice 20, COMPLETE): both authorUserId relations assigned to
-  user:575 by exact CAS; common rerun ALREADY_SATISFIED 2/2
-Targets: wordpress-db:post:56250 and wordpress-db:post:57731 only
-Scope to authorize separately: cityId / geoScope, approved publication flow,
-  selected/default city blog visibility, public URLs, cover/media P0/P1 decision
-Migration writer/authorship changes: forbidden
+Phase: EVENTS tail — CLOSED. Next: ROUTES review 14/14 (см. §5.4)
+Prerequisite (COMPLETE): all 9 eligible + 1 legacy Event confirmed already
+  CREATE'd (10/10 lineage records accounted for); two Event UPDATE
+  regressions (cityId clobber, status reset to PENDING) root-caused, fixed
+  in EventCommitWriter.ts, regression-tested (8 new tests); new
+  migration:events:sessions-resync capability built, tested (17 tests
+  across 3 files), and used to close the 3 records the old commit CLI's
+  SKIP_UNCHANGED path structurally couldn't rebuild; 8/8 publishable
+  eligible Events published (+ 1 pre-existing protected legacy PUBLISHED);
+  common resync-tool rerun 8/8 NOOP_ALREADY_SYNCED, 0 writes; a P0
+  search-indexing race found, reproduced twice, root-caused, and
+  backlogged (current data repaired, code fix out of scope — see §5.3).
+Targets: none remaining for Events CREATE/publish. Two open items, neither
+  blocks Routes: (1) wordpress-db:events:64159 (source post no longer
+  published on WP at all, deliberately excluded from publication) needs a
+  founder disposition decision (hard-exclude vs. leave PENDING
+  indefinitely); (2) EVENT_SEARCH_INDEX_PUBLICATION_RACE needs its own
+  scoped fix (touches shared search infra used by Places/Articles/Offers/
+  Routes too, not Events-specific).
+Migration writer/engine changes already made this session: scoped to
+  EventCommitWriter.ts (status/cityId UPDATE fix) + net-new, narrow
+  migration:events:sessions-resync tool (schedule-only write scope,
+  structurally cannot touch status/cityId/slug/title/owner/media/lineage).
+  No other engine behavior change.
 ```
