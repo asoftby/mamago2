@@ -2,19 +2,20 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-28  
-**Base:** `dev` @ `b30325f5` — PR #93 merged (via `feat/events-tail-import` @ `525aedec`)  
-**Текущая фаза:** `ROUTES review/publication COMPLETE (incl. live browser smoke) — 14/14 lineage records accounted for: 13/13 reviewed READY published (PUBLIC/Минск), 1 CITY_BLOCKED (Могилёв) correctly kept out of public state; 86 RouteStop notes reviewed, 12 mojibake-only fixes applied, 0 content/price/hours/address changes; idempotency rerun 13×SKIPPED (0 writes); 13 public URLs + discovery + Mogilev-404 browser-verified, 0 console errors; 2 pre-existing non-blocking gaps found and backlogged (canonical <link> missing, RouteStop coordinates never imported); Places/Offers/Article media closure next`  
-**Текущий кандидат для следующего шага:** Places/Offers/Article content и media closure (см. §5.5); отдельно: founder decision on `wordpress-db:events:64159` disposition, `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0 backlog), Mogilev City onboarding backlog, Route canonical-link fix, RouteStop coordinate backfill (см. §5.4/§6)  
-**Текущий gate:** `ROUTES_COMPLETE`
+**Обновлено:** 2026-07-28 (Places/Offers production readiness and media closure session)  
+**Base:** `dev` @ `b30325f5` — PR #93 merged (via `feat/events-tail-import` @ `525aedec`, then `feat/routes-review-publication` @ `657c6c59`)  
+**Текущая фаза:** `PLACES/OFFERS production readiness and media closure — DATA/MIGRATION closure complete for both entities, exact status/classification matrix built for all 83 Places, 2 writer regressions found+fixed+tested, publication path for both entities identified as a founder decision, not attempted unilaterally.` Places: 83 rows (82 WP-lineage + 1 pre-existing non-migration seed), 0 CREATE needed, 0 duplicates/orphans. Exact matrix (`docs/migration/reviews/place-status-classification-matrix-2026-07-28.md`): 5 `PUBLISHED` (4 lineage with known protected manual edits, already verified valid, + 1 seed), 76 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW` (content matches source exactly, but that proves content parity, not publication readiness — no bulk review/publish tool exists for Place yet), 2 `CITY_BLOCKED` (no cityId, source itself has none either — real content gap, not drift), 0 requiring manual content review. Offers: 63/63 safe-canonical scope reconfirmed intact (matches 2026-07-22 closure), a real `OfferCommitWriter` bug (silently dropped `cityId`) found, fixed, and backfilled for all 63; all 63 remain `DRAFT` (no existing lifecycle path currently moves migration-created Offers through `approveOffer`'s PENDING-only gate — a capability gap, not a reason to mass-publish via the privileged direct-publish endpoint). Offer/Place media: Place's existing 3-record LOCAL/DEV sample policy re-confirmed working; Offer media import remains entirely unimplemented (explicit code-level gate, not a regression) — founder Option A (P0 slice) vs Option B (P1 defer) framed, not decided. New P0: `PLACE_CANONICAL_METADATA_MISSING` (same class as the already-backlogged Route one); Offer canonical is `IMPLEMENTED_IN_CODE, PUBLIC RUNTIME PROOF PENDING` (correct in code, unverifiable live until an Offer is actually published). See §5.5 for full detail.  
+**Текущий кандидат для следующего шага:** Founder decisions — (1) Place publication universe/bulk lifecycle path for the 76 ready-for-review Places, and disposition of the 2 city-blocked ones; (2) Offer DRAFT→PENDING→PUBLISHED lifecycle path (submit-for-moderation step doesn't exist yet); (3) Offer media Option A (P0) vs Option B (P1 defer). Then: `PLACE_CANONICAL_METADATA_MISSING` fix before Place bulk publication, Article content/media closure, Reviews defer decision, Redirects/SEO (см. §5.5/§5.6/§5.7); отдельно: founder decision on `wordpress-db:events:64159` disposition, `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0 backlog, same class now confirmed applicable to Place/Offer too), Mogilev City onboarding backlog, Route + Place canonical-link fixes, RouteStop coordinate backfill (см. §5.4/§6)  
+**Текущий gate:** `PLACES_OFFERS_CLOSURE_PARTIAL` (data/migration closure done, exact matrix built; publication + media are founder-gated, not blocking further prelaunch work)
 
-> Note: этот файл написан из ветки `feat/routes-review-publication` (worktree
-> `mamago2-routes-review`, branched off `feat/events-tail-import` @
-> `525aedec`, which itself branches off `dev`). Отдельная ветка
-> `fix/admin-article-preview-routing` независимо содержит ещё не смерженные
-> обновления по Users manual/privileged closure и production activation
-> delivery readiness (§3.4a/§3.9/§3.9a там) — при мерже веток в `dev` эту
-> шапку и §2/§5/§7/§8 нужно свести вручную.
+> Note: этот файл написан из ветки `feat/places-offers-production-media-closure`
+> (worktree `mamago2-places-offers-closure`, branched off
+> `feat/routes-review-publication` @ `657c6c59`, which itself branches off
+> `feat/events-tail-import` @ `525aedec`, which branches off `dev`).
+> Отдельная ветка `fix/admin-article-preview-routing` независимо содержит ещё
+> не смерженные обновления по Users manual/privileged closure и production
+> activation delivery readiness (§3.4a/§3.9/§3.9a там) — при мерже веток в
+> `dev` эту шапку и §2/§5/§7/§8 нужно свести вручную.
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -55,8 +56,8 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Трек | Статус | Что остаётся |
 | --- | --- | --- |
 | Migration engine | COMPLETE | Regression и production validation |
-| Places | CORE COMPLETE | Media, production validation, public/city audit |
-| Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution, media, backlog H/I |
+| Places | DATA AND MIGRATION CLOSURE COMPLETE — 83/83 accounted for (82 lineage + 1 non-migration seed), 0 CREATE/duplicate/orphan, 1 writer regression fixed. Publication NOT complete: 5 published, 76 ready-for-editorial-review, 2 city-blocked, 0 requiring manual content review | Founder decision: publication universe/bulk lifecycle path for the 76; disposition of the 2 city-blocked; `PLACE_CANONICAL_METADATA_MISSING` fix; production execution |
+| Offers | SAFE SCOPE DATA CLOSURE COMPLETE 63/63; `cityId` writer bug fixed + backfilled. Publication NOT complete: all 63 DRAFT, no defined lifecycle path | Founder decision: DRAFT→PENDING→PUBLISHED lifecycle path (submit-for-moderation step doesn't exist); media Option A (P0) vs Option B (P1 defer); production execution; backlog H/I (28/8, unchanged) |
 | Routes | **COMPLETE** — 14/14 lineage accounted for, 13/13 reviewed Routes PUBLISHED, 1 CITY_BLOCKED (Mogilev) kept DRAFT | Mogilev City onboarding backlog (см. §5.4); Route images remain intentionally not imported (media policy) |
 | Events | **COMPLETE** — 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED + 1 protected legacy PUBLISHED | Founder disposition for 1 EXPIRED source (`64159`, left PENDING); `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0, backlogged, see §5.3); Event images (P1, frozen out-of-scope) |
 | Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
@@ -648,13 +649,164 @@ recorded as backlog, do not block the COMPLETE status below:
 
 ### 5.5 Places, Offers, Articles и media
 
-- [ ] Финальная production validation Places.
-- [ ] Place media manifest, storage и dedup audit.
-- [ ] Production execution Offers safe scope 63/63.
-- [ ] Offer media gate либо явный P1 defer.
-- [ ] Исправить Article visibility по selected/default city.
-- [ ] Article cover manifest и inline `wp-content/uploads` remap.
-- [ ] Local FULL, dev metadata-only и production FULL media proofs.
+**Places — 2026-07-28 (two sessions), worktree `mamago2-places-offers-closure`, branch
+`feat/places-offers-production-media-closure`, base `feat/routes-review-publication`@`657c6c59`.**
+Full detail: `docs/migration/reviews/place-*-2026-07-28.{md,json}`, corrected/exact matrix:
+`docs/migration/reviews/place-status-classification-matrix-2026-07-28.{md,json}`.
+
+```text
+PLACES:
+DATA AND MIGRATION CLOSURE COMPLETE
+
+82/82 lineage records accounted for
+1 non-migration seed accounted for separately ("Невидимый мир", no lineage — out of migration scope)
+0 unexpected CREATE/DELETE
+0 duplicate lineage/source keys/slugs
+0 orphan media links
+1 writer regression found + fixed + tested (see below)
+
+PUBLICATION:
+NOT COMPLETE — exact editorial/lifecycle scope remains
+
+Published:                                    5   (4 lineage + 1 non-migration seed)
+Ready for editorial publication review:      76   (READY_NOOP + PENDING — content matches source
+                                                    exactly, but SKIP_UNCHANGED proves content
+                                                    parity, not publication readiness; no bulk
+                                                    review/publish tool exists for Place yet)
+Manual-content review required:               0   (the 4 UPDATE_CONFLICT places are already
+                                                    PUBLISHED and were browser-verified valid this
+                                                    session — see matrix doc for the distinction)
+City blocked:                                  2   (no cityId, and the source itself has none either
+                                                    — not drift, a real content gap; excluded from
+                                                    any bulk-publish candidate universe)
+Source unpublished/excluded:                   0
+
+MEDIA:
+PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS — existing sampled-media policy (3 hand-picked Place keys
+get FULL in LOCAL/DEV, proven working end-to-end: real download/dedup/storage/link); the other 79
+get METADATA_ONLY by the same pre-existing, deliberate policy, not expanded this session — see
+place-media-manifest-2026-07-28.md for the founder-decision framing.
+
+PUBLIC RUNTIME VALIDATION:
+PASS for all 5 currently-PUBLISHED Places (200 OK, correct content/city/media/hours/reviews, 0
+console errors, desktop+mobile clean, a PENDING place correctly 404s) — but NEW P0 found:
+PLACE_CANONICAL_METADATA_MISSING. `generateMetadata()` never reads `Place.seoCanonicalUrl`;
+`seoCanonicalUrl` can be populated in the DB while the rendered HTML still has no
+`<link rel="canonical">` at all — confirmed on all 5 published Places. Current Place canonical
+validation = FAIL. This blocks final Go/No-Go but does NOT reopen or invalidate the
+data/migration closure above.
+
+PRODUCTION EXECUTION:
+NOT STARTED — manifest generation deliberately deferred to actual cutover time (no bulk Place
+discovery gap here, unlike Offer; deferred purely because source content could drift between now
+and cutover, so freezing today's hashes would be less rigorous than generating fresh ones then).
+
+Regression found+fixed: PlaceCommitWriter.buildUpdateData() unconditionally reset status to PENDING
+  and clobbered cityId on every UPDATE (same class as the EventCommitWriter bug) — dormant today (0
+  Places in an UPDATE_SAFE state) but a live risk for the next WP edit to any of the 76 clean rows.
+  Fixed + 3 regression tests added, full Place test suite green.
+```
+
+- [x] Places DB/source aggregate audit, exact status/classification matrix, safe-UPDATE regression
+      fix, media manifest, public validation — see above and `docs/migration/reviews/place-*-2026-07-28.*`.
+- [ ] Founder decision: Place publication universe and bulk lifecycle path for the 76
+      `READY_FOR_EDITORIAL_PUBLICATION_REVIEW` Places (no bulk review/publish tool exists for Place yet).
+- [ ] Founder decision: disposition of the 2 `CITY_BLOCKED` Places (assign city with real evidence,
+      or leave excluded indefinitely).
+- [ ] `PLACE_CANONICAL_METADATA_MISSING` fix (frontend, scoped slice) — before any Place bulk publication.
+- [ ] Production execution Places (manifest generation deferred to cutover time, not frozen now).
+
+**Offers — 2026-07-28 (two sessions), same worktree.** Full detail:
+`docs/migration/reviews/offer-*-2026-07-28.{md,json}`.
+
+```text
+OFFERS SAFE SCOPE:
+DATA CLOSURE COMPLETE 63/63
+
+63/63 safe canonical Offers accounted for (matches 2026-07-22 closure, commit 1fca8c8b — golden +
+  Batch 1-4, immutable manifest hashes on record; NOT re-run this session, per that session's own
+  "must not run again")
+63/63 linked to proven Places (0 duplicate source keys/linkage/slugs, 0 wrong-Place Offers)
+63/63 cityId backfilled from linked Place (writer regression found+fixed, see below)
+0 unexpected CREATE/DELETE
+common backfill rerun: 0 eligible, 0 writes — deterministic
+
+PUBLICATION:
+NOT COMPLETE — all 63 remain DRAFT
+
+Approved lifecycle path:
+NOT YET DEFINED. `approveOffer()` only accepts a PENDING→PUBLISHED transition; none of the 63 ever
+went through a DRAFT→PENDING submit step (they were migration-created, not Business-submitted) — a
+structural capability gap, not a reason to bypass the normal lifecycle. Preferred future lifecycle
+for a separate task:  DRAFT → (submit-for-moderation, not yet implemented) → PENDING →
+`approveOffer()` → PUBLISHED. A technical path to set `PUBLISHED` directly exists today via the
+privileged-role Business PATCH endpoint — it is explicitly NOT to be used for a mass direct
+DRAFT→PUBLISHED move without its own separate founder decision.
+
+MEDIA:
+NOT IMPLEMENTED — founder P0/P1 decision required.
+  Option A (P0): implement a minimal source-backed Offer media pipeline (cover image, reusing
+    PlaceMediaSyncer's dedup/storage pattern) before any Offer goes to production.
+  Option B (P1 defer): launch Offers without media, conditional on: layout doesn't break, CTA
+    works, no misleading placeholder is shown, and public/business/admin UAT passes.
+  Not declared deferred without explicit founder approval — recorded here as an open decision, not
+  as a settled P1.
+
+Class H: 28 documented backlog — no required Place relation (carried forward from the 2026-07-22
+  closure, not re-derived; no bulk Offer source-discovery tool exists in this codebase to redo it).
+Class I: 8 documented backlog — noncanonical alias (same as above).
+
+CANONICAL:
+Offer's public-page code already reads `seoCanonicalUrl` and sets `alternates.canonical` correctly
+(confirmed via code reading) — but with all 63 still DRAFT, there is no PUBLISHED Offer to browser-
+verify the rendered HTML against yet. Status: `IMPLEMENTED_IN_CODE, PUBLIC RUNTIME PROOF PENDING`
+— not declared a full PASS until at least one Offer is PUBLISHED and its HTML verified.
+
+PUBLIC/BUSINESS/ADMIN VALIDATION:
+PARTIAL — public 404 confirmed for a DRAFT Offer (correct), auth gating confirmed (401
+unauthenticated); full authenticated business/admin walkthrough NOT performed (all 63 are uniformly
+DRAFT, nothing a login flow would newly reveal beyond the DRAFT-status finding above — see
+offer-business-admin-smoke-2026-07-28.md).
+
+PRODUCTION EXECUTION:
+GATED — exact 63-key scope identified, prerequisite (writer fix) must ship before any production
+Offer commit; byte-exact manifest hash deferred to actual cutover time (no bulk preview tool exists
+to freeze one today) — see offer-local-execution-2026-07-28.md.
+
+Regression found+fixed: OfferCommitWriter.createOfferFromDraft() resolved+validated
+  draft.ownership.cityId (buildOfferCreateDraft blocks on MISSING_CITY otherwise) but never
+  persisted it — all 63 Offers had cityId: null despite their Place always having a real city. Fixed
+  the writer (+regression test, new OfferCommitWriter.test.ts — none existed before) and backfilled
+  all 63 existing rows from Offer.place.cityId (CAS-guarded, one-off runner — deleted after use, not
+  a committed reusable tool — protected fields verified byte-identical, reran to confirm 0 further
+  writes). 0/63 city mismatches now.
+```
+
+- [x] Offers DB/source reconfirmation, `cityId` regression fix+backfill, media capability-gap
+      assessment — see above and `docs/migration/reviews/offer-*-2026-07-28.*`.
+- [ ] Founder decision: Offer DRAFT→PENDING→PUBLISHED lifecycle path (submit-for-moderation step
+      does not exist yet — a capability gap, not a reason to use the privileged direct-publish
+      endpoint for a mass move).
+- [ ] Founder decision: Offer media — Option A (P0 minimal slice) or Option B (explicit P1 defer).
+- [ ] Production execution Offers safe scope 63/63 (manifest generation deferred to cutover time).
+
+**Articles** — out of scope for this session (per explicit instruction):
+
+```text
+ARTICLES: COMPLETE
+ARTICLE MEDIA: PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS
+```
+
+Not revisited without new regression evidence.
+
+**Shared finding (Places + Offers):** `EVENT_SEARCH_INDEX_PUBLICATION_RACE`'s defect class
+(fire-and-forget, unordered, unawaited `SearchDocument` upserts in
+`extendPrismaWithSearchIndexing`) is structurally applicable to Place/Offer too — same shared
+infrastructure. Did not reproduce this session because migration writes bypass that extension
+entirely (bare `PrismaClient`, confirmed by reading `scripts/migration-commit-wordpress-db.ts`); it
+would only become live once these entities are published through the normal admin/business app flow.
+Not re-investigated further (shared infra, its own scoped fix, same posture as the existing Events
+backlog entry).
 
 ### 5.6 Reviews
 
@@ -723,7 +875,17 @@ recorded as backlog, do not block the COMPLETE status below:
 - 63 expired Activities и связанная authorship — `P1_HISTORICAL_EXPIRED_ACTIVITY`.
 - Noncanonical Offer class I.
 - Offer class H без Place relation.
-- Draft/unpublished long-tail bulk publication.
+- Draft/unpublished long-tail bulk publication (includes: 76/83 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW`
+  Places with no bulk review/publish tool yet [+2 separately `CITY_BLOCKED`, excluded from that
+  universe], and all 63 safe-canonical Offers stuck `DRAFT` since `approveOffer()` only accepts a
+  PENDING→PUBLISHED transition — both found 2026-07-28, both founder decisions, see §5.5 and the
+  exact matrix in `docs/migration/reviews/place-status-classification-matrix-2026-07-28.md`).
+- Place detail page canonical `<link>` — `PlaceDetailPage`'s `generateMetadata()` never reads
+  `Place.seoCanonicalUrl` (same defect class as the Route one above, found via browser smoke
+  2026-07-28 against all 5 published Places). Small, isolated frontend fix, not a migration/data issue.
+- Offer media (cover/gallery import) — genuinely unimplemented (explicit code-level gate, not a
+  regression), separate media gate if revisited; recommendation is an explicit P1 defer, same posture
+  as Article media.
 - Full public profile content classification.
 - RankMath `start`/`contains` redirects.
 - Historical bookings, WooCommerce/LatePoint и social feeds.
@@ -814,3 +976,129 @@ No migration writer/engine code changes were needed for Routes — 100%
   script itself added no further audit value and it had no reusability
   (hardcoded IDs from this one run).
 ```
+
+**2026-07-28 (later same day) — Places/Offers production readiness and media
+closure.** Worktree `mamago2-places-offers-closure`, branch
+`feat/places-offers-production-media-closure`, base
+`feat/routes-review-publication`@`657c6c59` (Routes/Events commits confirmed
+present in log). Full detail across ten proof docs:
+`docs/migration/reviews/{place,offer}-*-2026-07-28.{md,json}`.
+
+```text
+Phase: PLACES/OFFERS production readiness and media closure — DATA/REGRESSION
+  CLOSURE COMPLETE; publication + media remain founder-gated, not
+  data-integrity issues.
+Places: 83 rows (82 WP-lineage + 1 pre-existing non-migration seed, out of
+  scope), 0 CREATE/duplicate/orphan. Reused existing
+  migration:preview:wordpress-db --entity place tool (no new tooling) for a
+  full 82-key read-only source snapshot+classification: 78/82
+  SKIP_UNCHANGED (READY_NOOP), 4/82 UPDATE_CONFLICT (places 437/895/5389/
+  43023 — known manual post-import edits, correctly BLOCKED, matches prior
+  session's documented expectation). Only 5/83 PUBLISHED; the other 78 are
+  content-clean but PENDING — no bulk review/publish tool exists for Place
+  yet (unlike Routes/Events), so bulk-publishing them is a founder decision,
+  not attempted. Found+fixed a real regression: PlaceCommitWriter's
+  buildUpdateData() unconditionally reset status to PENDING and clobbered
+  cityId on every UPDATE — identical bug class to the already-fixed
+  EventCommitWriter defect, currently dormant (0 Places in an UPDATE_SAFE
+  state) but a live risk for the next WordPress edit to any of the 78 clean
+  rows. Fixed, 3 regression tests added, full Place migration test suite
+  green. Live browser smoke (own worktree dev server): all 5 PUBLISHED
+  Places 200 OK with correct content/city/media/hours/reviews, 0 console
+  errors, desktop+mobile clean, a PENDING place correctly 404s. New P0
+  found: PLACE_CANONICAL_METADATA_MISSING (generateMetadata() never reads
+  seoCanonicalUrl, confirmed on all 5 — same defect class as the
+  already-backlogged Route one).
+Offers: 63/63 safe-canonical scope reconfirmed byte-identical to the prior
+  session's 2026-07-22 closure (commit 1fca8c8b, golden+Batch 1-4, immutable
+  manifest hashes on record) — NOT re-run (explicitly marked not to be).
+  Found+fixed a real regression: OfferCommitWriter.createOfferFromDraft()
+  resolved and validated draft.ownership.cityId (buildOfferCreateDraft
+  blocks on MISSING_CITY otherwise) but never persisted it to the row — all
+  63 Offers had cityId: null despite their Place always having a real city.
+  Fixed the writer, added OfferCommitWriter.test.ts (none existed before),
+  and backfilled all 63 existing rows from Offer.place.cityId (CAS-guarded,
+  one-off script, protected fields verified byte-identical before/after,
+  reran to confirm 0 further writes — idempotent). All 63 remain DRAFT: the
+  existing approveOffer() moderation function only accepts a
+  PENDING→PUBLISHED transition, and none of the 63 ever went through a
+  DRAFT→PENDING submit step (they were migration-created, not
+  Business-submitted) — a structural gap, flagged as a founder decision
+  (a technical PUBLISHED path does exist today via the privileged-role
+  Business PATCH endpoint, which correctly triggers slug+canonical
+  assignment as a side effect). Offer media import confirmed genuinely
+  unimplemented (explicit code-level gate, not a regression) —
+  recommendation is an explicit P1 defer, same posture as Article media.
+  Class H (28)/class I (8) backlog carried forward unchanged from the prior
+  closure (no bulk Offer source-discovery tool exists in this codebase to
+  re-derive them, and re-deriving would repeat an already-proven check).
+Shared finding: EVENT_SEARCH_INDEX_PUBLICATION_RACE's defect class
+  (fire-and-forget, unordered SearchDocument upserts) is structurally
+  applicable to Place/Offer too via the same extendPrismaWithSearchIndexing
+  extension — did not reproduce this session because migration writes
+  bypass that extension entirely (bare PrismaClient); would only surface via
+  the normal admin/business publish flow. Not re-investigated further
+  (shared infra, its own scoped fix).
+Cumulative audit: only DB write this session was the 63-row Offer.cityId
+  backfill (null → derived value) — every row count (Place 83, Offer 63,
+  MediaAsset 159, PlaceImage 39, Business 42, City 5) is unchanged from
+  session start. 0 unexpected CREATE/DELETE, 0 production writes, 0
+  commit/push/merge/PR performed.
+Tests: all 17 relevant Place/Offer migration test files pass (including 2
+  new regression tests + 1 new test file), tsc --noEmit clean, lint clean on
+  changed files, git diff --check clean.
+Three founder decisions now block further Places/Offers progress (none are
+  data-integrity issues — all are product/process decisions):
+  (1) bulk-publish path for the 78 clean PENDING Places;
+  (2) DRAFT→publish path for the 63 safe-canonical Offers;
+  (3) Offer media P0-vs-P1 (recommend P1).
+Next action once those are decided: PLACE_CANONICAL_METADATA_MISSING fix
+  (small, isolated, same shape as the Route one), then Article content/media
+  closure (§5.5), then Reviews defer decision (§5.6), then Redirects/SEO
+  (§5.7). This branch's docs/prelaunch-checklist.md still needs a manual
+  merge against fix/admin-article-preview-routing's independent Users/UAT
+  updates before either lands in dev (see §5.2/§0 note at top of file) — not
+  performed here, per explicit instruction not to touch that worktree.
+```
+
+**2026-07-28 (third session) — Places status/classification matrix correction, no
+new writes.** Same worktree/branch. Purpose: the prior session's "5 published,
+78 content-clean pending" summary for Places was directionally right but
+imprecise — it conflated the 1 non-migration seed Place with the 82 lineage
+Places, and did not separate genuinely `READY_FOR_EDITORIAL_PUBLICATION_REVIEW`
+Places from the 2 that are `CITY_BLOCKED`. No DB writes were needed or
+performed this session — purely a read-only join of the two already-captured
+proof docs (local DB baseline + WordPress source preview) into an exact,
+arithmetically-verified matrix.
+
+```text
+Corrected Place breakdown (82 lineage + 1 seed = 83, verified):
+  A1 PUBLISHED + READY_NOOP:                    0
+  A2 PUBLISHED + UPDATE_CONFLICT_PROTECTED:      4  (437/895/5389/43023 — already
+                                                     PUBLISHED before this session,
+                                                     browser-verified valid content)
+  A3 PUBLISHED + CITY_EVIDENCE_MISSING:          0
+  A5 PENDING + READY_NOOP:                      76
+  A7 PENDING + CITY_EVIDENCE_MISSING:            2  (32409 "Be English", 60742 "Школа
+                                                     архитектурного мышления" — source
+                                                     itself has no city evidence either)
+  B  seed (non-migration):                       1  (PUBLISHED, out of migration scope)
+  All other buckets (A4/A6/A8/A9):               0
+  Sum check: 0+4+0+0+76+0+2+0+0 = 82; +1 seed = 83 — matches exactly.
+```
+
+Full detail: `docs/migration/reviews/place-status-classification-matrix-2026-07-28.{md,json}`
+(JSON is deterministic — rows sorted by `sourceRecordKey`, aggregates recomputed
+directly from the rows array). §2 table and §5.5 above rewritten to use this
+exact matrix instead of the prior approximate framing; §5.5 also now explicitly
+separates DATA/MIGRATION closure (complete) from PUBLICATION closure (not
+complete) from MEDIA (documented gaps) from PUBLIC RUNTIME VALIDATION (found
+`PLACE_CANONICAL_METADATA_MISSING`) from PRODUCTION EXECUTION (not started) for
+both Places and Offers, and Offer media is now framed as an explicit Option
+A(P0)/Option B(P1) founder decision rather than a pre-decided P1 recommendation.
+No Events/Routes/Articles/UAT content was touched. Code (`PlaceCommitWriter`,
+`OfferCommitWriter`, their tests) was re-verified against this session's own
+description but not modified further — the fixes already made in the prior
+session were confirmed to match their intended contracts exactly (see the
+commit-by-commit breakdown recorded at the point these were split into their
+own commits, immediately following this entry).
