@@ -3,16 +3,18 @@
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
 **Обновлено:** 2026-07-28  
-**Base:** `dev` @ `b30325f5` — PR #93 merged  
-**Текущая фаза:** `EVENTS tail COMPLETE — 10/10 lineage records accounted for: 1 protected legacy + 8/8 publishable eligible PUBLISHED + 1 expired-source retained PENDING; Event UPDATE lifecycle/cityId regressions fixed + regression-tested; new schedule-resync capability built and used; Routes review next`  
-**Текущий кандидат для следующего шага:** Routes review 14/14 (см. §5.4); separately, founder decision on `wordpress-db:events:64159` disposition (source gone — hard-exclude vs. leave pending)  
-**Текущий gate:** `EVENTS_TAIL_COMPLETE`
+**Base:** `dev` @ `b30325f5` — PR #93 merged (via `feat/events-tail-import` @ `525aedec`)  
+**Текущая фаза:** `ROUTES review/publication COMPLETE (incl. live browser smoke) — 14/14 lineage records accounted for: 13/13 reviewed READY published (PUBLIC/Минск), 1 CITY_BLOCKED (Могилёв) correctly kept out of public state; 86 RouteStop notes reviewed, 12 mojibake-only fixes applied, 0 content/price/hours/address changes; idempotency rerun 13×SKIPPED (0 writes); 13 public URLs + discovery + Mogilev-404 browser-verified, 0 console errors; 2 pre-existing non-blocking gaps found and backlogged (canonical <link> missing, RouteStop coordinates never imported); Places/Offers/Article media closure next`  
+**Текущий кандидат для следующего шага:** Places/Offers/Article content и media closure (см. §5.5); отдельно: founder decision on `wordpress-db:events:64159` disposition, `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0 backlog), Mogilev City onboarding backlog, Route canonical-link fix, RouteStop coordinate backfill (см. §5.4/§6)  
+**Текущий gate:** `ROUTES_COMPLETE`
 
-> Note: этот файл написан из ветки `feat/events-tail-import` (branched off
-> `dev`). Отдельная ветка `fix/admin-article-preview-routing` независимо
-> содержит ещё не смерженные обновления по Users manual/privileged closure
-> и production activation delivery readiness (§3.4a/§3.9/§3.9a там) — при
-> мерже обеих веток в `dev` эту шапку и §2/§5/§7/§8 нужно свести вручную.
+> Note: этот файл написан из ветки `feat/routes-review-publication` (worktree
+> `mamago2-routes-review`, branched off `feat/events-tail-import` @
+> `525aedec`, which itself branches off `dev`). Отдельная ветка
+> `fix/admin-article-preview-routing` независимо содержит ещё не смерженные
+> обновления по Users manual/privileged closure и production activation
+> delivery readiness (§3.4a/§3.9/§3.9a там) — при мерже веток в `dev` эту
+> шапку и §2/§5/§7/§8 нужно свести вручную.
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -55,7 +57,7 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Migration engine | COMPLETE | Regression и production validation |
 | Places | CORE COMPLETE | Media, production validation, public/city audit |
 | Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution, media, backlog H/I |
-| Routes | IMPORTED 14/14 | Review, publish, slug history, redirects, public validation |
+| Routes | **COMPLETE** — 14/14 lineage accounted for, 13/13 reviewed Routes PUBLISHED, 1 CITY_BLOCKED (Mogilev) kept DRAFT | Mogilev City onboarding backlog (см. §5.4); Route images remain intentionally not imported (media policy) |
 | Events | **COMPLETE** — 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED + 1 protected legacy PUBLISHED | Founder disposition for 1 EXPIRED source (`64159`, left PENDING); `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0, backlogged, see §5.3); Event images (P1, frozen out-of-scope) |
 | Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
 | Users activation architecture | COMPLETE | Production email provider, rehearsal и delivery Go/No-Go |
@@ -472,13 +474,177 @@ implementation.
 
 Event images остаются вне frozen P0 scope.
 
-### 5.4 Routes
+### 5.4 Routes — COMPLETE: 14/14 lineage accounted for, 13/13 reviewed Routes PUBLISHED
 
-- [ ] Ручной review 14/14.
-- [ ] Stops, descriptions, RouteStop images и city mappings.
-- [ ] Publish approved Routes.
-- [ ] Slug history и redirect map.
-- [ ] Public URL validation.
+```text
+worktree:                  mamago2-routes-review, branch feat/routes-review-publication
+base:                      feat/events-tail-import @ 525aedec (contains all 3 Events tail commits)
+aggregate read-only audit: 14/14 active ROUTE lineage records, 14/14 Route rows exist
+                           (buildRouteEditorialReview, already-existing tooling from
+                           commit 2e0df3b6, first run 2026-07-13, rerun live 2026-07-28)
+classification:            13 x READY (after editorial review, see below), 1 x CITY_BLOCKED
+                           (Mogilev, wordpress-db:routes:46963 — found already
+                           status=PUBLISHED/visibility=PUBLIC/cityId=null in shared local
+                           DB, pre-existing anomaly from outside this session, not created
+                           by this slice)
+```
+
+Editorial copy review (13 routes, 86 RouteStop notes, one aggregated pass):
+
+```text
+method:              every stop's source note read in full and compared against the
+                      existing auto-shortener's proposal (proposeShortRouteStopNote,
+                      >300 chars -> first 1-3 sentences)
+finding:              the auto-shortener systematically drops the practical tail of
+                      almost every stop (contact phone, address, price, opening hours,
+                      coordinates, safety warnings) because that content sits after the
+                      narrative lead-in — unusable as-is under the "never change
+                      prices/hours/addresses/age limits/warnings" rule
+classification:       ACCEPT_SHORT 2, KEEP_FULL 84, EDIT_SHORT 0, BLOCKED 0
+mojibake fixes:       12 RouteStop rows (11 distinct single-byte corruptions, one route
+                      had 2 separate corrupted stops) — e.g. "сре��а" -> "среда",
+                      "Брас��авский" -> "Браславский"; unambiguous from Russian
+                      grammar/context, restores meaning, invents no new fact
+final write scope:    ONLY the 12 mojibake-affected RouteStop.note rows written
+                      (byte-identical exact-substring replacement); the other 74 stops
+                      left byte-identical in DB — no whitespace/paragraph normalization
+                      applied to avoid unrelated writes (narrowed from an earlier,
+                      broader 86-row whitespace-cleanup proposal after review)
+manifests:            docs/migration/reviews/route-review-2026-07-28.md/.json (live audit),
+                      docs/migration/reviews/route-apply-plan-2026-07-28.json (applied plan),
+                      docs/migration/reviews/route-note-diff-manifest-2026-07-28.json
+                      (per-stop before/after hash + NOOP/UPDATE action for all 86 stops)
+```
+
+Publication (existing reviewed tooling, `scripts/migration-apply-route-review.ts` /
+`applyRouteReviewPlan`, guarded per-route transaction, stop-on-first-error):
+
+```text
+dry run:              13/13 DRY_RUN, 0 SKIPPED/FAILED
+apply:                13/13 APPLIED — Route.status DRAFT->PUBLISHED,
+                      Route.visibility PRIVATE->PUBLIC, authorId remains null (unchanged)
+                      + the 12 mojibake RouteStop.note updates in the same transaction
+seo canonical sync:   syncRouteCanonical() (existing exported helper, same one the real
+                      admin publish endpoint calls) run for all 13 — 13/13 UPDATE
+                      (null -> /routes/<slug> canonical), search index upserted
+                      synchronously and confirmed isPublished:true per route
+idempotency rerun:    re-running the identical apply plan -> 13/13 SKIPPED
+                      (ROUTE_STATUS_CHANGED:PUBLISHED), 0 writes — deterministic
+```
+
+Mogilev (`wordpress-db:routes:46963`) — CITY_BLOCKED, kept out of public state:
+
+```text
+found:                already status=PUBLISHED/visibility=PUBLIC/cityId=null in the
+                      shared local DB before this session touched anything
+city check:           read-only exact lookup confirmed no City "Могилёв" exists
+                      (only Минск, Марьина Горка, and 3 inactive villages) — no City
+                      created, no cityId assigned, per explicit decision not to expand
+                      geography inside this Routes slice
+action:               UNPUBLISH_TO_NON_PUBLIC_STATE via a bounded script that reuses
+                      the exact same operations as the existing admin lifecycle
+                      endpoint (PATCH /api/admin/routes/[id] { publish:false }):
+                      prisma.route.update({ data: { status: DRAFT } }) — visibility
+                      untouched, matching that endpoint's own behavior — plus
+                      syncRouteCanonical(); guarded by an explicit before-state assert
+                      (PUBLISHED/PUBLIC/cityId null/authorId null) that aborts on
+                      mismatch
+preserved:            content, all 4 RouteStops, media, slug (marshrut-mogilev),
+                      authorId (null), MigrationLineage — all byte/value-identical
+                      before/after (asserted programmatically)
+verified:              status=DRAFT, visibility unchanged=PUBLIC (status alone gates
+                      public visibility — listPublicRoutes/listPublicRoutesByCity/
+                      getRouteBySlug's page-level canViewRoute() all require
+                      status===PUBLISHED AND visibility===PUBLIC), SearchDocument
+                      isPublished:false, absent from listPublicRoutesByCity(Минск),
+                      public page canViewRoute() returns false for anonymous users on
+                      a non-PUBLISHED route -> notFound() (404)
+backlog:              Mogilev City onboarding — City creation/configuration, slug,
+                      country, discovery, SEO, sitemap, redirects, public smoke —
+                      requires a separate founder-approved geography-expansion
+                      decision; this Route is not a failed/incomplete CREATE, it is
+                      imported and lineage-accounted-for, only excluded from
+                      publication
+```
+
+Cumulative audit (post-batch):
+
+```text
+active ROUTE lineage:       14 (unchanged)
+duplicate sourceRecordKey:  0
+duplicate lineage targetId: 0
+Route rows total:           14 (unchanged, 0 CREATE, 0 DELETE)
+published/public:           13
+draft:                      1 (Mogilev)
+duplicate city+slug pairs:  0
+non-null authorId:          0 (all editorial, ownership untouched)
+RouteStop rows total:       90 (unchanged, 0 CREATE, 0 DELETE)
+orphan RouteStops:          0 (routeId is a required FK — structurally impossible)
+RouteSlugHistory rows:      0 (unchanged — no slug was touched)
+```
+
+Public validation — service layer AND live browser smoke, both done:
+
+```text
+service layer:               listPublicRoutesByCity -> exactly the 13 published
+                            routes, Mogilev absent; canViewRoute -> anonymous users
+                            get notFound() for any status!==PUBLISHED route
+live browser smoke:          done against the already-running main-repo dev server
+                            (localhost:3000, same shared local DB) — this worktree's
+                            own server couldn't bind (Next dev lock shared with main
+                            repo dir), so the running instance was reused read-only
+  13 public URLs:             all -> HTTP 200 (curl-verified)
+  Mogilev URL:                 HTTP 404, real Next 404 page content confirmed
+                              (not a soft-404)
+  discovery listing (/routes): exactly 13 cards, titles correct, stop counts sum to
+                              86 (matches DB), Mogilev absent
+  stop order/content:          verified on 2 routes (6-stop "Дрозды", 9-stop
+                              "Новогодний") — order, titles, note text render
+                              correctly and in sequence
+  console/hydration errors:    0 across all pages checked (detail x2, listing,
+                              Mogilev 404)
+  mobile viewport (375x812):   renders correctly, no layout breakage
+  desktop viewport:            renders correctly
+  images:                      no broken images — expected, since 0/90 RouteStops
+                              have photoUrl (pre-existing media policy, unchanged)
+  robots meta:                 "noindex, nofollow" on every page — confirmed this is
+                              the existing site-wide src/lib/seo/globalNoindex.ts
+                              dev/local switch (see checklist §5.9 "noindex switch"),
+                              not Route-specific, not caused by this session
+```
+
+Two genuine gaps found during smoke — pre-existing, not introduced by this session
+(this session never touched `lat`/`lng`/`address`/`seoCanonicalUrl`-consumption code),
+recorded as backlog, do not block the COMPLETE status below:
+
+```text
+1. Canonical <link> missing in HTML: RouteDetailPage's generateMetadata() never reads
+   Route.seoCanonicalUrl (the field syncRouteCanonical() correctly computed and wrote
+   for all 13+Mogilev) — only city/event listing pages set `alternates.canonical`.
+   Route detail pages have emitted no canonical tag since this code was written,
+   before this session. Backlog: add `alternates: { canonical: db.seoCanonicalUrl }`
+   to RouteDetailPage generateMetadata.
+2. Map polyline is meaningless on every Route page: 0/90 RouteStops (all 13
+   published + Mogilev) have lat/lng/address populated, despite source notes
+   containing embedded "Координаты: ..." text — coordinates were never parsed into
+   RouteStop columns during the original WordPress import (pre-existing migration
+   gap, this session only touched the `note` field). The map widget falls back to
+   drawing a nonsensical line across the country. Backlog: RouteStop geo-enrichment
+   from source coordinates, separate migration slice.
+```
+
+- [x] Ручной review 14/14 (13 editorial + 1 CITY_BLOCKED classification).
+- [x] Stops, descriptions review; RouteStop images intentionally not imported (media
+      policy METADATA-skip, pre-existing decision, INFO-level warning only, not a
+      blocker); city mappings verified for 13/13 published (Минск, evidence-based).
+- [x] Publish approved Routes — 13/13 PUBLISHED/PUBLIC.
+- [ ] Slug history и redirect map — no slug changes occurred (0 RouteSlugHistory rows,
+      expected); legacy WordPress URL -> new slug redirect mapping for these 14 Routes
+      not separately re-verified against the 893-row WP redirect manifest this session.
+- [x] Public URL validation — verified at both the service/access-control layer AND
+      live browser smoke (13/13 URLs 200, Mogilev 404, discovery correct, 0 console
+      errors, mobile+desktop render clean). Two pre-existing, non-blocking gaps found
+      and backlogged (canonical `<link>`, RouteStop coordinates) — see §6.
 
 ### 5.5 Places, Offers, Articles и media
 
@@ -540,6 +706,19 @@ Event images остаются вне frozen P0 scope.
 
 ## 6. Не входит в обязательный P0 без отдельного решения
 
+- Mogilev City onboarding (`wordpress-db:routes:46963`, Route `marshrut-mogilev`) —
+  City creation/configuration, slug, country, discovery, SEO, sitemap, redirects,
+  public smoke; Route stays DRAFT until this is a separate founder-approved decision.
+- Route stop images (`ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED`) — media policy
+  decision, not imported for any of the 14 Routes; separate media gate if revisited.
+- Route detail page canonical `<link>` — `RouteDetailPage`'s `generateMetadata()`
+  never reads `Route.seoCanonicalUrl`; found via browser smoke, pre-dates this
+  session. Small, isolated frontend fix, not a migration/data issue.
+- RouteStop geo backfill — 0/90 RouteStops (all 14 Routes) have `lat`/`lng`/`address`
+  populated even though source notes contain embedded coordinates as text; the
+  public map widget renders a meaningless line as a result. Pre-existing gap from
+  the original WordPress Route import, found via browser smoke. Separate migration
+  slice (parse "Координаты: ..." out of source notes into RouteStop columns).
 - Past Events и Event images.
 - 63 expired Activities и связанная authorship — `P1_HISTORICAL_EXPIRED_ACTIVITY`.
 - Noncanonical Offer class I.
@@ -564,19 +743,20 @@ Overall strict prelaunch:        ~62–66% complete
 Remaining strict P0 work:        ~34–38%
 ```
 
-Почему остаток всё ещё крупный: самые рискованные Users identity/ownership writes уже закрыты, но впереди production activation provider, Events tail, Routes review, media, SEO/regressions и весь RC/cutover цикл.
+Почему остаток всё ещё крупный: самые рискованные Users identity/ownership writes, Events tail и Routes review уже закрыты, но впереди media/SEO/regressions и весь RC/cutover цикл.
 
-Крупных P0-блоков остаётся **9**:
+Крупных P0-блоков остаётся **7**:
 
 1. Editorial closure двух Articles: city/geo, publication, blog visibility и cover/media decision.
-2. Users production activation и manual dispositions.
-3. Events tail.
-4. Routes review/publish.
-5. Places/Offers/Article content и media closure.
-6. Reviews либо явный P1 defer.
-7. Redirects/pages/SEO.
-8. Product regression suite.
-9. RC rehearsal и production cutover.
+2. Users production activation (real bulk send, gated on final Go/No-Go).
+3. Places/Offers/Article content и media closure.
+4. Reviews либо явный P1 defer.
+5. Redirects/pages/SEO.
+6. Product regression suite.
+7. RC rehearsal и production cutover.
+
+Закрыто с прошлой ревизии: Events tail (COMPLETE), Routes review/publish (COMPLETE,
+13/13 published, Mogilev correctly excluded pending City decision).
 
 Ориентир по объёму работы:
 
@@ -591,28 +771,46 @@ Remaining strict P0 work:        ~34–38%
 ## 8. Следующее одно действие
 
 ```text
-Phase: EVENTS tail — CLOSED. Next: ROUTES review 14/14 (см. §5.4)
-Prerequisite (COMPLETE): all 9 eligible + 1 legacy Event confirmed already
-  CREATE'd (10/10 lineage records accounted for); two Event UPDATE
-  regressions (cityId clobber, status reset to PENDING) root-caused, fixed
-  in EventCommitWriter.ts, regression-tested (8 new tests); new
-  migration:events:sessions-resync capability built, tested (17 tests
-  across 3 files), and used to close the 3 records the old commit CLI's
-  SKIP_UNCHANGED path structurally couldn't rebuild; 8/8 publishable
-  eligible Events published (+ 1 pre-existing protected legacy PUBLISHED);
-  common resync-tool rerun 8/8 NOOP_ALREADY_SYNCED, 0 writes; a P0
-  search-indexing race found, reproduced twice, root-caused, and
-  backlogged (current data repaired, code fix out of scope — see §5.3).
-Targets: none remaining for Events CREATE/publish. Two open items, neither
-  blocks Routes: (1) wordpress-db:events:64159 (source post no longer
-  published on WP at all, deliberately excluded from publication) needs a
-  founder disposition decision (hard-exclude vs. leave PENDING
-  indefinitely); (2) EVENT_SEARCH_INDEX_PUBLICATION_RACE needs its own
-  scoped fix (touches shared search infra used by Places/Articles/Offers/
-  Routes too, not Events-specific).
-Migration writer/engine changes already made this session: scoped to
-  EventCommitWriter.ts (status/cityId UPDATE fix) + net-new, narrow
-  migration:events:sessions-resync tool (schedule-only write scope,
-  structurally cannot touch status/cityId/slug/title/owner/media/lineage).
-  No other engine behavior change.
+Phase: ROUTES review/publication — CLOSED. Next: Places/Offers/Article content
+  и media closure (см. §5.5)
+Prerequisite (COMPLETE): 14/14 Route lineage records accounted for; 86
+  RouteStop notes editorially reviewed (ACCEPT_SHORT 2, KEEP_FULL 84,
+  EDIT_SHORT 0, BLOCKED 0), 12 mojibake-only RouteStop.note rows corrected,
+  0 unrelated writes; 13/13 READY Routes PUBLISHED via existing
+  applyRouteReviewPlan tooling (guarded transaction, stop-on-first-error);
+  SEO canonical synced for all 13 via existing syncRouteCanonical(); Mogilev
+  (wordpress-db:routes:46963, cityId null, no matching City exists) moved
+  DRAFT via the same status-only operation the real admin
+  PATCH /api/admin/routes/[id] { publish:false } endpoint performs, content/
+  stops/media/slug/lineage preserved byte-identical; idempotency rerun
+  13/13 SKIPPED, 0 writes; cumulative audit clean (0 duplicate lineage/slug,
+  0 orphan RouteStops, 0 CREATE, 0 DELETE).
+Two open items carried over from Events, neither blocks the next phase:
+  (1) wordpress-db:events:64159 needs a founder disposition decision
+  (hard-exclude vs. leave PENDING indefinitely); (2)
+  EVENT_SEARCH_INDEX_PUBLICATION_RACE needs its own scoped fix (shared
+  search infra, not Events-specific — Routes' synchronous
+  syncRouteCanonical()-triggered index upsert did NOT reproduce the race in
+  this single-threaded batch, but that is not proof it's absent under
+  concurrent load; still backlogged, not re-investigated this session).
+New open items from this session: (1) Mogilev City onboarding backlog (see
+  §5.4 and §6) — requires a separate founder-approved geography-expansion
+  decision before this Route can publish; (2) Route detail page canonical
+  `<link>` missing (see §6), isolated frontend fix; (3) RouteStop geo
+  backfill (see §6), separate migration slice.
+Live in-browser smoke: DONE, against the already-running main-repo dev
+  server (same shared local DB) since this worktree's own server could not
+  bind (Next.js dev lock shared with the main repo directory). 13/13 URLs
+  200, Mogilev 404 confirmed with real content, discovery listing exactly
+  13 with correct stop-count sum (86), 0 console/hydration errors,
+  mobile+desktop render clean. Two pre-existing gaps found in the process
+  (items 2/3 above) — not introduced by this session, not blocking.
+No migration writer/engine code changes were needed for Routes — 100%
+  existing, already-reviewed tooling reused (buildRouteEditorialReview,
+  applyRouteReviewPlan, syncRouteCanonical). One bounded one-off script was
+  used to run the canonical sync + Mogilev unpublish and then deleted after
+  execution — its action is fully captured in this checklist and in
+  docs/migration/reviews/route-*-2026-07-28.{json,md}, so keeping the
+  script itself added no further audit value and it had no reusability
+  (hardcoded IDs from this one run).
 ```
