@@ -140,11 +140,11 @@ function applySnapshot(setters: {
 
 export function ArticleEditorClient({
   initial,
-  isAdminEditor = false,
+  canModerate = false,
 }: {
   initial: ArticleEditorSnapshot;
-  /** ADMIN: кнопка «Опубликовать» и прямой publish; MODERATOR: «Отправить на модерацию». */
-  isAdminEditor?: boolean;
+  /** Только ADMIN/MODERATOR видят решения по статье в статусе PENDING. */
+  canModerate?: boolean;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -628,22 +628,14 @@ export function ArticleEditorClient({
         if (!ok) return;
       }
 
-      const res = isAdminEditor
-        ? await fetch(`/api/admin/articles/${articleId}/moderate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ decision: "publish" }),
-          })
-        : await fetch(`/api/admin/articles/${articleId}/submit`, { method: "POST" });
+      const res = await fetch(`/api/admin/articles/${articleId}/submit`, { method: "POST" });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const msg =
           typeof data.error === "string"
             ? data.error
-            : isAdminEditor
-              ? "Не удалось опубликовать"
-              : "Не удалось отправить на модерацию";
+            : "Не удалось отправить на модерацию";
         setError(msg);
         toast.error(msg);
         return;
@@ -655,12 +647,7 @@ export function ArticleEditorClient({
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
       }
-      showArticleSuccess(
-        isAdminEditor ? "published" : "submitted",
-        articleId,
-        next,
-        Boolean(initial.id.trim()),
-      );
+      showArticleSuccess("submitted", articleId, next, Boolean(initial.id.trim()));
       router.replace(`/admin/content/articles/${articleId}/edit`);
       router.refresh();
     } catch (e) {
@@ -676,7 +663,6 @@ export function ArticleEditorClient({
     fetchSnapshot,
     persistComparableFromSnapshot,
     router,
-    isAdminEditor,
     validateGeoScopeForPublish,
     applyEditorSnapshot,
     showArticleSuccess,
@@ -688,6 +674,10 @@ export function ArticleEditorClient({
       setError(null);
       setModerating(true);
       try {
+        if (decision === "publish") {
+          const saved = await save({ silent: true, skipLoading: true });
+          if (!saved) return;
+        }
         const res = await fetch(`/api/admin/articles/${initial.id}/moderate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -729,6 +719,7 @@ export function ArticleEditorClient({
       validateGeoScopeForPublish,
       applyEditorSnapshot,
       showArticleSuccess,
+      save,
     ],
   );
 
@@ -1021,12 +1012,13 @@ export function ArticleEditorClient({
         onAuthorChange={setAuthorUserId}
         authorLabel={authorLabel}
         onAuthorLabelChange={setAuthorLabel}
-        isAdminEditor={isAdminEditor}
+        canModerate={canModerate}
+        hasUnsavedChanges={dirty}
         actionsBusy={actionsBusy}
         submitting={submitting}
         saving={saving}
         moderating={moderating}
-        onPublish={() => void submitForModeration()}
+        onSubmitForModeration={() => void submitForModeration()}
         onSaveDraft={() => void save()}
         onApprove={() => void moderate("publish")}
         onReject={() => void moderate("reject")}

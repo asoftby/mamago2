@@ -16,6 +16,7 @@ const SYSTEM_CLOCK: UserActionTokenClock = {
 };
 
 export type IssueUserActionTokenResult = {
+  id: string;
   token: string;
   expiresAt: Date;
 };
@@ -86,7 +87,7 @@ export async function issueUserActionToken(
 
   for (let attempt = 1; attempt <= ISSUE_TRANSACTION_MAX_ATTEMPTS; attempt += 1) {
     try {
-      await prisma.$transaction(
+      const tokenId = await prisma.$transaction(
         async (tx) => {
           const user = await tx.user.findUnique({
             where: { id: params.userId },
@@ -111,13 +112,14 @@ export async function issueUserActionToken(
             data: { invalidatedAt: now },
           });
 
-          await tx.userActionToken.create({
+          const created = await tx.userActionToken.create({
             data: {
               userId: params.userId,
               purpose: params.purpose,
               tokenHash,
               expiresAt,
             },
+            select: { id: true },
           });
 
           await tx.adminAuditLog.create({
@@ -133,11 +135,13 @@ export async function issueUserActionToken(
               },
             },
           });
+
+          return created.id;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 
-      return { token: rawToken, expiresAt };
+      return { id: tokenId, token: rawToken, expiresAt };
     } catch (error) {
       if (attempt < ISSUE_TRANSACTION_MAX_ATTEMPTS && isRetryableTransactionError(error)) {
         continue;

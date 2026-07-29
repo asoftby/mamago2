@@ -2,20 +2,11 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-29 (Places/Offers LOCAL publication closure session + refinement pass)  
-**Base:** `dev` @ `b30325f5` — PR #93 merged (via `feat/events-tail-import` @ `525aedec`, then `feat/routes-review-publication` @ `657c6c59`, then `feat/places-offers-production-media-closure` @ `74bcb483`)  
-**Текущая фаза:** `PLACES/OFFERS LOCAL PUBLICATION CLOSURE — COMPLETE, refined for precision.` `PLACE_CANONICAL_METADATA_MISSING` fixed and marked **RESOLVED LOCAL** (requires revalidation on the integrated RC). 76/76 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW` Places published via the existing `approvePlace()` lifecycle (81/83 total PUBLISHED; 2 `CITY_BLOCKED` correctly remain `PENDING`; 4 protected + 1 seed untouched). New `submitOfferForModeration()` lifecycle service implemented (none existed before); all 63 safe-canonical Offers taken `DRAFT → PENDING → PUBLISHED` through it + the existing `approveOffer()` — never the privileged direct-publish shortcut. Found and fixed a real broken-image defect in the shared fallback image (`public/og-default.jpg` was a 49-byte text stub, not a real image — used by both Offer and Event fallback rendering) before approving `OFFER_MEDIA_DEFERRED_P1`. Both entities: 0 unexpected CREATE/DELETE, 0 media/storage writes, 0 production writes. **Refinement correction**: the idempotency reruns are precisely `ALREADY_PUBLISHED_CANONICAL_AND_INDEX_RESYNC` for both entities, not a bare "0 writes" — `syncPlaceCanonical()`/`syncOfferCanonical()` and `SearchIndexerService.upsert*()` write unconditionally on every call (no before/after diff), so canonical-table and search-index rows do get touched (value-neutral, timestamp-only) even though 0 lifecycle/content/relation fields change. Authenticated business/admin UAT and the Offer CTA end-to-end request were **not performed** (no safe local credentials; declared `NOT PERFORMED`/`UAT PENDING` rather than assumed PASS) — only unauthenticated auth-gate checks and CTA UI-rendering smoke were done. Articles remain `COMPLETE` (§3.6-3.8, confirmed unchanged, not reopened). See §5.5 for full detail.  
-**Текущий кандидат для следующего шага:** (1) Fix `ROUTE_CANONICAL_METADATA_MISSING`, `ROUTE_MAP_WITHOUT_VALID_COORDINATES` (minimum: hide/replace the map when fewer than 2 valid RouteStop coordinate points — full coordinate backfill is a separate, non-blocking opportunity), and `EVENT_SEARCH_INDEX_PUBLICATION_RACE`; (2) manually integrate the Articles/Users/UAT branch, Events branch, Routes branch, and Places/Offers branches into one integrated RC worktree; (3) repeat the critical browser/runtime proof from that integrated RC (addressing every `BROWSER_PROOF_REVALIDATION_REQUIRED_ON_INTEGRATED_RC` note below); (4) run UAT Pass 1. Founder decisions on the 2 `CITY_BLOCKED` Places (32409/60742), Mogilev City onboarding, and `wordpress-db:events:64159` disposition may proceed in parallel and must not block the path above.  
-**Текущий gate:** `PLACES_OFFERS_LOCAL_PUBLICATION_COMPLETE` (both entities' safe/ready scope is live in the shared local DB, verified with precise rerun/provenance semantics; city-blocked disposition and production execution remain separately gated; integrated-RC browser revalidation still required before RC)
-
-> Note: этот файл написан из ветки `feat/places-offers-production-media-closure`
-> (worktree `mamago2-places-offers-closure`, branched off
-> `feat/routes-review-publication` @ `657c6c59`, which itself branches off
-> `feat/events-tail-import` @ `525aedec`, which branches off `dev`).
-> Отдельная ветка `fix/admin-article-preview-routing` независимо содержит ещё
-> не смерженные обновления по Users manual/privileged closure и production
-> activation delivery readiness (§3.4a/§3.9/§3.9a там) — при мерже веток в
-> `dev` эту шапку и §2/§5/§7/§8 нужно свести вручную.
+**Обновлено:** 2026-07-29 — integrated RC assembly
+**RC:** `release/integrated-rc`, base `ed5763c2`, source `fix/admin-article-preview-routing@532fd04d`
+**Текущая фаза:** `INTEGRATED RC — CODE/HISTORY ASSEMBLY`
+**Текущий кандидат для следующего шага:** technical verification and representative runtime proof on the exact integrated RC SHA, then SEO MIGRATION CLOSURE.
+**Текущий gate:** `TECHNICAL VERIFICATION PENDING`; SEO closure and UAT Pass 1 remain mandatory launch gates.
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -56,22 +47,23 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Трек | Статус | Что остаётся |
 | --- | --- | --- |
 | Migration engine | COMPLETE | Regression и production validation |
-| Places | **LOCAL PUBLICATION COMPLETE** — 81/83 PUBLISHED (4 protected + 76 newly published + 1 seed), 2 CITY_BLOCKED remain PENDING, `PLACE_CANONICAL_METADATA_MISSING` fixed, 76/76 idempotency rerun clean | Disposition of the 2 CITY_BLOCKED Places; production execution (manifest deferred to cutover) |
-| Offers | **SAFE SCOPE LOCAL PUBLICATION COMPLETE 63/63** — new `submitOfferForModeration()` lifecycle, DRAFT→PENDING→PUBLISHED via existing `approveOffer()`, media P1 defer approved after fixing a real broken-image asset bug, 63/63 idempotency rerun clean | Production execution (manifest deferred to cutover); backlog H/I (28/8, unchanged, by design) |
-| Routes | **COMPLETE** — 14/14 lineage accounted for, 13/13 reviewed Routes PUBLISHED, 1 CITY_BLOCKED (Mogilev) kept DRAFT | Mogilev City onboarding backlog (см. §5.4); Route images remain intentionally not imported (media policy) |
-| Events | **COMPLETE** — 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED + 1 protected legacy PUBLISHED | Founder disposition for 1 EXPIRED source (`64159`, left PENDING); `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0, backlogged, see §5.3); Event images (P1, frozen out-of-scope) |
-| Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
-| Users activation architecture | COMPLETE | Production email provider, rehearsal и delivery Go/No-Go |
+| Places | **LOCAL PUBLICATION COMPLETE** — 80/80 publishable lineage PUBLISHED (4 protected + 76 newly published); 2 CITY_BLOCKED remain PENDING; 1 non-lineage seed accounted separately | Disposition of 2 CITY_BLOCKED Places; production execution; integrated-RC revalidation |
+| Offers | **SAFE-SCOPE LOCAL PUBLICATION COMPLETE 63/63** — moderation lifecycle used; media explicitly deferred P1 | Authenticated owner/admin UAT and CTA end-to-end; production execution; backlog H/I |
+| Routes | **COMPLETE** — 14/14 lineage accounted for, 13/13 reviewed Routes PUBLISHED, 1 CITY_BLOCKED kept DRAFT; canonical and map-guard P0 fixes RESOLVED LOCAL | Integrated-RC revalidation; Mogilev onboarding backlog |
+| Events | **COMPLETE** — 10/10 lineage accounted for, 8/8 publishable eligible PUBLISHED + 1 protected legacy PUBLISHED; final publication indexing race RESOLVED LOCAL | Integrated-RC revalidation; founder disposition for expired source 64159; Event images P1 |
+| Users migration | **COMPLETE 578/578** — clean 564/564 + manual/privileged 14/14; all migrated users `PENDING_ACTIVATION`; role/ownership audit complete | Production activation delivery |
+| Users activation | **LOCAL/REHEARSAL COMPLETE; PRODUCTION DELIVERY GATED** | Resend production secrets, verified sending domain, final manifest/checksum, canary, sequential batches, bounce/failure reconciliation and production proof |
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
-| Users manual/privileged | PLANNED 15 | 5 founder decisions, 9 exclusions, 1 existing ADMIN unchanged |
+| Users manual/privileged | **COMPLETE 14/14** | 1 existing ADMIN unchanged, 13 `USER`, 1 `BUSINESS_OWNER` (user:129, exact 9-Place ownership); rerun 14×`SKIP_UNCHANGED`, 0 deltas |
 | Activities | P0 CLOSED | 63 expired Events → `P1_HISTORICAL_EXPIRED_ACTIVITY` |
-| Content authorship | SLICE 18 COMPLETE 1/2 | `post:56250` migrated (`authorUserId: null`); Slice 19 migrates `post:57731`, затем authorship reconciliation/write |
+| Articles / authorship | **ARTICLES COMPLETE** — 2/2 target Articles, exact authorship, common rerun `ALREADY_SATISFIED`, public rendering verified | Integrated-RC revalidation only |
 | User/Business profile media | NOT STARTED | P0/P1 decision, manifest, proof, production gate |
-| Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
+| Article media | **PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS** | Source 404 gaps documented; placeholders absent; do not reopen without regression evidence |
 | Reviews | NOT STARTED | Реализовать либо явно defer в P1 |
 | Redirects/pages/SEO | PARTIAL | Exact redirects, pages, canonical/sitemap/robots/noindex audit |
 | SEO MIGRATION CLOSURE | **MANDATORY LAUNCH GATE — NOT STARTED** | Full baseline, URL mapping, integrated-RC crawl, cutover runbook, monitoring and founder SEO Go/No-Go. **Launch is prohibited until this gate passes.** |
 | Product regressions | PARTIAL | Event discovery/404, Article city visibility, full smoke |
+| Full product acceptance / UAT | **NOT STARTED** | Pass 1, defect cycle, Pass 2, founder acceptance |
 | RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, production migration, DNS |
 
 ---
@@ -113,6 +105,39 @@ production Offer execution: not started
 - [x] Clean local scope: 564/564.
 - [x] Common rerun: 564 `SKIP_UNCHANGED`.
 - [x] Migrated Users remain `PENDING_ACTIVATION`, without password/session/token/provider writes.
+
+### 3.4a Users manual/privileged — founder-final disposition, fully closed
+
+Founder rule (final, overrides all prior manual/privileged dispositions that
+excluded or deferred purely on legacy WordPress role): Administrator/
+Editor/Author capabilities are never inherited; the only kept ADMIN is the
+existing founder account; every other legacy user migrates as `USER` unless
+a fresh, exact, proven Place ownership resolves `BUSINESS_OWNER`.
+
+```text
+kept unchanged:     wordpress-db:user:1 (existing ADMIN, no lineage, untouched)
+                    wordpress-db:user:521, wordpress-db:user:91 (already USER/PENDING_ACTIVATION)
+migrated:           14/14 — wordpress-db:user:{4,6,14,16,21,27,51,52,108,123,129,134,438,439}
+new snapshot:       bounded, exact-key, read-only WP capture (14 users only) —
+                    the original 579-user raw snapshot is lost (see §3.7);
+                    fixed manifest: docs/migration/users-manual-privileged-14-manifest.json
+role outcome:       13 × USER/PENDING_ACTIVATION; 1 × BUSINESS_OWNER (user:129)
+ownership evidence: only user:129 had published `places` authorship (9 posts,
+                    all exact, full lineage coverage) — reused the existing
+                    Slice 7/9 golden mechanisms unmodified
+                    (planBusinessOwnershipGolden/writeBusinessOwnershipGolden,
+                    planRoleElevationGolden/writeRoleElevationGolden)
+first run deltas:   User +14, Business +1, MigrationLineage +15, MigrationRecord +15,
+                    ADMIN +0, Session +0, UserActionToken +0, Place row count +0
+                    (existing Place rows re-owned, none created/deleted)
+rerun:              14 × SKIP_UNCHANGED; ownership/role re-check: 0 deltas everywhere
+```
+
+- [x] No legacy WordPress role ever consulted for classification or exclusion.
+- [x] `wordpress-db:user:1` left with zero lineage, zero writes — founder's
+      existing ADMIN account untouched (personal email omitted from proof).
+- [x] No password, session, token, or activation email ever written.
+- [x] No content authorship touched in this slice.
 
 ### 3.4 Business-linked Users — fully closed
 
@@ -193,6 +218,120 @@ written Article:  status PENDING, cityId null, geoScope null,
       scope for this MVP writer, same as every other entity's first
       golden write).
 
+### 3.9 Users production activation readiness (email delivery)
+
+No production email sent. Reused 100% of the existing foundation (request/
+complete endpoints, hash-only `UserActionToken`, pending-activation
+lifecycle, rate limiting, `activationEmailGate.ts`'s env gate) — no second
+activation flow.
+
+```text
+provider:          Resend, via existing emailService — new adapter is
+                   src/server/auth/activationEmailDelivery.ts
+                   (deliverMigratedAccountActivationEmail), wired into
+                   POST /api/auth/activation/request (previously discarded
+                   both the issued raw token and the gate result)
+gate:              resolveActivationEmailDelivery() — renamed its
+                   always-returned "PROVIDER_UNAVAILABLE" placeholder to
+                   "DELIVERY_ALLOWED" now that a provider exists; requires
+                   NODE_ENV=production AND APP_ENV=production AND
+                   MIGRATED_USER_ACTIVATION_EMAIL_ENABLED=true AND
+                   MIGRATED_USER_ACTIVATION_EMAIL_PRODUCTION_APPROVED=true
+kill switch:       either flag back to false, effective next request
+manifest:          578/578 eligible, 0 exclusions, hash
+                   56c0a18295d8aacf155bfb98182cd26cf1f8064c868e9d578e743627623a49a1
+                   (docs/migration/users-production-activation-manifest.json)
+rehearsal:         fake/sandbox transport + injected gate-environment —
+                   proved LOCAL/DEV hard-disable (incl. against this shell's
+                   real env), production-approved send path, token secrecy,
+                   one-time-use, expiry, invalid token, already-activated
+                   rejection, rate limiting, ADMIN/roles untouched; 0 real
+                   sends, 0 DB residue after cleanup
+tests:             existing userActionToken.service.integration.test.ts +
+                   activationEndpoints.integration.test.ts re-run unchanged
+                   (both pass; one string literal updated for the gate
+                   rename); new activationEmailDelivery.rehearsal.test.ts
+tsc --noEmit:      clean
+```
+
+- [x] No password/session/token/provider write in this pass.
+- [x] `ADMIN` count and every migrated User's role confirmed unchanged.
+
+### 3.9a Migrated-user login detection, `/activate` page, delivery audit — product-complete
+
+Closed all three remaining product blockers from §3.9. No commit/push.
+
+```text
+login detection:   src/app/api/auth/login/route.ts — after the existing
+                   constant-time verifyLoginPassword() call (never skipped,
+                   preserves timing safety: a PENDING_ACTIVATION account
+                   costs exactly as much time as wrong-password/unknown-
+                   email), a PENDING_ACTIVATION account with isValid=false
+                   triggers requestMigratedAccountActivationByEmail(source:
+                   LOGIN_FLOW) and returns 200 {pendingActivation:true,
+                   message} instead of the generic 401. Zero visual/field/
+                   button changes — both call sites (useAuthCredentialsFlow,
+                   CompactSaveAuthPanel) reuse the existing error-message
+                   slot for the neutral text. No manifest scan, no WP call —
+                   only the already-fetched User.status.
+shared flow:       src/server/auth/activationRequestFlow.ts
+                   (requestMigratedAccountActivationByEmail) — extracted so
+                   /api/auth/activation/request and the login branch share
+                   one rate-limited lookup+issue+deliver+audit path; token
+                   issuance always happens regardless of delivery-gate
+                   state (fixed a bug caught by re-running the existing
+                   token-count assertion: an early version skipped issuance
+                   entirely in LOCAL/DEV).
+/activate page:    src/app/(auth)/activate/ — reads token from the URL into
+                   local state once (never re-read, never logged), calls a
+                   new read-only POST /api/auth/activation/status (hash
+                   lookup only, never consumes the token) to resolve
+                   VALID/EXPIRED/USED/INVALID/ALREADY_ACTIVE before showing
+                   the password form, then calls the existing POST
+                   /api/auth/activation/complete unchanged. States: loading,
+                   blocked (4 variants with distinct copy), form, success
+                   (offers login, does not auto-sign-in). Added "activate"
+                   to KNOWN_ROOT_SEGMENTS (wpLegacyCatchAll routing) — the
+                   page 404'd via the WP-legacy catch-all redirect until
+                   this was added; wpLegacyCatchAll.test.ts still passes.
+                   Name/terms-consent step skipped: no backend field exists
+                   for either, and normal registration doesn't collect them
+                   either — same static terms/privacy notice as AuthForm's
+                   register mode.
+delivery audit:    ActivationDeliveryAudit model + manual migration
+                   20260728090000_add_activation_delivery_audit — userId,
+                   sourceRecordKey (MigrationLineage lookup, best-effort),
+                   provider, recipientMask, template, requestedAt/
+                   attemptedAt/sentAt, providerMessageId, status
+                   (BLOCKED_ENVIRONMENT/BLOCKED_KILL_SWITCH/QUEUED/SENT/
+                   FAILED), errorCode, activationTokenId (FK to
+                   UserActionToken — hash reference, never the raw token),
+                   source (LOGIN_FLOW/MANUAL_REQUEST/PRODUCTION_BATCH). No
+                   raw token, no activation URL, no email body, no provider
+                   secret ever stored. Cascade-deletes with the User/token.
+tests:             new activationActivatePage.integration.test.ts (status +
+                   complete over real HTTP handlers: valid->complete->used,
+                   already-active, expired) and login/
+                   pendingActivation.integration.test.ts (PENDING_ACTIVATION
+                   branch, ACTIVE unaffected, wrong-password/unknown-email
+                   still identical generic 401); all pre-existing activation
+                   tests re-run unchanged and pass.
+verification:      real organic traffic on the shared local dev server
+                   (not my own test) exercised the login branch for two
+                   real migrated accounts and produced correctly-shaped
+                   BLOCKED_ENVIRONMENT audit rows (masked recipient, no raw
+                   token) — left untouched, not test residue.
+tsc --noEmit / git diff --check: clean.
+```
+
+- [x] Migrated-user login detection COMPLETE.
+- [x] `/activate` frontend COMPLETE.
+- [x] Delivery audit persistence COMPLETE.
+- [x] End-to-end activation flow rehearsal COMPLETE (no real email sent).
+- [ ] Production bulk delivery остаётся gated финальным Go/No-Go (только
+      RC SHA freeze, backup, canary, provider bounce-webhook wiring и
+      явное решение founder — см. delivery plan §4).
+
 ---
 
 ## 4. Текущий Articles/authorship critical path
@@ -250,15 +389,17 @@ Next slice: targeted authorship assignment for user:575 across both Articles,
 
 ### 5.2 Users production и activation
 
-- [ ] Подтвердить dispositions для 15 manual/privileged users:
-  - 1 existing ADMIN оставить неизменным;
-  - 9 exclusions подтвердить;
-  - 5 `REQUIRES_FOUNDER_DECISION` решить.
-- [ ] Интегрировать и проверить production email provider.
-- [ ] Сохранить LOCAL/DEV external delivery hard-disabled.
-- [ ] Подготовить production User manifest и checksums.
-- [ ] Провести production-like rehearsal Users + activation.
-- [ ] Подготовить controlled activation delivery после Go/No-Go.
+- [x] Manual/privileged Users dispositions — founder decisions COMPLETE (см. §3.4a):
+  - 1 existing ADMIN (`user:1`) unchanged;
+  - 14/14 остальных migrated: 13 `USER`, 1 `BUSINESS_OWNER` (`user:129`, exact ownership);
+  - `user:521`/`user:91` остаются USER/PENDING_ACTIVATION без изменений (P1 defer, см. §5.1).
+- [x] Production email provider integration COMPLETE — см. §3.9.
+- [x] LOCAL/DEV delivery hard-disable VERIFIED (re-checked against real shell env + rehearsal).
+- [x] Activation manifest PREPARED — 578/578 eligible, hash `56c0a18...49a1`.
+- [x] Production-like rehearsal COMPLETE — fake/sandbox transport, 0 real sends, 0 DB residue.
+- [x] Controlled delivery plan READY — [users-production-activation-delivery-plan.md](users-production-activation-delivery-plan.md).
+- [x] Migrated-user login detection, `/activate` frontend, delivery audit persistence — все COMPLETE (см. §3.9a). Оба прежних блокера закрыты.
+- [ ] Реальная production delivery остаётся gated финальным Go/No-Go — оставшиеся пункты: RC SHA freeze, production backup, canary batch, provider bounce/failure webhook (см. delivery plan §1/§4).
 - [ ] Решить P0/P1 для User/Business avatars и logos.
 
 ### 5.3 Events — COMPLETE: 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED
@@ -993,7 +1134,109 @@ backlog entry).
 
 ---
 
-## 6. Blockers classification — confirmed OPEN P0 vs decision/backlog
+## 6. FULL PRODUCT ACCEPTANCE / UAT — обязательный P0 gate
+
+Полная матрица, evidence contract и журнал выполнения:
+[full-product-acceptance.md](../prelaunch/full-product-acceptance.md).
+
+```text
+Full product acceptance / UAT: NOT STARTED
+Pass 1:                       NOT STARTED
+P0 defects:                   UNKNOWN
+Pass 2:                       NOT STARTED
+Founder acceptance:           NOT RECORDED
+```
+
+Source document: `docs/prelaunch/full-product-acceptance.md`.
+Authenticated BUSINESS_OWNER/MODERATOR/ADMIN execution is pending; CTA
+request-to-business receipt and response is pending end to end. UAT Pass 1
+must run on the integrated RC exact SHA. Older isolated browser proofs do not
+replace integrated-RC UAT evidence.
+
+Техническая готовность, успешная миграция и зелёный CI не являются
+достаточным доказательством готовности к запуску. Перед Go/No-Go должны быть
+вручную пройдены критичные пользовательские, бизнесовые и административные
+сценарии от начала до конца.
+
+Запуск запрещён при:
+
+- открытом P0 defect;
+- непройденном P0 user journey;
+- неизвестном результате критичного сценария;
+- расхождении UI, API и состояния БД;
+- недоказанной production rollback/restore процедуре.
+
+### UAT PASS 1 — full critical-flow acceptance
+
+Цель: найти реальные дефекты на сквозных пользовательских сценариях.
+
+После Pass 1:
+
+- зарегистрировать дефекты и классифицировать P0/P1/P2;
+- исправить все P0;
+- P1 исправить либо получить явный founder defer;
+- P2 отправить в backlog.
+
+### UAT PASS 2 — regression and founder acceptance
+
+Цель: повторно пройти все критичные flows после исправлений.
+
+Launch gate:
+
+- 0 открытых P0 defects;
+- нет неизвестных `BLOCKED` P0 scenarios;
+- все P1 имеют fix либо явное defer-решение;
+- production-only gates имеют подтверждённый план выполнения;
+- founder acceptance recorded.
+
+Если после Pass 2 исправлялись критичные flows, обязателен targeted Pass 3
+по затронутым областям и их зависимостям.
+
+Обязательный порядок фаз:
+
+```text
+migration completion
+→ content/public validation
+→ full product UAT Pass 1
+→ defect fixes
+→ UAT Pass 2
+→ RC rehearsal
+→ production Go/No-Go
+→ cutover
+```
+
+### P0 launch journeys
+
+1. `P0-J1` — новый пользователь регистрируется, входит и использует публичный продукт.
+2. `P0-J2` — мигрированный пользователь активирует аккаунт и входит.
+3. `P0-J3` — BUSINESS_OWNER создаёт Business → Place → Offer и отправляет на модерацию.
+4. `P0-J4` — ADMIN/MODERATOR проверяет и публикует контент.
+5. `P0-J5` — опубликованная сущность появляется в правильном городе и discovery.
+6. `P0-J6` — пользователь открывает сущность и отправляет заявку/бронирование.
+7. `P0-J7` — бизнес получает заявку и отвечает.
+8. `P0-J8` — пользователь получает ответ и видит актуальный статус.
+9. `P0-J9` — Event корректно работает с датами, sessions и завершением.
+10. `P0-J10` — основные public/admin/business flows работают на mobile и desktop.
+11. `P0-J11` — старые WordPress URL корректно перенаправляются.
+12. `P0-J12` — backup, restore, RC build и production migration gates подтверждены.
+
+Birthday/custom-request не включён в P0 автоматически: реализация присутствует
+частично (`Occasion`, birthday discovery, Direct/editorial request surfaces), но
+полный обещанный пользователю request → matching → proposals → selection flow
+не доказан. Нужен founder decision: `P0 BLOCKER` либо `P1 DEFER`.
+
+Reviews реализованы в schema/admin/public surfaces, но migration и сквозная
+приёмка не начаты: founder decision `P0` либо явный `P1 DEFER` остаётся gate.
+
+Production-ready пользовательский checkout/payment callback flow кодом не
+подтверждён. Billing ledger и административные credit/debit/refund операции не
+считаются таким flow. Нужен founder decision: payments вне launch P0 либо
+отдельный P0 blocker; реальные платежи в UAT запрещены.
+
+---
+
+
+## 7. Blockers classification — confirmed OPEN P0 vs decision/backlog
 
 **P0 launch blockers resolved locally; integrated RC revalidation required:**
 
@@ -1079,32 +1322,35 @@ Side findings from the bounded Route runtime audit:
 
 ---
 
-## 7. Сколько осталось до конца
+## 8. Раздельная оценка готовности
 
 Это операционная оценка, не календарное обещание:
 
 ```text
-Core migration mechanics:       ~82% complete
-Local clean data work:           ~73% complete
-Production/cutover readiness:    ~30% complete
-Overall strict prelaunch:        ~62–66% complete
-Remaining strict P0 work:        ~34–38%
+Implementation readiness:  ~80% — основные surfaces и guards существуют;
+                            ряд flows не подтверждён end-to-end.
+Migration readiness:       ~73% — Users закрыты локально; Events/Routes/media,
+                            production execution и audits остаются.
+Product UAT readiness:      ~10% — матрица определена, Pass 1 ещё не начат,
+                            фактический объём продуктовых дефектов неизвестен.
+Production readiness:      ~30% — activation rehearsal готов, но backup/restore,
+                            RC exact-SHA, providers и production gates не пройдены.
+Overall launch readiness:   ~45% — ограничено непройденным UAT и production gates;
+                            это не среднее арифметическое остальных оценок.
 ```
 
 Почему остаток всё ещё крупный: самые рискованные Users identity/ownership writes, Events tail и Routes review уже закрыты, но впереди media/SEO/regressions и весь RC/cutover цикл.
 
-Крупных P0-блоков остаётся **7**:
+Крупные обязательные launch gates:
 
-1. Editorial closure двух Articles: city/geo, publication, blog visibility и cover/media decision.
-2. Users production activation (real bulk send, gated on final Go/No-Go).
-3. Places/Offers/Article content и media closure.
-4. Reviews либо явный P1 defer.
-5. Redirects/pages/SEO.
-6. Product regression suite.
-7. RC rehearsal и production cutover.
+1. Integrated-RC technical and representative runtime verification.
+2. SEO MIGRATION CLOSURE.
+3. Full product UAT Pass 1, defect cycle, Pass 2 and founder acceptance.
+4. Users production activation delivery Go/No-Go.
+5. Reviews and remaining media scope: implementation or explicit founder P1 defer.
+6. Redirects/pages/product regression and production cutover rehearsal.
 
-Закрыто с прошлой ревизии: Events tail (COMPLETE), Routes review/publish (COMPLETE,
-13/13 published, Mogilev correctly excluded pending City decision).
+Events, Routes, Places/Offers safe publication, Articles, Users migration and the three local P0 fixes are complete; they require integrated-RC revalidation, not reopening.
 
 Ориентир по объёму работы:
 
@@ -1116,247 +1362,14 @@ Remaining strict P0 work:        ~34–38%
 
 ---
 
-## 8. Следующее одно действие
+## 9. Следующее одно действие
 
 ```text
-Phase: ROUTES review/publication — CLOSED. Next: Places/Offers/Article content
-  и media closure (см. §5.5)
-Prerequisite (COMPLETE): 14/14 Route lineage records accounted for; 86
-  RouteStop notes editorially reviewed (ACCEPT_SHORT 2, KEEP_FULL 84,
-  EDIT_SHORT 0, BLOCKED 0), 12 mojibake-only RouteStop.note rows corrected,
-  0 unrelated writes; 13/13 READY Routes PUBLISHED via existing
-  applyRouteReviewPlan tooling (guarded transaction, stop-on-first-error);
-  SEO canonical synced for all 13 via existing syncRouteCanonical(); Mogilev
-  (wordpress-db:routes:46963, cityId null, no matching City exists) moved
-  DRAFT via the same status-only operation the real admin
-  PATCH /api/admin/routes/[id] { publish:false } endpoint performs, content/
-  stops/media/slug/lineage preserved byte-identical; idempotency rerun
-  13/13 SKIPPED, 0 writes; cumulative audit clean (0 duplicate lineage/slug,
-  0 orphan RouteStops, 0 CREATE, 0 DELETE).
-Two open items carried over from Events, neither blocks the next phase:
-  (1) wordpress-db:events:64159 needs a founder disposition decision
-  (hard-exclude vs. leave PENDING indefinitely); (2)
-  EVENT_SEARCH_INDEX_PUBLICATION_RACE needs its own scoped fix (shared
-  search infra, not Events-specific — Routes' synchronous
-  syncRouteCanonical()-triggered index upsert did NOT reproduce the race in
-  this single-threaded batch, but that is not proof it's absent under
-  concurrent load; still backlogged, not re-investigated this session).
-New open items from this session: (1) Mogilev City onboarding backlog (see
-  §5.4 and §6) — requires a separate founder-approved geography-expansion
-  decision before this Route can publish; (2) Route detail page canonical
-  `<link>` missing (see §6), isolated frontend fix; (3) RouteStop geo
-  backfill (see §6), separate migration slice.
-Live in-browser smoke: DONE, against the already-running main-repo dev
-  server (same shared local DB) since this worktree's own server could not
-  bind (Next.js dev lock shared with the main repo directory). 13/13 URLs
-  200, Mogilev 404 confirmed with real content, discovery listing exactly
-  13 with correct stop-count sum (86), 0 console/hydration errors,
-  mobile+desktop render clean. Two pre-existing gaps found in the process
-  (items 2/3 above) — not introduced by this session, not blocking.
-No migration writer/engine code changes were needed for Routes — 100%
-  existing, already-reviewed tooling reused (buildRouteEditorialReview,
-  applyRouteReviewPlan, syncRouteCanonical). One bounded one-off script was
-  used to run the canonical sync + Mogilev unpublish and then deleted after
-  execution — its action is fully captured in this checklist and in
-  docs/migration/reviews/route-*-2026-07-28.{json,md}, so keeping the
-  script itself added no further audit value and it had no reusability
-  (hardcoded IDs from this one run).
-```
-
-**2026-07-28 (later same day) — Places/Offers production readiness and media
-closure.** Worktree `mamago2-places-offers-closure`, branch
-`feat/places-offers-production-media-closure`, base
-`feat/routes-review-publication`@`657c6c59` (Routes/Events commits confirmed
-present in log). Full detail across ten proof docs:
-`docs/migration/reviews/{place,offer}-*-2026-07-28.{md,json}`.
-
-```text
-Phase: PLACES/OFFERS production readiness and media closure — DATA/REGRESSION
-  CLOSURE COMPLETE; publication + media remain founder-gated, not
-  data-integrity issues.
-Places: 83 rows (82 WP-lineage + 1 pre-existing non-migration seed, out of
-  scope), 0 CREATE/duplicate/orphan. Reused existing
-  migration:preview:wordpress-db --entity place tool (no new tooling) for a
-  full 82-key read-only source snapshot+classification: 78/82
-  SKIP_UNCHANGED (READY_NOOP), 4/82 UPDATE_CONFLICT (places 437/895/5389/
-  43023 — known manual post-import edits, correctly BLOCKED, matches prior
-  session's documented expectation). Only 5/83 PUBLISHED; the other 78 are
-  content-clean but PENDING — no bulk review/publish tool exists for Place
-  yet (unlike Routes/Events), so bulk-publishing them is a founder decision,
-  not attempted. Found+fixed a real regression: PlaceCommitWriter's
-  buildUpdateData() unconditionally reset status to PENDING and clobbered
-  cityId on every UPDATE — identical bug class to the already-fixed
-  EventCommitWriter defect, currently dormant (0 Places in an UPDATE_SAFE
-  state) but a live risk for the next WordPress edit to any of the 78 clean
-  rows. Fixed, 3 regression tests added, full Place migration test suite
-  green. Live browser smoke (own worktree dev server): all 5 PUBLISHED
-  Places 200 OK with correct content/city/media/hours/reviews, 0 console
-  errors, desktop+mobile clean, a PENDING place correctly 404s. New P0
-  found: PLACE_CANONICAL_METADATA_MISSING (generateMetadata() never reads
-  seoCanonicalUrl, confirmed on all 5 — same defect class as the
-  already-backlogged Route one).
-Offers: 63/63 safe-canonical scope reconfirmed byte-identical to the prior
-  session's 2026-07-22 closure (commit 1fca8c8b, golden+Batch 1-4, immutable
-  manifest hashes on record) — NOT re-run (explicitly marked not to be).
-  Found+fixed a real regression: OfferCommitWriter.createOfferFromDraft()
-  resolved and validated draft.ownership.cityId (buildOfferCreateDraft
-  blocks on MISSING_CITY otherwise) but never persisted it to the row — all
-  63 Offers had cityId: null despite their Place always having a real city.
-  Fixed the writer, added OfferCommitWriter.test.ts (none existed before),
-  and backfilled all 63 existing rows from Offer.place.cityId (CAS-guarded,
-  one-off script, protected fields verified byte-identical before/after,
-  reran to confirm 0 further writes — idempotent). All 63 remain DRAFT: the
-  existing approveOffer() moderation function only accepts a
-  PENDING→PUBLISHED transition, and none of the 63 ever went through a
-  DRAFT→PENDING submit step (they were migration-created, not
-  Business-submitted) — a structural gap, flagged as a founder decision
-  (a technical PUBLISHED path does exist today via the privileged-role
-  Business PATCH endpoint, which correctly triggers slug+canonical
-  assignment as a side effect). Offer media import confirmed genuinely
-  unimplemented (explicit code-level gate, not a regression) —
-  recommendation is an explicit P1 defer, same posture as Article media.
-  Class H (28)/class I (8) backlog carried forward unchanged from the prior
-  closure (no bulk Offer source-discovery tool exists in this codebase to
-  re-derive them, and re-deriving would repeat an already-proven check).
-Shared finding: EVENT_SEARCH_INDEX_PUBLICATION_RACE's defect class
-  (fire-and-forget, unordered SearchDocument upserts) is structurally
-  applicable to Place/Offer too via the same extendPrismaWithSearchIndexing
-  extension — did not reproduce this session because migration writes
-  bypass that extension entirely (bare PrismaClient); would only surface via
-  the normal admin/business publish flow. Not re-investigated further
-  (shared infra, its own scoped fix).
-Cumulative audit: only DB write this session was the 63-row Offer.cityId
-  backfill (null → derived value) — every row count (Place 83, Offer 63,
-  MediaAsset 159, PlaceImage 39, Business 42, City 5) is unchanged from
-  session start. 0 unexpected CREATE/DELETE, 0 production writes, 0
-  commit/push/merge/PR performed.
-Tests: all 17 relevant Place/Offer migration test files pass (including 2
-  new regression tests + 1 new test file), tsc --noEmit clean, lint clean on
-  changed files, git diff --check clean.
-Three founder decisions now block further Places/Offers progress (none are
-  data-integrity issues — all are product/process decisions):
-  (1) bulk-publish path for the 78 clean PENDING Places;
-  (2) DRAFT→publish path for the 63 safe-canonical Offers;
-  (3) Offer media P0-vs-P1 (recommend P1).
-Next action once those are decided: PLACE_CANONICAL_METADATA_MISSING fix
-  (small, isolated, same shape as the Route one), then Article content/media
-  closure (§5.5), then Reviews defer decision (§5.6), then Redirects/SEO
-  (§5.7). This branch's docs/prelaunch-checklist.md still needs a manual
-  merge against fix/admin-article-preview-routing's independent Users/UAT
-  updates before either lands in dev (see §5.2/§0 note at top of file) — not
-  performed here, per explicit instruction not to touch that worktree.
-```
-
-**2026-07-28 (third session) — Places status/classification matrix correction, no
-new writes.** Same worktree/branch. Purpose: the prior session's "5 published,
-78 content-clean pending" summary for Places was directionally right but
-imprecise — it conflated the 1 non-migration seed Place with the 82 lineage
-Places, and did not separate genuinely `READY_FOR_EDITORIAL_PUBLICATION_REVIEW`
-Places from the 2 that are `CITY_BLOCKED`. No DB writes were needed or
-performed this session — purely a read-only join of the two already-captured
-proof docs (local DB baseline + WordPress source preview) into an exact,
-arithmetically-verified matrix.
-
-```text
-Corrected Place breakdown (82 lineage + 1 seed = 83, verified):
-  A1 PUBLISHED + READY_NOOP:                    0
-  A2 PUBLISHED + UPDATE_CONFLICT_PROTECTED:      4  (437/895/5389/43023 — already
-                                                     PUBLISHED before this session,
-                                                     browser-verified valid content)
-  A3 PUBLISHED + CITY_EVIDENCE_MISSING:          0
-  A5 PENDING + READY_NOOP:                      76
-  A7 PENDING + CITY_EVIDENCE_MISSING:            2  (32409 "Be English", 60742 "Школа
-                                                     архитектурного мышления" — source
-                                                     itself has no city evidence either)
-  B  seed (non-migration):                       1  (PUBLISHED, out of migration scope)
-  All other buckets (A4/A6/A8/A9):               0
-  Sum check: 0+4+0+0+76+0+2+0+0 = 82; +1 seed = 83 — matches exactly.
-```
-
-Full detail: `docs/migration/reviews/place-status-classification-matrix-2026-07-28.{md,json}`
-(JSON is deterministic — rows sorted by `sourceRecordKey`, aggregates recomputed
-directly from the rows array). §2 table and §5.5 above rewritten to use this
-exact matrix instead of the prior approximate framing; §5.5 also now explicitly
-separates DATA/MIGRATION closure (complete) from PUBLICATION closure (not
-complete) from MEDIA (documented gaps) from PUBLIC RUNTIME VALIDATION (found
-`PLACE_CANONICAL_METADATA_MISSING`) from PRODUCTION EXECUTION (not started) for
-both Places and Offers, and Offer media is now framed as an explicit Option
-A(P0)/Option B(P1) founder decision rather than a pre-decided P1 recommendation.
-No Events/Routes/Articles/UAT content was touched. Code (`PlaceCommitWriter`,
-`OfferCommitWriter`, their tests) was re-verified against this session's own
-description but not modified further — the fixes already made in the prior
-session were confirmed to match their intended contracts exactly (see the
-commit-by-commit breakdown recorded at the point these were split into their
-own commits, immediately following this entry).
-
-**2026-07-29 — Places/Offers LOCAL publication closure.** New worktree
-`mamago2-places-offers-publication`, branch
-`feat/places-offers-publication-closure`, base
-`feat/places-offers-production-media-closure`@`74bcb483` (confirmed present:
-`d86a9b87`/`4474f073`/`74bcb483`). Full detail:
-`docs/migration/reviews/{place,offer}-publication-result-2026-07-29.md`,
-`docs/migration/reviews/place-offer-publication-cumulative-audit-2026-07-29.md`.
-
-```text
-Fixed PLACE_CANONICAL_METADATA_MISSING first (generateMetadata() now reads
-  seoCanonicalUrl, falls back to a slug-first path, never uses id when a slug
-  exists — new resolvePlaceCanonicalUrl.ts + 5 tests), before any Place
-  publication, per the task's own gate order.
-Process discovery: the shared "dev" preview always launches from the main
-  repo checkout, not the active worktree — every prior browser-smoke claim
-  in this whole prelaunch effort that relied on it was unknowingly verifying
-  against a different branch's code (DB was still correct, since it's
-  shared). Worked around by starting next dev manually inside the worktree.
-Attempted to invoke approvePlace()/approveOffer() from a bare tsx script;
-  both transitively require the Next.js bundler to resolve a
-  server-only-guarded import and crash outside it. A Node module-loader
-  patch workaround was correctly blocked by the session's safety classifier;
-  used a temporary, local-only, non-production Next.js API route instead
-  (deleted immediately after use) — same lifecycle services, real bundler
-  context, no monkey-patching.
-Places: built the exact 76-key manifest from the already-committed matrix,
-  re-verified 0 drift, previewed clean, published all 76 via approvePlace()
-  (0 raw status mutations). 81/83 total PUBLISHED (4 protected + 76 new + 1
-  seed); 2 CITY_BLOCKED remain PENDING, untouched. Protected fields
-  (title/cityId/ownerBusinessId) byte-identical before/after for all 76;
-  slug allowed null->assigned only (existing approvePlace() behavior).
-  76/76 HTTP 200, 76/76 real <link rel="canonical">, 0 id-based. Idempotency
-  rerun: 76/76 ALREADY_PUBLISHED_RESYNCED, 0 writes.
-Offers: no DRAFT->PENDING submit path existed for Offer before this session
-  (unlike Place's submitPlace()) — implemented
-  submitOfferForModeration(offerId, actor) in moderation.service.ts
-  (OWNER-checked or explicit PRIVILEGED_MIGRATION actor; idempotent on
-  PENDING; rejects PUBLISHED/REJECTED/archived; touches only status), 6
-  tests with self-generated temporary DB fixtures. Built the exact 63-key
-  manifest live (0 duplicates), previewed clean, ran all 63 through
-  submit->approve->canonical-sync->reindex in one pass, 0 errors. 63/63
-  PUBLISHED, 0 DRAFT remaining, protected fields (title/placeId/cityId/
-  businessId) verified at every step. Found and fixed a real, pre-existing,
-  non-Offer-specific defect during the required media-defer runtime check:
-  public/og-default.jpg (the shared Offer+Event OG-image fallback) was a
-  49-byte placeholder TEXT file mislabeled image/jpeg, rendering a genuine
-  broken <img> on every offer with no cover photo. Replaced with a real
-  1200x630 JPEG (asset-only fix via sharp, already a dependency) — only
-  after this fix does OFFER_MEDIA_DEFERRED_P1 actually satisfy its own
-  approval conditions. 63/63 HTTP 200 (following the canonical
-  /offers/[slug] -> /[city]/offers/[section]/[slug] redirect), 63/63 real
-  canonical, 0 id-based. Idempotency rerun: 63/63
-  ALREADY_PUBLISHED_RESYNCED, 0 writes. Class H (28)/I (8): untouched, never
-  persisted, nothing to touch.
-Cumulative: Place rows 83->83, Offer rows 63->63 (0 CREATE/DELETE either
-  entity), MediaAsset 159->159, PlaceImage 39->39 (0 media/storage writes —
-  the og-default.jpg replacement is a static asset, not a DB/storage write).
-  0 production writes. 0 commit/push/merge/PR performed this session; all
-  changes left uncommitted with a proposed logical commit split (code fixes
-  x2, docs) in the session's final report.
-Two temporary local-only API routes (bulk-place-publish-temp,
-  bulk-offer-publish-temp) were created solely to run the real lifecycle
-  services inside the Next.js bundler context and deleted immediately after
-  their one-time use — neither is present in the final diff.
-Not done: disposition of the 2 CITY_BLOCKED Places (separate founder
-  decision, unresolved); production execution for either entity (exact
-  manifest generation deferred to real cutover time, same reasoning as the
-  prior session); full authenticated business/admin UI walkthrough for
-  Offers (recommended once real Business accounts interact with these
-  rows, not as a repeat smoke of migration-created ones).
+Phase: INTEGRATED RC technical verification
+Prerequisite: Articles/Users/Activation/UAT history merged with the P0 line.
+Scope: Prisma validation/status (no migration writes), targeted tests, TypeScript,
+ESLint, build, check:push, exact-SHA representative runtime proof.
+Next after baseline: start SEO MIGRATION CLOSURE on the integrated RC.
+Out of scope: UAT Pass 1, production writes/email, DNS, Search Console, payments,
+CITY_BLOCKED changes, Event 64159 disposition and deferred P1 implementation.
 ```

@@ -13,7 +13,7 @@ export default async function AdminEditArticlePage({
   if (!article) notFound();
 
   const user = await getCurrentUser();
-  const isAdminEditor = user?.role === "ADMIN";
+  const canModerate = user?.role === "ADMIN" || user?.role === "MODERATOR";
 
-  return <ArticleEditorClient initial={article} isAdminEditor={isAdminEditor} />;
+  return <ArticleEditorClient initial={article} canModerate={canModerate} />;
 }

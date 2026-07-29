@@ -51,6 +51,12 @@ function isContentPreviewRoute(pathname: string): boolean {
   return CONTENT_PREVIEW_ROUTE_PATTERN.test(pathname);
 }
 
+const ARTICLE_PREVIEW_ROUTE_PATTERN = /^\/preview\/articles\/[^/]+$/;
+
+function isArticlePreviewRoute(pathname: string): boolean {
+  return ARTICLE_PREVIEW_ROUTE_PATTERN.test(pathname);
+}
+
 function isPublicInviteRoute(pathname: string): boolean {
   return pathname === "/invite/business";
 }
@@ -184,6 +190,10 @@ export function resolveSubdomainMiddlewareDecision(params: {
     }
 
     if (isContentPreviewRoute(pathname)) {
+      return { kind: "next" };
+    }
+
+    if (isAdminHost && isArticlePreviewRoute(pathname)) {
       return { kind: "next" };
     }
   }

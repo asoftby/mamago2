@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { normalizeEmail } from "@/lib/auth/email";
-import {
-  activationRateLimitKey,
-  checkActivationRateLimit,
-} from "@/server/auth/activationRateLimit";
-import { resolveActivationEmailDelivery } from "@/server/auth/activationEmailGate";
+import { requestMigratedAccountActivationByEmail } from "@/server/auth/activationRequestFlow";
 import {
   readSizeLimitedJson,
   trustedClientIp,
   waitForGenericResponseFloor,
 } from "@/server/auth/activationHttpSecurity";
-import { issueUserActionToken } from "@/server/auth/userActionToken.service";
 
 export const runtime = "nodejs";
 
@@ -45,40 +39,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const ip = trustedClientIp(request);
   if (!ip) {
-    return acceptedResponse(startedAt);
-  }
-  const ipLimit = await checkActivationRateLimit({
-    key: activationRateLimitKey("request-ip", ip),
-    limit: 10,
-    windowMs: 60 * 60 * 1000,
-  });
-  const emailLimit = await checkActivationRateLimit({
-    key: activationRateLimitKey("request-email", email),
-    limit: 3,
-    windowMs: 60 * 60 * 1000,
-  });
-  if (!ipLimit.allowed || !emailLimit.allowed) {
+    // Preserves the endpoint's original behavior: without a trusted proxy,
+    // this anonymous, unauthenticated endpoint does nothing at all rather
+    // than fall back to only email-scoped rate limiting.
     return acceptedResponse(startedAt);
   }
 
-  try {
-    const user = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
-      select: { id: true },
-    });
-    if (!user) {
-      return acceptedResponse(startedAt);
-    }
-
-    await issueUserActionToken({
-      userId: user.id,
-      purpose: "MIGRATED_ACCOUNT_ACTIVATION",
-    });
-    resolveActivationEmailDelivery();
-  } catch {
-    // The public response is deliberately identical for lookup, state,
-    // limiter, issuance and delivery failures.
-  }
+  await requestMigratedAccountActivationByEmail({ email, ip, source: "MANUAL_REQUEST" });
 
   return acceptedResponse(startedAt);
 }

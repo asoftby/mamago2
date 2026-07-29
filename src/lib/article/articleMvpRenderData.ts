@@ -1,9 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
-import { resolveArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
-import type { ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import { parsePriceData, type PriceData } from "@/lib/priceItems";
@@ -140,11 +138,7 @@ export type ArticleMvpResolvedBlock =
   | (Extract<ArticleBlockMvp, { type: "image" }> & { imageUrl: string | null })
   | (Extract<ArticleBlockMvp, { type: "gallery" }> & { imageUrls: (string | null)[] })
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & { card: ResolvedActivityCard | ResolvedOfferEmbedCard | null })
-  | (Extract<ArticleBlockMvp, { type: "embed" }> & {
-      sanitizedEmbedHtml: string;
-      embedProvider: "youtube" | "instagram" | "unknown";
-      embedRequiresInstagramScript: boolean;
-    });
+  | Extract<ArticleBlockMvp, { type: "embed" }>;
 
 function parseRuDateToTimestamp(value?: string | null): number {
   if (!value) return Number.POSITIVE_INFINITY;
@@ -443,13 +437,7 @@ export async function buildArticleMvpResolvedBlocks(
       continue;
     }
     if (b.type === "embed") {
-      const r = resolveArticleEmbed(b.embedHtml);
-      out.push({
-        ...b,
-        sanitizedEmbedHtml: r.sanitizedHtml,
-        embedProvider: r.provider,
-        embedRequiresInstagramScript: r.requiresInstagramScript,
-      });
+      out.push(b);
     }
   }
   return out;
