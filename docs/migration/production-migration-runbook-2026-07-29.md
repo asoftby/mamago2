@@ -13,6 +13,26 @@ generic commit-CLI mechanics (`migration:commit:wordpress-db`,
 
 Technical RC source SHA: `17c9dd29787bbab0462ca581c546ca83a5dc2e73`
 
+## 0. Production target worksheet (2026-07-30)
+
+None of these values are named anywhere in the docs corpus, the codebase,
+or any env file available in this local/dev environment. They are not
+guessed here, and no connection or write of any kind was attempted against
+any production target. Every row below is a required founder/ops input
+before the migration runbook's preflight (§1) can move from ❌ to ✅.
+
+| Input | Value |
+|---|---|
+| Application hosting target | `FOUNDER_INPUT_REQUIRED` |
+| Production PostgreSQL target | `FOUNDER_INPUT_REQUIRED` |
+| Production storage target | `FOUNDER_INPUT_REQUIRED` |
+| Deploy mechanism | `FOUNDER_INPUT_REQUIRED` |
+| DNS provider | `FOUNDER_INPUT_REQUIRED` |
+| Production domain | `FOUNDER_INPUT_REQUIRED` |
+| Production env/secrets owner | `FOUNDER_INPUT_REQUIRED` |
+| Launch window | `FOUNDER_INPUT_REQUIRED` |
+| Responsible operator | `FOUNDER_INPUT_REQUIRED` |
+
 ## 1. Preflight checklist
 
 | Item | Status | Note |

@@ -1273,9 +1273,17 @@ REMAINING (not blocking local technical closure, explicitly deferred):
 ### 5.9 Release candidate и production cutover
 
 - [ ] Freeze production source snapshots. — founder/ops action, not yet declared.
-- [ ] Production manifests и checksums. — index assembled:
-      [production-entity-manifests-2026-07-29.md](production-entity-manifests-2026-07-29.md);
-      Places/Offers manifests remain explicitly deferred to cutover time.
+- [x] Production manifests и checksums. — **Users, Articles, Places, Offers
+      (+ Place/Offer media) all frozen** as of 2026-07-30:
+      [production-entity-manifests-2026-07-29.md](production-entity-manifests-2026-07-29.md),
+      raw manifests in `docs/migration/manifests/`. Places manifest is a
+      live read-only WordPress-source preview (82 discovered, 78
+      SKIP_UNCHANGED, 4 expected UPDATE_CONFLICT — see
+      `migration-manual-protected-places` memory); Offers manifest is
+      built from the already-reviewed committed local state (63/63
+      cross-referenced against active lineage, 0 orphans) since the
+      per-record WP-source tool needs a missing `offers-inventory.json`
+      snapshot (documented blocker, not silently worked around).
 - [x] Fresh production backup и подтверждённый restore procedure —
       **local rehearsal PASS** 2026-07-29 (DB: 13/13 table counts, 507
       constraints, 736 indexes identical; storage: 482 files/38,494,112
@@ -1287,17 +1295,25 @@ REMAINING (not blocking local technical closure, explicitly deferred):
 - [ ] Cumulative DB/storage delta и forbidden fields/tables audits.
 - [ ] Redirect/SEO validation report.
 - [ ] Docker Build & Push exact RC SHA — GREEN.
-- [ ] Финальный Go/No-Go. — draft matrix:
+- [ ] Финальный Go/No-Go. — matrix (CONDITIONAL GO, narrowed 2026-07-30 to
+      production-environment-only gates):
       [go-no-go-readiness-2026-07-29.md](go-no-go-readiness-2026-07-29.md).
-- [ ] Последовательная production migration. — runbook drafted:
+- [ ] Последовательная production migration. — runbook + production target
+      worksheet:
       [production-migration-runbook-2026-07-29.md](production-migration-runbook-2026-07-29.md).
 - [ ] Post-migration validation и разрешённые idempotency reruns.
 - [ ] DNS cutover, noindex switch, monitoring/rollback decision window. —
       plans drafted:
       [dns-cutover-plan-2026-07-29.md](dns-cutover-plan-2026-07-29.md),
-      [launch-monitoring-plan-2026-07-29.md](launch-monitoring-plan-2026-07-29.md).
-      Activation canary formalized:
+      [launch-monitoring-plan-2026-07-29.md](launch-monitoring-plan-2026-07-29.md),
+      [launch-window-checklist-2026-07-30.md](launch-window-checklist-2026-07-30.md).
+      Activation canary formalized with founder input fields, batch
+      sequence proposal, and exact preview/send/reconcile commands
+      (documented, not run):
       [activation-canary-plan-2026-07-29.md](activation-canary-plan-2026-07-29.md).
+      Bounce handling: manual reconciliation decided (no webhook or
+      bounce/complaint schema states exist today — confirmed by code
+      inspection, not assumed).
 
 ---
 
@@ -1615,4 +1631,58 @@ Places/Offers, canary recipient selection, DB/hosting target confirmation,
 and the rollback-trigger threshold are the remaining explicit founder
 inputs before a CONDITIONAL GO can become a GO. See
 `go-no-go-readiness-2026-07-29.md` for the full decision matrix.
+```
+
+```text
+Phase: FINAL GO/NO-GO PREPARATION — remaining conditional gates closed
+2026-07-30, same worktree/branch/RC SHA. Re-confirmed immutable: 0
+non-docs diff since 17c9dd29787bbab0462ca581c546ca83a5dc2e73 (3 docs-only
+commits on top, all under docs/migration/).
+
+Closed this session:
+- Places manifest FROZEN via a single bounded read-only WordPress-source
+  preview (`migration:preview:wordpress-db --entity place
+  --allow-remote-readonly`, zero writes, confirmed by the script's own
+  docstring): 82 discovered, 78 SKIP_UNCHANGED, 4 UPDATE_CONFLICT (437,
+  895, 5389 — previously known — plus 43023 "Атмосфера", newly confirmed,
+  same TARGET_MODIFIED_AFTER_IMPORT pattern; `migration-manual-protected-
+  places` memory updated). Hash and raw manifest in
+  `docs/migration/manifests/places-preview-2026-07-30.json`.
+- Offers manifest FROZEN from the already-reviewed committed local state
+  (63/63 PUBLISHED Offers cross-referenced against active OFFER lineage,
+  0 orphans) — the per-record WP-source tool
+  (`migration:preview:offer-snapshot`) needs a pre-existing
+  `offers-inventory.json` snapshot that has no generator and doesn't
+  exist in this worktree; documented as an explicit blocker rather than
+  silently worked around. Hash and raw manifest in
+  `docs/migration/manifests/offers-local-manifest-2026-07-30.json`.
+- Production-build console re-check: reused the existing `.next` build
+  (unchanged since the RC SHA), ran `next start` on a separate port,
+  repeated the exact StrictMode-error repro 5 times across 3 pages at
+  390×844 — 0 console errors. Closed as
+  `NOT_REPRODUCED_IN_PRODUCTION_BUILD`.
+- Bounce handling decided: code inspection confirmed no `svix` dependency,
+  no Resend webhook route, and `ActivationDeliveryAudit.status` has no
+  bounced/complained/delivered states in its enum today — Option A
+  (webhook) is not just "unwired," it doesn't exist. Decision: Option B,
+  manual reconciliation against the Resend dashboard, gated batch-by-batch.
+- All 4 deferred content items (Places 32409/60742 CITY_BLOCKED, Event
+  64159 EXPIRED_SOURCE_PENDING, Route 46963 Mogilev CITY_BLOCKED) given
+  explicit recommendations (3× EXCLUDE_FROM_P0, 1× MOVE_TO_P1) — none left
+  in an undefined state.
+- New docs: `launch-window-checklist-2026-07-30.md` (one-page day-of
+  sequence); production target worksheet added to
+  `production-migration-runbook-2026-07-29.md` §0 (all rows
+  `FOUNDER_INPUT_REQUIRED`, none guessed).
+
+Verdict updated: CONDITIONAL GO, narrower than 2026-07-29 — every gate
+closeable from local/dev evidence or read-only source access is now
+closed; only production-environment inputs remain (hosting/DB/storage
+targets, canary recipients, batch-size approval, rollback threshold, and
+founder sign-off on the deferred-content recommendations and the
+manual-reconciliation bounce approach).
+
+Next single action: FOUNDER FINAL APPROVAL of the exact RC SHA and launch
+window, plus the 9 remaining founder inputs in
+`go-no-go-readiness-2026-07-29.md`. No production actions were performed.
 ```

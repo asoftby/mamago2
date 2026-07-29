@@ -160,96 +160,157 @@ console error found this session is not classified P0 — it needs a
 production-build re-check to close definitively, but nothing in this
 session's evidence suggests it reaches production.
 
-## P1/backlog (unchanged from prior sessions, plus two new items)
+## P1/backlog (unchanged from prior sessions, plus one new item)
 
 All items already listed in `rc-product-regression-2026-07-29.md`'s
 deferred list remain unchanged (Admin Routes overflow, external Unsplash
 fallback, missing dedicated listing paths, RouteStop geo backfill,
 traffic-based review of legacy redirects, manual redirect persistence).
 
-New this session:
+New 2026-07-29:
 
 - Multi-step editor wizard tab-row overflow at 390px width (see above) —
-  P1/P2, cosmetic, all actions remain reachable.
-- StrictMode-only console error on Place detail client-navigation — needs
-  a production-build verification pass to close; not yet classified as
-  reaching production.
+  P1/P2, cosmetic, all actions remain reachable. Follow-up task filed
+  (`task_84ea3080`, "Fix mobile step-tabs overflow in Place editor
+  wizard").
 
-## Founder decisions required
+**Closed 2026-07-30**: the StrictMode console error is no longer on this
+list — see the production-build re-check below.
+
+## 2026-07-30 update: production-build console re-check — CLOSED
+
+Ran the exact approved production artifact (`next start` against the
+existing `.next` build, `BUILD_ID: 9j_cqevBUvgYigBSLRcuC`, built from this
+same RC SHA — confirmed valid to reuse since the code/runtime diff since
+the RC SHA is 0) on a separate local port (3100), and repeated the exact
+navigation sequence that produced the "Rendered more hooks than during the
+previous render" error in dev (`/minsk` → `/minsk/kuda` →
+`/places/molekula`, at 390×844): **0 console errors across 5 repeated
+navigations** through the same two pages (plus a third page,
+`/minsk/events/[slug]`, for extra coverage). Network requests all 200/304
+except one expected `401` on the unauthenticated `/api/save/status`
+check. No StrictMode debug-log duplication appeared either (production
+doesn't double-invoke), consistent with the dev-only-artifact hypothesis.
+
+**Result: `NOT_REPRODUCED_IN_PRODUCTION_BUILD`.** Closed as a dev
+(`next dev` + React StrictMode) double-invocation artifact, confirmed not
+production-reaching. No code change made or needed — this was a
+verification pass, not a defect fix.
+
+## 2026-07-30 update: deferred content dispositions
+
+The four previously-deferred content decisions, current state confirmed
+directly against the local DB:
+
+| Entity / sourceRecordKey | Current state | Reason for defer | Public impact | Recommendation | Founder decision needed? |
+|---|---|---|---|---|---|
+| Place `wordpress-db:places:32409` ("Be English") | `PENDING`, no city assigned (`cityId: null`) | CITY_BLOCKED — source city text didn't resolve to a known `City` row | None — not `PUBLISHED`, invisible to the public site | `EXCLUDE_FROM_P0` — not a launch blocker; content backlog | **Yes** — whether/when to onboard the missing city or manually assign one |
+| Place `wordpress-db:places:60742` ("Школа архитектурного мышления для детей") | `PENDING`, no city assigned (`cityId: null`) | Same — CITY_BLOCKED | None — not `PUBLISHED` | `EXCLUDE_FROM_P0` | **Yes** — same as above |
+| Event `wordpress-db:events:64159` ("Концерт в темноте «Однажды, в Париже»") | `PENDING` | EXPIRED_SOURCE_PENDING — event date already passed at time of migration | None — not `PUBLISHED` | `EXCLUDE_FROM_P0` — publishing an already-expired event has no product value | Low priority — only if founder wants it archived/visible as past content rather than excluded |
+| Route `wordpress-db:routes:46963` ("Маршрут Могилев", slug `marshrut-mogilev`) | `DRAFT`, `visibility: PUBLIC` (visibility flag doesn't matter while status is DRAFT) | CITY_BLOCKED — Mogilev not yet an onboarded city in the taxonomy | None — not `PUBLISHED` | `MOVE_TO_P1` — this belongs to a separate "Mogilev city onboarding" feature, not a launch-blocking defect | **Yes** — whether to onboard Mogilev before or after this launch |
+
+None of the four have any current public-facing impact (all are
+non-`PUBLISHED`/non-`ACTIVE`), so none block GO on their own. All four
+have an explicit, non-ambiguous recommendation now — no item is left in
+an undefined state going into the GO/NO-GO decision.
+
+## Founder decisions required (updated 2026-07-30)
 
 1. Production DB and storage hosting target (not named anywhere in the
-   existing docs).
-2. Production entity manifests for Places and Offers (explicitly deferred
-   to cutover time by design — must be generated fresh, not invented).
-3. Activation canary recipients (3–5 accounts, founder-controlled).
-4. Batch size for activation sends beyond the canary (explicitly "TBD by
-   founder").
+   existing docs) — see the production target worksheet in
+   `production-migration-runbook-2026-07-29.md` §0.
+2. ~~Production entity manifests for Places and Offers~~ — **CLOSED
+   2026-07-30**, both frozen (see `production-entity-manifests-2026-07-29.md`).
+3. Activation canary recipients (2–3, founder-controlled) — founder input
+   fields prepared in `activation-canary-plan-2026-07-29.md`.
+4. Batch size for activation sends beyond the canary — a proposed
+   2–3/25/50/100/rest ramp is drafted; founder may approve or adjust.
 5. Rollback-trigger threshold (e.g. "> N% FAILED") — explicitly undecided
    in the existing runbook.
-6. Whether to accept the "no bounce webhook yet" risk for the activation
-   canary, or wire the webhook first.
-7. Disposition of CITY_BLOCKED Places (2), Event 64159, Mogilev Route
-   onboarding, and Offer Class H/I (36 rows) — all explicitly deferred to
-   founder sign-off, unchanged by this session.
-8. Whether the StrictMode console error needs a production-build
-   re-verification before sign-off, or is accepted as dev-only based on
-   this session's reasoning.
+6. Bounce handling — **decision made 2026-07-30**: manual reconciliation
+   (Option B), since no webhook or bounce/complaint schema states exist
+   today; founder must explicitly accept this for the full 578-recipient
+   delivery, or request the webhook + schema migration be built first.
+7. Disposition of the 4 deferred content items — **all four now have an
+   explicit recommendation** (see table above); founder sign-off still
+   needed on 3 of them (the two CITY_BLOCKED Places and Mogilev).
+8. ~~Whether the StrictMode console error needs a production-build
+   re-verification~~ — **CLOSED 2026-07-30**: `NOT_REPRODUCED_IN_PRODUCTION_BUILD`.
+9. Offer Class H (28 rows, no Place relation) and Class I (8 rows,
+   noncanonical alias) exclusion — unchanged from prior sessions, still
+   requires founder sign-off.
 
-## Decision matrix
+## Decision matrix (updated 2026-07-30)
 
 ### GO — only if all of:
 
 - [x] Product P0 = 0
-- [x] Mobile UAT PASS (with the one production-build re-check noted above)
-- [x] BUSINESS_OWNER UI E2E PASS (archive/restore sub-check not exercised)
-- [x] Build PASS (per prior RC session)
+- [x] Mobile UAT PASS
+- [x] BUSINESS_OWNER UI E2E PASS (archive/restore sub-check not exercised,
+      low risk)
+- [x] Build PASS (confirmed via this session's production-build re-check)
 - [x] Backup/restore proof PASS (local rehearsal; production execution
       still pending a target)
-- [ ] Exact manifests/checksums ready for **all** entities (Places/Offers
-      still deferred)
-- [x] Migration runbook ready (drafted this session)
-- [x] Activation canary ready (drafted; recipients/batch size still open)
-- [x] DNS/noindex plan ready (drafted this session)
-- [x] Monitoring plan ready (drafted this session)
-- [ ] Production secrets/config confirmed (DB/storage target unknown)
+- [x] Exact manifests/checksums ready — Places and Offers now frozen
+      (2026-07-30); Users and Articles were already frozen
+- [x] Migration runbook ready
+- [x] Activation canary ready (recipients/batch size still open — see
+      founder decisions)
+- [x] DNS/noindex plan ready
+- [x] Monitoring plan ready
+- [x] Production-build console re-check closed (`NOT_REPRODUCED_IN_PRODUCTION_BUILD`)
+- [x] Deferred content dispositions all have explicit recommendations
+- [ ] Production secrets/config confirmed (DB/hosting/storage target
+      still `FOUNDER_INPUT_REQUIRED` everywhere)
 
-**Not all GO conditions are met yet** — two boxes above are unchecked.
+**Only one category remains unchecked**: production environment/secrets
+confirmation, which by definition cannot be satisfied outside an actual
+launch window.
 
-### CONDITIONAL GO — applies here, for these explicitly named gates:
+### CONDITIONAL GO — applies here, for exactly these launch-window-only gates:
 
-- Production backup has not been executed (no target exists) — team and
-  restore proof are ready; execute at the actual production-window backup
-  step.
-- Exact activation canary recipients are not yet selected — founder
-  selection required, not blocking plan readiness.
-- DNS switch is awaiting a named production target/window.
-- Places/Offers production manifests are deferred by design to cutover
-  time, not a readiness failure.
+- Production backup execution (team, commands, and restore proof are
+  ready; no production target exists yet to back up).
+- Final production environment confirmation (the worksheet in
+  `production-migration-runbook-2026-07-29.md` §0 is entirely
+  `FOUNDER_INPUT_REQUIRED`).
+- Actual deploy to the confirmed target.
+- Activation canary send (recipients/batch size need founder approval
+  first, but the plan, commands, and reconciliation queries are ready).
+- DNS/noindex switch (sequence documented; no DNS access exists in this
+  environment to execute or even read current records).
 
 ### NO-GO — does not apply here:
 
-- No open P0.
-- Restore procedure is proven (both DB and storage, locally).
-- Manifests are fixed for the entities where freezing them now makes
-  sense (Users, Articles); the rest are deliberately deferred, not
-  missing.
-- Exact RC SHA is defined and its docs-only lineage to current HEAD is
-  verified.
-- Production origin/config is the one open unknown, tracked explicitly
-  above as a founder input, not an unaddressed risk.
-- No owner-access regression found (cross-tenant and role checks all
-  passed this session).
-- No activation/security regression found.
+- No open P0 (confirmed again this session; the one candidate P0-shaped
+  console error was closed as `NOT_REPRODUCED_IN_PRODUCTION_BUILD`).
+- Restore procedure is proven (DB and storage, locally).
+- Manifests/checksums are now complete for every entity that can be
+  frozen without a live production connection (Users, Articles, Places,
+  Offers, plus Place/Offer media).
+- Exact RC SHA is defined, immutable (re-confirmed this session — 0
+  non-docs diff since the SHA), and its docs-only lineage to current HEAD
+  is verified.
+- Production origin/config is a named, tracked founder input, not an
+  unaddressed unknown.
+- No owner-access regression found.
+- No activation/security regression found; bounce-handling gap is now a
+  documented, accepted-or-not founder decision rather than an unknown.
 
-## Verdict
+## Verdict (updated 2026-07-30)
 
-**CONDITIONAL GO** — technical and product readiness is complete for
-everything reachable from local/dev evidence; the remaining gates are all
-production-environment inputs that only the founder can supply (hosting
-target, canary recipients, batch size, rollback threshold, and the four
-deferred-disposition decisions). No new P0 was found. Two small
-new-this-session items (wizard tab overflow, StrictMode console error) are
-tracked but do not change the verdict.
+**CONDITIONAL GO — narrower than 2026-07-29.** Every gate that could be
+closed with local/dev evidence, read-only source access, or reasoning
+about existing code is now closed: Places/Offers manifests are frozen,
+the StrictMode console error is confirmed dev-only, bounce handling has
+an explicit decision (manual reconciliation) rather than an open question,
+and all four deferred content items have explicit recommendations. What
+remains is **exclusively** production-environment inputs that can only be
+supplied at or immediately before the actual launch window: hosting/DB/
+storage targets, canary recipient selection, batch-size approval,
+rollback threshold, and founder sign-off on the deferred-content
+recommendations and the manual-reconciliation bounce approach. No new P0
+was found this session.
 
 ## Commits this session
 
@@ -264,5 +325,6 @@ described in the session's commit policy.
 ## Next single action
 
 **Founder final approval of the exact RC SHA and launch window**, plus the
-eight founder-decision inputs listed above. Production launch itself was
+nine founder-decision inputs listed above (four of which are now simple
+approve/reject decisions rather than open questions). Production launch itself was
 not performed in this session, per instruction.

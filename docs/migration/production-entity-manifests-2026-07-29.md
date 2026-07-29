@@ -1,13 +1,14 @@
-# Production entity manifests & expected deltas — 2026-07-29
+# Production entity manifests & expected deltas — 2026-07-29 (updated 2026-07-30)
 
-Status: **planning document for FINAL GO/NO-GO PREPARATION**. This does not
-freeze new numbers — it consolidates counts already confirmed in
+Status: **Places and Offers manifests are now FROZEN** (see "2026-07-30
+update" below) — no longer deferred. The rest of this document is
+unchanged from 2026-07-29: it consolidates counts already confirmed in
 [`prelaunch-checklist.md`](prelaunch-checklist.md) and
 [`rc-product-regression-2026-07-29.md`](rc-product-regression-2026-07-29.md)
-into one manifest index, and flags exactly which manifests are still
-deferred to cutover time. No production read/write access was used to
+into one manifest index. No production read/write access was used to
 produce this document — all counts are from the local/dev migration state
-already reviewed and approved in the checklist.
+already reviewed and approved in the checklist, plus one bounded read-only
+WordPress-source preview (Places only) run on 2026-07-30.
 
 Technical RC source SHA: `17c9dd29787bbab0462ca581c546ca83a5dc2e73`
 Documentation HEAD at time of writing: see `git rev-parse HEAD` in this worktree.
@@ -27,8 +28,8 @@ Documentation HEAD at time of writing: see `git rev-parse HEAD` in this worktree
 | Users — manual/privileged | 14/14 (13 USER, 1 BUSINESS_OWNER) | Frozen — `docs/migration/users-manual-privileged-14-manifest.json` | manual review, checklist §3.4a | Included in the 578 total above |
 | Business-linked Users | 38/38 ownership + 38/38 BUSINESS_OWNER elevation | Reviewed, part of the 578 total | checklist §3.4 | No separate delta — subset of Users |
 | Businesses/ownership | Derived from the 38 business-linked users above | Reviewed | checklist §3.4 | CREATE ≈38 Business rows tied 1:1 to owner |
-| Places | 83 total rows; 82/82 lineage; 80/80 publishable PUBLISHED, 2 CITY_BLOCKED (PENDING), 1 non-migration seed | **Deferred** — "manifest generation deliberately deferred to actual cutover time" (checklist §5.5) | `migration:preview:wordpress-db --entity places` (read-only) | CREATE ~82 lineage-backed Places; 2 remain PENDING by design |
-| Offers | 63/63 published (safe canonical scope); 99 source published, 91 canonical, 28 Class H (no Place relation) + 8 Class I (alias) held back | **Deferred** — "byte-exact manifest hash deferred to actual cutover time... no bulk preview tool exists to freeze one today" (checklist §5.5) | same preview tool, `--entity offers` | CREATE 63 in safe scope; 36 (28+8) excluded pending founder decision (see backlog) |
+| Places | 83 total rows; 82/82 lineage; 80/80 publishable PUBLISHED, 2 CITY_BLOCKED (PENDING), 1 non-migration seed | **Frozen 2026-07-30** — `docs/migration/manifests/places-preview-2026-07-30.json`, hash `ca217c18ab59882ff3326e460ad6f825ad62f1b052b5d06d29dfc37ab17a7c6c` | `pnpm migration:preview:wordpress-db --entity place --allow-remote-readonly` (live WP-source, read-only, zero writes) | CREATE/UPDATE 78 SKIP_UNCHANGED + 4 expected `UPDATE_CONFLICT` (manually-protected 437/895/5389/43023, never overridden); 2 CITY_BLOCKED remain PENDING by design |
+| Offers | 63/63 published (safe canonical scope); 99 source published, 91 canonical, 28 Class H (no Place relation) + 8 Class I (alias) held back | **Frozen 2026-07-30 (from committed local state, not a live WP re-preview — see blocker note below)** — `docs/migration/manifests/offers-local-manifest-2026-07-30.json`, hash `e1dda8fd86dfe8df98e6ab4fe1e495f19a53579581aaae9401c8840aaf62dadf` | Local DB export (Offer + active OFFER `MigrationLineage`, 63/63 cross-referenced, 0 orphans) | CREATE 63 in safe scope; 36 (28+8) excluded pending founder decision (see backlog) |
 | Events (Activity) | 10 lineage records, 109 ActivitySession rows; 8/8 future-valid PUBLISHED + 1 protected legacy PUBLISHED; 1 EXPIRED_SOURCE_PENDING excluded | Reviewed, not called out as deferred | checklist §5.3 | CREATE 9 published Activities; 1 excluded (64159) pending founder decision |
 | Routes | 14/14 lineage; 13/13 reviewed PUBLISHED; 1 CITY_BLOCKED (Mogilev, `marshrut-mogilev`) kept DRAFT | Reviewed | checklist §5.4 | CREATE 13 published Routes; 1 stays DRAFT by design |
 | RouteStops | 90 rows (86 reviewed + Mogilev's 4); 12 mojibake fixes applied | Reviewed | checklist §5.4 | CREATE 90 |
@@ -37,6 +38,47 @@ Documentation HEAD at time of writing: see `git rev-parse HEAD` in this worktree
 | Media (local uploads) | 482 files, 38,494,112 bytes, per-file SHA-256 manifest verified in this session's backup/restore rehearsal | Frozen for **local dev only** — production media manifest not yet generated | see backup/restore rehearsal below | Production storage manifest is a cutover-time TODO (checklist §5.9) |
 | Activation recipients | 578 eligible, 0 exclusions (same manifest as Users above) | Frozen manifest; **canary subset size is explicitly a range ("3–5 accounts"), not fixed** — see `activation-canary-plan-2026-07-29.md` | `users-production-activation-delivery-plan.md` §4 | 0 real sends until founder-approved canary |
 | Sitemap URLs | 199 unique/resolving, 0 issues, 0 duplicates | Reviewed | rc-regression doc | No DB delta — derived output |
+| Place media | 39 `PlaceImage` rows, all attached to `PUBLISHED` Places; 159 `MediaAsset` rows total (site-wide) | **Frozen 2026-07-30** — counted from local DB, included in the Places manifest cross-check | Local DB query | CREATE ≈39 `PlaceImage` rows alongside their 82 Places |
+| Offer media | 0/63 published Offers have `coverImage` set; 0 `galleryImages` entries | **Frozen 2026-07-30** — confirmed zero, matches known `OFFER_MEDIA_DEFERRED_P1` backlog item | Local DB query | No media delta expected for Offers in this scope — already founder-approved as deferred |
+
+## 2026-07-30 update: Places and Offers manifests frozen
+
+**Places** — a single bounded, read-only preview was run against the live
+legacy WordPress source (`pnpm migration:preview:wordpress-db --entity
+place --allow-remote-readonly`, no `--limit`, so it covered the full
+scope). This makes **zero writes** (confirmed by the script's own
+docstring: "Nothing is written to any database, no MigrationRun/
+MigrationRecord rows are created"). Result: 82 discovered, 82 normalized,
+0 failed — 78 `SKIP_UNCHANGED`, 4 `UPDATE_CONFLICT`. The 4 conflicts are
+exactly the manually-protected Places already known (437, 895, 5389) plus
+one newly-confirmed instance (**43023**, "Атмосфера" — modified
+2026-07-23, 6 days after its last import on 2026-07-17; same
+`TARGET_MODIFIED_AFTER_IMPORT` pattern). All 4 are expected,
+non-blocking, and must never be force-overridden — see the updated
+`migration-manual-protected-places` memory note. Manifest saved to
+`docs/migration/manifests/places-preview-2026-07-30.json` (hash above).
+
+**Offers** — the per-record tool that exists for this
+(`migration:preview:offer-snapshot`) is **not a bulk/live WP-source
+fetcher**: it requires a pre-existing offline snapshot file
+(`offers-inventory.json`) that has no generator script in this repo and
+does not exist in this worktree (or anywhere else searched). **Exact
+blocker: `offers-inventory.json` snapshot input is missing and
+unreproducible without either the original ad-hoc export or a new script
+to build one from the live WP source.** Rather than leave Offers deferred
+again, this manifest instead freezes the **already-migrated, already
+human-reviewed local state**: all 63 `PUBLISHED` Offers cross-referenced
+1:1 against their active `OFFER` `MigrationLineage` rows (0 orphans, 0
+unlinked). This is a legitimate production manifest — these 63 rows
+already passed through classification, review, and publication in prior
+sessions — but it is **not** a fresh live-source diff the way the Places
+manifest is, so it cannot report `SKIP_UNCHANGED`/`UPDATE_CONFLICT`
+against the current WordPress source. If a true source-side diff is
+required before cutover, someone with access to the original
+`offers-inventory.json` (or a new bulk-fetch script) must produce it —
+this is a founder/dev-team decision, not something invented here. Manifest
+saved to `docs/migration/manifests/offers-local-manifest-2026-07-30.json`
+(hash above).
 
 ## Forbidden / invariant fields (as already documented, not newly invented)
 
