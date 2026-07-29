@@ -1157,8 +1157,8 @@ alone (no city filter) and leaked the URL's (possibly wrong) city into its
 own computed canonical, now resolves the offer's real city and redirects on
 any mismatch.
 
-Sitemap: was entirely missing Places/Offers/Routes/Articles/Events (explicit
-TODO, only homepage/city-hub/tag pages emitted). Populated using each
+Sitemap expanded to 199 directly resolving URLs; individual
+Place/Offer/Route/Article/Event URLs were previously absent. Populated using each
 entity's own public-visibility predicate + the same canonical resolvers, so
 sitemap URLs always match each page's own <link rel="canonical">. Found
 live during the dev crawl: content belonging to isActive:false cities
@@ -1219,8 +1219,9 @@ localhost:3076. Full reports: docs/migration/seo/integrated-rc-crawl-summary.md.
 
 Local-only phase: no push, no PR, no merge into release/integrated-rc/dev/
 main; release/integrated-rc and all source worktrees confirmed untouched
-throughout. 8 local commits on fix/seo-migration-closure, working tree
-clean.
+throughout. The final count is computed from the current base with
+`git rev-list --count b30325f5..HEAD` (40 commits after the two redirect-center
+closure commits), not a hand-maintained phase estimate.
 
 REMAINING (not blocking local technical closure, explicitly deferred):
 - External Search Console/Analytics/backlink baseline — not available
@@ -1523,7 +1524,8 @@ Completed 2026-07-29: canonical P0 (all 5 entities), city-duplicate-matrix fixes
 (Place/Offer), sitemap entity coverage + inactive-city exclusion, redirect
 manifest reconciliation (893 rows, 0 collisions/chains/loops), structured-data
 audit, media runtime, bounded verifier, dev + production-build crawls (0 P0
-both). 8 local commits on fix/seo-migration-closure, working tree clean, no
+both). 40 local commits on fix/seo-migration-closure relative to
+`b30325f5` after redirect-center closure, working tree clean, no
 push/PR/merge.
 
 Next single action: provide external Search Console / Analytics / backlink

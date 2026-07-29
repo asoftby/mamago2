@@ -186,3 +186,32 @@ SEO Go/No-Go requires all of:
 **Local technical closure (items 2–5, 8, 9, 11) — PASS.**
 **Full SEO Go/No-Go (items 1, 6, 7, 10, 12) — BLOCKED, needs external
 baseline + founder input, not purely a code/local-verification gap.**
+
+## 14. Redirect Center visibility closure
+
+`/admin/seo/redirects` was empty because `getRedirectCenterData()` returned
+hardcoded empty arrays and never read the migration redirect manifest. It now
+reads `scripts/data/wp-redirect-map.json`, the same source that feeds
+`manifest.csv`/`next.config.ts`, and uses the classifier shared with
+`scripts/validate-redirect-map.ts`.
+
+- System/migration redirects: 893, read-only.
+- Manual redirects: 0 persisted rules. The misleading browser-only create
+  flow was removed; persisted manual create/update is P1.
+- Server-side search covers source and destination; disposition filtering and
+  25-row pagination include clamped last/out-of-range pages.
+- The client receives only the current page, not the full manifest.
+- Counts: EXACT 12, HUB 21, P1 contains 24, INVALID_TARGET 836, collisions 0,
+  chains 0, loops 0.
+- Runtime and test evidence:
+  `docs/migration/seo/redirect-admin-visibility-proof.md`.
+
+```text
+SEO LOCAL TECHNICAL CLOSURE: COMPLETE / PASS
+REDIRECT RUNTIME INFRASTRUCTURE: COMPLETE
+REDIRECT ADMIN VISIBILITY: COMPLETE
+SYSTEM/MIGRATION REDIRECTS: 893 — READ ONLY
+MANUAL REDIRECTS: 0 — no persisted rules
+EXTERNAL TRAFFIC-BASED LEGACY URL REVIEW: P1 DEFERRED
+NEXT PHASE: PRODUCT REGRESSION / RC READINESS
+```

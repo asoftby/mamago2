@@ -64,11 +64,14 @@ classification below) against the local dev DB:
   rows in the legacy manifest. The great majority of these are historical/
   expired WP content that was deliberately excluded from migration (63
   events classified `P1_HISTORICAL_EXPIRED_ACTIVITY`, per the Users/
-  Activities closure sessions). Following one of these redirects lands a
-  real visitor on a real 404 for content that genuinely doesn't exist on
-  the new site — correct behavior, not a defect. Per explicit instruction,
-  not blocking release; the actual confirmed count (893) is the fixed
-  baseline, not chased toward the old 900 target.
+  Activities closure sessions). This classification is content-resolution
+  evidence, not an assertion that runtime returns 404. Local HTTP smoke on
+  2026-07-29 confirmed representative Article and Event rows take exactly
+  one 308 hop to the manifest destination and that destination returns 200
+  under the current public route fallback policy. This is not an exact SEO
+  migration of the missing content; traffic-based remapping is P1 deferred.
+  Per explicit instruction, the missing external traffic baseline does not
+  block the P0 local release gate.
 - **COLLISION / CHAIN / LOOP**: 0 each, confirmed by both the structural
   validator and the DB-resolution classifier independently.
 
@@ -108,3 +111,6 @@ Redirect architecture: **PASS** — 0 loops, 0 chains, 0 collisions, 0
 duplicate sources, manifest structurally 100% valid. Content-resolution
 gap (836 `INVALID_TARGET`) is a documented, expected consequence of
 migration scope, not a redirect defect, and does not block SEO closure.
+
+Runtime samples and admin visibility proof:
+`docs/migration/seo/redirect-admin-visibility-proof.md`.
