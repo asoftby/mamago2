@@ -1272,18 +1272,32 @@ REMAINING (not blocking local technical closure, explicitly deferred):
 
 ### 5.9 Release candidate и production cutover
 
-- [ ] Freeze production source snapshots.
-- [ ] Production manifests и checksums.
-- [ ] Fresh production backup и подтверждённый restore procedure.
+- [ ] Freeze production source snapshots. — founder/ops action, not yet declared.
+- [ ] Production manifests и checksums. — index assembled:
+      [production-entity-manifests-2026-07-29.md](production-entity-manifests-2026-07-29.md);
+      Places/Offers manifests remain explicitly deferred to cutover time.
+- [x] Fresh production backup и подтверждённый restore procedure —
+      **local rehearsal PASS** 2026-07-29 (DB: 13/13 table counts, 507
+      constraints, 736 indexes identical; storage: 482 files/38,494,112
+      bytes, 0 checksum discrepancies). Production execution still
+      `PENDING GO WINDOW` — no production DB/hosting target exists to
+      back up yet.
 - [ ] Full local production-like rehearsal.
 - [ ] Dev metadata-only rehearsal.
 - [ ] Cumulative DB/storage delta и forbidden fields/tables audits.
 - [ ] Redirect/SEO validation report.
 - [ ] Docker Build & Push exact RC SHA — GREEN.
-- [ ] Финальный Go/No-Go.
-- [ ] Последовательная production migration.
+- [ ] Финальный Go/No-Go. — draft matrix:
+      [go-no-go-readiness-2026-07-29.md](go-no-go-readiness-2026-07-29.md).
+- [ ] Последовательная production migration. — runbook drafted:
+      [production-migration-runbook-2026-07-29.md](production-migration-runbook-2026-07-29.md).
 - [ ] Post-migration validation и разрешённые idempotency reruns.
-- [ ] DNS cutover, noindex switch, monitoring/rollback decision window.
+- [ ] DNS cutover, noindex switch, monitoring/rollback decision window. —
+      plans drafted:
+      [dns-cutover-plan-2026-07-29.md](dns-cutover-plan-2026-07-29.md),
+      [launch-monitoring-plan-2026-07-29.md](launch-monitoring-plan-2026-07-29.md).
+      Activation canary formalized:
+      [activation-canary-plan-2026-07-29.md](activation-canary-plan-2026-07-29.md).
 
 ---
 
@@ -1540,4 +1554,65 @@ already closed; MutationObserver — DEV_ONLY/NOT_REPRODUCED; legal/about/
 contact page audit; content/metadata parity CSV; per-row legacy-URL action
 manifest for the 836 INVALID_TARGET redirect rows; PlaceHero.tsx dead
 /places link).
+```
+
+```text
+Phase: FINAL GO/NO-GO PREPARATION — readiness package assembled
+2026-07-29, worktree mamago2-product-regression-rc, branch
+codex/product-regression-rc-20260729, on RC source SHA
+17c9dd29787bbab0462ca581c546ca83a5dc2e73 (docs-only HEAD, verified no code
+diff to that SHA before starting).
+
+Both mandatory evidence gaps named above are now closed locally:
+- Mobile visual UAT at 390x844 and 412x915 across public/auth/business/admin
+  surfaces — no page-level horizontal overflow found; one console error
+  ("Rendered more hooks than during the previous render") observed on
+  client-side navigation under `next dev` + React StrictMode, plausibly a
+  dev-only double-invocation artifact (not yet re-verified under a
+  production build in this session — flag for a quick targeted check before
+  final sign-off); the already-known Admin Routes column-clipping P1 and
+  external-Unsplash-fallback P1 both reproduced as expected, no new P0.
+- BUSINESS_OWNER UI end-to-end, via a disposable local fixture (created and
+  fully deleted after the test, zero residue, counts diffed before/after):
+  own-Business scoping confirmed, edit → save correctly created a PENDING
+  `PlaceRevision` (moderation lifecycle working), cross-tenant edit URL
+  access was safely redirected to the actor's own list (no data leak), a
+  plain `USER` account was redirected away from `/business`, ADMIN/BUSINESS
+  fixture roles unchanged after testing.
+
+New this session, added to the readiness package:
+- `production-entity-manifests-2026-07-29.md` — manifest index consolidating
+  already-confirmed counts (Users 578, Articles 2 frozen with hashes; Places
+  and Offers explicitly still deferred to cutover time, per §5.5).
+- `production-migration-runbook-2026-07-29.md` — synthesized cross-entity
+  execution order (Users → Businesses → Places → Offers → Routes → Events →
+  Articles → Redirects → Media → Activation canary), preflight table with
+  explicit gaps flagged (no production DB/hosting target named anywhere in
+  the corpus — founder must supply).
+- `activation-canary-plan-2026-07-29.md` — formalizes the existing delivery
+  plan's canary step into PASS/STOP tables; recipients still
+  FOUNDER_SELECTION_REQUIRED, batch size still TBD by founder, bounce-webhook
+  gap unchanged.
+- `dns-cutover-plan-2026-07-29.md` — new; no equivalent existed. Built on the
+  existing noindex mechanism (`SITE_INDEXING_ENABLED` /
+  `SITE_NOINDEX_FORCE` / `SITE_NOINDEX_DEFAULT`, fail-safe default noindex)
+  and `ProductionMigrationGuard`.
+- `launch-monitoring-plan-2026-07-29.md` — new; first-15-min/hour/24h
+  checklist using existing tooling (Sentry, redirect validator, activation
+  audit), no new monitoring platform introduced.
+- Local DB backup/restore rehearsal: `pg_dump` → disposable database →
+  13/13 key table counts, 507 constraints, 736 indexes, role distribution
+  and published-content counts all identical; `prisma migrate status`
+  reports up to date against the restored copy; disposable database
+  dropped. PASS.
+- Local storage/media restore rehearsal: 482 files, 38,494,112 bytes,
+  per-file SHA-256 manifest; copied to a disposable directory, re-hashed,
+  0 discrepancies; disposable copy deleted. PASS.
+
+Next single action: FOUNDER FINAL APPROVAL of the exact RC SHA and launch
+window — production backup execution, production entity manifests for
+Places/Offers, canary recipient selection, DB/hosting target confirmation,
+and the rollback-trigger threshold are the remaining explicit founder
+inputs before a CONDITIONAL GO can become a GO. See
+`go-no-go-readiness-2026-07-29.md` for the full decision matrix.
 ```
