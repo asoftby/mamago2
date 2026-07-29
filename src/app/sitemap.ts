@@ -14,6 +14,7 @@ import { resolveRouteCanonicalUrl } from "@/lib/seo/resolveRouteCanonicalUrl";
 import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl";
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +24,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   const baseUrl = getBaseUrl("BY");
-  const now = new Date();
 
-  const entries: MetadataRoute.Sitemap = [
-    {
-      url: baseUrl,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 1,
-    },
-  ];
+  // The public surface's own middleware unconditionally 307-redirects "/"
+  // to the flagship city hub outside dev/localhost
+  // (resolveSubdomainMiddlewareDecision in subdomainMiddleware.ts) — a real
+  // production request for baseUrl never itself returns 200, so this
+  // entry is intentionally omitted here; the flagship city's hub entry
+  // below (from the city loop) gets priority 1 instead of 0.9, since it's
+  // effectively the sitemap's "homepage" entry (sitemap entries should
+  // resolve directly to 200, not redirect).
+  const entries: MetadataRoute.Sitemap = [];
 
   try {
     const cities = await prisma.city.findMany({
@@ -55,7 +56,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "hub" })}`,
         lastModified: city.updatedAt,
         changeFrequency: "daily",
-        priority: 0.9,
+        priority: city.slug === DEFAULT_CITY_SLUG ? 1 : 0.9,
       });
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "events" })}`,

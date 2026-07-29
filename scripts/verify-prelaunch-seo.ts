@@ -107,10 +107,33 @@ interface FollowResult {
   headers: Headers | null;
 }
 
+/**
+ * Rewrites a URL whose origin is EXPECTED_ORIGIN (e.g. https://mamago.by,
+ * baked into sitemap/canonical output by a production-configured build) to
+ * BASE_URL's origin (e.g. http://localhost:3076, where this verifier is
+ * actually pointed) so the crawl can reach a server under test that isn't
+ * really deployed at the production domain. Leaves any other origin
+ * untouched — a URL that's neither EXPECTED_ORIGIN nor BASE_URL is exactly
+ * what CANONICAL_WRONG_ORIGIN exists to catch, not something to silently
+ * "fix" by rewriting it away.
+ */
+function toFetchUrl(url: string): string {
+  if (!EXPECTED_ORIGIN || !BASE_URL || EXPECTED_ORIGIN === new URL(BASE_URL).origin) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.origin === EXPECTED_ORIGIN) {
+      return `${BASE_URL}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    // not an absolute URL — nothing to rewrite
+  }
+  return url;
+}
+
 async function followRedirects(startUrl: string, maxHops = 5): Promise<FollowResult> {
   const hops: RedirectHop[] = [];
   const seen = new Set<string>();
-  let current = startUrl;
+  let current = toFetchUrl(startUrl);
 
   for (let i = 0; i < maxHops; i++) {
     if (seen.has(current)) {
@@ -130,7 +153,7 @@ async function followRedirects(startUrl: string, maxHops = 5): Promise<FollowRes
       const location = res.headers.get("location");
       hops.push({ url: current, status: res.status, location });
       if (!location) return { finalUrl: current, finalStatus: res.status, hops, loop: false, html: null, headers: res.headers };
-      current = new URL(location, current).toString();
+      current = toFetchUrl(new URL(location, current).toString());
       continue;
     }
 
