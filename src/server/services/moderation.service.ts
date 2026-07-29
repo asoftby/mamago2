@@ -1,6 +1,6 @@
-import prisma from "@/lib/prisma";
+import prisma, { prismaBase, searchIndexer } from "@/lib/prisma";
 import { ContentStatus, ModerationEntityType, ModerationAction, Prisma } from "@prisma/client";
-import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { createPublishTimer } from "@/server/utils/publishPipeline";
 
 /**
  * Log a moderation action
@@ -99,9 +99,16 @@ export async function approvePlace(
   if (!place) throw new Error("Place not found");
   if (place.status !== "PENDING") throw new Error(`Cannot approve from status: ${place.status}`);
 
-  await prisma.$transaction([
-    prisma.place.update({ where: { id: placeId }, data: { status: "PUBLISHED" } }),
-    prisma.moderationLog.create({
+  // EVENT_SEARCH_INDEX_PUBLICATION_RACE fix: this status update and the
+  // slug assignment below are two sequential writes to the same row. Using
+  // prismaBase (no search-indexing extension) here means neither one
+  // independently dispatches a fire-and-forget reindex reading an
+  // intermediate (published-but-no-slug) snapshot — only the single,
+  // explicitly awaited upsertPlace() call below ever indexes this Place for
+  // this operation, always reading the final, fully-published state.
+  await prismaBase.$transaction([
+    prismaBase.place.update({ where: { id: placeId }, data: { status: "PUBLISHED" } }),
+    prismaBase.moderationLog.create({
       data: { entityType: "PLACE", entityId: placeId, action: "APPROVE", message: message || "Approved", reviewedByUserId },
     }),
   ]);
@@ -112,15 +119,26 @@ export async function approvePlace(
     await assignSlugOnPublish(placeId);
   }
   timer.mark("response");
+
+  // Single deterministic, awaited final reindex — the caller only gets a
+  // result after the search document reflects the final published state.
+  await searchIndexer.upsertPlaceStrict(placeId);
   timer.log({ status: "PUBLISHED", flow: "admin-approve" });
 
-  // Notify creator (outside transaction, non-blocking)
-  const { notifyPlaceApproved } = await import("./notification.service");
-  notifyPlaceApproved(placeId, place.title, place.createdByUserId).catch((e) =>
-    console.error("[moderation] notifyPlaceApproved failed:", e),
-  );
+  // Notify creator (outside transaction, non-blocking). The import itself
+  // (not just the call) is wrapped, so a notification-layer failure never
+  // fails the publish operation — same resilience the call below already
+  // had via .catch(), just extended to cover the import step too.
+  try {
+    const { notifyPlaceApproved } = await import("./notification.service");
+    notifyPlaceApproved(placeId, place.title, place.createdByUserId).catch((e) =>
+      console.error("[moderation] notifyPlaceApproved failed:", e),
+    );
+  } catch (e) {
+    console.error("[moderation] notifyPlaceApproved import failed:", e);
+  }
 
-  const published = await prisma.place.findUniqueOrThrow({
+  const published = await prismaBase.place.findUniqueOrThrow({
     where: { id: placeId },
     select: { id: true, status: true, slug: true, updatedAt: true },
   });
@@ -319,8 +337,16 @@ export async function approveActivity(
 
   const { resolvePendingLocationOnPublish } = await import("@/lib/business/resolvePendingLocationOnPublish");
 
+  // EVENT_SEARCH_INDEX_PUBLICATION_RACE fix: this transaction (status
+  // update, and any Place created for a pending location) and the slug
+  // assignment below are multiple sequential writes to the same Activity
+  // (and possibly a new Place). Using prismaBase (no search-indexing
+  // extension) here means none of these intermediate writes independently
+  // dispatches a fire-and-forget reindex reading a stale (e.g.
+  // published-but-no-slug) snapshot — only the explicitly awaited final
+  // upsert calls below ever index these rows for this operation.
   const { placeId: resolvedPlaceId, placeCreated, updatedScheduleJson } =
-    await prisma.$transaction(async (tx) => {
+    await prismaBase.$transaction(async (tx) => {
       const result = await resolvePendingLocationOnPublish(
         tx,
         activityId,
@@ -365,13 +391,25 @@ export async function approveActivity(
     await ensurePublishedActivityHasSlug(activityId);
   }
   timer.mark("response");
+
+  // Single deterministic, awaited final reindex per touched entity — the
+  // caller only gets a result after the search document(s) reflect the
+  // final published state.
+  await searchIndexer.upsertActivityStrict(activityId);
+  if (placeCreated && resolvedPlaceId) {
+    await searchIndexer.upsertPlaceStrict(resolvedPlaceId);
+  }
   timer.log({ status: "PUBLISHED", placeCreated: placeCreated ? 1 : 0, flow: "admin-approve" });
 
-  const { notifyActivityApproved } = await import("./notification.service");
-  if (activity.businessId) {
-    notifyActivityApproved(activityId, activity.title, activity.businessId).catch((e) =>
-      console.error("[moderation] notifyActivityApproved failed:", e),
-    );
+  try {
+    const { notifyActivityApproved } = await import("./notification.service");
+    if (activity.businessId) {
+      notifyActivityApproved(activityId, activity.title, activity.businessId).catch((e) =>
+        console.error("[moderation] notifyActivityApproved failed:", e),
+      );
+    }
+  } catch (e) {
+    console.error("[moderation] notifyActivityApproved import failed:", e);
   }
 }
 
@@ -517,29 +555,39 @@ export async function approveOffer(
   if (!offer) throw new Error("Offer not found");
   if (offer.status !== "PENDING") throw new Error(`Cannot approve from status: ${offer.status}`);
 
-  await prisma.offer.update({
+  // EVENT_SEARCH_INDEX_PUBLICATION_RACE fix: this status update and the
+  // slug/canonical sync below are two sequential writes to the same row.
+  // Using prismaBase (no search-indexing extension) here means the status
+  // update never independently dispatches a fire-and-forget reindex reading
+  // a stale (published-but-no-slug) snapshot. The slug/canonical sync is
+  // now always awaited (previously fire-and-forget via
+  // runAfterPublishResponse when the Offer already had a slug — the caller
+  // could get a "success" result before canonical sync even ran), and the
+  // explicit final upsertOffer() call below is the single, deterministic,
+  // awaited index of the final published state.
+  await prismaBase.offer.update({
     where: { id: offerId },
     data: { status: "PUBLISHED", publishedAt: new Date() },
   });
   timer.mark("status");
 
   const { ensurePublishedOfferHasSlug } = await import("@/lib/slug/publishSlugGuards");
-  if (!offer.slug) {
-    await ensurePublishedOfferHasSlug(offerId);
-  } else {
-    runAfterPublishResponse("publish:offer", "sync published offer canonical", () =>
-      ensurePublishedOfferHasSlug(offerId),
-    );
-  }
+  await ensurePublishedOfferHasSlug(offerId);
   timer.mark("response");
+
+  await searchIndexer.upsertOfferStrict(offerId);
   timer.log({ status: "PUBLISHED", flow: "admin-approve" });
 
-  const { notifyOfferApproved } = await import("./notification.service");
-  const ownerId = offer.place?.ownerBusinessId;
-  if (ownerId) {
-    notifyOfferApproved(offerId, offer.title, ownerId).catch((e) =>
-      console.error("[moderation] notifyOfferApproved failed:", e),
-    );
+  try {
+    const { notifyOfferApproved } = await import("./notification.service");
+    const ownerId = offer.place?.ownerBusinessId;
+    if (ownerId) {
+      notifyOfferApproved(offerId, offer.title, ownerId).catch((e) =>
+        console.error("[moderation] notifyOfferApproved failed:", e),
+      );
+    }
+  } catch (e) {
+    console.error("[moderation] notifyOfferApproved import failed:", e);
   }
 }
 
