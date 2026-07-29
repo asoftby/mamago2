@@ -3,12 +3,12 @@ import { resolvePlaceCanonicalUrl } from "./resolvePlaceCanonicalUrl";
 
 function testStoredCanonicalPreferred() {
   const result = resolvePlaceCanonicalUrl({
-    seoCanonicalUrl: "https://mamago.by/places/stored-canonical",
+    seoCanonicalUrl: "https://mamago.by/places/some-slug",
     slug: "some-slug",
     id: "place-1",
     publicBase: "https://mamago.by",
   });
-  assert.equal(result, "https://mamago.by/places/stored-canonical");
+  assert.equal(result, "https://mamago.by/places/some-slug");
 }
 
 function testFallsBackToSlugWhenNoStoredCanonical() {
@@ -52,10 +52,70 @@ function testEmptyStringStoredCanonicalTreatedAsAbsent() {
   assert.equal(result, "https://mamago.by/places/real-slug");
 }
 
+function testStaleLocalOriginRejected() {
+  const result = resolvePlaceCanonicalUrl({
+    seoCanonicalUrl: "http://mamago.local:3000/places/real-slug",
+    slug: "real-slug",
+    id: "place-1",
+    publicBase: "https://mamago.by",
+  });
+  assert.equal(result, "https://mamago.by/places/real-slug");
+}
+
+function testInvalidUrlRejected() {
+  const result = resolvePlaceCanonicalUrl({
+    seoCanonicalUrl: "not a url",
+    slug: "real-slug",
+    id: "place-1",
+    publicBase: "https://mamago.by",
+  });
+  assert.equal(result, "https://mamago.by/places/real-slug");
+}
+
+function testWrongEntityPathRejected() {
+  const result = resolvePlaceCanonicalUrl({
+    seoCanonicalUrl: "https://mamago.by/routes/real-slug",
+    slug: "real-slug",
+    id: "place-1",
+    publicBase: "https://mamago.by",
+  });
+  assert.equal(result, "https://mamago.by/places/real-slug");
+}
+
+function testWrongSlugRejected() {
+  const result = resolvePlaceCanonicalUrl({
+    seoCanonicalUrl: "https://mamago.by/places/a-different-place",
+    slug: "real-slug",
+    id: "place-1",
+    publicBase: "https://mamago.by",
+  });
+  assert.equal(result, "https://mamago.by/places/real-slug");
+}
+
+function testQueryOrHashRejected() {
+  for (const seoCanonicalUrl of [
+    "https://mamago.by/places/real-slug?preview=1",
+    "https://mamago.by/places/real-slug#section",
+  ]) {
+    const result = resolvePlaceCanonicalUrl({
+      seoCanonicalUrl,
+      slug: "real-slug",
+      id: "place-1",
+      publicBase: "https://mamago.by",
+    });
+    assert.equal(result, "https://mamago.by/places/real-slug");
+  }
+}
+
 testStoredCanonicalPreferred();
 testFallsBackToSlugWhenNoStoredCanonical();
 testNeverUsesIdWhenSlugExists();
 testFallsBackToIdOnlyWhenNoSlugAtAll();
 testEmptyStringStoredCanonicalTreatedAsAbsent();
+testStaleLocalOriginRejected();
+testInvalidUrlRejected();
+testWrongEntityPathRejected();
+testWrongSlugRejected();
+testQueryOrHashRejected();
 
 console.log("resolvePlaceCanonicalUrl tests: OK");

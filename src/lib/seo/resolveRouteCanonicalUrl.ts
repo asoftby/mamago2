@@ -1,3 +1,5 @@
+import { validateStoredCanonical } from "./validateStoredCanonical";
+
 /**
  * Resolves the canonical URL for a publicly-visible Route detail page.
  *
@@ -26,28 +28,16 @@ export interface ResolvePublicRouteCanonicalUrlInput extends ResolveRouteCanonic
 export function resolveRouteCanonicalUrl(input: ResolveRouteCanonicalUrlInput): string {
   const slug = input.slug?.trim();
   const base = input.publicBase.replace(/\/$/, "");
-  const fallback = `${base}/routes/${slug || input.id}`;
-  const stored = input.seoCanonicalUrl?.trim();
-  if (stored) {
-    try {
-      const url = new URL(stored);
-      const publicOrigin = new URL(input.publicBase).origin;
-      const expectedPath = `/routes/${slug || input.id}`;
-      if (
-        (url.protocol === "http:" || url.protocol === "https:") &&
-        url.origin === publicOrigin &&
-        url.pathname.replace(/\/$/, "") === expectedPath &&
-        !url.search &&
-        !url.hash
-      ) {
-        return url.toString();
-      }
-    } catch {
-      // Invalid stored metadata must not prevent the deterministic fallback.
-    }
-  }
+  const expectedPath = `/routes/${slug || input.id}`;
+  const fallback = `${base}${expectedPath}`;
 
-  return fallback;
+  const validated = validateStoredCanonical({
+    stored: input.seoCanonicalUrl,
+    publicBase: input.publicBase,
+    expectedPath,
+  });
+
+  return validated ?? fallback;
 }
 
 export function resolvePublicRouteCanonicalUrl(

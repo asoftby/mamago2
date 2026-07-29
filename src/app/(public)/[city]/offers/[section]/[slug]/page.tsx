@@ -10,6 +10,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { getOfferPublicPath, getOfferPublicSection, parseOfferPublicSection } from "@/lib/offers/offerPublicUrl";
+import { resolveOfferCanonicalUrl } from "@/lib/seo/resolveOfferCanonicalUrl";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { OfferPageView } from "@/components/offers";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -77,9 +78,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const publicBase = getCanonicalPublicAppUrl();
   const title = offer.seoTitle?.trim() || offer.title;
   const description = offer.seoDescription?.trim() || offer.description || "";
-  
-  const canonicalPath = getOfferPublicPath(offer, city);
-  const canonical = offer.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`;
+
+  const canonical = resolveOfferCanonicalUrl({
+    seoCanonicalUrl: offer.seoCanonicalUrl,
+    offer,
+    citySlug: city,
+    publicBase,
+  });
 
   return {
     ...buildOgMeta({
@@ -89,7 +94,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: canonical,
       robots: parseRobots(offer.seoRobots) ?? { index: true, follow: true },
     }),
-    alternates: offer.seoCanonicalUrl?.trim() ? { canonical: offer.seoCanonicalUrl.trim() } : undefined,
+    alternates: { canonical },
   };
 }
 
