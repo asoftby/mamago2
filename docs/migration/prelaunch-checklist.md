@@ -2,12 +2,12 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-29 — SEO MIGRATION CLOSURE (local technical) complete
-**RC:** `release/integrated-rc`, base `ed5763c2`, source `fix/admin-article-preview-routing@532fd04d`
+**Обновлено:** 2026-07-29 — PRODUCT REGRESSION / RC READINESS complete
+**RC:** `codex/product-regression-rc-20260729@17c9dd29`, based on `release/integrated-rc@5edeaaac`
 **SEO closure branch:** `fix/seo-migration-closure` (worktree `mamago2-seo-migration-closure`), base `release/integrated-rc@5edeaaac`
-**Текущая фаза:** `SEO MIGRATION CLOSURE — LOCAL TECHNICAL COMPLETE`
-**Текущий кандидат для следующего шага:** external Search Console/Analytics/backlink baseline for full SEO Go/No-Go, then PRODUCT REGRESSION / RC READINESS — not a return to already-closed migration entities.
-**Текущий gate:** `SEO LOCAL TECHNICAL CLOSURE: PASS`; full SEO Go/No-Go blocked on external baseline; UAT Pass 1 remains the next mandatory launch gate after that.
+**Текущая фаза:** `PRODUCT REGRESSION / RC READINESS — TECHNICAL PASS`
+**Текущий кандидат для следующего шага:** `FINAL GO/NO-GO PREPARATION` с закрытием двух обязательных ручных evidence gates: mobile visual UAT и authenticated BUSINESS_OWNER end-to-end UAT.
+**Текущий gate:** confirmed product P0 defects `0`; launch всё ещё не разрешён без указанных UAT evidence, founder acceptance и production-only gates.
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -16,15 +16,14 @@
 ## INTEGRATED RC
 
 ```text
-Status:             CODE/HISTORY ASSEMBLED
-Technical baseline: CODE/BUILD PASS
-RC branch:          release/integrated-rc
-Base SHA:           ed5763c2
-Source branch SHA:  532fd04d
-Merge commit SHA:   ecd76bea
-Browser/runtime:    RUNTIME PARTIAL — SEO/runtime findings below
-SEO closure:        PENDING — mandatory launch gate
-UAT Pass 1:         NOT STARTED
+Status:             PRODUCT REGRESSION TECHNICAL PASS
+Technical baseline: CODE/BUILD/TYPECHECK PASS
+RC branch:          codex/product-regression-rc-20260729
+Exact tested SHA:   17c9dd29787bbab0462ca581c546ca83a5dc2e73
+RC base:            release/integrated-rc@5edeaaac
+Browser/runtime:    DESKTOP PASS; MOBILE VISUAL NOT TESTED
+SEO closure:        LOCAL TECHNICAL PASS
+UAT Pass 1:         PARTIAL — owner/mobile manual evidence remains
 ```
 
 Known non-P0 defects retained:
@@ -1481,15 +1480,16 @@ Side findings from the bounded Route runtime audit:
 Это операционная оценка, не календарное обещание:
 
 ```text
-Implementation readiness:  ~80% — основные surfaces и guards существуют;
-                            ряд flows не подтверждён end-to-end.
-Migration readiness:       ~73% — Users закрыты локально; Events/Routes/media,
-                            production execution и audits остаются.
-Product UAT readiness:      ~10% — матрица определена, Pass 1 ещё не начат,
-                            фактический объём продуктовых дефектов неизвестен.
+Implementation readiness:  ~95% — critical surfaces и guards существуют;
+                            confirmed open product P0 defects: 0.
+Migration readiness:       ~85% — local scope и manifests закрыты;
+                            production execution и production audits остаются.
+Product UAT readiness:      ~75% — desktop, automated auth/business/admin и
+                            public smoke пройдены; mobile и owner UI остаются.
 Production readiness:      ~30% — activation rehearsal готов, но backup/restore,
                             RC exact-SHA, providers и production gates не пройдены.
-Overall launch readiness:   ~45% — ограничено непройденным UAT и production gates;
+Overall launch readiness:   ~90% technical RC / ~45% launch — технический RC
+                            зелёный, но production gates всё ещё не пройдены;
                             это не среднее арифметическое остальных оценок.
 ```
 
@@ -1519,21 +1519,19 @@ Events, Routes, Places/Offers safe publication, Articles, Users migration and th
 ## 9. Следующее одно действие
 
 ```text
-Phase: SEO MIGRATION CLOSURE — LOCAL TECHNICAL: PASS (see §5.7 for full evidence)
-Completed 2026-07-29: canonical P0 (all 5 entities), city-duplicate-matrix fixes
-(Place/Offer), sitemap entity coverage + inactive-city exclusion, redirect
-manifest reconciliation (893 rows, 0 collisions/chains/loops), structured-data
-audit, media runtime, bounded verifier, dev + production-build crawls (0 P0
-both). 40 local commits on fix/seo-migration-closure relative to
-`b30325f5` after redirect-center closure, working tree clean, no
-push/PR/merge.
+Phase: PRODUCT REGRESSION / RC READINESS — TECHNICAL PASS
+Completed 2026-07-29 on exact source SHA
+`17c9dd29787bbab0462ca581c546ca83a5dc2e73`: production build, built-artifact
+smoke, public discovery, desktop Admin/Redirect Center, automated auth,
+activation, ownership/access/lifecycle, typecheck and warmed SEO crawl. Confirmed
+open product P0 defects: 0. Full evidence:
+`docs/migration/rc-product-regression-2026-07-29.md`.
 
-Next single action: provide external Search Console / Analytics / backlink
-exports so a full SEO Go/No-Go can be recorded (LOCAL TECHNICAL CLOSURE alone
-does not authorize launch). Once that's in hand (or a founder decision to
-defer it), move to PRODUCT REGRESSION / RC READINESS — not a return to
-already-closed migration entities (Events/Routes/Places/Offers/Articles/Users)
-or already-closed SEO items above without new regression evidence.
+Next single action: FINAL GO/NO-GO PREPARATION. First attach manual mobile and
+authenticated BUSINESS_OWNER end-to-end evidence to this exact RC lineage;
+then assemble founder acceptance and owners/timestamps/proof for the existing
+production-only gates. Do not return to already-closed migration entities or
+SEO items without new regression evidence.
 
 Out of scope for this phase: UAT Pass 1, production writes/email, DNS, Search
 Console submission, payments, CITY_BLOCKED Places disposition, Event 64159
