@@ -9,6 +9,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { resolvePublicRouteCanonicalUrl } from "@/lib/seo/resolveRouteCanonicalUrl";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canViewRoute } from "@/lib/routes/routeAccess";
@@ -72,6 +73,7 @@ export async function generateMetadata({ params }: Props) {
     const db = await prisma.route.findUnique({
       where: { id: resolved.routeId },
       select: {
+        id: true,
         title: true,
         slug: true,
         status: true,
@@ -79,6 +81,7 @@ export async function generateMetadata({ params }: Props) {
         authorId: true,
         seoTitle: true,
         seoDescription: true,
+        seoCanonicalUrl: true,
         coverImageUrl: true,
         budgetLevel: true,
         _count: { select: { stops: true } },
@@ -105,16 +108,28 @@ export async function generateMetadata({ params }: Props) {
       const image =
         db.coverImageUrl ??
         db.stops.find((s) => s.photoUrl)?.photoUrl;
-      return buildOgMeta({
-        title,
-        description,
-        image,
-        url: `${publicBase}/routes/${db.slug ?? slug}`,
-        // UNLISTED («по ссылке») и любые непубличные превью не индексируем.
-        ...(db.status !== "PUBLISHED" || db.visibility !== "PUBLIC"
-          ? { robots: { index: false, follow: false } }
-          : {}),
+      const isPubliclyVisible = db.status === "PUBLISHED" && db.visibility === "PUBLIC";
+      const canonical = resolvePublicRouteCanonicalUrl({
+        seoCanonicalUrl: db.seoCanonicalUrl,
+        slug: db.slug,
+        id: db.id,
+        publicBase,
+        status: db.status,
+        visibility: db.visibility,
       });
+      return {
+        ...buildOgMeta({
+          title,
+          description,
+          image,
+          url: canonical ?? `${publicBase}/routes/${db.slug}`,
+          // UNLISTED («по ссылке») и любые непубличные превью не индексируем.
+          ...(!isPubliclyVisible ? { robots: { index: false, follow: false } } : {}),
+        }),
+        // Never emit a public canonical for a DRAFT/non-public Route —
+        // only a PUBLISHED + PUBLIC route gets a canonical link at all.
+        ...(canonical ? { alternates: { canonical } } : {}),
+      };
     }
   }
   return {};
