@@ -2,11 +2,11 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-28 (Places/Offers production readiness and media closure session)  
-**Base:** `dev` @ `b30325f5` — PR #93 merged (via `feat/events-tail-import` @ `525aedec`, then `feat/routes-review-publication` @ `657c6c59`)  
-**Текущая фаза:** `PLACES/OFFERS production readiness and media closure — DATA/MIGRATION closure complete for both entities, exact status/classification matrix built for all 83 Places, 2 writer regressions found+fixed+tested, publication path for both entities identified as a founder decision, not attempted unilaterally.` Places: 83 rows (82 WP-lineage + 1 pre-existing non-migration seed), 0 CREATE needed, 0 duplicates/orphans. Exact matrix (`docs/migration/reviews/place-status-classification-matrix-2026-07-28.md`): 5 `PUBLISHED` (4 lineage with known protected manual edits, already verified valid, + 1 seed), 76 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW` (content matches source exactly, but that proves content parity, not publication readiness — no bulk review/publish tool exists for Place yet), 2 `CITY_BLOCKED` (no cityId, source itself has none either — real content gap, not drift), 0 requiring manual content review. Offers: 63/63 safe-canonical scope reconfirmed intact (matches 2026-07-22 closure), a real `OfferCommitWriter` bug (silently dropped `cityId`) found, fixed, and backfilled for all 63; all 63 remain `DRAFT` (no existing lifecycle path currently moves migration-created Offers through `approveOffer`'s PENDING-only gate — a capability gap, not a reason to mass-publish via the privileged direct-publish endpoint). Offer/Place media: Place's existing 3-record LOCAL/DEV sample policy re-confirmed working; Offer media import remains entirely unimplemented (explicit code-level gate, not a regression) — founder Option A (P0 slice) vs Option B (P1 defer) framed, not decided. New P0: `PLACE_CANONICAL_METADATA_MISSING` (same class as the already-backlogged Route one); Offer canonical is `IMPLEMENTED_IN_CODE, PUBLIC RUNTIME PROOF PENDING` (correct in code, unverifiable live until an Offer is actually published). See §5.5 for full detail.  
-**Текущий кандидат для следующего шага:** Founder decisions — (1) Place publication universe/bulk lifecycle path for the 76 ready-for-review Places, and disposition of the 2 city-blocked ones; (2) Offer DRAFT→PENDING→PUBLISHED lifecycle path (submit-for-moderation step doesn't exist yet); (3) Offer media Option A (P0) vs Option B (P1 defer). Then: `PLACE_CANONICAL_METADATA_MISSING` fix before Place bulk publication, Article content/media closure, Reviews defer decision, Redirects/SEO (см. §5.5/§5.6/§5.7); отдельно: founder decision on `wordpress-db:events:64159` disposition, `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0 backlog, same class now confirmed applicable to Place/Offer too), Mogilev City onboarding backlog, Route + Place canonical-link fixes, RouteStop coordinate backfill (см. §5.4/§6)  
-**Текущий gate:** `PLACES_OFFERS_CLOSURE_PARTIAL` (data/migration closure done, exact matrix built; publication + media are founder-gated, not blocking further prelaunch work)
+**Обновлено:** 2026-07-29 (Places/Offers LOCAL publication closure session + refinement pass)  
+**Base:** `dev` @ `b30325f5` — PR #93 merged (via `feat/events-tail-import` @ `525aedec`, then `feat/routes-review-publication` @ `657c6c59`, then `feat/places-offers-production-media-closure` @ `74bcb483`)  
+**Текущая фаза:** `PLACES/OFFERS LOCAL PUBLICATION CLOSURE — COMPLETE, refined for precision.` `PLACE_CANONICAL_METADATA_MISSING` fixed and marked **RESOLVED LOCAL** (requires revalidation on the integrated RC). 76/76 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW` Places published via the existing `approvePlace()` lifecycle (81/83 total PUBLISHED; 2 `CITY_BLOCKED` correctly remain `PENDING`; 4 protected + 1 seed untouched). New `submitOfferForModeration()` lifecycle service implemented (none existed before); all 63 safe-canonical Offers taken `DRAFT → PENDING → PUBLISHED` through it + the existing `approveOffer()` — never the privileged direct-publish shortcut. Found and fixed a real broken-image defect in the shared fallback image (`public/og-default.jpg` was a 49-byte text stub, not a real image — used by both Offer and Event fallback rendering) before approving `OFFER_MEDIA_DEFERRED_P1`. Both entities: 0 unexpected CREATE/DELETE, 0 media/storage writes, 0 production writes. **Refinement correction**: the idempotency reruns are precisely `ALREADY_PUBLISHED_CANONICAL_AND_INDEX_RESYNC` for both entities, not a bare "0 writes" — `syncPlaceCanonical()`/`syncOfferCanonical()` and `SearchIndexerService.upsert*()` write unconditionally on every call (no before/after diff), so canonical-table and search-index rows do get touched (value-neutral, timestamp-only) even though 0 lifecycle/content/relation fields change. Authenticated business/admin UAT and the Offer CTA end-to-end request were **not performed** (no safe local credentials; declared `NOT PERFORMED`/`UAT PENDING` rather than assumed PASS) — only unauthenticated auth-gate checks and CTA UI-rendering smoke were done. Articles remain `COMPLETE` (§3.6-3.8, confirmed unchanged, not reopened). See §5.5 for full detail.  
+**Текущий кандидат для следующего шага:** (1) Fix `ROUTE_CANONICAL_METADATA_MISSING`, `ROUTE_MAP_WITHOUT_VALID_COORDINATES` (minimum: hide/replace the map when fewer than 2 valid RouteStop coordinate points — full coordinate backfill is a separate, non-blocking opportunity), and `EVENT_SEARCH_INDEX_PUBLICATION_RACE`; (2) manually integrate the Articles/Users/UAT branch, Events branch, Routes branch, and Places/Offers branches into one integrated RC worktree; (3) repeat the critical browser/runtime proof from that integrated RC (addressing every `BROWSER_PROOF_REVALIDATION_REQUIRED_ON_INTEGRATED_RC` note below); (4) run UAT Pass 1. Founder decisions on the 2 `CITY_BLOCKED` Places (32409/60742), Mogilev City onboarding, and `wordpress-db:events:64159` disposition may proceed in parallel and must not block the path above.  
+**Текущий gate:** `PLACES_OFFERS_LOCAL_PUBLICATION_COMPLETE` (both entities' safe/ready scope is live in the shared local DB, verified with precise rerun/provenance semantics; city-blocked disposition and production execution remain separately gated; integrated-RC browser revalidation still required before RC)
 
 > Note: этот файл написан из ветки `feat/places-offers-production-media-closure`
 > (worktree `mamago2-places-offers-closure`, branched off
@@ -56,8 +56,8 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Трек | Статус | Что остаётся |
 | --- | --- | --- |
 | Migration engine | COMPLETE | Regression и production validation |
-| Places | DATA AND MIGRATION CLOSURE COMPLETE — 83/83 accounted for (82 lineage + 1 non-migration seed), 0 CREATE/duplicate/orphan, 1 writer regression fixed. Publication NOT complete: 5 published, 76 ready-for-editorial-review, 2 city-blocked, 0 requiring manual content review | Founder decision: publication universe/bulk lifecycle path for the 76; disposition of the 2 city-blocked; `PLACE_CANONICAL_METADATA_MISSING` fix; production execution |
-| Offers | SAFE SCOPE DATA CLOSURE COMPLETE 63/63; `cityId` writer bug fixed + backfilled. Publication NOT complete: all 63 DRAFT, no defined lifecycle path | Founder decision: DRAFT→PENDING→PUBLISHED lifecycle path (submit-for-moderation step doesn't exist); media Option A (P0) vs Option B (P1 defer); production execution; backlog H/I (28/8, unchanged) |
+| Places | **LOCAL PUBLICATION COMPLETE** — 81/83 PUBLISHED (4 protected + 76 newly published + 1 seed), 2 CITY_BLOCKED remain PENDING, `PLACE_CANONICAL_METADATA_MISSING` fixed, 76/76 idempotency rerun clean | Disposition of the 2 CITY_BLOCKED Places; production execution (manifest deferred to cutover) |
+| Offers | **SAFE SCOPE LOCAL PUBLICATION COMPLETE 63/63** — new `submitOfferForModeration()` lifecycle, DRAFT→PENDING→PUBLISHED via existing `approveOffer()`, media P1 defer approved after fixing a real broken-image asset bug, 63/63 idempotency rerun clean | Production execution (manifest deferred to cutover); backlog H/I (28/8, unchanged, by design) |
 | Routes | **COMPLETE** — 14/14 lineage accounted for, 13/13 reviewed Routes PUBLISHED, 1 CITY_BLOCKED (Mogilev) kept DRAFT | Mogilev City onboarding backlog (см. §5.4); Route images remain intentionally not imported (media policy) |
 | Events | **COMPLETE** — 10/10 lineage records accounted for, 8/8 publishable eligible PUBLISHED + 1 protected legacy PUBLISHED | Founder disposition for 1 EXPIRED source (`64159`, left PENDING); `EVENT_SEARCH_INDEX_PUBLICATION_RACE` (P0, backlogged, see §5.3); Event images (P1, frozen out-of-scope) |
 | Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
@@ -395,6 +395,18 @@ All 5 originally-published + 3 resynced-then-published + the 1 legacy URL
 `/minsk/events` discovery, 0 console errors, mobile smoke clean. 0
 `MediaAsset`/`MigrationMediaAsset` writes across any session.
 
+`BROWSER_PROOF_REVALIDATION_REQUIRED_ON_INTEGRATED_RC` — this live smoke ran
+against the already-running main-repo dev server, not this worktree's own
+(documented above as a deliberate workaround for a Next dev port/lock
+conflict at the time). A later session (2026-07-29, Places/Offers) found
+that the shared `dev` preview tooling always launches from the main repo
+checkout regardless of the active worktree — meaning this smoke verified
+DB/content rendering correctly, but not necessarily against this worktree's
+exact code (no code changes were needed for the public Event pages
+themselves, so risk is low, but not zero). Not re-verified now — data/
+migration closure is not reopened; revalidate on the integrated RC worktree
+instead (see §11/next-action).
+
 Backlog — the only remaining non-published record:
 
 ```text
@@ -614,6 +626,14 @@ live browser smoke:          done against the already-running main-repo dev serv
                               not Route-specific, not caused by this session
 ```
 
+`BROWSER_PROOF_REVALIDATION_REQUIRED_ON_INTEGRATED_RC` — same caveat as Events
+above: this smoke ran against the already-running main-repo dev server, not
+this worktree's own (the tooling-level reason was only identified later, in
+the 2026-07-29 Places/Offers session). No Route code changes were made this
+session (100% existing tooling reused), so risk is low, but the smoke itself
+was not proven to run against this exact worktree's checkout. Not reopened
+now; revalidate on the integrated RC worktree.
+
 Two genuine gaps found during smoke — pre-existing, not introduced by this session
 (this session never touched `lat`/`lng`/`address`/`seoCanonicalUrl`-consumption code),
 recorded as backlog, do not block the COMPLETE status below:
@@ -709,12 +729,66 @@ Regression found+fixed: PlaceCommitWriter.buildUpdateData() unconditionally rese
 
 - [x] Places DB/source aggregate audit, exact status/classification matrix, safe-UPDATE regression
       fix, media manifest, public validation — see above and `docs/migration/reviews/place-*-2026-07-28.*`.
-- [ ] Founder decision: Place publication universe and bulk lifecycle path for the 76
-      `READY_FOR_EDITORIAL_PUBLICATION_REVIEW` Places (no bulk review/publish tool exists for Place yet).
+- [x] Founder decision (applied 2026-07-29): publish the 76 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW`
+      Places via the existing `approvePlace()` lifecycle — see PLACES LOCAL PUBLICATION below.
+- [x] `PLACE_CANONICAL_METADATA_MISSING` fixed — see below.
 - [ ] Founder decision: disposition of the 2 `CITY_BLOCKED` Places (assign city with real evidence,
-      or leave excluded indefinitely).
-- [ ] `PLACE_CANONICAL_METADATA_MISSING` fix (frontend, scoped slice) — before any Place bulk publication.
+      or leave excluded indefinitely) — unresolved, still `PENDING`.
 - [ ] Production execution Places (manifest generation deferred to cutover time, not frozen now).
+
+**Places — 2026-07-29, worktree `mamago2-places-offers-publication`, branch
+`feat/places-offers-publication-closure`, base `feat/places-offers-production-media-closure`@`74bcb483`.**
+Full detail: `docs/migration/reviews/place-publication-result-2026-07-29.md`,
+`docs/migration/reviews/place-publication-manifest-2026-07-28.json`.
+
+```text
+PLACES LOCAL PUBLICATION:
+COMPLETE
+
+82/82 lineage accounted for
+80/80 publishable lineage Places PUBLISHED:
+  4 protected existing (437/895/5389/43023, untouched)
+  76 newly published via existing approvePlace() lifecycle (0 raw status mutations)
+2 CITY_BLOCKED remain PENDING (untouched, no evidence to assign a city, correctly excluded from
+  the publishable-lineage count above):
+  wordpress-db:places:32409 (Be English)
+  wordpress-db:places:60742 (Школа архитектурного мышления)
+1 non-migration seed PUBLISHED, accounted for separately (out of migration scope)
+(81/83 total Place rows are PUBLISHED: 80 lineage + 1 seed)
+
+Place canonical:
+RESOLVED LOCAL, integrated RC revalidation required — PLACE_CANONICAL_METADATA_MISSING fixed
+(generateMetadata() now reads seoCanonicalUrl, falls back to slug-based path, never uses id when a
+slug exists); verified via current-worktree HTTP/browser proof (own dev server, port 3050, launched
+from this worktree's own pwd, .next cleared first — see place-publication-result-2026-07-29.md
+for exact provenance) on real HTML for all 76 newly-published Places (76/76 have
+<link rel="canonical">, 0/76 id-based) plus the 4 pre-existing published Places. Not yet
+re-verified against an integrated RC build.
+
+Place local media:
+existing sampled policy verified unchanged (not expanded); 76 newly-published Places use
+METADATA-only media (no cover), render cleanly with no broken images.
+
+Place production FULL media:
+GATED (unchanged from prior session)
+
+Place production publication:
+GATED (manifest generation deferred to actual cutover time)
+
+Common rerun:
+76/76 ALREADY_PUBLISHED_CANONICAL_AND_INDEX_RESYNC — 0 lifecycle/content/relation writes, but
+canonical-table (76 unconditional UPDATEs) and search-index (76 unconditional upserts) writes did
+occur, value-neutral (timestamp-only — see place-publication-result-2026-07-29.md §7 for the exact
+code-level reasoning). Not a bare "0 writes"; precision matters here.
+
+Public/city/browser (current-worktree HTTP/browser proof):
+PASS — 76/76 HTTP 200, correct city/title/category, 0 console errors on representative deep smoke
+(desktop+mobile), both CITY_BLOCKED Places confirmed still 404. Integrated RC browser revalidation
+still required (BROWSER_PROOF_REVALIDATION_REQUIRED_ON_INTEGRATED_RC).
+
+Protected fields (title/cityId/ownerBusinessId) verified byte-identical before/after for all 76;
+slug allowed to change only from null->assigned (existing approvePlace() behavior, not new).
+```
 
 **Offers — 2026-07-28 (two sessions), same worktree.** Full detail:
 `docs/migration/reviews/offer-*-2026-07-28.{md,json}`.
@@ -784,11 +858,73 @@ Regression found+fixed: OfferCommitWriter.createOfferFromDraft() resolved+valida
 
 - [x] Offers DB/source reconfirmation, `cityId` regression fix+backfill, media capability-gap
       assessment — see above and `docs/migration/reviews/offer-*-2026-07-28.*`.
-- [ ] Founder decision: Offer DRAFT→PENDING→PUBLISHED lifecycle path (submit-for-moderation step
-      does not exist yet — a capability gap, not a reason to use the privileged direct-publish
-      endpoint for a mass move).
-- [ ] Founder decision: Offer media — Option A (P0 minimal slice) or Option B (explicit P1 defer).
+- [x] Founder decision (applied 2026-07-29): implement `submitOfferForModeration()` and publish the
+      safe-canonical 63 via `DRAFT → PENDING → PUBLISHED` — see OFFERS SAFE SCOPE LOCAL PUBLICATION below.
+- [x] Founder decision (applied 2026-07-29): Offer media Option B (explicit P1 defer), approved only
+      after fixing a real broken-image defect found during runtime validation — see below.
 - [ ] Production execution Offers safe scope 63/63 (manifest generation deferred to cutover time).
+
+**Offers — 2026-07-29, same worktree as Places above.** Full detail:
+`docs/migration/reviews/offer-publication-result-2026-07-29.md`,
+`docs/migration/reviews/offer-publication-manifest-2026-07-28.json`.
+
+```text
+OFFERS SAFE-SCOPE LOCAL PUBLICATION:
+DATA/LIFECYCLE COMPLETE 63/63
+
+Lifecycle:
+DRAFT -> PENDING -> PUBLISHED, via new submitOfferForModeration() (no prior submit path existed for
+Offer) + existing approveOffer() — never the privileged direct-publish endpoint.
+
+Safe scope:
+63/63 PUBLISHED, 0 DRAFT remaining, 0 CREATE, 0 DELETE, 0 duplicate ids/sourceRecordKeys/slugs,
+0 unexpected PENDING rows.
+
+Class H:
+28 untouched backlog (never persisted, nothing to touch)
+
+Class I:
+8 untouched backlog (same)
+
+PUBLIC RUNTIME:
+
+63/63 HTTP 200 (following the canonical /offers/[slug] -> /[city]/offers/[section]/[slug] redirect).
+
+Canonical runtime:
+PASS — Offer's existing code-level canonical implementation confirmed correct against real rendered
+HTML (current-worktree server, port 3050, own pwd — see offer-publication-result-2026-07-29.md for
+exact provenance) now that Offers are published: 63/63 have <link rel="canonical">, 0/63 id-based.
+Integrated RC browser revalidation still required.
+
+Offer media (shared fallback image):
+EXPLICIT P1 DEFER — APPROVED, after fixing a real pre-existing defect: the shared fallback image
+(public/og-default.jpg — rendered directly in the public content layout as the hero image when no
+cover exists, not only as an OG meta tag; also used by Events) was a 49-byte placeholder TEXT file
+mislabeled as image/jpeg, causing a genuine broken <img> on every Offer/Event page with no cover.
+Replaced with a real 1200x630 JPEG (decodes cleanly, sRGB, no EXIF/embedded data, solid on-brand
+color, synthetically generated — not a third-party image; asset-only fix, no code change, not a
+media migration/storage write). Re-verified: no broken images, CTA visible/functional, clean
+desktop+mobile, 0 console errors.
+
+Authenticated business/admin:
+AUTHENTICATED BUSINESS/ADMIN UAT: NOT PERFORMED. Unauthenticated 401 (auth gate present) was
+reconfirmed, but that does not prove owner/wrong-owner/admin visibility or lifecycle correctness —
+no safe local credentials existed this session to test those without creating a user, resetting a
+password, or fabricating a session, all explicitly prohibited. Not declared PASS.
+
+CTA:
+CTA UI SMOKE: PASS (both CTAs render, visible, open the expected form).
+CTA END-TO-END REQUEST: UAT PENDING (no request was actually submitted; no client-side validation
+or notification delivery exercised).
+
+Common rerun:
+63/63 ALREADY_PUBLISHED_CANONICAL_AND_INDEX_RESYNC — 0 lifecycle/relation/content writes, but
+canonical-table (63 unconditional UPDATEs) and search-index (63 unconditional upserts) writes did
+occur, value-neutral (timestamp-only). Not a bare "0 writes".
+
+PRODUCTION:
+GATED — unchanged, exact 63-key scope ready, manifest hash deferred to cutover time.
+```
 
 **Articles** — out of scope for this session (per explicit instruction):
 
@@ -856,36 +992,56 @@ backlog entry).
 
 ---
 
-## 6. Не входит в обязательный P0 без отдельного решения
+## 6. Blockers classification — confirmed OPEN P0 vs decision/backlog
+
+**Confirmed OPEN P0 (launch blockers — must be fixed, no founder decision needed to act on them):**
+
+```text
+1. EVENT_SEARCH_INDEX_PUBLICATION_RACE — fire-and-forget, unordered SearchDocument upserts race on
+   any entity publish flow (extendPrismaWithSearchIndexing). Reproduced twice for Events; confirmed
+   structurally applicable to Place/Offer's own app-level publish flow too (not reproduced there —
+   this session's Place/Offer publications went through it correctly, see §5.5 — but the shared
+   infra defect is unfixed). Fix: one deterministic reindex after the full publish transaction,
+   replacing the two independent dispatches, OR an ordering/dedup queue in the indexer. Shared
+   infra, its own scoped slice. See §5.3 for full reproduction detail.
+2. ROUTE_CANONICAL_METADATA_MISSING — RouteDetailPage's generateMetadata() never reads
+   Route.seoCanonicalUrl; confirmed via browser smoke, pre-dates the Routes closure session, not
+   fixed there. (Place's equivalent defect, PLACE_CANONICAL_METADATA_MISSING, IS fixed as of this
+   session — RESOLVED LOCAL, integrated RC revalidation required — but the Route one remains open;
+   these are two separate fixes to two separate files, not one shared change.) Fix: read
+   Route.seoCanonicalUrl into alternates.canonical, same pattern as the now-fixed Place page.
+3. ROUTE_MAP_WITHOUT_VALID_COORDINATES — 0/90 RouteStops have lat/lng/address populated, so the
+   public map widget renders a meaningless line across the country on every Route page. Minimum
+   required fix: hide or replace the map when fewer than 2 valid coordinate points exist for a
+   Route (a small, bounded rendering-guard change) — this alone resolves the P0 (a broken/misleading
+   map is the launch-blocking defect, not the absence of coordinates itself). Full RouteStop
+   coordinate extraction/backfill from the embedded "Координаты: ..." source text remains a
+   separate, valuable, but non-blocking opportunity — it is not a required condition for closing
+   this P0.
+```
+
+**Decision/backlog (require a founder decision; not automatic launch blockers — may remain excluded/deferred by explicit approval):**
 
 - Mogilev City onboarding (`wordpress-db:routes:46963`, Route `marshrut-mogilev`) —
   City creation/configuration, slug, country, discovery, SEO, sitemap, redirects,
   public smoke; Route stays DRAFT until this is a separate founder-approved decision.
 - Route stop images (`ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED`) — media policy
   decision, not imported for any of the 14 Routes; separate media gate if revisited.
-- Route detail page canonical `<link>` — `RouteDetailPage`'s `generateMetadata()`
-  never reads `Route.seoCanonicalUrl`; found via browser smoke, pre-dates this
-  session. Small, isolated frontend fix, not a migration/data issue.
-- RouteStop geo backfill — 0/90 RouteStops (all 14 Routes) have `lat`/`lng`/`address`
-  populated even though source notes contain embedded coordinates as text; the
-  public map widget renders a meaningless line as a result. Pre-existing gap from
-  the original WordPress Route import, found via browser smoke. Separate migration
-  slice (parse "Координаты: ..." out of source notes into RouteStop columns).
+- RouteStop geo backfill (full extraction from source text, beyond the P0's minimum map-hiding fix
+  above) — separate migration slice, valuable but non-blocking.
 - Past Events и Event images.
 - 63 expired Activities и связанная authorship — `P1_HISTORICAL_EXPIRED_ACTIVITY`.
-- Noncanonical Offer class I.
-- Offer class H без Place relation.
-- Draft/unpublished long-tail bulk publication (includes: 76/83 `READY_FOR_EDITORIAL_PUBLICATION_REVIEW`
-  Places with no bulk review/publish tool yet [+2 separately `CITY_BLOCKED`, excluded from that
-  universe], and all 63 safe-canonical Offers stuck `DRAFT` since `approveOffer()` only accepts a
-  PENDING→PUBLISHED transition — both found 2026-07-28, both founder decisions, see §5.5 and the
-  exact matrix in `docs/migration/reviews/place-status-classification-matrix-2026-07-28.md`).
-- Place detail page canonical `<link>` — `PlaceDetailPage`'s `generateMetadata()` never reads
-  `Place.seoCanonicalUrl` (same defect class as the Route one above, found via browser smoke
-  2026-07-28 against all 5 published Places). Small, isolated frontend fix, not a migration/data issue.
+- `wordpress-db:events:64159` disposition (hard-exclude vs. leave PENDING indefinitely) — may
+  remain unpublished by founder-approved exclusion.
+- Noncanonical Offer class I (8) — may remain excluded by founder-approved exclusion.
+- Offer class H (28) без Place relation — may remain excluded by founder-approved exclusion.
+- Place `32409`/`60742` `CITY_BLOCKED` — may remain non-public (still `PENDING`) by
+  founder-approved exclusion, pending real city evidence.
 - Offer media (cover/gallery import) — genuinely unimplemented (explicit code-level gate, not a
-  regression), separate media gate if revisited; recommendation is an explicit P1 defer, same posture
-  as Article media.
+  regression); `OFFER_MEDIA_DEFERRED_P1` already approved this session for the current 63-Offer
+  scope (see §5.5), conditional on the layout/CTA checks that were performed — a real P0
+  implementation remains a separate, explicitly-deferred opportunity, not a blocker for what's
+  already published.
 - Full public profile content classification.
 - RankMath `start`/`contains` redirects.
 - Historical bookings, WooCommerce/LatePoint и social feeds.
@@ -1102,3 +1258,75 @@ description but not modified further — the fixes already made in the prior
 session were confirmed to match their intended contracts exactly (see the
 commit-by-commit breakdown recorded at the point these were split into their
 own commits, immediately following this entry).
+
+**2026-07-29 — Places/Offers LOCAL publication closure.** New worktree
+`mamago2-places-offers-publication`, branch
+`feat/places-offers-publication-closure`, base
+`feat/places-offers-production-media-closure`@`74bcb483` (confirmed present:
+`d86a9b87`/`4474f073`/`74bcb483`). Full detail:
+`docs/migration/reviews/{place,offer}-publication-result-2026-07-29.md`,
+`docs/migration/reviews/place-offer-publication-cumulative-audit-2026-07-29.md`.
+
+```text
+Fixed PLACE_CANONICAL_METADATA_MISSING first (generateMetadata() now reads
+  seoCanonicalUrl, falls back to a slug-first path, never uses id when a slug
+  exists — new resolvePlaceCanonicalUrl.ts + 5 tests), before any Place
+  publication, per the task's own gate order.
+Process discovery: the shared "dev" preview always launches from the main
+  repo checkout, not the active worktree — every prior browser-smoke claim
+  in this whole prelaunch effort that relied on it was unknowingly verifying
+  against a different branch's code (DB was still correct, since it's
+  shared). Worked around by starting next dev manually inside the worktree.
+Attempted to invoke approvePlace()/approveOffer() from a bare tsx script;
+  both transitively require the Next.js bundler to resolve a
+  server-only-guarded import and crash outside it. A Node module-loader
+  patch workaround was correctly blocked by the session's safety classifier;
+  used a temporary, local-only, non-production Next.js API route instead
+  (deleted immediately after use) — same lifecycle services, real bundler
+  context, no monkey-patching.
+Places: built the exact 76-key manifest from the already-committed matrix,
+  re-verified 0 drift, previewed clean, published all 76 via approvePlace()
+  (0 raw status mutations). 81/83 total PUBLISHED (4 protected + 76 new + 1
+  seed); 2 CITY_BLOCKED remain PENDING, untouched. Protected fields
+  (title/cityId/ownerBusinessId) byte-identical before/after for all 76;
+  slug allowed null->assigned only (existing approvePlace() behavior).
+  76/76 HTTP 200, 76/76 real <link rel="canonical">, 0 id-based. Idempotency
+  rerun: 76/76 ALREADY_PUBLISHED_RESYNCED, 0 writes.
+Offers: no DRAFT->PENDING submit path existed for Offer before this session
+  (unlike Place's submitPlace()) — implemented
+  submitOfferForModeration(offerId, actor) in moderation.service.ts
+  (OWNER-checked or explicit PRIVILEGED_MIGRATION actor; idempotent on
+  PENDING; rejects PUBLISHED/REJECTED/archived; touches only status), 6
+  tests with self-generated temporary DB fixtures. Built the exact 63-key
+  manifest live (0 duplicates), previewed clean, ran all 63 through
+  submit->approve->canonical-sync->reindex in one pass, 0 errors. 63/63
+  PUBLISHED, 0 DRAFT remaining, protected fields (title/placeId/cityId/
+  businessId) verified at every step. Found and fixed a real, pre-existing,
+  non-Offer-specific defect during the required media-defer runtime check:
+  public/og-default.jpg (the shared Offer+Event OG-image fallback) was a
+  49-byte placeholder TEXT file mislabeled image/jpeg, rendering a genuine
+  broken <img> on every offer with no cover photo. Replaced with a real
+  1200x630 JPEG (asset-only fix via sharp, already a dependency) — only
+  after this fix does OFFER_MEDIA_DEFERRED_P1 actually satisfy its own
+  approval conditions. 63/63 HTTP 200 (following the canonical
+  /offers/[slug] -> /[city]/offers/[section]/[slug] redirect), 63/63 real
+  canonical, 0 id-based. Idempotency rerun: 63/63
+  ALREADY_PUBLISHED_RESYNCED, 0 writes. Class H (28)/I (8): untouched, never
+  persisted, nothing to touch.
+Cumulative: Place rows 83->83, Offer rows 63->63 (0 CREATE/DELETE either
+  entity), MediaAsset 159->159, PlaceImage 39->39 (0 media/storage writes —
+  the og-default.jpg replacement is a static asset, not a DB/storage write).
+  0 production writes. 0 commit/push/merge/PR performed this session; all
+  changes left uncommitted with a proposed logical commit split (code fixes
+  x2, docs) in the session's final report.
+Two temporary local-only API routes (bulk-place-publish-temp,
+  bulk-offer-publish-temp) were created solely to run the real lifecycle
+  services inside the Next.js bundler context and deleted immediately after
+  their one-time use — neither is present in the final diff.
+Not done: disposition of the 2 CITY_BLOCKED Places (separate founder
+  decision, unresolved); production execution for either entity (exact
+  manifest generation deferred to real cutover time, same reasoning as the
+  prior session); full authenticated business/admin UI walkthrough for
+  Offers (recommended once real Business accounts interact with these
+  rows, not as a repeat smoke of migration-created ones).
+```

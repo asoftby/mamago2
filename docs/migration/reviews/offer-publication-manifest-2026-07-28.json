@@ -1,0 +1,1203 @@
+{
+  "generatedAt": "2026-07-28",
+  "count": 63,
+  "rows": [
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18932",
+      "offerId": "cmrvxhmnf0006wsizxm7v38oc",
+      "title": "Пакет: «Комфорт»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9d00j1wswv8b3rnkaa",
+      "businessId": "cmry2u01v0004ws968u2ivqkr",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrvxhmnf0006wsizxm7v38oc",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "2b028359573f990f58557aa2d90d80a8ed8f41767377b52652532ef434975d0e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18929",
+      "offerId": "cmrwf217x0006wsyl9sjab6vr",
+      "title": "Пакет «Базовый»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9d00j1wswv8b3rnkaa",
+      "businessId": "cmry2u01v0004ws968u2ivqkr",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf217x0006wsyl9sjab6vr",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "d7ea64e0df95cdc8d7a4e4ac5ef4ef8a95ae594baebfbb54ee2cd805c6382e47"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18931",
+      "offerId": "cmrwf220q0006ws0i68v7pk2x",
+      "title": "Пакет «Базовый +»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9d00j1wswv8b3rnkaa",
+      "businessId": "cmry2u01v0004ws968u2ivqkr",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf220q0006ws0i68v7pk2x",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "0a8da4af42b3b111da36add75394ebd6a69d751f59d27258157962a0c32a20ee"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18933",
+      "offerId": "cmrwf23h80006ws107izeht1z",
+      "title": "Пакет: «Комфорт +»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9d00j1wswv8b3rnkaa",
+      "businessId": "cmry2u01v0004ws968u2ivqkr",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf23h80006ws107izeht1z",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "73ec590921596b3f298641f1521445aca9787a5d2884efbc47de307fa549a8e6"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18934",
+      "offerId": "cmrwf247w0006ws17cecab6y7",
+      "title": "Пакет: «Премиум»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9d00j1wswv8b3rnkaa",
+      "businessId": "cmry2u01v0004ws968u2ivqkr",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf247w0006ws17cecab6y7",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "fb8c5a0659e14bceb3726474d876edabad6763a7231e3fd655d3463e4d87ddce"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29113",
+      "offerId": "cmrwf24y10006ws1etg4fldsv",
+      "title": "ФОРСАЖ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pae00kewswvnimo75x3",
+      "businessId": "cmrxz5go1000vwsfg9itt1ul4",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf24y10006ws1etg4fldsv",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "d59f2f894899f020dc921d5f4bc8e490c0d8cfdb3286d6b4732e47a31e7dc85c"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29124",
+      "offerId": "cmrwf25pw0006ws1ltf4ye9v9",
+      "title": "ТУРБО",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pae00kewswvnimo75x3",
+      "businessId": "cmrxz5go1000vwsfg9itt1ul4",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf25pw0006ws1ltf4ye9v9",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "c93c8b0d686b1125d9f92dbadccba3f39b527a0cb596368255afd2d6f392d91d"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29135",
+      "offerId": "cmrwf26gi0006ws2cqg895n7p",
+      "title": "ТУРБО MAXI",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pae00kewswvnimo75x3",
+      "businessId": "cmrxz5go1000vwsfg9itt1ul4",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf26gi0006ws2cqg895n7p",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "b1a35ee6bfb73b5a66f833f207efec2f5e3bb82b7d348c72a39ccfe0fc59d679"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29155",
+      "offerId": "cmrwf27770006ws2jniu7yoep",
+      "title": "ТУСЭ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p4s00bnwswvcdzk8tuu",
+      "businessId": "cmrxz5go1000vwsfg9itt1ul4",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf27770006ws2jniu7yoep",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "9450f3d793752867a2ea88cd17a3bad04755862295a8632bbd1802493559a5c8"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29158",
+      "offerId": "cmrwf27x80006ws2shcxrzcry",
+      "title": "БОМБА",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p4s00bnwswvcdzk8tuu",
+      "businessId": "cmrxz5go1000vwsfg9itt1ul4",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf27x80006ws2shcxrzcry",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "a3222c6b6a6c22a5221b3fc67decdb7a2820470291a09b51315bb799f2ae5219"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:32683",
+      "offerId": "cmrwf28nt0006ws311ruzo517",
+      "title": "День рождения в зале МАЛЫЙ КОТ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p27007qwswv9l4prtir",
+      "businessId": "cmrxz5h7j0084wsfghc86c9kv",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf28nt0006ws311ruzo517",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "d6b58da0a88d083d0f9b4068e232da1faf8ce8ad3130ec5d284e96ed7b956536"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33312",
+      "offerId": "cmrwf29ej0006ws38hijexqft",
+      "title": "Квест-сундук",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pbw00mjwswvrqrkwybt",
+      "businessId": "cmrxz5gtw002vwsfgu6ushvt9",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf29ej0006ws38hijexqft",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "ecaa6f75d8058397fd3ae2648e13f98e90b0352cbb1c72b1f25991dd4dcd265f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33317",
+      "offerId": "cmrwf2a4u0006ws3f965vzj3s",
+      "title": "Ведущий СТАНДАРТ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pbw00mjwswvrqrkwybt",
+      "businessId": "cmrxz5gtw002vwsfgu6ushvt9",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2a4u0006ws3f965vzj3s",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "edaa0dfecab6a4e99c0120a4ce7f03d00b8f93c0e5496aa850fa9a0ba3a429ba"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33345",
+      "offerId": "cmrwf2avz0006ws49iu3hi4m2",
+      "title": "Ведущий МАКСИ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pbw00mjwswvrqrkwybt",
+      "businessId": "cmrxz5gtw002vwsfgu6ushvt9",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2avz0006ws49iu3hi4m2",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "e823eb05dda85ec82f72e39dedefaf0268fcec554e8e0e8b1a9435b2159a7e19"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33613",
+      "offerId": "cmrwf2bm90006ws4gtla3nebi",
+      "title": "МАКСИ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2y008swswvko9zfc0i",
+      "businessId": "cmrxz5gt5002mwsfgn5divs6b",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2bm90006ws4gtla3nebi",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "e4148b0d8c94d1f3e3302ffe8484ee3e521ff1b91cec04fd33b740a4fe8ee7a0"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33649",
+      "offerId": "cmrwf2cci0006ws4nuthv7ih1",
+      "title": "Диско пати",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p5400c6wswvioml1ulq",
+      "businessId": "cmrxz5guk0034wsfg5brmhekl",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2cci0006ws4nuthv7ih1",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "261ec2bfca59a5e7983deb89f9dd0230813af3a5cb66a191d7ff5657655af252"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33652",
+      "offerId": "cmrwf2d350006ws4umryrklyv",
+      "title": "Диско пати макси",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p5400c6wswvioml1ulq",
+      "businessId": "cmrxz5guk0034wsfg5brmhekl",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2d350006ws4umryrklyv",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "9411d5dab40094d52410f390dfb7ca817a0e78726dcbae49f3d9db596ccdbe7e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33654",
+      "offerId": "cmrwf2dtj0006ws51hu9xed02",
+      "title": "Диско пати вип",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p5400c6wswvioml1ulq",
+      "businessId": "cmrxz5guk0034wsfg5brmhekl",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2dtj0006ws51hu9xed02",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "b515d884f345a24ce0d1fb423c470d987fc859efd8ec8f9ecafd41a6d2ee73ed"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33660",
+      "offerId": "cmrwf2ejq0006ws5838b2sjtn",
+      "title": "СТАНДАРТ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2y008swswvko9zfc0i",
+      "businessId": "cmrxz5gt5002mwsfgn5divs6b",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2ejq0006ws5838b2sjtn",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "851ea7f792562b9ab373a53953c39ed62d91e8cdf4cf20406351066ad58f4bcf"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33667",
+      "offerId": "cmrwf2f9w0006ws61t1ndaktd",
+      "title": "ЛАУД ПАТИ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2y008swswvko9zfc0i",
+      "businessId": "cmrxz5gt5002mwsfgn5divs6b",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwf2f9w0006ws61t1ndaktd",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "a77702895389ffabda21360e94e63d5576c209f5bf4dead044a79a894db7df91"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33673",
+      "offerId": "cmrwh2zc30006ws4mf7xxxub4",
+      "title": "ДЛЯ ПОСЕЩЕНИЙ",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2y008swswvko9zfc0i",
+      "businessId": "cmrxz5gt5002mwsfgn5divs6b",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh2zc30006ws4mf7xxxub4",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "90bd1b86f059b60ea430ba752bc8efd92eae207b7b4df4ba41b99612eb2b8fb4"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:42304",
+      "offerId": "cmrwh303o0006ws6kwcxg8cdb",
+      "title": "VIP Монополия (4 часа)",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pdj00o7wswvqu184662",
+      "businessId": "cmrxz5gxu004dwsfgivu3touj",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh303o0006ws6kwcxg8cdb",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "ebeaa527efe53dec24bcfa5f5d54e1794af260c7289ceb2bbb3abfeede828fd8"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43038",
+      "offerId": "cmrwh30u20006ws6rzgbwxuc4",
+      "title": "Аренда маленькой комнаты",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrnagtxy000hwsr2hy4843rk",
+      "businessId": "cmrxz5gx80044wsfgv3kb0i9f",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh30u20006ws6rzgbwxuc4",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "c5566631b4a7bd90da188945d248a562252547dda8f3d4af9471a84107413ac3"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43065",
+      "offerId": "cmrwh31k50006ws6yv6atza4g",
+      "title": "Аренда большого зала",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrnagtxy000hwsr2hy4843rk",
+      "businessId": "cmrxz5gx80044wsfgv3kb0i9f",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh31k50006ws6yv6atza4g",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "e8ced31ff80cc6f44ff1e3449284a160404d6e78891bb8979afa55534203f647"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43068",
+      "offerId": "cmrwh32a20006ws759fxxq5bv",
+      "title": "Аренда маленькой комнаты и большого зала",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrnagtxy000hwsr2hy4843rk",
+      "businessId": "cmrxz5gx80044wsfgv3kb0i9f",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh32a20006ws759fxxq5bv",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "332279ff856d2a56bffa12bf0bd0ff8fca1dddecbad856727756b2f0655a9434"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43103",
+      "offerId": "cmrwh33020006ws7chvtkaidx",
+      "title": "VIP Джуманджи (4 часа)",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pdr00ocwswva1gsup63",
+      "businessId": "cmrxz5gxu004dwsfgivu3touj",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh33020006ws7chvtkaidx",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "c1fe1517e4b56e0966f8e8a21a36983109f5942905b96d5df9e3cc13dd79be86"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43259",
+      "offerId": "cmrwh33qz0006ws7jw6xjk98l",
+      "title": "Аренда столика",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrnagtxy000hwsr2hy4843rk",
+      "businessId": "cmrxz5gx80044wsfgv3kb0i9f",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh33qz0006ws7jw6xjk98l",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "0686fc29e9365438fcc6cbc81efe79bb1eac587fa003684c24a8286090da4659"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43267",
+      "offerId": "cmrwh34h40006ws8a7xo94o1c",
+      "title": "«Пакет 1» (3 часа)",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pdy00ohwswvf42hniio",
+      "businessId": "cmrxz5h89008dwsfgspggx5yh",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh34h40006ws8a7xo94o1c",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "f6e604bbc8a39fb10977fb19fa626333bded3816705c9d10fb00279cd0f75b74"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43269",
+      "offerId": "cmrwh35780006ws8hglv7npyy",
+      "title": "«Пакет НЕОН» (3 часа)",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pdy00ohwswvf42hniio",
+      "businessId": "cmrxz5h89008dwsfgspggx5yh",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh35780006ws8hglv7npyy",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "1c4c7ecb7022e49cfcf5b2444af4d202b291201c93bf1c731b6a209a36badd75"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43278",
+      "offerId": "cmrwh35x90006ws8o2380vxtd",
+      "title": "«Роспись Мишек BEARBRICKS» (3 часа)",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pdy00ohwswvf42hniio",
+      "businessId": "cmrxz5h89008dwsfgspggx5yh",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh35x90006ws8o2380vxtd",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "41ef40783a5ca53079a55f40a8c67d6b83e5e455a66eb08d9721f20b114a204e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43309",
+      "offerId": "cmrwh36n40006ws9feni3a5p5",
+      "title": "Пакет услуг «Стандарт Плюс»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pd900nywswvzhb0b42d",
+      "businessId": "cmrxz5gyf004mwsfgjsms5k6q",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh36n40006ws9feni3a5p5",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "3273195769927be39dada5e23ce13cab15022d0a045ddba1fe4b956df7fc3b9e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43313",
+      "offerId": "cmrwh37d90006ws9mdgqp0caj",
+      "title": "Пакет услуг «VIP»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pd900nywswvzhb0b42d",
+      "businessId": "cmrxz5gyf004mwsfgjsms5k6q",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh37d90006ws9mdgqp0caj",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "8b7c8585ec66f3b740cd7c365c1047b0a0eb834b80a76a6355840a6c6043482e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43316",
+      "offerId": "cmrwh383d0006ws9wlt1k7vaq",
+      "title": "Пакет услуг «Улет»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pd900nywswvzhb0b42d",
+      "businessId": "cmrxz5gyf004mwsfgjsms5k6q",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh383d0006ws9wlt1k7vaq",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "7e55f920b754c8125a96fcd3fe0848fc5119e5fae261af283f5dd1d60cf74a27"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43331",
+      "offerId": "cmrwh38ts0006wsa33h6w6lyj",
+      "title": "Пакет «№1»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9800iwwswvhvrafukl",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh38ts0006wsa33h6w6lyj",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "f97d14ae982e4f54e53c782ae281279a856c0d4bd7538c518d679af765d4b847"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43340",
+      "offerId": "cmrwh39ju0006wsaclam3jle0",
+      "title": "Пакет «№2»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9800iwwswvhvrafukl",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh39ju0006wsaclam3jle0",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "8383c8c70cd8e122465f6a9c7858d30ecd38fc0bec47d017a5ea297980465f22"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43348",
+      "offerId": "cmrwh3a9m0006wsam75f7tsdu",
+      "title": "Пакет «№3»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9800iwwswvhvrafukl",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh3a9m0006wsam75f7tsdu",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "e3d1f77f1f5e870ae89340580fb3471b780788c08fe203287cfc22dec02bd9e0"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43350",
+      "offerId": "cmrwh3azj0006wsat1p1z5roh",
+      "title": "Пакет «№4»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9800iwwswvhvrafukl",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh3azj0006wsat1p1z5roh",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "dba6628c6e951abab3ebdf62d8e3f401fb23658ccc7db4b7fb75400597e676a5"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43352",
+      "offerId": "cmrwh3bpi0006wsb083ngtqdq",
+      "title": "Пакет «№5»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9800iwwswvhvrafukl",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh3bpi0006wsb083ngtqdq",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "56026ba31a5d7f892753546f9900cbb2a35fb29e7e6e60c26590858bd7a9e765"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43354",
+      "offerId": "cmrwh3cfx0006wsb7d2ote5ge",
+      "title": "Пакет «№6»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9800iwwswvhvrafukl",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh3cfx0006wsb7d2ote5ge",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "3918d33880a86881520722ac7a47349191012a6aa3d698dda09461501b8b9e42"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43365",
+      "offerId": "cmrwh3d5i0006wsbzyenbuuna",
+      "title": "Пакет «Классик»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe400omwswvtdt595fg",
+      "businessId": "cmrxz5gzp0054wsfgy2vgefuc",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh3d5i0006wsbzyenbuuna",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "1148c3a943cd618746eb3cd1ad32eabfdf65fe9e45e10d25c2d8c0bbfb0e73a5"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43370",
+      "offerId": "cmrwh7apq0006wsfqgju6juv2",
+      "title": "Пакет «Приключение»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe400omwswvtdt595fg",
+      "businessId": "cmrxz5gzp0054wsfgy2vgefuc",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7apq0006wsfqgju6juv2",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "1a532d79bd1907086547826e3489f9fe38c243684846ad0a1bbb30ce51bd0b31"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43386",
+      "offerId": "cmrwh7bhr0006wshlkc8b18xm",
+      "title": "Пакет «Вечеринка»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe400omwswvtdt595fg",
+      "businessId": "cmrxz5gzp0054wsfgy2vgefuc",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7bhr0006wshlkc8b18xm",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "4d69aa96657fd242a40fbcfe6754c0db5deab7104160dbdafacaedc7d4a054ed"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43388",
+      "offerId": "cmrwh7c8t0006wshsn6aih8xj",
+      "title": "Пакет «На полную катушку»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe400omwswvtdt595fg",
+      "businessId": "cmrxz5gzp0054wsfgy2vgefuc",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7c8t0006wshsn6aih8xj",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "3cbeccd2146b08a4bf3adc552a3513aded6a76c288dce167811769c3435150f9"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43408",
+      "offerId": "cmrwh7cyn0006wshzzvrmqxso",
+      "title": "Пакет «Хит»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p6y00f2wswvpyt33429",
+      "businessId": "cmrxz5h0c005dwsfgsupoehxo",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7cyn0006wshzzvrmqxso",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "6cfdd001447978c32b85abdc76b129f3b72bbcd7d49636f461395b90bcbc9991"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43410",
+      "offerId": "cmrwh7dok0006wsi7d145z78r",
+      "title": "Пакет «Хит+»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p6y00f2wswvpyt33429",
+      "businessId": "cmrxz5h0c005dwsfgsupoehxo",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7dok0006wsi7d145z78r",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "089eb46a3ae7814fc5295a6cf7c8e4b1e0a858f800d39f893c80d3d2f6fffd2f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43412",
+      "offerId": "cmrwh7eeo0006wsihvak7pnuv",
+      "title": "Пакет «Просто наука»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p6y00f2wswvpyt33429",
+      "businessId": "cmrxz5h0c005dwsfgsupoehxo",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7eeo0006wsihvak7pnuv",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "b6f5ca57482f32f58fdbf0c8fdd4af16d1c7ecf669958975acee567109057e29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43646",
+      "offerId": "cmrwh7f4f0006wsionf49nq3h",
+      "title": "«Стражи галактики»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe900orwswvrt982116",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7f4f0006wsionf49nq3h",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "a62b95c0f543c026b7506e414587772bd547ae6928fbd8aa5e05c5642252211e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43648",
+      "offerId": "cmrwh7fu90006wsjfhfrdtnrw",
+      "title": "«Мстители»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe900orwswvrt982116",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7fu90006wsjfhfrdtnrw",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "32baf25dec818d88be6e5efe7be723b54fb443c66de3f0a562e069345d0f8f03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43650",
+      "offerId": "cmrwh7gk90006wsjmut6tejr0",
+      "title": "«Громовержцы»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pe900orwswvrt982116",
+      "businessId": null,
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7gk90006wsjmut6tejr0",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "166c242749c229c1614054d86a4e3077e7d9457c9294e7c4aaa64a5fd498d77b"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43653",
+      "offerId": "cmrwh7ha90006wsjtr66y9fdf",
+      "title": "«Путь исследователя: тайны песчаных карьеров»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9s00jgwswv5uw04qtm",
+      "businessId": "cmrxz5gsj002dwsfgoq59e1he",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7ha90006wsjtr66y9fdf",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "4ba92664e795f148ad30e647d587063e95d4905f64e4145a08e721c85de87136"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43655",
+      "offerId": "cmrwh7i0c0006wsk3g8xtgkgp",
+      "title": "«Приключение в лесных просторах»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9s00jgwswv5uw04qtm",
+      "businessId": "cmrxz5gsj002dwsfgoq59e1he",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7i0c0006wsk3g8xtgkgp",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "abe547e08e54490dd0ea270a880085d8b7153d54fb1b2a9e65144ef373ef4a0b"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43657",
+      "offerId": "cmrwh7iqb0006wskaydykuoob",
+      "title": "«Робинзоны»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9s00jgwswv5uw04qtm",
+      "businessId": "cmrxz5gsj002dwsfgoq59e1he",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7iqb0006wskaydykuoob",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "c131cac6d65df0cfadcf282a08034e836b0197f7f173f44e49b5ffe95049b567"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43659",
+      "offerId": "cmrwh7jga0006wskhwxo1u14u",
+      "title": "«Техас Базовый»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7jga0006wskhwxo1u14u",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "06d61f70d0f21a2f583b52cb490ff697a83a94e9d9ff8e61dbee3190cb417751"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43661",
+      "offerId": "cmrwh7k6h0006wsl8i4e4re6i",
+      "title": "«Техас Стандартный»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7k6h0006wsl8i4e4re6i",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "25dc5ce25a786b189f4199076af75bb95f517ff30ec294edb99e0fd30b928f8c"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43663",
+      "offerId": "cmrwh7kwb0006wslfk656f8cw",
+      "title": "«Техас VIP»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7kwb0006wslfk656f8cw",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "2d3637cda7fc07836668c0c8cf192b61c760a2fc967319371b0bd1ddf6180689"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43665",
+      "offerId": "cmrwh7lm20006wslmi6jkr5s9",
+      "title": "«Джуманджи Базовый»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7lm20006wslmi6jkr5s9",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "928f3da9199ed36cc411f14b8e27db29a364bd56623eb81e280b24eab2de3feb"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43667",
+      "offerId": "cmrwh7mbs0006wslt6ie8lhb9",
+      "title": "«Джуманджи Стандартный»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7mbs0006wslt6ie8lhb9",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "26164c3e094f476cae9e422fe95392689ad3d1ec7703b001580af19b303d3f37"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43669",
+      "offerId": "cmrwh7n1j0006wsm0h277gowc",
+      "title": "«Джуманджи VIP»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7n1j0006wsm0h277gowc",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "41fdc6685c15b2595c9b54ab17fbf6b7127aa7ac80ce1676e7888e6dc5f1cb4f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43675",
+      "offerId": "cmrwh7nrk0006wsm9l0o941ms",
+      "title": "«Форт Боярд 3.0 VIP»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83pef00owwswvyq6pv2g0",
+      "businessId": null,
+      "cityId": "cmrq7tp2d0005wsk5zx6zwhuz",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7nrk0006wsm9l0o941ms",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "58980e65a3a8a40d9094f9df08a446bf7c0b29b2a3bf5f8a3be8d63fc5502cc2"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:51435",
+      "offerId": "cmrwh7ohy0006wsn0uk357x9i",
+      "title": "День Рождения на скаладроме",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p9s00jgwswv5uw04qtm",
+      "businessId": "cmrxz5gsj002dwsfgoq59e1he",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwh7ohy0006wsn0uk357x9i",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "b2f0c7318d9735ebe1c25d76931e6f6305507d4027358a7f947f99c976bc6bd7"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:15941",
+      "offerId": "cmrwhrieh0006wsdzyarvuw5f",
+      "title": "Аква-квест в День Рождения",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2l0089wswvxl8ks2ac",
+      "businessId": "cmrxz5h8y008mwsfgtxo6h07n",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwhrieh0006wsdzyarvuw5f",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "ea1cfec6b7a2def9f5d2b23e528fec8f9d7aa94eb25a64bc732a331bc18f36cd"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:16403",
+      "offerId": "cmrwhrj6t0006wsfw0dfi7pyq",
+      "title": "Игровая комната",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2l0089wswvxl8ks2ac",
+      "businessId": "cmrxz5h8y008mwsfgtxo6h07n",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwhrj6t0006wsfw0dfi7pyq",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "b7b6392e53c5e4fa0fc89b3655df3bf772fe639b04b9c5b0c06bd63ba111c6b8"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:16458",
+      "offerId": "cmrwhrjwy0006wsg31srt6pum",
+      "title": "Семейное кафе «Три Пингвина»",
+      "slug": null,
+      "kind": "SERVICE",
+      "placeId": "cmrq83p2l0089wswvxl8ks2ac",
+      "businessId": "cmrxz5h8y008mwsfgtxo6h07n",
+      "cityId": "cmqpohiye006dwss6idaw626x",
+      "currentStatus": "DRAFT",
+      "expectedActions": [
+        "SUBMIT_FOR_MODERATION",
+        "APPROVE"
+      ],
+      "expectedStatusAfter": "PUBLISHED",
+      "expectedPublicPath": "/offers/cmrwhrjwy0006wsg31srt6pum",
+      "mediaState": "DEFERRED_P1",
+      "protectedFieldHash": "be111442b2b7775479470e14ef2ea930a21aa5151f38ce83664631c13314b44f"
+    }
+  ]
+}
