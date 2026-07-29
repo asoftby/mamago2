@@ -313,7 +313,12 @@ export default async function ArticlePage({
     const schemaArticle = await getArticleSchemaData(mvp.id);
     const publicBase = getCanonicalPublicAppUrl();
     const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
-    const canonicalUrl = schemaArticle?.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`;
+    const canonicalUrl = resolveArticleCanonicalUrl({
+      seoCanonicalUrl: schemaArticle?.seoCanonicalUrl,
+      slug: mvp.slug ?? slug,
+      geoScope: "COUNTRY",
+      publicBase,
+    });
     const articleJsonLd =
       schemaArticle?.seoJsonLdOverride && typeof schemaArticle.seoJsonLdOverride === "object"
         ? (schemaArticle.seoJsonLdOverride as Record<string, unknown>)
@@ -412,8 +417,12 @@ export default async function ArticlePage({
       ? (seo.seoJsonLdOverride as Record<string, unknown>)
       : seo
         ? buildArticleJsonLd({
-            canonicalUrl:
-              seo.seoCanonicalUrl?.trim() || `${publicBase}${buildNationalArticlePath(article.slug)}`,
+            canonicalUrl: resolveArticleCanonicalUrl({
+              seoCanonicalUrl: seo.seoCanonicalUrl,
+              slug: article.slug,
+              geoScope: "COUNTRY",
+              publicBase,
+            }),
             headline: seo.title,
             description: seo.excerpt,
             image: seo.heroImage || seo.seoOgImage,

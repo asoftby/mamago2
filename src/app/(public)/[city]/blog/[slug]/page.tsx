@@ -165,7 +165,13 @@ export default async function CityArticlePage({ params }: PageProps) {
     articleRow.seoJsonLdOverride && typeof articleRow.seoJsonLdOverride === "object"
       ? (articleRow.seoJsonLdOverride as Record<string, unknown>)
       : buildArticleJsonLd({
-          canonicalUrl: articleRow.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`,
+          canonicalUrl: resolveArticleCanonicalUrl({
+            seoCanonicalUrl: articleRow.seoCanonicalUrl,
+            slug: articleRow.slug ?? slug,
+            geoScope: "CITY",
+            citySlug: city.slug,
+            publicBase,
+          }),
           headline: mvp.title,
           description: mvp.excerpt,
           image: mvp.heroUrl,
