@@ -80,7 +80,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const places = await prisma.place.findMany({
-      where: getPublicPublishedPlaceWhere(),
+      where: {
+        AND: [getPublicPublishedPlaceWhere(), { OR: [{ cityId: null }, { city: { isActive: true } }] }],
+      },
       select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true },
     });
     for (const place of places) {
@@ -102,7 +104,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const offers = await prisma.offer.findMany({
-      where: getPublicPublishedOfferWhere(),
+      where: {
+        AND: [
+          getPublicPublishedOfferWhere(),
+          { place: { OR: [{ cityId: null }, { city: { isActive: true } }] } },
+        ],
+      },
       select: {
         id: true,
         slug: true,
@@ -155,7 +162,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const articles = await prisma.article.findMany({
-      where: { status: "PUBLISHED", noindex: false },
+      where: {
+        status: "PUBLISHED",
+        noindex: false,
+        OR: [{ cityId: null }, { city: { isActive: true } }],
+      },
       select: {
         id: true,
         slug: true,
@@ -206,9 +217,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     );
     const cityRows =
       cityIds.length > 0
-        ? await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true } })
+        ? await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true, isActive: true } })
         : [];
     const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+    // Only resolved cities can be inactive — resolveCanonicalCitySlugForEvent's
+    // DEFAULT_CITY_SLUG fallback (used when no source resolves) is never a
+    // member of cityRows, so it's never in this set either.
+    const inactiveCitySlugs = new Set(cityRows.filter((row) => !row.isActive).map((row) => row.slug));
 
     for (const event of events) {
       const citySlug = resolveCanonicalCitySlugForEvent({
@@ -216,6 +231,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         placeCitySlug: event.place?.city?.slug ?? null,
         venueCitySlug: event.venue?.cityId ? citySlugById.get(event.venue.cityId) ?? null : null,
       });
+      if (inactiveCitySlugs.has(citySlug)) continue;
       entries.push({
         url: resolveEventCanonicalUrl({
           seoCanonicalUrl: event.seoCanonicalUrl,
