@@ -4,8 +4,8 @@
 
 **Обновлено:** 2026-07-28  
 **Base:** `dev` @ `c8a3f9aa0c2940aeb57dc5fb015937630f407036` — PR #89 merged  
-**Текущая фаза:** `USERS — dispositions + full activation flow (login detection, /activate, delivery audit) COMPLETE; EVENTS tail next`  
-**Текущий кандидат для следующего шага:** 5 remaining Events + 67 pending sessions  
+**Текущая фаза:** `USERS — dispositions + full activation flow COMPLETE; FULL PRODUCT ACCEPTANCE / UAT plan COMPLETE, execution NOT STARTED; EVENTS tail next`
+**Текущий кандидат для следующего шага:** 5 remaining Events + 67 pending sessions
 **Текущий gate:** `USERS_ACTIVATION_PRODUCT_COMPLETE`
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
@@ -51,17 +51,18 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Offers | LOCAL SAFE SCOPE COMPLETE 63/63 | Production execution, media, backlog H/I |
 | Routes | IMPORTED 14/14 | Review, publish, slug history, redirects, public validation |
 | Events | PARTIAL 4/9 | 5 CREATE, 67 sessions, rerun, city/date/URL validation |
-| Users clean migration | LOCAL COMPLETE 564/564 | Production import и activation delivery |
-| Users activation architecture | **PRODUCT-COMPLETE** | Login detection, `/activate` page, delivery audit persistence все реализованы и протестированы; real bulk send остаётся gated финальным Go/No-Go (см. §5.2) |
+| Users migration | **COMPLETE 578/578** — clean 564/564 + manual/privileged 14/14; all `PENDING_ACTIVATION`; role/ownership audit complete | Production activation delivery |
+| Users activation | **LOCAL/REHEARSAL COMPLETE; PRODUCTION DELIVERY GATED** | Resend production secrets/domain, frozen recipient manifest/checksum, canary, sequential batches, bounce/failure reconciliation and final production proof |
 | Business-linked Users | **FULLY CLOSED** | 38/38 ownership, 38/38 `BUSINESS_OWNER`, backlog 0 |
 | Users manual/privileged | **COMPLETE 14/14** | 1 existing ADMIN unchanged, 13 `USER`, 1 `BUSINESS_OWNER` (user:129, exact 9-Place ownership); rerun 14×`SKIP_UNCHANGED`, 0 deltas |
 | Activities | P0 CLOSED | 63 expired Events → `P1_HISTORICAL_EXPIRED_ACTIVITY` |
-| Content authorship | SLICE 18 COMPLETE 1/2 | `post:56250` migrated (`authorUserId: null`); Slice 19 migrates `post:57731`, затем authorship reconciliation/write |
+| Articles / authorship | **ARTICLES COMPLETE** — 2/2 target Articles, exact authorship, common rerun `ALREADY_SATISFIED`, public rendering verified | Integrated-RC revalidation only |
 | User/Business profile media | NOT STARTED | P0/P1 decision, manifest, proof, production gate |
-| Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
+| Article media | **PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS** | Source 404 gaps documented; placeholders absent; do not reopen without regression evidence |
 | Reviews | NOT STARTED | Реализовать либо явно defer в P1 |
 | Redirects/pages/SEO | PARTIAL | Exact redirects, pages, canonical/sitemap/robots/noindex audit |
 | Product regressions | PARTIAL | Event discovery/404, Article city visibility, full smoke |
+| Full product acceptance / UAT | **NOT STARTED** | Pass 1, defect cycle, Pass 2, founder acceptance |
 | RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, production migration, DNS |
 
 ---
@@ -133,7 +134,7 @@ rerun:              14 × SKIP_UNCHANGED; ownership/role re-check: 0 deltas ever
 
 - [x] No legacy WordPress role ever consulted for classification or exclusion.
 - [x] `wordpress-db:user:1` left with zero lineage, zero writes — founder's
-      real ADMIN account (`asoftby@gmail.com`) untouched.
+      existing ADMIN account untouched (personal email omitted from proof).
 - [x] No password, session, token, or activation email ever written.
 - [x] No content authorship touched in this slice.
 
@@ -483,7 +484,108 @@ Event images остаются вне frozen P0 scope.
 
 ---
 
-## 6. Не входит в обязательный P0 без отдельного решения
+## 6. FULL PRODUCT ACCEPTANCE / UAT — обязательный P0 gate
+
+Полная матрица, evidence contract и журнал выполнения:
+[full-product-acceptance.md](../prelaunch/full-product-acceptance.md).
+
+```text
+Full product acceptance / UAT: NOT STARTED
+Pass 1:                       NOT STARTED
+P0 defects:                   UNKNOWN
+Pass 2:                       NOT STARTED
+Founder acceptance:           NOT RECORDED
+```
+
+Source document: `docs/prelaunch/full-product-acceptance.md`.
+Authenticated BUSINESS_OWNER/MODERATOR/ADMIN execution is pending; CTA
+request-to-business receipt and response is pending end to end. UAT Pass 1
+must run on the integrated RC exact SHA. Older isolated browser proofs do not
+replace integrated-RC UAT evidence.
+
+Техническая готовность, успешная миграция и зелёный CI не являются
+достаточным доказательством готовности к запуску. Перед Go/No-Go должны быть
+вручную пройдены критичные пользовательские, бизнесовые и административные
+сценарии от начала до конца.
+
+Запуск запрещён при:
+
+- открытом P0 defect;
+- непройденном P0 user journey;
+- неизвестном результате критичного сценария;
+- расхождении UI, API и состояния БД;
+- недоказанной production rollback/restore процедуре.
+
+### UAT PASS 1 — full critical-flow acceptance
+
+Цель: найти реальные дефекты на сквозных пользовательских сценариях.
+
+После Pass 1:
+
+- зарегистрировать дефекты и классифицировать P0/P1/P2;
+- исправить все P0;
+- P1 исправить либо получить явный founder defer;
+- P2 отправить в backlog.
+
+### UAT PASS 2 — regression and founder acceptance
+
+Цель: повторно пройти все критичные flows после исправлений.
+
+Launch gate:
+
+- 0 открытых P0 defects;
+- нет неизвестных `BLOCKED` P0 scenarios;
+- все P1 имеют fix либо явное defer-решение;
+- production-only gates имеют подтверждённый план выполнения;
+- founder acceptance recorded.
+
+Если после Pass 2 исправлялись критичные flows, обязателен targeted Pass 3
+по затронутым областям и их зависимостям.
+
+Обязательный порядок фаз:
+
+```text
+migration completion
+→ content/public validation
+→ full product UAT Pass 1
+→ defect fixes
+→ UAT Pass 2
+→ RC rehearsal
+→ production Go/No-Go
+→ cutover
+```
+
+### P0 launch journeys
+
+1. `P0-J1` — новый пользователь регистрируется, входит и использует публичный продукт.
+2. `P0-J2` — мигрированный пользователь активирует аккаунт и входит.
+3. `P0-J3` — BUSINESS_OWNER создаёт Business → Place → Offer и отправляет на модерацию.
+4. `P0-J4` — ADMIN/MODERATOR проверяет и публикует контент.
+5. `P0-J5` — опубликованная сущность появляется в правильном городе и discovery.
+6. `P0-J6` — пользователь открывает сущность и отправляет заявку/бронирование.
+7. `P0-J7` — бизнес получает заявку и отвечает.
+8. `P0-J8` — пользователь получает ответ и видит актуальный статус.
+9. `P0-J9` — Event корректно работает с датами, sessions и завершением.
+10. `P0-J10` — основные public/admin/business flows работают на mobile и desktop.
+11. `P0-J11` — старые WordPress URL корректно перенаправляются.
+12. `P0-J12` — backup, restore, RC build и production migration gates подтверждены.
+
+Birthday/custom-request не включён в P0 автоматически: реализация присутствует
+частично (`Occasion`, birthday discovery, Direct/editorial request surfaces), но
+полный обещанный пользователю request → matching → proposals → selection flow
+не доказан. Нужен founder decision: `P0 BLOCKER` либо `P1 DEFER`.
+
+Reviews реализованы в schema/admin/public surfaces, но migration и сквозная
+приёмка не начаты: founder decision `P0` либо явный `P1 DEFER` остаётся gate.
+
+Production-ready пользовательский checkout/payment callback flow кодом не
+подтверждён. Billing ledger и административные credit/debit/refund операции не
+считаются таким flow. Нужен founder decision: payments вне launch P0 либо
+отдельный P0 blocker; реальные платежи в UAT запрещены.
+
+---
+
+## 7. Не входит в обязательный P0 без отдельного решения
 
 - Past Events и Event images.
 - 63 expired Activities и связанная authorship — `P1_HISTORICAL_EXPIRED_ACTIVITY`.
@@ -497,23 +599,28 @@ Event images остаются вне frozen P0 scope.
 
 ---
 
-## 7. Сколько осталось до конца
+## 8. Раздельная оценка готовности
 
 Это операционная оценка, не календарное обещание:
 
 ```text
-Core migration mechanics:       ~82% complete
-Local clean data work:           ~73% complete
-Production/cutover readiness:    ~30% complete
-Overall strict prelaunch:        ~62–66% complete
-Remaining strict P0 work:        ~34–38%
+Implementation readiness:  ~80% — основные surfaces и guards существуют;
+                            ряд flows не подтверждён end-to-end.
+Migration readiness:       ~73% — Users закрыты локально; Events/Routes/media,
+                            production execution и audits остаются.
+Product UAT readiness:      ~10% — матрица определена, Pass 1 ещё не начат,
+                            фактический объём продуктовых дефектов неизвестен.
+Production readiness:      ~30% — activation rehearsal готов, но backup/restore,
+                            RC exact-SHA, providers и production gates не пройдены.
+Overall launch readiness:   ~45% — ограничено непройденным UAT и production gates;
+                            это не среднее арифметическое остальных оценок.
 ```
 
 Почему остаток всё ещё крупный: самые рискованные Users identity/ownership writes уже закрыты, но впереди production activation provider, Events tail, Routes review, media, SEO/regressions и весь RC/cutover цикл.
 
-Крупных P0-блоков остаётся **9**:
+Крупных P0-блоков остаётся **10**:
 
-1. Editorial closure двух Articles: city/geo, publication, blog visibility и cover/media decision.
+1. Integrated-RC revalidation of completed Articles and documented source-media gaps.
 2. Users production activation (dispositions + delivery readiness COMPLETE, см. §3.4a/§3.9; real send gated on final Go/No-Go).
 3. Events tail.
 4. Routes review/publish.
@@ -522,6 +629,7 @@ Remaining strict P0 work:        ~34–38%
 7. Redirects/pages/SEO.
 8. Product regression suite.
 9. RC rehearsal и production cutover.
+10. Full product UAT Pass 1, defect cycle, Pass 2 и founder acceptance.
 
 Ориентир по объёму работы:
 
@@ -533,7 +641,7 @@ Remaining strict P0 work:        ~34–38%
 
 ---
 
-## 8. Следующее одно действие
+## 9. Следующее одно действие
 
 ```text
 Phase: EVENTS tail
