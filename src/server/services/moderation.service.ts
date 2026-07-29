@@ -442,6 +442,66 @@ export async function rejectActivity(
 // ── OFFER ─────────────────────────────────────────────────────────────────────
 
 /**
+ * Who is submitting an Offer for moderation. `OWNER` requires the caller to
+ * own the linked Place's Business — checked here, not left to the API route,
+ * since this function is also meant to be called directly (migration/admin
+ * bulk publication). `PRIVILEGED_MIGRATION` bypasses the ownership check
+ * explicitly — never implicitly (there is no way to skip the check other
+ * than passing this literal actor type).
+ */
+export type SubmitOfferForModerationActor =
+  | { type: "OWNER"; userId: string }
+  | { type: "PRIVILEGED_MIGRATION" };
+
+export interface SubmitOfferForModerationResult {
+  status: "PENDING";
+  alreadyPending: boolean;
+}
+
+/**
+ * DRAFT -> PENDING only. Idempotent when already PENDING (returns
+ * `alreadyPending: true`, no write). Never touches Place, Business, city,
+ * title, slug, content, CTA, or media — status is the only field this
+ * writes. Throws (never silently no-ops) for PUBLISHED, REJECTED, or an
+ * archived Offer — none of those may be resubmitted by this function.
+ */
+export async function submitOfferForModeration(
+  offerId: string,
+  actor: SubmitOfferForModerationActor
+): Promise<SubmitOfferForModerationResult> {
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    select: {
+      status: true,
+      archivedAt: true,
+      place: { select: { ownerBusiness: { select: { ownerUserId: true } } } },
+    },
+  });
+  if (!offer) throw new Error("Offer not found");
+
+  if (actor.type === "OWNER") {
+    const ownerUserId = offer.place.ownerBusiness?.ownerUserId;
+    if (!ownerUserId || ownerUserId !== actor.userId) {
+      throw new Error("Not authorized to submit this Offer for moderation");
+    }
+  }
+
+  if (offer.archivedAt) {
+    throw new Error("Cannot submit an archived Offer for moderation");
+  }
+
+  if (offer.status === "PENDING") {
+    return { status: "PENDING", alreadyPending: true };
+  }
+  if (offer.status !== "DRAFT") {
+    throw new Error(`Cannot submit for moderation from status: ${offer.status}`);
+  }
+
+  await prisma.offer.update({ where: { id: offerId }, data: { status: "PENDING" } });
+  return { status: "PENDING", alreadyPending: false };
+}
+
+/**
  * Approve an Offer. Resolves owner via place relation.
  */
 export async function approveOffer(
