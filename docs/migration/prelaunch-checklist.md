@@ -70,6 +70,7 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | Article media | NOT STARTED | Cover + inline remap, storage/dedup proof |
 | Reviews | NOT STARTED | Реализовать либо явно defer в P1 |
 | Redirects/pages/SEO | PARTIAL | Exact redirects, pages, canonical/sitemap/robots/noindex audit |
+| SEO MIGRATION CLOSURE | **MANDATORY LAUNCH GATE — NOT STARTED** | Full baseline, URL mapping, integrated-RC crawl, cutover runbook, monitoring and founder SEO Go/No-Go. **Launch is prohibited until this gate passes.** |
 | Product regressions | PARTIAL | Event discovery/404, Article city visibility, full smoke |
 | RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, production migration, DNS |
 
@@ -994,23 +995,34 @@ backlog entry).
 
 ## 6. Blockers classification — confirmed OPEN P0 vs decision/backlog
 
-**Confirmed OPEN P0 (launch blockers — must be fixed, no founder decision needed to act on them):**
+**P0 launch blockers resolved locally; integrated RC revalidation required:**
 
 ```text
-1. EVENT_SEARCH_INDEX_PUBLICATION_RACE — fire-and-forget, unordered SearchDocument upserts race on
+1. EVENT_SEARCH_INDEX_PUBLICATION_RACE — RESOLVED LOCAL.
+   Per-entity indexing is now ordered and the final publication index is strict + awaited.
+   Event/Place/Offer fixture regressions pass; INTEGRATED RC REVALIDATION REQUIRED.
+   Historical root cause:
+   fire-and-forget, unordered SearchDocument upserts raced on
    any entity publish flow (extendPrismaWithSearchIndexing). Reproduced twice for Events; confirmed
    structurally applicable to Place/Offer's own app-level publish flow too (not reproduced there —
    this session's Place/Offer publications went through it correctly, see §5.5 — but the shared
    infra defect is unfixed). Fix: one deterministic reindex after the full publish transaction,
    replacing the two independent dispatches, OR an ordering/dedup queue in the indexer. Shared
    infra, its own scoped slice. See §5.3 for full reproduction detail.
-2. ROUTE_CANONICAL_METADATA_MISSING — RouteDetailPage's generateMetadata() never reads
+2. ROUTE_CANONICAL_METADATA_MISSING — RESOLVED LOCAL.
+   Published PUBLIC Routes emit one absolute stored-or-slug-fallback canonical; stale/invalid
+   stored origins fall back safely. DRAFT/non-public Routes emit no public canonical.
+   INTEGRATED RC REVALIDATION REQUIRED. Historical root cause:
+   RouteDetailPage's generateMetadata() never read
    Route.seoCanonicalUrl; confirmed via browser smoke, pre-dates the Routes closure session, not
    fixed there. (Place's equivalent defect, PLACE_CANONICAL_METADATA_MISSING, IS fixed as of this
    session — RESOLVED LOCAL, integrated RC revalidation required — but the Route one remains open;
    these are two separate fixes to two separate files, not one shared change.) Fix: read
    Route.seoCanonicalUrl into alternates.canonical, same pattern as the now-fixed Place page.
-3. ROUTE_MAP_WITHOUT_VALID_COORDINATES — 0/90 RouteStops have lat/lng/address populated, so the
+3. ROUTE_MAP_WITHOUT_VALID_COORDINATES — RESOLVED LOCAL.
+   MAP HIDDEN/REPLACED BELOW 2 VALID DISTINCT POINTS. COORDINATE BACKFILL NOT PERFORMED.
+   INTEGRATED RC REVALIDATION REQUIRED. Historical root cause:
+   0/90 RouteStops have lat/lng/address populated, so the
    public map widget renders a meaningless line across the country on every Route page. Minimum
    required fix: hide or replace the map when fewer than 2 valid coordinate points exist for a
    Route (a small, bounded rendering-guard change) — this alone resolves the P0 (a broken/misleading
@@ -1019,6 +1031,24 @@ backlog entry).
    separate, valuable, but non-blocking opportunity — it is not a required condition for closing
    this P0.
 ```
+
+`BROWSER_PROOF_REVALIDATION_REQUIRED_ON_INTEGRATED_RC` remains mandatory for
+this slice and all earlier critical runtime proofs whose exact checkout
+provenance was not established.
+
+Side findings from the bounded Route runtime audit:
+
+- `ROUTE_RATINGS_PARAMS_NOT_AWAITED — OPEN P1`: the automatically mounted
+  rating block calls `GET /api/routes/ratings/[routeId]`; its Next 16 handler
+  reads Promise-based `params` synchronously and returns 400/default counts.
+  The Route HTTP 200, canonical, map guard and main content remain functional.
+  Proposed next fix: await typed Promise params in the GET handler and add the
+  existing route-handler test pattern. Not fixed in this P0 slice.
+- `MISSING_FAVICON_ASSET — OPEN P2`: `/favicon.ico?...` redirects to
+  `/api/media/file/1783033874844-9q4z9h5fueo-favicomamago.webp?...`, which is
+  absent from this worktree's local upload storage and returns 404. This is a
+  branding/static cosmetic request; it does not affect layout, canonical,
+  indexability or primary content. Not fixed in this P0 slice.
 
 **Decision/backlog (require a founder decision; not automatic launch blockers — may remain excluded/deferred by explicit approval):**
 
