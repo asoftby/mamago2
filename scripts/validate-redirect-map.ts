@@ -424,6 +424,77 @@ async function main() {
   fs.writeFileSync(csvPath, csv);
   console.log(`\nCSV written: ${csvPath} (${csvRows.length - 1} rows)`);
 
+  // ---------- disposition classification (EXACT_REDIRECT / VALID_HUB_REMAP /
+  // P1_START_OR_CONTAINS / INVALID_TARGET / COLLISION / CHAIN / LOOP) ----------
+  // event-category/place-category/place are precise 1:1 taxonomy→hub mappings;
+  // age/specialists/scenarios/hb-programs/uslugi/master-classes-fest/age-events
+  // are loose best-effort category remaps (staff pages, seasonal campaigns,
+  // service pages) — same destination-is-live outcome, lower content fidelity.
+  const HUB_REMAP_TYPES = new Set(["event-category", "place-category", "place"]);
+  const collisionSources = new Set(duplicates.map((d) => d.source));
+  const chainSources = new Set(chains.map((c) => c.source));
+  const loopSources = new Set(chains.filter((c) => c.reason.includes("ЦИКЛ")).map((c) => c.source));
+
+  type Disposition =
+    | "EXACT_REDIRECT"
+    | "VALID_HUB_REMAP"
+    | "P1_START_OR_CONTAINS"
+    | "INVALID_TARGET"
+    | "COLLISION"
+    | "CHAIN"
+    | "LOOP";
+
+  function classify(e: Entry): Disposition {
+    if (collisionSources.has(e.source)) return "COLLISION";
+    if (loopSources.has(e.source)) return "LOOP";
+    if (chainSources.has(e.source)) return "CHAIN";
+    const r = resolutions.get(e)!;
+    if (r.kind === "broken") return "INVALID_TARGET";
+    if (r.kind === "entity") return r.status === "PUBLISHED" ? "EXACT_REDIRECT" : "INVALID_TARGET";
+    // kind === "listing"
+    return HUB_REMAP_TYPES.has(e.type ?? "") ? "VALID_HUB_REMAP" : "P1_START_OR_CONTAINS";
+  }
+
+  const dispositionCounts: Record<Disposition, number> = {
+    EXACT_REDIRECT: 0,
+    VALID_HUB_REMAP: 0,
+    P1_START_OR_CONTAINS: 0,
+    INVALID_TARGET: 0,
+    COLLISION: 0,
+    CHAIN: 0,
+    LOOP: 0,
+  };
+  const classificationRows = [["source", "type", "disposition", "destination", "clicks"]];
+  for (const e of manifest) {
+    const disposition = classify(e);
+    dispositionCounts[disposition]++;
+    classificationRows.push([e.source, e.type ?? "", disposition, e.destination, String(e.clicks ?? 0)]);
+  }
+  const classificationCsv = classificationRows
+    .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
+    .join("\n");
+  const classificationCsvPath = path.join(OUT_DIR, "redirect-disposition-classification.csv");
+  fs.writeFileSync(classificationCsvPath, classificationCsv);
+
+  console.log("\n=== DISPOSITION CLASSIFICATION ===");
+  console.log(JSON.stringify(dispositionCounts, null, 2));
+  console.log(`Classification CSV written: ${classificationCsvPath} (${manifest.length} rows)`);
+
+  // источник совпадает с зарезервированным top-level сегментом реального app route
+  const KNOWN_ROOT_SEGMENTS = new Set([
+    "account", "actions", "activate", "admin", "api", "auth", "blog", "business",
+    "business-entry", "editor", "forgot-password", "ideas", "identity", "invite",
+    "legal", "login", "me", "n", "notifications", "offers", "p", "page", "places",
+    "preview", "profile", "profile-entry", "register", "reset-password", "routes",
+    "search", "settings", "u", "ui-lab", "ui-lab-admin", "ui-test",
+  ]);
+  const rootRouteCollisions = manifest.filter((e) => {
+    const segs = e.source.split("/").filter(Boolean);
+    return segs.length === 1 && KNOWN_ROOT_SEGMENTS.has(segs[0].toLowerCase());
+  });
+  console.log("\n=== SOURCE COLLIDES WITH RESERVED APP ROOT SEGMENT ===");
+  for (const e of rootRouteCollisions) console.log(`${e.source} → ${e.destination}`);
+
   // формат-замечания и unpublished — предупреждения; остальное — ошибка
   if (brokenTargets.length || chains.length || duplicates.length) {
     process.exitCode = 1;
