@@ -91,3 +91,61 @@ P0 found: none
 
 No unexplained server errors during either pass. `[redirect-manifest]
 Loaded 893 redirect rules` confirmed on every start.
+
+---
+
+# Production build crawl
+
+Node 22.23.1, `pnpm build` with `APP_PUBLIC_URL=https://mamago.by`,
+`NEXT_PUBLIC_APP_URL=https://mamago.by`, `SITE_INDEXING_ENABLED=true`,
+`REQUIRE_REDIRECT_MANIFEST=1` — build succeeded, `[redirect-manifest]`
+loaded all 893 rules under `require: true` (fail-loud) with no issues.
+Served via the actual `output: standalone` artifact
+(`node .next/standalone/server.js`, `.next/static` copied in per the
+standard manual step for standalone deployments — `next start` errors on
+this config) on port 3076, `NODE_ENV=production`.
+
+Ran the verifier against `http://localhost:3076` with
+`--expected-origin https://mamago.by` (the app is configured for the real
+production domain while physically served from localhost).
+
+**First run** found one non-P0 issue: `https://mamago.by ::
+CANONICAL_TO_REDIRECT_SOURCE_IN_SITEMAP`. Investigated: this is
+`NODE_ENV=production`-specific — the public surface's own middleware
+(`resolveSubdomainMiddlewareDecision`) unconditionally 307-redirects `/`
+to the flagship city hub outside dev/localhost (an early
+`isDevLocalHost()` bypass in dev mode means this never fires on `localhost`
+there, which is why the dev-mode pass on port 3075 never surfaced it).
+Pre-existing, intentional production behavior — not a regression. Fixed by
+removing the sitemap's separate root entry and instead giving the flagship
+city's own hub entry priority 1, since that's what `/` actually resolves
+to; sitemap entries should resolve directly to 200, not redirect.
+
+Also found and fixed a verifier-only bug: it tried to literally fetch the
+sitemap's absolute `https://mamago.by/...` URLs instead of rewriting them
+to the local server under test — added `toFetchUrl()` to redirect the
+network fetch (not the reported URL) from `EXPECTED_ORIGIN` to `BASE_URL`.
+
+**Second run** (after both fixes, rebuilt + restandalone):
+
+```
+sitemap: 199 urls (was 200 — root entry removed, no duplicate introduced), 0 duplicates
+pages crawled: 199, pages with issues: 0
+legacy redirect samples: 20, broken: 0
+city-duplicate probes: 2, failing: 0
+P0 found: none
+```
+
+## Production spot checks
+
+- `robots.txt`: `Allow: /` + `Sitemap: https://mamago.by/sitemap.xml` —
+  correct production origin.
+- `/places/molekula` canonical: `https://mamago.by/places/molekula` and
+  `<meta name="robots" content="index, follow">` — **confirms production
+  origin never leaks to localhost**, even though physically served from
+  `localhost:3076` (directly answers the phase's stop condition
+  "production origin остаётся localhost" — it does not).
+- Media: files were already present in `.next/standalone/storage/uploads`
+  (482 files) — Next's build-time file tracing followed this worktree's
+  symlinks and copied the real file contents into the standalone bundle
+  automatically; no extra step needed for the production crawl.
