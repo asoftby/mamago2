@@ -1,10 +1,20 @@
 # SEO MIGRATION CLOSURE
 
-Status: **MANDATORY LAUNCH GATE — NOT STARTED / NOT COMPLETE**.
+Status (2026-07-29): **LOCAL TECHNICAL CLOSURE: PASS** — full SEO
+Go/No-Go remains **BLOCKED — EXTERNAL BASELINE REQUIRED** (Search
+Console/Analytics/backlinks not available locally). See
+`docs/migration/prelaunch-checklist.md` §5.7 for the full evidence summary
+and `docs/migration/seo/` for detailed per-topic reports
+(`redirect-audit-summary.md`, `structured-data-audit.md`,
+`media-runtime-audit.md`, `integrated-rc-crawl-summary.md`). Work done on
+branch `fix/seo-migration-closure`, worktree `mamago2-seo-migration-closure`,
+base `release/integrated-rc@5edeaaac`.
 
 Production launch is prohibited until this phase has a documented founder
-SEO Go/No-Go. All runtime assertions must be repeated on the integrated RC
-with production-host configuration.
+SEO Go/No-Go. All runtime assertions were repeated on this integrated-RC
+branch with production-host configuration (`APP_PUBLIC_URL=https://mamago.by`,
+standalone production build + server, port 3076) — see
+`integrated-rc-crawl-summary.md`.
 
 ## 1. Immutable baseline
 
@@ -49,8 +59,14 @@ Cross-entity canonicals are forbidden. Private/admin/business and
 DRAFT/PENDING/blocked entities are excluded; pagination/filter/search pages
 have an explicit policy.
 
-Current local status: Place and Route canonical `RESOLVED LOCAL`; Offer
-canonical `PASS LOCAL`; Article/Event require integrated-RC revalidation.
+Current local status (2026-07-29, `fix/seo-migration-closure`): Place,
+Route, Offer, Article and Event canonical all `RESOLVED LOCAL` — revalidated
+on the integrated RC via a shared `validateStoredCanonical` origin/path/
+slug/query-hash check, tested (5 entity test suites), and confirmed live in
+both a dev crawl (port 3075) and a production build + standalone-server
+crawl (port 3076, `APP_PUBLIC_URL=https://mamago.by`). Event canonical was
+previously entirely absent; fixed. City-scoped duplicate risks found and
+fixed for Place and Offer (see `prelaunch-checklist.md` §5.7).
 
 ## 4. Content and metadata parity
 
@@ -132,15 +148,41 @@ thresholds and rollback/repair policy before launch.
 
 SEO Go/No-Go requires all of:
 
-1. 100% P0 legacy URLs mapped and all known indexable legacy URLs classified.
-2. Redirect loops = 0; P0 chains = 0; irrelevant homepage redirects = 0.
-3. Canonical to non-200/noindex/redirect = 0; unexpected indexable 404/5xx = 0.
-4. Sitemap contains only canonical indexable 200 URLs.
-5. Private/DRAFT/PENDING/blocked URLs are not indexable.
-6. P0 content/metadata parity and city duplicate control pass.
-7. P0 internal links to legacy/redirect/404 = 0.
-8. Search `urlPath` equals canonical.
-9. Integrated RC crawl passes.
-10. Cutover runbook, monitoring and thresholds are ready.
-11. Open SEO P0 = 0.
-12. Founder SEO Go/No-Go is recorded.
+1. ⧗ 100% P0 legacy URLs mapped and all known indexable legacy URLs
+   classified — disposition classification done at the manifest-row grain
+   (`redirect-audit-summary.md`); a founder-reviewable per-row P0/P1/P2
+   priority manifest against real traffic evidence needs the external
+   baseline (item 12 below) and has not been built.
+2. ✅ Redirect loops = 0; P0 chains = 0; irrelevant homepage redirects = 0 —
+   confirmed by both `loadRedirectManifest()` (structural) and
+   `validate-redirect-map.ts` (DB-resolution), independently.
+3. ✅ Canonical to non-200/noindex/redirect = 0; unexpected indexable 404/5xx
+   = 0 — verified live in dev + production-build crawls (0 P0 both).
+4. ✅ Sitemap contains only canonical indexable 200 URLs — Places/Offers/
+   Routes/Articles/Events added (previously entirely absent); inactive-city
+   content excluded after a live defect was found and fixed.
+5. ✅ Private/DRAFT/PENDING/blocked URLs are not indexable — verified via
+   each entity's existing public-visibility predicate, reused for the
+   sitemap query itself.
+6. ⧗ P0 content/metadata parity and city duplicate control pass — city
+   duplicate control: ✅ (Place/Offer bugs found and fixed, Route/Article/
+   Event confirmed already safe). Content/metadata parity: not built as a
+   separate report this session.
+7. ⧗ P0 internal links to legacy/redirect/404 = 0 — spot-checked, no
+   localhost/redirect-source links found in production components; one
+   dead link found (`PlaceHero.tsx` → `/places`, no listing page exists),
+   not fixed (no clear correct target without a product decision). Not a
+   full exhaustive internal-link crawl.
+8. ✅ Search `urlPath` equals canonical — sitemap URLs are built from the
+   same canonical resolvers used by each page's own `<link rel="canonical">`.
+9. ✅ Integrated RC crawl passes — dev (both indexing modes) and production
+   build + standalone server, 0 P0 both.
+10. ❌ Cutover runbook, monitoring and thresholds are ready — not built this
+    session.
+11. ✅ Open SEO P0 = 0 — as of the last verifier run on this branch.
+12. ❌ Founder SEO Go/No-Go is recorded — blocked on external Search
+    Console/Analytics/backlink baseline, not available locally.
+
+**Local technical closure (items 2–5, 8, 9, 11) — PASS.**
+**Full SEO Go/No-Go (items 1, 6, 7, 10, 12) — BLOCKED, needs external
+baseline + founder input, not purely a code/local-verification gap.**

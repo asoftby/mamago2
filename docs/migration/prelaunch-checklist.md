@@ -2,11 +2,12 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-29 — integrated RC assembly
+**Обновлено:** 2026-07-29 — SEO MIGRATION CLOSURE (local technical) complete
 **RC:** `release/integrated-rc`, base `ed5763c2`, source `fix/admin-article-preview-routing@532fd04d`
-**Текущая фаза:** `INTEGRATED RC — CODE/HISTORY ASSEMBLY`
-**Текущий кандидат для следующего шага:** technical verification and representative runtime proof on the exact integrated RC SHA, then SEO MIGRATION CLOSURE.
-**Текущий gate:** `TECHNICAL VERIFICATION PENDING`; SEO closure and UAT Pass 1 remain mandatory launch gates.
+**SEO closure branch:** `fix/seo-migration-closure` (worktree `mamago2-seo-migration-closure`), base `release/integrated-rc@5edeaaac`
+**Текущая фаза:** `SEO MIGRATION CLOSURE — LOCAL TECHNICAL COMPLETE`
+**Текущий кандидат для следующего шага:** external Search Console/Analytics/backlink baseline for full SEO Go/No-Go, then PRODUCT REGRESSION / RC READINESS — not a return to already-closed migration entities.
+**Текущий gate:** `SEO LOCAL TECHNICAL CLOSURE: PASS`; full SEO Go/No-Go blocked on external baseline; UAT Pass 1 remains the next mandatory launch gate after that.
 
 > Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
@@ -93,8 +94,8 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 | User/Business profile media | NOT STARTED | P0/P1 decision, manifest, proof, production gate |
 | Article media | **PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS** | Source 404 gaps documented; placeholders absent; do not reopen without regression evidence |
 | Reviews | NOT STARTED | Реализовать либо явно defer в P1 |
-| Redirects/pages/SEO | PARTIAL | Exact redirects, pages, canonical/sitemap/robots/noindex audit |
-| SEO MIGRATION CLOSURE | **MANDATORY LAUNCH GATE — NOT STARTED** | Full baseline, URL mapping, integrated-RC crawl, cutover runbook, monitoring and founder SEO Go/No-Go. **Launch is prohibited until this gate passes.** |
+| Redirects/pages/SEO | **LOCAL TECHNICAL COMPLETE** — see §5.7 | Legal/about/contact page audit; external baseline |
+| SEO MIGRATION CLOSURE | **LOCAL TECHNICAL: PASS** — see §5.7 | External Search Console/Analytics/backlink baseline, founder SEO Go/No-Go, cutover runbook, monitoring plan. **Full launch Go/No-Go still requires these; local technical closure alone is not launch clearance.** |
 | Product regressions | PARTIAL | Event discovery/404, Article city visibility, full smoke |
 | Full product acceptance / UAT | **NOT STARTED** | Pass 1, defect cycle, Pass 2, founder acceptance |
 | RC / production cutover | NOT STARTED | Freeze, backup, rehearsal, Go/No-Go, production migration, DNS |
@@ -1130,15 +1131,134 @@ backlog entry).
 
 ### 5.7 Redirects, mandatory pages и SEO
 
-- [ ] RankMath `exact` redirects subset.
-- [ ] Redirects на `/` вручную перемапить на релевантные hubs.
-- [ ] Legal/about/contact pages.
-- [ ] WordPress catch-all.
-- [ ] Canonical/no-trailing-slash и city-scoped URLs.
-- [ ] Sitemap/robots/noindex launch gate.
-- [ ] Redirect manifest minimum и collision audit.
+**2026-07-29, worktree `mamago2-seo-migration-closure`, branch
+`fix/seo-migration-closure`, base `release/integrated-rc`@`5edeaaac`.**
 
-`start`/`contains` redirects остаются P1.
+```text
+SEO MIGRATION CLOSURE (local technical):
+COMPLETE
+
+Canonical P0 (Event/Place/Offer/Article) fixed + tested (5 entity resolvers,
+all sharing one validateStoredCanonical origin/path/slug/query-hash check —
+Route's pre-existing pattern generalized). Event canonical was completely
+absent (buildOgMeta never set alternates.canonical); Place/Offer/Article
+trusted a stored seoCanonicalUrl unconditionally (stale mamago.local:3000
+rendered verbatim); Offer's write-side sync computed the wrong path entirely
+(missing city+section — a stored value could point at a URL that itself
+301-redirects). Also found the same unvalidated-canonical bug leaking into
+Article JSON-LD (separate code path from generateMetadata, same fix).
+
+City duplicate matrix: Route/Article/Event were already structurally safe
+(query-level city filtering). Two real bugs found and fixed: [city]/places/
+[slug] re-exported the non-city route unconditionally (ignored its own city
+param — every city segment rendered 200), now redirects to the one true
+canonical in a single hop; [city]/offers/[section]/[slug] resolved by slug
+alone (no city filter) and leaked the URL's (possibly wrong) city into its
+own computed canonical, now resolves the offer's real city and redirects on
+any mismatch.
+
+Sitemap: was entirely missing Places/Offers/Routes/Articles/Events (explicit
+TODO, only homepage/city-hub/tag pages emitted). Populated using each
+entity's own public-visibility predicate + the same canonical resolvers, so
+sitemap URLs always match each page's own <link rel="canonical">. Found
+live during the dev crawl: content belonging to isActive:false cities
+(ratomka/mir/kopische — 4 Places, 7 Offers) was included despite not being
+in the static KNOWN_CITY_SLUGS allowlist the WP legacy catch-all uses at
+Edge-middleware time — a real canonical-to-redirect defect (7 Offer sitemap
+URLs 301'd to /minsk instead of resolving 200). Fixed by excluding
+inactive-city content, matching the pre-existing city-hub loop's own filter.
+Also removed the sitemap's separate root entry (the public surface's own
+middleware unconditionally 307-redirects "/" to the flagship city hub
+outside dev/localhost — pre-existing, NODE_ENV=production-specific
+behavior only caught by the production-build crawl, not the dev one) —
+the flagship city's hub entry now carries priority 1 instead.
+
+Robots/noindex: contract-tested (globalNoindex.test.ts) that meta robots
+and X-Robots-Tag can never disagree — both already derive from one flag by
+construction, locked with a test.
+
+Redirect manifest (893 rows, scripts/data/wp-redirect-map.json ->
+manifest.csv -> next.config.ts): loadRedirectManifest() (the exact function
+next.config.ts calls) reports 893/893 structurally valid, 0 issues — no bad
+paths, self-redirects, duplicate-source conflicts, unknown-destination
+sections, or cycles. validate-redirect-map.ts extended (not rebuilt) with a
+disposition classification: EXACT_REDIRECT 12, VALID_HUB_REMAP 21,
+P1_START_OR_CONTAINS 24, INVALID_TARGET 836 (destination well-formed, no
+live entity yet — expected migration-scope gap: only ~26 Articles and 10
+Activity/Event lineage records were ever migrated against 106/717
+Article/event-type legacy rows; not a redirect-config defect), COLLISION 0,
+CHAIN 0, LOOP 0. One source (/places) collides with a reserved app-root
+segment but doesn't hijack a live route (no dedicated /places listing page
+exists). 0 redirects to bare "/". Full report:
+docs/migration/seo/redirect-audit-summary.md.
+
+Structured data: audited all builders (Article/Event/Place/Route/Offer/
+Organization/WebSite/Breadcrumb/FAQ). Organization/WebSite emitted exactly
+once (shared layout). No fake ratings (aggregateRating only emitted with a
+real DB-backed reviewCount > 0). Full report:
+docs/migration/seo/structured-data-audit.md.
+
+Media runtime: MEDIA_STORAGE_ROOT has no env override; per-file symlinks
+(not a directory symlink, to avoid touching the git-tracked
+storage/uploads/.gitkeep) from this worktree to the main worktree's real
+uploads (482 files, source untouched). Closes MEDIA_RUNTIME_PROOF_BLOCKED.
+Favicon P2 confirmed fully resolved end-to-end (official asset already
+existed, was only missing from this worktree's storage) — no code change
+needed. MutationObserver TypeError: attempted reproduction via real browser
+across 5 entity page types, not reproduced — classified DEV_ONLY/
+NOT_REPRODUCED. Full report: docs/migration/seo/media-runtime-audit.md.
+
+Bounded verifier (scripts/verify-prelaunch-seo.ts + .test.ts, 18 parser/rule
+tests, no external dependencies): dev crawl (port 3075, both
+SITE_INDEXING_ENABLED on and off) and production build + standalone-server
+crawl (port 3076, APP_PUBLIC_URL=https://mamago.by,
+REQUIRE_REDIRECT_MANIFEST=1) both report 0 P0 findings and 0 remaining
+issues after fixes. Canonical/robots.txt/sitemap confirmed to always show
+the real production origin, never localhost, despite being served from
+localhost:3076. Full reports: docs/migration/seo/integrated-rc-crawl-summary.md.
+
+Local-only phase: no push, no PR, no merge into release/integrated-rc/dev/
+main; release/integrated-rc and all source worktrees confirmed untouched
+throughout. 8 local commits on fix/seo-migration-closure, working tree
+clean.
+
+REMAINING (not blocking local technical closure, explicitly deferred):
+- External Search Console/Analytics/backlink baseline — not available
+  locally; full SEO Go/No-Go needs it, local technical closure does not.
+- Legacy URL -> new URL action manifest CSV (KEEP_200/REDIRECT_301/
+  GONE_410/REAL_404/BLOCKED_NOINDEX/MANUAL_DECISION per source row) — the
+  disposition classification above covers the same ground at a coarser
+  grain; a full per-row manifest with founder-reviewable dispositions for
+  the 836 INVALID_TARGET rows was not built this session (P1_START_OR_CONTAINS
+  vs REAL_404 vs GONE_410 is a founder/content call, not inferrable from
+  code).
+- Content/metadata parity report (title/description/H1/OG per entity) not
+  built as a separate CSV this session.
+- Internal-link audit found one dead link (PlaceHero.tsx -> /places, no
+  dedicated listing page exists) — flagged, not fixed (no clear correct
+  target without a product decision).
+```
+
+- [x] RankMath `exact` redirects subset — covered by the EXACT_REDIRECT/
+      VALID_HUB_REMAP disposition classes (33 of 893 rows resolve to live
+      content today; the rest are migration-scope gaps, not manifest bugs).
+- [x] Redirects на `/` вручную перемапить на релевантные hubs — 0 rows in
+      the legacy manifest target bare `/`.
+- [ ] Legal/about/contact pages — not audited this session.
+- [x] WordPress catch-all — verified it does not swallow valid app routes
+      beyond the one known false-positive class (Edge-static
+      `KNOWN_CITY_SLUGS` missing DB-only inactive cities, worked around by
+      excluding that content from the sitemap rather than touching the
+      Edge-time allowlist).
+- [x] Canonical/no-trailing-slash и city-scoped URLs — see canonical P0 and
+      city-duplicate-matrix summary above.
+- [x] Sitemap/robots/noindex launch gate — see sitemap/robots summary
+      above; verified in both dev and production-build crawls.
+- [x] Redirect manifest minimum и collision audit — 893 rows (fixed actual
+      count, not chased toward the old 900 threshold per instruction), 0
+      collisions/chains/loops confirmed by two independent checks.
+
+`start`/`contains` redirects остаются P1 (P1_START_OR_CONTAINS, 24 rows).
 
 ### 5.8 Product regressions — launch blockers
 
@@ -1398,11 +1518,26 @@ Events, Routes, Places/Offers safe publication, Articles, Users migration and th
 ## 9. Следующее одно действие
 
 ```text
-Phase: INTEGRATED RC technical verification
-Prerequisite: Articles/Users/Activation/UAT history merged with the P0 line.
-Scope: Prisma validation/status (no migration writes), targeted tests, TypeScript,
-ESLint, build, check:push, exact-SHA representative runtime proof.
-Next after baseline: start SEO MIGRATION CLOSURE on the integrated RC.
-Out of scope: UAT Pass 1, production writes/email, DNS, Search Console, payments,
-CITY_BLOCKED changes, Event 64159 disposition and deferred P1 implementation.
+Phase: SEO MIGRATION CLOSURE — LOCAL TECHNICAL: PASS (see §5.7 for full evidence)
+Completed 2026-07-29: canonical P0 (all 5 entities), city-duplicate-matrix fixes
+(Place/Offer), sitemap entity coverage + inactive-city exclusion, redirect
+manifest reconciliation (893 rows, 0 collisions/chains/loops), structured-data
+audit, media runtime, bounded verifier, dev + production-build crawls (0 P0
+both). 8 local commits on fix/seo-migration-closure, working tree clean, no
+push/PR/merge.
+
+Next single action: provide external Search Console / Analytics / backlink
+exports so a full SEO Go/No-Go can be recorded (LOCAL TECHNICAL CLOSURE alone
+does not authorize launch). Once that's in hand (or a founder decision to
+defer it), move to PRODUCT REGRESSION / RC READINESS — not a return to
+already-closed migration entities (Events/Routes/Places/Offers/Articles/Users)
+or already-closed SEO items above without new regression evidence.
+
+Out of scope for this phase: UAT Pass 1, production writes/email, DNS, Search
+Console submission, payments, CITY_BLOCKED Places disposition, Event 64159
+disposition, Mogilev onboarding, and deferred P1 implementation (favicon —
+already closed; MutationObserver — DEV_ONLY/NOT_REPRODUCED; legal/about/
+contact page audit; content/metadata parity CSV; per-row legacy-URL action
+manifest for the 836 INVALID_TARGET redirect rows; PlaceHero.tsx dead
+/places link).
 ```
