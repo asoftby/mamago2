@@ -4,10 +4,10 @@ import { getCurrentUser } from "@/lib/auth/server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { routeId: string } },
+  { params }: { params: Promise<{ routeId: string }> },
 ) {
   try {
-    const { routeId } = params;
+    const { routeId } = await params;
 
     if (!routeId) {
       return NextResponse.json({ error: "Missing routeId" }, { status: 400 });

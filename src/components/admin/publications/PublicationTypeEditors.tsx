@@ -98,7 +98,7 @@ export function NewsPublicationEditor({
   const [scheduledAtLocal, setScheduledAtLocal] = useState("");
   const [publishedAtLocal, setPublishedAtLocal] = useState("");
   const [views, setViews] = useState(0);
-  const [isAdminEditor, setIsAdminEditor] = useState(true);
+  const [canModerate, setCanModerate] = useState(false);
   const [actionsBusy, setActionsBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -365,7 +365,7 @@ export function NewsPublicationEditor({
       if (!res.ok) return;
       const u = (await res.json().catch(() => null)) as { id?: string; role?: string } | null;
       if (!cancelled && u?.role) {
-        setIsAdminEditor(u.role === "ADMIN");
+        setCanModerate(u.role === "ADMIN" || u.role === "MODERATOR");
       }
       // Auto-populate author with current user only for brand-new (unsaved) articles.
       if (!cancelled && u?.id && !articleId) {
@@ -571,27 +571,16 @@ export function NewsPublicationEditor({
       }
 
       const submitPerf = createClientSavePerf("publish-article:client", {
-        endpoint: isAdminEditor
-          ? `/api/admin/articles/${id}/moderate`
-          : `/api/admin/articles/${id}/submit`,
-        payload: isAdminEditor ? { decision: "publish" } : undefined,
+        endpoint: `/api/admin/articles/${id}/submit`,
       });
-      const res = isAdminEditor
-        ? await fetch(`/api/admin/articles/${id}/moderate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ decision: "publish" }),
-          })
-        : await fetch(`/api/admin/articles/${id}/submit`, { method: "POST" });
-      submitPerf.log({ status: res.status, mode: isAdminEditor ? "publish" : "submit" });
+      const res = await fetch(`/api/admin/articles/${id}/submit`, { method: "POST" });
+      submitPerf.log({ status: res.status, mode: "submit" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const msg =
           typeof data.error === "string"
             ? data.error
-            : isAdminEditor
-              ? "Не удалось опубликовать"
-              : "Не удалось отправить на модерацию";
+            : "Не удалось отправить на модерацию";
         toast.error(msg);
         return;
       }
@@ -603,11 +592,7 @@ export function NewsPublicationEditor({
       }
       clearBreakingNewsLocalDrafts(id);
       router.replace(`/admin/content/publications/new?type=news&id=${encodeURIComponent(id)}`);
-      if (isAdminEditor) {
-        showBreakingNewsSuccess("published", id, publishedSnap, Boolean(articleId));
-      } else {
-        showBreakingNewsSuccess("submitted", id, publishedSnap, Boolean(articleId));
-      }
+      showBreakingNewsSuccess("submitted", id, publishedSnap, Boolean(articleId));
     } finally {
       setSubmitting(false);
       setActionsBusy(false);
@@ -908,12 +893,13 @@ export function NewsPublicationEditor({
           if (id) setAuthorError(null);
         }}
         authorError={authorError}
-        isAdminEditor={isAdminEditor}
+        canModerate={canModerate}
+        hasUnsavedChanges={dirty}
         actionsBusy={actionsBusy}
         submitting={submitting}
         saving={saving}
         moderating={moderating}
-        onPublish={() => void submitForModeration()}
+        onSubmitForModeration={() => void submitForModeration()}
         onSaveDraft={() => void saveDraft()}
         onApprove={() => void moderate("publish")}
         onReject={() => void moderate("reject")}

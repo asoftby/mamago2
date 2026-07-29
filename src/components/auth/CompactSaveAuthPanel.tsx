@@ -14,6 +14,11 @@ import { ModalCloseButton } from "@/components/ui/modal-close-button";
 
 type Mode = "login" | "register";
 
+interface ActivationNotice {
+  delivered: boolean;
+  maskedEmail: string;
+}
+
 const inputClass =
   "w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#EF8759] transition-shadow placeholder:text-neutral-400";
 
@@ -23,6 +28,8 @@ function isValidEmail(value: string): boolean {
 }
 
 const MIN_PASSWORD_LEN = 8;
+/** Purely a UX throttle against spam-clicking — the real limit is server-side (activationRateLimit). */
+const RESEND_COOLDOWN_SECONDS = 30;
 
 export interface CompactSaveAuthPanelProps {
   title: string;
@@ -60,10 +67,15 @@ export function CompactSaveAuthPanel({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activationNotice, setActivationNotice] = useState<ActivationNotice | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
 
   const switchMode = useCallback((m: Mode) => {
     setMode(m);
     setError("");
+    setActivationNotice(null);
+    setResendAvailableAt(null);
   }, []);
 
   useEffect(() => {
@@ -72,7 +84,86 @@ export function CompactSaveAuthPanel({
     setPassword("");
     setShowPassword(false);
     setError("");
+    setActivationNotice(null);
+    setResendAvailableAt(null);
   }, [resetKey]);
+
+  useEffect(() => {
+    if (resendAvailableAt === null) {
+      setResendSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      setResendSecondsLeft(Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000)));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [resendAvailableAt]);
+
+  /** Shared by the initial submit and "Отправить ссылку повторно" — a PENDING_ACTIVATION account's password is never actually checked server-side, so resubmitting is just "try requesting the link again." */
+  const attemptLogin = useCallback(
+    async (emailVal: string, passwordVal: string) => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ email: emailVal, password: passwordVal }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.pendingActivation === true) {
+          setError("");
+          setActivationNotice({
+            delivered: data.delivered === true,
+            maskedEmail: typeof data.maskedEmail === "string" ? data.maskedEmail : emailVal,
+          });
+          setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECONDS * 1000);
+          return;
+        }
+        setActivationNotice(null);
+        setResendAvailableAt(null);
+        if (!res.ok) {
+          const raw = typeof data.error === "string" ? data.error : "";
+          setError(
+            raw === "Invalid email or password"
+              ? "Неверный email или пароль"
+              : raw || "Что-то пошло не так",
+          );
+          return;
+        }
+        notifyPostAuthSync();
+        await onAuthSuccess?.();
+        if (!skipRedirect) {
+          const raw = nextHref || getPostAuthRedirect();
+          const target = appendBirthdayBuilderAuthParam(raw);
+          navigateToCompatibleHref(router, target, { replace: true });
+        }
+      } catch {
+        setError("Ошибка сети");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [nextHref, onAuthSuccess, router, skipRedirect],
+  );
+
+  const resendActivationLink = useCallback(async () => {
+    if (resendSecondsLeft > 0) return;
+    const emailVal = email.trim().toLowerCase();
+    if (!emailVal) return;
+    await attemptLogin(emailVal, password);
+  }, [email, password, resendSecondsLeft, attemptLogin]);
+
+  /** "Указать другой email" — back to a blank slate, not just hiding the notice. */
+  const useDifferentEmail = useCallback(() => {
+    setActivationNotice(null);
+    setResendAvailableAt(null);
+    setError("");
+    setEmail("");
+    setPassword("");
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -98,35 +189,13 @@ export function CompactSaveAuthPanel({
       }
     }
 
+    if (mode === "login") {
+      await attemptLogin(emailVal, passwordVal);
+      return;
+    }
+
     setLoading(true);
     try {
-      if (mode === "login") {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ email: emailVal, password: passwordVal }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const raw = typeof data.error === "string" ? data.error : "";
-          setError(
-            raw === "Invalid email or password"
-              ? "Неверный email или пароль"
-              : raw || "Что-то пошло не так",
-          );
-          return;
-        }
-        notifyPostAuthSync();
-        await onAuthSuccess?.();
-        if (!skipRedirect) {
-          const raw = nextHref || getPostAuthRedirect();
-          const target = appendBirthdayBuilderAuthParam(raw);
-          navigateToCompatibleHref(router, target, { replace: true });
-        }
-        return;
-      }
-
       const res = await fetch("/api/auth/complete-registration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -255,19 +324,58 @@ export function CompactSaveAuthPanel({
             </button>
           </div>
 
-          {error && (
-            <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-              <p className="text-sm text-red-600">{error}</p>
-              {mode === "register" && error.includes("уже существует") && (
+          {activationNotice ? (
+            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
+              {activationNotice.delivered ? (
+                <>
+                  <p className="text-sm font-medium text-blue-900">
+                    Мы перенесли вашу учётную запись в новую версию mamaGo
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    Чтобы завершить перенос и войти, перейдите по ссылке, которую мы отправили на{" "}
+                    <span className="font-medium">{activationNotice.maskedEmail}</span>.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-blue-700">
+                  Не удалось отправить ссылку. Попробуйте ещё раз немного позже.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
                 <button
                   type="button"
-                  onClick={() => switchMode("login")}
-                  className="text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-900"
+                  onClick={resendActivationLink}
+                  disabled={loading || resendSecondsLeft > 0}
+                  className="text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
                 >
-                  Войти в существующий аккаунт
+                  {resendSecondsLeft > 0
+                    ? `Отправить ссылку повторно (${resendSecondsLeft}с)`
+                    : "Отправить ссылку повторно"}
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={useDifferentEmail}
+                  className="text-xs font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                >
+                  Указать другой email
+                </button>
+              </div>
             </div>
+          ) : (
+            error && (
+              <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+                <p className="text-sm text-red-600">{error}</p>
+                {mode === "register" && error.includes("уже существует") && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode("login")}
+                    className="text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-900"
+                  >
+                    Войти в существующий аккаунт
+                  </button>
+                )}
+              </div>
+            )
           )}
 
           <button

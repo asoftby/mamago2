@@ -10,6 +10,7 @@ import {
   buildCityPublicPath,
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
+import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -48,11 +49,6 @@ export async function generateMetadata({ params }: PageProps) {
   if (!city) return {};
 
   const publicBase = getCanonicalPublicAppUrl();
-  const defaultCanonical = `${publicBase}${buildCityPublicPath({
-    citySlug: city.slug,
-    type: "article",
-    slug,
-  })}`;
 
   const mvp = await loadArticleMvpBySlugPublic(slug, city.id);
   if (!mvp) return {};
@@ -81,7 +77,13 @@ export async function generateMetadata({ params }: PageProps) {
 
   const title = article.seoTitle?.trim() || `${mvp.title} — mamaGo`;
   const description = article.seoDescription?.trim() || mvp.excerpt?.trim() || undefined;
-  const canonical = article.seoCanonicalUrl?.trim() || defaultCanonical;
+  const canonical = resolveArticleCanonicalUrl({
+    seoCanonicalUrl: article.seoCanonicalUrl,
+    slug,
+    geoScope: "CITY",
+    citySlug: city.slug,
+    publicBase,
+  });
   const noindex =
     article.noindex === true ||
     (article.seoRobots?.toLowerCase().includes("noindex") ?? false);
@@ -163,7 +165,13 @@ export default async function CityArticlePage({ params }: PageProps) {
     articleRow.seoJsonLdOverride && typeof articleRow.seoJsonLdOverride === "object"
       ? (articleRow.seoJsonLdOverride as Record<string, unknown>)
       : buildArticleJsonLd({
-          canonicalUrl: articleRow.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`,
+          canonicalUrl: resolveArticleCanonicalUrl({
+            seoCanonicalUrl: articleRow.seoCanonicalUrl,
+            slug: articleRow.slug ?? slug,
+            geoScope: "CITY",
+            citySlug: city.slug,
+            publicBase,
+          }),
           headline: mvp.title,
           description: mvp.excerpt,
           image: mvp.heroUrl,

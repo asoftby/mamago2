@@ -5,6 +5,7 @@ import {
   buildCityPublicPath,
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 
 function absoluteBase(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
@@ -65,12 +66,26 @@ export async function syncPlaceCanonical(placeId: string): Promise<void> {
 export async function syncOfferCanonical(offerId: string): Promise<void> {
   const row = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { id: true, slug: true, seoCanonicalSource: true },
+    select: {
+      id: true,
+      slug: true,
+      kind: true,
+      campProgramType: true,
+      seoCanonicalSource: true,
+      place: { select: { city: { select: { slug: true } } } },
+    },
   });
   if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
 
-  const seg = row.slug?.trim() || row.id;
-  const path = `/offers/${seg}`;
+  const citySlug = row.place?.city?.slug || "minsk";
+  const path = getOfferPublicPath(
+    {
+      kind: row.kind,
+      campProgramType: row.campProgramType,
+      slug: row.slug,
+    },
+    citySlug,
+  );
   const absolute = `${absoluteBase()}${path}`;
   const hasSlug = !!row.slug?.trim();
 

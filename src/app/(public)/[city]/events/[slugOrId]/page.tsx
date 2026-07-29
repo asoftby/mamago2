@@ -16,6 +16,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { PublicationType } from "@prisma/client";
@@ -78,20 +79,29 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
   if (!fromDb) return {};
 
   const publicBase = getCanonicalPublicAppUrl();
-  const canonical =
-    fromDb.seoCanonicalUrl?.trim() || (fromDb.slug ? `${publicBase}/${city}/events/${fromDb.slug}` : null);
+  const canonical = resolveEventCanonicalUrl({
+    seoCanonicalUrl: fromDb.seoCanonicalUrl,
+    citySlug: city,
+    slug: fromDb.slug,
+    id: fromDb.id,
+    publicBase,
+  });
 
   const title = fromDb.seoTitle?.trim() || `${fromDb.title} в ${cityLabel(city)} — mamaGo`;
   const description =
     fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityLabel(city)}.`;
 
-  return buildOgMeta({
-    title,
-    description,
-    image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
-    url: canonical ?? `${publicBase}/${city}/events/${fromDb.slug ?? fromDb.id}`,
-    robots: parseRobots(fromDb.seoRobots) ?? { index: true, follow: true },
-  });}
+  return {
+    ...buildOgMeta({
+      title,
+      description,
+      image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
+      url: canonical,
+      robots: parseRobots(fromDb.seoRobots) ?? { index: true, follow: true },
+    }),
+    alternates: { canonical },
+  };
+}
 
 export default async function CityEventPublicPage({ params, searchParams }: EventPublicPageProps) {
   const { city, slugOrId } = await params;
@@ -104,9 +114,13 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     }
 
     const publicBase = getCanonicalPublicAppUrl();
-    const canonicalUrl =
-      fromDb.seoCanonicalUrl?.trim() ||
-      `${publicBase}/${city}/events/${fromDb.slug ?? fromDb.id}`;
+    const canonicalUrl = resolveEventCanonicalUrl({
+      seoCanonicalUrl: fromDb.seoCanonicalUrl,
+      citySlug: city,
+      slug: fromDb.slug,
+      id: fromDb.id,
+      publicBase,
+    });
     const locationName =
       fromDb.venue?.place?.title ||
       fromDb.venue?.title ||

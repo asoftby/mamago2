@@ -9,6 +9,7 @@ import {
   buildCityPublicPath,
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
+import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
@@ -165,7 +166,6 @@ export async function generateMetadata({
   }
 
   const publicBase = getCanonicalPublicAppUrl();
-  const defaultCanonical = `${publicBase}${buildNationalArticlePath(slug)}`;
   // COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
@@ -184,7 +184,12 @@ export async function generateMetadata({
     });
     const title = article?.seoTitle?.trim() || `${mvp.title} — mamaGo`;
     const description = article?.seoDescription?.trim() || mvp.excerpt?.trim() || undefined;
-    const canonical = article?.seoCanonicalUrl?.trim() || defaultCanonical;
+    const canonical = resolveArticleCanonicalUrl({
+      seoCanonicalUrl: article?.seoCanonicalUrl,
+      slug,
+      geoScope: "COUNTRY",
+      publicBase,
+    });
     const noindex =
       article?.noindex === true ||
       (article?.seoRobots?.toLowerCase().includes("noindex") ?? false);
@@ -213,7 +218,12 @@ export async function generateMetadata({
     seo?.noindex === true || (seo?.seoRobots?.toLowerCase().includes("noindex") ?? false);
   const title = seo?.seoTitle?.trim() || `${article.title} — mamaGo`;
   const description = seo?.seoDescription?.trim() || article.subtitle;
-  const canonical = seo?.seoCanonicalUrl?.trim() || defaultCanonical;
+  const canonical = resolveArticleCanonicalUrl({
+    seoCanonicalUrl: seo?.seoCanonicalUrl,
+    slug,
+    geoScope: "COUNTRY",
+    publicBase,
+  });
 
   return {
     ...buildOgMeta({
@@ -303,7 +313,12 @@ export default async function ArticlePage({
     const schemaArticle = await getArticleSchemaData(mvp.id);
     const publicBase = getCanonicalPublicAppUrl();
     const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
-    const canonicalUrl = schemaArticle?.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`;
+    const canonicalUrl = resolveArticleCanonicalUrl({
+      seoCanonicalUrl: schemaArticle?.seoCanonicalUrl,
+      slug: mvp.slug ?? slug,
+      geoScope: "COUNTRY",
+      publicBase,
+    });
     const articleJsonLd =
       schemaArticle?.seoJsonLdOverride && typeof schemaArticle.seoJsonLdOverride === "object"
         ? (schemaArticle.seoJsonLdOverride as Record<string, unknown>)
@@ -402,8 +417,12 @@ export default async function ArticlePage({
       ? (seo.seoJsonLdOverride as Record<string, unknown>)
       : seo
         ? buildArticleJsonLd({
-            canonicalUrl:
-              seo.seoCanonicalUrl?.trim() || `${publicBase}${buildNationalArticlePath(article.slug)}`,
+            canonicalUrl: resolveArticleCanonicalUrl({
+              seoCanonicalUrl: seo.seoCanonicalUrl,
+              slug: article.slug,
+              geoScope: "COUNTRY",
+              publicBase,
+            }),
             headline: seo.title,
             description: seo.excerpt,
             image: seo.heroImage || seo.seoOgImage,

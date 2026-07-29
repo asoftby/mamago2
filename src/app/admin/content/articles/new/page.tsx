@@ -10,7 +10,7 @@ export default async function AdminNewArticlePage() {
   }
 
   const initial = buildEmptyArticleEditorSnapshot({ defaultAuthorUserId: user.id });
-  const isAdminEditor = user.role === "ADMIN";
+  const canModerate = user.role === "ADMIN" || user.role === "MODERATOR";
 
-  return <ArticleEditorClient initial={initial} isAdminEditor={isAdminEditor} />;
+  return <ArticleEditorClient initial={initial} canModerate={canModerate} />;
 }

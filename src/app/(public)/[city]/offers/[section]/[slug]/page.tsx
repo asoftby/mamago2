@@ -10,6 +10,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { getOfferPublicPath, getOfferPublicSection, parseOfferPublicSection } from "@/lib/offers/offerPublicUrl";
+import { resolveOfferCanonicalUrl } from "@/lib/seo/resolveOfferCanonicalUrl";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { OfferPageView } from "@/components/offers";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -77,9 +78,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const publicBase = getCanonicalPublicAppUrl();
   const title = offer.seoTitle?.trim() || offer.title;
   const description = offer.seoDescription?.trim() || offer.description || "";
-  
-  const canonicalPath = getOfferPublicPath(offer, city);
-  const canonical = offer.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`;
+
+  // Always resolve against the Offer's own city, never the URL's — the URL
+  // city can be wrong (or a nonsense value) and must not leak into the
+  // canonical (see CityPlaceRedirectPage for the same class of bug on Place).
+  const actualCitySlug = offer.place?.city?.slug || "minsk";
+  const canonical = resolveOfferCanonicalUrl({
+    seoCanonicalUrl: offer.seoCanonicalUrl,
+    offer,
+    citySlug: actualCitySlug,
+    publicBase,
+  });
 
   return {
     ...buildOgMeta({
@@ -89,7 +98,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url: canonical,
       robots: parseRobots(offer.seoRobots) ?? { index: true, follow: true },
     }),
-    alternates: offer.seoCanonicalUrl?.trim() ? { canonical: offer.seoCanonicalUrl.trim() } : undefined,
+    alternates: { canonical },
   };
 }
 
@@ -156,15 +165,20 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
   }
 
   const canonicalSection = getOfferPublicSection(offer);
-  
-  // Если секция в URL не совпадает с канонической или если это редирект по слагу
-  if (canonicalSection !== sectionSlug || resolved.isRedirect) {
-    const canonicalPath = getOfferPublicPath(offer, city);
+  // The Offer's own city — never the URL's. getOfferPageData() above only
+  // filters by slug, not city, so a wrong (or nonsense) city segment would
+  // otherwise still resolve the offer and, worse, get baked into the
+  // "canonical" computed from it.
+  const actualCitySlug = offer.place?.city?.slug || "minsk";
+
+  // Редирект на единственный канонический URL, если city, секция или slug не совпадают
+  if (actualCitySlug !== city || canonicalSection !== sectionSlug || resolved.isRedirect) {
+    const canonicalPath = getOfferPublicPath(offer, actualCitySlug);
     permanentRedirect(canonicalPath);
   }
 
   const publicBase = getCanonicalPublicAppUrl();
-  const canonicalPath = getOfferPublicPath(offer, city);
+  const canonicalPath = getOfferPublicPath(offer, actualCitySlug);
   const canonicalUrl = `${publicBase}${canonicalPath}`;
   
   // 1. Offer JSON-LD

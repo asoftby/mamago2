@@ -35,6 +35,7 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
 import { RouteMapHero } from "@/components/routes/RouteMapHero";
+import { hasEnoughValidRoutePoints } from "@/lib/routes/validRoutePoints";
 import { RouteRatingBlock } from "@/components/routes/RouteRatingBlock";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { format, parseISO } from "date-fns";
@@ -358,6 +359,11 @@ export function RouteDetailClient({ route }: Props) {
 
   const mapsUrl = buildGoogleMapsUrl(route.stops);
   const routeStats = calculateRouteStats(route.stops, travelMode);
+  // ROUTE_MAP_WITHOUT_VALID_COORDINATES guard: only render the map/polyline
+  // when at least 2 distinct, valid, server-stored coordinate points exist.
+  // Deliberately does not count RouteMapHero's own client-side geocode
+  // fallback — that's not a "doказанный" (proven) coordinate source.
+  const showMap = hasEnoughValidRoutePoints(route.stops);
   const duration = estimateDuration(
     route.stopsCount,
     travelMode,
@@ -493,52 +499,64 @@ export function RouteDetailClient({ route }: Props) {
                 : "rounded-2xl aspect-[16/13.5] md:aspect-video",
             )}
           >
-            <RouteMapHero
-              stops={route.stops}
-              fallbackImageUrl={route.coverImageUrl}
-              className="absolute inset-0 w-full h-full"
-              travelMode={travelMode}
-            />
+            {showMap ? (
+              <>
+                <RouteMapHero
+                  stops={route.stops}
+                  fallbackImageUrl={route.coverImageUrl}
+                  className="absolute inset-0 w-full h-full"
+                  travelMode={travelMode}
+                />
 
-            {/* Travel mode toggle — top left */}
-            <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-xl p-1 shadow-md border border-white/60">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setTravelMode("walk"); }}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  travelMode === "walk"
-                    ? "bg-neutral-900 text-white shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-800",
-                )}
-              >
-                <Footprints className="w-3.5 h-3.5" />
-                <span style={{ fontFamily: "Menlo, monospace" }} className="uppercase">Пешком</span>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setTravelMode("car"); }}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                  travelMode === "car"
-                    ? "bg-neutral-900 text-white shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-800",
-                )}
-              >
-                <Car className="w-3.5 h-3.5" />
-                <span style={{ fontFamily: "Menlo, monospace" }} className="uppercase">На авто</span>
-              </button>
-            </div>
+                {/* Travel mode toggle — top left */}
+                <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-xl p-1 shadow-md border border-white/60">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setTravelMode("walk"); }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                      travelMode === "walk"
+                        ? "bg-neutral-900 text-white shadow-sm"
+                        : "text-neutral-500 hover:text-neutral-800",
+                    )}
+                  >
+                    <Footprints className="w-3.5 h-3.5" />
+                    <span style={{ fontFamily: "Menlo, monospace" }} className="uppercase">Пешком</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setTravelMode("car"); }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                      travelMode === "car"
+                        ? "bg-neutral-900 text-white shadow-sm"
+                        : "text-neutral-500 hover:text-neutral-800",
+                    )}
+                  >
+                    <Car className="w-3.5 h-3.5" />
+                    <span style={{ fontFamily: "Menlo, monospace" }} className="uppercase">На авто</span>
+                  </button>
+                </div>
 
-            {/* Fullscreen toggle — top right */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setMapFullscreen((v) => !v); }}
-              className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-xl bg-white/90 backdrop-blur-sm shadow-md border border-white/60 text-neutral-600 hover:text-neutral-900 transition-colors"
-              aria-label={mapFullscreen ? "Свернуть карту" : "Развернуть карту"}
-            >
-              {mapFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
+                {/* Fullscreen toggle — top right */}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setMapFullscreen((v) => !v); }}
+                  className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-xl bg-white/90 backdrop-blur-sm shadow-md border border-white/60 text-neutral-600 hover:text-neutral-900 transition-colors"
+                  aria-label={mapFullscreen ? "Свернуть карту" : "Развернуть карту"}
+                >
+                  {mapFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+              </>
+            ) : (
+              // ROUTE_MAP_WITHOUT_VALID_COORDINATES guard: fewer than 2 valid
+              // stored coordinate points — never render a fabricated-looking
+              // polyline. Neutral empty state; main Route content (title,
+              // stats, stop list) stays fully accessible below.
+              <div className="absolute inset-0 flex items-center justify-center bg-neutral-100 text-center px-6">
+                <p className="text-sm text-neutral-500">Карта маршрута пока недоступна</p>
+              </div>
+            )}
 
             {/* Overlay title card */}
             <div className="absolute bottom-0 left-0 right-0 p-3">

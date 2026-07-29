@@ -1,14 +1,22 @@
-import { sanitizeHtmlAllowlist } from "@/lib/article/articleBlockHtml";
+export type ParsedArticleEmbed =
+  | { provider: "youtube"; videoId: string; embedUrl: string }
+  | { provider: "instagram"; url: string }
+  | { provider: "external"; url: string }
+  | null;
 
-/** Результат разбора кода вставки для публичного рендера и предпросмотра. */
-export type ArticleEmbedResolveResult = {
-  sanitizedHtml: string;
-  provider: "youtube" | "instagram" | "unknown";
-  requiresInstagramScript: boolean;
-};
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "youtube-nocookie.com",
+  "www.youtube-nocookie.com",
+  "youtu.be",
+]);
+const INSTAGRAM_HOSTS = new Set(["instagram.com", "www.instagram.com"]);
+const YOUTUBE_VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{6,64}$/;
 
-function decodeBasicEntities(s: string): string {
-  return s
+function decodeBasicEntities(value: string): string {
+  return value
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -17,149 +25,74 @@ function decodeBasicEntities(s: string): string {
 }
 
 function getHtmlAttr(tag: string, name: string): string | null {
-  const re = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, "i");
-  const m = tag.match(re);
-  if (!m) return null;
-  return decodeBasicEntities(m[2] ?? m[3] ?? "");
+  const quoted = tag.match(new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, "i"));
+  if (quoted) return decodeBasicEntities(quoted[2] ?? quoted[3] ?? "");
+  const unquoted = tag.match(new RegExp(`\\b${name}\\s*=\\s*([^\\s>]+)`, "i"));
+  return unquoted ? decodeBasicEntities(unquoted[1]) : null;
 }
 
-function escapeAttr(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+function extractStoredValue(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object") return "";
+  const record = value as Record<string, unknown>;
+  for (const key of ["url", "src", "embedUrl", "embedHtml", "value"]) {
+    if (typeof record[key] === "string" && record[key].trim()) return record[key].trim();
+  }
+  return "";
 }
 
-function normalizeYoutubeEmbedSrc(src: string): string | null {
+function extractUrlCandidate(raw: string): string {
+  const iframe = raw.match(/<iframe\b[^>]*>/i)?.[0];
+  if (iframe) return getHtmlAttr(iframe, "src")?.trim() ?? "";
+  const blockquote = raw.match(/<blockquote\b[\s\S]*?<\/blockquote>/i)?.[0];
+  if (blockquote && /instagram-media/i.test(blockquote)) {
+    return getHtmlAttr(blockquote, "data-instgrm-permalink")?.trim() ?? "";
+  }
+  return raw;
+}
+
+function youtubeVideoId(url: URL): string | null {
+  const host = url.hostname.toLowerCase();
+  if (!YOUTUBE_HOSTS.has(host)) return null;
+  const segments = url.pathname.split("/").filter(Boolean);
+  let candidate: string | null = null;
+
+  if (host === "youtu.be") candidate = segments.length === 1 ? segments[0] : null;
+  else if (segments[0] === "embed" || segments[0] === "shorts") {
+    candidate = segments.length === 2 ? segments[1] : null;
+  } else if (url.pathname === "/watch") candidate = url.searchParams.get("v");
+
+  return candidate && YOUTUBE_VIDEO_ID_PATTERN.test(candidate) ? candidate : null;
+}
+
+function instagramEmbedUrl(url: URL): string | null {
+  if (!INSTAGRAM_HOSTS.has(url.hostname.toLowerCase())) return null;
+  const segments = url.pathname.split("/").filter(Boolean);
+  if (!["p", "reel", "tv"].includes(segments[0] ?? "") || segments.length < 2) return null;
+  const shortcode = segments[1];
+  if (!/^[a-zA-Z0-9_-]+$/.test(shortcode)) return null;
+  return `https://www.instagram.com/${segments[0]}/${shortcode}/embed`;
+}
+
+/** Parses legacy HTML, ordinary URLs and normalized object values without trusting stored HTML. */
+export function parseArticleEmbed(value: unknown): ParsedArticleEmbed {
+  const raw = extractStoredValue(value);
+  if (!raw) return null;
   try {
-    const u = new URL(src.trim());
-    if (u.protocol !== "https:") return null;
-    const host = u.hostname.toLowerCase();
-    const ok =
-      host === "www.youtube.com" ||
-      host === "youtube.com" ||
-      host === "www.youtube-nocookie.com" ||
-      host === "youtube-nocookie.com";
-    if (!ok) return null;
-    const path = u.pathname.replace(/\/+$/, "");
-    if (!/^\/embed\/[a-zA-Z0-9_-]{6,}/.test(path)) return null;
-    const hostOut = host.includes("nocookie") ? "www.youtube-nocookie.com" : "www.youtube.com";
-    return `https://${hostOut}${u.pathname}${u.search}`;
+    const url = new URL(extractUrlCandidate(raw));
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    const videoId = youtubeVideoId(url);
+    if (videoId) {
+      return {
+        provider: "youtube",
+        videoId,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}`,
+      };
+    }
+    const instagramUrl = instagramEmbedUrl(url);
+    if (instagramUrl) return { provider: "instagram", url: instagramUrl };
+    return { provider: "external", url: url.href };
   } catch {
     return null;
   }
-}
-
-function normalizeInstagramIframeSrc(src: string): string | null {
-  try {
-    const u = new URL(src.trim());
-    if (u.protocol !== "https:") return null;
-    const host = u.hostname.toLowerCase();
-    if (host !== "www.instagram.com" && host !== "instagram.com") return null;
-    const path = u.pathname.replace(/\/+$/, "");
-    if (!/^\/(p|reel|tv)\/[^/]+\/embed$/.test(path)) return null;
-    return `https://www.instagram.com${path}${u.search}`;
-  } catch {
-    return null;
-  }
-}
-
-function buildSafeIframe(src: string, title: string, aspectClass: "video" | "portrait"): string {
-  if (aspectClass === "portrait") {
-    return `<div class="article-embed__instagram-frame"><iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe></div>`;
-  }
-  return `<iframe src="${escapeAttr(src)}" title="${escapeAttr(title)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" style="width:100%;max-width:100%;border:0;border-radius:0.75rem;aspect-ratio:16/9;min-height:200px"></iframe>`;
-}
-
-function extractFirstIframeOpenTag(html: string): string | null {
-  const m = html.match(/<iframe\b[^>]*>/i);
-  return m ? m[0] : null;
-}
-
-function tryIframe(html: string): ArticleEmbedResolveResult | null {
-  const open = extractFirstIframeOpenTag(html);
-  if (!open) return null;
-  const srcRaw = getHtmlAttr(open, "src");
-  if (!srcRaw) return null;
-
-  const yt = normalizeYoutubeEmbedSrc(srcRaw);
-  if (yt) {
-    return {
-      sanitizedHtml: `<div class="article-embed article-embed--youtube">${buildSafeIframe(yt, "YouTube", "video")}</div>`,
-      provider: "youtube",
-      requiresInstagramScript: false,
-    };
-  }
-
-  const ig = normalizeInstagramIframeSrc(srcRaw);
-  if (ig) {
-    return {
-      sanitizedHtml: `<div class="article-embed article-embed--instagram">${buildSafeIframe(ig, "Instagram", "portrait")}</div>`,
-      provider: "instagram",
-      requiresInstagramScript: false,
-    };
-  }
-
-  return null;
-}
-
-function validateInstagramPermalink(href: string): boolean {
-  try {
-    const u = new URL(href.trim());
-    if (u.protocol !== "https:") return false;
-    const host = u.hostname.toLowerCase();
-    if (host !== "www.instagram.com" && host !== "instagram.com") return false;
-    const p = u.pathname.replace(/\/+$/, "");
-    return /^\/(p|reel|tv)\/[^/]+$/.test(p);
-  } catch {
-    return false;
-  }
-}
-
-function tryInstagramBlockquote(html: string): ArticleEmbedResolveResult | null {
-  const m = html.match(/<blockquote\b[\s\S]*?<\/blockquote>/i);
-  if (!m) return null;
-  const raw = m[0];
-  if (!/instagram-media/i.test(raw)) return null;
-  const permalink = getHtmlAttr(raw, "data-instgrm-permalink");
-  if (!permalink || !validateInstagramPermalink(permalink)) return null;
-
-  const sanitized = sanitizeHtmlAllowlist(raw, ["blockquote", "a", "div", "p", "span"], [
-      "class",
-      "data-instgrm-permalink",
-      "data-instgrm-version",
-      "data-instgrm-captioned",
-      "href",
-      "style",
-      "target",
-      "rel",
-    ]);
-  if (!/<blockquote/i.test(sanitized)) return null;
-
-  return {
-    sanitizedHtml: `<div class="article-embed article-embed--instagram-blockquote">${sanitized}</div>`,
-    provider: "instagram",
-    requiresInstagramScript: true,
-  };
-}
-
-/**
- * Безопасный разбор кода вставки: только YouTube iframe, Instagram iframe или официальный blockquote Instagram.
- * Произвольный HTML и &lt;script&gt; из пользовательского ввода не попадают в результат.
- */
-export function resolveArticleEmbed(embedHtml: string): ArticleEmbedResolveResult {
-  const raw = (embedHtml ?? "").trim();
-  if (!raw) {
-    return { sanitizedHtml: "", provider: "unknown", requiresInstagramScript: false };
-  }
-
-  const iframeResult = tryIframe(raw);
-  if (iframeResult) return iframeResult;
-
-  const bqResult = tryInstagramBlockquote(raw);
-  if (bqResult) return bqResult;
-
-  return { sanitizedHtml: "", provider: "unknown", requiresInstagramScript: false };
 }

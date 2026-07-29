@@ -12,6 +12,7 @@ import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { resolvePlaceCanonicalUrl } from "@/lib/seo/resolvePlaceCanonicalUrl";
 import { MarketplacePlacePage } from "@/components/place/marketplace";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canEditPlace } from "@/lib/permissions/placeEditPermissions";
@@ -45,7 +46,7 @@ interface PlacePageProps {
 
 export async function generateMetadata({ params }: PlacePageProps): Promise<Metadata> {
   const { slug } = await params;
-  
+
   // Check if it's a legacy ID (cuid format)
   const isLegacyId = slug.length > 20 && !slug.includes("-");
   
@@ -56,6 +57,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     seoTitle: string | null;
     seoDescription: string | null;
     seoOgImage: string | null;
+    seoCanonicalUrl: string | null;
     formattedAddr: string | null;
     customAddress: string | null;
     cityId: string | null;
@@ -66,18 +68,19 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     images: { id: string; url: string; kind: string; sortOrder: number }[];
     ownerBusiness: { operationalStatus: string } | null;
   } | null;
-  
+
   if (isLegacyId) {
     // Legacy ID - find by id
     place = await prisma.place.findUnique({
       where: { id: slug },
-      select: { 
+      select: {
         id: true,
-        title: true, 
+        title: true,
         shortDesc: true,
         seoTitle: true,
         seoDescription: true,
         seoOgImage: true,
+        seoCanonicalUrl: true,
         formattedAddr: true,
         customAddress: true,
         cityId: true,
@@ -97,7 +100,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         },
       },
     });
-    
+
     // If found and has slug, this will be redirected in the page component
     if (!place) {
       return {
@@ -113,13 +116,14 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     }
     place = await prisma.place.findUnique({
       where: { id: slugResult.placeId },
-      select: { 
+      select: {
         id: true,
-        title: true, 
+        title: true,
         shortDesc: true,
         seoTitle: true,
         seoDescription: true,
         seoOgImage: true,
+        seoCanonicalUrl: true,
         formattedAddr: true,
         customAddress: true,
         cityId: true,
@@ -139,7 +143,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
         },
       },
     });
-    
+
     if (!place) {
       return {
         title: "Place Not Found",
@@ -173,12 +177,22 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     logoForMeta?.url ||
     place.images[0]?.url;
 
-  return buildOgMeta({
-    title: place.seoTitle?.trim() || displayTitle,
-    description: place.seoDescription?.trim() || place.shortDesc,
-    image: coverImage,
-    url: `${publicBase}/places/${place.slug ?? place.id}`,
+  const canonical = resolvePlaceCanonicalUrl({
+    seoCanonicalUrl: place.seoCanonicalUrl,
+    slug: place.slug,
+    id: place.id,
+    publicBase,
   });
+
+  return {
+    ...buildOgMeta({
+      title: place.seoTitle?.trim() || displayTitle,
+      description: place.seoDescription?.trim() || place.shortDesc,
+      image: coverImage,
+      url: canonical,
+    }),
+    alternates: { canonical },
+  };
 }
 
 export default async function PlacePage({ params }: PlacePageProps) {

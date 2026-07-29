@@ -83,6 +83,10 @@ export function AuthForm({
     error,
     submitLogin,
     submitRegister,
+    activationNotice,
+    resendSecondsLeft,
+    resendActivationLink,
+    useDifferentEmail,
   } = flow;
 
   async function handleCredentialsSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -195,19 +199,58 @@ export function AuthForm({
               </div>
             )}
 
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 space-y-2">
-                <p className="text-sm text-red-600">{error}</p>
-                {mode === "register" && error.includes("уже существует") && (
+            {activationNotice ? (
+              <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2.5 space-y-2">
+                {activationNotice.delivered ? (
+                  <>
+                    <p className="text-sm font-medium text-blue-900">
+                      Мы перенесли вашу учётную запись в новую версию mamaGo
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      Чтобы завершить перенос и войти, перейдите по ссылке, которую мы отправили на{" "}
+                      <span className="font-medium">{activationNotice.maskedEmail}</span>.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-blue-700">
+                    Не удалось отправить ссылку. Попробуйте ещё раз немного позже.
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
                   <button
                     type="button"
-                    onClick={() => switchMode("login")}
-                    className="text-xs text-red-700 hover:text-red-900 underline underline-offset-2 font-medium"
+                    onClick={resendActivationLink}
+                    disabled={loading || resendSecondsLeft > 0}
+                    className="text-xs font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
                   >
-                    Войти в существующий аккаунт
+                    {resendSecondsLeft > 0
+                      ? `Отправить ссылку повторно (${resendSecondsLeft}с)`
+                      : "Отправить ссылку повторно"}
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={useDifferentEmail}
+                    className="text-xs font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2"
+                  >
+                    Указать другой email
+                  </button>
+                </div>
               </div>
+            ) : (
+              error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 space-y-2">
+                  <p className="text-sm text-red-600">{error}</p>
+                  {mode === "register" && error.includes("уже существует") && (
+                    <button
+                      type="button"
+                      onClick={() => switchMode("login")}
+                      className="text-xs text-red-700 hover:text-red-900 underline underline-offset-2 font-medium"
+                    >
+                      Войти в существующий аккаунт
+                    </button>
+                  )}
+                </div>
+              )
             )}
 
             <button type="submit" disabled={loading} className={AUTH_PRIMARY_BUTTON_CLASS}>

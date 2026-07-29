@@ -15,6 +15,7 @@ export const WP_LEGACY_CATCH_ALL_DESTINATION = `/${DEFAULT_CITY_SLUG}`;
 export const KNOWN_ROOT_SEGMENTS = [
   "account",
   "actions",
+  "activate",
   "admin",
   "api",
   "auth",

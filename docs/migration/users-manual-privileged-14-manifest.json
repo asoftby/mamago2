@@ -1,0 +1,139 @@
+{
+  "phase": "USERS manual/privileged — founder-authorized final disposition",
+  "scope": "exactly the 14 legacy users neither kept ADMIN (user:1) nor already-migrated user:521/user:91",
+  "founderRule": "no legacy WordPress role (Administrator/Editor/Author) is ever inherited; every record migrates as USER/PENDING_ACTIVATION; BUSINESS_OWNER only after exact proven Place ownership",
+  "snapshotSha256": "dd63ea2d560ce6ec0f13de8ee551341120b5d1eca2f088cc0e7396e139384d68",
+  "executionPolicy": {
+    "sequential": true,
+    "stopOnFirstError": true,
+    "reruns": 1
+  },
+  "entries": [
+    {
+      "sourceRecordKey": "wordpress-db:user:4",
+      "emailMask": "v***@getvoxel.io",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "53b2130730a0fa2ebb84c967ee298a3b98c3367847215987b93fd62ec16a051c"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:6",
+      "emailMask": "s***@hoster.by",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "3ed3bee5151433e6ee4f7a1141776664a231e4474e976bb2e02235fb9ee37ccd"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:14",
+      "emailMask": "l***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 1,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "5073383f6c42c3a310a894debb86eddef50e71cf8d8794c65a8d7fd5a559db79"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:16",
+      "emailMask": "l***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 65,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "a8c1ef4ec726bed69905d4e0a8365834ab90c11b4fb8163ac1fd32ab7a89d2ae"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:21",
+      "emailMask": "k***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "5a9931d5012482897ad631fbb55aae4c65291a1cfc8d93070a93baa2f8c53a30"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:27",
+      "emailMask": "o***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 1,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "8941566b5d9b50e7c127ed21385aa4fa846743607a48f747172c6e237268cced"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:51",
+      "emailMask": "v***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "106cc0015e3379c6790c31b4e801981775760a2d8f316c7f2a492331bffc48df"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:52",
+      "emailMask": "t***@yandex.by",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "c4c520701b0e65387fe38922de1cd00ab57b12073a7102fcf27c44b1f94584c4"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:108",
+      "emailMask": "i***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "5bf9ceaba05023d0ae01a31d801c1c8ba5a612daa341b195083cda1338a968e1"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:123",
+      "emailMask": "m***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "1f5d574cfe20d23a17958bfc3af67304308081c0ef867a8989d42f273cd9184f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:129",
+      "emailMask": "n***@mamago.by",
+      "placePostIdsCount": 9,
+      "otherAuthoredCount": 1,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "28ecbad09e088d8ce1e16684223006b868a92d636b9599a2133c5e0ec7e82622"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:134",
+      "emailMask": "s***@cropas.by",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "51921d6015dc2e01a67468d4d8dd5c0253a7498931dc4fd7ab80594414a0e251"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:438",
+      "emailMask": "v***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "db56b29922bebdab87077e0a5979d80a8f101673f0cb50737415d02076b8c595"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:439",
+      "emailMask": "o***@gmail.com",
+      "placePostIdsCount": 0,
+      "otherAuthoredCount": 0,
+      "action": "CREATE",
+      "reason": null,
+      "canonicalHash": "3b194f29be92ac4b857b1d69bcaf52741f5973264990c41b6966672e9a48ac57"
+    }
+  ]
+}

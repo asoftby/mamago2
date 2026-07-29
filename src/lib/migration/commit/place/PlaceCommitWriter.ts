@@ -61,15 +61,27 @@ function buildCreateData(draft: PlaceCreateDraft): Prisma.PlaceUncheckedCreateIn
   } as Prisma.PlaceUncheckedCreateInput;
 }
 
+/**
+ * Deliberately omits `status` and conditionally omits `cityId`, unlike
+ * `buildCreateData()`. `draft.status` is always the CREATE-only default
+ * ("PENDING") — sending it on every UPDATE would silently revert an
+ * already-`PUBLISHED` Place back to `PENDING` the moment its content is
+ * ever re-committed (the same regression class found and fixed in
+ * `EventCommitWriter`). Lifecycle is exclusively an approval-flow concern,
+ * never a migration-UPDATE concern. Likewise `draft.cityId` is `null`
+ * whenever `PlaceCommitContext.cityId` couldn't be resolved — absence of
+ * fresh city evidence must never clear a cityId a live Place already has,
+ * so the key is only included when the draft actually proves a non-null
+ * value.
+ */
 function buildUpdateData(draft: PlaceCreateDraft): Prisma.PlaceUncheckedUpdateInput {
   return {
     title: draft.title,
     shortDesc: draft.shortDesc,
     description: draft.description,
     ...(draft.category?.trim() ? { category: draft.category } : {}),
-    status: draft.status,
     locationSource: draft.locationSource,
-    cityId: draft.cityId,
+    ...(draft.cityId ? { cityId: draft.cityId } : {}),
     lat: draft.lat,
     lng: draft.lng,
     phone: draft.phone,

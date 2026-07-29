@@ -4,6 +4,7 @@ export type {
   AutomaticRedirectRule,
   ManualRedirect,
   ManualRedirectCode,
+  RedirectDisposition,
   RedirectRule,
   UnmatchedDetectedType,
   UnmatchedRowStatus,

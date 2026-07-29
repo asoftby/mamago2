@@ -5,6 +5,7 @@ import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
 import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
+import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticlePlaceCardBlock } from "@/components/article/blocks/ArticlePlaceCardBlock";
 import {
   deriveArticleLeadPlainText,
@@ -20,13 +21,12 @@ import {
 } from "@/lib/article/articleHeadingAnchors";
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
-import { cn } from "@/lib/utils";
-import { ArticleInstagramScript } from "@/components/article/mvp/ArticleInstagramScript";
 import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
+import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
@@ -97,10 +97,6 @@ export function ArticleMvpView({
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
   const firstBodyBlockIndex = blocks.findIndex((b) => b.type !== "intro");
 
-  const needsInstagramEmbedScript = blocks.some(
-    (b) => b.type === "embed" && b.embedRequiresInstagramScript,
-  );
-
   // Filter out the Breaking News marker — never show it as visible subtitle text.
   const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
   const leadPlain =
@@ -129,9 +125,6 @@ export function ArticleMvpView({
         className="max-w-3xl mx-auto px-4 sm:px-6 py-10 md:py-16 scroll-smooth"
         role="article"
       >
-      {needsInstagramEmbedScript ? (
-        <ArticleInstagramScript />
-      ) : null}
       <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
       <div className="mb-4 md:mb-0">
         <MobileSmartBackButton fallbackHref={cityHomeHref} />
@@ -176,6 +169,10 @@ export function ArticleMvpView({
 
           const body = (() => {
             if (block.type === "text") {
+              const legacyEmbed = parseArticleEmbed(block.text);
+              if (legacyEmbed?.provider === "youtube") {
+                return <ArticleEmbedBlock value={block.text} />;
+              }
               return (
                 <div
                   className="font-serif leading-[1.75] md:leading-[1.8] text-foreground/95 mb-6 md:mb-7 last:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-primary/40"
@@ -277,30 +274,7 @@ export function ArticleMvpView({
               );
             }
             if (block.type === "embed") {
-              const igBlockquote = block.embedRequiresInstagramScript;
-              const embedShellClass = cn(
-                "article-embed-shell w-full overflow-hidden rounded-xl border border-border/60 bg-muted/15",
-                igBlockquote && "article-embed-shell--instagram-blockquote",
-              );
-              return (
-                <figure className="not-prose my-8 md:my-10 max-w-[720px]">
-                  {block.sanitizedEmbedHtml ? (
-                    <div
-                      className={embedShellClass}
-                      dangerouslySetInnerHTML={{ __html: block.sanitizedEmbedHtml }}
-                    />
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-muted-foreground/35 bg-muted/25 px-4 py-6 text-center text-sm text-muted-foreground">
-                      Вставка не распознана. Используйте код встраивания YouTube или Instagram.
-                    </div>
-                  )}
-                  {block.caption ? (
-                    <figcaption className="mt-3 text-sm text-muted-foreground text-center px-1">
-                      {block.caption}
-                    </figcaption>
-                  ) : null}
-                </figure>
-              );
+              return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
             }
             if (block.type === "activityCard") {
               const c = block.card;

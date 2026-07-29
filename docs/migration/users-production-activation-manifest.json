@@ -1,0 +1,5213 @@
+{
+  "phase": "USERS production activation — fixed eligibility manifest",
+  "generatedAt": "2026-07-28T08:03:39.229Z",
+  "note": "read-only; no email sent building this manifest; excludes ACTIVE ADMIN/MODERATOR, non-PENDING_ACTIVATION, invalid/duplicate email",
+  "totalMigratedUsers": 578,
+  "eligibleCount": 578,
+  "exclusionCounts": {},
+  "manifestHash": "56c0a18295d8aacf155bfb98182cd26cf1f8064c868e9d578e743627623a49a1",
+  "entries": [
+    {
+      "userId": "cmrwr31hb000qws1jwohetzw6",
+      "sourceRecordKey": "wordpress-db:user:10",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr329k00gvws1jt4xhq89p",
+      "sourceRecordKey": "wordpress-db:user:100",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr329y00h3ws1jdyocjots",
+      "sourceRecordKey": "wordpress-db:user:101",
+      "emailMask": "c***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ab00hbws1jifhjwvbp",
+      "sourceRecordKey": "wordpress-db:user:102",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ao00hjws1jw5xiotx1",
+      "sourceRecordKey": "wordpress-db:user:103",
+      "emailMask": "9***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32b300hrws1jt1rl03lm",
+      "sourceRecordKey": "wordpress-db:user:104",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32bi00hzws1j4iq9f42j",
+      "sourceRecordKey": "wordpress-db:user:105",
+      "emailMask": "m***@kvantumminsk.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32bv00i7ws1jopk5g237",
+      "sourceRecordKey": "wordpress-db:user:106",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32c800ifws1j0lrfjmh8",
+      "sourceRecordKey": "wordpress-db:user:107",
+      "emailMask": "p***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copev001xwsxi74pgavbo",
+      "sourceRecordKey": "wordpress-db:user:108",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ck00inws1jakjxvqip",
+      "sourceRecordKey": "wordpress-db:user:109",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31hp000yws1juvndrt6f",
+      "sourceRecordKey": "wordpress-db:user:11",
+      "emailMask": "i***@protektinvest.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32cw00ivws1j0xivcbu3",
+      "sourceRecordKey": "wordpress-db:user:110",
+      "emailMask": "y***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32d700j3ws1j78oqyq60",
+      "sourceRecordKey": "wordpress-db:user:111",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32di00jbws1jzv8zolpi",
+      "sourceRecordKey": "wordpress-db:user:112",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32dt00jjws1jx8mm2wil",
+      "sourceRecordKey": "wordpress-db:user:113",
+      "emailMask": "i***@teleport.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32e500jrws1jqgqot62t",
+      "sourceRecordKey": "wordpress-db:user:114",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32eg00jzws1ji89pr9m7",
+      "sourceRecordKey": "wordpress-db:user:115",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32er00k7ws1jnsb5qf4w",
+      "sourceRecordKey": "wordpress-db:user:116",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32f300kfws1ju6v1iwc4",
+      "sourceRecordKey": "wordpress-db:user:117",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32fe00knws1j710y00t8",
+      "sourceRecordKey": "wordpress-db:user:118",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32fo00kvws1jm9o3bph7",
+      "sourceRecordKey": "wordpress-db:user:119",
+      "emailMask": "n***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31i30016ws1jnkhi9vo8",
+      "sourceRecordKey": "wordpress-db:user:12",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32fz00l3ws1j6zir48x0",
+      "sourceRecordKey": "wordpress-db:user:120",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copf50025wsxicx1xh993",
+      "sourceRecordKey": "wordpress-db:user:123",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32gg00lbws1jo2cl1d4j",
+      "sourceRecordKey": "wordpress-db:user:124",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32gs00ljws1js5j2u5ti",
+      "sourceRecordKey": "wordpress-db:user:128",
+      "emailMask": "i***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copfi002dwsxiobtu8tlw",
+      "sourceRecordKey": "wordpress-db:user:129",
+      "emailMask": "n***@mamago.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ie001ews1j0p4brusx",
+      "sourceRecordKey": "wordpress-db:user:13",
+      "emailMask": "m***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32h500lrws1jsszk21jr",
+      "sourceRecordKey": "wordpress-db:user:130",
+      "emailMask": "p***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32hq00lzws1j5xpx978e",
+      "sourceRecordKey": "wordpress-db:user:131",
+      "emailMask": "e***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ic00m7ws1j27wewsz1",
+      "sourceRecordKey": "wordpress-db:user:132",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ir00mfws1joynywc7w",
+      "sourceRecordKey": "wordpress-db:user:133",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copfs002lwsxigg6jq1m2",
+      "sourceRecordKey": "wordpress-db:user:134",
+      "emailMask": "s***@cropas.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32j400mnws1jiskps64u",
+      "sourceRecordKey": "wordpress-db:user:135",
+      "emailMask": "p***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32jg00mvws1jcu6u0ute",
+      "sourceRecordKey": "wordpress-db:user:136",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ju00n3ws1jl00kkzt1",
+      "sourceRecordKey": "wordpress-db:user:137",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32k600nbws1juuzarqr6",
+      "sourceRecordKey": "wordpress-db:user:138",
+      "emailMask": "k***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ki00njws1j3qbqqrbr",
+      "sourceRecordKey": "wordpress-db:user:139",
+      "emailMask": "z***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copdd000lwsxidw1fuk0l",
+      "sourceRecordKey": "wordpress-db:user:14",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ku00nrws1j7knpw7fs",
+      "sourceRecordKey": "wordpress-db:user:140",
+      "emailMask": "i***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32l600nzws1jmkelzgws",
+      "sourceRecordKey": "wordpress-db:user:141",
+      "emailMask": "k***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32lh00o7ws1jq7amoqsr",
+      "sourceRecordKey": "wordpress-db:user:142",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32lt00ofws1j8ie5v47g",
+      "sourceRecordKey": "wordpress-db:user:143",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32m600onws1j6jm90ja2",
+      "sourceRecordKey": "wordpress-db:user:144",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32mg00ovws1jy7gbbe5v",
+      "sourceRecordKey": "wordpress-db:user:145",
+      "emailMask": "t***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32mu00p3ws1jekuce3e1",
+      "sourceRecordKey": "wordpress-db:user:146",
+      "emailMask": "j***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32nd00pbws1jiph5eoyg",
+      "sourceRecordKey": "wordpress-db:user:147",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32nu00pjws1jkxbblfbj",
+      "sourceRecordKey": "wordpress-db:user:148",
+      "emailMask": "l***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32o600prws1je369vyq9",
+      "sourceRecordKey": "wordpress-db:user:149",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ok00pzws1jx2ne9k52",
+      "sourceRecordKey": "wordpress-db:user:150",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32ox00q7ws1jat2vdjom",
+      "sourceRecordKey": "wordpress-db:user:151",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32pb00qfws1jbmyqk0kp",
+      "sourceRecordKey": "wordpress-db:user:152",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32po00qnws1jwe1h68wm",
+      "sourceRecordKey": "wordpress-db:user:153",
+      "emailMask": "y***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32q400qvws1jtake4phk",
+      "sourceRecordKey": "wordpress-db:user:154",
+      "emailMask": "a***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32qg00r3ws1jlg27oad0",
+      "sourceRecordKey": "wordpress-db:user:155",
+      "emailMask": "e***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32qx00rbws1juvxebu8p",
+      "sourceRecordKey": "wordpress-db:user:156",
+      "emailMask": "3***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32rc00rjws1j6znrzpnu",
+      "sourceRecordKey": "wordpress-db:user:157",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32rp00rrws1jt9qlrl9e",
+      "sourceRecordKey": "wordpress-db:user:158",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32s400rzws1jd0txkqwd",
+      "sourceRecordKey": "wordpress-db:user:159",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copdn000twsxibc9adf86",
+      "sourceRecordKey": "wordpress-db:user:16",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32si00s7ws1j1hrvdt3n",
+      "sourceRecordKey": "wordpress-db:user:160",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32sv00sfws1j3s4sf9px",
+      "sourceRecordKey": "wordpress-db:user:161",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32te00snws1jjo45yyvv",
+      "sourceRecordKey": "wordpress-db:user:162",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32tx00svws1j1d156rtw",
+      "sourceRecordKey": "wordpress-db:user:163",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32uh00t3ws1joh4d1tn2",
+      "sourceRecordKey": "wordpress-db:user:164",
+      "emailMask": "7***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32uz00tbws1jdf0dchg9",
+      "sourceRecordKey": "wordpress-db:user:165",
+      "emailMask": "a***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32vf00tjws1j3yxyo4qe",
+      "sourceRecordKey": "wordpress-db:user:166",
+      "emailMask": "a***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32vu00trws1jge6r07xj",
+      "sourceRecordKey": "wordpress-db:user:167",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32wb00tzws1jiu8bxusc",
+      "sourceRecordKey": "wordpress-db:user:168",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32wq00u7ws1jgh8jil9l",
+      "sourceRecordKey": "wordpress-db:user:169",
+      "emailMask": "6***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31iq001mws1j4f8sqahm",
+      "sourceRecordKey": "wordpress-db:user:17",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32x700ufws1j2ntgj3zi",
+      "sourceRecordKey": "wordpress-db:user:170",
+      "emailMask": "l***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32xm00unws1ja7evjefh",
+      "sourceRecordKey": "wordpress-db:user:171",
+      "emailMask": "d***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32y300uvws1j8z1za1ck",
+      "sourceRecordKey": "wordpress-db:user:172",
+      "emailMask": "b***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32yj00v3ws1jex3x5yi9",
+      "sourceRecordKey": "wordpress-db:user:173",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32z100vbws1jfcq911rs",
+      "sourceRecordKey": "wordpress-db:user:174",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr32zi00vjws1jkp3758qt",
+      "sourceRecordKey": "wordpress-db:user:175",
+      "emailMask": "p***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr330400vrws1jpk42yly4",
+      "sourceRecordKey": "wordpress-db:user:176",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr330o00vzws1jg8xzxmmo",
+      "sourceRecordKey": "wordpress-db:user:177",
+      "emailMask": "e***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr331h00w7ws1j53fcp6vm",
+      "sourceRecordKey": "wordpress-db:user:178",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr331y00wfws1juv4c52oh",
+      "sourceRecordKey": "wordpress-db:user:179",
+      "emailMask": "e***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31j4001uws1jxi5k2pft",
+      "sourceRecordKey": "wordpress-db:user:18",
+      "emailMask": "c***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr332f00wnws1j7w4wl8p1",
+      "sourceRecordKey": "wordpress-db:user:180",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr332t00wvws1jj3nkjrtq",
+      "sourceRecordKey": "wordpress-db:user:181",
+      "emailMask": "p***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr333900x3ws1jty7s3yru",
+      "sourceRecordKey": "wordpress-db:user:182",
+      "emailMask": "n***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr334400xbws1jcf17e7e1",
+      "sourceRecordKey": "wordpress-db:user:183",
+      "emailMask": "h***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr334j00xjws1jo875do45",
+      "sourceRecordKey": "wordpress-db:user:184",
+      "emailMask": "_***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr334v00xrws1jihx2hyz2",
+      "sourceRecordKey": "wordpress-db:user:185",
+      "emailMask": "1***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr335700xzws1j4k17cdqc",
+      "sourceRecordKey": "wordpress-db:user:186",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr335l00y7ws1j87hg9c5c",
+      "sourceRecordKey": "wordpress-db:user:187",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr336300yfws1jnl433vys",
+      "sourceRecordKey": "wordpress-db:user:188",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr336i00ynws1js7i1kcfc",
+      "sourceRecordKey": "wordpress-db:user:189",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr336v00yvws1j784nlgao",
+      "sourceRecordKey": "wordpress-db:user:190",
+      "emailMask": "y***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr337700z3ws1jt8ixxjcb",
+      "sourceRecordKey": "wordpress-db:user:191",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr337k00zbws1ju5pyevfe",
+      "sourceRecordKey": "wordpress-db:user:192",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr337y00zjws1jpublpwet",
+      "sourceRecordKey": "wordpress-db:user:193",
+      "emailMask": "2***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr338a00zrws1j357hgves",
+      "sourceRecordKey": "wordpress-db:user:194",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr338m00zzws1jqw2p7efs",
+      "sourceRecordKey": "wordpress-db:user:195",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr338z0107ws1jm2c473hb",
+      "sourceRecordKey": "wordpress-db:user:196",
+      "emailMask": "z***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr339c010fws1jzudiyiw8",
+      "sourceRecordKey": "wordpress-db:user:197",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr339o010nws1jue8juosj",
+      "sourceRecordKey": "wordpress-db:user:198",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33a2010vws1jc7y9mmzd",
+      "sourceRecordKey": "wordpress-db:user:199",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31gb0005ws1jzmnh1y72",
+      "sourceRecordKey": "wordpress-db:user:2",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31jn0022ws1jr1pvyy9i",
+      "sourceRecordKey": "wordpress-db:user:20",
+      "emailMask": "n***@iquadart.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33ae0113ws1jxbi7qq5k",
+      "sourceRecordKey": "wordpress-db:user:200",
+      "emailMask": "a***@ya.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33ax011bws1jdckxy9ib",
+      "sourceRecordKey": "wordpress-db:user:201",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33b9011jws1jjk5jctmc",
+      "sourceRecordKey": "wordpress-db:user:202",
+      "emailMask": "p***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33bn011rws1jgcj7v74e",
+      "sourceRecordKey": "wordpress-db:user:203",
+      "emailMask": "s***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33c3011zws1jommoyaxd",
+      "sourceRecordKey": "wordpress-db:user:204",
+      "emailMask": "d***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33cd0127ws1j419pl3hi",
+      "sourceRecordKey": "wordpress-db:user:205",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33cs012fws1jlww5xfmz",
+      "sourceRecordKey": "wordpress-db:user:206",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33d4012nws1jkcm7ptao",
+      "sourceRecordKey": "wordpress-db:user:207",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33dg012vws1j2qbj2grh",
+      "sourceRecordKey": "wordpress-db:user:208",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33dt0133ws1jfovp2ulp",
+      "sourceRecordKey": "wordpress-db:user:209",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copdv0011wsxif4wnwvbu",
+      "sourceRecordKey": "wordpress-db:user:21",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33e5013bws1jzebaa6ee",
+      "sourceRecordKey": "wordpress-db:user:210",
+      "emailMask": "p***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33ej013jws1j0ydy4h9b",
+      "sourceRecordKey": "wordpress-db:user:211",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33ew013rws1jvbwpruj5",
+      "sourceRecordKey": "wordpress-db:user:212",
+      "emailMask": "e***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33f8013zws1j9m2dpv4k",
+      "sourceRecordKey": "wordpress-db:user:213",
+      "emailMask": "g***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33fn0147ws1jxs1scur5",
+      "sourceRecordKey": "wordpress-db:user:214",
+      "emailMask": "j***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33fz014fws1juc6gt6mw",
+      "sourceRecordKey": "wordpress-db:user:215",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33gc014nws1j9lqmekno",
+      "sourceRecordKey": "wordpress-db:user:216",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33gs014vws1jp51d8tzm",
+      "sourceRecordKey": "wordpress-db:user:217",
+      "emailMask": "v***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33h40153ws1jounrtsq5",
+      "sourceRecordKey": "wordpress-db:user:218",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33hh015bws1j5lonvil0",
+      "sourceRecordKey": "wordpress-db:user:219",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31k1002aws1j53dgnlyk",
+      "sourceRecordKey": "wordpress-db:user:22",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33hv015jws1jmh5ip4vn",
+      "sourceRecordKey": "wordpress-db:user:220",
+      "emailMask": "k***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33i9015rws1jhkzhk8wa",
+      "sourceRecordKey": "wordpress-db:user:221",
+      "emailMask": "n***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33im015zws1j5esgdusx",
+      "sourceRecordKey": "wordpress-db:user:222",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33j00167ws1jgqozgcfd",
+      "sourceRecordKey": "wordpress-db:user:223",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33jd016fws1jhbxh5zb3",
+      "sourceRecordKey": "wordpress-db:user:224",
+      "emailMask": "y***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33jr016nws1jhx6lxqby",
+      "sourceRecordKey": "wordpress-db:user:225",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33k3016vws1j2njzjnny",
+      "sourceRecordKey": "wordpress-db:user:226",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33kg0173ws1jzo74oh5d",
+      "sourceRecordKey": "wordpress-db:user:227",
+      "emailMask": "l***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33kx017bws1jrsoleemo",
+      "sourceRecordKey": "wordpress-db:user:228",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33lb017jws1jhn0572zz",
+      "sourceRecordKey": "wordpress-db:user:229",
+      "emailMask": "a***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ki002iws1jkzio6svm",
+      "sourceRecordKey": "wordpress-db:user:23",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33lr017rws1jfciz09yi",
+      "sourceRecordKey": "wordpress-db:user:230",
+      "emailMask": "a***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33m5017zws1jxivz5ety",
+      "sourceRecordKey": "wordpress-db:user:231",
+      "emailMask": "n***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33ml0187ws1ju707073a",
+      "sourceRecordKey": "wordpress-db:user:232",
+      "emailMask": "g***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33no018fws1jk4ohvuh7",
+      "sourceRecordKey": "wordpress-db:user:233",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33o8018nws1jlwbveyak",
+      "sourceRecordKey": "wordpress-db:user:234",
+      "emailMask": "m***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33oo018vws1jqe0obs6f",
+      "sourceRecordKey": "wordpress-db:user:235",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33p70193ws1joz9mwu16",
+      "sourceRecordKey": "wordpress-db:user:236",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33pm019bws1j1mztd15k",
+      "sourceRecordKey": "wordpress-db:user:237",
+      "emailMask": "a***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33q1019jws1jc26swbbc",
+      "sourceRecordKey": "wordpress-db:user:238",
+      "emailMask": "o***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33qg019rws1jjcq5efkk",
+      "sourceRecordKey": "wordpress-db:user:239",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31kv002qws1j9hsreid4",
+      "sourceRecordKey": "wordpress-db:user:24",
+      "emailMask": "g***@iquadart.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33qs019zws1jg3cl1kk6",
+      "sourceRecordKey": "wordpress-db:user:240",
+      "emailMask": "i***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33r401a7ws1jsp0y0bpm",
+      "sourceRecordKey": "wordpress-db:user:241",
+      "emailMask": "l***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33rg01afws1jhrlbk84j",
+      "sourceRecordKey": "wordpress-db:user:242",
+      "emailMask": "h***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33rv01anws1jzzgab20n",
+      "sourceRecordKey": "wordpress-db:user:243",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33sa01avws1jecbqwlrn",
+      "sourceRecordKey": "wordpress-db:user:244",
+      "emailMask": "o***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33sq01b3ws1j26sc0wc9",
+      "sourceRecordKey": "wordpress-db:user:245",
+      "emailMask": "r***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33t501bbws1jmtuwff7x",
+      "sourceRecordKey": "wordpress-db:user:246",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33to01bjws1jxrkmq3lr",
+      "sourceRecordKey": "wordpress-db:user:247",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33uc01brws1jx8idj5vy",
+      "sourceRecordKey": "wordpress-db:user:248",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33uu01bzws1jcgp7dv8f",
+      "sourceRecordKey": "wordpress-db:user:249",
+      "emailMask": "t***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31l7002yws1j8payeh47",
+      "sourceRecordKey": "wordpress-db:user:25",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33v701c7ws1jx33khpap",
+      "sourceRecordKey": "wordpress-db:user:250",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33vl01cfws1jro4xwtua",
+      "sourceRecordKey": "wordpress-db:user:251",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33vy01cnws1ja363e915",
+      "sourceRecordKey": "wordpress-db:user:252",
+      "emailMask": "v***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33wc01cvws1jn4gp9dga",
+      "sourceRecordKey": "wordpress-db:user:253",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33wp01d3ws1jcx60ws4b",
+      "sourceRecordKey": "wordpress-db:user:254",
+      "emailMask": "p***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33x401dbws1jhobomub0",
+      "sourceRecordKey": "wordpress-db:user:255",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33xk01djws1jak064aj8",
+      "sourceRecordKey": "wordpress-db:user:256",
+      "emailMask": "m***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33y301drws1jahpclrcs",
+      "sourceRecordKey": "wordpress-db:user:257",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33ym01dzws1jyy6hqd7g",
+      "sourceRecordKey": "wordpress-db:user:258",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33z201e7ws1j3yf0i26u",
+      "sourceRecordKey": "wordpress-db:user:259",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31lk0036ws1j8ienlcar",
+      "sourceRecordKey": "wordpress-db:user:26",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr33zr01efws1jkfjfkt0u",
+      "sourceRecordKey": "wordpress-db:user:260",
+      "emailMask": "k***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr340i01enws1jdoithhb6",
+      "sourceRecordKey": "wordpress-db:user:261",
+      "emailMask": "d***@icloud.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr340v01evws1j2vyd260t",
+      "sourceRecordKey": "wordpress-db:user:262",
+      "emailMask": "1***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr341701f3ws1jxkh50ghn",
+      "sourceRecordKey": "wordpress-db:user:263",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr341j01fbws1j2at14x3m",
+      "sourceRecordKey": "wordpress-db:user:264",
+      "emailMask": "b***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr341u01fjws1jec88iwm1",
+      "sourceRecordKey": "wordpress-db:user:265",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr342401frws1j0y263uhp",
+      "sourceRecordKey": "wordpress-db:user:266",
+      "emailMask": "a***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr342g01fzws1j6nfjsdvi",
+      "sourceRecordKey": "wordpress-db:user:267",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr342r01g7ws1jicgnne76",
+      "sourceRecordKey": "wordpress-db:user:268",
+      "emailMask": "y***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr343201gfws1jy1n81r1k",
+      "sourceRecordKey": "wordpress-db:user:269",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4cope40019wsxicu22ndk6",
+      "sourceRecordKey": "wordpress-db:user:27",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr343d01gnws1jx9jx2kri",
+      "sourceRecordKey": "wordpress-db:user:270",
+      "emailMask": "6***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr343p01gvws1jxfgzl0pw",
+      "sourceRecordKey": "wordpress-db:user:271",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr344001h3ws1jl4h1e3db",
+      "sourceRecordKey": "wordpress-db:user:272",
+      "emailMask": "l***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr344a01hbws1jq3kih6hc",
+      "sourceRecordKey": "wordpress-db:user:273",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr344l01hjws1j4fmve6nm",
+      "sourceRecordKey": "wordpress-db:user:274",
+      "emailMask": "h***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr344v01hrws1jlgsg11xu",
+      "sourceRecordKey": "wordpress-db:user:275",
+      "emailMask": "i***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr345601hzws1jua8djjor",
+      "sourceRecordKey": "wordpress-db:user:276",
+      "emailMask": "5***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr345h01i7ws1ju9hqzvd4",
+      "sourceRecordKey": "wordpress-db:user:277",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr345r01ifws1jvz9vfqcl",
+      "sourceRecordKey": "wordpress-db:user:278",
+      "emailMask": "1***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr346201inws1jm6uh896n",
+      "sourceRecordKey": "wordpress-db:user:279",
+      "emailMask": "m***@str.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ly003ews1jcbiovhi1",
+      "sourceRecordKey": "wordpress-db:user:28",
+      "emailMask": "y***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr346d01ivws1jjc626i5g",
+      "sourceRecordKey": "wordpress-db:user:280",
+      "emailMask": "b***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr346p01j3ws1jifopaqfj",
+      "sourceRecordKey": "wordpress-db:user:281",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr347001jbws1jf2u407xc",
+      "sourceRecordKey": "wordpress-db:user:282",
+      "emailMask": "g***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr347o01jjws1jnr73v0ub",
+      "sourceRecordKey": "wordpress-db:user:283",
+      "emailMask": "d***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr348201jrws1j1npqaqb2",
+      "sourceRecordKey": "wordpress-db:user:284",
+      "emailMask": "u***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr348e01jzws1jb2nr720l",
+      "sourceRecordKey": "wordpress-db:user:285",
+      "emailMask": "m***@ya.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr348p01k7ws1j7ngt783x",
+      "sourceRecordKey": "wordpress-db:user:286",
+      "emailMask": "c***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr349201kfws1jb9whgqf4",
+      "sourceRecordKey": "wordpress-db:user:287",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr349f01knws1j1m8zr7a8",
+      "sourceRecordKey": "wordpress-db:user:288",
+      "emailMask": "y***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr349s01kvws1jy608d55i",
+      "sourceRecordKey": "wordpress-db:user:289",
+      "emailMask": "a***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31mb003mws1j567xmft5",
+      "sourceRecordKey": "wordpress-db:user:29",
+      "emailMask": "i***@iquadart.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34a401l3ws1ju56wnenb",
+      "sourceRecordKey": "wordpress-db:user:290",
+      "emailMask": "e***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ag01lbws1jz0xe5x34",
+      "sourceRecordKey": "wordpress-db:user:291",
+      "emailMask": "e***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34as01ljws1j1s1v6pvz",
+      "sourceRecordKey": "wordpress-db:user:292",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34b401lrws1j2qhlxxvf",
+      "sourceRecordKey": "wordpress-db:user:293",
+      "emailMask": "b***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34bg01lzws1juv002u1b",
+      "sourceRecordKey": "wordpress-db:user:294",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34bs01m7ws1j9lran5tt",
+      "sourceRecordKey": "wordpress-db:user:295",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34c601mfws1jcbpierwk",
+      "sourceRecordKey": "wordpress-db:user:296",
+      "emailMask": "n***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ci01mnws1jx51me476",
+      "sourceRecordKey": "wordpress-db:user:297",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34cw01mvws1j30dhnjmw",
+      "sourceRecordKey": "wordpress-db:user:298",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34d801n3ws1j80wmq5y9",
+      "sourceRecordKey": "wordpress-db:user:299",
+      "emailMask": "h***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34dm01nbws1jvqg5alpp",
+      "sourceRecordKey": "wordpress-db:user:300",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34dz01njws1jzs1s5jnf",
+      "sourceRecordKey": "wordpress-db:user:301",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ed01nrws1jb02s6l8w",
+      "sourceRecordKey": "wordpress-db:user:302",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34eq01nzws1j2j959kah",
+      "sourceRecordKey": "wordpress-db:user:303",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34f501o7ws1jlhzsjby9",
+      "sourceRecordKey": "wordpress-db:user:304",
+      "emailMask": "i***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34fl01ofws1jwnfvwx2b",
+      "sourceRecordKey": "wordpress-db:user:305",
+      "emailMask": "o***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34fz01onws1jwsel3lsm",
+      "sourceRecordKey": "wordpress-db:user:306",
+      "emailMask": "c***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34gg01ovws1jdksf573b",
+      "sourceRecordKey": "wordpress-db:user:307",
+      "emailMask": "6***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34gy01p3ws1jabzfcecp",
+      "sourceRecordKey": "wordpress-db:user:308",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34hd01pbws1j9jxi0127",
+      "sourceRecordKey": "wordpress-db:user:309",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34hs01pjws1jnt09v0p3",
+      "sourceRecordKey": "wordpress-db:user:310",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34i601prws1jqe42k25l",
+      "sourceRecordKey": "wordpress-db:user:311",
+      "emailMask": "v***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ik01pzws1jjvssdjj2",
+      "sourceRecordKey": "wordpress-db:user:312",
+      "emailMask": "5***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34j101q7ws1jzfgztyb3",
+      "sourceRecordKey": "wordpress-db:user:313",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34jl01qfws1jqlkxlc92",
+      "sourceRecordKey": "wordpress-db:user:314",
+      "emailMask": "m***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34k201qnws1j7ab7zadg",
+      "sourceRecordKey": "wordpress-db:user:315",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34km01qvws1j2y6fqxiu",
+      "sourceRecordKey": "wordpress-db:user:316",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34l701r3ws1jbc86afye",
+      "sourceRecordKey": "wordpress-db:user:317",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34lo01rbws1jeazga5ct",
+      "sourceRecordKey": "wordpress-db:user:318",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34m701rjws1jduuvr748",
+      "sourceRecordKey": "wordpress-db:user:319",
+      "emailMask": "s***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34mo01rrws1jip472zey",
+      "sourceRecordKey": "wordpress-db:user:320",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34n401rzws1jicqg76vr",
+      "sourceRecordKey": "wordpress-db:user:321",
+      "emailMask": "y***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34nl01s7ws1jusoxm9er",
+      "sourceRecordKey": "wordpress-db:user:322",
+      "emailMask": "d***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34o201sfws1jtgmbltfi",
+      "sourceRecordKey": "wordpress-db:user:323",
+      "emailMask": "x***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34oi01snws1jutp6nl0y",
+      "sourceRecordKey": "wordpress-db:user:324",
+      "emailMask": "v***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34p001svws1jolicnhzt",
+      "sourceRecordKey": "wordpress-db:user:325",
+      "emailMask": "y***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ph01t3ws1jym6h804m",
+      "sourceRecordKey": "wordpress-db:user:326",
+      "emailMask": "m***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34q301tbws1j5k336kxm",
+      "sourceRecordKey": "wordpress-db:user:327",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34qm01tjws1j8uxuj88o",
+      "sourceRecordKey": "wordpress-db:user:328",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34r101trws1j2j77e61a",
+      "sourceRecordKey": "wordpress-db:user:329",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34rh01tzws1jpnv7684z",
+      "sourceRecordKey": "wordpress-db:user:330",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ry01u7ws1je17s2lgs",
+      "sourceRecordKey": "wordpress-db:user:331",
+      "emailMask": "5***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34sk01ufws1jmq2tq4l8",
+      "sourceRecordKey": "wordpress-db:user:332",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34tc01unws1jhfvysi7x",
+      "sourceRecordKey": "wordpress-db:user:333",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34ts01uvws1jvoyywg9g",
+      "sourceRecordKey": "wordpress-db:user:334",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34u701v3ws1jxblof86f",
+      "sourceRecordKey": "wordpress-db:user:335",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34uo01vbws1j0q4rdygb",
+      "sourceRecordKey": "wordpress-db:user:336",
+      "emailMask": "n***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34v401vjws1jpefyj22p",
+      "sourceRecordKey": "wordpress-db:user:337",
+      "emailMask": "k***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34vh01vrws1j0nat2j5g",
+      "sourceRecordKey": "wordpress-db:user:338",
+      "emailMask": "z***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34vw01vzws1jxlprfoiz",
+      "sourceRecordKey": "wordpress-db:user:339",
+      "emailMask": "i***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34wa01w7ws1jz4hid4cb",
+      "sourceRecordKey": "wordpress-db:user:340",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34wn01wfws1j66ydhfce",
+      "sourceRecordKey": "wordpress-db:user:341",
+      "emailMask": "h***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34wz01wnws1jonutlqut",
+      "sourceRecordKey": "wordpress-db:user:342",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34xc01wvws1jk1xkcu1l",
+      "sourceRecordKey": "wordpress-db:user:343",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34xq01x3ws1jkdwwaq8h",
+      "sourceRecordKey": "wordpress-db:user:344",
+      "emailMask": "y***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34y201xbws1jppo9ca8t",
+      "sourceRecordKey": "wordpress-db:user:345",
+      "emailMask": "m***@ya.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34yf01xjws1j716bahdm",
+      "sourceRecordKey": "wordpress-db:user:346",
+      "emailMask": "f***@test.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34yr01xrws1j5katjis0",
+      "sourceRecordKey": "wordpress-db:user:347",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34z401xzws1je69v7r6e",
+      "sourceRecordKey": "wordpress-db:user:348",
+      "emailMask": "k***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34zi01y7ws1jdmr061d5",
+      "sourceRecordKey": "wordpress-db:user:349",
+      "emailMask": "a***@icloud.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31mn003uws1jod17ro8v",
+      "sourceRecordKey": "wordpress-db:user:35",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr34zv01yfws1j5q3zjsgl",
+      "sourceRecordKey": "wordpress-db:user:350",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr350801ynws1j4ioc6kr2",
+      "sourceRecordKey": "wordpress-db:user:351",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr350k01yvws1j88j9bwcw",
+      "sourceRecordKey": "wordpress-db:user:352",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr350w01z3ws1jvzge5ak2",
+      "sourceRecordKey": "wordpress-db:user:353",
+      "emailMask": "m***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr351701zbws1jbvdlwtor",
+      "sourceRecordKey": "wordpress-db:user:354",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr351j01zjws1jfgcfut99",
+      "sourceRecordKey": "wordpress-db:user:355",
+      "emailMask": "o***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr351u01zrws1jw6w7z72x",
+      "sourceRecordKey": "wordpress-db:user:356",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr352701zzws1jvwwkjg85",
+      "sourceRecordKey": "wordpress-db:user:357",
+      "emailMask": "3***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr352j0207ws1jc1j9qy9u",
+      "sourceRecordKey": "wordpress-db:user:358",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr352u020fws1jyo9v4w3g",
+      "sourceRecordKey": "wordpress-db:user:359",
+      "emailMask": "i***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31n30042ws1jd7t9sk4c",
+      "sourceRecordKey": "wordpress-db:user:36",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr3536020nws1jv9h6f6ai",
+      "sourceRecordKey": "wordpress-db:user:360",
+      "emailMask": "z***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr353i020vws1j9j1wm0o2",
+      "sourceRecordKey": "wordpress-db:user:361",
+      "emailMask": "2***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr353v0213ws1jf99g8yhn",
+      "sourceRecordKey": "wordpress-db:user:362",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr3547021bws1joo4uxt6k",
+      "sourceRecordKey": "wordpress-db:user:363",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr354j021jws1ja7k2xh6b",
+      "sourceRecordKey": "wordpress-db:user:364",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr354w021rws1j9xtwybhd",
+      "sourceRecordKey": "wordpress-db:user:365",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr3558021zws1jitsyxd6p",
+      "sourceRecordKey": "wordpress-db:user:366",
+      "emailMask": "t***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr355l0227ws1je8z58g0e",
+      "sourceRecordKey": "wordpress-db:user:367",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr355x022fws1jwq3mynrf",
+      "sourceRecordKey": "wordpress-db:user:368",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr356a022nws1jeudxeg1b",
+      "sourceRecordKey": "wordpress-db:user:369",
+      "emailMask": "o***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ng004aws1jspk6zkhq",
+      "sourceRecordKey": "wordpress-db:user:37",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr356m022vws1j0s0c8h4z",
+      "sourceRecordKey": "wordpress-db:user:370",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr356y0233ws1jq602jyns",
+      "sourceRecordKey": "wordpress-db:user:371",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr357g023bws1jrz57vqwz",
+      "sourceRecordKey": "wordpress-db:user:372",
+      "emailMask": "s***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr357t023jws1jbt1h6x8p",
+      "sourceRecordKey": "wordpress-db:user:373",
+      "emailMask": "o***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr358g023rws1jww2ie8ct",
+      "sourceRecordKey": "wordpress-db:user:374",
+      "emailMask": "t***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr3591023zws1jn42n8kbq",
+      "sourceRecordKey": "wordpress-db:user:375",
+      "emailMask": "i***@csd.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr359l0247ws1jb5jioxp8",
+      "sourceRecordKey": "wordpress-db:user:376",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35a3024fws1j90u86zo2",
+      "sourceRecordKey": "wordpress-db:user:377",
+      "emailMask": "h***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ai024nws1jh839l189",
+      "sourceRecordKey": "wordpress-db:user:378",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35aw024vws1jeaenggbw",
+      "sourceRecordKey": "wordpress-db:user:379",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwpzreu0005ws572fazgf83",
+      "sourceRecordKey": "wordpress-db:user:38",
+      "emailMask": "1***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ba0253ws1juetz3og2",
+      "sourceRecordKey": "wordpress-db:user:380",
+      "emailMask": "a***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35bv025bws1jt6p8hro0",
+      "sourceRecordKey": "wordpress-db:user:381",
+      "emailMask": "o***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ch025jws1jtfgk7o5c",
+      "sourceRecordKey": "wordpress-db:user:382",
+      "emailMask": "j***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35dq025rws1juv22kvo6",
+      "sourceRecordKey": "wordpress-db:user:383",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ei025zws1jgqna8di1",
+      "sourceRecordKey": "wordpress-db:user:384",
+      "emailMask": "i***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ex0267ws1jmou8r0dy",
+      "sourceRecordKey": "wordpress-db:user:385",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ff026fws1j9lhscoho",
+      "sourceRecordKey": "wordpress-db:user:386",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ft026nws1j7sffh1t8",
+      "sourceRecordKey": "wordpress-db:user:387",
+      "emailMask": "d***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35g6026vws1j0lb8wjkh",
+      "sourceRecordKey": "wordpress-db:user:388",
+      "emailMask": "i***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35gk0273ws1jzbf0orxi",
+      "sourceRecordKey": "wordpress-db:user:389",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31o1004nws1joqoox653",
+      "sourceRecordKey": "wordpress-db:user:39",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35gw027bws1j40ccq18v",
+      "sourceRecordKey": "wordpress-db:user:390",
+      "emailMask": "i***@rambler.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35h8027jws1jj6djpdaq",
+      "sourceRecordKey": "wordpress-db:user:391",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35hk027rws1ju8j2ez78",
+      "sourceRecordKey": "wordpress-db:user:392",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35hw027zws1jdfwjpb04",
+      "sourceRecordKey": "wordpress-db:user:393",
+      "emailMask": "j***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35i90287ws1j5sj1j3fw",
+      "sourceRecordKey": "wordpress-db:user:394",
+      "emailMask": "a***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35il028fws1jwfqyfgpy",
+      "sourceRecordKey": "wordpress-db:user:395",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ix028nws1jg0xov6vh",
+      "sourceRecordKey": "wordpress-db:user:396",
+      "emailMask": "t***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ja028vws1jye09afwn",
+      "sourceRecordKey": "wordpress-db:user:397",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35jm0293ws1ja1lz6ejv",
+      "sourceRecordKey": "wordpress-db:user:398",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35jz029bws1j0k5atd2x",
+      "sourceRecordKey": "wordpress-db:user:399",
+      "emailMask": "l***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copcq0005wsxiprs9q04q",
+      "sourceRecordKey": "wordpress-db:user:4",
+      "emailMask": "v***@getvoxel.io",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31oe004vws1jnqhhkce2",
+      "sourceRecordKey": "wordpress-db:user:40",
+      "emailMask": "a***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ka029jws1jgn9xbdkl",
+      "sourceRecordKey": "wordpress-db:user:400",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35kn029rws1jd79al0sg",
+      "sourceRecordKey": "wordpress-db:user:401",
+      "emailMask": "h***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35kz029zws1j19vvoj7o",
+      "sourceRecordKey": "wordpress-db:user:402",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35lb02a7ws1jnrl6xmvx",
+      "sourceRecordKey": "wordpress-db:user:403",
+      "emailMask": "a***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35lw02afws1j27wssegv",
+      "sourceRecordKey": "wordpress-db:user:404",
+      "emailMask": "p***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35md02anws1jeoohnztb",
+      "sourceRecordKey": "wordpress-db:user:405",
+      "emailMask": "b***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ms02avws1jdaj2pxhb",
+      "sourceRecordKey": "wordpress-db:user:406",
+      "emailMask": "o***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35na02b3ws1j0mz7zg1h",
+      "sourceRecordKey": "wordpress-db:user:407",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35np02bbws1jyzikqe2g",
+      "sourceRecordKey": "wordpress-db:user:408",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35o102bjws1j9yxmp1xo",
+      "sourceRecordKey": "wordpress-db:user:409",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ot0053ws1j53b4hvvm",
+      "sourceRecordKey": "wordpress-db:user:41",
+      "emailMask": "d***@teleport.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35og02brws1jf2iwj82m",
+      "sourceRecordKey": "wordpress-db:user:410",
+      "emailMask": "w***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35ot02bzws1je58d30yr",
+      "sourceRecordKey": "wordpress-db:user:411",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35p802c7ws1jmqbad2xq",
+      "sourceRecordKey": "wordpress-db:user:412",
+      "emailMask": "i***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35pm02cfws1jdex9oxf9",
+      "sourceRecordKey": "wordpress-db:user:413",
+      "emailMask": "p***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35q002cnws1jzhdesq6b",
+      "sourceRecordKey": "wordpress-db:user:414",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35qe02cvws1jqpb55hf2",
+      "sourceRecordKey": "wordpress-db:user:415",
+      "emailMask": "r***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35qt02d3ws1j4lejrxs4",
+      "sourceRecordKey": "wordpress-db:user:416",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35r602dbws1jyxkbyzpz",
+      "sourceRecordKey": "wordpress-db:user:417",
+      "emailMask": "7***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35rm02djws1jh1qa5e5f",
+      "sourceRecordKey": "wordpress-db:user:418",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35s302drws1jav4tg2hm",
+      "sourceRecordKey": "wordpress-db:user:419",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31p9005bws1jbbdpmgo2",
+      "sourceRecordKey": "wordpress-db:user:42",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35sk02dzws1j9finvoqy",
+      "sourceRecordKey": "wordpress-db:user:420",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35sx02e7ws1jhq4gobi0",
+      "sourceRecordKey": "wordpress-db:user:421",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35tg02efws1juilpuwe2",
+      "sourceRecordKey": "wordpress-db:user:422",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35tv02enws1jz5ndecfh",
+      "sourceRecordKey": "wordpress-db:user:423",
+      "emailMask": "s***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35u702evws1jvq2zj3mz",
+      "sourceRecordKey": "wordpress-db:user:424",
+      "emailMask": "g***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35uq02f3ws1jbhnu5dir",
+      "sourceRecordKey": "wordpress-db:user:425",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35v702fbws1j1wbzv2ac",
+      "sourceRecordKey": "wordpress-db:user:426",
+      "emailMask": "k***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35vm02fjws1j0apcm4db",
+      "sourceRecordKey": "wordpress-db:user:427",
+      "emailMask": "l***@mail.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35w402frws1jlvv47stx",
+      "sourceRecordKey": "wordpress-db:user:428",
+      "emailMask": "k***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35wq02fzws1jgewbtny3",
+      "sourceRecordKey": "wordpress-db:user:429",
+      "emailMask": "c***@mail.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31pm005jws1j8dgrng7w",
+      "sourceRecordKey": "wordpress-db:user:43",
+      "emailMask": "m***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35x702g7ws1jqtx2u16k",
+      "sourceRecordKey": "wordpress-db:user:430",
+      "emailMask": "g***@yandex.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35xp02gfws1jf2q20egt",
+      "sourceRecordKey": "wordpress-db:user:431",
+      "emailMask": "n***@yandex.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35y402gnws1j0iuyerxt",
+      "sourceRecordKey": "wordpress-db:user:432",
+      "emailMask": "d***@yandex.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35yv02gvws1jzgq4qy9j",
+      "sourceRecordKey": "wordpress-db:user:433",
+      "emailMask": "1***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35za02h3ws1jel7u4wkl",
+      "sourceRecordKey": "wordpress-db:user:434",
+      "emailMask": "c***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr35zo02hbws1jca66bo4q",
+      "sourceRecordKey": "wordpress-db:user:435",
+      "emailMask": "r***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr360602hjws1jgrrnaea6",
+      "sourceRecordKey": "wordpress-db:user:436",
+      "emailMask": "h***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr360m02hrws1j0xikajqy",
+      "sourceRecordKey": "wordpress-db:user:437",
+      "emailMask": "j***@bk.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copg5002twsxi973m9nrk",
+      "sourceRecordKey": "wordpress-db:user:438",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copgg0031wsxibdekur1w",
+      "sourceRecordKey": "wordpress-db:user:439",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31pz005rws1jlcgeun3b",
+      "sourceRecordKey": "wordpress-db:user:44",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr360z02hzws1jow949h6m",
+      "sourceRecordKey": "wordpress-db:user:440",
+      "emailMask": "c***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr361e02i7ws1jhkjj8n6r",
+      "sourceRecordKey": "wordpress-db:user:441",
+      "emailMask": "t***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr361r02ifws1jx49rpf3b",
+      "sourceRecordKey": "wordpress-db:user:442",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr362302inws1jygy5rx95",
+      "sourceRecordKey": "wordpress-db:user:443",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr362f02ivws1j4yune0qw",
+      "sourceRecordKey": "wordpress-db:user:444",
+      "emailMask": "g***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr362s02j3ws1j7v6qc5bd",
+      "sourceRecordKey": "wordpress-db:user:445",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr363502jbws1jc2ot4jqu",
+      "sourceRecordKey": "wordpress-db:user:446",
+      "emailMask": "l***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr363h02jjws1j1qg7uzlu",
+      "sourceRecordKey": "wordpress-db:user:447",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr363t02jrws1jr5x5kg4q",
+      "sourceRecordKey": "wordpress-db:user:448",
+      "emailMask": "o***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr364502jzws1jbscb4c18",
+      "sourceRecordKey": "wordpress-db:user:449",
+      "emailMask": "d***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31qb005zws1juozn751b",
+      "sourceRecordKey": "wordpress-db:user:45",
+      "emailMask": "b***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr364g02k7ws1jhde1rw6i",
+      "sourceRecordKey": "wordpress-db:user:450",
+      "emailMask": "a***@cafegarage.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr364w02kfws1j418ojuve",
+      "sourceRecordKey": "wordpress-db:user:451",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr365902knws1jm4fjix9j",
+      "sourceRecordKey": "wordpress-db:user:452",
+      "emailMask": "f***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr365l02kvws1j66dimbkd",
+      "sourceRecordKey": "wordpress-db:user:453",
+      "emailMask": "t***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr366402l3ws1jagfuc2c0",
+      "sourceRecordKey": "wordpress-db:user:454",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr366m02lbws1j37q0ek7a",
+      "sourceRecordKey": "wordpress-db:user:455",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr367202ljws1jdkb3oco2",
+      "sourceRecordKey": "wordpress-db:user:456",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr367f02lrws1j9npddjjq",
+      "sourceRecordKey": "wordpress-db:user:457",
+      "emailMask": "h***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr367v02lzws1jipmigz9i",
+      "sourceRecordKey": "wordpress-db:user:458",
+      "emailMask": "j***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr368902m7ws1j0gixubrj",
+      "sourceRecordKey": "wordpress-db:user:459",
+      "emailMask": "a***@gimi.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31qn0067ws1jifcgo5rd",
+      "sourceRecordKey": "wordpress-db:user:46",
+      "emailMask": "z***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr368q02mfws1j50f28sfh",
+      "sourceRecordKey": "wordpress-db:user:461",
+      "emailMask": "o***@oem.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr369402mnws1j4sirym70",
+      "sourceRecordKey": "wordpress-db:user:462",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr369i02mvws1j5kkun1ym",
+      "sourceRecordKey": "wordpress-db:user:463",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36a302n3ws1jjtmzo9a8",
+      "sourceRecordKey": "wordpress-db:user:464",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36aj02nbws1jahfqms5w",
+      "sourceRecordKey": "wordpress-db:user:465",
+      "emailMask": "k***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36b102njws1jhij0dum7",
+      "sourceRecordKey": "wordpress-db:user:466",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36bg02nrws1jroq5lpcg",
+      "sourceRecordKey": "wordpress-db:user:467",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36bw02nzws1j06usvmv3",
+      "sourceRecordKey": "wordpress-db:user:468",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ce02o7ws1jz48pdsq7",
+      "sourceRecordKey": "wordpress-db:user:469",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31r2006fws1jhvoheacg",
+      "sourceRecordKey": "wordpress-db:user:47",
+      "emailMask": "p***@mail.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36cw02ofws1jtd5c49lu",
+      "sourceRecordKey": "wordpress-db:user:470",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36de02onws1jtje2ogvo",
+      "sourceRecordKey": "wordpress-db:user:471",
+      "emailMask": "7***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36dx02ovws1jdwjjdc9a",
+      "sourceRecordKey": "wordpress-db:user:472",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ee02p3ws1jjdu82rtx",
+      "sourceRecordKey": "wordpress-db:user:473",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ez02pbws1jhunmeaz9",
+      "sourceRecordKey": "wordpress-db:user:474",
+      "emailMask": "m***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36fg02pjws1jejq136d9",
+      "sourceRecordKey": "wordpress-db:user:475",
+      "emailMask": "g***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36fy02prws1jxc1sqtlv",
+      "sourceRecordKey": "wordpress-db:user:476",
+      "emailMask": "a***@protektinvest.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36gf02pzws1jgns5uyys",
+      "sourceRecordKey": "wordpress-db:user:477",
+      "emailMask": "n***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36h102q7ws1jr073j8fe",
+      "sourceRecordKey": "wordpress-db:user:478",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36hm02qfws1j561npsfu",
+      "sourceRecordKey": "wordpress-db:user:479",
+      "emailMask": "n***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31re006nws1jeehlukt1",
+      "sourceRecordKey": "wordpress-db:user:48",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36i902qnws1jpfitbhct",
+      "sourceRecordKey": "wordpress-db:user:480",
+      "emailMask": "f***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ix02qvws1j6072q6in",
+      "sourceRecordKey": "wordpress-db:user:481",
+      "emailMask": "4***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36jt02r3ws1jw4q4ivxr",
+      "sourceRecordKey": "wordpress-db:user:482",
+      "emailMask": "m***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36kg02rbws1jwfwizn3h",
+      "sourceRecordKey": "wordpress-db:user:483",
+      "emailMask": "r***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36l402rjws1jt6qm12yq",
+      "sourceRecordKey": "wordpress-db:user:484",
+      "emailMask": "r***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36lp02rrws1j4kitzm1x",
+      "sourceRecordKey": "wordpress-db:user:485",
+      "emailMask": "r***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36mw02rzws1jik0k70gj",
+      "sourceRecordKey": "wordpress-db:user:486",
+      "emailMask": "r***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36nj02s7ws1j77e9b93x",
+      "sourceRecordKey": "wordpress-db:user:487",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36o202sfws1junt8t3m3",
+      "sourceRecordKey": "wordpress-db:user:488",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36oj02snws1jn5viq45p",
+      "sourceRecordKey": "wordpress-db:user:489",
+      "emailMask": "3***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31rq006vws1j8pqbbl0k",
+      "sourceRecordKey": "wordpress-db:user:49",
+      "emailMask": "t***@mamago.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ox02svws1jjs5zgiyy",
+      "sourceRecordKey": "wordpress-db:user:490",
+      "emailMask": "o***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36pc02t3ws1jk8v1tfhh",
+      "sourceRecordKey": "wordpress-db:user:491",
+      "emailMask": "g***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36pr02tbws1jdh2ftjyq",
+      "sourceRecordKey": "wordpress-db:user:492",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36q302tjws1j0bn6p0vm",
+      "sourceRecordKey": "wordpress-db:user:493",
+      "emailMask": "a***@ya.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36qj02trws1jm02sk03e",
+      "sourceRecordKey": "wordpress-db:user:494",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36qu02tzws1j42172tym",
+      "sourceRecordKey": "wordpress-db:user:495",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36r902u7ws1jrjb3dgrh",
+      "sourceRecordKey": "wordpress-db:user:496",
+      "emailMask": "i***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36rl02ufws1j3b1cmkuo",
+      "sourceRecordKey": "wordpress-db:user:497",
+      "emailMask": "o***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ry02unws1jasobsmrg",
+      "sourceRecordKey": "wordpress-db:user:498",
+      "emailMask": "h***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36sd02uvws1j532lkv1m",
+      "sourceRecordKey": "wordpress-db:user:499",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31s40073ws1jkyje2lfz",
+      "sourceRecordKey": "wordpress-db:user:50",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36sq02v3ws1jdr66h3co",
+      "sourceRecordKey": "wordpress-db:user:500",
+      "emailMask": "s***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36t602vbws1j420yzy0t",
+      "sourceRecordKey": "wordpress-db:user:501",
+      "emailMask": "3***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36tl02vjws1j5ilh90u9",
+      "sourceRecordKey": "wordpress-db:user:502",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36u002vrws1je08g1m9r",
+      "sourceRecordKey": "wordpress-db:user:503",
+      "emailMask": "g***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36uh02vzws1jql8synsu",
+      "sourceRecordKey": "wordpress-db:user:504",
+      "emailMask": "b***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36ux02w7ws1jtf57op81",
+      "sourceRecordKey": "wordpress-db:user:505",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36vd02wfws1j8g7ub0zi",
+      "sourceRecordKey": "wordpress-db:user:506",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36vv02wnws1j5s336lvp",
+      "sourceRecordKey": "wordpress-db:user:507",
+      "emailMask": "p***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36wa02wvws1jvppe1osl",
+      "sourceRecordKey": "wordpress-db:user:508",
+      "emailMask": "v***@yahoo.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36wr02x3ws1jum6omqi1",
+      "sourceRecordKey": "wordpress-db:user:509",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copec001hwsxi7f7jdy6j",
+      "sourceRecordKey": "wordpress-db:user:51",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36x602xbws1jcehpbas8",
+      "sourceRecordKey": "wordpress-db:user:510",
+      "emailMask": "g***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36xq02xjws1j92bowykk",
+      "sourceRecordKey": "wordpress-db:user:511",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36y802xrws1jz5g4odes",
+      "sourceRecordKey": "wordpress-db:user:512",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36yv02xzws1j7g8bul3w",
+      "sourceRecordKey": "wordpress-db:user:513",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36zd02y7ws1jixolq7f8",
+      "sourceRecordKey": "wordpress-db:user:514",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr36zw02yfws1jcibsn03o",
+      "sourceRecordKey": "wordpress-db:user:515",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr370i02ynws1jibk1k7l5",
+      "sourceRecordKey": "wordpress-db:user:516",
+      "emailMask": "a***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr371002yvws1jzb586r4s",
+      "sourceRecordKey": "wordpress-db:user:517",
+      "emailMask": "f***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr371g02z3ws1jjqltkw63",
+      "sourceRecordKey": "wordpress-db:user:518",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr371z02zbws1j74e4246c",
+      "sourceRecordKey": "wordpress-db:user:519",
+      "emailMask": "u***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copem001pwsxiww4qiwfn",
+      "sourceRecordKey": "wordpress-db:user:52",
+      "emailMask": "t***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr372h02zjws1jxgqlmmc2",
+      "sourceRecordKey": "wordpress-db:user:520",
+      "emailMask": "t***@mail.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr373202zrws1jrd0t68p4",
+      "sourceRecordKey": "wordpress-db:user:521",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr373j02zzws1j83alyc9v",
+      "sourceRecordKey": "wordpress-db:user:522",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37430307ws1j9210b37v",
+      "sourceRecordKey": "wordpress-db:user:523",
+      "emailMask": "s***@ya.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr374o030fws1jwsk00f2b",
+      "sourceRecordKey": "wordpress-db:user:524",
+      "emailMask": "o***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr375f030nws1jz1yj987w",
+      "sourceRecordKey": "wordpress-db:user:525",
+      "emailMask": "k***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr3760030vws1jtpypf6s2",
+      "sourceRecordKey": "wordpress-db:user:526",
+      "emailMask": "h***@mail.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr376j0313ws1jzrxayju8",
+      "sourceRecordKey": "wordpress-db:user:527",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr3770031bws1jhds8ck5d",
+      "sourceRecordKey": "wordpress-db:user:528",
+      "emailMask": "g***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr377o031jws1j6sb3639j",
+      "sourceRecordKey": "wordpress-db:user:529",
+      "emailMask": "z***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31sk007bws1jbj4a4hvn",
+      "sourceRecordKey": "wordpress-db:user:53",
+      "emailMask": "m***@mooon.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr378c031rws1ji13mevo5",
+      "sourceRecordKey": "wordpress-db:user:530",
+      "emailMask": "m***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr378v031zws1jted95vjt",
+      "sourceRecordKey": "wordpress-db:user:531",
+      "emailMask": "i***@qz.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr379d0327ws1j3wpsiijz",
+      "sourceRecordKey": "wordpress-db:user:532",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr379y032fws1jl0ws8275",
+      "sourceRecordKey": "wordpress-db:user:533",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37ah032nws1jh0bat5qp",
+      "sourceRecordKey": "wordpress-db:user:534",
+      "emailMask": "p***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37b3032vws1j1po3b4mi",
+      "sourceRecordKey": "wordpress-db:user:535",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37bv0333ws1jpa76607m",
+      "sourceRecordKey": "wordpress-db:user:536",
+      "emailMask": "i***@dnk-molekula.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37cd033bws1jb4smfp19",
+      "sourceRecordKey": "wordpress-db:user:537",
+      "emailMask": "p***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37cu033jws1j2n7pubbj",
+      "sourceRecordKey": "wordpress-db:user:538",
+      "emailMask": "o***@bolshoibelarus.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37di033rws1jvovq5vqe",
+      "sourceRecordKey": "wordpress-db:user:539",
+      "emailMask": "p***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31sw007jws1jmspsp5hr",
+      "sourceRecordKey": "wordpress-db:user:54",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37dw033zws1juxqc8uf4",
+      "sourceRecordKey": "wordpress-db:user:540",
+      "emailMask": "_***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37eb0347ws1j5qsy8wfl",
+      "sourceRecordKey": "wordpress-db:user:541",
+      "emailMask": "v***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37eo034fws1jcrgko6fl",
+      "sourceRecordKey": "wordpress-db:user:542",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37f3034nws1jix2rr98e",
+      "sourceRecordKey": "wordpress-db:user:543",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37ff034vws1jnodso2tn",
+      "sourceRecordKey": "wordpress-db:user:544",
+      "emailMask": "a***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37fv0353ws1jxgf14lma",
+      "sourceRecordKey": "wordpress-db:user:545",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37g7035bws1j54itistf",
+      "sourceRecordKey": "wordpress-db:user:546",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37gj035jws1jmebruewd",
+      "sourceRecordKey": "wordpress-db:user:547",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37gy035rws1jl1ut9ees",
+      "sourceRecordKey": "wordpress-db:user:548",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37hh035zws1jb73kinsx",
+      "sourceRecordKey": "wordpress-db:user:549",
+      "emailMask": "e***@gmai.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31t8007rws1j5bpxtwkf",
+      "sourceRecordKey": "wordpress-db:user:55",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37hz0367ws1jt1tbk1ap",
+      "sourceRecordKey": "wordpress-db:user:550",
+      "emailMask": "c***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37ie036fws1jdiat01a5",
+      "sourceRecordKey": "wordpress-db:user:551",
+      "emailMask": "g***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37j0036nws1j5ftr5ubs",
+      "sourceRecordKey": "wordpress-db:user:552",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37jg036vws1j0jxa46lc",
+      "sourceRecordKey": "wordpress-db:user:553",
+      "emailMask": "t***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37jx0373ws1jwyb04ihe",
+      "sourceRecordKey": "wordpress-db:user:554",
+      "emailMask": "p***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37ke037bws1j83s0241b",
+      "sourceRecordKey": "wordpress-db:user:555",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37kt037jws1jpu1ixwsl",
+      "sourceRecordKey": "wordpress-db:user:556",
+      "emailMask": "g***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37la037rws1jdrj76qk1",
+      "sourceRecordKey": "wordpress-db:user:557",
+      "emailMask": "t***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37lp037zws1jhvxmtvz0",
+      "sourceRecordKey": "wordpress-db:user:558",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37m90387ws1johy2joe8",
+      "sourceRecordKey": "wordpress-db:user:559",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31tj007zws1jefkqab0r",
+      "sourceRecordKey": "wordpress-db:user:56",
+      "emailMask": "p***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37mr038fws1jcrn1hnpb",
+      "sourceRecordKey": "wordpress-db:user:560",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37na038nws1jq7okktdo",
+      "sourceRecordKey": "wordpress-db:user:561",
+      "emailMask": "p***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37nx038vws1j808snais",
+      "sourceRecordKey": "wordpress-db:user:562",
+      "emailMask": "9***@mail.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37od0393ws1jz9xxjeha",
+      "sourceRecordKey": "wordpress-db:user:563",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37os039bws1jjsprj9i2",
+      "sourceRecordKey": "wordpress-db:user:564",
+      "emailMask": "b***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37p4039jws1jny9xqyka",
+      "sourceRecordKey": "wordpress-db:user:565",
+      "emailMask": "1***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37pl039rws1jqrw7d7un",
+      "sourceRecordKey": "wordpress-db:user:566",
+      "emailMask": "v***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37q2039zws1je53qfrmo",
+      "sourceRecordKey": "wordpress-db:user:567",
+      "emailMask": "k***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37qh03a7ws1joi835b0o",
+      "sourceRecordKey": "wordpress-db:user:568",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37qx03afws1jvyp4xg7e",
+      "sourceRecordKey": "wordpress-db:user:569",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31tx0087ws1j2jbdtg20",
+      "sourceRecordKey": "wordpress-db:user:57",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37re03anws1j6r4xdlkv",
+      "sourceRecordKey": "wordpress-db:user:570",
+      "emailMask": "k***@cinemalab.io",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37s403avws1jift9qe2m",
+      "sourceRecordKey": "wordpress-db:user:571",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37sq03b3ws1j3wlvwxfe",
+      "sourceRecordKey": "wordpress-db:user:572",
+      "emailMask": "m***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37t303bbws1jwxn5jpsu",
+      "sourceRecordKey": "wordpress-db:user:573",
+      "emailMask": "t***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37tj03bjws1jf3bg8u3s",
+      "sourceRecordKey": "wordpress-db:user:574",
+      "emailMask": "o***@tut.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37tw03brws1jjh672ph3",
+      "sourceRecordKey": "wordpress-db:user:575",
+      "emailMask": "a***@hotmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37u903bzws1jj1ubzveg",
+      "sourceRecordKey": "wordpress-db:user:576",
+      "emailMask": "m***@aschool.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37uv03c7ws1jdf6mhqws",
+      "sourceRecordKey": "wordpress-db:user:577",
+      "emailMask": "s***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37vd03cfws1jz12ilo73",
+      "sourceRecordKey": "wordpress-db:user:579",
+      "emailMask": "t***@test.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ua008fws1j6kertp6e",
+      "sourceRecordKey": "wordpress-db:user:58",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37vs03cnws1jbdvc2qef",
+      "sourceRecordKey": "wordpress-db:user:580",
+      "emailMask": "i***@tutu.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37wa03cvws1j9pyo7udp",
+      "sourceRecordKey": "wordpress-db:user:581",
+      "emailMask": "t***@uyrte.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37wo03d3ws1jv1m68tj0",
+      "sourceRecordKey": "wordpress-db:user:582",
+      "emailMask": "q***@qwerty.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37xa03dbws1j5158a53v",
+      "sourceRecordKey": "wordpress-db:user:583",
+      "emailMask": "t***@example.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37xq03djws1jc063q3qp",
+      "sourceRecordKey": "wordpress-db:user:584",
+      "emailMask": "t***@example.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37y403drws1jehl9yqd4",
+      "sourceRecordKey": "wordpress-db:user:585",
+      "emailMask": "w***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37yh03dzws1j7isn8oyh",
+      "sourceRecordKey": "wordpress-db:user:586",
+      "emailMask": "i***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37zd03e7ws1jrabrb1il",
+      "sourceRecordKey": "wordpress-db:user:587",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr37zu03efws1j0dgao2fj",
+      "sourceRecordKey": "wordpress-db:user:588",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr380f03enws1j1yb5f9f1",
+      "sourceRecordKey": "wordpress-db:user:589",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31um008nws1jzz601qll",
+      "sourceRecordKey": "wordpress-db:user:59",
+      "emailMask": "k***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr380x03evws1j65miz4c7",
+      "sourceRecordKey": "wordpress-db:user:590",
+      "emailMask": "g***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr381h03f3ws1jjhu1cio8",
+      "sourceRecordKey": "wordpress-db:user:591",
+      "emailMask": "g***@mclub.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr381z03fbws1jlhw7y6s8",
+      "sourceRecordKey": "wordpress-db:user:592",
+      "emailMask": "v***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr382i03fjws1jpuummlxv",
+      "sourceRecordKey": "wordpress-db:user:593",
+      "emailMask": "g***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr383003frws1jojrfqe4k",
+      "sourceRecordKey": "wordpress-db:user:594",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr383f03fzws1jpwf97wb2",
+      "sourceRecordKey": "wordpress-db:user:595",
+      "emailMask": "l***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr383r03g7ws1jfzpa3avm",
+      "sourceRecordKey": "wordpress-db:user:596",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr384403gfws1jtd5bjl90",
+      "sourceRecordKey": "wordpress-db:user:597",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr384h03gnws1jftua7pyd",
+      "sourceRecordKey": "wordpress-db:user:598",
+      "emailMask": "y***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr384s03gvws1jvthbphe8",
+      "sourceRecordKey": "wordpress-db:user:599",
+      "emailMask": "o***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cms4copd3000dwsxi7vk7qg2g",
+      "sourceRecordKey": "wordpress-db:user:6",
+      "emailMask": "s***@hoster.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31uy008vws1jq6pg162u",
+      "sourceRecordKey": "wordpress-db:user:60",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr385403h3ws1jgrtvcoej",
+      "sourceRecordKey": "wordpress-db:user:600",
+      "emailMask": "w***@yandex.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31v90093ws1jpea3d97y",
+      "sourceRecordKey": "wordpress-db:user:61",
+      "emailMask": "n***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31vn009bws1jtcxa6de2",
+      "sourceRecordKey": "wordpress-db:user:62",
+      "emailMask": "f***@alfa-bank.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31w3009jws1jkwpc0qg7",
+      "sourceRecordKey": "wordpress-db:user:63",
+      "emailMask": "d***@gmail.com",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31wi009rws1jxwzryazt",
+      "sourceRecordKey": "wordpress-db:user:64",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31wy009zws1jrqhkjk97",
+      "sourceRecordKey": "wordpress-db:user:65",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31xc00a7ws1jrq443qwf",
+      "sourceRecordKey": "wordpress-db:user:66",
+      "emailMask": "p***@yandex.ru",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31xs00afws1jpt5jizl7",
+      "sourceRecordKey": "wordpress-db:user:67",
+      "emailMask": "2***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31yc00anws1j79x8ahxg",
+      "sourceRecordKey": "wordpress-db:user:69",
+      "emailMask": "n***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwpzaht0005wsti391tac85",
+      "sourceRecordKey": "wordpress-db:user:7",
+      "emailMask": "a***@list.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31ys00avws1jgeo19h29",
+      "sourceRecordKey": "wordpress-db:user:70",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31zq00b3ws1j5y5rlh0i",
+      "sourceRecordKey": "wordpress-db:user:71",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr320600bbws1jninizowu",
+      "sourceRecordKey": "wordpress-db:user:72",
+      "emailMask": "m***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr320i00bjws1jgmuck2yu",
+      "sourceRecordKey": "wordpress-db:user:73",
+      "emailMask": "k***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr320w00brws1jq7s0i9be",
+      "sourceRecordKey": "wordpress-db:user:74",
+      "emailMask": "e***@inbox.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr321a00bzws1jllqb5iyu",
+      "sourceRecordKey": "wordpress-db:user:75",
+      "emailMask": "t***@tatyana.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr321p00c7ws1j8jj9ubza",
+      "sourceRecordKey": "wordpress-db:user:76",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr322200cfws1jg5p4ykz7",
+      "sourceRecordKey": "wordpress-db:user:77",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr322f00cnws1j4zuj0bmn",
+      "sourceRecordKey": "wordpress-db:user:78",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr322r00cvws1jbrjk2t7y",
+      "sourceRecordKey": "wordpress-db:user:79",
+      "emailMask": "s***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr323300d3ws1j3vfrqgf8",
+      "sourceRecordKey": "wordpress-db:user:80",
+      "emailMask": "e***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr323e00dbws1jun5cm4b9",
+      "sourceRecordKey": "wordpress-db:user:81",
+      "emailMask": "z***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr323s00djws1jay7vi9q6",
+      "sourceRecordKey": "wordpress-db:user:82",
+      "emailMask": "l***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr324a00drws1jp9o1imbf",
+      "sourceRecordKey": "wordpress-db:user:83",
+      "emailMask": "b***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr324p00dzws1j1r0auq4d",
+      "sourceRecordKey": "wordpress-db:user:84",
+      "emailMask": "i***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr325100e7ws1j81gonadi",
+      "sourceRecordKey": "wordpress-db:user:85",
+      "emailMask": "y***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr325f00efws1jbjybuw7f",
+      "sourceRecordKey": "wordpress-db:user:89",
+      "emailMask": "i***@mamago.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr31gz000iws1jpo3rteii",
+      "sourceRecordKey": "wordpress-db:user:9",
+      "emailMask": "a***@protektinvest.by",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr325r00enws1jkatn83id",
+      "sourceRecordKey": "wordpress-db:user:90",
+      "emailMask": "d***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr326400evws1jyoubrgbv",
+      "sourceRecordKey": "wordpress-db:user:91",
+      "emailMask": "1***@mail.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr326j00f3ws1jfeknh99e",
+      "sourceRecordKey": "wordpress-db:user:92",
+      "emailMask": "m***@mirey-robotics.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr326v00fbws1jn13gt0ef",
+      "sourceRecordKey": "wordpress-db:user:93",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr327700fjws1jo9e45mk1",
+      "sourceRecordKey": "wordpress-db:user:94",
+      "emailMask": "j***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr327o00frws1j6puz425j",
+      "sourceRecordKey": "wordpress-db:user:95",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr328300fzws1j2ufg9c0c",
+      "sourceRecordKey": "wordpress-db:user:96",
+      "emailMask": "v***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr328e00g7ws1jh3g99huh",
+      "sourceRecordKey": "wordpress-db:user:97",
+      "emailMask": "a***@gmail.com",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr328t00gfws1jaeyduj2b",
+      "sourceRecordKey": "wordpress-db:user:98",
+      "emailMask": "k***@yandex.ru",
+      "role": "USER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    },
+    {
+      "userId": "cmrwr329800gnws1j4miwdfcu",
+      "sourceRecordKey": "wordpress-db:user:99",
+      "emailMask": "i***@png.by",
+      "role": "BUSINESS_OWNER",
+      "eligibility": "ELIGIBLE",
+      "exclusionReason": null,
+      "expectedAction": "SEND_ACTIVATION_EMAIL"
+    }
+  ]
+}

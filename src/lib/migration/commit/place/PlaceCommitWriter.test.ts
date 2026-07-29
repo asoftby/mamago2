@@ -319,6 +319,44 @@ async function testUpdateUsesUpdateAndReturnsUpdatedStatus() {
 }
 
 // ---------------------------------------------------------------------------
+// Regression: UPDATE must never reset lifecycle or clobber an unresolved
+// cityId — same bug class previously found and fixed in EventCommitWriter.
+// ---------------------------------------------------------------------------
+
+async function testUpdateNeverSendsStatus() {
+  const { client, calls } = createFakeClient({ createdPlace: placeFixture({ id: "place-1" }) });
+  const writer = new PlaceCommitWriter(client);
+  // draftFixture().status is always "PENDING" (the CREATE-only default) —
+  // if this ever reappeared in the UPDATE payload, an already-PUBLISHED
+  // Place would silently revert to PENDING on its next re-commit.
+  await writer.updatePlaceFromDraft("place-1", draftFixture());
+
+  const lastCall = calls[calls.length - 1] as { data: Record<string, unknown> };
+  assert.equal("status" in lastCall.data, false, "UPDATE must never touch status — lifecycle is an approval-flow concern only");
+}
+
+async function testUpdateOmitsCityIdWhenDraftCityIdIsNull() {
+  const { client, calls } = createFakeClient({ createdPlace: placeFixture({ id: "place-1" }) });
+  const writer = new PlaceCommitWriter(client);
+  // cityId: null means the migration context couldn't resolve a city this
+  // run — that must never be sent as an UPDATE, or a live Place's existing
+  // cityId would be clobbered to null for lack of fresh evidence.
+  await writer.updatePlaceFromDraft("place-1", draftFixture({ cityId: null }));
+
+  const lastCall = calls[calls.length - 1] as { data: Record<string, unknown> };
+  assert.equal("cityId" in lastCall.data, false, "UPDATE must omit cityId entirely when unresolved, never write null over an existing value");
+}
+
+async function testUpdateStillAppliesCityIdWhenDraftProvesANonNullValue() {
+  const { client, calls } = createFakeClient({ createdPlace: placeFixture({ id: "place-1" }) });
+  const writer = new PlaceCommitWriter(client);
+  await writer.updatePlaceFromDraft("place-1", draftFixture({ cityId: "city-resolved" }));
+
+  const lastCall = calls[calls.length - 1] as { data: Record<string, unknown> };
+  assert.equal(lastCall.data.cityId, "city-resolved", "a proven, non-null cityId must still be applied on UPDATE");
+}
+
+// ---------------------------------------------------------------------------
 // Opening hours — create/update, transaction boundary, idempotency.
 // ---------------------------------------------------------------------------
 
@@ -433,6 +471,9 @@ async function main() {
   await testEmptyShortDescThrows();
   await testReturnsPlaceIdAndCreatedStatus();
   await testUpdateUsesUpdateAndReturnsUpdatedStatus();
+  await testUpdateNeverSendsStatus();
+  await testUpdateOmitsCityIdWhenDraftCityIdIsNull();
+  await testUpdateStillAppliesCityIdWhenDraftProvesANonNullValue();
 
   await testCreateWithoutOpeningHoursNeverTouchesOpeningHoursTable();
   await testCreateWithOpeningHoursCreatesBothInOneTransaction();
