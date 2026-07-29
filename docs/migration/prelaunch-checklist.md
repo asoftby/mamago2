@@ -12,6 +12,39 @@
 > Этот файл содержит только актуальное состояние, обязательные gates и критический
 > путь до запуска.
 
+## INTEGRATED RC
+
+```text
+Status:             CODE/HISTORY ASSEMBLED
+Technical baseline: CODE/BUILD PASS
+RC branch:          release/integrated-rc
+Base SHA:           ed5763c2
+Source branch SHA:  532fd04d
+Merge commit SHA:   ecd76bea
+Browser/runtime:    RUNTIME PARTIAL — SEO/runtime findings below
+SEO closure:        PENDING — mandatory launch gate
+UAT Pass 1:         NOT STARTED
+```
+
+Known non-P0 defects retained:
+
+- `ROUTE_RATINGS_PARAMS_NOT_AWAITED` — **OPEN P1**.
+- `MISSING_FAVICON_ASSET` — **OPEN P2**.
+
+Integrated-RC runtime findings to reconcile during SEO MIGRATION CLOSURE:
+
+- Representative Event renders with no canonical.
+- Representative Article/Place/Offer render one absolute slug-based canonical,
+  but its stored origin remains `mamago.local:3000` rather than the exact RC
+  runtime origin.
+- Browser console recorded a client-side `MutationObserver` target `TypeError`.
+- Media-backed representative pages produced local file 404s because the
+  sibling RC worktree intentionally did not copy `storage/uploads`; no
+  media/storage writes or copies were performed.
+- Representative Route renders exactly one absolute slug canonical, hides the
+  unusable map below two valid unique points, shows its empty state and has no
+  horizontal overflow.
+
 ---
 
 ## 1. Неподвижные правила
