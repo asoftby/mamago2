@@ -101,6 +101,30 @@ function main() {
     assert.strictEqual(isSecureCookie(), false, "Explicit AUTH_COOKIE_SECURE=false must override APP_ENV=production");
   });
 
+  // 4c. Staging on real *.mamago.by HTTPS subdomains: cross-subdomain sharing
+  // is opt-in via explicit overrides, not a hardcoded APP_ENV=staging branch —
+  // subdomainMiddleware.ts redirects auth routes on business./admin.mamago.by
+  // back to the public mamago.by host, so the session must be readable across
+  // all three subdomains in that topology.
+  withEnv({
+    NODE_ENV: "production",
+    APP_ENV: "staging",
+    AUTH_COOKIE_DOMAIN: ".mamago.by",
+    AUTH_COOKIE_SECURE: "true",
+  }, () => {
+    const domain = getAuthCookieDomain("business.mamago.by");
+    assert.strictEqual(domain, ".mamago.by", "Staging with explicit AUTH_COOKIE_DOMAIN must share across *.mamago.by");
+    assert.strictEqual(isSecureCookie(), true, "Staging with explicit AUTH_COOKIE_SECURE=true must be Secure over HTTPS");
+  });
+
+  // 4d. Staging on a separate domain / preview URL / plain host: without the
+  // explicit overrides, staging must NOT get .mamago.by scoping (host-only).
+  withEnv({ NODE_ENV: "production", APP_ENV: "staging" }, () => {
+    const domain = getAuthCookieDomain("my-app-preview.vercel.app");
+    assert.strictEqual(domain, undefined, "Staging without explicit overrides must stay host-only on a non-mamago.by host");
+    assert.strictEqual(isSecureCookie(), false, "Staging without explicit AUTH_COOKIE_SECURE must not force Secure");
+  });
+
   // 5. Bare NODE_ENV=production with no APP_ENV set: must NOT imply .mamago.by.
   withEnv({ NODE_ENV: "production" }, () => {
     const domain = getAuthCookieDomain("localhost:3000");
