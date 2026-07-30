@@ -17,6 +17,12 @@
       "status": "BLOCKED",
       "artifacts": [
         {
+          "path": "docs/migration/users-slice5-clean-manifest.json",
+          "sha256": "50fe394d38b6d9055975532e670e9c6eae50d80469468ecbd14e2a5950a405ec",
+          "executable": false,
+          "description": "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. 559/564 reproduced 2026-07-30 via a bounded read-only WP capture reconciled against approved LOCAL MigrationRecord.normalizedPayload ground truth; 5 remain unresolved (see blocker)."
+        },
+        {
           "path": "docs/migration/users-production-activation-manifest.json",
           "sha256": "bffaff4750fbb931cdfa26442a15910caca5adfd79615e8bf7a95c3ab8cf84c4",
           "executable": false,
@@ -37,21 +43,187 @@
       "prerequisites": [
         "Frozen executable user migration scope with sourceRecordKeys and expected actions."
       ],
-      "blocker": "Existing artifacts prove final local state but do not encode an executable fresh-environment user scope."
+      "blockerCode": "USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE",
+      "blocker": "Semantic reconciliation against approved LOCAL evidence reproduced 559/564 canonicalCandidateHash entries via one uniform rule (2026-07-30). 5 sourceRecordKeys remain unresolved: wordpress-db:user:7, wordpress-db:user:17, wordpress-db:user:22, wordpress-db:user:42, wordpress-db:user:43. Historical first_name/last_name input for these records is unrecoverable (never persisted as raw payload; no other committed evidence records it) and no per-user override is permitted. Requires either a founder-approved accepted-exception decision or discovery of the original historical snapshot."
     },
     {
       "name": "businesses",
       "status": "BLOCKED",
-      "artifacts": [],
-      "records": [],
+      "artifacts": [
+        {
+          "path": "docs/migration/manifests/phoenix-business-ownership-base-2026-07-30.json",
+          "sha256": "be2a4a8497c845afa539538157e39c5e89eb14eef6cf99efdb27576f0aedc98b",
+          "executable": true,
+          "description": "Generic 36 EXACT_LINK_CANDIDATE business-ownership + BUSINESS_OWNER elevation scope."
+        },
+        {
+          "path": "docs/migration/manifests/phoenix-business-ownership-overrides-2026-07-30.json",
+          "sha256": "008c071b1a4a4a6ee9da9042bd4db3c0d667f2748d0310fe3d6f83187aff0b55",
+          "executable": true,
+          "description": "Manual override scope for the 2 partial-coverage users (wordpress-db:user:89 -> 19 approved Places, wordpress-db:user:130 -> 1 approved Place), copied verbatim from committed Slice 12/13 script constants."
+        }
+      ],
+      "records": [
+        {
+          "sourceRecordKey": "wordpress-db:user:140",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:141",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:145",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:38",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:380",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:40",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:405",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:423",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:427",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:429",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:430",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:431",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:432",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:45",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:47",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:520",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:525",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:526",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:528",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:53",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:531",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:536",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:538",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:561",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:562",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:564",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:566",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:572",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:576",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:586",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:59",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:591",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:63",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:66",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:99",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:130",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:89",
+          "action": "CREATE"
+        }
+      ],
       "protectedSourceRecordKeys": [],
-      "excludedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [
+        "wordpress-db:user:43"
+      ],
       "deterministicConflicts": [],
       "mediaPolicy": "NONE",
       "prerequisites": [
-        "Frozen business/ownership sourceRecordKey manifest."
+        "users phase executable for all 37 dependent sourceRecordKeys"
       ],
-      "blocker": "Ownership proof slices are historical reports; no single executable frozen business manifest exists."
+      "blockerCode": "BLOCKED_BY_DEPENDENCY",
+      "blocker": "Ownership/role-elevation artifacts are structurally ready (37 executable records, both artifacts hash-bound), but every dependent User must exist first — the users phase remains BLOCKED (USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE), so this phase cannot execute until that is resolved. 1 additional generic-rule candidate(s) (wordpress-db:user:43) are permanently excluded from this phase: they are also among the 5 Users records with no per-user override permitted, so their User dependency can never resolve."
     },
     {
       "name": "places",

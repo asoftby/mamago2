@@ -53,6 +53,10 @@ function validatePhase(phase: PhoenixReleasePhase, sourcePath: string): void {
   const plannedForbidden = recordKeys.find((key) => forbidden.has(key));
   if (plannedForbidden) throw new Error(`${sourcePath}: protected/excluded record ${plannedForbidden} is executable.`);
   if (phase.status === "BLOCKED" && !phase.blocker) throw new Error(`${sourcePath}: blocked phase ${phase.name} needs blocker.`);
+  if (phase.blockerCode && !phase.blocker) throw new Error(`${sourcePath}: ${phase.name}.blockerCode requires a human-readable blocker string.`);
+  if (phase.status !== "BLOCKED" && (phase.blocker || phase.blockerCode)) {
+    throw new Error(`${sourcePath}: ${phase.name} is ${phase.status} but still carries a stale blocker/blockerCode.`);
+  }
 }
 
 export function loadPhoenixReleaseManifest(path: string): {
