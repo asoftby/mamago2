@@ -50,10 +50,11 @@ export async function POST(request: NextRequest) {
     // Create redirect response
     const response = NextResponse.redirect(redirectUrl, 303);
     
-    // Delete session cookie on response
-    const requestHost = request.headers.get("host") ?? undefined;
-    deleteSessionCookie(response, requestHost);
-    
+    // Delete session cookie on response (must match the host derivation used
+    // when the cookie was set at login, or the domain option can mismatch
+    // and the cookie fails to clear behind a proxy).
+    deleteSessionCookie(response, host ?? undefined);
+
     return response;
   } catch (error) {
     console.error("Logout error:", error);
@@ -61,8 +62,7 @@ export async function POST(request: NextRequest) {
     const redirectUrl = new URL(redirectDestination, request.url);
     redirectUrl.searchParams.set("loggedOut", "1");
     const response = NextResponse.redirect(redirectUrl, 303);
-    const requestHost = request.headers.get("host") ?? undefined;
-    deleteSessionCookie(response, requestHost);
+    deleteSessionCookie(response, host ?? undefined);
     return response;
   }
 }
