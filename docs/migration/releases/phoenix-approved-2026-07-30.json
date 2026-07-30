@@ -1,0 +1,734 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "phoenix-approved-2026-07-30",
+  "phaseOrder": [
+    "users",
+    "businesses",
+    "places",
+    "offers",
+    "routes",
+    "events",
+    "articles",
+    "redirects"
+  ],
+  "phases": [
+    {
+      "name": "users",
+      "status": "BLOCKED",
+      "artifacts": [
+        {
+          "path": "docs/migration/users-production-activation-manifest.json",
+          "sha256": "bffaff4750fbb931cdfa26442a15910caca5adfd79615e8bf7a95c3ab8cf84c4",
+          "executable": false,
+          "description": "Activation eligibility evidence; activation delivery is outside this release."
+        },
+        {
+          "path": "docs/migration/users-manual-privileged-14-manifest.json",
+          "sha256": "e8fc0553a0f9a21b0fc6173978579c64ede16c991c205c00a852e81a4dcfd003",
+          "executable": false,
+          "description": "Manual privileged-user evidence."
+        }
+      ],
+      "records": [],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "NONE",
+      "prerequisites": [
+        "Frozen executable user migration scope with sourceRecordKeys and expected actions."
+      ],
+      "blocker": "Existing artifacts prove final local state but do not encode an executable fresh-environment user scope."
+    },
+    {
+      "name": "businesses",
+      "status": "BLOCKED",
+      "artifacts": [],
+      "records": [],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "NONE",
+      "prerequisites": [
+        "Frozen business/ownership sourceRecordKey manifest."
+      ],
+      "blocker": "Ownership proof slices are historical reports; no single executable frozen business manifest exists."
+    },
+    {
+      "name": "places",
+      "status": "READY",
+      "artifacts": [
+        {
+          "path": "docs/migration/manifests/places-preview-2026-07-30.json",
+          "sha256": "ca217c18ab59882ff3326e460ad6f825ad62f1b052b5d06d29dfc37ab17a7c6c",
+          "executable": true,
+          "description": "Frozen live WordPress Place preview."
+        }
+      ],
+      "records": [
+        {
+          "sourceRecordKey": "wordpress-db:places:5457",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:5492",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:5515",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:5528",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:5579",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:5594",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:8901",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:9312",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:9865",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:9870",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:9948",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:10343",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:10370",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:10380",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:10515",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:11087",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:11408",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:11463",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:11892",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:12447",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:12884",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:12923",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13164",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13311",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13317",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13322",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13323",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13324",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13327",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13331",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:13487",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:18886",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:19800",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:20069",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:21778",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:25756",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:26215",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:27759",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:30346",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:30411",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:30426",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:30502",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:30963",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:31267",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:32271",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:32409",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:32633",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:32636",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:32637",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:34933",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:36245",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:41193",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:42218",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:43071",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:43247",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:43356",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:43622",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:43635",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:45603",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:45634",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:45846",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:47316",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:47916",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:48312",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:48372",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:48375",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:48875",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:49952",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:49977",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:50033",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:50902",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:51109",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:54625",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:55950",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:55953",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:60742",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:61420",
+          "action": "SKIP_UNCHANGED"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:places:63360",
+          "action": "SKIP_UNCHANGED"
+        }
+      ],
+      "protectedSourceRecordKeys": [
+        "wordpress-db:places:437",
+        "wordpress-db:places:895",
+        "wordpress-db:places:5389",
+        "wordpress-db:places:43023"
+      ],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [
+        "wordpress-db:places:437",
+        "wordpress-db:places:895",
+        "wordpress-db:places:5389",
+        "wordpress-db:places:43023"
+      ],
+      "mediaPolicy": "METADATA",
+      "prerequisites": [
+        "technicalMigrationCreator logical identity"
+      ]
+    },
+    {
+      "name": "offers",
+      "status": "BLOCKED",
+      "artifacts": [
+        {
+          "path": "docs/migration/manifests/offers-local-manifest-2026-07-30.json",
+          "sha256": "e1dda8fd86dfe8df98e6ab4fe1e495f19a53579581aaae9401c8840aaf62dadf",
+          "executable": false,
+          "description": "Frozen reviewed local target state with lineage."
+        }
+      ],
+      "records": [
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:18932",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:18929",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:18931",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:18933",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:18934",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:29113",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:29124",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:29135",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:29155",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:29158",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:32683",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33312",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33317",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33345",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33613",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33649",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33652",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33654",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33660",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33667",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:33673",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:42304",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43038",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43065",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43068",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43103",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43259",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43267",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43269",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43278",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43309",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43313",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43316",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43331",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43340",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43348",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43350",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43352",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43354",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43365",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43370",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43386",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43388",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43408",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43410",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43412",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43646",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43648",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43650",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43653",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43655",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43657",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43659",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43661",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43663",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43665",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43667",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43669",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:43675",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:51435",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:15941",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:16403",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:hb-programs:16458",
+          "action": "CREATE"
+        }
+      ],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "NONE",
+      "prerequisites": [
+        "Per-record stable Place, owner, business and city logical dependency map."
+      ],
+      "blocker": "The frozen Offer artifact contains LOCAL target IDs and is not a live-source executable context artifact."
+    },
+    {
+      "name": "routes",
+      "status": "BLOCKED",
+      "artifacts": [],
+      "records": [],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "METADATA",
+      "prerequisites": [
+        "Frozen executable Route sourceRecordKey manifest and expected actions."
+      ],
+      "blocker": "Route review/apply artifacts are historical review evidence, not a release execution scope."
+    },
+    {
+      "name": "events",
+      "status": "BLOCKED",
+      "artifacts": [],
+      "records": [],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "METADATA",
+      "prerequisites": [
+        "Frozen executable Event sourceRecordKey manifest and ownership identities."
+      ],
+      "blocker": "No committed executable approved Event scope artifact exists."
+    },
+    {
+      "name": "articles",
+      "status": "BLOCKED",
+      "artifacts": [],
+      "records": [],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "NONE",
+      "prerequisites": [
+        "Committed two-record Article manifest with sourceRecordKeys and hash."
+      ],
+      "blocker": "The approved Article keys/hash exist only in narrative/proof files, not one executable frozen artifact."
+    },
+    {
+      "name": "redirects",
+      "status": "VALIDATION_ONLY",
+      "artifacts": [
+        {
+          "path": "scripts/data/wp-redirect-map.json",
+          "sha256": "da1991de3ba971b5cf6e40ac7b460a3565309692d60c0765dd4e6dcfb977e97d",
+          "executable": true,
+          "description": "Frozen redirect validation input."
+        }
+      ],
+      "records": [],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "NOT_APPLICABLE",
+      "prerequisites": []
+    }
+  ]
+}
