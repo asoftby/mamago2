@@ -33,6 +33,13 @@ export interface PhoenixReleasePhase {
   mediaPolicy: "FULL" | "METADATA" | "NONE" | "NOT_APPLICABLE";
   prerequisites: string[];
   blocker?: string;
+  /**
+   * Machine-readable blocker classification (e.g.
+   * `USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE`,
+   * `BLOCKED_BY_DEPENDENCY`). Always paired with a human-readable
+   * `blocker` string; never a substitute for it.
+   */
+  blockerCode?: string;
 }
 
 export interface PhoenixReleaseManifest {

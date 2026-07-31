@@ -1,11 +1,15 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
+import { USERS_UNRESOLVED_SOURCE_RECORD_KEYS } from "../src/lib/migration/release/knownBlockers";
 
 const output = "docs/migration/releases/phoenix-approved-2026-07-30.json";
 const placesPath = "docs/migration/manifests/places-preview-2026-07-30.json";
 const offersPath = "docs/migration/manifests/offers-local-manifest-2026-07-30.json";
 const usersPath = "docs/migration/users-production-activation-manifest.json";
 const privilegedUsersPath = "docs/migration/users-manual-privileged-14-manifest.json";
+const usersCleanManifestPath = "docs/migration/users-slice5-clean-manifest.json";
+const businessOwnershipBasePath = "docs/migration/manifests/phoenix-business-ownership-base-2026-07-30.json";
+const businessOwnershipOverridesPath = "docs/migration/manifests/phoenix-business-ownership-overrides-2026-07-30.json";
 const redirectsPath = "scripts/data/wp-redirect-map.json";
 
 function sha256(path: string): string {
@@ -23,6 +27,30 @@ const placeConflicts = places.candidates
   .filter((record) => record.action === "UPDATE_CONFLICT")
   .map((record) => record.sourceRecordKey);
 
+const businessBase = JSON.parse(readFileSync(businessOwnershipBasePath, "utf8")) as {
+  entries: Array<{ sourceRecordKey: string }>;
+  entangledWithUnresolvedUsers: string[];
+};
+const businessOverrides = JSON.parse(readFileSync(businessOwnershipOverridesPath, "utf8")) as {
+  entries: Array<{ sourceRecordKey: string }>;
+};
+
+// wordpress-db:user:43 (and any other base candidate the artifact flags as
+// entangled) can never resolve its User dependency — excluding it from the
+// phase's executable records (not from the artifact itself, which still
+// faithfully records the full 36-candidate rule) keeps a future sequential
+// apply from halting on it forever instead of processing the rest.
+const entangledSet = new Set(businessBase.entangledWithUnresolvedUsers);
+if (![...entangledSet].every((key) => (USERS_UNRESOLVED_SOURCE_RECORD_KEYS as readonly string[]).includes(key))) {
+  throw new Error("Business base artifact flags an entangled key that is not in the current Users unresolved list.");
+}
+const businessRecords = [
+  ...businessBase.entries
+    .filter((e) => !entangledSet.has(e.sourceRecordKey))
+    .map((e) => ({ sourceRecordKey: e.sourceRecordKey, action: "CREATE" as const })),
+  ...businessOverrides.entries.map((e) => ({ sourceRecordKey: e.sourceRecordKey, action: "CREATE" as const })),
+];
+
 const manifest = {
   schemaVersion: 1,
   releaseId: "phoenix-approved-2026-07-30",
@@ -32,6 +60,15 @@ const manifest = {
       name: "users",
       status: "BLOCKED",
       artifacts: [
+        {
+          path: usersCleanManifestPath,
+          sha256: sha256(usersCleanManifestPath),
+          executable: false,
+          description:
+            "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. " +
+            "559/564 reproduced 2026-07-30 via a bounded read-only WP capture reconciled against " +
+            "approved LOCAL MigrationRecord.normalizedPayload ground truth; 5 remain unresolved (see blocker).",
+        },
         {
           path: usersPath,
           sha256: sha256(usersPath),
@@ -51,19 +88,49 @@ const manifest = {
       deterministicConflicts: [],
       mediaPolicy: "NONE",
       prerequisites: ["Frozen executable user migration scope with sourceRecordKeys and expected actions."],
-      blocker: "Existing artifacts prove final local state but do not encode an executable fresh-environment user scope.",
+      blockerCode: "USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE",
+      blocker:
+        `Semantic reconciliation against approved LOCAL evidence reproduced 559/564 canonicalCandidateHash ` +
+        `entries via one uniform rule (2026-07-30). ${USERS_UNRESOLVED_SOURCE_RECORD_KEYS.length} ` +
+        `sourceRecordKeys remain unresolved: ${USERS_UNRESOLVED_SOURCE_RECORD_KEYS.join(", ")}. Historical ` +
+        `first_name/last_name input for these records is unrecoverable (never persisted as raw payload; no ` +
+        `other committed evidence records it) and no per-user override is permitted. Requires either a ` +
+        `founder-approved accepted-exception decision or discovery of the original historical snapshot.`,
     },
     {
       name: "businesses",
       status: "BLOCKED",
-      artifacts: [],
-      records: [],
+      artifacts: [
+        {
+          path: businessOwnershipBasePath,
+          sha256: sha256(businessOwnershipBasePath),
+          executable: true,
+          description: "Generic 36 EXACT_LINK_CANDIDATE business-ownership + BUSINESS_OWNER elevation scope.",
+        },
+        {
+          path: businessOwnershipOverridesPath,
+          sha256: sha256(businessOwnershipOverridesPath),
+          executable: true,
+          description:
+            "Manual override scope for the 2 partial-coverage users (wordpress-db:user:89 -> 19 approved " +
+            "Places, wordpress-db:user:130 -> 1 approved Place), copied verbatim from committed Slice 12/13 " +
+            "script constants.",
+        },
+      ],
+      records: businessRecords,
       protectedSourceRecordKeys: [],
-      excludedSourceRecordKeys: [],
+      excludedSourceRecordKeys: [...entangledSet],
       deterministicConflicts: [],
       mediaPolicy: "NONE",
-      prerequisites: ["Frozen business/ownership sourceRecordKey manifest."],
-      blocker: "Ownership proof slices are historical reports; no single executable frozen business manifest exists.",
+      prerequisites: [`users phase executable for all ${businessRecords.length} dependent sourceRecordKeys`],
+      blockerCode: "BLOCKED_BY_DEPENDENCY",
+      blocker:
+        `Ownership/role-elevation artifacts are structurally ready (${businessRecords.length} executable ` +
+        `records, both artifacts hash-bound), but every dependent User must exist first — the users phase ` +
+        `remains BLOCKED (USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE), so this phase cannot execute until ` +
+        `that is resolved. ${entangledSet.size} additional generic-rule candidate(s) ` +
+        `(${[...entangledSet].join(", ")}) are permanently excluded from this phase: they are also among the ` +
+        `5 Users records with no per-user override permitted, so their User dependency can never resolve.`,
     },
     {
       name: "places",
