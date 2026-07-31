@@ -126,6 +126,7 @@ class H: 28 — missing required Place relation
 class I: 8 — noncanonical alias
 Offer media: separate gate
 production Offer execution: not started
+Phoenix OfferDomainHashV2 transition: BLOCKED — 63/63 LOCAL targets have unsupported multi-field drift; see phoenix-offers-domain-hash-v2-audit-2026-07-31.json
 ```
 
 ### 3.3 Users identity and activation foundation
@@ -1685,4 +1686,24 @@ manual-reconciliation bounce approach).
 Next single action: FOUNDER FINAL APPROVAL of the exact RC SHA and launch
 window, plus the 9 remaining founder inputs in
 `go-no-go-readiness-2026-07-29.md`. No production actions were performed.
+```
+
+```text
+Phase: PHOENIX OFFERS DOMAIN HASH TRANSITION — PLAN/TEST COMPLETE, OFFERS BLOCKED
+2026-07-31, branch feat/phoenix-offers-artifact, baseline 779087b7.
+
+A bounded read-only WordPress capture returned the exact committed 63 Offer
+sourceRecordKeys (missing/extra/duplicates 0/0/0); raw source stayed mode 0600
+under /private/tmp and was not committed. OfferDomainHashV2 now separates
+domain identity from OfferExecutionPolicyHashV1. Frozen predecessor lineage
+matched 63/63; only 16/63 fresh legacy NONE hashes matched. Full field-level
+LOCAL reconciliation produced 0 lineage-only candidates, 0 safe whitespace
+updates, and 63 unsupported multi-field conflicts (SEO + lifecycle on all;
+additional slug/media/schedule/content subsets). Offers remains BLOCKED with
+OFFERS_DOMAIN_HASH_TRANSITION_PENDING_DISPOSITIONS. No migration/database/media
+writes, downloads, DEV/PROD access, deploy, or apply occurred.
+
+Next single action: approve explicit lifecycle/SEO/slug/media/schedule update
+contracts or exclusions for the 63 conflict records; do not perform a lineage
+hash transition until every target-domain mismatch has a disposition.
 ```
