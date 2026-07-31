@@ -8,11 +8,14 @@ import {
   JsonLinesPhoenixReportStore,
   loadPhoenixEnvironment,
   loadPhoenixReleaseManifest,
+  runPhoenixRelease,
   verifyArtifactHashes,
   type PhoenixEnvironment,
   type PhoenixMode,
   type PhoenixPhaseName,
+  type PhoenixPhaseReport,
 } from "../src/lib/migration/release";
+import { buildPhoenixAdapterRegistry } from "../src/lib/migration/release/adapters/registry";
 
 interface Args {
   environment: PhoenixEnvironment;
@@ -110,14 +113,50 @@ async function main(): Promise<void> {
 
   // Apply/rerun intentionally fail closed until every phase has a concrete
   // adapter contract. This prevents the CLI shell from becoming an ad-hoc
-  // reimplementation of the proven entity runners.
+  // reimplementation of the proven entity runners. Note this means a full
+  // 7-phase manifest never reaches `places`/`offers`/`routes`/`events`/
+  // `articles` today: `businesses` sits between `users` and `places` in
+  // `phaseOrder` and is BLOCKED
+  // (BUSINESS_OWNERSHIP_GENERIC_CASE_SOURCE_EVIDENCE_MISSING), so
+  // `runPhoenixRelease` itself throws `PHASE_BLOCKED: businesses: ...`
+  // immediately after `users` completes — by design, not an oversight.
   const blocked = manifest.phases.filter((phase) => phase.status === "BLOCKED");
   if (blocked.length > 0) {
     throw new Error(`RELEASE_BLOCKED: ${blocked.map((phase) => `${phase.name}: ${phase.blocker}`).join("; ")}`);
   }
-  void new JsonLinesPhoenixReportStore(args.reportPath);
-  void args.resumeFrom;
-  throw new Error("RELEASE_ADAPTER_REGISTRY_EMPTY: no write phase was invoked.");
+
+  const artifactRoot = process.env.PHOENIX_RELEASE_ARTIFACT_ROOT;
+  if (!artifactRoot) throw new Error("RELEASE_BLOCKED: PHOENIX_RELEASE_ARTIFACT_ROOT is required for apply/rerun.");
+
+  // `environment.database` is a deliberately redacted fingerprint (no
+  // secrets) — the real DATABASE_URL used to construct the write client is
+  // the same one `loadPhoenixEnvironment`/`queryDatabaseFingerprint` already
+  // validated above, read directly from process.env.
+  const databaseUrl = process.env.DATABASE_URL!;
+  const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
+  try {
+    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest });
+    const reportStore = new JsonLinesPhoenixReportStore(args.reportPath);
+    const previousReports: PhoenixPhaseReport[] = args.resumeFrom
+      ? [...((await reportStore.readCompletedPrefix?.()) ?? [])]
+      : [];
+
+    const reports = await runPhoenixRelease({
+      manifest,
+      manifestPath: args.manifestPath,
+      manifestHash,
+      environment,
+      mode: args.mode,
+      codeSha: codeSha(),
+      adapters,
+      reportStore,
+      resumeFrom: args.resumeFrom,
+      previousReports,
+    });
+    console.log(JSON.stringify(reports, null, 2));
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 const isDirectRun = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;

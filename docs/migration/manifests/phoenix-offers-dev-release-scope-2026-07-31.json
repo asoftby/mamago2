@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-offers-dev-release-scope-2026-07-31",
+  "entity": "offers",
+  "sourceCaptureTimestamp": "2026-07-31T15:40:59.310Z",
+  "canonicalization": "wordpress-db-domain-v2 (src/lib/migration/adapters/wordpress-db/canonicalSourceHash.ts)",
+  "total": 63,
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:15941",
+      "sourceHash": "wordpress-db-domain-v2:d378376474e0df773492c1674696f08c3eb8374d85c36002157a70ab2a071a81",
+      "sourceUpdatedAt": "2024-03-19 23:48:41"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:16403",
+      "sourceHash": "wordpress-db-domain-v2:bc46548beadb69cc256868f872050a62bcdf127e1b8a5385ef86781b98b3d4ec",
+      "sourceUpdatedAt": "2024-03-19 23:50:04"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:16458",
+      "sourceHash": "wordpress-db-domain-v2:bdb758a683fa3205a5c3180d8d6b0dbd4953e9d7e5e6bab18738a332d02ba27e",
+      "sourceUpdatedAt": "2024-06-07 22:21:07"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18929",
+      "sourceHash": "wordpress-db-domain-v2:c831c9fe7f1aaa1fa12d4d77ffeede451f8d872ff16d2c3751a685030b3ea39f",
+      "sourceUpdatedAt": "2025-11-26 00:07:17"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18931",
+      "sourceHash": "wordpress-db-domain-v2:1f48cab48bd818cb3dec6bea127077235cef787f953683b9c5c3159c16a36785",
+      "sourceUpdatedAt": "2025-11-26 00:08:02"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18932",
+      "sourceHash": "wordpress-db-domain-v2:b3224960fa30c8db1cf8ea7d7d746a3bb83661356feeea49bff642aa78047fe7",
+      "sourceUpdatedAt": "2025-11-26 00:08:48"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18933",
+      "sourceHash": "wordpress-db-domain-v2:4e95e9a146ae932eb30f3e904e127e8c1d66ad6d19bddd666521d7f6269a6655",
+      "sourceUpdatedAt": "2025-11-26 00:09:53"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18934",
+      "sourceHash": "wordpress-db-domain-v2:b5dc87ee72035734f375e4da0ff5fd307c3cfa2c137807e6be8924243b3f713d",
+      "sourceUpdatedAt": "2025-11-26 00:11:45"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29113",
+      "sourceHash": "wordpress-db-domain-v2:b2f7744d93c9939ed0bb3221e98af85761a06c2a993e51dbb5b4d6b402af0aac",
+      "sourceUpdatedAt": "2025-04-29 19:53:45"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29124",
+      "sourceHash": "wordpress-db-domain-v2:4f8732e65121a47a34240b05160e14ee0665850d5195a8a860fd73a59b06c11d",
+      "sourceUpdatedAt": "2025-04-29 19:54:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29135",
+      "sourceHash": "wordpress-db-domain-v2:b533cf5ae04aea0106901f1ad58e1273b852456de5647b39564f4fc256d9cd5f",
+      "sourceUpdatedAt": "2025-04-29 19:52:33"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29155",
+      "sourceHash": "wordpress-db-domain-v2:3c482b322171a90d03e7a9e2043b4a22987791b1ee6d1fd2c91f12c8f56d15f9",
+      "sourceUpdatedAt": "2025-11-10 12:03:29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29158",
+      "sourceHash": "wordpress-db-domain-v2:201f80fc1ec0687e64d1cf40615098a53b593c6dc585c7e71dc9b2bb30ab5e9f",
+      "sourceUpdatedAt": "2025-11-10 13:31:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:32683",
+      "sourceHash": "wordpress-db-domain-v2:ee99bfec373baa6ba0dd8a861d6ee9ea56e2fb94a943678545831616dabe6eb5",
+      "sourceUpdatedAt": "2024-11-21 15:48:45"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33312",
+      "sourceHash": "wordpress-db-domain-v2:0a154e6e62a18e3bf91b4d6dae858b54f7cc900698afc95609ae0bd90af434bd",
+      "sourceUpdatedAt": "2025-04-29 17:32:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33317",
+      "sourceHash": "wordpress-db-domain-v2:586f87e0a58efbc41caddb1ae8bd530f01d8f7618fe4b1b688b1dbf5247d7eaa",
+      "sourceUpdatedAt": "2025-04-29 17:36:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33345",
+      "sourceHash": "wordpress-db-domain-v2:64b82945405ab5a6d530b929fcdbfbd637d855614d3a54d07db7a89d2d52c5cc",
+      "sourceUpdatedAt": "2025-04-29 17:34:18"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33613",
+      "sourceHash": "wordpress-db-domain-v2:6d3e629a8225e925acb1d867fe9832f4f9da291ec0445f3db099fc3be2e8de5d",
+      "sourceUpdatedAt": "2025-04-29 17:23:14"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33649",
+      "sourceHash": "wordpress-db-domain-v2:880a9f14b872b245c269a51b9fe48432b4d91c3ffc28a8746c4c6a1265840a8a",
+      "sourceUpdatedAt": "2025-06-01 13:17:48"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33652",
+      "sourceHash": "wordpress-db-domain-v2:17294a30927336bd82eb63a8fbd677ee0d4e965256ef5c5eeee15359dee9e09f",
+      "sourceUpdatedAt": "2025-06-01 13:45:28"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33654",
+      "sourceHash": "wordpress-db-domain-v2:ed950c60f39a07553fd218612a67b8f1cae93118c5e9c1e9ad61c5909a868110",
+      "sourceUpdatedAt": "2025-06-01 13:43:37"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33660",
+      "sourceHash": "wordpress-db-domain-v2:c02b88d440b6a7dd1e13b005f67486315c1be882d9a1a235002548fbd15fa81a",
+      "sourceUpdatedAt": "2025-04-29 17:22:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33667",
+      "sourceHash": "wordpress-db-domain-v2:fdda9b9565e2b6f1efded59a18e6282902f4aab3ac3e665b8fa346e33f5069be",
+      "sourceUpdatedAt": "2025-04-29 17:22:49"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33673",
+      "sourceHash": "wordpress-db-domain-v2:696f9c1f25de12d23799fbf8a4d241744ce070f2e51222526d633552971853de",
+      "sourceUpdatedAt": "2025-04-29 17:20:43"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:42304",
+      "sourceHash": "wordpress-db-domain-v2:5e05d1efbe58ada87f86104e5e63717e85f52484f2dbe7b54d3d7782b17fd342",
+      "sourceUpdatedAt": "2026-03-10 14:41:42"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43038",
+      "sourceHash": "wordpress-db-domain-v2:d4d78f76c4541f9bc28098873c7745fb2c6d0728edaec1956766fac6b68779fc",
+      "sourceUpdatedAt": "2025-04-28 18:27:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43065",
+      "sourceHash": "wordpress-db-domain-v2:0417c8d7d6273419482ca36d5664b348182ec296e82c6889d8745fbe4d16beec",
+      "sourceUpdatedAt": "2025-04-29 17:12:20"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43068",
+      "sourceHash": "wordpress-db-domain-v2:1febfe11143c1646b8cb83ec47d885c8702c168bfc95b487142ab985b97f5ec1",
+      "sourceUpdatedAt": "2025-04-29 17:15:39"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43103",
+      "sourceHash": "wordpress-db-domain-v2:9ced676fb4089287e59a1e0980b74293750f0bf1247f6e7a8939d379c0d71057",
+      "sourceUpdatedAt": "2026-03-10 14:46:22"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43259",
+      "sourceHash": "wordpress-db-domain-v2:34d19f32fb65747118ae2e6aa382cb661faecc7598c893ba97b79c35f1434c16",
+      "sourceUpdatedAt": "2025-04-29 17:18:02"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43267",
+      "sourceHash": "wordpress-db-domain-v2:59e2fd286bd8d520ca405e9997da648f96c428f224da809765206dca3626abb1",
+      "sourceUpdatedAt": "2025-05-08 11:57:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43269",
+      "sourceHash": "wordpress-db-domain-v2:1da619a8df395086f29e528ca4e80c0c1700b7fd5a07460eb9206fc0bed42073",
+      "sourceUpdatedAt": "2025-05-08 11:59:51"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43278",
+      "sourceHash": "wordpress-db-domain-v2:512b5afd346c63c72312522bb33a0b93dc8df72c29faa8ed5f3e640b6b41b26e",
+      "sourceUpdatedAt": "2025-05-08 12:03:42"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43309",
+      "sourceHash": "wordpress-db-domain-v2:1bfa547ca8604fc2a47396b6d10b8c8d02bd084965d8d83070bfa5ac35a513aa",
+      "sourceUpdatedAt": "2025-04-29 20:55:36"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43313",
+      "sourceHash": "wordpress-db-domain-v2:dadd60b42242090580f5ff36df3a23061b4f1c19ff6f0cfaef818de457e01e72",
+      "sourceUpdatedAt": "2025-04-29 20:55:45"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43316",
+      "sourceHash": "wordpress-db-domain-v2:f3cda36c7b3d51f1912ba87a54034ad931a4d08a524369df7010364915609cc6",
+      "sourceUpdatedAt": "2025-04-29 20:55:52"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43331",
+      "sourceHash": "wordpress-db-domain-v2:d09397c1a4e2aef71a1e918365a827416c4f9c29413e19cf74416b676bde1bd5",
+      "sourceUpdatedAt": "2025-04-28 20:06:54"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43340",
+      "sourceHash": "wordpress-db-domain-v2:3508e6d7e1fc6f611e4af3b365e9e51508167d4330d6a4deb8895528c1d80aa4",
+      "sourceUpdatedAt": "2025-04-28 20:42:16"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43348",
+      "sourceHash": "wordpress-db-domain-v2:f815ca5c6493f83bf1626cce22814614ccf2c75417b844e9af920b143740a9dc",
+      "sourceUpdatedAt": "2025-04-28 20:44:27"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43350",
+      "sourceHash": "wordpress-db-domain-v2:2199219ed46685c9f8647d8bda8b89683c6bc29f40daa76f94e4471b6cc595fe",
+      "sourceUpdatedAt": "2025-04-28 20:46:37"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43352",
+      "sourceHash": "wordpress-db-domain-v2:add3c005fe86e7773823f5195e80061ccbaf8c0f5400b073fc8e8f2922be802f",
+      "sourceUpdatedAt": "2025-04-28 20:48:22"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43354",
+      "sourceHash": "wordpress-db-domain-v2:c3305e5c00188d665c1850674095c7cce75ca73a46bf0fc6ed38e8c13caecfe9",
+      "sourceUpdatedAt": "2025-04-28 21:01:28"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43365",
+      "sourceHash": "wordpress-db-domain-v2:a30c45f483b1e02b7bc0ba998781eb96c711620bb833160000196b54322bae26",
+      "sourceUpdatedAt": "2025-06-10 15:05:11"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43370",
+      "sourceHash": "wordpress-db-domain-v2:2ee0ec4e50cda60eaba5883aff0411aa9930d35a06c1394a875be78da9bb306f",
+      "sourceUpdatedAt": "2025-06-10 15:03:34"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43386",
+      "sourceHash": "wordpress-db-domain-v2:53797fe12acdc38a1933c7d60bf49bf1a3772f139b061c9ad3bf9b0e8de6ceaa",
+      "sourceUpdatedAt": "2025-06-10 15:01:10"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43388",
+      "sourceHash": "wordpress-db-domain-v2:eb4e487bf247694feec0b4551d108f5614e0c68e49b58b6ee391ce6c48619549",
+      "sourceUpdatedAt": "2025-06-10 15:02:04"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43408",
+      "sourceHash": "wordpress-db-domain-v2:feb6333f696dd2e078c420578278b159638f29ba6186488b8e6a60377ed6dc74",
+      "sourceUpdatedAt": "2025-05-08 11:37:54"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43410",
+      "sourceHash": "wordpress-db-domain-v2:9fe180c6a0ce98c4c1889dafc411610ac70fef7d9dc5e19ab48c472fea36b113",
+      "sourceUpdatedAt": "2025-05-08 11:38:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43412",
+      "sourceHash": "wordpress-db-domain-v2:6386034f59f68af3292f931e6227075c7ee4e9ffd09a022cc8f8afd88b1ae0cf",
+      "sourceUpdatedAt": "2025-05-08 11:38:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43646",
+      "sourceHash": "wordpress-db-domain-v2:099a3575e173143515f3e922bf3207452f8b3f7376daabc8b1cb52f0c51607e0",
+      "sourceUpdatedAt": "2025-04-29 21:47:24"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43648",
+      "sourceHash": "wordpress-db-domain-v2:341c16db799ee8047e54d83d23b456168530af74f144734df5cea665408b997d",
+      "sourceUpdatedAt": "2025-04-29 21:49:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43650",
+      "sourceHash": "wordpress-db-domain-v2:60d7e8a31255d029ed3bdbcf0452d283c1c761d6c5910f9eaf207254f4b8aadd",
+      "sourceUpdatedAt": "2025-04-29 21:50:24"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43653",
+      "sourceHash": "wordpress-db-domain-v2:a0361848c59ce725a417c6df5d7ef29078cea4071095b9da8991a8399567b9fb",
+      "sourceUpdatedAt": "2025-04-29 21:58:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43655",
+      "sourceHash": "wordpress-db-domain-v2:f01f149f3a3226a8d25b683ed3be57eae0eb86b6fdb4ed1559c95f71b11b112e",
+      "sourceUpdatedAt": "2025-04-29 21:57:57"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43657",
+      "sourceHash": "wordpress-db-domain-v2:3cf1f80a9daf20f6d37967f0e37ab85281880c96442b91d9d48b8bbd1e16522b",
+      "sourceUpdatedAt": "2025-04-29 22:00:12"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43659",
+      "sourceHash": "wordpress-db-domain-v2:19300d427637776b97f75f405cc23afa56f3df30f639d4a1bcc2257efb263155",
+      "sourceUpdatedAt": "2025-04-29 22:03:22"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43661",
+      "sourceHash": "wordpress-db-domain-v2:2616c49950137a1d8b6f5b995ae72c28817b7a06175c4bf99c44af0e00b3c64a",
+      "sourceUpdatedAt": "2025-04-29 22:04:42"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43663",
+      "sourceHash": "wordpress-db-domain-v2:ffa6b32fcb0d290a1b2ed168d212670c9b4db9325a99f78919771b201aa4bbae",
+      "sourceUpdatedAt": "2025-04-29 22:06:04"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43665",
+      "sourceHash": "wordpress-db-domain-v2:366c7fd8852cc7d6d2b03aa6c4e1aaf54c45bd7a9dde72e9e5a2dc8836882d33",
+      "sourceUpdatedAt": "2025-04-29 22:07:41"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43667",
+      "sourceHash": "wordpress-db-domain-v2:0f9cd6cf8a29eb8d57026c69f6fdc498e308435e7d83a641079c79998319e755",
+      "sourceUpdatedAt": "2025-04-29 22:09:06"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43669",
+      "sourceHash": "wordpress-db-domain-v2:6c667ed7d712fff22ebc7a29b0b40f250f4daa8aabaa36ab96bb59c2a3092fe3",
+      "sourceUpdatedAt": "2025-04-29 22:10:40"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43675",
+      "sourceHash": "wordpress-db-domain-v2:4c9ea908df524e33a3a9d3db3d0cebc886fb73e91d6ac58aaf0a7727514e444e",
+      "sourceUpdatedAt": "2025-04-29 22:14:13"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:51435",
+      "sourceHash": "wordpress-db-domain-v2:dbbce5b998e855f9c1c88f5b4e29503c9fbabcfb50f79e8955e2a93c27597eb7",
+      "sourceUpdatedAt": "2025-10-23 09:29:02"
+    }
+  ],
+  "privateArtifact": {
+    "path": "offers/capture.json",
+    "sha256": "398e86f0a989e226330b70e838ddaf901276681cd7ae7976a24546eb2b177b16",
+    "transferRequirement": "Never committed; raw content lives only at this immutable local path (mode 0600). Any transfer to another machine/session must use an out-of-band secure channel and must not be pasted into chat or logs."
+  }
+}

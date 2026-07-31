@@ -112,16 +112,59 @@ export function createOffersDependencyResolver(
 }
 
 /**
- * The one piece of real content this create-only pass cannot source
- * locally. A production implementation reads the bounded, immutable raw
- * WordPress snapshot (never committed to the repo — see rule 14 in
- * `docs/migration/prelaunch-checklist.md`); this session has none for
- * Offers, so any real `RawOfferSourceRepository` will throw
- * `OFFER_RAW_SOURCE_UNAVAILABLE` until `scripts/capture-phoenix-offers-source.ts`
- * has actually been run.
+ * Real implementation reads the bounded, immutable raw WordPress capture
+ * produced by `scripts/capture-phoenix-release-bundle-source.ts` — see
+ * `FrozenOfferSourceRepository`.
  */
 export interface RawOfferSourceRepository {
   loadNormalizedCandidate(sourceRecordKey: string): NormalizedOfferCandidate;
+}
+
+/**
+ * Unlike Article/Event/Route, Offer's `dependencyPlan.businessSourceKey`
+ * cannot be determined from raw WordPress content alone — it reflects
+ * whether the *target* Place (already migrated, resolved via lineage) has
+ * an `ownerBusinessId`, a target-system fact, not a source fact. This
+ * mirrors `scripts/audit-phoenix-offers-plan.ts`'s exact resolution: Place
+ * via `MigrationLineage`, business presence via `place.ownerBusinessId`.
+ * `resolveDependencies` independently re-resolves and validates this same
+ * business presence at write time — this function only has to predict it
+ * correctly enough to compute the right `OfferDomainHashV2` at plan time;
+ * it is never itself trusted as the write-time dependency resolution.
+ */
+export function createOffersLoadCandidate(
+  rawSource: RawOfferSourceRepository,
+  prisma: OffersProductionWiringPrismaClient,
+  sourceId: string,
+): (sourceRecordKey: string) => Promise<OffersMigrationCandidate> {
+  return async (sourceRecordKey) => {
+    const rawCandidate = rawSource.loadNormalizedCandidate(sourceRecordKey);
+    const collapsed = collapseOfferPlaceRelations({ offerPostId: rawCandidate.sourcePostId, relations: rawCandidate.placeRelation.relations });
+    if (collapsed.status !== "RESOLVED") throw new Error(`OFFER_PLACE_RELATION_${collapsed.status}`);
+    const placeSourceRecordKey = `wordpress-db:places:${collapsed.effectiveLegacyPlaceId}`;
+
+    const placeLineages = await prisma.migrationLineage.findMany({
+      where: { sourceId, sourceRecordKey: placeSourceRecordKey, targetType: PLACE_TARGET_TYPE, isActive: true },
+    });
+    if (placeLineages.length !== 1 || !placeLineages[0].targetId) throw new Error("PLACE_DEPENDENCY_NOT_FOUND");
+    const place = await prisma.place.findUnique({ where: { id: placeLineages[0].targetId }, select: { ownerBusinessId: true } });
+    if (!place) throw new Error("PLACE_DEPENDENCY_TARGET_MISSING");
+    const businessSourceKey = place.ownerBusinessId ? `place-owner-business:${placeSourceRecordKey}` : null;
+
+    const dependencyPlan: OffersMigrationCandidate["dependencyPlan"] = {
+      placeSourceRecordKey,
+      businessSourceKey,
+      placeReadiness: "EXISTS_NOW",
+      businessReadiness: businessSourceKey ? "EXISTS_NOW" : null,
+    };
+    const domainHashV2 = buildOfferDomainHashV2(rawCandidate, {
+      placeSourceRecordKey,
+      ownerIdentity: { kind: "technicalMigrationCreator", value: "technicalMigrationCreator" },
+      businessSourceKey,
+    });
+
+    return { sourceRecordKey, domainHashV2, dependencyPlan };
+  };
 }
 
 /**

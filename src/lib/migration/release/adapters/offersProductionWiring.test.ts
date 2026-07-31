@@ -5,6 +5,7 @@ import { buildOfferDomainHashV2 } from "../../commit/offer/offerDomainHash";
 import { SequentialEntityPhaseAdapter } from "../adapter";
 import {
   createOffersDependencyResolver,
+  createOffersLoadCandidate,
   createOffersTargetStateResolver,
   createOffersWriter,
   type OffersProductionWiringPrismaClient,
@@ -205,6 +206,50 @@ async function testDependencyResolverBusinessUnexpectedButPresentFails(): Promis
 }
 
 // ---------------------------------------------------------------------------
+// createOffersLoadCandidate
+// ---------------------------------------------------------------------------
+
+async function testLoadCandidateNoBusinessComputesCorrectDomainHash(): Promise<void> {
+  const rawCandidate = fixtureRawCandidate();
+  const prisma = fakePrisma({ lineages: [placeLineage()], places: { "place-1": { id: "place-1", createdByUserId: "user-1", ownerBusinessId: null, cityId: "city-1" } } });
+  const rawSource: RawOfferSourceRepository = { loadNormalizedCandidate: () => rawCandidate };
+  const loadCandidate = createOffersLoadCandidate(rawSource, prisma, SOURCE_ID);
+  const candidate = await loadCandidate(OFFER_KEY);
+  assert.equal(candidate.dependencyPlan.placeSourceRecordKey, PLACE_KEY);
+  assert.equal(candidate.dependencyPlan.businessSourceKey, null);
+  const expectedHash = buildOfferDomainHashV2(rawCandidate, {
+    placeSourceRecordKey: PLACE_KEY,
+    ownerIdentity: { kind: "technicalMigrationCreator", value: "technicalMigrationCreator" },
+    businessSourceKey: null,
+  });
+  assert.equal(candidate.domainHashV2, expectedHash);
+}
+
+async function testLoadCandidateWithBusinessSetsBusinessSourceKey(): Promise<void> {
+  const rawCandidate = fixtureRawCandidate();
+  const prisma = fakePrisma({ lineages: [placeLineage()], places: { "place-1": { id: "place-1", createdByUserId: "user-1", ownerBusinessId: "biz-1", cityId: "city-1" } } });
+  const rawSource: RawOfferSourceRepository = { loadNormalizedCandidate: () => rawCandidate };
+  const loadCandidate = createOffersLoadCandidate(rawSource, prisma, SOURCE_ID);
+  const candidate = await loadCandidate(OFFER_KEY);
+  assert.equal(candidate.dependencyPlan.businessSourceKey, "place-owner-business:" + PLACE_KEY);
+  assert.equal(candidate.dependencyPlan.businessReadiness, "EXISTS_NOW");
+}
+
+async function testLoadCandidateZeroPlaceLineageFails(): Promise<void> {
+  const prisma = fakePrisma({});
+  const rawSource: RawOfferSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate() };
+  const loadCandidate = createOffersLoadCandidate(rawSource, prisma, SOURCE_ID);
+  await expectRejectMessage(() => loadCandidate(OFFER_KEY), "PLACE_DEPENDENCY_NOT_FOUND");
+}
+
+async function testLoadCandidatePlaceTargetMissingFails(): Promise<void> {
+  const prisma = fakePrisma({ lineages: [placeLineage()] });
+  const rawSource: RawOfferSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate() };
+  const loadCandidate = createOffersLoadCandidate(rawSource, prisma, SOURCE_ID);
+  await expectRejectMessage(() => loadCandidate(OFFER_KEY), "PLACE_DEPENDENCY_TARGET_MISSING");
+}
+
+// ---------------------------------------------------------------------------
 // createOffersWriter
 // ---------------------------------------------------------------------------
 
@@ -369,7 +414,7 @@ async function testExecutorStopsOnFirstErrorWhenWriteTransactionFails(): Promise
 
   let secondRecordLoaded = false;
   const deps: OffersMigrationDependencies = {
-    loadCandidate: (sourceRecordKey) => {
+    loadCandidate: async (sourceRecordKey) => {
       if (sourceRecordKey !== OFFER_KEY) secondRecordLoaded = true;
       return fixtureCandidate({ sourceRecordKey, domainHashV2, dependencyPlan: fixtureDependencyPlan() });
     },
@@ -416,6 +461,10 @@ async function main(): Promise<void> {
   await testDependencyResolverBusinessTargetMissingFails();
   await testDependencyResolverBusinessExpectedButAbsentFails();
   await testDependencyResolverBusinessUnexpectedButPresentFails();
+  await testLoadCandidateNoBusinessComputesCorrectDomainHash();
+  await testLoadCandidateWithBusinessSetsBusinessSourceKey();
+  await testLoadCandidateZeroPlaceLineageFails();
+  await testLoadCandidatePlaceTargetMissingFails();
   await testWriterThrowsWhenRawSourceUnavailable();
   await testWriterRejectsOnDomainHashMismatch();
   await testWriterTransactionCommitsOfferAndLineageTogether();

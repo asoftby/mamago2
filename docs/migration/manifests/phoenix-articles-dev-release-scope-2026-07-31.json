@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-articles-dev-release-scope-2026-07-31",
+  "entity": "articles",
+  "sourceCaptureTimestamp": "2026-07-31T15:41:30.957Z",
+  "canonicalization": "wordpress-db-domain-v2 (src/lib/migration/adapters/wordpress-db/canonicalSourceHash.ts)",
+  "total": 26,
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:post:24695",
+      "sourceHash": "wordpress-db-domain-v2:63e4b2f0172c6870885f0929aa0f59478f702b4bf3e24d24973cf8661b5abce0",
+      "sourceUpdatedAt": "2024-08-08 19:04:37"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:24772",
+      "sourceHash": "wordpress-db-domain-v2:f207ce8af4bca21c5fc127a1a26ced64f72f902fe6b3a2eeda7935043912c273",
+      "sourceUpdatedAt": "2024-08-15 20:50:14"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:24774",
+      "sourceHash": "wordpress-db-domain-v2:6d35234b064e40b269c0ca57727cd4e335a2733272088ead7f5a31b70ff77379",
+      "sourceUpdatedAt": "2024-08-13 17:49:56"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:24988",
+      "sourceHash": "wordpress-db-domain-v2:d97d76b294f683afd0e02d053eb27463e801cb0f8ec08ee219f0e39ff1f27d86",
+      "sourceUpdatedAt": "2024-08-21 14:53:11"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:26068",
+      "sourceHash": "wordpress-db-domain-v2:6a3fccbeb86f71adfe72da6c16c892c5bdde1fcff246ac5218e34a164f39bd75",
+      "sourceUpdatedAt": "2024-12-17 00:19:02"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:26605",
+      "sourceHash": "wordpress-db-domain-v2:eb712f879dea01e2fe949b7e8b2a0a114a283b8adc569d29483ca6cb69d5a9e3",
+      "sourceUpdatedAt": "2024-09-13 14:44:07"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:27355",
+      "sourceHash": "wordpress-db-domain-v2:11d6e787cfa84bcbb8f60a587d45e56ce132188e2ceec0ab35dcd15285e649e2",
+      "sourceUpdatedAt": "2024-09-24 13:51:29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:28546",
+      "sourceHash": "wordpress-db-domain-v2:6be6a01e93731d401ddb0ba12983daa795b1e30d1fda2d22efacd9fde4e65a01",
+      "sourceUpdatedAt": "2024-10-04 15:26:16"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:30049",
+      "sourceHash": "wordpress-db-domain-v2:b9cca06daee4e1cd24942d92c856863d35e266f017660b24849541f0c6e4e2fa",
+      "sourceUpdatedAt": "2024-10-16 16:29:58"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:30593",
+      "sourceHash": "wordpress-db-domain-v2:4749925323b3db5acbe27eb8ee31c6099ff5070278c616efab28378ff5f81615",
+      "sourceUpdatedAt": "2024-12-17 00:16:18"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:30642",
+      "sourceHash": "wordpress-db-domain-v2:dbcf3691a99a9860452490ca25180f4e0b8a6ae888629891ce64d0e7518fac66",
+      "sourceUpdatedAt": "2024-12-17 00:14:29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:30700",
+      "sourceHash": "wordpress-db-domain-v2:254f6c5e0dfc2abc5280f8f36dc4c2878e32d322051c397fff2eef036f768bf3",
+      "sourceUpdatedAt": "2024-10-26 02:05:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:31021",
+      "sourceHash": "wordpress-db-domain-v2:cf8014b030b95f1ec33bade566c4a00dbfc28f1041a943623f5acf5b5bc74899",
+      "sourceUpdatedAt": "2024-11-04 10:48:49"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:32082",
+      "sourceHash": "wordpress-db-domain-v2:98716cb56e0ba5185197174945565bacf1037bb581dba51b843aac97e63e75f4",
+      "sourceUpdatedAt": "2024-12-17 00:12:47"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:32217",
+      "sourceHash": "wordpress-db-domain-v2:e0a2bc15db007255bd3abcad41ac32f231aba8b36b72a6fc2f1322c35afedea2",
+      "sourceUpdatedAt": "2024-12-17 00:10:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:33172",
+      "sourceHash": "wordpress-db-domain-v2:72879fc94bb355d3566070083be6bc05d90809e303384c25991986abd8321e02",
+      "sourceUpdatedAt": "2024-12-01 14:48:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:33899",
+      "sourceHash": "wordpress-db-domain-v2:e6c9ce095fa6ce3fa8ccf3aa2698678f3c7aebe32a250c78ca87b89b34d2e02a",
+      "sourceUpdatedAt": "2024-12-31 01:47:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:34363",
+      "sourceHash": "wordpress-db-domain-v2:e6df0cb617af7038916eb9c3e779f39e44a884b31278f4f777e2d015f0bf54e3",
+      "sourceUpdatedAt": "2026-02-02 12:58:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:34997",
+      "sourceHash": "wordpress-db-domain-v2:6c0db4237681eea46bc05f1483ca9aa761378edd7000f6b915188b4752c00766",
+      "sourceUpdatedAt": "2024-12-31 01:46:32"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:35329",
+      "sourceHash": "wordpress-db-domain-v2:c0eef42739d92995f77aa77afd60a08eebc3475e866316da3f45394d26c41667",
+      "sourceUpdatedAt": "2024-12-31 01:49:42"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:37026",
+      "sourceHash": "wordpress-db-domain-v2:9550f68070bb2481418a2b941a7a9238f28b540be27dd6740b1144bb3e963579",
+      "sourceUpdatedAt": "2025-01-30 15:36:41"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:39844",
+      "sourceHash": "wordpress-db-domain-v2:255dde06c28810af2a5514575f631e4b4fed6f8dffdb5eebd326af89ec83e653",
+      "sourceUpdatedAt": "2025-03-13 18:10:25"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:40724",
+      "sourceHash": "wordpress-db-domain-v2:f1ecd54a5fbc9443cef9e992300e5102929ac335005e1742d38b186f18d5f077",
+      "sourceUpdatedAt": "2026-02-02 13:54:43"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:56250",
+      "sourceHash": "wordpress-db-domain-v2:79a0239e108d2975c30b385bf6995a38f6eb55ec4866befdcb98c095b8fcb6ea",
+      "sourceUpdatedAt": "2025-12-12 16:13:20"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:57731",
+      "sourceHash": "wordpress-db-domain-v2:658a1ac7be5aa46461f3901e6b31268110ac54ab1f2d512404aef1d65390ef1b",
+      "sourceUpdatedAt": "2025-12-30 00:59:57"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:post:9704",
+      "sourceHash": "wordpress-db-domain-v2:950cc0fa835d8cf5b1b387b6c5badde52113964f4b67b45a65cba2f3db0047f1",
+      "sourceUpdatedAt": "2024-08-21 18:59:41"
+    }
+  ],
+  "privateArtifact": {
+    "path": "articles/capture.json",
+    "sha256": "def08a4a6a31b91583c6dd502a2322b1a8e9577abacf3160a430e226c5866529",
+    "transferRequirement": "Never committed; raw content lives only at this immutable local path (mode 0600). Any transfer to another machine/session must use an out-of-band secure channel and must not be pasted into chat or logs."
+  }
+}

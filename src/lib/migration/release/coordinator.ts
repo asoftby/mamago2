@@ -39,21 +39,93 @@ function assertRerun(results: readonly PhoenixRecordResult[], deterministic: Rea
   if (unexpected) throw new Error(`RERUN_UNEXPECTED_${unexpected.outcome}: ${unexpected.sourceRecordKey}.`);
 }
 
+/**
+ * Resume must never trust the caller's arithmetic alone. Every check below
+ * exists to catch a specific, real way a resume could otherwise silently
+ * continue into the wrong state:
+ *  - a phase that never actually finished (or finished with failures);
+ *  - the wrong phase, or phases out of `phaseOrder`;
+ *  - a duplicated or corrupted report;
+ *  - different code, manifest, or environment than what produced the
+ *    reports being resumed from.
+ * None of this performs cleanup — an invalid resume attempt only ever
+ * throws; the partial prefix it was trying to resume from is left exactly
+ * as-is for a human to inspect.
+ */
 function assertResume(input: RunPhoenixReleaseInput, completedPrefix: readonly PhoenixPhaseName[]): void {
   if (!input.resumeFrom) return;
   const previous = input.previousReports ?? [];
   if (previous.length === 0) throw new Error("RESUME_REPORT_REQUIRED");
-  for (const report of previous) {
+
+  const resumeIndex = input.manifest.phaseOrder.indexOf(input.resumeFrom);
+  if (resumeIndex < 0) throw new Error("RESUME_PREFIX_MISMATCH");
+
+  if (new Set(completedPrefix).size !== completedPrefix.length) throw new Error("RESUME_PREFIX_DUPLICATE");
+
+  // Count alone can't catch a resume that skipped, reordered, or
+  // substituted a phase — only an exact, element-wise match against the
+  // manifest's own declared order can.
+  const expectedPrefix = input.manifest.phaseOrder.slice(0, resumeIndex);
+  if (
+    completedPrefix.length !== expectedPrefix.length ||
+    expectedPrefix.some((expectedPhase, index) => completedPrefix[index] !== expectedPhase)
+  ) {
+    throw new Error("RESUME_PREFIX_MISMATCH");
+  }
+
+  for (const [index, report] of previous.entries()) {
     if (
       report.releaseId !== input.manifest.releaseId ||
       report.manifestHash !== input.manifestHash ||
+      report.codeSha !== input.codeSha ||
       JSON.stringify(report.environmentFingerprint) !== JSON.stringify(input.environment)
     ) {
       throw new Error("RESUME_FINGERPRINT_MISMATCH");
     }
+    if (report.failed > 0) throw new Error("RESUME_INTO_FAILED_PHASE");
+
+    // A report's own embedded `completedPrefix` is a second, independent
+    // record of "what was done by the time this phase finished" — it must
+    // agree with the phaseOrder prefix ending at this report, or the
+    // report store itself is corrupted/tampered and cannot be trusted as
+    // completion proof.
+    const expectedOwnPrefix = input.manifest.phaseOrder.slice(0, index + 1);
+    if (JSON.stringify(report.completedPrefix) !== JSON.stringify(expectedOwnPrefix)) {
+      throw new Error("RESUME_REPORT_PREFIX_CORRUPTED");
+    }
   }
-  const resumeIndex = input.manifest.phaseOrder.indexOf(input.resumeFrom);
-  if (resumeIndex < 0 || completedPrefix.length !== resumeIndex) throw new Error("RESUME_PREFIX_MISMATCH");
+}
+
+/**
+ * Given a manifest and the reports produced so far, returns the exact
+ * phase name a caller may safely pass as `resumeFrom` — or `null` if every
+ * phase in `phaseOrder` has already completed successfully. Throws the
+ * same structured errors `assertResume` would if the supplied reports
+ * aren't a valid, uncorrupted, all-successful prefix — callers should
+ * never guess a resume point by hand.
+ */
+export function resolveSafeResumePoint(
+  manifest: PhoenixReleaseManifest,
+  previousReports: readonly PhoenixPhaseReport[],
+): PhoenixPhaseName | null {
+  if (previousReports.length === 0) return manifest.phaseOrder[0] ?? null;
+  const completedPrefix = previousReports.map((report) => report.phase);
+  if (new Set(completedPrefix).size !== completedPrefix.length) throw new Error("RESUME_PREFIX_DUPLICATE");
+  const expectedPrefix = manifest.phaseOrder.slice(0, completedPrefix.length);
+  if (
+    completedPrefix.length !== expectedPrefix.length ||
+    expectedPrefix.some((expectedPhase, index) => completedPrefix[index] !== expectedPhase)
+  ) {
+    throw new Error("RESUME_PREFIX_MISMATCH");
+  }
+  for (const [index, report] of previousReports.entries()) {
+    if (report.failed > 0) throw new Error("RESUME_INTO_FAILED_PHASE");
+    const expectedOwnPrefix = manifest.phaseOrder.slice(0, index + 1);
+    if (JSON.stringify(report.completedPrefix) !== JSON.stringify(expectedOwnPrefix)) {
+      throw new Error("RESUME_REPORT_PREFIX_CORRUPTED");
+    }
+  }
+  return manifest.phaseOrder[completedPrefix.length] ?? null;
 }
 
 export async function runPhoenixRelease(input: RunPhoenixReleaseInput): Promise<PhoenixPhaseReport[]> {

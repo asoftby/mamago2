@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { SequentialEntityPhaseAdapter } from "./adapter";
-import { runPhoenixRelease } from "./coordinator";
+import { resolveSafeResumePoint, runPhoenixRelease } from "./coordinator";
 import { loadPhoenixEnvironment } from "./environment";
 import { resolveLogicalIdentity } from "./identity";
 import {
@@ -170,12 +170,22 @@ async function testCoordinatorReportsResumeAndRerun(): Promise<void> {
   assert.equal(planned[0].skipped, 1, "existing lineage golden 5457 remains SKIP_UNCHANGED");
   assert.deepEqual(reports[0].completedPrefix, ["places"]);
 
+  // Isolates the fingerprint check from the (stricter) prefix check: a
+  // two-phase manifest lets `previousReports` be a genuinely valid
+  // completed-prefix (["places"], resuming into "offers") except for the
+  // injected manifestHash mismatch.
+  const twoPhaseManifest: PhoenixReleaseManifest = {
+    ...base.manifest,
+    phaseOrder: ["places", "offers"],
+    phases: [...base.manifest.phases, { ...phase([]), name: "offers" }],
+  };
   await expectReject(
     () =>
       runPhoenixRelease({
         ...base,
+        manifest: twoPhaseManifest,
         mode: "PLAN",
-        resumeFrom: "places",
+        resumeFrom: "offers",
         previousReports: [{ ...reports[0], manifestHash: "different" }],
       }),
     /RESUME_FINGERPRINT_MISMATCH/,
@@ -214,6 +224,131 @@ async function testCoordinatorReportsResumeAndRerun(): Promise<void> {
   );
   assert.equal(failureReports[0].firstFailure, "wordpress-db:places:5457:injected");
   assert.deepEqual(failureReports[0].completedPrefix, []);
+}
+
+function fakeReport(overrides: Partial<PhoenixPhaseReport> & Pick<PhoenixPhaseReport, "phase" | "completedPrefix">): PhoenixPhaseReport {
+  return {
+    releaseId: "test-release",
+    environment: "DEV",
+    codeSha: "code-sha",
+    manifestPath: "manifest.json",
+    manifestHash: "manifest-hash",
+    attempted: 0,
+    created: 0,
+    updated: 0,
+    skipped: 1,
+    protectedConflicts: 0,
+    failed: 0,
+    targetCountDelta: 0,
+    migrationRecordDelta: 0,
+    migrationLineageDelta: 0,
+    duplicateLineage: 0,
+    duplicateTargets: 0,
+    mediaStorageDelta: 0,
+    forbiddenTableAudit: "PASS",
+    firstFailure: null,
+    environmentFingerprint: environment,
+    resolvedIdentities: {},
+    ...overrides,
+  };
+}
+
+async function testResumeValidationHardening(): Promise<void> {
+  const twoPhase: PhoenixReleaseManifest = {
+    schemaVersion: 1,
+    releaseId: "test-release",
+    phaseOrder: ["places", "offers"],
+    phases: [phase([]), { ...phase([]), name: "offers" }],
+  };
+  const noopAdapter = new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey, action) => ({ sourceRecordKey, action, outcome: "SKIPPED" }),
+  });
+  const base = {
+    manifest: twoPhase,
+    manifestPath: "manifest.json",
+    manifestHash: "manifest-hash",
+    environment,
+    codeSha: "code-sha",
+    adapters: { offers: noopAdapter },
+    reportStore: { append: async () => {} },
+    mode: "PLAN" as const,
+  };
+  const goodPlacesReport = fakeReport({ phase: "places", completedPrefix: ["places"] });
+
+  // codeSha mismatch: same manifest/environment, different code than what
+  // produced the prior report.
+  await expectReject(
+    () =>
+      runPhoenixRelease({ ...base, resumeFrom: "offers", previousReports: [{ ...goodPlacesReport, codeSha: "different-sha" }] }),
+    /RESUME_FINGERPRINT_MISMATCH/,
+  );
+
+  // Duplicate phase in previousReports.
+  await expectReject(
+    () =>
+      runPhoenixRelease({
+        ...base,
+        resumeFrom: "offers",
+        previousReports: [goodPlacesReport, { ...goodPlacesReport, phase: "places" }],
+      }),
+    /RESUME_PREFIX_DUPLICATE/,
+  );
+
+  // Corrupted per-report completedPrefix: the report claims "places" and
+  // "offers" both done, but only reports for "places" were actually supplied.
+  await expectReject(
+    () =>
+      runPhoenixRelease({
+        ...base,
+        resumeFrom: "offers",
+        previousReports: [{ ...goodPlacesReport, completedPrefix: ["places", "offers"] }],
+      }),
+    /RESUME_REPORT_PREFIX_CORRUPTED/,
+  );
+
+  // Resuming past a phase that itself failed must never be allowed, even
+  // if the prefix/fingerprints otherwise line up.
+  await expectReject(
+    () =>
+      runPhoenixRelease({
+        ...base,
+        resumeFrom: "offers",
+        previousReports: [{ ...goodPlacesReport, failed: 1 }],
+      }),
+    /RESUME_INTO_FAILED_PHASE/,
+  );
+
+  // The valid case must still work: exact matching prefix, fingerprints,
+  // and codeSha all agree.
+  const validResult = await runPhoenixRelease({ ...base, resumeFrom: "offers", previousReports: [goodPlacesReport] });
+  assert.equal(validResult.length, 1);
+  assert.equal(validResult[0].phase, "offers");
+}
+
+function testResolveSafeResumePoint(): void {
+  const twoPhase: PhoenixReleaseManifest = {
+    schemaVersion: 1,
+    releaseId: "test-release",
+    phaseOrder: ["places", "offers"],
+    phases: [phase([]), { ...phase([]), name: "offers" }],
+  };
+  assert.equal(resolveSafeResumePoint(twoPhase, []), "places", "nothing completed yet -> resume from the first phase");
+  const goodPlacesReport = fakeReport({ phase: "places", completedPrefix: ["places"] });
+  assert.equal(resolveSafeResumePoint(twoPhase, [goodPlacesReport]), "offers");
+  assert.equal(
+    resolveSafeResumePoint(twoPhase, [goodPlacesReport, fakeReport({ phase: "offers", completedPrefix: ["places", "offers"] })]),
+    null,
+    "every phase completed -> nothing left to resume",
+  );
+  assert.throws(() => resolveSafeResumePoint(twoPhase, [{ ...goodPlacesReport, failed: 1 }]), /RESUME_INTO_FAILED_PHASE/);
+  assert.throws(
+    () => resolveSafeResumePoint(twoPhase, [goodPlacesReport, { ...goodPlacesReport, phase: "places" }]),
+    /RESUME_PREFIX_DUPLICATE/,
+  );
+  assert.throws(
+    () => resolveSafeResumePoint(twoPhase, [{ ...goodPlacesReport, completedPrefix: ["places", "offers"] }]),
+    /RESUME_REPORT_PREFIX_CORRUPTED/,
+  );
 }
 
 async function testAppendOnlySecretFreeReport(): Promise<void> {
@@ -260,6 +395,8 @@ async function main(): Promise<void> {
   await testIdentityCardinality();
   await testExactScopeOfferSequenceAndStop();
   await testCoordinatorReportsResumeAndRerun();
+  await testResumeValidationHardening();
+  testResolveSafeResumePoint();
   await testAppendOnlySecretFreeReport();
   console.log("Phoenix release tests: PASS");
 }

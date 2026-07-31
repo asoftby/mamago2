@@ -48,7 +48,7 @@ function testOwnershipArtifactsExactScope(): void {
 // Founder-approved first-release exclusion set (fail-closed)
 // ---------------------------------------------------------------------------
 
-function testAssertExactExclusionSetAcceptsTheRealFive(): void {
+function testAssertExactExclusionSetAcceptsTheRealFour(): void {
   assertExactExclusionSet(
     [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS],
     USERS_UNRESOLVED_SOURCE_RECORD_KEYS,
@@ -56,7 +56,7 @@ function testAssertExactExclusionSetAcceptsTheRealFive(): void {
 }
 
 function testAssertExactExclusionSetRejectsMissingKey(): void {
-  const missingOne = USERS_UNRESOLVED_SOURCE_RECORD_KEYS.slice(0, 4);
+  const missingOne = USERS_UNRESOLVED_SOURCE_RECORD_KEYS.slice(0, 3);
   assert.throws(
     () => assertExactExclusionSet(missingOne, USERS_UNRESOLVED_SOURCE_RECORD_KEYS),
     /EXCLUSION_COUNT_MISMATCH/,
@@ -72,7 +72,7 @@ function testAssertExactExclusionSetRejectsExtraKey(): void {
 }
 
 function testAssertExactExclusionSetRejectsSubstitutedKey(): void {
-  const substituted = [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS.slice(0, 4), "wordpress-db:user:999"];
+  const substituted = [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS.slice(0, 3), "wordpress-db:user:999"];
   assert.throws(
     () => assertExactExclusionSet(substituted, USERS_UNRESOLVED_SOURCE_RECORD_KEYS),
     /UNKNOWN_EXCLUSION_KEY/,
@@ -97,7 +97,7 @@ function testFounderExclusionArtifactRealFileNoPii(): void {
   };
   assert.equal(artifact.decisionType, "EXCLUDE_FROM_FIRST_RELEASE");
   assert.equal(artifact.approvedBy, "FOUNDER");
-  assert.equal(artifact.excludedCount, 5);
+  assert.equal(artifact.excludedCount, 4);
   assertExactExclusionSet(artifact.excludedSourceRecordKeys, USERS_UNRESOLVED_SOURCE_RECORD_KEYS);
   assert(!/@/.test(raw), "founder exclusion artifact must contain no email addresses");
   for (const field of ["email", "firstName", "lastName", "displayName"]) {
@@ -111,8 +111,10 @@ function testRealManifestUsersReadyWithExclusions(): void {
   const users = manifest.phases.find((p) => p.name === "users")!;
   assert.equal(users.status, "READY");
   assert.equal(users.blocker, undefined, "READY phase must carry no leftover blocker");
-  assert.equal(users.records.length, 559);
-  assert.equal(users.excludedSourceRecordKeys.length, 5);
+  assert.equal(users.records.length, 563);
+  assert.equal(users.records.filter((r) => r.sourceRecordKey === "wordpress-db:user:1").length, 1);
+  assert.equal(users.records.filter((r) => r.sourceRecordKey === "wordpress-db:user:129").length, 1);
+  assert.equal(users.excludedSourceRecordKeys.length, 4);
   assertExactExclusionSet(users.excludedSourceRecordKeys, USERS_UNRESOLVED_SOURCE_RECORD_KEYS);
   for (const key of USERS_UNRESOLVED_SOURCE_RECORD_KEYS) {
     assert.equal(users.exclusionReasons?.[key], "EXCLUDE_FROM_FIRST_RELEASE");
@@ -120,26 +122,31 @@ function testRealManifestUsersReadyWithExclusions(): void {
   }
 }
 
-function testRealManifestBusinessesReadyWithExclusionReason(): void {
+function testRealManifestBusinessesReadyWithApprovedScope(): void {
   const manifestPath = "docs/migration/releases/phoenix-approved-2026-07-30.json";
   const { manifest } = loadPhoenixReleaseManifest(manifestPath);
   const businesses = manifest.phases.find((p) => p.name === "businesses")!;
   assert.equal(businesses.status, "READY");
-  assert.equal(businesses.blocker, undefined, "READY phase must carry no leftover blocker");
-  assert.equal(businesses.records.length, 37);
-  assert.equal(businesses.exclusionReasons?.["wordpress-db:user:43"], "EXCLUDED_BY_USER_DECISION");
+  assert.equal(businesses.blockerCode, undefined);
+  assert.equal(businesses.records.length, 38);
+  assert.equal(businesses.excludedSourceRecordKeys.length, 0);
+  assert(businesses.records.some((record) => record.sourceRecordKey === "wordpress-db:user:43"));
 }
 
-async function testSequentialApplyOverRealScopeNeverAttemptsExcludedRecords(): Promise<void> {
+async function testSequentialApplyOverRealUsersScopeNeverAttemptsExcludedRecords(): Promise<void> {
+  // Businesses is BLOCKED (BUSINESS_OWNERSHIP_GENERIC_CASE_SOURCE_EVIDENCE_MISSING)
+  // as of this session — a sequential apply through both phases together is
+  // no longer possible against the real manifest; PHASE_BLOCKED coverage
+  // for that lives in testUsersBlockedPreventsBusinessesFromRunning below
+  // (synthetic fixture). This proves the users-only executable scope.
   const manifestPath = "docs/migration/releases/phoenix-approved-2026-07-30.json";
   const { manifest, manifestHash } = loadPhoenixReleaseManifest(manifestPath);
   const users = manifest.phases.find((p) => p.name === "users")!;
-  const businesses = manifest.phases.find((p) => p.name === "businesses")!;
   const subManifest: PhoenixReleaseManifest = {
     schemaVersion: 1,
     releaseId: manifest.releaseId,
-    phaseOrder: ["users", "businesses"],
-    phases: [users, businesses],
+    phaseOrder: ["users"],
+    phases: [users],
   };
   const attempted: string[] = [];
   const fakeAdapter = new SequentialEntityPhaseAdapter({
@@ -155,16 +162,15 @@ async function testSequentialApplyOverRealScopeNeverAttemptsExcludedRecords(): P
     manifestHash,
     environment,
     codeSha: "fixture-sha",
-    adapters: { users: fakeAdapter, businesses: fakeAdapter },
+    adapters: { users: fakeAdapter },
     reportStore: { append: async (report) => void reports.push(report) },
     mode: "APPLY",
   });
-  assert.equal(result.length, 2, "both users and businesses phases must complete");
-  assert.equal(attempted.length, 559 + 37, "exactly the executable scope, no more, no less");
+  assert.equal(result.length, 1, "users phase must complete");
+  assert.equal(attempted.length, 563, "560 clean-scope records plus three explicit dependency prerequisites");
   for (const key of USERS_UNRESOLVED_SOURCE_RECORD_KEYS) {
     assert(!attempted.includes(key), `excluded ${key} must never be passed to an executor`);
   }
-  assert(!attempted.includes("wordpress-db:user:43"), "user:43 must never be attempted in the businesses phase");
 }
 
 // ---------------------------------------------------------------------------
@@ -382,18 +388,13 @@ async function testResumeCannotSkipBlockedUsersPhase(): Promise<void> {
   );
 }
 
-function testBusinessesPhaseExcludesUserEntangledWithUnresolvedUsers(): void {
+function testBusinessesPhaseReincludesUser43AfterFounderDecision(): void {
   const manifestPath = "docs/migration/releases/phoenix-approved-2026-07-30.json";
   const { manifest } = loadPhoenixReleaseManifest(manifestPath);
   const businesses = manifest.phases.find((p) => p.name === "businesses")!;
-  // wordpress-db:user:43 is one of the 36 EXACT_LINK_CANDIDATE users AND
-  // one of the 5 permanently-unresolved Users records — a sequential
-  // apply must never attempt it (its User dependency can never resolve),
-  // so it must be excluded from executable records, not merely present
-  // and expected to fail.
-  assert(!businesses.records.some((r) => r.sourceRecordKey === "wordpress-db:user:43"));
-  assert(businesses.excludedSourceRecordKeys.includes("wordpress-db:user:43"));
-  assert.equal(businesses.records.length, 37, "36 generic - 1 entangled + 2 override = 37");
+  assert(businesses.records.some((r) => r.sourceRecordKey === "wordpress-db:user:43"));
+  assert(!businesses.excludedSourceRecordKeys.includes("wordpress-db:user:43"));
+  assert.equal(businesses.records.length, 38, "36 generic + 2 overrides");
 }
 
 function testManifestRejectsStaleBlockerOnReadyPhase(): void {
@@ -467,16 +468,16 @@ async function testActivationEmailGateBlocksPhoenixEnvironment(): Promise<void> 
 
 async function main(): Promise<void> {
   testOwnershipArtifactsExactScope();
-  testAssertExactExclusionSetAcceptsTheRealFive();
+  testAssertExactExclusionSetAcceptsTheRealFour();
   testAssertExactExclusionSetRejectsMissingKey();
   testAssertExactExclusionSetRejectsExtraKey();
   testAssertExactExclusionSetRejectsSubstitutedKey();
   testAssertExactExclusionSetRejectsDuplicate();
   testFounderExclusionArtifactRealFileNoPii();
   testRealManifestUsersReadyWithExclusions();
-  testRealManifestBusinessesReadyWithExclusionReason();
-  await testSequentialApplyOverRealScopeNeverAttemptsExcludedRecords();
-  testBusinessesPhaseExcludesUserEntangledWithUnresolvedUsers();
+  testRealManifestBusinessesReadyWithApprovedScope();
+  await testSequentialApplyOverRealUsersScopeNeverAttemptsExcludedRecords();
+  testBusinessesPhaseReincludesUser43AfterFounderDecision();
   testManifestRejectsStaleBlockerOnReadyPhase();
   testCommittedManifestArtifactHashesVerify();
   await testUsersExecutorForbidsAdminMutation();

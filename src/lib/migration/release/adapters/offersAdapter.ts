@@ -70,7 +70,14 @@ export interface OffersMigrationWriteResult {
 }
 
 export interface OffersMigrationDependencies {
-  loadCandidate(sourceRecordKey: string): OffersMigrationCandidate;
+  /**
+   * Async because, unlike Article/Event/Route, Offer's dependencyPlan
+   * (specifically `businessSourceKey`) reflects a target-system fact — the
+   * already-migrated Place's `ownerBusinessId` — not something derivable
+   * from raw source content alone. See `createOffersLoadCandidate` in
+   * `offersProductionWiring.ts`.
+   */
+  loadCandidate(sourceRecordKey: string): Promise<OffersMigrationCandidate>;
   resolveTargetState(candidate: OffersMigrationCandidate): Promise<OffersTargetLineageState>;
   /**
    * Must re-resolve Place/Business/owner dependencies against real target
@@ -131,7 +138,7 @@ export class OffersPhaseExecutor implements ExactRecordExecutor {
     // escaped exception — otherwise `runSequential`'s stop-on-first-error
     // loop and its report-store audit trail are bypassed entirely.
     try {
-      const candidate = this.deps.loadCandidate(sourceRecordKey);
+      const candidate = await this.deps.loadCandidate(sourceRecordKey);
       const target = await this.deps.resolveTargetState(candidate);
       const plan = planOffersCreateAction(candidate, target);
 

@@ -1707,3 +1707,45 @@ Next single action: approve explicit lifecycle/SEO/slug/media/schedule update
 contracts or exclusions for the 63 conflict records; do not perform a lineage
 hash transition until every target-domain mismatch has a disposition.
 ```
+
+```text
+Phase: PHOENIX RELEASE BUNDLE — COMMON ADAPTER REGISTRY BUILT; PLACES OWNER-SCOPE GAP FOUND, HELD FOR REVIEW
+2026-07-31, branch feat/phoenix-final-release-bundle (PR #102, still Draft).
+
+Built the common production adapter registry (buildPhoenixAdapterRegistry,
+src/lib/migration/release/adapters/registry.ts): one factory wiring all six
+proven vertical slices (Users/Places/Offers/Routes/Events/Articles) to real
+production dependencies, used identically for LOCAL/DEV/PROD, fail-closed on
+missing/duplicate adapters and phase-order mismatches. Wired it into
+scripts/migration-phoenix-release.ts's --apply/--rerun (previously a stub).
+Bound the Articles manifest phase to READY with its already-proven
+26-record scope artifact — the vertical slice was complete but the manifest
+still carried its original narrative-only BLOCKED entry with 0 records.
+
+New scripts/phoenix-full-bundle-clean-run.ts runs all six phases together
+against a disposable schema — the first check exercising cross-entity
+dependency resolution end-to-end rather than one entity in isolation. It
+immediately found and let us fix a real bug (per-entity MigrationSource
+rows broke cross-entity lineage lookups; now one shared MigrationSource for
+the bundle), then surfaced a genuine scope gap, not a bug: 15 of the 78
+approved Places (cascading to 20 of 63 Offers) are owned by a legacy
+WordPress user outside the frozen 559-user Phoenix scope. Traced to three
+distinct, already-known identities (see
+docs/migration/phoenix-places-owner-scope-gap-2026-07-31.md for the full
+breakdown): user:1 is the pre-existing target ADMIN, never migrated by
+design; user:43 is one of the 5 founder-excluded Users records; user:129 is
+one of the already-complete "manual/privileged 14" Users track (checklist
+line 90) with its own resolved 9-Place ownership. Per explicit instruction,
+this is a product-scope decision, not one the agent resolves unilaterally —
+held for founder review, manifest untouched, no exclusion/expansion applied.
+
+All Phoenix release/adapter tests, tsc --noEmit, and targeted ESLint pass
+clean. Pushed. Full disposable clean-run and full rerun still pending on
+this decision; cumulative adversarial review and PR #102 body update not
+yet done.
+
+Next single action: founder decision on the Places owner-scope gap (exclude
+the 35 affected records vs. wire user:1/user:129 as resolvable dependencies
+vs. other), per the three options in
+docs/migration/phoenix-places-owner-scope-gap-2026-07-31.md.
+```

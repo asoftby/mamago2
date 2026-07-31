@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-events-dev-release-scope-2026-07-31",
+  "entity": "events",
+  "sourceCaptureTimestamp": "2026-07-31T15:41:14.176Z",
+  "canonicalization": "wordpress-db-domain-v2 (src/lib/migration/adapters/wordpress-db/canonicalSourceHash.ts)",
+  "total": 8,
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:events:56062",
+      "sourceHash": "wordpress-db-domain-v2:bc5dbf214c86a91fb316154d5adde03f224ea113ab7ce575992eedd149e530fc",
+      "sourceUpdatedAt": "2026-07-19 14:18:12"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:56226",
+      "sourceHash": "wordpress-db-domain-v2:59a6a23ac20b844e2360c38bf5d961c0baee123bb8d32fd40bb6dea1f4fb9273",
+      "sourceUpdatedAt": "2026-07-19 14:07:23"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:56479",
+      "sourceHash": "wordpress-db-domain-v2:234eda79c2fb346b12382764959d727412dfa6182b06a1220e123542d7872326",
+      "sourceUpdatedAt": "2026-07-27 15:24:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:60404",
+      "sourceHash": "wordpress-db-domain-v2:21d68f259795d743febc1d86fb3c2e980eb042b20011ada62c15c93a72a26b15",
+      "sourceUpdatedAt": "2026-01-19 00:16:48"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:62977",
+      "sourceHash": "wordpress-db-domain-v2:a0d75e82196f5a747fc086c1abde1ef75e6edc5bba905bcdbe683b48eaa8fb47",
+      "sourceUpdatedAt": "2026-02-26 13:23:23"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:63510",
+      "sourceHash": "wordpress-db-domain-v2:aa45d6021a95fb831afebf27321ef751a44df1a84ddf71ab1a3755c1b95e4a69",
+      "sourceUpdatedAt": "2026-03-20 09:10:56"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:64251",
+      "sourceHash": "wordpress-db-domain-v2:7c343941eb008a19001be97ada4913ec5faeb84069dd390df47e9847f96e2829",
+      "sourceUpdatedAt": "2026-05-20 13:18:49"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:events:64505",
+      "sourceHash": "wordpress-db-domain-v2:5a0828b3e1893ec0935be2d1915dbd16278b4b1163dbc9085b809c6fd9892b6d",
+      "sourceUpdatedAt": "2026-07-17 17:21:17"
+    }
+  ],
+  "privateArtifact": {
+    "path": "events/capture.json",
+    "sha256": "1ae318559c10727e3d7fc315ea3be69c4e0e3506f97220e8a55979607af83840",
+    "transferRequirement": "Never committed; raw content lives only at this immutable local path (mode 0600). Any transfer to another machine/session must use an out-of-band secure channel and must not be pasted into chat or logs."
+  }
+}
