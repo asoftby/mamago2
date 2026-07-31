@@ -93,13 +93,14 @@ export function buildMysqlClientConfig(
 
 /** The remote shell script text for a single already-fully-substituted SQL statement. Contains no secrets. */
 export function buildRemoteScript(sql: string): string {
+  const encodedSql = Buffer.from(sql, "utf8").toString("base64");
   return [
     "set -euo pipefail",
     "umask 177",
     'CNF="$(mktemp)"',
     'trap \'rm -f "$CNF"\' EXIT',
     'cat > "$CNF"',
-    `mysql --defaults-extra-file="$CNF" -e "${sql.replace(/"/g, '\\"')}"`,
+    `printf '%s' '${encodedSql}' | base64 --decode | mysql --defaults-extra-file="$CNF"`,
   ].join("\n");
 }
 

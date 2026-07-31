@@ -2832,6 +2832,18 @@
           "sha256": "e1dda8fd86dfe8df98e6ab4fe1e495f19a53579581aaae9401c8840aaf62dadf",
           "executable": false,
           "description": "Frozen reviewed local target state with lineage."
+        },
+        {
+          "path": "docs/migration/manifests/phoenix-offers-hash-transition-v1.json",
+          "sha256": "eb761fde3b707b8b29a5017833f0f6bc3230ccc1d77561c3929649f21c5f3ac8",
+          "executable": false,
+          "description": "Versioned OfferDomainHashV2 and execution-policy separation contract; plan/test only."
+        },
+        {
+          "path": "docs/migration/manifests/phoenix-offers-domain-hash-v2-audit-2026-07-31.json",
+          "sha256": "4e38481d5274f0d132b70d522af26971fff6979933dc9ed4dd355c45a46bd933",
+          "executable": false,
+          "description": "Non-PII LOCAL read-only field reconciliation for the exact unified 63-key scope."
         }
       ],
       "records": [
@@ -3095,7 +3107,8 @@
       "prerequisites": [
         "Per-record stable Place, owner, business and city logical dependency map."
       ],
-      "blocker": "The frozen Offer artifact contains LOCAL target IDs and is not a live-source executable context artifact."
+      "blocker": "OfferDomainHashV2 audit found 63 multi-field conflicts; per-record executable dispositions and supported update writers remain unapproved.",
+      "blockerCode": "OFFERS_DOMAIN_HASH_TRANSITION_PENDING_DISPOSITIONS"
     },
     {
       "name": "routes",
