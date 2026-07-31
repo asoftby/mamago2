@@ -97,7 +97,9 @@ async function main(): Promise<void> {
           records: phase.records,
           protectedSourceRecordKeys: phase.protectedSourceRecordKeys,
           excludedSourceRecordKeys: phase.excludedSourceRecordKeys,
+          exclusionReasons: phase.exclusionReasons ?? {},
           blocker: phase.blocker ?? null,
+          blockerCode: phase.blockerCode ?? null,
         };
       }),
     };

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { USERS_UNRESOLVED_SOURCE_RECORD_KEYS } from "../src/lib/migration/release/knownBlockers";
+import { USERS_UNRESOLVED_SOURCE_RECORD_KEYS, assertExactExclusionSet } from "../src/lib/migration/release/knownBlockers";
 
 const output = "docs/migration/releases/phoenix-approved-2026-07-30.json";
 const placesPath = "docs/migration/manifests/places-preview-2026-07-30.json";
@@ -8,6 +8,7 @@ const offersPath = "docs/migration/manifests/offers-local-manifest-2026-07-30.js
 const usersPath = "docs/migration/users-production-activation-manifest.json";
 const privilegedUsersPath = "docs/migration/users-manual-privileged-14-manifest.json";
 const usersCleanManifestPath = "docs/migration/users-slice5-clean-manifest.json";
+const usersFounderExclusionsPath = "docs/migration/manifests/phoenix-users-founder-exclusions-2026-07-31.json";
 const businessOwnershipBasePath = "docs/migration/manifests/phoenix-business-ownership-base-2026-07-30.json";
 const businessOwnershipOverridesPath = "docs/migration/manifests/phoenix-business-ownership-overrides-2026-07-30.json";
 const redirectsPath = "scripts/data/wp-redirect-map.json";
@@ -26,6 +27,44 @@ const offers = JSON.parse(readFileSync(offersPath, "utf8")) as Array<{
 const placeConflicts = places.candidates
   .filter((record) => record.action === "UPDATE_CONFLICT")
   .map((record) => record.sourceRecordKey);
+
+const usersClean = JSON.parse(readFileSync(usersCleanManifestPath, "utf8")) as {
+  candidateCount: number;
+  entries: Array<{ sourceRecordKey: string; expectedFirstAction: "CREATE" | "SKIP_UNCHANGED" }>;
+};
+if (usersClean.candidateCount !== 564 || usersClean.entries.length !== 564) {
+  throw new Error(`Expected exactly 564 Users clean-manifest entries, found ${usersClean.entries.length}.`);
+}
+
+const usersFounderExclusions = JSON.parse(readFileSync(usersFounderExclusionsPath, "utf8")) as {
+  decisionType: string;
+  excludedSourceRecordKeys: string[];
+  excludedCount: number;
+};
+
+// Fail-closed: the founder decision must exclude exactly the current
+// Users-unresolved set — no more, no fewer, no substitutions. Any drift
+// here (a 6th exclusion snuck in, one of the 5 missing, a typo) throws
+// before the manifest is generated, rather than silently producing a
+// wrong executable scope.
+if (usersFounderExclusions.decisionType !== "EXCLUDE_FROM_FIRST_RELEASE") {
+  throw new Error(`Unexpected founder decision type: ${usersFounderExclusions.decisionType}.`);
+}
+if (usersFounderExclusions.excludedCount !== usersFounderExclusions.excludedSourceRecordKeys.length) {
+  throw new Error("Founder exclusion artifact's excludedCount does not match its own excludedSourceRecordKeys length.");
+}
+assertExactExclusionSet(usersFounderExclusions.excludedSourceRecordKeys, USERS_UNRESOLVED_SOURCE_RECORD_KEYS);
+const founderExcludedSet = new Set(usersFounderExclusions.excludedSourceRecordKeys);
+
+const usersExecutableRecords = usersClean.entries
+  .filter((entry) => !founderExcludedSet.has(entry.sourceRecordKey))
+  .map((entry) => ({ sourceRecordKey: entry.sourceRecordKey, action: entry.expectedFirstAction }));
+if (usersExecutableRecords.length !== 559) {
+  throw new Error(`Expected exactly 559 executable Users records, computed ${usersExecutableRecords.length}.`);
+}
+if (usersExecutableRecords.some((r) => founderExcludedSet.has(r.sourceRecordKey))) {
+  throw new Error("A founder-excluded sourceRecordKey leaked into the executable Users records.");
+}
 
 const businessBase = JSON.parse(readFileSync(businessOwnershipBasePath, "utf8")) as {
   entries: Array<{ sourceRecordKey: string }>;
@@ -58,16 +97,25 @@ const manifest = {
   phases: [
     {
       name: "users",
-      status: "BLOCKED",
+      status: "READY",
       artifacts: [
         {
           path: usersCleanManifestPath,
           sha256: sha256(usersCleanManifestPath),
+          executable: true,
+          description:
+            "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. 559/564 " +
+            "reproduced 2026-07-30 via a bounded read-only WP capture reconciled against approved LOCAL " +
+            "MigrationRecord.normalizedPayload ground truth; the remaining 5 are excluded from this first " +
+            "release (see phoenix-users-founder-exclusions-2026-07-31.json).",
+        },
+        {
+          path: usersFounderExclusionsPath,
+          sha256: sha256(usersFounderExclusionsPath),
           executable: false,
           description:
-            "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. " +
-            "559/564 reproduced 2026-07-30 via a bounded read-only WP capture reconciled against " +
-            "approved LOCAL MigrationRecord.normalizedPayload ground truth; 5 remain unresolved (see blocker).",
+            "Founder-approved EXCLUDE_FROM_FIRST_RELEASE decision for the 5 unresolved sourceRecordKeys " +
+            "(2026-07-31) — temporary release exclusion, not a deletion; tracked as a post-release backlog item.",
         },
         {
           path: usersPath,
@@ -82,24 +130,17 @@ const manifest = {
           description: "Manual privileged-user evidence.",
         },
       ],
-      records: [],
+      records: usersExecutableRecords,
       protectedSourceRecordKeys: [],
-      excludedSourceRecordKeys: [],
+      excludedSourceRecordKeys: [...founderExcludedSet],
+      exclusionReasons: Object.fromEntries([...founderExcludedSet].map((key) => [key, "EXCLUDE_FROM_FIRST_RELEASE"])),
       deterministicConflicts: [],
       mediaPolicy: "NONE",
-      prerequisites: ["Frozen executable user migration scope with sourceRecordKeys and expected actions."],
-      blockerCode: "USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE",
-      blocker:
-        `Semantic reconciliation against approved LOCAL evidence reproduced 559/564 canonicalCandidateHash ` +
-        `entries via one uniform rule (2026-07-30). ${USERS_UNRESOLVED_SOURCE_RECORD_KEYS.length} ` +
-        `sourceRecordKeys remain unresolved: ${USERS_UNRESOLVED_SOURCE_RECORD_KEYS.join(", ")}. Historical ` +
-        `first_name/last_name input for these records is unrecoverable (never persisted as raw payload; no ` +
-        `other committed evidence records it) and no per-user override is permitted. Requires either a ` +
-        `founder-approved accepted-exception decision or discovery of the original historical snapshot.`,
+      prerequisites: ["technicalMigrationCreator logical identity"],
     },
     {
       name: "businesses",
-      status: "BLOCKED",
+      status: "READY",
       artifacts: [
         {
           path: businessOwnershipBasePath,
@@ -120,17 +161,10 @@ const manifest = {
       records: businessRecords,
       protectedSourceRecordKeys: [],
       excludedSourceRecordKeys: [...entangledSet],
+      exclusionReasons: Object.fromEntries([...entangledSet].map((key) => [key, "EXCLUDED_BY_USER_DECISION"])),
       deterministicConflicts: [],
       mediaPolicy: "NONE",
-      prerequisites: [`users phase executable for all ${businessRecords.length} dependent sourceRecordKeys`],
-      blockerCode: "BLOCKED_BY_DEPENDENCY",
-      blocker:
-        `Ownership/role-elevation artifacts are structurally ready (${businessRecords.length} executable ` +
-        `records, both artifacts hash-bound), but every dependent User must exist first — the users phase ` +
-        `remains BLOCKED (USERS_HISTORICAL_NAME_INPUT_UNRECOVERABLE), so this phase cannot execute until ` +
-        `that is resolved. ${entangledSet.size} additional generic-rule candidate(s) ` +
-        `(${[...entangledSet].join(", ")}) are permanently excluded from this phase: they are also among the ` +
-        `5 Users records with no per-user override permitted, so their User dependency can never resolve.`,
+      prerequisites: [`users phase completed for all ${businessRecords.length} dependent sourceRecordKeys`],
     },
     {
       name: "places",
