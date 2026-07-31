@@ -5,10 +5,20 @@ import type { PhoenixExpectedRecord, PhoenixRecordResult } from "../types";
  * Thin Phoenix wrapper for the first Offers release onto a FRESH (clean)
  * target environment. Deliberately depends on an injected interface, not
  * concrete Prisma-backed functions, so tests run entirely on fakes — no DB,
- * no WordPress SSH, no real writes. The real production wiring (constructing
- * `OffersMigrationDependencies` from `OfferDomainHashV2`
- * (`src/lib/migration/commit/offer/offerDomainHash.ts`) plus a `PrismaClient`)
- * is a separate, later step gated on a proven clean-target DEV baseline.
+ * no WordPress SSH, no real writes.
+ *
+ * The planning/runtime-resolution half of `OffersMigrationDependencies`
+ * (`resolveTargetState`, `resolveDependencies`) is now real, Prisma-backed
+ * code — see `offersProductionWiring.ts` — and has been proven read-only
+ * against a live DEV baseline (0 `Offer` rows, 0 `MigrationLineage` rows for
+ * the exact 63 `sourceRecordKey`s). The write path (`createOffersWriter` in
+ * the same file) is structurally implemented too, reusing the proven
+ * `buildOfferCreateDraft` + `OfferCommitWriter` + `MigrationLineageWriter`
+ * pipeline atomically. None of this makes the Offers phase APPLY-ready: it
+ * still has no reproducible `RawOfferSourceRepository`/`loadCandidate`
+ * source for these 63 records (no raw WordPress snapshot exists locally or
+ * in the repo), so a real `CREATE` cannot execute yet — see the manifest's
+ * `OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING` blocker.
  *
  * This is NOT the LOCAL Offers reconciliation/update pipeline
  * (`OfferCommitRunner` + `planOfferHashTransition` in `commit/offer/`) —

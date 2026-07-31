@@ -124,8 +124,19 @@ export interface RawOfferSourceRepository {
   loadNormalizedCandidate(sourceRecordKey: string): NormalizedOfferCandidate;
 }
 
-export interface OffersWriterPrismaClient extends OffersProductionWiringPrismaClient {
-  migrationLineage: OffersProductionWiringPrismaClient["migrationLineage"] & Pick<PrismaClient["migrationLineage"], "create" | "updateMany" | "findUnique" | "findUniqueOrThrow">;
+/**
+ * The narrowest slice either writer needs, available on both a top-level
+ * `PrismaClient` and the interactive-transaction client Prisma passes into
+ * a `$transaction(async (tx) => ...)` callback — both satisfy this
+ * structurally, no cast required.
+ */
+export interface OffersWriteTransactionClient {
+  offer: Pick<PrismaClient["offer"], "create" | "updateMany">;
+  migrationLineage: Pick<PrismaClient["migrationLineage"], "create" | "updateMany" | "findUnique" | "findUniqueOrThrow">;
+}
+
+export interface OffersWriterPrismaClient {
+  $transaction<T>(fn: (tx: OffersWriteTransactionClient) => Promise<T>): Promise<T>;
 }
 
 export function createOffersWriter(
@@ -162,22 +173,28 @@ export function createOffersWriter(
     });
     if (!built.ok) throw new Error(`OFFER_DRAFT_INVALID:${built.reasons.map((reason) => reason.code).join("+")}`);
 
-    const writer = new OfferCommitWriter(prisma);
-    const written = await writer.createOfferFromDraft(built.draft);
-    if (!written.ok) throw new Error(written.errorMessage);
+    // Everything above is pure computation / already-read state; only the
+    // actual Offer + MigrationLineage writes need to be atomic, so the
+    // transaction is opened as late as possible and scoped to exactly one
+    // record — never widened across multiple Offers.
+    return prisma.$transaction(async (tx) => {
+      const writer = new OfferCommitWriter(tx);
+      const written = await writer.createOfferFromDraft(built.draft);
+      if (!written.ok) throw new Error(written.errorMessage);
 
-    const lineageWriter = new MigrationLineageWriter(prisma);
-    await lineageWriter.createLineage({
-      sourceId,
-      sourceEntityType: "offer",
-      sourceStableKey: candidate.sourceRecordKey,
-      sourceRecordKey: candidate.sourceRecordKey,
-      targetType: OFFER_TARGET_TYPE,
-      targetId: written.offerId,
-      targetStableKey: written.offerId,
-      lastSourceHash: candidate.domainHashV2,
+      const lineageWriter = new MigrationLineageWriter(tx);
+      await lineageWriter.createLineage({
+        sourceId,
+        sourceEntityType: "offer",
+        sourceStableKey: candidate.sourceRecordKey,
+        sourceRecordKey: candidate.sourceRecordKey,
+        targetType: OFFER_TARGET_TYPE,
+        targetId: written.offerId,
+        targetStableKey: written.offerId,
+        lastSourceHash: candidate.domainHashV2,
+      });
+
+      return { targetId: written.offerId };
     });
-
-    return { targetId: written.offerId };
   };
 }
