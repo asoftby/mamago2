@@ -52,12 +52,12 @@ function testRealManifestOffersScopeIsSixtyThreeAllCreate(): void {
     offers.records.every((r) => r.action === "CREATE"),
     "every committed Offers record must already be declared CREATE for a fresh target",
   );
-  // Flagging for founder review, not silently fixing: the phase is still
-  // BLOCKED (OFFERS_DOMAIN_HASH_TRANSITION_PENDING_DISPOSITIONS), which
-  // describes the LOCAL hash-transition problem, not this fresh-DEV-target
-  // create-only contract. Unblocking requires a proven clean DEV baseline
-  // (Step 8), which this test suite does not and cannot perform.
+  // A live clean DEV baseline (0 Offer/lineage rows for these 63 keys) has
+  // since been proven, so the phase is BLOCKED for a different, real reason
+  // now: OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING — there is still no
+  // reproducible raw WordPress loadCandidate source for these 63 records.
   assert.equal(offers.status, "BLOCKED");
+  assert.equal(offers.blockerCode, "OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING");
 }
 
 // ---------------------------------------------------------------------------

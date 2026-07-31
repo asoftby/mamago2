@@ -89,6 +89,7 @@
     "test:phoenix-release": "tsx src/lib/migration/release/release.test.ts",
     "test:phoenix-release-users-businesses-adapters": "tsx src/lib/migration/release/adapters/phoenixUsersBusinessesAdapters.test.ts",
     "test:phoenix-release-offers-adapter": "tsx src/lib/migration/release/adapters/offersAdapter.test.ts",
+    "test:phoenix-release-offers-wiring": "tsx src/lib/migration/release/adapters/offersProductionWiring.test.ts",
     "notifications:plan-reminders": "tsx src/server/notifications/jobs/run-plan-event-reminders.ts",
     "notifications:plan-tomorrow-digests": "tsx src/server/notifications/jobs/run-plan-tomorrow-digests.ts",
     "db:backup": "bash scripts/backup-local-db.sh",
