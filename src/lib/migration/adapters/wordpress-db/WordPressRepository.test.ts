@@ -809,6 +809,26 @@ async function testOfferPlaceRelationsQueryQueriesBothDirections() {
   assert.match(relationsCall!.sql, /relation_side/);
 }
 
+async function testOfferPlaceRelationsCoerceMysqlNumericStrings() {
+  const repo = new WordPressRepository(async () => [{
+    post_id: "601",
+    related_post_id: "18886",
+    related_post_type: "places",
+    relation_key: "post-relation-hb-programs",
+    relation_order: "0",
+    relation_side: "parent",
+  }] as never);
+  const rows = await repo.getOfferPlaceRelations([601]);
+  assert.deepEqual(rows.get(601), [{
+    post_id: 601,
+    related_post_id: 18886,
+    related_post_type: "places",
+    relation_key: "post-relation-hb-programs",
+    relation_order: 0,
+    relation_side: "parent",
+  }]);
+}
+
 async function main() {
   await testArticleBundle();
   await testPublishedArticleById();
@@ -836,6 +856,7 @@ async function main() {
   testOfferSourceRecordKeyIsStableAndDistinguishesSourceType();
   await testOfferEmptyOptionalMetaDoesNotThrow();
   await testOfferPlaceRelationsQueryQueriesBothDirections();
+  await testOfferPlaceRelationsCoerceMysqlNumericStrings();
 }
 
 main()

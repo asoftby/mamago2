@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-offers-hash-transition-v1",
+  "entity": "offers",
+  "legacyHashVersion": "offer-commit-v1",
+  "domainHashVersion": "offer-domain-v2",
+  "executionPolicyHashVersion": "offer-execution-policy-v1",
+  "canonicalization": {
+    "implementation": "src/lib/migration/commit/offer/offerDomainHash.ts",
+    "included": [
+      "normalized title, source slug and selected description",
+      "Offer kind and product type",
+      "pricing, age, contacts and SEO domain fields",
+      "DRAFT/NOT_PUBLIC migration lifecycle",
+      "logical Place, owner and Business dependencies",
+      "canonical WordPress attachment sourceRecordKeys",
+      "SHA-256 of source booking settings plus schema variant"
+    ],
+    "excluded": [
+      "LOCAL/DEV/PROD environment",
+      "NONE/METADATA/FULL media execution mode",
+      "binary upload/download decisions",
+      "storage bucket/path and MediaAsset IDs",
+      "environment-specific target IDs and runtime flags"
+    ]
+  },
+  "executionPolicy": {
+    "fields": ["environment", "mediaPolicy", "binaryUploadAllowed", "metadataOnly"],
+    "idempotencyImpact": "NONE"
+  },
+  "allowedDispositions": [
+    "LEGACY_MATCH",
+    "LINEAGE_HASH_TRANSITION",
+    "SAFE_DOMAIN_UPDATE",
+    "CONFLICT",
+    "BLOCKED_INSUFFICIENT_EVIDENCE"
+  ],
+  "lineageOnlyTransitionRequirements": [
+    "exactly one active lineage and exactly one target",
+    "sourceRecordKey and target identity match",
+    "logical Place, owner and Business dependencies reconcile",
+    "every persisted target domain field matches OfferDomainHashV2 payload",
+    "frozen predecessor hash matches current lineage",
+    "CAS updates exactly one lineage row",
+    "Offer row writes are forbidden"
+  ],
+  "writerCapabilities": {
+    "TITLE_WHITESPACE_ONLY": "SUPPORTED_EXISTING",
+    "SLUG_CHANGE": "BLOCKED",
+    "CONTENT_CHANGE": "BLOCKED",
+    "STATUS_VISIBILITY_CHANGE": "BLOCKED",
+    "BUSINESS_DEPENDENCY_CHANGE": "BLOCKED",
+    "PLACE_DEPENDENCY_CHANGE": "BLOCKED",
+    "MEDIA_REFERENCE_CHANGE": "SEPARATE_MEDIA_CONTRACT",
+    "SCHEDULE_CHANGE": "BLOCKED",
+    "SEO_CHANGE": "BLOCKED",
+    "MULTI_FIELD_CHANGE": "BLOCKED"
+  },
+  "writeAuthorization": "PLAN_AND_TEST_ONLY"
+}

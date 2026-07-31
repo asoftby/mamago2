@@ -215,7 +215,12 @@ export class WordPressRepository {
     if (postIds.length === 0) return new Map();
     const { sql, params } = buildOfferPlaceRelationsQuery(postIds);
     const rows = await this.executor<WordPressOfferPlaceRelationRow>(sql, params);
-    return groupByPostId(rows);
+    return groupByPostId(rows.map((row) => ({
+      ...row,
+      post_id: Number(row.post_id),
+      related_post_id: Number(row.related_post_id),
+      relation_order: Number(row.relation_order),
+    })));
   }
 
   private async assemblePostBundles(

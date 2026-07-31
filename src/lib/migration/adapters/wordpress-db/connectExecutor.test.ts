@@ -151,12 +151,17 @@ function testBuildManualFallbackMessageNeverContainsPassword() {
   assert.ok(message.includes(`${TEST_CONFIG.sshUser}@${TEST_CONFIG.sshHost}`));
 }
 
-function testBuildRemoteScriptEscapesEmbeddedQuotes() {
-  const script = buildRemoteScript('SELECT "weird" AS x');
+function testBuildRemoteScriptTransportsSqlWithoutShellEvaluation() {
+  const sql = 'SELECT r.`order`, "weird", \'single\' AS x';
+  const script = buildRemoteScript(sql);
   assert.match(script, /mktemp/);
   assert.match(script, /umask 177/);
   assert.match(script, /trap/);
-  assert.match(script, /mysql --defaults-extra-file="\$CNF" -e "SELECT \\"weird\\" AS x"/);
+  assert.match(script, /base64 --decode \| mysql --defaults-extra-file="\$CNF"/);
+  assert.ok(!script.includes(sql));
+  assert.ok(!script.includes("`order`"));
+  const encoded = script.match(/printf '%s' '([^']+)'/)?.[1];
+  assert.equal(Buffer.from(encoded ?? "", "base64").toString("utf8"), sql);
 }
 
 function testParseTabularRows() {
@@ -356,7 +361,7 @@ async function main() {
   testBuildSshArgsIncludesMultiplexingOptions();
   testControlPathNeverContainsPassword();
   testBuildManualFallbackMessageNeverContainsPassword();
-  testBuildRemoteScriptEscapesEmbeddedQuotes();
+  testBuildRemoteScriptTransportsSqlWithoutShellEvaluation();
   testParseTabularRows();
   testUnescapeMysqlBatchValue();
   testConcatBuffersToUtf8HandlesSplitMultiByteCharacter();
