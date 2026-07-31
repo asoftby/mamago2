@@ -19,9 +19,13 @@ assert.equal(planOfferHashTransition({ lineageCount: 2, targetCount: 1, predeces
 assert.equal(planOfferHashTransition({ lineageCount: 1, targetCount: 1, predecessorMatches: false, targetDomainMatches: true, supportedUpdate: false }), "BLOCKED_INSUFFICIENT_EVIDENCE");
 assert.equal(planOfferHashTransition({ lineageCount: 1, targetCount: 1, predecessorMatches: true, targetDomainMatches: false, supportedUpdate: true }), "SAFE_DOMAIN_UPDATE");
 let lineageCalls = 0; const offerRowWriteCalls = 0;
-assert.deepEqual(await executeLineageHashTransition({ disposition: "LINEAGE_HASH_TRANSITION", sourceRecordKey: candidate.sourceRecordKey, expectedPredecessorHash: "legacy", domainHashV2: "v2", updateLineageCas: async () => { lineageCalls += 1; return { updatedCount: 1 }; } }), { outcome: "LINEAGE_HASH_TRANSITION" });
+const exactEvidence = async () => ({ lineageCount: 1, targetCount: 1, predecessorMatches: true, targetDomainMatches: true });
+assert.deepEqual(await executeLineageHashTransition({ sourceRecordKey: candidate.sourceRecordKey, expectedPredecessorHash: "legacy", domainHashV2: "v2", reconcile: exactEvidence, updateLineageCas: async () => { lineageCalls += 1; return { updatedCount: 1 }; } }), { outcome: "LINEAGE_HASH_TRANSITION" });
 assert.equal(lineageCalls, 1); assert.equal(offerRowWriteCalls, 0);
-assert.deepEqual(await executeLineageHashTransition({ disposition: "LINEAGE_HASH_TRANSITION", sourceRecordKey: candidate.sourceRecordKey, expectedPredecessorHash: "stale", domainHashV2: "v2", updateLineageCas: async () => ({ updatedCount: 0 }) }), { outcome: "FAILED", reasonCode: "PREDECESSOR_CAS_FAILED" });
+assert.deepEqual(await executeLineageHashTransition({ sourceRecordKey: candidate.sourceRecordKey, expectedPredecessorHash: "stale", domainHashV2: "v2", reconcile: exactEvidence, updateLineageCas: async () => ({ updatedCount: 0 }) }), { outcome: "FAILED", reasonCode: "PREDECESSOR_CAS_FAILED" });
+assert.deepEqual(await executeLineageHashTransition({ sourceRecordKey: candidate.sourceRecordKey, expectedPredecessorHash: "legacy", domainHashV2: "v2", reconcile: async () => ({ lineageCount: 2, targetCount: 1, predecessorMatches: true, targetDomainMatches: true }), updateLineageCas: async () => { lineageCalls += 1; return { updatedCount: 1 }; } }), { outcome: "FAILED", reasonCode: "RECONCILIATION_CONFLICT" });
+assert.deepEqual(await executeLineageHashTransition({ sourceRecordKey: candidate.sourceRecordKey, expectedPredecessorHash: "legacy", domainHashV2: "v2", reconcile: async () => ({ lineageCount: 1, targetCount: 1, predecessorMatches: true, targetDomainMatches: false }), updateLineageCas: async () => { lineageCalls += 1; return { updatedCount: 1 }; } }), { outcome: "FAILED", reasonCode: "RECONCILIATION_CONFLICT" });
+assert.equal(lineageCalls, 1);
 console.log("offerDomainHash tests: OK");
 }
 void main();

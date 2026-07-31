@@ -82,13 +82,15 @@ export function planOfferHashTransition(input: { lineageCount: number; targetCou
 }
 
 export async function executeLineageHashTransition(input: {
-  disposition: OfferHashTransitionDisposition;
   sourceRecordKey: string;
   expectedPredecessorHash: string;
   domainHashV2: string;
+  reconcile: () => Promise<{ lineageCount: number; targetCount: number; predecessorMatches: boolean; targetDomainMatches: boolean }>;
   updateLineageCas: (value: { sourceRecordKey: string; expectedPredecessorHash: string; domainHashV2: string }) => Promise<{ updatedCount: number }>;
 }): Promise<{ outcome: "LINEAGE_HASH_TRANSITION" | "FAILED"; reasonCode?: string }> {
-  if (input.disposition !== "LINEAGE_HASH_TRANSITION") return { outcome: "FAILED", reasonCode: "DISPOSITION_NOT_LINEAGE_TRANSITION" };
+  const evidence = await input.reconcile();
+  const disposition = planOfferHashTransition({ ...evidence, supportedUpdate: false });
+  if (disposition !== "LINEAGE_HASH_TRANSITION") return { outcome: "FAILED", reasonCode: `RECONCILIATION_${disposition}` };
   const result = await input.updateLineageCas({ sourceRecordKey: input.sourceRecordKey, expectedPredecessorHash: input.expectedPredecessorHash, domainHashV2: input.domainHashV2 });
   return result.updatedCount === 1 ? { outcome: "LINEAGE_HASH_TRANSITION" } : { outcome: "FAILED", reasonCode: "PREDECESSOR_CAS_FAILED" };
 }
