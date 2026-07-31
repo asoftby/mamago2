@@ -8,6 +8,7 @@ import { loadPhoenixReleaseManifest, parsePhoenixReleaseManifest, verifyArtifact
 import type { PhoenixEnvironmentContext, PhoenixPhaseReport, PhoenixReleaseManifest, PhoenixReleasePhase } from "../types";
 import { UsersPhaseExecutor, type UsersMigrationDependencies } from "./usersAdapter";
 import { BusinessOwnershipPhaseExecutor, type BusinessOwnershipDependencies, type BusinessOwnershipOverride } from "./businessOwnershipAdapter";
+import { USERS_UNRESOLVED_SOURCE_RECORD_KEYS, assertExactExclusionSet } from "../knownBlockers";
 
 const environment: PhoenixEnvironmentContext = {
   environment: "LOCAL",
@@ -41,6 +42,129 @@ function testOwnershipArtifactsExactScope(): void {
   const baseKeys = new Set(base.entries.map((e: { sourceRecordKey: string }) => e.sourceRecordKey));
   assert(!baseKeys.has("wordpress-db:user:89"), "override users must not appear in the generic base rule");
   assert(!baseKeys.has("wordpress-db:user:130"), "override users must not appear in the generic base rule");
+}
+
+// ---------------------------------------------------------------------------
+// Founder-approved first-release exclusion set (fail-closed)
+// ---------------------------------------------------------------------------
+
+function testAssertExactExclusionSetAcceptsTheRealFive(): void {
+  assertExactExclusionSet(
+    [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS],
+    USERS_UNRESOLVED_SOURCE_RECORD_KEYS,
+  ); // must not throw
+}
+
+function testAssertExactExclusionSetRejectsMissingKey(): void {
+  const missingOne = USERS_UNRESOLVED_SOURCE_RECORD_KEYS.slice(0, 4);
+  assert.throws(
+    () => assertExactExclusionSet(missingOne, USERS_UNRESOLVED_SOURCE_RECORD_KEYS),
+    /EXCLUSION_COUNT_MISMATCH/,
+  );
+}
+
+function testAssertExactExclusionSetRejectsExtraKey(): void {
+  const extra = [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS, "wordpress-db:user:999"];
+  assert.throws(
+    () => assertExactExclusionSet(extra, USERS_UNRESOLVED_SOURCE_RECORD_KEYS),
+    /EXCLUSION_COUNT_MISMATCH/,
+  );
+}
+
+function testAssertExactExclusionSetRejectsSubstitutedKey(): void {
+  const substituted = [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS.slice(0, 4), "wordpress-db:user:999"];
+  assert.throws(
+    () => assertExactExclusionSet(substituted, USERS_UNRESOLVED_SOURCE_RECORD_KEYS),
+    /UNKNOWN_EXCLUSION_KEY/,
+  );
+}
+
+function testAssertExactExclusionSetRejectsDuplicate(): void {
+  const withDuplicate = [...USERS_UNRESOLVED_SOURCE_RECORD_KEYS, USERS_UNRESOLVED_SOURCE_RECORD_KEYS[0]];
+  assert.throws(
+    () => assertExactExclusionSet(withDuplicate, USERS_UNRESOLVED_SOURCE_RECORD_KEYS),
+    /DUPLICATE_EXCLUSION/,
+  );
+}
+
+function testFounderExclusionArtifactRealFileNoPii(): void {
+  const raw = readFileSync("docs/migration/manifests/phoenix-users-founder-exclusions-2026-07-31.json", "utf8");
+  const artifact = JSON.parse(raw) as {
+    decisionType: string;
+    approvedBy: string;
+    excludedCount: number;
+    excludedSourceRecordKeys: string[];
+  };
+  assert.equal(artifact.decisionType, "EXCLUDE_FROM_FIRST_RELEASE");
+  assert.equal(artifact.approvedBy, "FOUNDER");
+  assert.equal(artifact.excludedCount, 5);
+  assertExactExclusionSet(artifact.excludedSourceRecordKeys, USERS_UNRESOLVED_SOURCE_RECORD_KEYS);
+  assert(!/@/.test(raw), "founder exclusion artifact must contain no email addresses");
+  for (const field of ["email", "firstName", "lastName", "displayName"]) {
+    assert(!raw.toLowerCase().includes(field.toLowerCase()), `founder exclusion artifact must not reference ${field}`);
+  }
+}
+
+function testRealManifestUsersReadyWithExclusions(): void {
+  const manifestPath = "docs/migration/releases/phoenix-approved-2026-07-30.json";
+  const { manifest } = loadPhoenixReleaseManifest(manifestPath);
+  const users = manifest.phases.find((p) => p.name === "users")!;
+  assert.equal(users.status, "READY");
+  assert.equal(users.blocker, undefined, "READY phase must carry no leftover blocker");
+  assert.equal(users.records.length, 559);
+  assert.equal(users.excludedSourceRecordKeys.length, 5);
+  assertExactExclusionSet(users.excludedSourceRecordKeys, USERS_UNRESOLVED_SOURCE_RECORD_KEYS);
+  for (const key of USERS_UNRESOLVED_SOURCE_RECORD_KEYS) {
+    assert.equal(users.exclusionReasons?.[key], "EXCLUDE_FROM_FIRST_RELEASE");
+    assert(!users.records.some((r) => r.sourceRecordKey === key), `${key} must not be executable`);
+  }
+}
+
+function testRealManifestBusinessesReadyWithExclusionReason(): void {
+  const manifestPath = "docs/migration/releases/phoenix-approved-2026-07-30.json";
+  const { manifest } = loadPhoenixReleaseManifest(manifestPath);
+  const businesses = manifest.phases.find((p) => p.name === "businesses")!;
+  assert.equal(businesses.status, "READY");
+  assert.equal(businesses.blocker, undefined, "READY phase must carry no leftover blocker");
+  assert.equal(businesses.records.length, 37);
+  assert.equal(businesses.exclusionReasons?.["wordpress-db:user:43"], "EXCLUDED_BY_USER_DECISION");
+}
+
+async function testSequentialApplyOverRealScopeNeverAttemptsExcludedRecords(): Promise<void> {
+  const manifestPath = "docs/migration/releases/phoenix-approved-2026-07-30.json";
+  const { manifest, manifestHash } = loadPhoenixReleaseManifest(manifestPath);
+  const users = manifest.phases.find((p) => p.name === "users")!;
+  const businesses = manifest.phases.find((p) => p.name === "businesses")!;
+  const subManifest: PhoenixReleaseManifest = {
+    schemaVersion: 1,
+    releaseId: manifest.releaseId,
+    phaseOrder: ["users", "businesses"],
+    phases: [users, businesses],
+  };
+  const attempted: string[] = [];
+  const fakeAdapter = new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey, action) => {
+      attempted.push(sourceRecordKey);
+      return { sourceRecordKey, action, outcome: "CREATED" };
+    },
+  });
+  const reports: PhoenixPhaseReport[] = [];
+  const result = await runPhoenixRelease({
+    manifest: subManifest,
+    manifestPath,
+    manifestHash,
+    environment,
+    codeSha: "fixture-sha",
+    adapters: { users: fakeAdapter, businesses: fakeAdapter },
+    reportStore: { append: async (report) => void reports.push(report) },
+    mode: "APPLY",
+  });
+  assert.equal(result.length, 2, "both users and businesses phases must complete");
+  assert.equal(attempted.length, 559 + 37, "exactly the executable scope, no more, no less");
+  for (const key of USERS_UNRESOLVED_SOURCE_RECORD_KEYS) {
+    assert(!attempted.includes(key), `excluded ${key} must never be passed to an executor`);
+  }
+  assert(!attempted.includes("wordpress-db:user:43"), "user:43 must never be attempted in the businesses phase");
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +467,15 @@ async function testActivationEmailGateBlocksPhoenixEnvironment(): Promise<void> 
 
 async function main(): Promise<void> {
   testOwnershipArtifactsExactScope();
+  testAssertExactExclusionSetAcceptsTheRealFive();
+  testAssertExactExclusionSetRejectsMissingKey();
+  testAssertExactExclusionSetRejectsExtraKey();
+  testAssertExactExclusionSetRejectsSubstitutedKey();
+  testAssertExactExclusionSetRejectsDuplicate();
+  testFounderExclusionArtifactRealFileNoPii();
+  testRealManifestUsersReadyWithExclusions();
+  testRealManifestBusinessesReadyWithExclusionReason();
+  await testSequentialApplyOverRealScopeNeverAttemptsExcludedRecords();
   testBusinessesPhaseExcludesUserEntangledWithUnresolvedUsers();
   testManifestRejectsStaleBlockerOnReadyPhase();
   testCommittedManifestArtifactHashesVerify();

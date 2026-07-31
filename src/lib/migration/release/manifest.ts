@@ -57,6 +57,13 @@ function validatePhase(phase: PhoenixReleasePhase, sourcePath: string): void {
   if (phase.status !== "BLOCKED" && (phase.blocker || phase.blockerCode)) {
     throw new Error(`${sourcePath}: ${phase.name} is ${phase.status} but still carries a stale blocker/blockerCode.`);
   }
+  if (phase.exclusionReasons) {
+    const excluded = new Set(phase.excludedSourceRecordKeys);
+    const unknownKey = Object.keys(phase.exclusionReasons).find((key) => !excluded.has(key));
+    if (unknownKey) {
+      throw new Error(`${sourcePath}: ${phase.name}.exclusionReasons references ${unknownKey}, which is not in excludedSourceRecordKeys.`);
+    }
+  }
 }
 
 export function loadPhoenixReleaseManifest(path: string): {

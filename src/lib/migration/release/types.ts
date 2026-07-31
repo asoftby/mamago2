@@ -40,6 +40,14 @@ export interface PhoenixReleasePhase {
    * `blocker` string; never a substitute for it.
    */
   blockerCode?: string;
+  /**
+   * Per-record reason code for entries in `excludedSourceRecordKeys`
+   * (e.g. `EXCLUDE_FROM_FIRST_RELEASE`, `EXCLUDED_BY_USER_DECISION`).
+   * Orthogonal to `blocker`/`blockerCode` — a phase can be `READY` while
+   * still carrying documented, founder-approved per-record exclusions.
+   * Every key must also appear in `excludedSourceRecordKeys`.
+   */
+  exclusionReasons?: Record<string, string>;
 }
 
 export interface PhoenixReleaseManifest {
