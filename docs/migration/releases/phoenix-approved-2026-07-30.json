@@ -3103,12 +3103,15 @@
       "protectedSourceRecordKeys": [],
       "excludedSourceRecordKeys": [],
       "deterministicConflicts": [],
-      "mediaPolicy": "NONE",
+      "mediaPolicy": "METADATA",
       "prerequisites": [
+        "Users phase READY.",
+        "Businesses phase READY.",
+        "Places phase READY.",
         "Per-record stable Place, owner, business and city logical dependency map."
       ],
-      "blocker": "OfferDomainHashV2 audit found 63 multi-field conflicts; per-record executable dispositions and supported update writers remain unapproved.",
-      "blockerCode": "OFFERS_DOMAIN_HASH_TRANSITION_PENDING_DISPOSITIONS"
+      "blocker": "The fresh-DEV-target create-only planning/dependency-resolution wiring (src/lib/migration/release/adapters/offersAdapter.ts, offersProductionWiring.ts) is proven against a live clean DEV baseline (0 Offer rows, 0 MigrationLineage rows for the exact 63 sourceRecordKeys). The write path still has no reproducible raw WordPress loadCandidate source for these 63 records — no committed or locally captured raw snapshot exists (unlike Users/Articles/Activities) — so the phase cannot actually execute a real CREATE yet. The prior OFFERS_DOMAIN_HASH_TRANSITION_PENDING_DISPOSITIONS blocker described a different, LOCAL-only reconciliation problem (63 already-migrated LOCAL Offer rows conflicting with OfferDomainHashV2) that is out of scope for this clean DEV target and remains separate historical evidence.",
+      "blockerCode": "OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING"
     },
     {
       "name": "routes",
