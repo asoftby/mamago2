@@ -67,8 +67,58 @@ async function queryDatabaseFingerprint(databaseUrl: string): Promise<{ currentD
   }
 }
 
-function codeSha(): string {
-  return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const CODE_SHA_PATTERN = /^[0-9a-f]{40}$/;
+const BAKED_CODE_SHA_PATH = "/app/.phoenix-code-sha";
+
+function assertValidCodeSha(value: string, source: string): string {
+  if (!CODE_SHA_PATTERN.test(value)) {
+    throw new Error(`CODE_SHA_INVALID: ${source} did not produce exactly 40 lowercase hexadecimal characters.`);
+  }
+  return value;
+}
+
+export interface ResolveCodeShaDeps {
+  readBakedFile?: () => string;
+  gitRevParseHead?: () => string;
+}
+
+/**
+ * The `phoenix-migrate` image has no Git binary and no `.git` directory
+ * (see Dockerfile), so `git rev-parse HEAD` always fails there with
+ * `spawnSync git ENOENT`. That image instead bakes the approved commit SHA
+ * into `/app/.phoenix-code-sha` at build time (`--build-arg
+ * PHOENIX_CODE_SHA=<sha>`). Git remains the source of truth for ordinary
+ * local execution from a real checkout, where the baked file doesn't exist.
+ */
+export function resolveCodeSha(deps: ResolveCodeShaDeps = {}): string {
+  const readBakedFile = deps.readBakedFile ?? (() => readFileSync(BAKED_CODE_SHA_PATH, "utf8"));
+  const gitRevParseHead =
+    deps.gitRevParseHead ?? (() => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim());
+
+  let baked: string | undefined;
+  try {
+    baked = readBakedFile();
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code !== "ENOENT") {
+      throw new Error(`CODE_SHA_BAKED_FILE_UNREADABLE: could not read baked code-SHA file (${code ?? "unknown error"}).`);
+    }
+    baked = undefined;
+  }
+
+  if (baked !== undefined) {
+    return assertValidCodeSha(baked.trim(), "baked code-SHA file");
+  }
+
+  let gitOutput: string;
+  try {
+    gitOutput = gitRevParseHead();
+  } catch {
+    throw new Error(
+      "CODE_SHA_UNAVAILABLE: no baked code-SHA file and `git rev-parse HEAD` failed — code identity could not be established.",
+    );
+  }
+  return assertValidCodeSha(gitOutput.trim(), "git rev-parse HEAD");
 }
 
 async function main(): Promise<void> {
@@ -89,7 +139,7 @@ async function main(): Promise<void> {
       releaseId: manifest.releaseId,
       manifestPath: args.manifestPath,
       manifestHash,
-      codeSha: codeSha(),
+      codeSha: resolveCodeSha(),
       environment,
       phases: manifest.phaseOrder.map((name) => {
         const phase = manifest.phases.find((item) => item.name === name)!;
@@ -147,7 +197,7 @@ async function main(): Promise<void> {
       manifestHash,
       environment,
       mode: args.mode,
-      codeSha: codeSha(),
+      codeSha: resolveCodeSha(),
       adapters,
       reportStore,
       resumeFrom: args.resumeFrom,

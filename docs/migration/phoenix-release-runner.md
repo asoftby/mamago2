@@ -40,6 +40,36 @@ also verifies the URL database name against `current_database()`.
 Activation delivery must remain disabled during content migration.
 Non-production indexing must remain disabled.
 
+## Container builds
+
+The runner calls `git rev-parse HEAD` to stamp every plan/apply/rerun report
+with the exact code SHA that produced it. Git and `.git` are intentionally
+absent from the migration image, so that call would fail there.
+
+Migration/Phoenix images must be built from the dedicated `phoenix-migrate`
+Dockerfile stage, not `builder`:
+
+```bash
+docker buildx build \
+  --target phoenix-migrate \
+  --build-arg PHOENIX_CODE_SHA=<exact commit sha> \
+  --tag mamago2-migrate:phoenix-<short-sha> \
+  .
+```
+
+`PHOENIX_CODE_SHA` must be the exact 40-character lowercase hexadecimal commit
+SHA the image was built from; the build fails otherwise. That value is baked
+into `/app/.phoenix-code-sha` (read-only) inside the image and also set as the
+`org.opencontainers.image.revision` OCI label — it is not exposed through a
+mutable runtime environment variable.
+
+At runtime, `resolveCodeSha()` (`scripts/migration-phoenix-release.ts`) prefers
+`/app/.phoenix-code-sha` when present, and only falls back to
+`git rev-parse HEAD` when that file is absent — which is what happens during
+ordinary local execution from a real checkout. If the baked file exists but is
+empty, malformed, or unreadable for a reason other than "file does not exist",
+resolution fails closed and does not fall back to Git.
+
 ## Current approved release
 
 The committed manifest is generated from already-approved artifacts:

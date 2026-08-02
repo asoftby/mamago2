@@ -1,0 +1,223 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { resolveCodeSha } from "./migration-phoenix-release";
+
+const VALID_SHA = "559240d77b36bada507318a35ffaf3ad442056de";
+const OTHER_VALID_SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
+
+function enoent(): never {
+  const error = new Error("ENOENT: no such file or directory") as NodeJS.ErrnoException;
+  error.code = "ENOENT";
+  throw error;
+}
+
+function eacces(): never {
+  const error = new Error("EACCES: permission denied") as NodeJS.ErrnoException;
+  error.code = "EACCES";
+  throw error;
+}
+
+function testValidBakedShaIsReturned() {
+  const result = resolveCodeSha({
+    readBakedFile: () => `${VALID_SHA}\n`,
+    gitRevParseHead: () => {
+      throw new Error("git must not be invoked when the baked file exists");
+    },
+  });
+  assert.equal(result, VALID_SHA);
+}
+
+function testGitNotInvokedWhenBakedFileExists() {
+  let gitCalled = false;
+  const result = resolveCodeSha({
+    readBakedFile: () => OTHER_VALID_SHA,
+    gitRevParseHead: () => {
+      gitCalled = true;
+      return VALID_SHA;
+    },
+  });
+  assert.equal(result, OTHER_VALID_SHA);
+  assert.equal(gitCalled, false);
+}
+
+function testMissingBakedFileFallsBackToValidGitSha() {
+  const result = resolveCodeSha({
+    readBakedFile: enoent,
+    gitRevParseHead: () => `${VALID_SHA}\n`,
+  });
+  assert.equal(result, VALID_SHA);
+}
+
+function testMalformedBakedShaFailsClosedWithoutGitFallback() {
+  let gitCalled = false;
+  assert.throws(
+    () =>
+      resolveCodeSha({
+        readBakedFile: () => "not-a-real-sha",
+        gitRevParseHead: () => {
+          gitCalled = true;
+          return VALID_SHA;
+        },
+      }),
+    /CODE_SHA_INVALID/,
+  );
+  assert.equal(gitCalled, false);
+}
+
+function testEmptyBakedShaFailsClosedWithoutGitFallback() {
+  let gitCalled = false;
+  assert.throws(
+    () =>
+      resolveCodeSha({
+        readBakedFile: () => "\n",
+        gitRevParseHead: () => {
+          gitCalled = true;
+          return VALID_SHA;
+        },
+      }),
+    /CODE_SHA_INVALID/,
+  );
+  assert.equal(gitCalled, false);
+}
+
+function testUnreadableBakedFileFailsClosedWithoutGitFallback() {
+  let gitCalled = false;
+  assert.throws(
+    () =>
+      resolveCodeSha({
+        readBakedFile: eacces,
+        gitRevParseHead: () => {
+          gitCalled = true;
+          return VALID_SHA;
+        },
+      }),
+    /CODE_SHA_BAKED_FILE_UNREADABLE/,
+  );
+  assert.equal(gitCalled, false);
+}
+
+function testMalformedGitOutputFails() {
+  assert.throws(
+    () =>
+      resolveCodeSha({
+        readBakedFile: enoent,
+        gitRevParseHead: () => "not-a-sha",
+      }),
+    /CODE_SHA_INVALID/,
+  );
+}
+
+function testNeitherSourceAvailableProducesClearFailure() {
+  assert.throws(
+    () =>
+      resolveCodeSha({
+        readBakedFile: enoent,
+        gitRevParseHead: () => {
+          throw new Error("spawnSync git ENOENT");
+        },
+      }),
+    /CODE_SHA_UNAVAILABLE/,
+  );
+}
+
+interface DockerfileStage {
+  name: string;
+  base: string;
+  body: string;
+}
+
+function readDockerfile(): string {
+  const dockerfilePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "Dockerfile");
+  return readFileSync(dockerfilePath, "utf8");
+}
+
+/** Splits a Dockerfile into named stages by its `FROM <base> [AS <name>]` lines. */
+function parseDockerfileStages(dockerfile: string): DockerfileStage[] {
+  const lines = dockerfile.split("\n");
+  const fromPattern = /^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/i;
+  const stages: DockerfileStage[] = [];
+  let current: { name: string; base: string; startIndex: number } | null = null;
+
+  lines.forEach((line, index) => {
+    const match = fromPattern.exec(line);
+    if (!match) return;
+    if (current) {
+      stages.push({ name: current.name, base: current.base, body: lines.slice(current.startIndex + 1, index).join("\n") });
+    }
+    current = { name: match[2] ?? match[1], base: match[1], startIndex: index };
+  });
+  if (current) {
+    stages.push({ name: current.name, base: current.base, body: lines.slice(current.startIndex + 1).join("\n") });
+  }
+  return stages;
+}
+
+function assertNoGit(stage: DockerfileStage) {
+  assert.doesNotMatch(stage.body, /apk add[^\n]*\bgit\b/i, `${stage.name} must not install git`);
+  assert.doesNotMatch(stage.body, /apt-get install[^\n]*\bgit\b/i, `${stage.name} must not install git`);
+  assert.doesNotMatch(stage.body, /COPY[^\n]*\.git\b/, `${stage.name} must not copy .git`);
+}
+
+function testDockerfileStageGraphAndBakedShaContract() {
+  const stages = parseDockerfileStages(readDockerfile());
+  const byName = new Map(stages.map((stage) => [stage.name, stage]));
+
+  const workspace = byName.get("workspace");
+  assert.ok(workspace, "Dockerfile must declare a `workspace` stage");
+
+  const builder = byName.get("builder");
+  assert.ok(builder, "Dockerfile must declare a `builder` stage");
+  assert.equal(builder!.base, "workspace", "`builder` must inherit from `workspace`");
+
+  const phoenixMigrate = byName.get("phoenix-migrate");
+  assert.ok(phoenixMigrate, "Dockerfile must declare a `phoenix-migrate` stage");
+  assert.equal(phoenixMigrate!.base, "workspace", "`phoenix-migrate` must inherit from `workspace`");
+  assert.notEqual(phoenixMigrate!.base, "builder", "`phoenix-migrate` must not inherit from `builder`");
+
+  const runner = byName.get("runner");
+  assert.ok(runner, "Dockerfile must declare a `runner` stage");
+  assert.match(runner!.body, /COPY --from=builder/, "`runner` must keep copying from `builder`");
+
+  for (const stage of stages) {
+    if (stage.name === "builder") {
+      assert.match(stage.body, /pnpm build:ci/, "`builder` must still run `pnpm build:ci`");
+    } else {
+      assert.doesNotMatch(stage.body, /pnpm build:ci/, `${stage.name} must not run pnpm build:ci`);
+      assert.doesNotMatch(stage.body, /next build/, `${stage.name} must not run next build`);
+    }
+    assertNoGit(stage);
+  }
+
+  assert.doesNotMatch(
+    phoenixMigrate!.body,
+    /fonts\.googleapis\.com|fonts\.gstatic\.com/,
+    "`phoenix-migrate` must not depend on Google Fonts",
+  );
+
+  assert.ok(phoenixMigrate!.body.includes("ARG PHOENIX_CODE_SHA"));
+  assert.ok(phoenixMigrate!.body.includes("[0-9a-f]{40}"), "baked SHA must be validated as exact 40 lowercase hex chars");
+  assert.ok(phoenixMigrate!.body.includes("/app/.phoenix-code-sha"));
+  assert.ok(phoenixMigrate!.body.includes("chmod 0444"));
+  assert.ok(
+    phoenixMigrate!.body.includes("org.opencontainers.image.revision=$PHOENIX_CODE_SHA"),
+    "OCI revision label must come from the validated build argument",
+  );
+}
+
+function main() {
+  testValidBakedShaIsReturned();
+  testGitNotInvokedWhenBakedFileExists();
+  testMissingBakedFileFallsBackToValidGitSha();
+  testMalformedBakedShaFailsClosedWithoutGitFallback();
+  testEmptyBakedShaFailsClosedWithoutGitFallback();
+  testUnreadableBakedFileFailsClosedWithoutGitFallback();
+  testMalformedGitOutputFails();
+  testNeitherSourceAvailableProducesClearFailure();
+  testDockerfileStageGraphAndBakedShaContract();
+}
+
+main();
+console.log("migration-phoenix-release tests: OK");
