@@ -226,6 +226,60 @@ async function testRepeatedContinuationCreatesNothingNew(): Promise<void> {
   assert(results.every((r) => r.outcome === "SKIPPED"), "every record resolves SKIPPED, matching CREATE 0");
 }
 
+async function testMultiPhaseContinuationExecutesOnlyExactRemainingSuffix(): Promise<void> {
+  const phaseKeys: Record<"users" | "businesses" | "places" | "offers" | "routes" | "events" | "articles", string[]> = {
+    users: ["u1", "u2"], businesses: ["b1"],
+    places: ["wordpress-db:places:5457", "wordpress-db:places:5492", "wordpress-db:places:5515", "wordpress-db:places:5528", "wordpress-db:places:32271"],
+    offers: ["o1"], routes: ["r1"], events: ["e1"], articles: ["a1"],
+  };
+  const phaseOrder = Object.keys(phaseKeys) as Array<keyof typeof phaseKeys>;
+  const multiManifest: PhoenixReleaseManifest = {
+    schemaVersion: 1, releaseId: "multi-phase-continuation", phaseOrder,
+    phases: phaseOrder.map((name) => ({
+      ...phase(phaseKeys[name].map((sourceRecordKey) => ({ sourceRecordKey, action: "CREATE" as const }))), name,
+    })),
+  };
+  const executed: string[] = [];
+  const skipSets = {
+    users: new Set(phaseKeys.users), businesses: new Set(phaseKeys.businesses),
+    places: new Set(phaseKeys.places.slice(0, 3)),
+  };
+  const adapters = Object.fromEntries(phaseOrder.map((name) => [name, new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey: string, action: PhoenixRecordResult["action"]) => {
+      executed.push(sourceRecordKey);
+      return { sourceRecordKey, action, outcome: "CREATED" as const };
+    },
+  }, skipSets[name as keyof typeof skipSets])])) as never;
+  const reports: PhoenixPhaseReport[] = [];
+  await runPhoenixRelease({
+    manifest: multiManifest, manifestPath: "manifest.json", manifestHash: "hash", environment,
+    codeSha: "future-fixed-sha", mode: "APPLY", adapters,
+    reportStore: { append: async (report) => void reports.push(report) },
+  });
+  assert.deepEqual(executed, ["wordpress-db:places:5528", "wordpress-db:places:32271", "o1", "r1", "e1", "a1"]);
+  assert.equal(reports.find((r) => r.phase === "users")?.created, 0);
+  assert.equal(reports.find((r) => r.phase === "businesses")?.created, 0);
+  assert.equal(reports.find((r) => r.phase === "places")?.skipped, 3);
+  assert.equal(reports.every((r) => r.updated === 0), true);
+
+  const rerunExecuted: string[] = [];
+  const fullyCompletedAdapters = Object.fromEntries(phaseOrder.map((name) => [name, new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey: string, action: PhoenixRecordResult["action"]) => {
+      rerunExecuted.push(sourceRecordKey);
+      return { sourceRecordKey, action, outcome: "CREATED" as const };
+    },
+  }, new Set(phaseKeys[name]))])) as never;
+  const rerunReports: PhoenixPhaseReport[] = [];
+  await runPhoenixRelease({
+    manifest: multiManifest, manifestPath: "manifest.json", manifestHash: "hash", environment,
+    codeSha: "future-fixed-sha", mode: "APPLY", adapters: fullyCompletedAdapters,
+    reportStore: { append: async (report) => void rerunReports.push(report) },
+  });
+  assert.deepEqual(rerunExecuted, []);
+  assert.equal(rerunReports.every((report) => report.created === 0 && report.updated === 0), true,
+    "a fully completed rerun must report CREATE 0 and UPDATE 0 in every phase");
+}
+
 // --- Scenario 7 (part 2): a fail-closed record outside the proven-complete
 // set is still attempted normally, and the sequential stop-on-first-error
 // behavior is unaffected by an unrelated completed set.
@@ -559,6 +613,7 @@ async function main(): Promise<void> {
   await testFreshFullApplyCompletesAllCanonicalRecords();
   await testContinuationSkipsCompletedPrefixAndCompletesSuffix();
   await testRepeatedContinuationCreatesNothingNew();
+  await testMultiPhaseContinuationExecutesOnlyExactRemainingSuffix();
   await testNonPrefixRecordStillFailsClosedNormally();
   await testContinuationEvidenceRecordedInReports();
   await testCoordinatorReportsResumeAndRerun();

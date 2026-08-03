@@ -70,6 +70,62 @@ ordinary local execution from a real checkout. If the baked file exists but is
 empty, malformed, or unreadable for a reason other than "file does not exist",
 resolution fails closed and does not fall back to Git.
 
+## Continuation (`--continue-from-report`)
+
+`--apply` can resume directly from a predecessor's progress report — even one
+produced by an older code SHA — without a throwaway intentionally-failing run
+first:
+
+```bash
+pnpm migration:phoenix-release \
+  --environment DEV \
+  --manifest docs/migration/releases/phoenix-approved-2026-07-30.json \
+  --apply \
+  --continue-from-report <path to the predecessor's JSONL report> \
+  --continue-from-report-sha256 <its exact SHA-256> \
+  --continue-from-code-sha <the predecessor's exact 40-hex code SHA> \
+  --report <path for this run's own new report>
+```
+
+All three continuation flags are required together (or omitted together); they
+are only valid with `--apply` and cannot combine with `--resume-from`. The
+predecessor code SHA must be a member of `KNOWN_PREDECESSOR_CODE_SHAS`
+(`src/lib/migration/release/continuation.ts`) — a fixed, reviewed allowlist,
+never an open "ignore this check" flag. Every phase the predecessor report's
+prior lines claim finished successfully is re-verified against live database
+state before being skipped in full; the one phase it actually failed in is
+skipped only up to its exact, live-verified prefix — see
+`resolveMultiPhaseContinuation`.
+
+## Detached container execution and exit-code observability
+
+A continuation (or any apply/rerun) container should be launched **without**
+`--rm` when its exit code needs to be captured reliably from a separate `docker
+wait` call:
+
+```bash
+docker run -d --name phoenix-dev-continue-<short-sha> ... mamago2-migrate:... \
+  npx tsx scripts/migration-phoenix-release.ts --apply --continue-from-report ...
+CONTAINER_ID=$(docker ps -aqf "name=phoenix-dev-continue-<short-sha>")
+docker wait "$CONTAINER_ID"        # blocks, then prints the exact exit code
+# inspect the durable, externally-mounted --report file and perform the
+# cumulative audit before removing anything
+docker rm "$CONTAINER_ID"           # only after the exit code and report are captured
+```
+
+`--rm` auto-removes a container the instant it exits — including its exit
+code and logs — which can race a separately-issued `docker wait` (the
+container may already be gone by the time `wait` runs, especially for a fast
+container). That race is not itself dangerous: the durable, externally-mounted
+`--report` file survives regardless (`JsonLinesPhoenixReportStore` writes
+outside the container by construction) and remains the authoritative terminal-
+state evidence, cross-checked against a bounded read-only database audit. But
+it does mean the exit code can't always be read directly, so prefer the
+`docker run -d` (no `--rm`) + `docker wait` + inspect + `docker rm` sequence
+above for any run whose outcome needs to be captured with certainty on the
+first attempt — reserve `--rm` for read-only runs (`--plan`) where losing the
+container's own state costs nothing.
+
 ## Current approved release
 
 The committed manifest is generated from already-approved artifacts:

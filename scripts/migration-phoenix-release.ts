@@ -21,7 +21,9 @@ import {
   applyReleaseActionExceptions,
   buildContinuationEvidence,
   extractFailedKey,
-  loadCrossShaContinuationReport,
+  loadCrossShaContinuationChain,
+  resolveChainOriginCodeSha,
+  type CrossShaContinuationChain,
 } from "../src/lib/migration/release/continuation";
 import { exactExecutableKeys } from "../src/lib/migration/release/manifest";
 
@@ -231,36 +233,37 @@ async function main(): Promise<void> {
       phases: manifest.phases.map(applyReleaseActionExceptions),
     };
 
-    let continuationReport: PhoenixPhaseReport | undefined;
+    let continuationChain: CrossShaContinuationChain | undefined;
     let continuationEvidence: Record<string, string> | undefined;
     if (args.continueFromReport) {
       // Presence of any one continuation flag already implies all three
       // (parseArgs enforces this), so these are always defined here.
-      const predecessor = loadCrossShaContinuationReport(
+      const chain = loadCrossShaContinuationChain(
         {
           reportPath: args.continueFromReport,
           reportSha256: args.continueFromReportSha256!,
           predecessorCodeSha: args.continueFromCodeSha!,
         },
-        { releaseId: manifest.releaseId, manifestHash, currentCodeSha: codeSha, environment },
+        { releaseId: manifest.releaseId, manifestHash, currentCodeSha: codeSha, environment, manifest: correctedManifest },
       );
-      const phase = correctedManifest.phases.find((item) => item.name === predecessor.phase);
-      if (!phase) throw new Error(`RELEASE_BLOCKED:CONTINUATION_PHASE_NOT_IN_MANIFEST:${predecessor.phase}`);
-      const failedKey = extractFailedKey(predecessor);
+      const phase = correctedManifest.phases.find((item) => item.name === chain.failureReport.phase);
+      if (!phase) throw new Error(`RELEASE_BLOCKED:CONTINUATION_PHASE_NOT_IN_MANIFEST:${chain.failureReport.phase}`);
+      const failedKey = extractFailedKey(chain.failureReport);
       const skippedCompletedPrefixCount = exactExecutableKeys(phase).indexOf(failedKey);
       if (skippedCompletedPrefixCount < 0) throw new Error("RELEASE_BLOCKED:CONTINUATION_FAILED_KEY_NOT_IN_MANIFEST");
 
-      continuationReport = predecessor;
+      continuationChain = chain;
       continuationEvidence = buildContinuationEvidence({
         predecessorCodeSha: args.continueFromCodeSha!,
         predecessorReportSha256: args.continueFromReportSha256!,
         predecessorTerminalFailedKey: failedKey,
         skippedCompletedPrefixCount,
         continuationStartKey: failedKey,
+        chainOriginCodeSha: resolveChainOriginCodeSha(chain.failureReport, args.continueFromCodeSha!),
       });
     }
 
-    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest: correctedManifest, continuationReport });
+    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest: correctedManifest, continuationChain });
     const reportStore = new JsonLinesPhoenixReportStore(args.reportPath);
     const previousReports: PhoenixPhaseReport[] = args.resumeFrom
       ? [...((await reportStore.readCompletedPrefix?.()) ?? [])]

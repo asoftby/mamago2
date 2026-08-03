@@ -109,12 +109,104 @@ function createTransactionalPlacesFake(input: { placeShouldFail?: boolean; linea
   return { prisma, committedPlaces: () => committedPlaces, committedLineages: () => committedLineages, placeCreateCalls: () => placeCreateCalls, lineageCreateCalls: () => lineageCreateCalls };
 }
 
-function fixtureRawCandidate(): NormalizedPlaceCandidate {
+function fixtureRawCandidate(overrides: Partial<NormalizedPlaceCandidate> = {}): NormalizedPlaceCandidate {
   return {
     title: "Golden Place", slug: "golden-place", content: "Body", excerpt: "", status: "publish",
     publishedAt: "2026-01-01 00:00:00", modifiedAt: "2026-01-01 00:00:00", shortDescription: "Short desc",
     phone: null, phoneE164: null, email: null, workHoursRaw: null, openingHours: null, locationRaw: null,
+    cityRaw: null, addressText: null,
+    ...overrides,
   } as unknown as NormalizedPlaceCandidate;
+}
+
+function fakeCityPrisma(cities: Array<{ id: string; name: string }>, transactional: ReturnType<typeof createTransactionalPlacesFake>): PlacesWriterPrismaClient {
+  return {
+    city: { findMany: (async () => cities) as unknown as PlacesWriterPrismaClient["city"]["findMany"] },
+    $transaction: transactional.prisma.$transaction,
+  };
+}
+
+// --- City dependency resolution: happy path, not-found, ambiguous, mismatch,
+// and the address-text fallback path — the exact mechanism root-caused for
+// wordpress-db:places:5528 (see docs/migration/prelaunch-checklist.md §J/§K:
+// a genuine missing-City-seed gap, not a resolver defect — these tests prove
+// the resolver's own behavior is already correct on every path).
+
+async function testCityResolutionHappyPathSingleExactMatch(): Promise<void> {
+  const rawSource: RawPlaceSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate({ cityRaw: "Минск" }), loadLegacyAuthorId: () => 7, loadSourceHash: () => "h" };
+  const fake = createTransactionalPlacesFake();
+  const prisma = fakeCityPrisma([{ id: "city-minsk", name: "Минск" }], fake);
+  const write = createPlacesWriter(prisma, rawSource, SOURCE_ID);
+  const result = await write({ sourceRecordKey: PLACE_KEY, domainHash: "h", dependencyPlan: { ownerUserSourceRecordKey: "wordpress-db:user:7" } }, { createdByUserId: "user-7" });
+  assert.equal(result.targetId, fake.committedPlaces()[0].id);
+  assert.equal(fake.committedPlaces()[0].cityId, "city-minsk");
+}
+
+async function testCityResolutionNotFoundFailsClosed(): Promise<void> {
+  // Exactly the wordpress-db:places:5528 shape: a real, legitimate city name
+  // ("Копище") with zero matching active City rows — never silently
+  // defaulted, created, or dropped.
+  const rawSource: RawPlaceSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate({ cityRaw: "Копище" }), loadLegacyAuthorId: () => 7, loadSourceHash: () => "h" };
+  const fake = createTransactionalPlacesFake();
+  const prisma = fakeCityPrisma([], fake);
+  const write = createPlacesWriter(prisma, rawSource, SOURCE_ID);
+  await expectRejectMessage(
+    () => write({ sourceRecordKey: PLACE_KEY, domainHash: "h", dependencyPlan: { ownerUserSourceRecordKey: "wordpress-db:user:7" } }, { createdByUserId: "user-7" }),
+    "PLACE_CITY_DEPENDENCY_NOT_FOUND",
+  );
+  assert.equal(fake.committedPlaces().length, 0, "no Place may be written when its City dependency cannot be resolved");
+}
+
+async function testCityResolutionAmbiguousFailsClosed(): Promise<void> {
+  const rawSource: RawPlaceSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate({ cityRaw: "Минск" }), loadLegacyAuthorId: () => 7, loadSourceHash: () => "h" };
+  const fake = createTransactionalPlacesFake();
+  const prisma = fakeCityPrisma([{ id: "city-a", name: "Минск" }, { id: "city-b", name: "Минск" }], fake);
+  const write = createPlacesWriter(prisma, rawSource, SOURCE_ID);
+  await expectRejectMessage(
+    () => write({ sourceRecordKey: PLACE_KEY, domainHash: "h", dependencyPlan: { ownerUserSourceRecordKey: "wordpress-db:user:7" } }, { createdByUserId: "user-7" }),
+    "PLACE_CITY_DEPENDENCY_AMBIGUOUS",
+  );
+  assert.equal(fake.committedPlaces().length, 0);
+}
+
+async function testCityResolutionCaseNormalizationMismatchFailsClosed(): Promise<void> {
+  // A defensive second check beyond the DB's own case-insensitive query —
+  // simulated here with a fake that (unlike real Postgres collation) can
+  // return a name that doesn't actually match, to prove this check is real
+  // and load-bearing, not dead code.
+  const rawSource: RawPlaceSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate({ cityRaw: "Минск" }), loadLegacyAuthorId: () => 7, loadSourceHash: () => "h" };
+  const fake = createTransactionalPlacesFake();
+  const prisma = fakeCityPrisma([{ id: "city-a", name: "Совершенно другой город" }], fake);
+  const write = createPlacesWriter(prisma, rawSource, SOURCE_ID);
+  await expectRejectMessage(
+    () => write({ sourceRecordKey: PLACE_KEY, domainHash: "h", dependencyPlan: { ownerUserSourceRecordKey: "wordpress-db:user:7" } }, { createdByUserId: "user-7" }),
+    "PLACE_CITY_DEPENDENCY_MISMATCH",
+  );
+  assert.equal(fake.committedPlaces().length, 0);
+}
+
+async function testCityResolutionAddressTextFallbackMatchesExactSegment(): Promise<void> {
+  const rawSource: RawPlaceSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate({ cityRaw: null, addressText: "улица Ленина 1, Минск, Беларусь" }), loadLegacyAuthorId: () => 7, loadSourceHash: () => "h" };
+  const fake = createTransactionalPlacesFake();
+  const prisma = fakeCityPrisma([{ id: "city-minsk", name: "Минск" }], fake);
+  const write = createPlacesWriter(prisma, rawSource, SOURCE_ID);
+  const result = await write({ sourceRecordKey: PLACE_KEY, domainHash: "h", dependencyPlan: { ownerUserSourceRecordKey: "wordpress-db:user:7" } }, { createdByUserId: "user-7" });
+  assert.equal(fake.committedPlaces()[0].cityId, "city-minsk");
+  assert.ok(result.targetId);
+}
+
+async function testCityResolutionAddressTextFallbackNoMatchLeavesCityNull(): Promise<void> {
+  // Unlike the cityRaw path, zero address-segment matches is not itself a
+  // failure — the record simply gets created without a resolved City. This
+  // is deliberate existing behavior (never a guessed match), verified here
+  // so a future change can't silently start throwing on this path too.
+  const rawSource: RawPlaceSourceRepository = { loadNormalizedCandidate: () => fixtureRawCandidate({ cityRaw: null, addressText: "улица Авиационная 16, Копище, Беларусь" }), loadLegacyAuthorId: () => 7, loadSourceHash: () => "h" };
+  const fake = createTransactionalPlacesFake();
+  const prisma = fakeCityPrisma([{ id: "city-minsk", name: "Минск" }], fake);
+  const write = createPlacesWriter(prisma, rawSource, SOURCE_ID);
+  const result = await write({ sourceRecordKey: PLACE_KEY, domainHash: "h", dependencyPlan: { ownerUserSourceRecordKey: "wordpress-db:user:7" } }, { createdByUserId: "user-7" });
+  assert.equal(fake.committedPlaces()[0].cityId, null);
+  assert.ok(result.targetId);
 }
 
 async function testWriterCommitsPlaceAndLineageTogether(): Promise<void> {
@@ -143,6 +235,12 @@ async function main(): Promise<void> {
   await testLoadCandidateComposesFromRawSource();
   await testWriterCommitsPlaceAndLineageTogether();
   await testWriterLineageFailureRollsBackPlace();
+  await testCityResolutionHappyPathSingleExactMatch();
+  await testCityResolutionNotFoundFailsClosed();
+  await testCityResolutionAmbiguousFailsClosed();
+  await testCityResolutionCaseNormalizationMismatchFailsClosed();
+  await testCityResolutionAddressTextFallbackMatchesExactSegment();
+  await testCityResolutionAddressTextFallbackNoMatchLeavesCityNull();
   console.log("Phoenix Places production wiring tests: PASS");
 }
 

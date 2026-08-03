@@ -204,6 +204,48 @@ function readDockerfile(): string {
   return readFileSync(dockerfilePath, "utf8");
 }
 
+function readRunbook(): string {
+  const runbookPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "docs/migration/phoenix-release-runner.md",
+  );
+  return readFileSync(runbookPath, "utf8");
+}
+
+/**
+ * A `docker run -d --rm` continuation container can exit and be auto-removed
+ * before a separately-issued `docker wait` reaches it — exactly what
+ * happened during the first real continuation attempt (see
+ * docs/migration/prelaunch-checklist.md §J). The runbook must document the
+ * safer `-d` (no `--rm`) + `docker wait` + inspect + `docker rm` sequence so
+ * this doesn't need to be rediscovered operationally every time.
+ */
+function testRunbookDocumentsSaferExitCodeCaptureContract() {
+  const runbook = readRunbook();
+  assert.match(runbook, /docker wait/, "runbook must document `docker wait` for exit-code capture");
+  assert.match(runbook, /--rm/, "runbook must discuss `--rm`'s interaction with exit-code capture");
+  assert.match(
+    runbook,
+    /race|before.*captured|captured.*before/i,
+    "runbook must explain the `--rm`/`docker wait` race, not just show a command",
+  );
+  const contract = runbook.slice(runbook.indexOf("docker run -d --name"), runbook.indexOf("```", runbook.indexOf("docker run -d --name")));
+  const waitIndex = contract.indexOf("docker wait");
+  const removeIndex = contract.indexOf("docker rm");
+  assert.ok(waitIndex > 0, "the runnable contract must capture the exact exit code with docker wait");
+  assert.equal(contract.slice(0, waitIndex).includes("--rm"), false, "the detached container must not auto-remove before docker wait");
+  assert.ok(removeIndex > waitIndex, "the stopped container may only be removed after wait and evidence inspection");
+}
+
+function testRunbookDocumentsContinuationFlags() {
+  const runbook = readRunbook();
+  for (const flag of ["--continue-from-report", "--continue-from-report-sha256", "--continue-from-code-sha"]) {
+    assert.ok(runbook.includes(flag), `runbook must document ${flag}`);
+  }
+  assert.match(runbook, /KNOWN_PREDECESSOR_CODE_SHAS/, "runbook must point at the predecessor-SHA allowlist, not just describe the flags");
+}
+
 /** Splits a Dockerfile into named stages by its `FROM <base> [AS <name>]` lines. */
 function parseDockerfileStages(dockerfile: string): DockerfileStage[] {
   const lines = dockerfile.split("\n");
@@ -291,6 +333,8 @@ function main() {
   testContinuationFlagsOnlyValidWithApply();
   testContinuationFlagsCannotCombineWithResumeFrom();
   testNoContinuationFlagsLeavesThemUndefined();
+  testRunbookDocumentsSaferExitCodeCaptureContract();
+  testRunbookDocumentsContinuationFlags();
 }
 
 main();

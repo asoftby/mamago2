@@ -6,17 +6,25 @@ import { join } from "node:path";
 import {
   KNOWN_PREDECESSOR_CODE_SHAS,
   PHOENIX_RELEASE_ACTION_EXCEPTIONS,
+  PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256,
   applyReleaseActionExceptions,
+  assertPhoenixPlaceCityPrerequisites,
   buildContinuationEvidence,
   extractFailedKey,
-  loadCrossShaContinuationReport,
+  loadCrossShaContinuationChain,
+  resolveChainOriginCodeSha,
   resolveExactCompletedPrefix,
+  resolveFullPhaseCompletion,
+  resolveMultiPhaseContinuation,
 } from "./continuation";
 import { sha256Bytes } from "./manifest";
-import type { PhoenixEnvironmentContext, PhoenixPhaseReport, PhoenixReleasePhase } from "./types";
+import type { PhoenixEnvironmentContext, PhoenixPhaseName, PhoenixPhaseReport, PhoenixReleaseManifest, PhoenixReleasePhase } from "./types";
 
 const PREDECESSOR_CODE_SHA = "f466c34c0cf095d054ae79d86a12505129719739";
+const SECOND_HOP_PREDECESSOR_CODE_SHA = "2dc00b6026651c0d1b1008598a19a6833930820f";
 const NEW_CODE_SHA = "b".repeat(40);
+const RELEASE_ID = "phoenix-approved-test";
+const MANIFEST_HASH = "manifest-hash";
 
 const environment: PhoenixEnvironmentContext = {
   environment: "DEV",
@@ -31,178 +39,11 @@ const environment: PhoenixEnvironmentContext = {
   storage: { environment: "DEV", provider: "filesystem", locationHash: "safe-hash" },
 };
 
-function fakeReport(overrides: Partial<PhoenixPhaseReport> = {}): PhoenixPhaseReport {
-  return {
-    releaseId: "phoenix-approved-test",
-    environment: "DEV",
-    codeSha: PREDECESSOR_CODE_SHA,
-    manifestPath: "manifest.json",
-    manifestHash: "manifest-hash",
-    phase: "users",
-    attempted: 21,
-    created: 20,
-    updated: 0,
-    skipped: 0,
-    protectedConflicts: 0,
-    failed: 1,
-    targetCountDelta: 0,
-    migrationRecordDelta: 0,
-    migrationLineageDelta: 0,
-    duplicateLineage: 0,
-    duplicateTargets: 0,
-    mediaStorageDelta: 0,
-    forbiddenTableAudit: "NOT_RUN",
-    firstFailure: "wordpress-db:user:38:UNEXPECTED_PLAN_ACTION:CREATE",
-    completedPrefix: [],
-    environmentFingerprint: environment,
-    resolvedIdentities: {},
-    ...overrides,
-  };
-}
-
-const expectedIdentity = {
-  releaseId: "phoenix-approved-test",
-  manifestHash: "manifest-hash",
-  currentCodeSha: NEW_CODE_SHA,
-  environment,
-};
-
 function tempReportPath(content: string): string {
   const root = mkdtempSync(join(tmpdir(), "phoenix-continuation-test-"));
   const path = join(root, "dev.jsonl");
   writeFileSync(path, content);
   return path;
-}
-
-function reportRequest(raw: string, overrides: Partial<{ reportSha256: string; predecessorCodeSha: string }> = {}) {
-  return {
-    reportPath: tempReportPath(raw),
-    reportSha256: overrides.reportSha256 ?? sha256Bytes(raw),
-    predecessorCodeSha: overrides.predecessorCodeSha ?? PREDECESSOR_CODE_SHA,
-  };
-}
-
-// =============================================================================
-// Section 2 — cross-code-SHA continuation identity
-// =============================================================================
-
-// Test 1: accepted only with the exact explicit predecessor SHA + report SHA-256.
-function testCrossShaAcceptsExactExplicitAuthorization(): void {
-  const raw = `${JSON.stringify(fakeReport())}\n`;
-  const report = loadCrossShaContinuationReport(reportRequest(raw), expectedIdentity);
-  assert.equal(report.codeSha, PREDECESSOR_CODE_SHA);
-  assert.equal(report.firstFailure, "wordpress-db:user:38:UNEXPECTED_PLAN_ACTION:CREATE");
-}
-
-// Test 2: wrong predecessor code SHA fails closed (not in the allowlist at all).
-function testCrossShaRejectsUnknownPredecessorCodeSha(): void {
-  const unknownSha = "1".repeat(40);
-  const raw = `${JSON.stringify(fakeReport({ codeSha: unknownSha }))}\n`;
-  assert.throws(
-    () => loadCrossShaContinuationReport(reportRequest(raw, { predecessorCodeSha: unknownSha }), expectedIdentity),
-    /CONTINUATION_PREDECESSOR_CODE_SHA_UNKNOWN/,
-  );
-  assert(!KNOWN_PREDECESSOR_CODE_SHAS.has(unknownSha), "fixture sanity: this SHA must not be in the allowlist");
-}
-
-// Test 3: wrong report SHA-256 fails closed.
-function testCrossShaRejectsWrongReportSha256(): void {
-  const raw = `${JSON.stringify(fakeReport())}\n`;
-  assert.throws(
-    () => loadCrossShaContinuationReport(reportRequest(raw, { reportSha256: "0".repeat(64) }), expectedIdentity),
-    /CONTINUATION_REPORT_SHA256_MISMATCH/,
-  );
-}
-
-// Test 4: same report without matching cross-SHA authorization fails closed
-// (the report's own codeSha disagrees with the explicitly supplied predecessor SHA).
-function testCrossShaRejectsReportCodeShaDisagreement(): void {
-  const raw = `${JSON.stringify(fakeReport({ codeSha: "c".repeat(40) }))}\n`;
-  assert.throws(
-    () => loadCrossShaContinuationReport(reportRequest(raw), expectedIdentity),
-    /CONTINUATION_REPORT_CODE_SHA_MISMATCH/,
-  );
-}
-
-function testCrossShaRejectsCurrentCodeShaEqualToPredecessor(): void {
-  const raw = `${JSON.stringify(fakeReport())}\n`;
-  assert.throws(
-    () =>
-      loadCrossShaContinuationReport(reportRequest(raw), { ...expectedIdentity, currentCodeSha: PREDECESSOR_CODE_SHA }),
-    /CONTINUATION_CODE_SHA_UNCHANGED/,
-  );
-}
-
-function testCrossShaRejectsIdentityMismatches(): void {
-  const raw = (overrides: Partial<PhoenixPhaseReport>) => `${JSON.stringify(fakeReport(overrides))}\n`;
-  assert.throws(
-    () => loadCrossShaContinuationReport(reportRequest(raw({ releaseId: "other-release" })), expectedIdentity),
-    /CONTINUATION_RELEASE_ID_MISMATCH/,
-  );
-  assert.throws(
-    () => loadCrossShaContinuationReport(reportRequest(raw({ manifestHash: "different-hash" })), expectedIdentity),
-    /CONTINUATION_MANIFEST_HASH_MISMATCH/,
-  );
-  assert.throws(
-    () => loadCrossShaContinuationReport(reportRequest(raw({ environment: "PROD" })), expectedIdentity),
-    /CONTINUATION_ENVIRONMENT_MISMATCH/,
-  );
-  assert.throws(
-    () =>
-      loadCrossShaContinuationReport(
-        reportRequest(raw({ environmentFingerprint: { ...environment, database: { ...environment.database, host: "other-host" } } })),
-        expectedIdentity,
-      ),
-    /CONTINUATION_ENVIRONMENT_FINGERPRINT_MISMATCH/,
-  );
-}
-
-function testCrossShaRejectsNonFailureReport(): void {
-  const raw = `${JSON.stringify(fakeReport({ failed: 0, firstFailure: null }))}\n`;
-  assert.throws(() => loadCrossShaContinuationReport(reportRequest(raw), expectedIdentity), /CONTINUATION_REPORT_NOT_A_FAILURE/);
-}
-
-function testCrossShaRejectsMalformedEmptyMultiLineOrUnreadableReport(): void {
-  assert.throws(() => loadCrossShaContinuationReport(reportRequest("not json at all\n"), expectedIdentity), /CONTINUATION_REPORT_MALFORMED/);
-  assert.throws(() => loadCrossShaContinuationReport(reportRequest(""), expectedIdentity), /CONTINUATION_REPORT_EMPTY/);
-  const multiLine = `${JSON.stringify(fakeReport())}\n${JSON.stringify(fakeReport({ firstFailure: "wordpress-db:user:39:X" }))}\n`;
-  assert.throws(() => loadCrossShaContinuationReport(reportRequest(multiLine), expectedIdentity), /CONTINUATION_REPORT_NOT_SINGLE_ENTRY/);
-  assert.throws(
-    () =>
-      loadCrossShaContinuationReport(
-        { reportPath: "/nonexistent/path/dev.jsonl", reportSha256: "0".repeat(64), predecessorCodeSha: PREDECESSOR_CODE_SHA },
-        expectedIdentity,
-      ),
-    /CONTINUATION_REPORT_UNREADABLE/,
-  );
-}
-
-// =============================================================================
-// Section 3 — exact completed-prefix proof
-// =============================================================================
-
-const FAILED_KEY = "wordpress-db:user:38";
-
-function usersPhaseFixture(overrideAction?: { index: number; action: PhoenixReleasePhase["records"][number]["action"] }): PhoenixReleasePhase {
-  const before = Array.from({ length: 20 }, (_, i) => `wordpress-db:user:${i + 1}`);
-  const after = Array.from({ length: 4 }, (_, i) => `wordpress-db:user:${i + 39}`);
-  const keys = [...before, FAILED_KEY, ...after];
-  const records = keys.map((sourceRecordKey) => ({
-    sourceRecordKey,
-    action: (sourceRecordKey === FAILED_KEY ? "SKIP_UNCHANGED" : "CREATE") as PhoenixReleasePhase["records"][number]["action"],
-  }));
-  if (overrideAction) records[overrideAction.index] = { ...records[overrideAction.index], action: overrideAction.action };
-  return {
-    name: "users",
-    status: "READY",
-    artifacts: [],
-    records,
-    protectedSourceRecordKeys: [],
-    excludedSourceRecordKeys: [],
-    deterministicConflicts: [],
-    mediaPolicy: "NOT_APPLICABLE",
-    prerequisites: [],
-  };
 }
 
 function fakePrisma(rows: Array<{ sourceRecordKey: string }>) {
@@ -213,227 +54,581 @@ function fakePrisma(rows: Array<{ sourceRecordKey: string }>) {
   } as unknown as import("@prisma/client").PrismaClient;
 }
 
-function completedPrefixKeys(): string[] {
-  return usersPhaseFixture().records.slice(0, 20).map((r) => r.sourceRecordKey);
+// =============================================================================
+// Fixtures — three phases shaped after the real manifest: users (25 keys,
+// wordpress-db:user:38 at index 20, SKIP_UNCHANGED per the real stale
+// manifest declaration), businesses (10 keys), places (6 keys, the failing
+// wordpress-db:places:5528 at index 3, exactly like the real DEV state).
+// =============================================================================
+
+const FAILED_USER_KEY = "wordpress-db:user:38";
+const FAILED_PLACE_KEY = "wordpress-db:places:5528";
+
+function usersPhaseFixture(overrideAction?: { index: number; action: PhoenixReleasePhase["records"][number]["action"] }): PhoenixReleasePhase {
+  const before = Array.from({ length: 20 }, (_, i) => `wordpress-db:user:${i + 1}`);
+  const after = Array.from({ length: 4 }, (_, i) => `wordpress-db:user:${i + 39}`);
+  const keys = [...before, FAILED_USER_KEY, ...after];
+  const records = keys.map((sourceRecordKey) => ({
+    sourceRecordKey,
+    action: (sourceRecordKey === FAILED_USER_KEY ? "SKIP_UNCHANGED" : "CREATE") as PhoenixReleasePhase["records"][number]["action"],
+  }));
+  if (overrideAction) records[overrideAction.index] = { ...records[overrideAction.index], action: overrideAction.action };
+  return {
+    name: "users", status: "READY", artifacts: [], records,
+    protectedSourceRecordKeys: [], excludedSourceRecordKeys: [], deterministicConflicts: [],
+    mediaPolicy: "NOT_APPLICABLE", prerequisites: [],
+  };
 }
 
-// Test 5 / 6 / 7: exact 20-key DEV prefix continues directly at user:38, no
-// deliberate intermediate failed apply required — this call is the entire
-// mechanism, driven straight off the original predecessor report.
-async function testExactPrefixContinuesDirectlyAtUser38(): Promise<void> {
+function businessesPhaseFixture(): PhoenixReleasePhase {
+  const records = Array.from({ length: 10 }, (_, i) => ({
+    sourceRecordKey: `wordpress-db:user:${i + 1}`,
+    action: "CREATE" as const,
+  }));
+  return {
+    name: "businesses", status: "READY", artifacts: [], records,
+    protectedSourceRecordKeys: [], excludedSourceRecordKeys: [], deterministicConflicts: [],
+    mediaPolicy: "NOT_APPLICABLE", prerequisites: [],
+  };
+}
+
+function placesPhaseFixture(): PhoenixReleasePhase {
+  const before = ["wordpress-db:places:5457", "wordpress-db:places:5492", "wordpress-db:places:5515"];
+  const after = ["wordpress-db:places:5579", "wordpress-db:places:5594"];
+  const keys = [...before, FAILED_PLACE_KEY, ...after];
+  const records = keys.map((sourceRecordKey) => ({ sourceRecordKey, action: "CREATE" as const }));
+  return {
+    name: "places", status: "READY", artifacts: [], records,
+    protectedSourceRecordKeys: [], excludedSourceRecordKeys: [], deterministicConflicts: [],
+    mediaPolicy: "METADATA", prerequisites: [],
+  };
+}
+
+function testManifest(phases: PhoenixReleasePhase[] = [usersPhaseFixture(), businessesPhaseFixture(), placesPhaseFixture()]): PhoenixReleaseManifest {
+  return { schemaVersion: 1, releaseId: RELEASE_ID, phaseOrder: phases.map((p) => p.name), phases };
+}
+
+function usersKeys(): string[] {
+  return usersPhaseFixture().records.map((r) => r.sourceRecordKey);
+}
+function businessesKeys(): string[] {
+  return businessesPhaseFixture().records.map((r) => r.sourceRecordKey);
+}
+function placesPrefixKeys(): string[] {
+  return placesPhaseFixture().records.slice(0, 3).map((r) => r.sourceRecordKey);
+}
+
+function baseReport(overrides: Partial<PhoenixPhaseReport> = {}): PhoenixPhaseReport {
+  return {
+    releaseId: RELEASE_ID,
+    environment: "DEV",
+    codeSha: PREDECESSOR_CODE_SHA,
+    manifestPath: "manifest.json",
+    manifestHash: MANIFEST_HASH,
+    phase: "users",
+    attempted: 0, created: 0, updated: 0, skipped: 0, protectedConflicts: 0, failed: 0,
+    targetCountDelta: 0, migrationRecordDelta: 0, migrationLineageDelta: 0,
+    duplicateLineage: 0, duplicateTargets: 0, mediaStorageDelta: 0,
+    forbiddenTableAudit: "NOT_RUN",
+    firstFailure: null,
+    completedPrefix: [],
+    environmentFingerprint: environment,
+    resolvedIdentities: {},
+    ...overrides,
+  };
+}
+
+// First-hop report: single line, users phase fails at wordpress-db:user:38.
+function firstHopFailureReport(): PhoenixPhaseReport {
+  return baseReport({
+    phase: "users",
+    attempted: 21, created: 20, updated: 0, failed: 1,
+    firstFailure: "wordpress-db:user:38:UNEXPECTED_PLAN_ACTION:CREATE",
+  });
+}
+
+// Second-hop chain: users success, businesses success, places fails at 5528 —
+// exactly the shape of the real dev-continuation-2dc00b602665.jsonl.
+function secondHopChain(): PhoenixPhaseReport[] {
+  const usersSuccess = baseReport({
+    codeSha: SECOND_HOP_PREDECESSOR_CODE_SHA,
+    phase: "users", attempted: 25, created: 5, updated: 0, skipped: 20, failed: 0,
+    completedPrefix: ["users"],
+    resolvedIdentities: {
+      continuationPredecessorCodeSha: PREDECESSOR_CODE_SHA,
+      continuationPredecessorReportSha256: "a".repeat(64),
+      continuationPredecessorTerminalFailedKey: FAILED_USER_KEY,
+      continuationSkippedCompletedPrefixCount: "20",
+      continuationStartKey: FAILED_USER_KEY,
+      continuationChainOriginCodeSha: PREDECESSOR_CODE_SHA,
+    },
+  });
+  const businessesSuccess = baseReport({
+    codeSha: SECOND_HOP_PREDECESSOR_CODE_SHA,
+    phase: "businesses", attempted: 10, created: 10, updated: 0, failed: 0,
+    completedPrefix: ["users", "businesses"],
+  });
+  const placesFailure = baseReport({
+    codeSha: SECOND_HOP_PREDECESSOR_CODE_SHA,
+    phase: "places", attempted: 4, created: 3, updated: 0, failed: 1,
+    completedPrefix: ["users", "businesses"],
+    firstFailure: `${FAILED_PLACE_KEY}:PLACE_CITY_DEPENDENCY_NOT_FOUND`,
+  });
+  return [usersSuccess, businessesSuccess, placesFailure];
+}
+
+function reportRequest(entries: PhoenixPhaseReport[], overrides: Partial<{ reportSha256: string; predecessorCodeSha: string }> = {}) {
+  const raw = `${entries.map((e) => JSON.stringify(e)).join("\n")}\n`;
+  return {
+    reportPath: tempReportPath(raw),
+    reportSha256: overrides.reportSha256 ?? sha256Bytes(raw),
+    predecessorCodeSha: overrides.predecessorCodeSha ?? entries[0].codeSha,
+  };
+}
+
+const expectedFirstHop = { releaseId: RELEASE_ID, manifestHash: MANIFEST_HASH, currentCodeSha: SECOND_HOP_PREDECESSOR_CODE_SHA, environment, manifest: testManifest() };
+const expectedSecondHop = { releaseId: RELEASE_ID, manifestHash: MANIFEST_HASH, currentCodeSha: NEW_CODE_SHA, environment, manifest: testManifest() };
+
+// =============================================================================
+// loadCrossShaContinuationChain
+// =============================================================================
+
+function testFirstHopChainAcceptsZeroPriorPhases(): void {
+  const chain = loadCrossShaContinuationChain(reportRequest([firstHopFailureReport()]), expectedFirstHop);
+  assert.equal(chain.priorPhaseReports.length, 0);
+  assert.equal(chain.failureReport.phase, "users");
+}
+
+function testSecondHopRejectsAnyUnpinnedReportArtifact(): void {
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest(secondHopChain()), { ...expectedSecondHop, releaseId: "phoenix-approved-2026-07-30" }),
+    /CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED/,
+  );
+  assert.equal(PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256, "257671d8dd039d803d5571cdcd0d00a8ddbdeaf4fba55c1a21b4f35850a9cfcc");
+}
+
+function testChainRejectsUnknownPredecessorCodeSha(): void {
+  const unknownSha = "1".repeat(40);
+  const entries = [{ ...firstHopFailureReport(), codeSha: unknownSha }];
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest(entries, { predecessorCodeSha: unknownSha }), expectedFirstHop),
+    /CONTINUATION_PREDECESSOR_CODE_SHA_UNKNOWN/,
+  );
+  assert(!KNOWN_PREDECESSOR_CODE_SHAS.has(unknownSha));
+}
+
+function testChainRejectsWrongReportSha256(): void {
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([firstHopFailureReport()], { reportSha256: "0".repeat(64) }), expectedFirstHop),
+    /CONTINUATION_REPORT_SHA256_MISMATCH/,
+  );
+}
+
+function testChainRejectsFailureLineCodeShaDisagreement(): void {
+  const entries = [{ ...firstHopFailureReport(), codeSha: "c".repeat(40) }];
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest(entries, { predecessorCodeSha: PREDECESSOR_CODE_SHA }), expectedFirstHop),
+    /CONTINUATION_REPORT_CODE_SHA_MISMATCH/,
+  );
+}
+
+function testChainRejectsCurrentEqualsPredecessor(): void {
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([firstHopFailureReport()]), { ...expectedFirstHop, currentCodeSha: PREDECESSOR_CODE_SHA }),
+    /CONTINUATION_CODE_SHA_UNCHANGED/,
+  );
+}
+
+function testChainRejectsFailureLineIdentityMismatches(): void {
+  const raw = (overrides: Partial<PhoenixPhaseReport>) => [{ ...firstHopFailureReport(), ...overrides }];
+  assert.throws(() => loadCrossShaContinuationChain(reportRequest(raw({ releaseId: "other" })), expectedFirstHop), /CONTINUATION_RELEASE_ID_MISMATCH/);
+  assert.throws(() => loadCrossShaContinuationChain(reportRequest(raw({ manifestHash: "other" })), expectedFirstHop), /CONTINUATION_MANIFEST_HASH_MISMATCH/);
+  assert.throws(() => loadCrossShaContinuationChain(reportRequest(raw({ environment: "PROD" })), expectedFirstHop), /CONTINUATION_ENVIRONMENT_MISMATCH/);
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest(raw({ environmentFingerprint: { ...environment, database: { ...environment.database, host: "other" } } })), expectedFirstHop),
+    /CONTINUATION_ENVIRONMENT_FINGERPRINT_MISMATCH/,
+  );
+}
+
+function testChainRejectsNonFailureLastLine(): void {
+  const entries = [{ ...firstHopFailureReport(), failed: 0, firstFailure: null }];
+  assert.throws(() => loadCrossShaContinuationChain(reportRequest(entries), expectedFirstHop), /CONTINUATION_REPORT_NOT_A_FAILURE/);
+}
+
+function testChainRejectsMalformedEmptyOrUnreadableReport(): void {
+  const expected = expectedFirstHop;
+  assert.throws(
+    () => loadCrossShaContinuationChain({ reportPath: tempReportPath("not json\n"), reportSha256: sha256Bytes("not json\n"), predecessorCodeSha: PREDECESSOR_CODE_SHA }, expected),
+    /CONTINUATION_REPORT_MALFORMED/,
+  );
+  assert.throws(
+    () => loadCrossShaContinuationChain({ reportPath: tempReportPath(""), reportSha256: sha256Bytes(""), predecessorCodeSha: PREDECESSOR_CODE_SHA }, expected),
+    /CONTINUATION_REPORT_EMPTY/,
+  );
+  assert.throws(
+    () => loadCrossShaContinuationChain({ reportPath: "/nonexistent/dev.jsonl", reportSha256: "0".repeat(64), predecessorCodeSha: PREDECESSOR_CODE_SHA }, expected),
+    /CONTINUATION_REPORT_UNREADABLE/,
+  );
+}
+
+function testChainRejectsPriorPhaseCountMismatch(): void {
+  // Only "users" supplied as a prior line, but the failure is in "places" —
+  // "businesses" is missing from the chain entirely.
+  const [usersSuccess, , placesFailure] = secondHopChain();
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([usersSuccess, placesFailure]), expectedSecondHop),
+    /CONTINUATION_PRIOR_PHASE_COUNT_MISMATCH/,
+  );
+}
+
+function testChainRejectsPriorPhaseOrderMismatch(): void {
+  const [usersSuccess, businessesSuccess, placesFailure] = secondHopChain();
+  const reordered = { ...usersSuccess, phase: "businesses" as const };
+  const reorderedBusinesses = { ...businessesSuccess, phase: "users" as const };
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([reordered, reorderedBusinesses, placesFailure]), expectedSecondHop),
+    /CONTINUATION_PRIOR_PHASE_ORDER_MISMATCH/,
+  );
+}
+
+function testChainRejectsPriorPhaseNotSuccessful(): void {
+  const [usersSuccess, businessesSuccess, placesFailure] = secondHopChain();
+  const businessesActuallyFailed = { ...businessesSuccess, failed: 1 };
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([usersSuccess, businessesActuallyFailed, placesFailure]), expectedSecondHop),
+    /CONTINUATION_PRIOR_PHASE_NOT_SUCCESSFUL:businesses/,
+  );
+}
+
+function testChainRejectsPriorPhasePrefixCorrupted(): void {
+  const [usersSuccess, businessesSuccess, placesFailure] = secondHopChain();
+  const corrupted = { ...businessesSuccess, completedPrefix: ["users", "businesses", "places"] as PhoenixPhaseName[] };
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([usersSuccess, corrupted, placesFailure]), expectedSecondHop),
+    /CONTINUATION_PRIOR_PHASE_PREFIX_CORRUPTED:businesses/,
+  );
+}
+
+function testChainRejectsPriorPhaseCodeShaDisagreement(): void {
+  const [usersSuccess, businessesSuccess, placesFailure] = secondHopChain();
+  const wrongCodeSha = { ...businessesSuccess, codeSha: "d".repeat(40) };
+  assert.throws(
+    () => loadCrossShaContinuationChain(reportRequest([usersSuccess, wrongCodeSha, placesFailure], { predecessorCodeSha: SECOND_HOP_PREDECESSOR_CODE_SHA }), expectedSecondHop),
+    /CONTINUATION_REPORT_CODE_SHA_MISMATCH/,
+  );
+}
+
+function testChainCorrectlySkipsValidationOnlyPhaseInSequence(): void {
+  // A VALIDATION_ONLY phase positioned before the failure must never be
+  // expected to have its own report line — mirrors runPhoenixRelease's own
+  // `continue` behavior for such phases in apply/rerun mode.
+  const manifestWithValidationOnly: PhoenixReleaseManifest = {
+    schemaVersion: 1,
+    releaseId: RELEASE_ID,
+    phaseOrder: ["users", "redirects", "businesses"],
+    phases: [
+      usersPhaseFixture(),
+      { ...businessesPhaseFixture(), name: "redirects", status: "VALIDATION_ONLY" },
+      { ...businessesPhaseFixture() },
+    ],
+  };
+  const usersSuccess = baseReport({ phase: "users", failed: 0, completedPrefix: ["users"] });
+  const businessesFailure = baseReport({
+    phase: "businesses",
+    failed: 1,
+    completedPrefix: ["users"],
+    firstFailure: "wordpress-db:user:1:SOME_ERROR",
+  });
+  const chain = loadCrossShaContinuationChain(
+    reportRequest([usersSuccess, businessesFailure]),
+    { releaseId: RELEASE_ID, manifestHash: MANIFEST_HASH, currentCodeSha: NEW_CODE_SHA, environment, manifest: manifestWithValidationOnly },
+  );
+  assert.equal(chain.priorPhaseReports.length, 1);
+  assert.equal(chain.priorPhaseReports[0].phase, "users");
+}
+
+// =============================================================================
+// resolveExactCompletedPrefix (single failing phase, partial prefix)
+// =============================================================================
+
+async function testExactPrefixContinuesDirectlyAtFailedKey(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport({ created: 20, updated: 0 });
-  const rows = completedPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey }));
-  const resolved = await resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase);
-  assert.equal(resolved.phase, "users");
-  assert.equal(resolved.continuationStartKey, FAILED_KEY);
-  assert.deepEqual([...resolved.alreadyCompleted].sort(), completedPrefixKeys().sort());
+  const rows = usersKeys().slice(0, 20).map((sourceRecordKey) => ({ sourceRecordKey }));
+  const resolved = await resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase);
+  assert.equal(resolved.continuationStartKey, FAILED_USER_KEY);
   assert.equal(resolved.alreadyCompleted.size, 20);
 }
 
-async function testExactPrefixRejectsMissingKeyInsidePrefix(): Promise<void> {
+async function testExactPrefixRejectsMissingKey(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport();
-  const rows = completedPrefixKeys()
-    .filter((key) => key !== "wordpress-db:user:5")
-    .map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_PREFIX_KEY_MISSING:wordpress-db:user:5/,
-  );
+  const rows = usersKeys().slice(0, 20).filter((k) => k !== "wordpress-db:user:5").map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase), /CONTINUATION_PREFIX_KEY_MISSING/);
 }
 
-async function testExactPrefixRejectsCompletedKeyAfterFailedKey(): Promise<void> {
+async function testExactPrefixRejectsNonPrefixKey(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport();
-  const rows = [...completedPrefixKeys(), "wordpress-db:user:39"].map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_UNEXPECTED_COMPLETED_KEY:wordpress-db:user:39/,
-  );
+  const rows = [...usersKeys().slice(0, 20), "wordpress-db:user:39"].map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase), /CONTINUATION_UNEXPECTED_COMPLETED_KEY/);
 }
 
 async function testExactPrefixRejectsFailedKeyAlreadyComplete(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport();
-  const rows = [...completedPrefixKeys(), FAILED_KEY].map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_FAILED_KEY_ALREADY_COMPLETE/,
-  );
+  const rows = [...usersKeys().slice(0, 20), FAILED_USER_KEY].map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase), /CONTINUATION_FAILED_KEY_ALREADY_COMPLETE/);
 }
 
 async function testExactPrefixRejectsDuplicateLineage(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport();
-  const rows = [...completedPrefixKeys(), "wordpress-db:user:1"].map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_DUPLICATE_LINEAGE:wordpress-db:user:1/,
-  );
+  const rows = [...usersKeys().slice(0, 20), "wordpress-db:user:1"].map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase), /CONTINUATION_DUPLICATE_LINEAGE/);
 }
 
 async function testExactPrefixRejectsUnrelatedLineage(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport();
-  const rows = [...completedPrefixKeys(), "wordpress-db:user:99999"].map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_UNRELATED_LINEAGE:wordpress-db:user:99999/,
-  );
+  const rows = [...usersKeys().slice(0, 20), "wordpress-db:user:99999"].map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase), /CONTINUATION_UNRELATED_LINEAGE/);
 }
 
-async function testExactPrefixRejectsAmbiguousActionInPrefix(): Promise<void> {
+async function testExactPrefixRejectsAmbiguousAction(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture({ index: 5, action: "SKIP_UNCHANGED" }));
-  const report = fakeReport();
-  const rows = completedPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_PREFIX_AMBIGUOUS_ACTION:wordpress-db:user:6/,
-  );
+  const rows = usersKeys().slice(0, 20).map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", firstHopFailureReport(), phase), /CONTINUATION_PREFIX_AMBIGUOUS_ACTION/);
 }
 
-async function testExactPrefixRejectsUnsupportedPhase(): Promise<void> {
-  const phase: PhoenixReleasePhase = { ...usersPhaseFixture(), name: "events" };
-  const report = fakeReport({ phase: "events", firstFailure: "wordpress-db:event:1:X" });
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma([]), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_UNSUPPORTED_PHASE:events/,
-  );
-}
-
-async function testExactPrefixRejectsPhaseMismatch(): Promise<void> {
-  const phase: PhoenixReleasePhase = { ...usersPhaseFixture(), name: "places" };
-  const report = fakeReport({ phase: "users" });
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma([]), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_PHASE_MISMATCH/,
-  );
-}
-
-async function testExactPrefixRejectsFailedKeyNotInManifest(): Promise<void> {
-  const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport({ firstFailure: "wordpress-db:user:999999:UNEXPECTED_PLAN_ACTION:CREATE" });
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma([]), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_FAILED_KEY_NOT_IN_MANIFEST/,
-  );
-}
-
-// The report count may be lower than the current proven prefix, as long as
-// the live prefix itself remains exact — the defining behavior that lets a
-// later, smaller chained-continuation report still safely resume.
 async function testExactPrefixAllowsReportCountLowerThanProvenPrefix(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport({ created: 0, updated: 0 });
-  const rows = completedPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey }));
-  const resolved = await resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase);
+  const report = { ...firstHopFailureReport(), created: 0, updated: 0 };
+  const rows = usersKeys().slice(0, 20).map((sourceRecordKey) => ({ sourceRecordKey }));
+  const resolved = await resolveExactCompletedPrefix(fakePrisma(rows), "ns", report, phase);
   assert.equal(resolved.alreadyCompleted.size, 20);
 }
 
 async function testExactPrefixRejectsReportCountExceedingProvenPrefix(): Promise<void> {
   const phase = applyReleaseActionExceptions(usersPhaseFixture());
-  const report = fakeReport({ created: 21, updated: 0 });
-  const rows = completedPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey }));
-  await assert.rejects(
-    () => resolveExactCompletedPrefix(fakePrisma(rows), "phoenix-release-bundle", report, phase),
-    /CONTINUATION_REPORT_COUNT_EXCEEDS_PREFIX:reported=21:prefix=20/,
-  );
+  const report = { ...firstHopFailureReport(), created: 21, updated: 0 };
+  const rows = usersKeys().slice(0, 20).map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveExactCompletedPrefix(fakePrisma(rows), "ns", report, phase), /CONTINUATION_REPORT_COUNT_EXCEEDS_PREFIX/);
 }
 
 // =============================================================================
-// Section 4 — narrow release action exception (wordpress-db:user:38)
+// resolveFullPhaseCompletion (a phase that must be 100% done)
+// =============================================================================
+
+async function testFullPhaseCompletionSucceedsOnExactMatch(): Promise<void> {
+  const phase = businessesPhaseFixture();
+  const rows = businessesKeys().map((sourceRecordKey) => ({ sourceRecordKey }));
+  const result = await resolveFullPhaseCompletion(fakePrisma(rows), "ns", phase);
+  assert.equal(result.size, 10);
+}
+
+async function testFullPhaseCompletionRejectsMissingKey(): Promise<void> {
+  const phase = businessesPhaseFixture();
+  const rows = businessesKeys().slice(0, 9).map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveFullPhaseCompletion(fakePrisma(rows), "ns", phase), /CONTINUATION_PREFIX_KEY_MISSING/);
+}
+
+async function testFullPhaseCompletionRejectsUnrelatedKey(): Promise<void> {
+  const phase = businessesPhaseFixture();
+  const rows = [...businessesKeys(), "wordpress-db:user:99999"].map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveFullPhaseCompletion(fakePrisma(rows), "ns", phase), /CONTINUATION_UNRELATED_LINEAGE/);
+}
+
+async function testFullPhaseCompletionRejectsDuplicateLineage(): Promise<void> {
+  const phase = businessesPhaseFixture();
+  const rows = [...businessesKeys(), businessesKeys()[0]].map((sourceRecordKey) => ({ sourceRecordKey }));
+  await assert.rejects(() => resolveFullPhaseCompletion(fakePrisma(rows), "ns", phase), /CONTINUATION_DUPLICATE_LINEAGE/);
+}
+
+// =============================================================================
+// resolveMultiPhaseContinuation — the full second-hop orchestration
+// =============================================================================
+
+async function testMultiPhaseContinuationResolvesExactSecondHopScenario(): Promise<void> {
+  const manifest = testManifest();
+  const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+  const entries = secondHopChain();
+  const chain = { priorPhaseReports: entries.slice(0, -1), failureReport: entries.at(-1)! };
+
+  const allRows = [
+    ...usersKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER" })),
+    ...businessesKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS" })),
+    ...placesPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "PLACE" })),
+  ];
+  const prisma = {
+    migrationLineage: {
+      findMany: async (args: { where: { targetType: string } }) =>
+        allRows.filter((r) => r.targetType === args.where.targetType).map((r) => ({ sourceRecordKey: r.sourceRecordKey })),
+    },
+  } as unknown as import("@prisma/client").PrismaClient;
+
+  const result = await resolveMultiPhaseContinuation(prisma, "ns", chain, correctedManifest);
+  assert.equal(result.failedPhase, "places");
+  assert.equal(result.continuationStartKey, FAILED_PLACE_KEY);
+  assert.equal(result.phaseSkipSets.get("users")?.size, 25, "users phase is skipped in FULL — every executable key");
+  assert.equal(result.phaseSkipSets.get("businesses")?.size, 10, "businesses phase is skipped in FULL");
+  assert.deepEqual([...(result.phaseSkipSets.get("places") ?? [])].sort(), placesPrefixKeys().sort(), "places phase is skipped only up to its exact partial prefix");
+}
+
+async function testMultiPhaseContinuationFailsClosedWhenPriorPhaseNotActuallyComplete(): Promise<void> {
+  const manifest = testManifest();
+  const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+  const entries = secondHopChain();
+  const chain = { priorPhaseReports: entries.slice(0, -1), failureReport: entries.at(-1)! };
+
+  // businesses claims to be fully complete (10/10) but live DB only shows 9 —
+  // the report chain's own success claim must never be trusted blindly.
+  const allRows = [
+    ...usersKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER" })),
+    ...businessesKeys().slice(0, 9).map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS" })),
+    ...placesPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "PLACE" })),
+  ];
+  const prisma = {
+    migrationLineage: {
+      findMany: async (args: { where: { targetType: string } }) =>
+        allRows.filter((r) => r.targetType === args.where.targetType).map((r) => ({ sourceRecordKey: r.sourceRecordKey })),
+    },
+  } as unknown as import("@prisma/client").PrismaClient;
+
+  await assert.rejects(() => resolveMultiPhaseContinuation(prisma, "ns", chain, correctedManifest), /CONTINUATION_PREFIX_KEY_MISSING/);
+}
+
+// =============================================================================
+// applyReleaseActionExceptions
 // =============================================================================
 
 function testReleaseExceptionCorrectsUser38Action(): void {
-  const phase = usersPhaseFixture();
-  const corrected = applyReleaseActionExceptions(phase);
-  const record = corrected.records.find((r) => r.sourceRecordKey === FAILED_KEY);
-  assert.equal(record?.action, "CREATE");
-  // Every other record is untouched.
-  for (const record of corrected.records) {
-    if (record.sourceRecordKey === FAILED_KEY) continue;
-    assert.equal(record.action, "CREATE");
-  }
+  const corrected = applyReleaseActionExceptions(usersPhaseFixture());
+  assert.equal(corrected.records.find((r) => r.sourceRecordKey === FAILED_USER_KEY)?.action, "CREATE");
 }
 
 function testReleaseExceptionFailsClosedOnStaleManifestAction(): void {
-  const phase = usersPhaseFixture({ index: 20, action: "CREATE" }); // already CREATE, not the expected SKIP_UNCHANGED
-  assert.throws(() => applyReleaseActionExceptions(phase), /CONTINUATION_RELEASE_EXCEPTION_STALE:wordpress-db:user:38/);
+  const phase = usersPhaseFixture({ index: 20, action: "CREATE" });
+  assert.throws(() => applyReleaseActionExceptions(phase), /CONTINUATION_RELEASE_EXCEPTION_STALE/);
 }
 
 function testReleaseExceptionNoOpOutsideUsersPhase(): void {
   const phase: PhoenixReleasePhase = { ...usersPhaseFixture(), name: "places" };
-  const corrected = applyReleaseActionExceptions(phase);
-  assert.deepEqual(corrected, phase);
+  assert.deepEqual(applyReleaseActionExceptions(phase), phase);
 }
 
-function testReleaseExceptionRegistryIsExactlyOneNarrowEntry(): void {
-  assert.equal(PHOENIX_RELEASE_ACTION_EXCEPTIONS.length, 1);
-  assert.equal(PHOENIX_RELEASE_ACTION_EXCEPTIONS[0].sourceRecordKey, FAILED_KEY);
+function testReleaseExceptionRegistryDoesNotCoverThePlaceCityFailure(): void {
+  // wordpress-db:places:5528/32271 are a missing-prerequisite (City rows
+  // absent from DEV), never a manifest/live-plan mismatch — they must never
+  // be papered over by this table. See §J/§K.
+  assert.equal(PHOENIX_RELEASE_ACTION_EXCEPTIONS.some((e) => e.sourceRecordKey.includes("places")), false);
+}
+
+async function testPlaceCityPrerequisitesReportAllMissingBeforeWrite(): Promise<void> {
+  const prisma = { city: { findMany: async () => [] } } as never;
+  await assert.rejects(
+    () => assertPhoenixPlaceCityPrerequisites(prisma),
+    /PLACE_CITY_PREREQUISITES_UNSATISFIED:.*Копище.*Мир/,
+  );
+}
+
+async function testPlaceCityPrerequisitesRejectAmbiguousMatch(): Promise<void> {
+  const prisma = { city: { findMany: async () => [
+    { id: "1", name: "Копище" }, { id: "2", name: "Копище" }, { id: "3", name: "Мир" },
+  ] } } as never;
+  await assert.rejects(() => assertPhoenixPlaceCityPrerequisites(prisma), /"ambiguous":\["Копище"\]/);
+}
+
+async function testPlaceCityPrerequisitesAcceptExactlyOneEach(): Promise<void> {
+  let query: unknown;
+  const prisma = { city: { findMany: async (args: unknown) => {
+    query = args;
+    return [{ id: "1", name: "Копище" }, { id: "2", name: "Мир" }];
+  } } } as never;
+  await assertPhoenixPlaceCityPrerequisites(prisma);
+  assert.deepEqual(query, {
+    where: { name: { in: ["Копище", "Мир"], mode: "insensitive" }, isActive: true },
+    select: { id: true, name: true },
+  });
 }
 
 // =============================================================================
-// extractFailedKey / buildContinuationEvidence
+// extractFailedKey / buildContinuationEvidence / resolveChainOriginCodeSha
 // =============================================================================
 
-function testExtractFailedKeyStripsMultiColonErrorSuffix(): void {
-  const report = fakeReport({ firstFailure: "wordpress-db:user:38:UNEXPECTED_PLAN_ACTION:CREATE" });
-  assert.equal(extractFailedKey(report), FAILED_KEY);
+function testExtractFailedKeyStripsMultiColonSuffix(): void {
+  assert.equal(extractFailedKey(firstHopFailureReport()), FAILED_USER_KEY);
 }
 
 function testExtractFailedKeyRejectsNonFailure(): void {
-  assert.throws(() => extractFailedKey(fakeReport({ failed: 0, firstFailure: null })), /CONTINUATION_REPORT_NOT_A_FAILURE/);
+  assert.throws(() => extractFailedKey({ ...firstHopFailureReport(), failed: 0, firstFailure: null }), /CONTINUATION_REPORT_NOT_A_FAILURE/);
 }
 
-function testBuildContinuationEvidenceShape(): void {
+function testBuildContinuationEvidenceIncludesChainOrigin(): void {
   const evidence = buildContinuationEvidence({
-    predecessorCodeSha: PREDECESSOR_CODE_SHA,
+    predecessorCodeSha: SECOND_HOP_PREDECESSOR_CODE_SHA,
     predecessorReportSha256: "a".repeat(64),
-    predecessorTerminalFailedKey: FAILED_KEY,
-    skippedCompletedPrefixCount: 20,
-    continuationStartKey: FAILED_KEY,
+    predecessorTerminalFailedKey: FAILED_PLACE_KEY,
+    skippedCompletedPrefixCount: 3,
+    continuationStartKey: FAILED_PLACE_KEY,
+    chainOriginCodeSha: PREDECESSOR_CODE_SHA,
   });
-  assert.deepEqual(evidence, {
-    continuationPredecessorCodeSha: PREDECESSOR_CODE_SHA,
-    continuationPredecessorReportSha256: "a".repeat(64),
-    continuationPredecessorTerminalFailedKey: FAILED_KEY,
-    continuationSkippedCompletedPrefixCount: "20",
-    continuationStartKey: FAILED_KEY,
-  });
+  assert.equal(evidence.continuationChainOriginCodeSha, PREDECESSOR_CODE_SHA);
+  assert.equal(evidence.continuationPredecessorCodeSha, SECOND_HOP_PREDECESSOR_CODE_SHA);
+}
+
+function testResolveChainOriginCodeShaFirstHopIsItsOwnOrigin(): void {
+  const report = firstHopFailureReport();
+  assert.equal(resolveChainOriginCodeSha(report, PREDECESSOR_CODE_SHA), PREDECESSOR_CODE_SHA);
+}
+
+function testResolveChainOriginCodeShaSecondHopInheritsOrigin(): void {
+  const [usersSuccess] = secondHopChain();
+  assert.equal(resolveChainOriginCodeSha(usersSuccess, SECOND_HOP_PREDECESSOR_CODE_SHA), PREDECESSOR_CODE_SHA);
 }
 
 async function main(): Promise<void> {
-  testCrossShaAcceptsExactExplicitAuthorization();
-  testCrossShaRejectsUnknownPredecessorCodeSha();
-  testCrossShaRejectsWrongReportSha256();
-  testCrossShaRejectsReportCodeShaDisagreement();
-  testCrossShaRejectsCurrentCodeShaEqualToPredecessor();
-  testCrossShaRejectsIdentityMismatches();
-  testCrossShaRejectsNonFailureReport();
-  testCrossShaRejectsMalformedEmptyMultiLineOrUnreadableReport();
+  testFirstHopChainAcceptsZeroPriorPhases();
+  testSecondHopRejectsAnyUnpinnedReportArtifact();
+  testChainRejectsUnknownPredecessorCodeSha();
+  testChainRejectsWrongReportSha256();
+  testChainRejectsFailureLineCodeShaDisagreement();
+  testChainRejectsCurrentEqualsPredecessor();
+  testChainRejectsFailureLineIdentityMismatches();
+  testChainRejectsNonFailureLastLine();
+  testChainRejectsMalformedEmptyOrUnreadableReport();
+  testChainRejectsPriorPhaseCountMismatch();
+  testChainRejectsPriorPhaseOrderMismatch();
+  testChainRejectsPriorPhaseNotSuccessful();
+  testChainRejectsPriorPhasePrefixCorrupted();
+  testChainRejectsPriorPhaseCodeShaDisagreement();
+  testChainCorrectlySkipsValidationOnlyPhaseInSequence();
 
-  await testExactPrefixContinuesDirectlyAtUser38();
-  await testExactPrefixRejectsMissingKeyInsidePrefix();
-  await testExactPrefixRejectsCompletedKeyAfterFailedKey();
+  await testExactPrefixContinuesDirectlyAtFailedKey();
+  await testExactPrefixRejectsMissingKey();
+  await testExactPrefixRejectsNonPrefixKey();
   await testExactPrefixRejectsFailedKeyAlreadyComplete();
   await testExactPrefixRejectsDuplicateLineage();
   await testExactPrefixRejectsUnrelatedLineage();
-  await testExactPrefixRejectsAmbiguousActionInPrefix();
-  await testExactPrefixRejectsUnsupportedPhase();
-  await testExactPrefixRejectsPhaseMismatch();
-  await testExactPrefixRejectsFailedKeyNotInManifest();
+  await testExactPrefixRejectsAmbiguousAction();
   await testExactPrefixAllowsReportCountLowerThanProvenPrefix();
   await testExactPrefixRejectsReportCountExceedingProvenPrefix();
+
+  await testFullPhaseCompletionSucceedsOnExactMatch();
+  await testFullPhaseCompletionRejectsMissingKey();
+  await testFullPhaseCompletionRejectsUnrelatedKey();
+  await testFullPhaseCompletionRejectsDuplicateLineage();
+
+  await testMultiPhaseContinuationResolvesExactSecondHopScenario();
+  await testMultiPhaseContinuationFailsClosedWhenPriorPhaseNotActuallyComplete();
 
   testReleaseExceptionCorrectsUser38Action();
   testReleaseExceptionFailsClosedOnStaleManifestAction();
   testReleaseExceptionNoOpOutsideUsersPhase();
-  testReleaseExceptionRegistryIsExactlyOneNarrowEntry();
+  testReleaseExceptionRegistryDoesNotCoverThePlaceCityFailure();
+  await testPlaceCityPrerequisitesReportAllMissingBeforeWrite();
+  await testPlaceCityPrerequisitesRejectAmbiguousMatch();
+  await testPlaceCityPrerequisitesAcceptExactlyOneEach();
 
-  testExtractFailedKeyStripsMultiColonErrorSuffix();
+  testExtractFailedKeyStripsMultiColonSuffix();
   testExtractFailedKeyRejectsNonFailure();
-  testBuildContinuationEvidenceShape();
+  testBuildContinuationEvidenceIncludesChainOrigin();
+  testResolveChainOriginCodeShaFirstHopIsItsOwnOrigin();
+  testResolveChainOriginCodeShaSecondHopInheritsOrigin();
 
   console.log("Phoenix continuation tests: OK");
 }

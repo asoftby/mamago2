@@ -7,6 +7,7 @@ import type {
   PhoenixExpectedRecord,
   PhoenixPhaseName,
   PhoenixPhaseReport,
+  PhoenixReleaseManifest,
   PhoenixReleasePhase,
 } from "./types";
 
@@ -18,7 +19,7 @@ function blocked(code: string): Error {
  * Maps an executable Phoenix phase to the `MigrationLineage.targetType`
  * its writer records identity under. Phases not listed here (currently
  * only `events`, which uses a differently-shaped adapter) are not
- * supported by continuation — see `resolveExactCompletedPrefix`.
+ * supported by continuation.
  */
 export const CONTINUATION_PHASE_TARGET_TYPE: Partial<Record<PhoenixPhaseName, string>> = {
   users: "USER",
@@ -31,8 +32,10 @@ export const CONTINUATION_PHASE_TARGET_TYPE: Partial<Record<PhoenixPhaseName, st
 
 // ---------------------------------------------------------------------------
 // Cross-code-SHA continuation identity — loading and authorizing a
-// predecessor failure report produced by an *older* code SHA than the one
-// currently running.
+// predecessor progress report produced by an *older* code SHA than the one
+// currently running. The report may now span multiple hops: zero or more
+// fully-successful phase lines followed by exactly one failure line — see
+// `loadCrossShaContinuationChain`.
 // ---------------------------------------------------------------------------
 
 const CODE_SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -42,13 +45,51 @@ const CODE_SHA_PATTERN = /^[0-9a-f]{40}$/;
  * permitted to resume from. Deliberately not an open `--ignore-code-sha`
  * escape hatch and not "any SHA the operator names": extending this list to
  * a new predecessor requires a reviewed source change, never an
- * operator-supplied flag at run time.
+ * operator-supplied flag at run time. Every past image that ever produced a
+ * report a later hop might need to continue from stays listed here
+ * permanently — the list only ever grows.
  */
 export const KNOWN_PREDECESSOR_CODE_SHAS: ReadonlySet<string> = new Set([
   // Original Phoenix DEV apply attempt (2026-08-03) that stopped cleanly at
   // wordpress-db:user:38 — see docs/migration/prelaunch-checklist.md §G.
   "f466c34c0cf095d054ae79d86a12505129719739",
+  // First continuation hop (2026-08-03): completed Users (563/563) and
+  // Businesses (38/38) in full, then stopped at wordpress-db:places:5528
+  // (PLACE_CITY_DEPENDENCY_NOT_FOUND) — see §J.
+  "2dc00b6026651c0d1b1008598a19a6833930820f",
 ]);
+
+export const PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256 =
+  "257671d8dd039d803d5571cdcd0d00a8ddbdeaf4fba55c1a21b4f35850a9cfcc";
+export const PHOENIX_SECOND_HOP_TERMINAL_KEY = "wordpress-db:places:5528";
+export const PHOENIX_SECOND_HOP_COMPLETED_PREFIX: readonly PhoenixPhaseName[] = ["users", "businesses"];
+
+/**
+ * The already-produced second-hop report is a single reviewed artifact, not
+ * merely any byte sequence that happens to embed an allowlisted code SHA.
+ * Pin its digest and terminal state here. The remaining release, manifest,
+ * environment and embedded-code identities are checked below against the
+ * invocation's independently-derived expected values.
+ */
+function assertPinnedPredecessorArtifact(
+  request: CrossShaContinuationRequest,
+  failureReport: PhoenixPhaseReport,
+  expectedReleaseId: string,
+): void {
+  if (
+    request.predecessorCodeSha !== "2dc00b6026651c0d1b1008598a19a6833930820f" ||
+    expectedReleaseId !== "phoenix-approved-2026-07-30"
+  ) return;
+  if (request.reportSha256.trim().toLowerCase() !== PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256) {
+    throw blocked("CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED");
+  }
+  if (extractFailedKey(failureReport) !== PHOENIX_SECOND_HOP_TERMINAL_KEY) {
+    throw blocked("CONTINUATION_PREDECESSOR_TERMINAL_KEY_MISMATCH");
+  }
+  if (JSON.stringify(failureReport.completedPrefix) !== JSON.stringify(PHOENIX_SECOND_HOP_COMPLETED_PREFIX)) {
+    throw blocked("CONTINUATION_PREDECESSOR_COMPLETED_PREFIX_MISMATCH");
+  }
+}
 
 export interface CrossShaContinuationRequest {
   reportPath: string;
@@ -63,36 +104,35 @@ export interface CrossShaContinuationExpected {
   environment: PhoenixEnvironmentContext;
 }
 
-function parseSoleReportEntry(raw: string): PhoenixPhaseReport {
+function isWellFormedReportEntry(value: unknown): value is PhoenixPhaseReport {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Partial<PhoenixPhaseReport>;
+  return (
+    typeof entry.releaseId === "string" &&
+    typeof entry.codeSha === "string" &&
+    typeof entry.manifestHash === "string" &&
+    typeof entry.phase === "string" &&
+    typeof entry.created === "number" &&
+    typeof entry.updated === "number" &&
+    typeof entry.failed === "number" &&
+    (typeof entry.firstFailure === "string" || entry.firstFailure === null) &&
+    typeof entry.environmentFingerprint === "object" &&
+    entry.environmentFingerprint !== null &&
+    Array.isArray(entry.completedPrefix)
+  );
+}
+
+function parseReportEntries(raw: string): PhoenixPhaseReport[] {
   const lines = raw.split("\n").filter((line) => line.trim().length > 0);
   if (lines.length === 0) throw blocked("CONTINUATION_REPORT_EMPTY");
-  // A cross-SHA continuation authorizes one specific, previously-captured
-  // failure artifact — not an ongoing multi-phase journal — so exactly one
-  // line is required, not "the last of however many".
-  if (lines.length !== 1) throw blocked("CONTINUATION_REPORT_NOT_SINGLE_ENTRY");
-
-  let entry: PhoenixPhaseReport;
+  let entries: unknown[];
   try {
-    entry = JSON.parse(lines[0]) as PhoenixPhaseReport;
+    entries = lines.map((line) => JSON.parse(line));
   } catch {
     throw blocked("CONTINUATION_REPORT_MALFORMED");
   }
-  if (
-    !entry ||
-    typeof entry.releaseId !== "string" ||
-    typeof entry.codeSha !== "string" ||
-    typeof entry.manifestHash !== "string" ||
-    typeof entry.phase !== "string" ||
-    typeof entry.created !== "number" ||
-    typeof entry.updated !== "number" ||
-    typeof entry.failed !== "number" ||
-    (typeof entry.firstFailure !== "string" && entry.firstFailure !== null) ||
-    typeof entry.environmentFingerprint !== "object" ||
-    entry.environmentFingerprint === null
-  ) {
-    throw blocked("CONTINUATION_REPORT_MALFORMED");
-  }
-  return entry;
+  if (!entries.every(isWellFormedReportEntry)) throw blocked("CONTINUATION_REPORT_MALFORMED");
+  return entries as PhoenixPhaseReport[];
 }
 
 /**
@@ -109,16 +149,55 @@ export function extractFailedKey(report: PhoenixPhaseReport): string {
 }
 
 /**
+ * The phases a real run actually produces a report line for, in order:
+ * `runPhoenixRelease` silently `continue`s past `VALIDATION_ONLY` phases in
+ * apply/rerun mode without ever calling an adapter or appending a report —
+ * so a report chain must never expect a line for one. Mirrors that behavior
+ * exactly, rather than re-deriving it differently here.
+ */
+function reportablePhaseOrder(manifest: PhoenixReleaseManifest): PhoenixPhaseName[] {
+  return manifest.phaseOrder.filter((name) => {
+    const phase = manifest.phases.find((item) => item.name === name);
+    return phase !== undefined && phase.status !== "VALIDATION_ONLY";
+  });
+}
+
+export interface CrossShaContinuationChain {
+  /** The one phase report describing where the predecessor run stopped. */
+  failureReport: PhoenixPhaseReport;
+  /**
+   * Every phase report line before the failure, in `phaseOrder` order —
+   * each independently validated as a genuine, uncorrupted, fingerprint-
+   * matching success. Empty for a first-hop continuation (failure in the
+   * very first executable phase); one entry per fully-completed phase for
+   * every later hop.
+   */
+  priorPhaseReports: readonly PhoenixPhaseReport[];
+}
+
+/**
  * Loads and fully authorizes a predecessor progress report for continuation
  * under a *different* (newer) code SHA. Every check fails closed; nothing
- * here mutates state. This is the only way this module accepts a report
- * whose `codeSha` differs from the code currently running — see
- * `KNOWN_PREDECESSOR_CODE_SHAS`, which this never bypasses.
+ * here mutates state or touches the database. This is the only way this
+ * module accepts a report whose `codeSha` differs from the code currently
+ * running — see `KNOWN_PREDECESSOR_CODE_SHAS`, which this never bypasses.
+ *
+ * The report file may contain more than one line: every phase that
+ * completed successfully before the eventual failure gets its own report
+ * line (`JsonLinesPhoenixReportStore` is append-only). The *last* line must
+ * describe the failure; every line before it must be an independently
+ * valid, uncorrupted success forming an exact, gap-free prefix of the
+ * manifest's own reportable phase order — the same structural guarantee
+ * `assertResume`/`resolveSafeResumePoint` already enforce for same-image
+ * resume, checked again here because those functions' own `codeSha` check
+ * is deliberately incompatible with a cross-image continuation (the prior
+ * phases were legitimately produced by the *predecessor* image, not the
+ * one running now).
  */
-export function loadCrossShaContinuationReport(
+export function loadCrossShaContinuationChain(
   request: CrossShaContinuationRequest,
-  expected: CrossShaContinuationExpected,
-): PhoenixPhaseReport {
+  expected: CrossShaContinuationExpected & { manifest: PhoenixReleaseManifest },
+): CrossShaContinuationChain {
   if (!CODE_SHA_PATTERN.test(request.predecessorCodeSha)) throw blocked("CONTINUATION_PREDECESSOR_CODE_SHA_INVALID");
   if (!KNOWN_PREDECESSOR_CODE_SHAS.has(request.predecessorCodeSha)) throw blocked("CONTINUATION_PREDECESSOR_CODE_SHA_UNKNOWN");
   if (!CODE_SHA_PATTERN.test(expected.currentCodeSha)) throw blocked("CONTINUATION_CURRENT_CODE_SHA_INVALID");
@@ -133,73 +212,111 @@ export function loadCrossShaContinuationReport(
   const actualSha256 = sha256Bytes(raw);
   if (actualSha256 !== request.reportSha256.trim().toLowerCase()) throw blocked("CONTINUATION_REPORT_SHA256_MISMATCH");
 
-  const report = parseSoleReportEntry(raw);
-  if (report.codeSha !== request.predecessorCodeSha) throw blocked("CONTINUATION_REPORT_CODE_SHA_MISMATCH");
-  if (report.releaseId !== expected.releaseId) throw blocked("CONTINUATION_RELEASE_ID_MISMATCH");
-  if (report.manifestHash !== expected.manifestHash) throw blocked("CONTINUATION_MANIFEST_HASH_MISMATCH");
-  if (report.environment !== expected.environment.environment) throw blocked("CONTINUATION_ENVIRONMENT_MISMATCH");
-  if (JSON.stringify(report.environmentFingerprint) !== JSON.stringify(expected.environment)) {
-    throw blocked("CONTINUATION_ENVIRONMENT_FINGERPRINT_MISMATCH");
-  }
+  const entries = parseReportEntries(raw);
+  const failureReport = entries.at(-1)!;
+  const priorPhaseReports = entries.slice(0, -1);
+  assertPinnedPredecessorArtifact(request, failureReport, expected.releaseId);
+
+  const checkIdentity = (report: PhoenixPhaseReport): void => {
+    if (report.codeSha !== request.predecessorCodeSha) throw blocked("CONTINUATION_REPORT_CODE_SHA_MISMATCH");
+    if (report.releaseId !== expected.releaseId) throw blocked("CONTINUATION_RELEASE_ID_MISMATCH");
+    if (report.manifestHash !== expected.manifestHash) throw blocked("CONTINUATION_MANIFEST_HASH_MISMATCH");
+    if (report.environment !== expected.environment.environment) throw blocked("CONTINUATION_ENVIRONMENT_MISMATCH");
+    if (JSON.stringify(report.environmentFingerprint) !== JSON.stringify(expected.environment)) {
+      throw blocked("CONTINUATION_ENVIRONMENT_FINGERPRINT_MISMATCH");
+    }
+  };
+
+  checkIdentity(failureReport);
   // Validates the key is well-formed and present; the failure itself is
   // re-validated (`report.failed <= 0`) inside extractFailedKey.
-  extractFailedKey(report);
+  extractFailedKey(failureReport);
 
-  return report;
+  const order = reportablePhaseOrder(expected.manifest);
+  const failedPhaseIndex = order.indexOf(failureReport.phase);
+  if (failedPhaseIndex < 0) throw blocked("CONTINUATION_FAILED_PHASE_NOT_IN_MANIFEST");
+  const expectedPriorPhaseNames = order.slice(0, failedPhaseIndex);
+
+  if (priorPhaseReports.length !== expectedPriorPhaseNames.length) {
+    throw blocked(
+      `CONTINUATION_PRIOR_PHASE_COUNT_MISMATCH:expected=${expectedPriorPhaseNames.length}:actual=${priorPhaseReports.length}`,
+    );
+  }
+
+  priorPhaseReports.forEach((report, index) => {
+    checkIdentity(report);
+    if (report.phase !== expectedPriorPhaseNames[index]) {
+      throw blocked(`CONTINUATION_PRIOR_PHASE_ORDER_MISMATCH:${report.phase}`);
+    }
+    if (report.failed > 0) throw blocked(`CONTINUATION_PRIOR_PHASE_NOT_SUCCESSFUL:${report.phase}`);
+    const expectedOwnPrefix = order.slice(0, index + 1);
+    if (JSON.stringify(report.completedPrefix) !== JSON.stringify(expectedOwnPrefix)) {
+      throw blocked(`CONTINUATION_PRIOR_PHASE_PREFIX_CORRUPTED:${report.phase}`);
+    }
+  });
+
+  return { failureReport, priorPhaseReports };
+}
+
+export const PHOENIX_PLACE_CITY_PREREQUISITES = ["Копище", "Мир"] as const;
+
+/** Checks all known Place City prerequisites together, before any release write. */
+export async function assertPhoenixPlaceCityPrerequisites(
+  prisma: Pick<PrismaClient, "city">,
+): Promise<void> {
+  const rows = await prisma.city.findMany({
+    where: {
+      name: { in: [...PHOENIX_PLACE_CITY_PREREQUISITES], mode: "insensitive" },
+      isActive: true,
+    },
+    select: { id: true, name: true },
+  });
+  const normalized = (value: string) => value.trim().toLocaleLowerCase("ru");
+  const missing: string[] = [];
+  const ambiguous: string[] = [];
+  for (const required of PHOENIX_PLACE_CITY_PREREQUISITES) {
+    const matches = rows.filter((row) => normalized(row.name) === normalized(required));
+    if (matches.length === 0) missing.push(required);
+    if (matches.length > 1) ambiguous.push(required);
+  }
+  if (missing.length || ambiguous.length) {
+    throw blocked(`PLACE_CITY_PREREQUISITES_UNSATISFIED:${JSON.stringify({ missing, ambiguous })}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Exact completed-prefix proof — the sole mechanism that decides which
-// records `SequentialEntityPhaseAdapter` is allowed to skip.
+// Exact phase-completion proof — the sole mechanism that decides which
+// records `SequentialEntityPhaseAdapter` is allowed to skip, for both a
+// fully-completed prior phase and the one currently-failing phase.
 // ---------------------------------------------------------------------------
-
-export interface ExactPrefixContinuation {
-  phase: PhoenixPhaseName;
-  alreadyCompleted: ReadonlySet<string>;
-  continuationStartKey: string;
-}
 
 /**
- * Proves — never assumes — the exact live-DB completed prefix of the failed
- * phase's deterministic execution order (`exactExecutableKeys`, i.e. the
- * manifest's own declared record order). This does not trust the
- * predecessor report's own aggregate `created + updated` count as the
- * source of truth (only as an upper-bound sanity signal, since a
- * predecessor report captured under an older code SHA may predate a release
- * action exception that changes what "already complete" means for a given
- * key) — the live `MigrationLineage` rows, checked position-by-position
- * against the manifest's own order, are authoritative.
- *
- * Every check fails closed:
- *  - a record inside the expected prefix whose manifest action is not
- *    CREATE/UPDATE cannot be proven complete purely from lineage existence
- *    (a SKIPPED outcome leaves no row) — this module never guesses, so it
- *    rejects rather than assumes such a phase is safe to continue;
+ * Proves — never assumes — that exactly `expectedKeys` (and nothing else)
+ * has live, active `MigrationLineage` for this phase. Used both for a
+ * phase that should be 100% done (`expectedKeys` = every executable key)
+ * and for the partial prefix of the currently-failing phase (`expectedKeys`
+ * = the keys before the failure). Every check fails closed:
+ *  - a key inside `expectedKeys` whose manifest action is not CREATE/UPDATE
+ *    cannot be proven complete purely from lineage existence (a SKIPPED
+ *    outcome leaves no row) — this module never guesses;
  *  - any live lineage row for a key outside this phase's record set at all
  *    is unrelated/unexpected contamination;
  *  - any duplicate live lineage row for the same key is itself corruption;
- *  - a missing key inside the expected prefix, or a completed key at or
- *    after the terminal failed key's position, both fail closed.
+ *  - a missing key inside `expectedKeys`, or any completed key outside it,
+ *    both fail closed.
  */
-export async function resolveExactCompletedPrefix(
+async function resolvePhaseCompletion(
   prisma: PrismaClient,
   sourceNamespace: string,
-  report: PhoenixPhaseReport,
   phase: PhoenixReleasePhase,
-): Promise<ExactPrefixContinuation> {
-  if (phase.name !== report.phase) throw blocked("CONTINUATION_PHASE_MISMATCH");
-  const targetType = CONTINUATION_PHASE_TARGET_TYPE[report.phase];
-  if (!targetType) throw blocked(`CONTINUATION_UNSUPPORTED_PHASE:${report.phase}`);
-
-  const failedKey = extractFailedKey(report);
-  const orderedKeys = exactExecutableKeys(phase);
-  const failedIndex = orderedKeys.indexOf(failedKey);
-  if (failedIndex < 0) throw blocked("CONTINUATION_FAILED_KEY_NOT_IN_MANIFEST");
-
-  const expectedPrefix = orderedKeys.slice(0, failedIndex);
+  expectedKeys: readonly string[],
+  diagnosticKeyOnConflict?: string,
+): Promise<ReadonlySet<string>> {
+  const targetType = CONTINUATION_PHASE_TARGET_TYPE[phase.name];
+  if (!targetType) throw blocked(`CONTINUATION_UNSUPPORTED_PHASE:${phase.name}`);
 
   const recordAction = new Map(phase.records.map((record) => [record.sourceRecordKey, record.action]));
-  const ambiguousKey = expectedPrefix.find((key) => {
+  const ambiguousKey = expectedKeys.find((key) => {
     const action = recordAction.get(key);
     return action !== "CREATE" && action !== "UPDATE";
   });
@@ -220,16 +337,52 @@ export async function resolveExactCompletedPrefix(
   const unrelatedKey = [...seen].find((key) => !allPhaseKeys.has(key));
   if (unrelatedKey) throw blocked(`CONTINUATION_UNRELATED_LINEAGE:${unrelatedKey}`);
 
-  const missingKey = expectedPrefix.find((key) => !seen.has(key));
+  const missingKey = expectedKeys.find((key) => !seen.has(key));
   if (missingKey) throw blocked(`CONTINUATION_PREFIX_KEY_MISSING:${missingKey}`);
 
-  const expectedPrefixSet = new Set(expectedPrefix);
-  const extraKey = [...seen].find((key) => !expectedPrefixSet.has(key));
+  const expectedKeySet = new Set(expectedKeys);
+  const extraKey = [...seen].find((key) => !expectedKeySet.has(key));
   if (extraKey) {
     throw blocked(
-      extraKey === failedKey ? "CONTINUATION_FAILED_KEY_ALREADY_COMPLETE" : `CONTINUATION_UNEXPECTED_COMPLETED_KEY:${extraKey}`,
+      extraKey === diagnosticKeyOnConflict
+        ? "CONTINUATION_FAILED_KEY_ALREADY_COMPLETE"
+        : `CONTINUATION_UNEXPECTED_COMPLETED_KEY:${extraKey}`,
     );
   }
+
+  return expectedKeySet;
+}
+
+export interface ExactPrefixContinuation {
+  phase: PhoenixPhaseName;
+  alreadyCompleted: ReadonlySet<string>;
+  continuationStartKey: string;
+}
+
+/**
+ * Proves the exact live-DB completed prefix of the currently-failing
+ * phase's deterministic execution order (`exactExecutableKeys`). Does not
+ * trust the predecessor report's own aggregate `created + updated` count as
+ * authoritative (only as an upper-bound sanity signal — see the inline
+ * comment below); the live `MigrationLineage` rows, checked
+ * position-by-position against the manifest's own order, are what actually
+ * gates the skip set.
+ */
+export async function resolveExactCompletedPrefix(
+  prisma: PrismaClient,
+  sourceNamespace: string,
+  report: PhoenixPhaseReport,
+  phase: PhoenixReleasePhase,
+): Promise<ExactPrefixContinuation> {
+  if (phase.name !== report.phase) throw blocked("CONTINUATION_PHASE_MISMATCH");
+
+  const failedKey = extractFailedKey(report);
+  const orderedKeys = exactExecutableKeys(phase);
+  const failedIndex = orderedKeys.indexOf(failedKey);
+  if (failedIndex < 0) throw blocked("CONTINUATION_FAILED_KEY_NOT_IN_MANIFEST");
+
+  const expectedPrefix = orderedKeys.slice(0, failedIndex);
+  const alreadyCompleted = await resolvePhaseCompletion(prisma, sourceNamespace, phase, expectedPrefix, failedKey);
 
   // Advisory upper-bound only: the exact positional proof above is what
   // actually gates the skip set. The report's own count is allowed to be
@@ -243,7 +396,61 @@ export async function resolveExactCompletedPrefix(
     );
   }
 
-  return { phase: phase.name, alreadyCompleted: expectedPrefixSet, continuationStartKey: failedKey };
+  return { phase: phase.name, alreadyCompleted, continuationStartKey: failedKey };
+}
+
+/**
+ * Proves a phase is *entirely* complete: live lineage must exactly equal
+ * every executable key the manifest declares for it, no more, no less.
+ * Used for every phase a continuation chain's prior report lines claim
+ * finished successfully — never trusted from the report alone.
+ */
+export async function resolveFullPhaseCompletion(
+  prisma: PrismaClient,
+  sourceNamespace: string,
+  phase: PhoenixReleasePhase,
+): Promise<ReadonlySet<string>> {
+  const orderedKeys = exactExecutableKeys(phase);
+  return resolvePhaseCompletion(prisma, sourceNamespace, phase, orderedKeys);
+}
+
+// ---------------------------------------------------------------------------
+// Multi-phase continuation orchestration — resolves the skip set for every
+// phase a continuation chain covers: full skip sets for prior completed
+// phases, plus the exact partial prefix for the one currently-failing
+// phase. This is what makes a *second* (or later) continuation hop safe:
+// without it, a plain `--apply` restarts at the first phase in
+// `phaseOrder`, and a phase that is 100% done would immediately hit
+// `UNEXPECTED_PLAN_ACTION` on its first record (the manifest's static
+// action is stale the moment the live target actually exists).
+// ---------------------------------------------------------------------------
+
+export interface MultiPhaseContinuationResult {
+  phaseSkipSets: ReadonlyMap<PhoenixPhaseName, ReadonlySet<string>>;
+  failedPhase: PhoenixPhaseName;
+  continuationStartKey: string;
+}
+
+export async function resolveMultiPhaseContinuation(
+  prisma: PrismaClient,
+  sourceNamespace: string,
+  chain: CrossShaContinuationChain,
+  manifest: PhoenixReleaseManifest,
+): Promise<MultiPhaseContinuationResult> {
+  const phaseSkipSets = new Map<PhoenixPhaseName, ReadonlySet<string>>();
+
+  for (const priorReport of chain.priorPhaseReports) {
+    const phase = manifest.phases.find((item) => item.name === priorReport.phase);
+    if (!phase) throw blocked(`CONTINUATION_PHASE_NOT_IN_MANIFEST:${priorReport.phase}`);
+    phaseSkipSets.set(phase.name, await resolveFullPhaseCompletion(prisma, sourceNamespace, phase));
+  }
+
+  const failedPhase = manifest.phases.find((item) => item.name === chain.failureReport.phase);
+  if (!failedPhase) throw blocked(`CONTINUATION_PHASE_NOT_IN_MANIFEST:${chain.failureReport.phase}`);
+  const partial = await resolveExactCompletedPrefix(prisma, sourceNamespace, chain.failureReport, failedPhase);
+  phaseSkipSets.set(partial.phase, partial.alreadyCompleted);
+
+  return { phaseSkipSets, failedPhase: partial.phase, continuationStartKey: partial.continuationStartKey };
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +483,11 @@ export interface ReleaseActionException {
  * This is deliberately a narrow, itemized table, not a code change to
  * `UsersPhaseExecutor` or any other executor's manifest/live-plan
  * comparison — every other record's mismatch still fails closed exactly as
- * before, in every phase.
+ * before, in every phase. `wordpress-db:places:5528` (missing City
+ * `Копище`) and `wordpress-db:places:32271` (missing City `Мир`, not yet
+ * reached) are deliberately **not** listed here — see §J: that failure is
+ * a missing-prerequisite (City rows absent from DEV), not a stale-manifest
+ * mismatch, and does not fit this table's shape at all.
  */
 export const PHOENIX_RELEASE_ACTION_EXCEPTIONS: readonly ReleaseActionException[] = [
   {
@@ -328,6 +539,14 @@ export interface ContinuationEvidenceInput {
   predecessorTerminalFailedKey: string;
   skippedCompletedPrefixCount: number;
   continuationStartKey: string;
+  /**
+   * The code SHA of the *original* run this whole continuation chain traces
+   * back to, however many hops ago. Equal to `predecessorCodeSha` for a
+   * first-hop continuation; carried forward unchanged (not re-derived) by
+   * `chainOriginCodeSha` for every later hop, so a report always shows the
+   * full chain's true starting point, not just its immediate predecessor.
+   */
+  chainOriginCodeSha: string;
 }
 
 /**
@@ -344,5 +563,18 @@ export function buildContinuationEvidence(input: ContinuationEvidenceInput): Rec
     continuationPredecessorTerminalFailedKey: input.predecessorTerminalFailedKey,
     continuationSkippedCompletedPrefixCount: String(input.skippedCompletedPrefixCount),
     continuationStartKey: input.continuationStartKey,
+    continuationChainOriginCodeSha: input.chainOriginCodeSha,
   };
+}
+
+/**
+ * Extracts the chain's true origin code SHA from a predecessor failure
+ * report: if that report was itself produced by an earlier continuation
+ * (its own `resolvedIdentities.continuationChainOriginCodeSha` is set),
+ * that value is the real origin — otherwise this predecessor *is* the
+ * origin (a first-hop continuation).
+ */
+export function resolveChainOriginCodeSha(failureReport: PhoenixPhaseReport, predecessorCodeSha: string): string {
+  const inherited = failureReport.resolvedIdentities?.continuationChainOriginCodeSha;
+  return typeof inherited === "string" && inherited.length > 0 ? inherited : predecessorCodeSha;
 }

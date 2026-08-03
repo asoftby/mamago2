@@ -4,8 +4,8 @@ import type { PrismaClient } from "@prisma/client";
 import type { PlacesWriterPrismaClient } from "./placesProductionWiring";
 
 import { SequentialEntityPhaseAdapter } from "../adapter";
-import { resolveExactCompletedPrefix } from "../continuation";
-import type { PhoenixPhaseAdapter, PhoenixPhaseName, PhoenixPhaseReport, PhoenixReleaseManifest } from "../types";
+import { assertPhoenixPlaceCityPrerequisites, resolveMultiPhaseContinuation, type CrossShaContinuationChain } from "../continuation";
+import type { PhoenixPhaseAdapter, PhoenixPhaseName, PhoenixReleaseManifest } from "../types";
 
 import { OffersPhaseExecutor } from "./offersAdapter";
 import { createOffersDependencyResolver, createOffersLoadCandidate, createOffersTargetStateResolver, createOffersWriter } from "./offersProductionWiring";
@@ -64,13 +64,17 @@ export interface BuildPhoenixAdapterRegistryInput {
    * `--continue-from-report-sha256` / `--continue-from-code-sha` and
    * `continuation.ts`). `input.manifest` here must already reflect any
    * applicable `applyReleaseActionExceptions` correction — this registry
-   * does not apply those itself. The failed phase's already-complete
-   * records (live-DB-verified as an *exact* prefix of the manifest's own
-   * deterministic record order, not merely a count match) are skipped
-   * without re-deriving a plan for them; every other record in that phase,
-   * and every other phase, is unaffected.
+   * does not apply those itself. Every phase the chain's prior report lines
+   * claim finished successfully is skipped *entirely* (live-DB-verified as
+   * exactly every executable key, not merely a count match); the one
+   * currently-failing phase is skipped up to its *exact* live-verified
+   * prefix, not merely a count match; every other record, and every other
+   * phase, is unaffected. See `resolveMultiPhaseContinuation` — this is
+   * what makes a second (or later) continuation hop safe: without it, a
+   * plain `--apply` would restart every already-100%-complete phase from
+   * its first record.
    */
-  continuationReport?: PhoenixPhaseReport;
+  continuationChain?: CrossShaContinuationChain;
 }
 
 interface ScopeArtifact {
@@ -92,12 +96,6 @@ function scopeArtifactChecksum(entity: string): string {
 function domainHashMap(entity: string): Map<string, string> {
   const artifact = readScopeArtifact(entity);
   return new Map(artifact.records.map((record) => [record.sourceRecordKey, record.sourceHash]));
-}
-
-function mustFindPhase(manifest: PhoenixReleaseManifest, name: PhoenixPhaseName) {
-  const phase = manifest.phases.find((item) => item.name === name);
-  if (!phase) throw new Error(`RELEASE_BLOCKED:CONTINUATION_PHASE_NOT_IN_MANIFEST:${name}`);
-  return phase;
 }
 
 /**
@@ -182,28 +180,29 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
   const { prisma, artifactRoot } = input;
   assertRegistryConsistency(input.manifest, EXECUTABLE_PHASES);
 
+  // A continuation must establish every known City dependency together,
+  // before even the MigrationSource upsert below. This reports Копище and
+  // Мир in one read-only preflight instead of failing one Place at a time.
+  if (input.continuationChain) await assertPhoenixPlaceCityPrerequisites(prisma);
+
   const source = await prisma.migrationSource.upsert({
     where: { adapterKey_sourceNamespace: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE } },
     create: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE, name: "Phoenix release bundle" },
     update: {},
   });
 
-  // Resolved once, up front: the live-DB-verified *exact prefix* skip set
-  // for the one phase named in `continuationReport`, if any. Fails closed
-  // immediately (before any adapter is built) on an unsupported phase, a
-  // non-prefix or missing completed key, unrelated/duplicate lineage, or an
-  // ambiguous (non CREATE/UPDATE) record inside the claimed prefix — see
+  // Resolved once, up front: the live-DB-verified skip set for every phase
+  // `continuationChain` covers — full-phase skip sets for every prior
+  // report line's fully-completed phase, plus the exact partial prefix for
+  // the one currently-failing phase. Fails closed immediately (before any
+  // adapter is built) on an unsupported phase, a non-prefix or missing
+  // completed key, unrelated/duplicate lineage, or an ambiguous
+  // (non CREATE/UPDATE) record inside any claimed prefix — see
   // `continuation.ts`.
-  const continuation = input.continuationReport
-    ? await resolveExactCompletedPrefix(
-        prisma,
-        source.sourceNamespace,
-        input.continuationReport,
-        mustFindPhase(input.manifest, input.continuationReport.phase),
-      )
+  const continuation = input.continuationChain
+    ? await resolveMultiPhaseContinuation(prisma, source.sourceNamespace, input.continuationChain, input.manifest)
     : undefined;
-  const completedFor = (phase: PhoenixPhaseName): ReadonlySet<string> | undefined =>
-    continuation?.phase === phase ? continuation.alreadyCompleted : undefined;
+  const completedFor = (phase: PhoenixPhaseName): ReadonlySet<string> | undefined => continuation?.phaseSkipSets.get(phase);
 
   const registry: Partial<Record<PhoenixPhaseName, PhoenixPhaseAdapter>> = {};
 
