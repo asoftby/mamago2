@@ -5,6 +5,9 @@ import { join } from "node:path";
 
 import {
   KNOWN_PREDECESSOR_CODE_SHAS,
+  PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT,
+  PHOENIX_OFFERS_PARTIAL_REPORT_SHA256,
+  PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY,
   PHOENIX_RELEASE_ACTION_EXCEPTIONS,
   PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256,
   applyReleaseActionExceptions,
@@ -12,6 +15,7 @@ import {
   assertPhoenixPlaceCityPrerequisites,
   buildContinuationEvidence,
   extractFailedKey,
+  isPhoenixOffersPartialContinuation,
   loadCrossShaContinuationChain,
   resolveChainOriginCodeSha,
   resolveExactCompletedPrefix,
@@ -704,6 +708,507 @@ function testResolveChainOriginCodeShaSecondHopInheritsOrigin(): void {
   assert.equal(resolveChainOriginCodeSha(usersSuccess, SECOND_HOP_PREDECESSOR_CODE_SHA), PREDECESSOR_CODE_SHA);
 }
 
+// =============================================================================
+// Offers-partial hop (1ae265… → next image) — pinned failure report
+// =============================================================================
+
+const OFFERS_PARTIAL_CODE_SHA = "1ae2658108fda224acd994021752ff52452e8cad";
+const OFFERS_PARTIAL_REPORT_SHA = "5490cc2503b8f028c08b6e99181429090ee4fe332343f293ae7f41b0702d78bb";
+const OFFERS_PARTIAL_FAILED_KEY = "wordpress-db:hb-programs:43659";
+const CURRENT_AFTER_OFFERS_PARTIAL = "c".repeat(40);
+
+function offersPartialFailureReport(overrides: Partial<PhoenixPhaseReport> = {}): PhoenixPhaseReport {
+  return baseReport({
+    releaseId: "phoenix-approved-2026-07-30",
+    codeSha: OFFERS_PARTIAL_CODE_SHA,
+    phase: "offers",
+    attempted: 53,
+    created: 52,
+    updated: 0,
+    failed: 1,
+    firstFailure: `${OFFERS_PARTIAL_FAILED_KEY}:PLACE_DEPENDENCY_MISSING_CITY`,
+    completedPrefix: [],
+    resolvedIdentities: {
+      liveCheckpointSha256: "1eb43f7f635af6aa750b44ce17503a90c8952287b2ae92c6f998cf6e340f7508",
+      liveCheckpointCodeSha: OFFERS_PARTIAL_CODE_SHA,
+      liveCheckpointStartKey: "wordpress-db:hb-programs:18932",
+    },
+    ...overrides,
+  });
+}
+
+function offersPartialApprovedManifest(): { manifest: PhoenixReleaseManifest; manifestHash: string } {
+  const loaded = loadPhoenixReleaseManifest("docs/migration/releases/phoenix-approved-2026-07-30.json");
+  return {
+    manifest: { ...loaded.manifest, phases: loaded.manifest.phases.map(applyReleaseActionExceptions) },
+    manifestHash: loaded.manifestHash,
+  };
+}
+
+function offersPartialEnv(): PhoenixEnvironmentContext {
+  return {
+    environment: "DEV",
+    database: {
+      environment: "DEV",
+      host: "db",
+      port: "5432",
+      database: "devmamago",
+      schema: "public",
+      currentDatabase: "devmamago",
+    },
+    storage: {
+      environment: "DEV",
+      provider: "none",
+      locationHash: "4befce66a0662ee2898fac1823124092582b35948d02a9b094a27ac3281184aa",
+    },
+  };
+}
+
+function offersPartialRequest(report: PhoenixPhaseReport, overrides: Partial<{ reportSha256: string; predecessorCodeSha: string }> = {}) {
+  // Use the exact authorized digest when the report bytes are the fixture
+  // shape; otherwise hash the written content so negative tests that mutate
+  // the report still exercise load-time SHA verification correctly.
+  const raw = `${JSON.stringify(report)}\n`;
+  const actual = sha256Bytes(raw);
+  return {
+    reportPath: tempReportPath(raw),
+    reportSha256: overrides.reportSha256 ?? actual,
+    predecessorCodeSha: overrides.predecessorCodeSha ?? OFFERS_PARTIAL_CODE_SHA,
+  };
+}
+
+function testOffersPartialAllowlistContainsPredecessor(): void {
+  assert(KNOWN_PREDECESSOR_CODE_SHAS.has(OFFERS_PARTIAL_CODE_SHA));
+  assert.equal(PHOENIX_OFFERS_PARTIAL_REPORT_SHA256, OFFERS_PARTIAL_REPORT_SHA);
+  assert.equal(PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY, OFFERS_PARTIAL_FAILED_KEY);
+  assert.equal(PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT, 52);
+}
+
+function testOffersPartialRejectsUnknownPredecessor(): void {
+  const unknown = "d".repeat(40);
+  const report = offersPartialFailureReport({ codeSha: unknown });
+  assert.throws(
+    () =>
+      loadCrossShaContinuationChain(offersPartialRequest(report, { predecessorCodeSha: unknown }), {
+        releaseId: "phoenix-approved-2026-07-30",
+        manifestHash: "x",
+        currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+        environment: offersPartialEnv(),
+        manifest: offersPartialApprovedManifest().manifest,
+      }),
+    /CONTINUATION_PREDECESSOR_CODE_SHA_UNKNOWN/,
+  );
+}
+
+function testOffersPartialRejectsWrongReportSha(): void {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash });
+  assert.throws(
+    () =>
+      loadCrossShaContinuationChain(
+        offersPartialRequest(report, { reportSha256: "0".repeat(64) }),
+        {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+      ),
+    /CONTINUATION_REPORT_SHA256_MISMATCH/,
+  );
+}
+
+function testOffersPartialRejectsUnpinnedReportDigestEvenWithMatchingCodeSha(): void {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash, created: 52 });
+  // Write real bytes then claim the authorized digest — pin must reject.
+  const raw = `${JSON.stringify(report)}\n`;
+  assert.notEqual(sha256Bytes(raw), OFFERS_PARTIAL_REPORT_SHA);
+  assert.throws(
+    () =>
+      loadCrossShaContinuationChain(
+        {
+          reportPath: tempReportPath(raw),
+          reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+      ),
+    /CONTINUATION_REPORT_SHA256_MISMATCH/,
+  );
+}
+
+async function testOffersPartialRejectsMissingReportShaOnLiveResolve(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
+  const prisma = offersPartialPrisma(manifest);
+  await assert.rejects(
+    () =>
+      evaluateContinuationAwarePlan({
+        prisma,
+        request: {
+          reportPath: "unused",
+          reportSha256: "0".repeat(64),
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        expected: {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+        chain: { priorPhaseReports: [], failureReport: report },
+      }),
+    /CONTINUATION_OFFERS_PARTIAL_REPORT_SHA_REQUIRED/,
+  );
+}
+
+function testOffersPartialPinRejectsWrongCompletedCount(): void {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  for (const created of [51, 53]) {
+    const report = offersPartialFailureReport({ manifestHash, created });
+    assert.equal(
+      isPhoenixOffersPartialContinuation({
+        predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+        failureReport: report,
+      }),
+      false,
+    );
+    const raw = `${JSON.stringify(report)}\n`;
+    // Mutated bytes cannot match the pinned digest: claim authorized → SHA
+    // mismatch; claim actual → predecessor report not authorized.
+    assert.throws(
+      () =>
+        loadCrossShaContinuationChain(
+          {
+            reportPath: tempReportPath(raw),
+            reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+            predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+          },
+          {
+            releaseId: "phoenix-approved-2026-07-30",
+            manifestHash,
+            currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+            environment: offersPartialEnv(),
+            manifest,
+          },
+        ),
+      /CONTINUATION_REPORT_SHA256_MISMATCH/,
+    );
+    assert.throws(
+      () =>
+        loadCrossShaContinuationChain(
+          {
+            reportPath: tempReportPath(raw),
+            reportSha256: sha256Bytes(raw),
+            predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+          },
+          {
+            releaseId: "phoenix-approved-2026-07-30",
+            manifestHash,
+            currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+            environment: offersPartialEnv(),
+            manifest,
+          },
+        ),
+      /CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED/,
+    );
+  }
+}
+
+function testOffersPartialPinRejectsWrongFailedKey(): void {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({
+    manifestHash,
+    firstFailure: "wordpress-db:hb-programs:18932:PLACE_DEPENDENCY_MISSING_CITY",
+  });
+  assert.equal(
+    isPhoenixOffersPartialContinuation({
+      predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+      reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+      failureReport: report,
+    }),
+    false,
+  );
+  const raw = `${JSON.stringify(report)}\n`;
+  assert.throws(
+    () =>
+      loadCrossShaContinuationChain(
+        {
+          reportPath: tempReportPath(raw),
+          reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+      ),
+    /CONTINUATION_REPORT_SHA256_MISMATCH/,
+  );
+  assert.throws(
+    () =>
+      loadCrossShaContinuationChain(
+        { reportPath: tempReportPath(raw), reportSha256: sha256Bytes(raw), predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA },
+        {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+      ),
+    /CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED/,
+  );
+}
+
+function testOffersPartialPinRejectsMultipleFailures(): void {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash, failed: 2 });
+  assert.equal(
+    isPhoenixOffersPartialContinuation({
+      predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+      reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+      failureReport: report,
+    }),
+    false,
+  );
+  const raw = `${JSON.stringify(report)}\n`;
+  assert.throws(
+    () =>
+      loadCrossShaContinuationChain(
+        {
+          reportPath: tempReportPath(raw),
+          reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+      ),
+    /CONTINUATION_REPORT_SHA256_MISMATCH/,
+  );
+}
+
+function offersPartialLiveRows(manifest: PhoenixReleaseManifest) {
+  const keys = (name: PhoenixPhaseName) => exactExecutableKeys(manifest.phases.find((phase) => phase.name === name)!);
+  const offerPrefix = keys("offers").slice(0, 52);
+  return {
+    offerPrefix,
+    lineages: [
+      ...keys("users").map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER", targetId: `u-${sourceRecordKey}` })),
+      ...keys("businesses").map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS", targetId: `b-${sourceRecordKey}` })),
+      ...keys("places").map((sourceRecordKey) => ({
+        sourceRecordKey,
+        targetType: "PLACE",
+        targetId: sourceRecordKey === "wordpress-db:places:43635" ? "place-43635" : `p-${sourceRecordKey}`,
+      })),
+      ...offerPrefix.map((sourceRecordKey) => ({ sourceRecordKey, targetType: "OFFER", targetId: `o-${sourceRecordKey}` })),
+    ],
+    offers: offerPrefix.map((createRequestId) => ({ createRequestId, id: `o-${createRequestId}` })),
+  };
+}
+
+function offersPartialPrisma(manifest: PhoenixReleaseManifest, mutate?: (state: ReturnType<typeof offersPartialLiveRows>) => void) {
+  const state = offersPartialLiveRows(manifest);
+  mutate?.(state);
+  const lineages = state.lineages.filter(
+    (row, index, all) =>
+      all.findIndex((other) => other.sourceRecordKey === row.sourceRecordKey && other.targetType === row.targetType) === index,
+  );
+  return {
+    migrationLineage: {
+      findMany: async (args: { where: { targetType?: string; sourceRecordKey?: string } }) => {
+        let rows = lineages;
+        if (args.where.targetType) rows = rows.filter((row) => row.targetType === args.where.targetType);
+        if (args.where.sourceRecordKey) rows = rows.filter((row) => row.sourceRecordKey === args.where.sourceRecordKey);
+        return rows.map(({ sourceRecordKey, targetId }) => ({ sourceRecordKey, targetId }));
+      },
+    },
+    offer: {
+      findMany: async (args: { where: { createRequestId: { in: string[] } } }) =>
+        state.offers.filter((offer) => args.where.createRequestId.in.includes(offer.createRequestId)),
+      findUnique: async (args: { where: { createRequestId: string } }) =>
+        state.offers.find((offer) => offer.createRequestId === args.where.createRequestId) ?? null,
+    },
+    place: {
+      findUnique: async (args: { where: { id: string } }) =>
+        args.where.id === "place-43635"
+          ? { id: "place-43635", cityId: "city-ratomka", city: { slug: "ratomka", name: "Ратомка", isActive: true } }
+          : null,
+    },
+    city: {
+      findMany: async () => [
+        { id: "city-kopishche", name: "Копище" },
+        { id: "city-mir", name: "Мир" },
+        { id: "city-ratomka", name: "Ратомка" },
+      ],
+    },
+  } as unknown as import("@prisma/client").PrismaClient;
+}
+
+async function testOffersPartialExactApprovedReportReady(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  // Reconstruct the exact authorized report bytes by using the real DEV
+  // fingerprint fields + manifestHash, then force the digest gate via the
+  // isPhoenixOffersPartialContinuation path through evaluateContinuationAwarePlan
+  // with a locally-consistent hash (pin check already covered above).
+  const report = offersPartialFailureReport({
+    manifestHash,
+    environmentFingerprint: offersPartialEnv(),
+  });
+  const request = offersPartialRequest(report);
+  // For evaluate we bypass loadCrossShaContinuationChain's pin-vs-real-file
+  // digest equality by supplying a chain directly, and pass the authorized
+  // report SHA so isPhoenixOffersPartialContinuation matches.
+  const chain = { priorPhaseReports: [] as const, failureReport: report };
+  const prisma = offersPartialPrisma(manifest);
+  const result = await evaluateContinuationAwarePlan({
+    prisma,
+    request: { ...request, reportSha256: OFFERS_PARTIAL_REPORT_SHA },
+    expected: {
+      releaseId: "phoenix-approved-2026-07-30",
+      manifestHash,
+      currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+      environment: offersPartialEnv(),
+      manifest,
+    },
+    chain,
+  });
+  assert.equal(result.status, "READY");
+  assert.equal(result.continuationStartKey, OFFERS_PARTIAL_FAILED_KEY);
+  assert.equal(result.completed.offers?.length, 52);
+  assert.equal(result.completed.users?.length, exactExecutableKeys(manifest.phases.find((p) => p.name === "users")!).length);
+  assert.equal(result.completed.businesses?.length, exactExecutableKeys(manifest.phases.find((p) => p.name === "businesses")!).length);
+  assert.equal(result.completed.places?.length, exactExecutableKeys(manifest.phases.find((p) => p.name === "places")!).length);
+  assert.equal(result.writesAttempted, 0);
+  assert.equal(result.laterPhasesUntouched, true);
+}
+
+async function testOffersPartialRejectsMissingLineageAmong52(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    state.lineages = state.lineages.filter((row) => !(row.targetType === "OFFER" && row.sourceRecordKey === state.offerPrefix[0]));
+    state.offers = state.offers.filter((offer) => offer.createRequestId !== state.offerPrefix[0]);
+  });
+  await assert.rejects(
+    () =>
+      evaluateContinuationAwarePlan({
+        prisma,
+        request: {
+          reportPath: "unused",
+          reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        expected: {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+        chain: { priorPhaseReports: [], failureReport: report },
+      }),
+    /CONTINUATION_PREFIX_KEY_MISSING/,
+  );
+}
+
+async function testOffersPartialRejectsWhenFailedOfferAlreadyExists(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    state.lineages.push({ sourceRecordKey: OFFERS_PARTIAL_FAILED_KEY, targetType: "OFFER", targetId: "offer-43659" });
+    state.offers.push({ createRequestId: OFFERS_PARTIAL_FAILED_KEY, id: "offer-43659" });
+  });
+  await assert.rejects(
+    () =>
+      evaluateContinuationAwarePlan({
+        prisma,
+        request: {
+          reportPath: "unused",
+          reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        expected: {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+        chain: { priorPhaseReports: [], failureReport: report },
+      }),
+    /CONTINUATION_FAILED_KEY_ALREADY_COMPLETE|CONTINUATION_OFFERS_PARTIAL_FAILED_KEY_TARGET_EXISTS|CONTINUATION_UNEXPECTED_COMPLETED_KEY/,
+  );
+}
+
+async function testOffersPartialRejectsLaterPhaseStarted(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    state.lineages.push({ sourceRecordKey: "wordpress-db:routes:1", targetType: "ROUTE", targetId: "route-1" });
+  });
+  await assert.rejects(
+    () =>
+      evaluateContinuationAwarePlan({
+        prisma,
+        request: {
+          reportPath: "unused",
+          reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+          predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+        },
+        expected: {
+          releaseId: "phoenix-approved-2026-07-30",
+          manifestHash,
+          currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+          environment: offersPartialEnv(),
+          manifest,
+        },
+        chain: { priorPhaseReports: [], failureReport: report },
+      }),
+    /CONTINUATION_LATER_PHASE_TOUCHED:routes/,
+  );
+}
+
+async function testOffersPartialCompletedWritersAreNotInvoked(): Promise<void> {
+  const { SequentialEntityPhaseAdapter } = await import("./adapter");
+  const { manifest } = offersPartialApprovedManifest();
+  const offersPhase = manifest.phases.find((phase) => phase.name === "offers")!;
+  const prefix = new Set(exactExecutableKeys(offersPhase).slice(0, 52));
+  let executeCalls = 0;
+  const adapter = new SequentialEntityPhaseAdapter(
+    {
+      execute: async (sourceRecordKey) => {
+        executeCalls += 1;
+        return { sourceRecordKey, action: "CREATE", outcome: "CREATED" };
+      },
+    },
+    prefix,
+  );
+  const results = await adapter.apply(offersPhase);
+  const skipped = results.filter((result) => result.outcome === "SKIPPED");
+  assert.equal(skipped.length, 52);
+  assert.equal(results[52]?.sourceRecordKey, OFFERS_PARTIAL_FAILED_KEY);
+  assert.equal(executeCalls, exactExecutableKeys(offersPhase).length - 52);
+}
+
 async function main(): Promise<void> {
   testFirstHopChainAcceptsZeroPriorPhases();
   testSecondHopRejectsAnyUnpinnedReportArtifact();
@@ -756,6 +1261,20 @@ async function main(): Promise<void> {
   testBuildContinuationEvidenceIncludesChainOrigin();
   testResolveChainOriginCodeShaFirstHopIsItsOwnOrigin();
   testResolveChainOriginCodeShaSecondHopInheritsOrigin();
+
+  testOffersPartialAllowlistContainsPredecessor();
+  testOffersPartialRejectsUnknownPredecessor();
+  testOffersPartialRejectsWrongReportSha();
+  testOffersPartialRejectsUnpinnedReportDigestEvenWithMatchingCodeSha();
+  await testOffersPartialRejectsMissingReportShaOnLiveResolve();
+  testOffersPartialPinRejectsWrongCompletedCount();
+  testOffersPartialPinRejectsWrongFailedKey();
+  testOffersPartialPinRejectsMultipleFailures();
+  await testOffersPartialExactApprovedReportReady();
+  await testOffersPartialRejectsMissingLineageAmong52();
+  await testOffersPartialRejectsWhenFailedOfferAlreadyExists();
+  await testOffersPartialRejectsLaterPhaseStarted();
+  await testOffersPartialCompletedWritersAreNotInvoked();
 
   console.log("Phoenix continuation tests: OK");
 }

@@ -19,6 +19,15 @@ function blocked(code: string): Error {
 export interface PhoenixContinuationReadClient {
   city: { findMany: PrismaClient["city"]["findMany"] };
   migrationLineage: { findMany: PrismaClient["migrationLineage"]["findMany"] };
+  /**
+   * Optional Offer/Place reads used only by the pinned Offers-partial hop
+   * (`1ae265…` report). Older continuation hops never call these members.
+   */
+  offer?: {
+    findMany: PrismaClient["offer"]["findMany"];
+    findUnique: PrismaClient["offer"]["findUnique"];
+  };
+  place?: { findUnique: PrismaClient["place"]["findUnique"] };
 }
 
 type PhoenixLineageReadClient = Pick<PhoenixContinuationReadClient, "migrationLineage">;
@@ -67,6 +76,11 @@ export const KNOWN_PREDECESSOR_CODE_SHAS: ReadonlySet<string> = new Set([
   // Businesses (38/38) in full, then stopped at wordpress-db:places:5528
   // (PLACE_CITY_DEPENDENCY_NOT_FOUND) — see §J.
   "2dc00b6026651c0d1b1008598a19a6833930820f",
+  // Live-checkpoint Offers apply (2026-08-03/04): created 52 Offers then
+  // stopped at wordpress-db:hb-programs:43659 (PLACE_DEPENDENCY_MISSING_CITY).
+  // Users/Businesses/Places were already proven by the live checkpoint and
+  // are therefore absent as prior report lines — see the Offers-partial pin.
+  "1ae2658108fda224acd994021752ff52452e8cad",
 ]);
 
 export const PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256 =
@@ -74,11 +88,23 @@ export const PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256 =
 export const PHOENIX_SECOND_HOP_TERMINAL_KEY = "wordpress-db:places:5528";
 export const PHOENIX_SECOND_HOP_COMPLETED_PREFIX: readonly PhoenixPhaseName[] = ["users", "businesses"];
 
+export const PHOENIX_OFFERS_PARTIAL_PREDECESSOR_CODE_SHA = "1ae2658108fda224acd994021752ff52452e8cad";
+export const PHOENIX_OFFERS_PARTIAL_REPORT_SHA256 =
+  "5490cc2503b8f028c08b6e99181429090ee4fe332343f293ae7f41b0702d78bb";
+export const PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY = "wordpress-db:hb-programs:43659";
+export const PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT = 52;
+export const PHOENIX_OFFERS_PARTIAL_PLACE_SOURCE_RECORD_KEY = "wordpress-db:places:43635";
+export const PHOENIX_OFFERS_PARTIAL_CITY_SLUG = "ratomka";
+export const PHOENIX_OFFERS_PARTIAL_CITY_NAME = "Ратомка";
+/** Phase-level completedPrefix on the single failure line (no prior report lines). */
+export const PHOENIX_OFFERS_PARTIAL_COMPLETED_PREFIX: readonly PhoenixPhaseName[] = [];
+export const PHOENIX_OFFERS_PARTIAL_PRIOR_PHASES: readonly PhoenixPhaseName[] = ["users", "businesses", "places"];
+
 /**
- * The already-produced second-hop report is a single reviewed artifact, not
- * merely any byte sequence that happens to embed an allowlisted code SHA.
- * Pin its digest and terminal state here. The remaining release, manifest,
- * environment and embedded-code identities are checked below against the
+ * The already-produced second-hop / Offers-partial reports are single reviewed
+ * artifacts, not merely any byte sequence that happens to embed an allowlisted
+ * code SHA. Pin digest and terminal state here. Remaining release/manifest/
+ * environment/embedded-code identities are checked below against the
  * invocation's independently-derived expected values.
  */
 function assertPinnedPredecessorArtifact(
@@ -86,19 +112,62 @@ function assertPinnedPredecessorArtifact(
   failureReport: PhoenixPhaseReport,
   expectedReleaseId: string,
 ): void {
-  if (
-    request.predecessorCodeSha !== "2dc00b6026651c0d1b1008598a19a6833930820f" ||
-    expectedReleaseId !== "phoenix-approved-2026-07-30"
-  ) return;
-  if (request.reportSha256.trim().toLowerCase() !== PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256) {
-    throw blocked("CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED");
+  if (expectedReleaseId !== "phoenix-approved-2026-07-30") return;
+
+  if (request.predecessorCodeSha === "2dc00b6026651c0d1b1008598a19a6833930820f") {
+    if (request.reportSha256.trim().toLowerCase() !== PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256) {
+      throw blocked("CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED");
+    }
+    if (extractFailedKey(failureReport) !== PHOENIX_SECOND_HOP_TERMINAL_KEY) {
+      throw blocked("CONTINUATION_PREDECESSOR_TERMINAL_KEY_MISMATCH");
+    }
+    if (JSON.stringify(failureReport.completedPrefix) !== JSON.stringify(PHOENIX_SECOND_HOP_COMPLETED_PREFIX)) {
+      throw blocked("CONTINUATION_PREDECESSOR_COMPLETED_PREFIX_MISMATCH");
+    }
+    return;
   }
-  if (extractFailedKey(failureReport) !== PHOENIX_SECOND_HOP_TERMINAL_KEY) {
-    throw blocked("CONTINUATION_PREDECESSOR_TERMINAL_KEY_MISMATCH");
+
+  if (request.predecessorCodeSha === PHOENIX_OFFERS_PARTIAL_PREDECESSOR_CODE_SHA) {
+    if (request.reportSha256.trim().toLowerCase() !== PHOENIX_OFFERS_PARTIAL_REPORT_SHA256) {
+      throw blocked("CONTINUATION_PREDECESSOR_REPORT_NOT_AUTHORIZED");
+    }
+    if (failureReport.phase !== "offers") throw blocked("CONTINUATION_OFFERS_PARTIAL_PHASE_MISMATCH");
+    if (failureReport.failed !== 1) throw blocked("CONTINUATION_OFFERS_PARTIAL_FAILURE_COUNT_MISMATCH");
+    if (failureReport.created !== PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT || failureReport.updated !== 0) {
+      throw blocked("CONTINUATION_OFFERS_PARTIAL_COMPLETED_COUNT_MISMATCH");
+    }
+    if (extractFailedKey(failureReport) !== PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY) {
+      throw blocked("CONTINUATION_PREDECESSOR_TERMINAL_KEY_MISMATCH");
+    }
+    if (JSON.stringify(failureReport.completedPrefix) !== JSON.stringify(PHOENIX_OFFERS_PARTIAL_COMPLETED_PREFIX)) {
+      throw blocked("CONTINUATION_PREDECESSOR_COMPLETED_PREFIX_MISMATCH");
+    }
   }
-  if (JSON.stringify(failureReport.completedPrefix) !== JSON.stringify(PHOENIX_SECOND_HOP_COMPLETED_PREFIX)) {
-    throw blocked("CONTINUATION_PREDECESSOR_COMPLETED_PREFIX_MISMATCH");
-  }
+}
+
+/** Report-shape match for the pinned Offers-partial hop (ignores digest). */
+export function looksLikePhoenixOffersPartialFailure(failureReport: PhoenixPhaseReport): boolean {
+  return (
+    failureReport.codeSha === PHOENIX_OFFERS_PARTIAL_PREDECESSOR_CODE_SHA &&
+    failureReport.phase === "offers" &&
+    failureReport.failed === 1 &&
+    failureReport.created === PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT &&
+    failureReport.updated === 0 &&
+    extractFailedKey(failureReport) === PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY &&
+    JSON.stringify(failureReport.completedPrefix) === JSON.stringify(PHOENIX_OFFERS_PARTIAL_COMPLETED_PREFIX)
+  );
+}
+
+export function isPhoenixOffersPartialContinuation(input: {
+  predecessorCodeSha: string;
+  reportSha256: string;
+  failureReport: PhoenixPhaseReport;
+}): boolean {
+  return (
+    input.predecessorCodeSha === PHOENIX_OFFERS_PARTIAL_PREDECESSOR_CODE_SHA &&
+    input.reportSha256.trim().toLowerCase() === PHOENIX_OFFERS_PARTIAL_REPORT_SHA256 &&
+    looksLikePhoenixOffersPartialFailure(input.failureReport)
+  );
 }
 
 export interface CrossShaContinuationRequest {
@@ -242,10 +311,20 @@ export function loadCrossShaContinuationChain(
   // re-validated (`report.failed <= 0`) inside extractFailedKey.
   extractFailedKey(failureReport);
 
+  const offersPartial = isPhoenixOffersPartialContinuation({
+    predecessorCodeSha: request.predecessorCodeSha,
+    reportSha256: request.reportSha256,
+    failureReport,
+  });
+
   const order = reportablePhaseOrder(expected.manifest);
   const failedPhaseIndex = order.indexOf(failureReport.phase);
   if (failedPhaseIndex < 0) throw blocked("CONTINUATION_FAILED_PHASE_NOT_IN_MANIFEST");
-  const expectedPriorPhaseNames = order.slice(0, failedPhaseIndex);
+  const expectedPriorPhaseNames = offersPartial ? [] : order.slice(0, failedPhaseIndex);
+
+  if (offersPartial && priorPhaseReports.length !== 0) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_UNEXPECTED_PRIOR_LINES");
+  }
 
   if (priorPhaseReports.length !== expectedPriorPhaseNames.length) {
     throw blocked(
@@ -446,8 +525,39 @@ export async function resolveMultiPhaseContinuation(
   sourceNamespace: string,
   chain: CrossShaContinuationChain,
   manifest: PhoenixReleaseManifest,
+  options?: { offersPartialReportSha256?: string },
 ): Promise<MultiPhaseContinuationResult> {
   const phaseSkipSets = new Map<PhoenixPhaseName, ReadonlySet<string>>();
+
+  // Fail closed: a chain that looks like the pinned Offers-partial hop must
+  // carry the authorized report digest. Omitting / mismatching the digest
+  // must not silently degrade into a single-line offers continuation that
+  // skips only the 52-offer prefix and never proves prior phases / Ratomka.
+  if (looksLikePhoenixOffersPartialFailure(chain.failureReport)) {
+    const digest = options?.offersPartialReportSha256?.trim().toLowerCase();
+    if (!digest || digest !== PHOENIX_OFFERS_PARTIAL_REPORT_SHA256) {
+      throw blocked("CONTINUATION_OFFERS_PARTIAL_REPORT_SHA_REQUIRED");
+    }
+  }
+
+  const offersPartial =
+    options?.offersPartialReportSha256 !== undefined &&
+    isPhoenixOffersPartialContinuation({
+      predecessorCodeSha: chain.failureReport.codeSha,
+      reportSha256: options.offersPartialReportSha256,
+      failureReport: chain.failureReport,
+    });
+
+  // Live-checkpoint-originated Offers failure reports carry no prior phase
+  // success lines. Prove Users/Businesses/Places complete from live lineage
+  // so SequentialEntityPhaseAdapter skips them without writers.
+  if (offersPartial) {
+    for (const phaseName of PHOENIX_OFFERS_PARTIAL_PRIOR_PHASES) {
+      const phase = manifest.phases.find((item) => item.name === phaseName);
+      if (!phase) throw blocked(`CONTINUATION_PHASE_NOT_IN_MANIFEST:${phaseName}`);
+      phaseSkipSets.set(phase.name, await resolveFullPhaseCompletion(prisma, sourceNamespace, phase));
+    }
+  }
 
   for (const priorReport of chain.priorPhaseReports) {
     const phase = manifest.phases.find((item) => item.name === priorReport.phase);
@@ -458,6 +568,14 @@ export async function resolveMultiPhaseContinuation(
   const failedPhase = manifest.phases.find((item) => item.name === chain.failureReport.phase);
   if (!failedPhase) throw blocked(`CONTINUATION_PHASE_NOT_IN_MANIFEST:${chain.failureReport.phase}`);
   const partial = await resolveExactCompletedPrefix(prisma, sourceNamespace, chain.failureReport, failedPhase);
+  if (offersPartial && partial.alreadyCompleted.size !== PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT) {
+    throw blocked(
+      `CONTINUATION_OFFERS_PARTIAL_LIVE_PREFIX_COUNT_MISMATCH:expected=${PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT}:actual=${partial.alreadyCompleted.size}`,
+    );
+  }
+  if (offersPartial && partial.continuationStartKey !== PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_START_KEY_MISMATCH");
+  }
   phaseSkipSets.set(partial.phase, partial.alreadyCompleted);
 
   return { phaseSkipSets, failedPhase: partial.phase, continuationStartKey: partial.continuationStartKey };
@@ -490,6 +608,91 @@ export async function assertContinuationLaterPhasesUntouched(
     if (rows.length > 0) {
       throw blocked(`CONTINUATION_LATER_PHASE_TOUCHED:${phaseName}:${rows[0].sourceRecordKey}`);
     }
+  }
+}
+
+/**
+ * Extra live invariants for the pinned Offers-partial hop only: Offer target
+ * rows for the proven 52-key prefix, absence of Offer 43659, Place 43635
+ * linked to City Ратомка/ratomka, and no duplicate OFFER targets.
+ */
+export async function assertPhoenixOffersPartialLiveInvariants(input: {
+  prisma: PhoenixContinuationReadClient;
+  sourceNamespace: string;
+  manifest: PhoenixReleaseManifest;
+  alreadyCompletedOffers: ReadonlySet<string>;
+  continuationStartKey: string;
+}): Promise<void> {
+  if (!input.prisma.offer || !input.prisma.place) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_READ_CLIENT_INCOMPLETE");
+  }
+  if (input.continuationStartKey !== PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_START_KEY_MISMATCH");
+  }
+  if (input.alreadyCompletedOffers.size !== PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_LIVE_PREFIX_COUNT_MISMATCH");
+  }
+
+  const offersPhase = input.manifest.phases.find((phase) => phase.name === "offers");
+  if (!offersPhase) throw blocked("CONTINUATION_PHASE_NOT_IN_MANIFEST:offers");
+  const orderedKeys = exactExecutableKeys(offersPhase);
+  const expectedPrefix = orderedKeys.slice(0, PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT);
+  if (expectedPrefix.length !== PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_MANIFEST_PREFIX_MISMATCH");
+  }
+  for (const key of expectedPrefix) {
+    if (!input.alreadyCompletedOffers.has(key)) throw blocked(`CONTINUATION_OFFERS_PARTIAL_PREFIX_KEY_MISSING:${key}`);
+  }
+  if (orderedKeys[PHOENIX_OFFERS_PARTIAL_COMPLETED_COUNT] !== PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_TERMINAL_INDEX_MISMATCH");
+  }
+
+  const offerTargets = await input.prisma.offer.findMany({
+    where: { createRequestId: { in: [...expectedPrefix] } },
+    select: { createRequestId: true, id: true },
+  });
+  if (offerTargets.length !== expectedPrefix.length) {
+    throw blocked(
+      `CONTINUATION_OFFERS_PARTIAL_TARGET_COUNT_MISMATCH:expected=${expectedPrefix.length}:actual=${offerTargets.length}`,
+    );
+  }
+  const targetIds = offerTargets.map((row) => row.id);
+  if (new Set(targetIds).size !== targetIds.length) throw blocked("CONTINUATION_OFFERS_PARTIAL_DUPLICATE_TARGET");
+  const byRequest = new Set(offerTargets.map((row) => row.createRequestId));
+  for (const key of expectedPrefix) {
+    if (!byRequest.has(key)) throw blocked(`CONTINUATION_OFFERS_PARTIAL_TARGET_MISSING:${key}`);
+  }
+
+  const blockedOffer = await input.prisma.offer.findUnique({
+    where: { createRequestId: PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY },
+    select: { id: true },
+  });
+  if (blockedOffer) throw blocked("CONTINUATION_OFFERS_PARTIAL_FAILED_KEY_TARGET_EXISTS");
+
+  const placeLineages = await input.prisma.migrationLineage.findMany({
+    where: {
+      sourceRecordKey: PHOENIX_OFFERS_PARTIAL_PLACE_SOURCE_RECORD_KEY,
+      targetType: "PLACE" as never,
+      isActive: true,
+      source: { sourceNamespace: input.sourceNamespace },
+    },
+    select: { targetId: true },
+  });
+  if (placeLineages.length !== 1 || !placeLineages[0].targetId) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_PLACE_LINEAGE_MISMATCH");
+  }
+  const place = await input.prisma.place.findUnique({
+    where: { id: placeLineages[0].targetId },
+    select: { id: true, cityId: true, city: { select: { slug: true, name: true, isActive: true } } },
+  });
+  if (!place) throw blocked("CONTINUATION_OFFERS_PARTIAL_PLACE_TARGET_MISSING");
+  if (!place.cityId || !place.city) throw blocked("CONTINUATION_OFFERS_PARTIAL_PLACE_CITY_MISSING");
+  if (
+    place.city.slug !== PHOENIX_OFFERS_PARTIAL_CITY_SLUG ||
+    place.city.name !== PHOENIX_OFFERS_PARTIAL_CITY_NAME ||
+    !place.city.isActive
+  ) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_PLACE_CITY_MISMATCH");
   }
 }
 
@@ -533,6 +736,7 @@ export async function evaluateContinuationAwarePlan(input: {
     PHOENIX_RELEASE_SOURCE_NAMESPACE,
     input.chain,
     input.expected.manifest,
+    { offersPartialReportSha256: input.request.reportSha256 },
   );
   await assertContinuationLaterPhasesUntouched(
     input.prisma,
@@ -540,6 +744,22 @@ export async function evaluateContinuationAwarePlan(input: {
     input.expected.manifest,
     continuation.failedPhase,
   );
+
+  if (
+    isPhoenixOffersPartialContinuation({
+      predecessorCodeSha: input.request.predecessorCodeSha,
+      reportSha256: input.request.reportSha256,
+      failureReport: input.chain.failureReport,
+    })
+  ) {
+    await assertPhoenixOffersPartialLiveInvariants({
+      prisma: input.prisma,
+      sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE,
+      manifest: input.expected.manifest,
+      alreadyCompletedOffers: continuation.phaseSkipSets.get("offers") ?? new Set(),
+      continuationStartKey: continuation.continuationStartKey,
+    });
+  }
 
   let cityPrerequisites = { missing: [] as string[], ambiguous: [] as string[] };
   try {

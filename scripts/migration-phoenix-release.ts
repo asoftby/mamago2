@@ -380,6 +380,7 @@ async function main(): Promise<void> {
     }
 
     const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest: correctedManifest, continuationChain,
+      continuationReportSha256: args.continueFromReportSha256,
       liveCheckpointPhaseSkipSets: liveCheckpointContinuation?.phaseSkipSets });
     const reportStore = new JsonLinesPhoenixReportStore(args.reportPath);
     const previousReports: PhoenixPhaseReport[] = args.resumeFrom

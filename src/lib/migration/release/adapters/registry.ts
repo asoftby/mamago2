@@ -6,7 +6,9 @@ import type { PlacesWriterPrismaClient } from "./placesProductionWiring";
 import { SequentialEntityPhaseAdapter } from "../adapter";
 import {
   PHOENIX_RELEASE_SOURCE_NAMESPACE,
+  assertPhoenixOffersPartialLiveInvariants,
   assertPhoenixPlaceCityPrerequisites,
+  isPhoenixOffersPartialContinuation,
   resolveMultiPhaseContinuation,
   type CrossShaContinuationChain,
 } from "../continuation";
@@ -80,6 +82,12 @@ export interface BuildPhoenixAdapterRegistryInput {
    * its first record.
    */
   continuationChain?: CrossShaContinuationChain;
+  /**
+   * Exact SHA-256 of the predecessor report file passed to
+   * `--continue-from-report-sha256`. Required for the pinned Offers-partial
+   * hop so live invariants can re-identify that single authorized artifact.
+   */
+  continuationReportSha256?: string;
   /** Exact same-image live-checkpoint skip sets, revalidated before registry construction. */
   liveCheckpointPhaseSkipSets?: ReadonlyMap<PhoenixPhaseName, ReadonlySet<string>>;
 }
@@ -211,8 +219,30 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
   // (non CREATE/UPDATE) record inside any claimed prefix — see
   // `continuation.ts`.
   const continuation = input.continuationChain
-    ? await resolveMultiPhaseContinuation(prisma, source.sourceNamespace, input.continuationChain, input.manifest)
+    ? await resolveMultiPhaseContinuation(prisma, source.sourceNamespace, input.continuationChain, input.manifest, {
+        offersPartialReportSha256: input.continuationReportSha256,
+      })
     : undefined;
+  // resolveMultiPhaseContinuation already hard-blocks Offers-partial-shaped
+  // chains that omit / mismatch the authorized report digest. When that hop
+  // is active, live Offer/Place invariants are mandatory — never optional.
+  if (
+    input.continuationChain &&
+    continuation &&
+    isPhoenixOffersPartialContinuation({
+      predecessorCodeSha: input.continuationChain.failureReport.codeSha,
+      reportSha256: input.continuationReportSha256 ?? "",
+      failureReport: input.continuationChain.failureReport,
+    })
+  ) {
+    await assertPhoenixOffersPartialLiveInvariants({
+      prisma,
+      sourceNamespace: source.sourceNamespace,
+      manifest: input.manifest,
+      alreadyCompletedOffers: continuation.phaseSkipSets.get("offers") ?? new Set(),
+      continuationStartKey: continuation.continuationStartKey,
+    });
+  }
   const completedFor = (phase: PhoenixPhaseName): ReadonlySet<string> | undefined =>
     input.liveCheckpointPhaseSkipSets?.get(phase) ?? continuation?.phaseSkipSets.get(phase);
 
