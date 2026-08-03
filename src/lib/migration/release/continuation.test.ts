@@ -8,6 +8,7 @@ import {
   PHOENIX_RELEASE_ACTION_EXCEPTIONS,
   PHOENIX_SECOND_HOP_PREDECESSOR_REPORT_SHA256,
   applyReleaseActionExceptions,
+  evaluateContinuationAwarePlan,
   assertPhoenixPlaceCityPrerequisites,
   buildContinuationEvidence,
   extractFailedKey,
@@ -17,7 +18,7 @@ import {
   resolveFullPhaseCompletion,
   resolveMultiPhaseContinuation,
 } from "./continuation";
-import { sha256Bytes } from "./manifest";
+import { exactExecutableKeys, loadPhoenixReleaseManifest, sha256Bytes } from "./manifest";
 import type { PhoenixEnvironmentContext, PhoenixPhaseName, PhoenixPhaseReport, PhoenixReleaseManifest, PhoenixReleasePhase } from "./types";
 
 const PREDECESSOR_CODE_SHA = "f466c34c0cf095d054ae79d86a12505129719739";
@@ -492,6 +493,121 @@ async function testMultiPhaseContinuationFailsClosedWhenPriorPhaseNotActuallyCom
   await assert.rejects(() => resolveMultiPhaseContinuation(prisma, "ns", chain, correctedManifest), /CONTINUATION_PREFIX_KEY_MISSING/);
 }
 
+function laterPhase(name: PhoenixPhaseName, sourceRecordKey: string): PhoenixReleasePhase {
+  return {
+    name, status: "READY", artifacts: [], records: [{ sourceRecordKey, action: "CREATE" }],
+    protectedSourceRecordKeys: [], excludedSourceRecordKeys: [], deterministicConflicts: [],
+    mediaPolicy: "NOT_APPLICABLE", prerequisites: [],
+  };
+}
+
+async function testContinuationAwarePlanIsReadOnlyAndAggregatesCurrentCityBlockers(): Promise<void> {
+  const manifest = testManifest([
+    usersPhaseFixture(), businessesPhaseFixture(), placesPhaseFixture(),
+    laterPhase("offers", "wordpress-db:offers:1"),
+    laterPhase("routes", "wordpress-db:routes:1"),
+    laterPhase("events", "wordpress-db:events:1"),
+    laterPhase("articles", "wordpress-db:articles:1"),
+  ]);
+  const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+  const entries = secondHopChain();
+  const rows = [
+    ...usersKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER" })),
+    ...businessesKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS" })),
+    ...placesPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "PLACE" })),
+  ];
+  const calls: string[] = [];
+  const prisma = {
+    migrationLineage: { findMany: async (args: { where: { targetType: string } }) => {
+      calls.push(`migrationLineage.findMany:${args.where.targetType}`);
+      return rows.filter((row) => row.targetType === args.where.targetType).map(({ sourceRecordKey }) => ({ sourceRecordKey }));
+    } },
+    city: { findMany: async () => { calls.push("city.findMany"); return []; } },
+  } as unknown as import("@prisma/client").PrismaClient;
+
+  const result = await evaluateContinuationAwarePlan({
+    prisma,
+    request: { reportPath: "/read-only/predecessor.jsonl", reportSha256: "a".repeat(64), predecessorCodeSha: SECOND_HOP_PREDECESSOR_CODE_SHA },
+    expected: { ...expectedSecondHop, manifest: correctedManifest },
+    chain: { priorPhaseReports: entries.slice(0, -1), failureReport: entries.at(-1)! },
+  });
+
+  assert.equal(result.status, "BLOCKED");
+  assert.deepEqual(result.cityPrerequisites, { missing: ["Копище", "Мир"], ambiguous: [] });
+  assert.equal(result.completed.users?.length, 25);
+  assert.equal(result.completed.businesses?.length, 10);
+  assert.deepEqual(result.completed.places, placesPrefixKeys());
+  assert.equal(result.continuationStartKey, FAILED_PLACE_KEY);
+  assert.equal(result.laterPhasesUntouched, true);
+  assert.equal(result.writesAttempted, 0);
+  assert.deepEqual(calls, [
+    "migrationLineage.findMany:USER", "migrationLineage.findMany:BUSINESS", "migrationLineage.findMany:PLACE",
+    "migrationLineage.findMany:OFFER", "migrationLineage.findMany:ROUTE", "migrationLineage.findMany:ACTIVITY",
+    "migrationLineage.findMany:ARTICLE", "city.findMany",
+  ]);
+}
+
+async function testContinuationAwarePlanRejectsTouchedLaterPhaseBeforeCityCheck(): Promise<void> {
+  const manifest = testManifest([
+    usersPhaseFixture(), businessesPhaseFixture(), placesPhaseFixture(), laterPhase("offers", "wordpress-db:offers:1"),
+  ]);
+  const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+  const entries = secondHopChain();
+  const rows = [
+    ...usersKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER" })),
+    ...businessesKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS" })),
+    ...placesPrefixKeys().map((sourceRecordKey) => ({ sourceRecordKey, targetType: "PLACE" })),
+    { sourceRecordKey: "wordpress-db:offers:1", targetType: "OFFER" },
+  ];
+  let cityRead = false;
+  const prisma = {
+    migrationLineage: { findMany: async (args: { where: { targetType: string } }) =>
+      rows.filter((row) => row.targetType === args.where.targetType).map(({ sourceRecordKey }) => ({ sourceRecordKey })) },
+    city: { findMany: async () => { cityRead = true; return []; } },
+  } as unknown as import("@prisma/client").PrismaClient;
+  await assert.rejects(() => evaluateContinuationAwarePlan({
+    prisma,
+    request: { reportPath: "unused", reportSha256: "a".repeat(64), predecessorCodeSha: SECOND_HOP_PREDECESSOR_CODE_SHA },
+    expected: { ...expectedSecondHop, manifest: correctedManifest },
+    chain: { priorPhaseReports: entries.slice(0, -1), failureReport: entries.at(-1)! },
+  }), /CONTINUATION_LATER_PHASE_TOUCHED:offers/);
+  assert.equal(cityRead, false);
+}
+
+async function testContinuationAwarePlanProvesExactApprovedManifestBoundary(): Promise<void> {
+  const { manifest, manifestHash } = loadPhoenixReleaseManifest(
+    "docs/migration/releases/phoenix-approved-2026-07-30.json",
+  );
+  const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+  const keys = (name: PhoenixPhaseName) => exactExecutableKeys(correctedManifest.phases.find((phase) => phase.name === name)!);
+  const rows = [
+    ...keys("users").map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER" })),
+    ...keys("businesses").map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS" })),
+    ...["wordpress-db:places:5457", "wordpress-db:places:5492", "wordpress-db:places:5515"]
+      .map((sourceRecordKey) => ({ sourceRecordKey, targetType: "PLACE" })),
+  ];
+  const entries = secondHopChain().map((entry) => ({
+    ...entry, releaseId: manifest.releaseId, manifestHash,
+  }));
+  const prisma = {
+    migrationLineage: { findMany: async (args: { where: { targetType: string } }) =>
+      rows.filter((row) => row.targetType === args.where.targetType).map(({ sourceRecordKey }) => ({ sourceRecordKey })) },
+    city: { findMany: async () => [] },
+  } as unknown as import("@prisma/client").PrismaClient;
+  const result = await evaluateContinuationAwarePlan({
+    prisma,
+    request: { reportPath: "read-only", reportSha256: "a".repeat(64), predecessorCodeSha: SECOND_HOP_PREDECESSOR_CODE_SHA },
+    expected: { ...expectedSecondHop, releaseId: manifest.releaseId, manifestHash, manifest: correctedManifest },
+    chain: { priorPhaseReports: entries.slice(0, -1), failureReport: entries.at(-1)! },
+  });
+  assert.equal(result.completed.users?.length, 563);
+  assert.equal(result.completed.businesses?.length, 38);
+  assert.deepEqual(result.completed.places, [
+    "wordpress-db:places:5457", "wordpress-db:places:5492", "wordpress-db:places:5515",
+  ]);
+  assert.equal(result.continuationStartKey, "wordpress-db:places:5528");
+}
+
 // =============================================================================
 // applyReleaseActionExceptions
 // =============================================================================
@@ -531,6 +647,13 @@ async function testPlaceCityPrerequisitesRejectAmbiguousMatch(): Promise<void> {
     { id: "1", name: "Копище" }, { id: "2", name: "Копище" }, { id: "3", name: "Мир" },
   ] } } as never;
   await assert.rejects(() => assertPhoenixPlaceCityPrerequisites(prisma), /"ambiguous":\["Копище"\]/);
+}
+
+async function testInactiveCityDoesNotSatisfyPrerequisite(): Promise<void> {
+  let query: { where?: { isActive?: boolean } } | undefined;
+  const prisma = { city: { findMany: async (args: typeof query) => { query = args; return []; } } } as never;
+  await assert.rejects(() => assertPhoenixPlaceCityPrerequisites(prisma), /Копище.*Мир/);
+  assert.equal(query?.where?.isActive, true);
 }
 
 async function testPlaceCityPrerequisitesAcceptExactlyOneEach(): Promise<void> {
@@ -615,6 +738,9 @@ async function main(): Promise<void> {
 
   await testMultiPhaseContinuationResolvesExactSecondHopScenario();
   await testMultiPhaseContinuationFailsClosedWhenPriorPhaseNotActuallyComplete();
+  await testContinuationAwarePlanIsReadOnlyAndAggregatesCurrentCityBlockers();
+  await testContinuationAwarePlanRejectsTouchedLaterPhaseBeforeCityCheck();
+  await testContinuationAwarePlanProvesExactApprovedManifestBoundary();
 
   testReleaseExceptionCorrectsUser38Action();
   testReleaseExceptionFailsClosedOnStaleManifestAction();
@@ -622,6 +748,7 @@ async function main(): Promise<void> {
   testReleaseExceptionRegistryDoesNotCoverThePlaceCityFailure();
   await testPlaceCityPrerequisitesReportAllMissingBeforeWrite();
   await testPlaceCityPrerequisitesRejectAmbiguousMatch();
+  await testInactiveCityDoesNotSatisfyPrerequisite();
   await testPlaceCityPrerequisitesAcceptExactlyOneEach();
 
   testExtractFailedKeyStripsMultiColonSuffix();

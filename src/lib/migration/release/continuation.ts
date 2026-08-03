@@ -15,6 +15,16 @@ function blocked(code: string): Error {
   return new Error(`RELEASE_BLOCKED:${code}`);
 }
 
+/** The complete database surface available to continuation-aware planning. */
+export interface PhoenixContinuationReadClient {
+  city: { findMany: PrismaClient["city"]["findMany"] };
+  migrationLineage: { findMany: PrismaClient["migrationLineage"]["findMany"] };
+}
+
+type PhoenixLineageReadClient = Pick<PhoenixContinuationReadClient, "migrationLineage">;
+
+export const PHOENIX_RELEASE_SOURCE_NAMESPACE = "phoenix-release-bundle";
+
 /**
  * Maps an executable Phoenix phase to the `MigrationLineage.targetType`
  * its writer records identity under. Phases not listed here (currently
@@ -262,7 +272,7 @@ export const PHOENIX_PLACE_CITY_PREREQUISITES = ["Копище", "Мир"] as co
 
 /** Checks all known Place City prerequisites together, before any release write. */
 export async function assertPhoenixPlaceCityPrerequisites(
-  prisma: Pick<PrismaClient, "city">,
+  prisma: Pick<PhoenixContinuationReadClient, "city">,
 ): Promise<void> {
   const rows = await prisma.city.findMany({
     where: {
@@ -306,7 +316,7 @@ export async function assertPhoenixPlaceCityPrerequisites(
  *    both fail closed.
  */
 async function resolvePhaseCompletion(
-  prisma: PrismaClient,
+  prisma: PhoenixLineageReadClient,
   sourceNamespace: string,
   phase: PhoenixReleasePhase,
   expectedKeys: readonly string[],
@@ -369,7 +379,7 @@ export interface ExactPrefixContinuation {
  * gates the skip set.
  */
 export async function resolveExactCompletedPrefix(
-  prisma: PrismaClient,
+  prisma: PhoenixLineageReadClient,
   sourceNamespace: string,
   report: PhoenixPhaseReport,
   phase: PhoenixReleasePhase,
@@ -406,7 +416,7 @@ export async function resolveExactCompletedPrefix(
  * finished successfully — never trusted from the report alone.
  */
 export async function resolveFullPhaseCompletion(
-  prisma: PrismaClient,
+  prisma: PhoenixLineageReadClient,
   sourceNamespace: string,
   phase: PhoenixReleasePhase,
 ): Promise<ReadonlySet<string>> {
@@ -432,7 +442,7 @@ export interface MultiPhaseContinuationResult {
 }
 
 export async function resolveMultiPhaseContinuation(
-  prisma: PrismaClient,
+  prisma: PhoenixLineageReadClient,
   sourceNamespace: string,
   chain: CrossShaContinuationChain,
   manifest: PhoenixReleaseManifest,
@@ -451,6 +461,112 @@ export async function resolveMultiPhaseContinuation(
   phaseSkipSets.set(partial.phase, partial.alreadyCompleted);
 
   return { phaseSkipSets, failedPhase: partial.phase, continuationStartKey: partial.continuationStartKey };
+}
+
+const CONTINUATION_AUDIT_TARGET_TYPE: Partial<Record<PhoenixPhaseName, string>> = {
+  ...CONTINUATION_PHASE_TARGET_TYPE,
+  events: "ACTIVITY",
+};
+
+/** Proves that no active lineage exists for any executable phase after the failed phase. */
+export async function assertContinuationLaterPhasesUntouched(
+  prisma: PhoenixLineageReadClient,
+  sourceNamespace: string,
+  manifest: PhoenixReleaseManifest,
+  failedPhase: PhoenixPhaseName,
+): Promise<void> {
+  const failedIndex = manifest.phaseOrder.indexOf(failedPhase);
+  if (failedIndex < 0) throw blocked(`CONTINUATION_PHASE_NOT_IN_MANIFEST:${failedPhase}`);
+
+  for (const phaseName of manifest.phaseOrder.slice(failedIndex + 1)) {
+    const phase = manifest.phases.find((item) => item.name === phaseName);
+    if (!phase || phase.status === "VALIDATION_ONLY") continue;
+    const targetType = CONTINUATION_AUDIT_TARGET_TYPE[phaseName];
+    if (!targetType) throw blocked(`CONTINUATION_UNSUPPORTED_PHASE:${phaseName}`);
+    const rows = await prisma.migrationLineage.findMany({
+      where: { targetType: targetType as never, isActive: true, source: { sourceNamespace } },
+      select: { sourceRecordKey: true },
+    });
+    if (rows.length > 0) {
+      throw blocked(`CONTINUATION_LATER_PHASE_TOUCHED:${phaseName}:${rows[0].sourceRecordKey}`);
+    }
+  }
+}
+
+export interface ContinuationAwarePlanResult {
+  mode: "CONTINUATION_READ_ONLY_PLAN";
+  status: "READY" | "BLOCKED";
+  releaseId: string;
+  manifestHash: string;
+  codeSha: string;
+  predecessorCodeSha: string;
+  predecessorReportSha256: string;
+  completed: Partial<Record<PhoenixPhaseName, readonly string[]>>;
+  continuationStartKey: string;
+  laterPhasesUntouched: true;
+  cityPrerequisites: { missing: string[]; ambiguous: string[] };
+  writesAttempted: 0;
+}
+
+/**
+ * Live continuation preflight. Its deliberately tiny client type makes entity,
+ * migration-record/run and report writes unavailable at compile time.
+ */
+export async function runContinuationAwarePlan(input: {
+  prisma: PhoenixContinuationReadClient;
+  request: CrossShaContinuationRequest;
+  expected: CrossShaContinuationExpected & { manifest: PhoenixReleaseManifest };
+}): Promise<ContinuationAwarePlanResult> {
+  const chain = loadCrossShaContinuationChain(input.request, input.expected);
+  return evaluateContinuationAwarePlan({ ...input, chain });
+}
+
+/** Pure live-state evaluation after predecessor-file identity authorization. */
+export async function evaluateContinuationAwarePlan(input: {
+  prisma: PhoenixContinuationReadClient;
+  request: CrossShaContinuationRequest;
+  expected: CrossShaContinuationExpected & { manifest: PhoenixReleaseManifest };
+  chain: CrossShaContinuationChain;
+}): Promise<ContinuationAwarePlanResult> {
+  const continuation = await resolveMultiPhaseContinuation(
+    input.prisma,
+    PHOENIX_RELEASE_SOURCE_NAMESPACE,
+    input.chain,
+    input.expected.manifest,
+  );
+  await assertContinuationLaterPhasesUntouched(
+    input.prisma,
+    PHOENIX_RELEASE_SOURCE_NAMESPACE,
+    input.expected.manifest,
+    continuation.failedPhase,
+  );
+
+  let cityPrerequisites = { missing: [] as string[], ambiguous: [] as string[] };
+  try {
+    await assertPhoenixPlaceCityPrerequisites(input.prisma);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const marker = "RELEASE_BLOCKED:PLACE_CITY_PREREQUISITES_UNSATISFIED:";
+    if (!message.startsWith(marker)) throw error;
+    cityPrerequisites = JSON.parse(message.slice(marker.length)) as typeof cityPrerequisites;
+  }
+
+  return {
+    mode: "CONTINUATION_READ_ONLY_PLAN",
+    status: cityPrerequisites.missing.length || cityPrerequisites.ambiguous.length ? "BLOCKED" : "READY",
+    releaseId: input.expected.releaseId,
+    manifestHash: input.expected.manifestHash,
+    codeSha: input.expected.currentCodeSha,
+    predecessorCodeSha: input.request.predecessorCodeSha,
+    predecessorReportSha256: input.request.reportSha256,
+    completed: Object.fromEntries(
+      [...continuation.phaseSkipSets].map(([phase, keys]) => [phase, [...keys]]),
+    ) as ContinuationAwarePlanResult["completed"],
+    continuationStartKey: continuation.continuationStartKey,
+    laterPhasesUntouched: true,
+    cityPrerequisites,
+    writesAttempted: 0,
+  };
 }
 
 // ---------------------------------------------------------------------------

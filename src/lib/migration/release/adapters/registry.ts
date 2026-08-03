@@ -4,7 +4,12 @@ import type { PrismaClient } from "@prisma/client";
 import type { PlacesWriterPrismaClient } from "./placesProductionWiring";
 
 import { SequentialEntityPhaseAdapter } from "../adapter";
-import { assertPhoenixPlaceCityPrerequisites, resolveMultiPhaseContinuation, type CrossShaContinuationChain } from "../continuation";
+import {
+  PHOENIX_RELEASE_SOURCE_NAMESPACE,
+  assertPhoenixPlaceCityPrerequisites,
+  resolveMultiPhaseContinuation,
+  type CrossShaContinuationChain,
+} from "../continuation";
 import type { PhoenixPhaseAdapter, PhoenixPhaseName, PhoenixReleaseManifest } from "../types";
 
 import { OffersPhaseExecutor } from "./offersAdapter";
@@ -147,7 +152,6 @@ function assertRegistryConsistency(manifest: PhoenixReleaseManifest, coveredPhas
  * one shared namespace for the whole bundle is exactly as valid as six
  * separate ones — it just has to actually be shared.
  */
-const PHOENIX_RELEASE_SOURCE_NAMESPACE = "phoenix-release-bundle";
 
 function withProtectedPlaceAdoption(base: PhoenixPhaseAdapter, prisma: PrismaClient, sourceId: string): PhoenixPhaseAdapter {
   const adoptionHash = "protected-adoption:places-preview-2026-07-30";

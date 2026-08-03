@@ -148,24 +148,39 @@ function testContinuationFlagsRequireAllThreeTogether() {
   assert.equal(full.continueFromCodeSha, VALID_SHA);
 }
 
-function testContinuationFlagsOnlyValidWithApply() {
+function testContinuationAwarePlanRequiresAllThreeTogether() {
+  const base = ["--environment", "DEV", "--manifest", "manifest.json", "--plan"];
   assert.throws(
-    () =>
-      parseArgs([
-        "--environment",
-        "DEV",
-        "--manifest",
-        "manifest.json",
-        "--plan",
-        "--continue-from-report",
-        "/tmp/dev.jsonl",
-        "--continue-from-report-sha256",
-        "a".repeat(64),
-        "--continue-from-code-sha",
-        VALID_SHA,
-      ]),
-    /only valid with --apply/,
+    () => parseArgs([...base, "--continue-from-report", "/tmp/dev.jsonl"]),
+    /all three or none/,
   );
+  assert.throws(
+    () => parseArgs([
+      ...base,
+      "--continue-from-report", "/tmp/dev.jsonl",
+      "--continue-from-report-sha256", "a".repeat(64),
+    ]),
+    /all three or none/,
+  );
+}
+
+function testPlainPlanRemainsStaticModeWithoutContinuation() {
+  const args = parseArgs(["--environment", "DEV", "--manifest", "manifest.json", "--plan"]);
+  assert.equal(args.mode, "PLAN");
+  assert.equal(args.continueFromReport, undefined);
+  assert.equal(args.continueFromReportSha256, undefined);
+  assert.equal(args.continueFromCodeSha, undefined);
+}
+
+function testContinuationFlagsOnlyValidWithApply() {
+  const plan = parseArgs([
+    "--environment", "DEV", "--manifest", "manifest.json", "--plan",
+    "--continue-from-report", "/tmp/dev.jsonl",
+    "--continue-from-report-sha256", "a".repeat(64),
+    "--continue-from-code-sha", VALID_SHA,
+  ]);
+  assert.equal(plan.mode, "PLAN");
+  assert.equal(plan.continueFromReport, "/tmp/dev.jsonl");
 }
 
 function testContinuationFlagsCannotCombineWithResumeFrom() {
@@ -330,6 +345,8 @@ function main() {
   testNeitherSourceAvailableProducesClearFailure();
   testDockerfileStageGraphAndBakedShaContract();
   testContinuationFlagsRequireAllThreeTogether();
+  testContinuationAwarePlanRequiresAllThreeTogether();
+  testPlainPlanRemainsStaticModeWithoutContinuation();
   testContinuationFlagsOnlyValidWithApply();
   testContinuationFlagsCannotCombineWithResumeFrom();
   testNoContinuationFlagsLeavesThemUndefined();

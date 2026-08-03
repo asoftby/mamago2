@@ -23,6 +23,7 @@ import {
   extractFailedKey,
   loadCrossShaContinuationChain,
   resolveChainOriginCodeSha,
+  runContinuationAwarePlan,
   type CrossShaContinuationChain,
 } from "../src/lib/migration/release/continuation";
 import { exactExecutableKeys } from "../src/lib/migration/release/manifest";
@@ -63,14 +64,14 @@ export function parseArgs(argv: readonly string[]): Args {
   const continueFromCodeSha = value(argv, "--continue-from-code-sha");
   const continuationFlags = [continueFromReport, continueFromReportSha256, continueFromCodeSha];
   if (continuationFlags.some(Boolean)) {
-    if (modes[0] !== "APPLY") {
-      throw new Error("--continue-from-report/--continue-from-report-sha256/--continue-from-code-sha are only valid with --apply.");
-    }
-    if (argv.includes("--resume-from")) throw new Error("--continue-from-report cannot be combined with --resume-from.");
     if (!continuationFlags.every(Boolean)) {
       throw new Error(
         "--continue-from-report requires --continue-from-report-sha256 and --continue-from-code-sha together (all three or none).",
       );
+    }
+    if (argv.includes("--resume-from")) throw new Error("--continue-from-report cannot be combined with --resume-from.");
+    if (modes[0] !== "APPLY" && modes[0] !== "PLAN") {
+      throw new Error("--continue-from-report/--continue-from-report-sha256/--continue-from-code-sha are only valid with --plan or --apply.");
     }
   }
 
@@ -167,7 +168,7 @@ async function main(): Promise<void> {
   // Planning is intentionally useful even while some phases are blocked:
   // it verifies every frozen hash, fingerprints the deployment target, and
   // exposes the exact executable/protected scope without performing writes.
-  if (args.mode === "PLAN") {
+  if (args.mode === "PLAN" && !args.continueFromReport) {
     const plan = {
       releaseId: manifest.releaseId,
       manifestPath: args.manifestPath,
@@ -192,6 +193,31 @@ async function main(): Promise<void> {
     // No secrets are present: the loader returns only safe fingerprints.
     console.log(JSON.stringify(plan, null, 2));
     return;
+  }
+
+  if (args.mode === "PLAN") {
+    const codeSha = resolveCodeSha();
+    const correctedManifest: PhoenixReleaseManifest = {
+      ...manifest,
+      phases: manifest.phases.map(applyReleaseActionExceptions),
+    };
+    const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL! });
+    try {
+      const result = await runContinuationAwarePlan({
+        prisma,
+        request: {
+          reportPath: args.continueFromReport!,
+          reportSha256: args.continueFromReportSha256!,
+          predecessorCodeSha: args.continueFromCodeSha!,
+        },
+        expected: { releaseId: manifest.releaseId, manifestHash, currentCodeSha: codeSha, environment, manifest: correctedManifest },
+      });
+      console.log(JSON.stringify(result, null, 2));
+      if (result.status === "BLOCKED") process.exitCode = 2;
+      return;
+    } finally {
+      await prisma.$disconnect();
+    }
   }
 
   // Apply/rerun intentionally fail closed until every phase has a concrete
