@@ -208,6 +208,18 @@ function testNoContinuationFlagsLeavesThemUndefined() {
   assert.equal(args.continueFromCodeSha, undefined);
 }
 
+function testCheckpointFlagsFailClosedWhenPartialAndPlainPlanIsUnchanged() {
+  const plain = parseArgs(["--environment", "DEV", "--manifest", "manifest.json", "--plan"]);
+  assert.equal(plain.createLiveCheckpoint, undefined);
+  assert.equal(plain.continueFromLiveCheckpoint, undefined);
+  assert.throws(() => parseArgs(["--environment", "DEV", "--manifest", "manifest.json", "--plan", "--create-live-checkpoint", "/tmp/out.json"]), /complete anchor/);
+  assert.throws(() => parseArgs(["--environment", "DEV", "--manifest", "manifest.json", "--apply", "--continue-from-live-checkpoint", "/tmp/checkpoint.json"]), /all three or none/);
+  const live = parseArgs(["--environment", "DEV", "--manifest", "manifest.json", "--plan",
+    "--continue-from-live-checkpoint", "/tmp/checkpoint.json", "--continue-from-live-checkpoint-sha256", "a".repeat(64),
+    "--continue-from-live-checkpoint-code-sha", VALID_SHA]);
+  assert.equal(live.continueFromLiveCheckpoint, "/tmp/checkpoint.json");
+}
+
 interface DockerfileStage {
   name: string;
   base: string;
@@ -350,6 +362,7 @@ function main() {
   testContinuationFlagsOnlyValidWithApply();
   testContinuationFlagsCannotCombineWithResumeFrom();
   testNoContinuationFlagsLeavesThemUndefined();
+  testCheckpointFlagsFailClosedWhenPartialAndPlainPlanIsUnchanged();
   testRunbookDocumentsSaferExitCodeCaptureContract();
   testRunbookDocumentsContinuationFlags();
 }

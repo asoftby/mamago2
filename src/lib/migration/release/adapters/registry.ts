@@ -80,6 +80,8 @@ export interface BuildPhoenixAdapterRegistryInput {
    * its first record.
    */
   continuationChain?: CrossShaContinuationChain;
+  /** Exact same-image live-checkpoint skip sets, revalidated before registry construction. */
+  liveCheckpointPhaseSkipSets?: ReadonlyMap<PhoenixPhaseName, ReadonlySet<string>>;
 }
 
 interface ScopeArtifact {
@@ -189,11 +191,16 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
   // Мир in one read-only preflight instead of failing one Place at a time.
   if (input.continuationChain) await assertPhoenixPlaceCityPrerequisites(prisma);
 
-  const source = await prisma.migrationSource.upsert({
-    where: { adapterKey_sourceNamespace: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE } },
-    create: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE, name: "Phoenix release bundle" },
-    update: {},
-  });
+  const source = input.liveCheckpointPhaseSkipSets
+    ? await prisma.migrationSource.findUnique({
+        where: { adapterKey_sourceNamespace: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE } },
+      })
+    : await prisma.migrationSource.upsert({
+        where: { adapterKey_sourceNamespace: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE } },
+        create: { adapterKey: "wordpress-db", sourceNamespace: PHOENIX_RELEASE_SOURCE_NAMESPACE, name: "Phoenix release bundle" },
+        update: {},
+      });
+  if (!source) throw new Error("RELEASE_BLOCKED:LIVE_CHECKPOINT_SOURCE_MISSING");
 
   // Resolved once, up front: the live-DB-verified skip set for every phase
   // `continuationChain` covers — full-phase skip sets for every prior
@@ -206,7 +213,8 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
   const continuation = input.continuationChain
     ? await resolveMultiPhaseContinuation(prisma, source.sourceNamespace, input.continuationChain, input.manifest)
     : undefined;
-  const completedFor = (phase: PhoenixPhaseName): ReadonlySet<string> | undefined => continuation?.phaseSkipSets.get(phase);
+  const completedFor = (phase: PhoenixPhaseName): ReadonlySet<string> | undefined =>
+    input.liveCheckpointPhaseSkipSets?.get(phase) ?? continuation?.phaseSkipSets.get(phase);
 
   const registry: Partial<Record<PhoenixPhaseName, PhoenixPhaseAdapter>> = {};
 

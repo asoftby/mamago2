@@ -15,6 +15,9 @@ import {
   type PhoenixPhaseName,
   type PhoenixPhaseReport,
   type PhoenixReleaseManifest,
+  createLiveStateCheckpoint,
+  loadAndValidateLiveStateCheckpoint,
+  type LiveCheckpointEvidenceRequest,
 } from "../src/lib/migration/release";
 import { buildPhoenixAdapterRegistry } from "../src/lib/migration/release/adapters/registry";
 import {
@@ -38,6 +41,11 @@ interface Args {
   continueFromReport?: string;
   continueFromReportSha256?: string;
   continueFromCodeSha?: string;
+  createLiveCheckpoint?: string;
+  checkpointEvidence?: LiveCheckpointEvidenceRequest;
+  continueFromLiveCheckpoint?: string;
+  continueFromLiveCheckpointSha256?: string;
+  continueFromLiveCheckpointCodeSha?: string;
 }
 
 function value(argv: readonly string[], flag: string): string | undefined {
@@ -75,6 +83,37 @@ export function parseArgs(argv: readonly string[]): Args {
     }
   }
 
+  const createLiveCheckpoint = value(argv, "--create-live-checkpoint");
+  const checkpointEvidenceValues = {
+    anchorReportPath: value(argv, "--checkpoint-anchor-report"),
+    anchorReportSha256: value(argv, "--checkpoint-anchor-report-sha256"),
+    anchorReportCodeSha: value(argv, "--checkpoint-anchor-report-code-sha"),
+    partialReportPath: value(argv, "--checkpoint-partial-report"),
+    partialReportSha256: value(argv, "--checkpoint-partial-report-sha256"),
+    partialReportCodeSha: value(argv, "--checkpoint-partial-report-code-sha"),
+    protectedManifestPath: value(argv, "--checkpoint-protected-manifest"),
+    protectedManifestSha256: value(argv, "--checkpoint-protected-manifest-sha256"),
+  };
+  const checkpointEvidenceList = Object.values(checkpointEvidenceValues);
+  if (createLiveCheckpoint || checkpointEvidenceList.some(Boolean)) {
+    if (!createLiveCheckpoint || !checkpointEvidenceList.every(Boolean)) {
+      throw new Error("--create-live-checkpoint requires the complete anchor, partial-report and protected-manifest evidence flag set.");
+    }
+    if (modes[0] !== "PLAN") throw new Error("--create-live-checkpoint is only valid with --plan.");
+    if (continuationFlags.some(Boolean)) throw new Error("--create-live-checkpoint cannot combine with report continuation.");
+  }
+  const checkpointEvidence = createLiveCheckpoint ? checkpointEvidenceValues as LiveCheckpointEvidenceRequest : undefined;
+
+  const continueFromLiveCheckpoint = value(argv, "--continue-from-live-checkpoint");
+  const continueFromLiveCheckpointSha256 = value(argv, "--continue-from-live-checkpoint-sha256");
+  const continueFromLiveCheckpointCodeSha = value(argv, "--continue-from-live-checkpoint-code-sha");
+  const liveContinuationFlags = [continueFromLiveCheckpoint, continueFromLiveCheckpointSha256, continueFromLiveCheckpointCodeSha];
+  if (liveContinuationFlags.some(Boolean)) {
+    if (!liveContinuationFlags.every(Boolean)) throw new Error("--continue-from-live-checkpoint requires path, SHA-256 and code SHA together (all three or none).");
+    if (modes[0] !== "PLAN" && modes[0] !== "APPLY") throw new Error("--continue-from-live-checkpoint is only valid with --plan or --apply.");
+    if (continuationFlags.some(Boolean) || createLiveCheckpoint || argv.includes("--resume-from")) throw new Error("Live-checkpoint continuation cannot combine with report continuation, checkpoint creation or --resume-from.");
+  }
+
   return {
     environment,
     manifestPath,
@@ -85,6 +124,11 @@ export function parseArgs(argv: readonly string[]): Args {
     continueFromReport,
     continueFromReportSha256,
     continueFromCodeSha,
+    createLiveCheckpoint,
+    checkpointEvidence,
+    continueFromLiveCheckpoint,
+    continueFromLiveCheckpointSha256,
+    continueFromLiveCheckpointCodeSha,
   };
 }
 
@@ -168,7 +212,7 @@ async function main(): Promise<void> {
   // Planning is intentionally useful even while some phases are blocked:
   // it verifies every frozen hash, fingerprints the deployment target, and
   // exposes the exact executable/protected scope without performing writes.
-  if (args.mode === "PLAN" && !args.continueFromReport) {
+  if (args.mode === "PLAN" && !args.continueFromReport && !args.createLiveCheckpoint && !args.continueFromLiveCheckpoint) {
     const plan = {
       releaseId: manifest.releaseId,
       manifestPath: args.manifestPath,
@@ -193,6 +237,38 @@ async function main(): Promise<void> {
     // No secrets are present: the loader returns only safe fingerprints.
     console.log(JSON.stringify(plan, null, 2));
     return;
+  }
+
+  if (args.mode === "PLAN" && args.createLiveCheckpoint) {
+    const codeSha = resolveCodeSha();
+    const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+    const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL! });
+    try {
+      const checkpoint = await createLiveStateCheckpoint({
+        prisma,
+        request: args.checkpointEvidence!,
+        expected: { releaseId: manifest.releaseId, manifestHash, codeSha, environment, manifest: correctedManifest },
+        outputPath: args.createLiveCheckpoint,
+      });
+      console.log(JSON.stringify(checkpoint, null, 2));
+      return;
+    } finally { await prisma.$disconnect(); }
+  }
+
+  if (args.mode === "PLAN" && args.continueFromLiveCheckpoint) {
+    const codeSha = resolveCodeSha();
+    const correctedManifest: PhoenixReleaseManifest = { ...manifest, phases: manifest.phases.map(applyReleaseActionExceptions) };
+    const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL! });
+    try {
+      const validated = await loadAndValidateLiveStateCheckpoint({
+        prisma, checkpointPath: args.continueFromLiveCheckpoint,
+        checkpointSha256: args.continueFromLiveCheckpointSha256!, checkpointCodeSha: args.continueFromLiveCheckpointCodeSha!,
+        expected: { releaseId: manifest.releaseId, manifestHash, codeSha, environment, manifest: correctedManifest },
+      });
+      console.log(JSON.stringify({ mode: "LIVE_CHECKPOINT_READ_ONLY_PLAN", status: "READY", completed: validated.checkpoint.completedCounts,
+        nextPhase: validated.startPhase, firstExecutableSourceKey: validated.checkpoint.firstExecutableSourceKey, writersInvoked: 0 }, null, 2));
+      return;
+    } finally { await prisma.$disconnect(); }
   }
 
   if (args.mode === "PLAN") {
@@ -261,6 +337,7 @@ async function main(): Promise<void> {
 
     let continuationChain: CrossShaContinuationChain | undefined;
     let continuationEvidence: Record<string, string> | undefined;
+    let liveCheckpointContinuation: Awaited<ReturnType<typeof loadAndValidateLiveStateCheckpoint>> | undefined;
     if (args.continueFromReport) {
       // Presence of any one continuation flag already implies all three
       // (parseArgs enforces this), so these are always defined here.
@@ -289,7 +366,21 @@ async function main(): Promise<void> {
       });
     }
 
-    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest: correctedManifest, continuationChain });
+    if (args.continueFromLiveCheckpoint) {
+      liveCheckpointContinuation = await loadAndValidateLiveStateCheckpoint({
+        prisma, checkpointPath: args.continueFromLiveCheckpoint,
+        checkpointSha256: args.continueFromLiveCheckpointSha256!, checkpointCodeSha: args.continueFromLiveCheckpointCodeSha!,
+        expected: { releaseId: manifest.releaseId, manifestHash, codeSha, environment, manifest: correctedManifest },
+      });
+      continuationEvidence = {
+        liveCheckpointSha256: args.continueFromLiveCheckpointSha256!,
+        liveCheckpointCodeSha: args.continueFromLiveCheckpointCodeSha!,
+        liveCheckpointStartKey: liveCheckpointContinuation.checkpoint.firstExecutableSourceKey,
+      };
+    }
+
+    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest: correctedManifest, continuationChain,
+      liveCheckpointPhaseSkipSets: liveCheckpointContinuation?.phaseSkipSets });
     const reportStore = new JsonLinesPhoenixReportStore(args.reportPath);
     const previousReports: PhoenixPhaseReport[] = args.resumeFrom
       ? [...((await reportStore.readCompletedPrefix?.()) ?? [])]
@@ -307,6 +398,7 @@ async function main(): Promise<void> {
       resumeFrom: args.resumeFrom,
       previousReports,
       continuationEvidence,
+      liveCheckpointStartPhase: liveCheckpointContinuation?.startPhase,
     });
     console.log(JSON.stringify(reports, null, 2));
   } finally {

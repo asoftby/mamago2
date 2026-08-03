@@ -33,6 +33,8 @@ export interface RunPhoenixReleaseInput {
    * non-continuation run, which is unaffected.
    */
   continuationEvidence?: Record<string, string>;
+  /** Same-image live checkpoint boundary; prior phases are never invoked. */
+  liveCheckpointStartPhase?: PhoenixPhaseName;
 }
 
 function firstUnexpectedFailure(results: readonly PhoenixRecordResult[]): PhoenixRecordResult | undefined {
@@ -141,7 +143,12 @@ export async function runPhoenixRelease(input: RunPhoenixReleaseInput): Promise<
   const completedPrefix = (input.previousReports ?? []).map((report) => report.phase);
   assertResume(input, completedPrefix);
   const output: PhoenixPhaseReport[] = [];
-  const startIndex = input.resumeFrom ? input.manifest.phaseOrder.indexOf(input.resumeFrom) : 0;
+  const startIndex = input.liveCheckpointStartPhase
+    ? input.manifest.phaseOrder.indexOf(input.liveCheckpointStartPhase)
+    : input.resumeFrom
+      ? input.manifest.phaseOrder.indexOf(input.resumeFrom)
+      : 0;
+  if (startIndex < 0) throw new Error("LIVE_CHECKPOINT_START_PHASE_MISMATCH");
 
   for (const phaseName of input.manifest.phaseOrder.slice(startIndex)) {
     const phase = input.manifest.phases.find((item) => item.name === phaseName);
