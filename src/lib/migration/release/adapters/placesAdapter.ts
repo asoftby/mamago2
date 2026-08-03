@@ -1,6 +1,7 @@
 import type { ExactRecordExecutor } from "../adapter";
 import type { PhoenixExpectedRecord, PhoenixRecordResult } from "../types";
 import { planLineageOnlyCreateAction, type LineageOnlyTargetState } from "./lineageOnlyPlanner";
+import { isRerunForbiddenLiveCreate, isRerunIdempotentCreateSkip, type PhoenixExecuteOptions } from "./rerunIdempotency";
 
 /**
  * Thin Phoenix wrapper for the first Places release onto a FRESH (clean)
@@ -45,7 +46,11 @@ export interface PlacesMigrationDependencies {
 export class PlacesPhaseExecutor implements ExactRecordExecutor {
   constructor(private readonly deps: PlacesMigrationDependencies) {}
 
-  async execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult> {
+  async execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
+  ): Promise<PhoenixRecordResult> {
     try {
       const candidate = this.deps.loadCandidate(sourceRecordKey);
       const target = await this.deps.resolveTargetState(candidate);
@@ -57,7 +62,13 @@ export class PlacesPhaseExecutor implements ExactRecordExecutor {
       if (plan.action === "CONFLICT") {
         return { sourceRecordKey, action: expectedAction, outcome: "PROTECTED_CONFLICT", error: plan.reason ?? "CONFLICT" };
       }
+      if (isRerunForbiddenLiveCreate(plan.action, options)) {
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: "RERUN_LIVE_CREATE_FORBIDDEN" };
+      }
       if (plan.action !== expectedAction) {
+        if (isRerunIdempotentCreateSkip(expectedAction, plan.action, options)) {
+          return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
+        }
         return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
       }
       if (plan.action === "SKIP_UNCHANGED") {

@@ -1,5 +1,6 @@
 import type { ExactRecordExecutor } from "../adapter";
 import type { PhoenixExpectedRecord, PhoenixRecordResult } from "../types";
+import { isRerunForbiddenLiveCreate, isRerunIdempotentCreateSkip, type PhoenixExecuteOptions } from "./rerunIdempotency";
 
 export interface RoutesMigrationCandidate { sourceRecordKey: string; domainHash: string; slug: string }
 export interface RoutesTargetState { lineageCount: number; targetCount: number; lineageTargetExists: boolean; lineageDomainHash: string | null }
@@ -14,14 +15,30 @@ export function planRoutesCreateAction(hash: string, target: RoutesTargetState):
 export interface RoutesMigrationDependencies { loadCandidate(key: string): RoutesMigrationCandidate; resolveTargetState(candidate: RoutesMigrationCandidate): Promise<RoutesTargetState>; write(candidate: RoutesMigrationCandidate): Promise<{ targetId: string }> }
 export class RoutesPhaseExecutor implements ExactRecordExecutor {
   constructor(private readonly deps: RoutesMigrationDependencies) {}
-  async execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult> {
+  async execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
+  ): Promise<PhoenixRecordResult> {
     try {
-      const candidate = this.deps.loadCandidate(sourceRecordKey); const plan = planRoutesCreateAction(candidate.domainHash, await this.deps.resolveTargetState(candidate));
+      const candidate = this.deps.loadCandidate(sourceRecordKey);
+      const plan = planRoutesCreateAction(candidate.domainHash, await this.deps.resolveTargetState(candidate));
       if (plan.action === "FAILED") return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: plan.reason ?? "FAILED" };
       if (plan.action === "CONFLICT") return { sourceRecordKey, action: expectedAction, outcome: "PROTECTED_CONFLICT", error: plan.reason ?? "CONFLICT" };
-      if (plan.action !== expectedAction) return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
+      if (isRerunForbiddenLiveCreate(plan.action, options)) {
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: "RERUN_LIVE_CREATE_FORBIDDEN" };
+      }
+      if (plan.action !== expectedAction) {
+        if (isRerunIdempotentCreateSkip(expectedAction, plan.action, options)) {
+          return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
+        }
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
+      }
       if (plan.action === "SKIP_UNCHANGED") return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
-      await this.deps.write(candidate); return { sourceRecordKey, action: expectedAction, outcome: "CREATED" };
-    } catch (error) { return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: error instanceof Error ? error.message : String(error) }; }
+      await this.deps.write(candidate);
+      return { sourceRecordKey, action: expectedAction, outcome: "CREATED" };
+    } catch (error) {
+      return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: error instanceof Error ? error.message : String(error) };
+    }
   }
 }

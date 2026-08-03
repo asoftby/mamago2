@@ -12,7 +12,10 @@ export class BusinessesProductionExecutor implements ExactRecordExecutor {
   private static readonly SOURCE_HASH = "approved-business-ownership-2026-07-30";
   constructor(private readonly prisma: PrismaClient, private readonly sourceId: string) {}
 
-  async execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult> {
+  async execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+  ): Promise<PhoenixRecordResult> {
     try {
       const userLineages = await this.prisma.migrationLineage.findMany({ where: { sourceId: this.sourceId, sourceRecordKey, targetType: "USER", targetRole: "primary", isActive: true } });
       if (userLineages.length !== 1 || !userLineages[0].targetId) throw new Error(userLineages.length > 1 ? "USER_DEPENDENCY_AMBIGUOUS" : "USER_DEPENDENCY_NOT_FOUND");

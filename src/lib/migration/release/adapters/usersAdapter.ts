@@ -1,5 +1,6 @@
 import type { ExactRecordExecutor } from "../adapter";
 import type { PhoenixExpectedRecord, PhoenixRecordResult } from "../types";
+import { isRerunForbiddenLiveCreate, isRerunIdempotentCreateSkip, type PhoenixExecuteOptions } from "./rerunIdempotency";
 
 /**
  * Thin Phoenix wrapper around the already-proven Users vertical-slice
@@ -39,7 +40,9 @@ const NON_USER_ROLES = new Set(["ADMIN", "MODERATOR", "BUSINESS_OWNER"]);
  * `executeExpectedAction` is compared against the plan, not blindly
  * trusted: a plan that disagrees with what the frozen manifest expects is
  * a FAILED outcome (stop-on-first-error upstream), never silently
- * reconciled to whichever action actually happened.
+ * reconciled to whichever action actually happened — except the narrow
+ * `--rerun` CREATE→SKIP_UNCHANGED idempotency case (see
+ * `rerunIdempotency.ts`).
  */
 export class UsersPhaseExecutor implements ExactRecordExecutor {
   constructor(private readonly deps: UsersMigrationDependencies) {}
@@ -47,6 +50,7 @@ export class UsersPhaseExecutor implements ExactRecordExecutor {
   async execute(
     sourceRecordKey: string,
     expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
   ): Promise<PhoenixRecordResult> {
     // Every dependency call is guarded: an unexpected throw from a real
     // implementation must become a structured FAILED result, never an
@@ -59,7 +63,13 @@ export class UsersPhaseExecutor implements ExactRecordExecutor {
       if (plan.action === "BLOCKED") {
         return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: plan.reason ?? "BLOCKED" };
       }
+      if (isRerunForbiddenLiveCreate(plan.action, options)) {
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: "RERUN_LIVE_CREATE_FORBIDDEN" };
+      }
       if (plan.action !== expectedAction) {
+        if (isRerunIdempotentCreateSkip(expectedAction, plan.action, options)) {
+          return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
+        }
         return {
           sourceRecordKey,
           action: expectedAction,

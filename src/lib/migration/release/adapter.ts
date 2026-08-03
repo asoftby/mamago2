@@ -6,9 +6,14 @@ import type {
   PhoenixReleasePhase,
 } from "./types";
 import { exactExecutableKeys } from "./manifest";
+import type { PhoenixExecuteOptions } from "./adapters/rerunIdempotency";
 
 export interface ExactRecordExecutor {
-  execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult>;
+  execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
+  ): Promise<PhoenixRecordResult>;
   reconcile?(phase: PhoenixReleasePhase, results: readonly PhoenixRecordResult[]): Promise<Partial<PhoenixPhaseReport>>;
 }
 
@@ -35,16 +40,19 @@ export class SequentialEntityPhaseAdapter implements PhoenixPhaseAdapter {
         outcome: record.action === "UPDATE_CONFLICT" ? "PROTECTED_CONFLICT" : "SKIPPED",
       }));
 
-  apply = async (phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> => this.runSequential(phase);
+  apply = async (phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> => this.runSequential(phase, "APPLY");
 
-  rerun = async (phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> => this.runSequential(phase);
+  rerun = async (phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> => this.runSequential(phase, "RERUN");
 
   reconcile = async (
     phase: PhoenixReleasePhase,
     results: readonly PhoenixRecordResult[],
   ): Promise<Partial<PhoenixPhaseReport>> => this.executor.reconcile?.(phase, results) ?? {};
 
-  private async runSequential(phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> {
+  private async runSequential(
+    phase: PhoenixReleasePhase,
+    mode: NonNullable<PhoenixExecuteOptions["mode"]>,
+  ): Promise<PhoenixRecordResult[]> {
     const allowed = new Set(exactExecutableKeys(phase));
     const results: PhoenixRecordResult[] = [];
     for (const record of phase.records) {
@@ -53,7 +61,7 @@ export class SequentialEntityPhaseAdapter implements PhoenixPhaseAdapter {
         results.push({ sourceRecordKey: record.sourceRecordKey, action: record.action, outcome: "SKIPPED" });
         continue;
       }
-      const result = await this.executor.execute(record.sourceRecordKey, record.action);
+      const result = await this.executor.execute(record.sourceRecordKey, record.action, { mode });
       results.push(result);
       if (result.outcome === "FAILED") break;
     }

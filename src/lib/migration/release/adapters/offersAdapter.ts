@@ -1,5 +1,6 @@
 import type { ExactRecordExecutor } from "../adapter";
 import type { PhoenixExpectedRecord, PhoenixRecordResult } from "../types";
+import { isRerunForbiddenLiveCreate, isRerunIdempotentCreateSkip, type PhoenixExecuteOptions } from "./rerunIdempotency";
 
 /**
  * Thin Phoenix wrapper for the first Offers release onto a FRESH (clean)
@@ -132,7 +133,11 @@ export function classifyDependencyReadiness(input: {
 export class OffersPhaseExecutor implements ExactRecordExecutor {
   constructor(private readonly deps: OffersMigrationDependencies) {}
 
-  async execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult> {
+  async execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
+  ): Promise<PhoenixRecordResult> {
     // Every dependency call is guarded: an unexpected throw from a real
     // implementation must become a structured FAILED result, never an
     // escaped exception — otherwise `runSequential`'s stop-on-first-error
@@ -148,7 +153,13 @@ export class OffersPhaseExecutor implements ExactRecordExecutor {
       if (plan.action === "CONFLICT") {
         return { sourceRecordKey, action: expectedAction, outcome: "PROTECTED_CONFLICT", error: plan.reason ?? "CONFLICT" };
       }
+      if (isRerunForbiddenLiveCreate(plan.action, options)) {
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: "RERUN_LIVE_CREATE_FORBIDDEN" };
+      }
       if (plan.action !== expectedAction) {
+        if (isRerunIdempotentCreateSkip(expectedAction, plan.action, options)) {
+          return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
+        }
         return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
       }
       if (plan.action === "SKIP_UNCHANGED") {

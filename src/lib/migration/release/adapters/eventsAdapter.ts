@@ -1,6 +1,7 @@
 import type { ExactRecordExecutor } from "../adapter";
 import { exactExecutableKeys } from "../manifest";
 import type { PhoenixExpectedRecord, PhoenixPhaseAdapter, PhoenixPhaseReport, PhoenixRecordResult, PhoenixReleasePhase } from "../types";
+import { isRerunForbiddenLiveCreate, isRerunIdempotentCreateSkip, type PhoenixExecuteOptions } from "./rerunIdempotency";
 
 export interface EventsMigrationCandidate {
   sourceRecordKey: string;
@@ -42,13 +43,25 @@ export interface EventsMigrationDependencies {
 
 export class EventsPhaseExecutor implements ExactRecordExecutor {
   constructor(private readonly deps: EventsMigrationDependencies) {}
-  async execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult> {
+  async execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
+  ): Promise<PhoenixRecordResult> {
     try {
       const candidate = this.deps.loadCandidate(sourceRecordKey);
       const plan = planEventsCreateAction(candidate.domainHash, await this.deps.resolveTargetState(candidate));
       if (plan.action === "FAILED") return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: plan.reason ?? "FAILED" };
       if (plan.action === "CONFLICT") return { sourceRecordKey, action: expectedAction, outcome: "PROTECTED_CONFLICT", error: plan.reason ?? "CONFLICT" };
-      if (plan.action !== expectedAction) return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
+      if (isRerunForbiddenLiveCreate(plan.action, options)) {
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: "RERUN_LIVE_CREATE_FORBIDDEN" };
+      }
+      if (plan.action !== expectedAction) {
+        if (isRerunIdempotentCreateSkip(expectedAction, plan.action, options)) {
+          return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
+        }
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
+      }
       if (plan.action === "SKIP_UNCHANGED") return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
       await this.deps.write(candidate);
       return { sourceRecordKey, action: expectedAction, outcome: "CREATED" };
@@ -61,19 +74,29 @@ export class EventsPhaseExecutor implements ExactRecordExecutor {
 /** Fresh-target release-only adapter. Preflight runs before the first record in every mode. */
 export class EventsFreshTargetPhaseAdapter implements PhoenixPhaseAdapter {
   constructor(private readonly preflight: () => Promise<EventsPhasePreflightResult>, private readonly executor: EventsPhaseExecutor) {}
-  plan = (phase: PhoenixReleasePhase) => this.run(phase);
-  apply = (phase: PhoenixReleasePhase) => this.run(phase);
-  rerun = (phase: PhoenixReleasePhase) => this.run(phase);
+  plan = async (phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> =>
+    phase.records
+      .filter((record) => exactExecutableKeys(phase).includes(record.sourceRecordKey))
+      .map((record) => ({
+        sourceRecordKey: record.sourceRecordKey,
+        action: record.action,
+        outcome: record.action === "UPDATE_CONFLICT" ? "PROTECTED_CONFLICT" : "SKIPPED",
+      }));
+  apply = (phase: PhoenixReleasePhase) => this.run(phase, "APPLY");
+  rerun = (phase: PhoenixReleasePhase) => this.run(phase, "RERUN");
   reconcile = async (): Promise<Partial<PhoenixPhaseReport>> => ({});
 
-  private async run(phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> {
+  private async run(
+    phase: PhoenixReleasePhase,
+    mode: NonNullable<PhoenixExecuteOptions["mode"]>,
+  ): Promise<PhoenixRecordResult[]> {
     const checked = await this.preflight();
     if (!checked.ok) return [{ sourceRecordKey: "events:phase-preflight", action: "CREATE", outcome: "FAILED", error: checked.blocker ?? "EVENTS_UNCLASSIFIABLE_TARGET_STATE" }];
     const allowed = new Set(exactExecutableKeys(phase));
     const results: PhoenixRecordResult[] = [];
     for (const record of phase.records) {
       if (!allowed.has(record.sourceRecordKey)) continue;
-      const result = await this.executor.execute(record.sourceRecordKey, record.action);
+      const result = await this.executor.execute(record.sourceRecordKey, record.action, { mode });
       results.push(result);
       if (result.outcome === "FAILED") break;
     }
