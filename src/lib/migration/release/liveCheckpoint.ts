@@ -35,6 +35,45 @@ function digest(values: readonly string[]): string {
   return createHash("sha256").update([...values].sort().join("\n")).digest("hex");
 }
 
+/**
+ * Matches only the exact output shape of `UserMigrationVerticalSlice.maskEmail`
+ * (`${local.slice(0, 1)}***@${domain}`) for a valid, non-empty-local email —
+ * never a loose "contains `***@`" test. Exactly one non-`@`, non-whitespace
+ * character before `***@`, then a non-empty domain with no `@` or whitespace.
+ * `local.slice(0, 1)` is only ever empty for a malformed `email` with no
+ * local part, which `planUserMigration`'s upstream email validation already
+ * rejects before `maskEmail` runs — so a real mask never has an empty
+ * leading character, and this pattern correctly refuses to exempt one.
+ * `platform-owner-runtime-identity` and any other non-mask string never match.
+ */
+const USER_MASK_EMAIL_NATURAL_KEY_PATTERN = /^[^@\s]\*\*\*@[^@\s]+$/;
+
+/**
+ * A privacy mask is a lossy digest of the real email (only the first
+ * character and domain survive), so distinct Users legitimately collide on
+ * it — it is not identity-bearing and must not be treated as a uniqueness
+ * key. The exemption is intentionally narrow: it must be the exact row
+ * shape the vertical-slice writer produces for a fresh Phoenix-release USER
+ * create (`targetRole: "primary"`, `lastPlanAction: "CREATE"`), not merely
+ * "any USER row whose key looks like a mask" — `LINK_EXISTING` adoptions
+ * (e.g. `platform-owner-runtime-identity`) and off-shape roles/actions stay
+ * identity-bearing.
+ */
+export function isPrivacyMaskedUserNaturalKey(row: {
+  targetType: string;
+  targetRole: string;
+  lastPlanAction: string | null;
+  targetNaturalKey: string | null;
+}): boolean {
+  return (
+    row.targetType === "USER" &&
+    row.targetRole === "primary" &&
+    row.lastPlanAction === "CREATE" &&
+    row.targetNaturalKey !== null &&
+    USER_MASK_EMAIL_NATURAL_KEY_PATTERN.test(row.targetNaturalKey)
+  );
+}
+
 function stableJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
@@ -218,7 +257,9 @@ async function proveLiveState(prisma: PhoenixLiveCheckpointReadClient, expected:
   const allowedTypes = new Set(["USER", "BUSINESS", "PLACE", ...laterTypes]);
   if (lineages.some((row) => !allowedTypes.has(row.targetType))) throw blocked("UNEXPECTED_SCOPE");
 
-  const natural = lineages.filter((row) => row.targetNaturalKey).map((row) => `${row.targetType}:${row.targetNaturalKey}`);
+  const natural = lineages
+    .filter((row) => row.targetNaturalKey && !isPrivacyMaskedUserNaturalKey(row))
+    .map((row) => `${row.targetType}:${row.targetNaturalKey}`);
   if (new Set(natural).size !== natural.length) throw blocked("DUPLICATE_NATURAL_KEY");
   const targets = lineages.filter((row) => row.targetId).map((row) => `${row.targetType}:${row.targetId}`);
   if (new Set(targets).size !== targets.length) throw blocked("DUPLICATE_TARGET_ID");

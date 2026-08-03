@@ -3,7 +3,13 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createLiveStateCheckpoint, loadAndValidateLiveStateCheckpoint, type LiveCheckpointEvidencePins, type LiveCheckpointExpected } from "./liveCheckpoint";
+import {
+  createLiveStateCheckpoint,
+  isPrivacyMaskedUserNaturalKey,
+  loadAndValidateLiveStateCheckpoint,
+  type LiveCheckpointEvidencePins,
+  type LiveCheckpointExpected,
+} from "./liveCheckpoint";
 import { sha256Bytes } from "./manifest";
 import { runPhoenixRelease } from "./coordinator";
 import type { PhoenixEnvironmentContext, PhoenixPhaseAdapter, PhoenixPhaseName, PhoenixPhaseReport, PhoenixReleaseManifest } from "./types";
@@ -76,12 +82,19 @@ function fixture() {
 }
 
 type Lineage = { sourceRecordKey: string; targetType: string; targetId: string; targetRole: string; targetNaturalKey: string; lastSourceHash: string; lastPlanAction: string; isActive: boolean };
-function fakePrisma(options: { missingPlace?: boolean; offerStarted?: boolean; targetMismatch?: boolean; lineageMismatch?: boolean; ambiguousTarget?: boolean } = {}) {
-  const make = (sourceRecordKey: string, targetType: string): Lineage => ({ sourceRecordKey, targetType, targetId: `${targetType}-${sourceRecordKey}`,
-    targetRole: "primary", targetNaturalKey: `${targetType.toLowerCase()}:${sourceRecordKey}`, lastSourceHash: "hash", lastPlanAction: "CREATE", isActive: true });
+type LineageOverride = Partial<Pick<Lineage, "targetId" | "targetRole" | "targetNaturalKey" | "lastPlanAction" | "isActive">>;
+type OverrideFn = (sourceRecordKey: string, index: number) => LineageOverride | undefined;
+
+function fakePrisma(options: {
+  missingPlace?: boolean; offerStarted?: boolean; targetMismatch?: boolean; lineageMismatch?: boolean; ambiguousTarget?: boolean;
+  userOverrides?: OverrideFn; businessOverrides?: OverrideFn; placeOverrides?: OverrideFn;
+} = {}) {
+  const make = (sourceRecordKey: string, targetType: string, override?: LineageOverride): Lineage => ({ sourceRecordKey, targetType, targetId: `${targetType}-${sourceRecordKey}`,
+    targetRole: "primary", targetNaturalKey: `${targetType.toLowerCase()}:${sourceRecordKey}`, lastSourceHash: "hash", lastPlanAction: "CREATE", isActive: true, ...override });
   const lineages: Lineage[] = [
-    ...userKeys.map((key) => make(key, "USER")), ...businessKeys.map((key) => make(key, "BUSINESS")),
-    ...placeKeys.filter((_, index) => !(options.missingPlace && index === 0)).map((key) => make(key, "PLACE")),
+    ...userKeys.map((key, i) => make(key, "USER", options.userOverrides?.(key, i))),
+    ...businessKeys.map((key, i) => make(key, "BUSINESS", options.businessOverrides?.(key, i))),
+    ...placeKeys.filter((_, index) => !(options.missingPlace && index === 0)).map((key, i) => make(key, "PLACE", options.placeOverrides?.(key, i))),
     { sourceRecordKey: "wordpress-db:places:43023", targetType: "PLACE", targetId: "atmosfera-id", targetRole: "primary",
       targetNaturalKey: options.lineageMismatch ? "slug:wrong" : "slug:atmosfera", lastSourceHash: "protected-adoption:places-preview-2026-07-30", lastPlanAction: "LINK_EXISTING", isActive: true },
   ];
@@ -108,13 +121,133 @@ async function create(options: Parameters<typeof fakePrisma>[0] = {}) {
   return { ...f, outputPath, checkpoint };
 }
 
+function testMaskGuardPredicate() {
+  const row = (overrides: Partial<Parameters<typeof isPrivacyMaskedUserNaturalKey>[0]>) =>
+    ({ targetType: "USER", targetRole: "primary", lastPlanAction: "CREATE", targetNaturalKey: "a***@gmail.com", ...overrides });
+
+  // Exact-shape PASS cases: exactly one non-@/whitespace char, then `***@`, then a non-empty domain.
+  for (const key of ["a***@example.com", "Я***@example.by", "1***@domain.test"]) {
+    assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetNaturalKey: key })), true, `${key} is the exact maskEmail shape and is exempt`);
+  }
+
+  // FAIL cases: anything off the exact maskEmail shape stays identity-bearing.
+  for (const key of [
+    "***@example.com", // empty local part — real maskEmail(email) never empty-slices on a valid email
+    "ab***@example.com", // two leading chars
+    " ***@example.com", // leading char is whitespace (a single space), not a real local-part character
+    "пробел***@example.com", // multi-char leading run (not exactly one character)
+    "@***@example.com", // leading char is itself "@"
+    "a***@", // empty domain
+    "a***@example @com", // domain contains whitespace and an embedded "@"
+    "platform-owner-runtime-identity", // not mask-shaped at all
+  ]) {
+    assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetNaturalKey: key })), false, `${JSON.stringify(key)} must not be exempt`);
+  }
+
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetType: "BUSINESS" })), false, "non-USER rows are never exempt");
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetType: "PLACE" })), false, "non-USER rows are never exempt");
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetRole: "secondary" })), false, "wrong role is not exempt even with a valid mask");
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ lastPlanAction: "LINK_EXISTING" })), false, "wrong plan action is not exempt even with a valid mask");
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ lastPlanAction: "UPDATE" })), false, "wrong plan action is not exempt even with a valid mask");
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetNaturalKey: "a**@gmail.com" })), false, "malformed mask-like key (wrong asterisk count) is not exempt");
+  assert.equal(isPrivacyMaskedUserNaturalKey(row({ targetNaturalKey: null })), false, "null natural key is never exempt");
+  console.log("isPrivacyMaskedUserNaturalKey unit checks: OK");
+}
+
+// Mirrors the independently-audited DEV shape (75 duplicate masked-natural-key
+// groups covering 462 of the 563 USER rows) confirmed via the read-only
+// live-lineage audit against devmamago on 2026-08-03.
+const DEV_SHAPE_GROUP_SIZES = [
+  ...Array(21).fill(2), ...Array(13).fill(3), ...Array(7).fill(4), ...Array(7).fill(5), ...Array(4).fill(6),
+  ...Array(2).fill(7), ...Array(2).fill(8), ...Array(1).fill(9), ...Array(4).fill(10), ...Array(1).fill(11),
+  ...Array(2).fill(12), ...Array(3).fill(13), ...Array(2).fill(14), ...Array(2).fill(15), ...Array(1).fill(18),
+  ...Array(1).fill(21), ...Array(2).fill(22),
+];
+assert.equal(DEV_SHAPE_GROUP_SIZES.length, 75, "DEV-shaped fixture must model exactly 75 groups");
+assert.equal(DEV_SHAPE_GROUP_SIZES.reduce((a, b) => a + b, 0), 462, "DEV-shaped fixture must model exactly 462 rows");
+
+function devShapedUserOverrides(): OverrideFn {
+  const maskByIndex = new Map<number, string>();
+  let cursor = 0;
+  DEV_SHAPE_GROUP_SIZES.forEach((size, groupIndex) => {
+    const mask = `u***@g${groupIndex}.test`;
+    for (let i = 0; i < size; i += 1) { maskByIndex.set(cursor, mask); cursor += 1; }
+  });
+  return (_key, index) => (maskByIndex.has(index) ? { targetNaturalKey: maskByIndex.get(index) } : undefined);
+}
+
 async function main() {
+  testMaskGuardPredicate();
+
   const first = await create();
   assert.equal(first.checkpoint.type, "PHOENIX_LIVE_STATE_CHECKPOINT");
   assert.deepEqual(first.checkpoint.completedCounts, { users: 563, businesses: 38, places: 78 });
   assert.equal(first.checkpoint.firstExecutableSourceKey, FIRST_OFFER);
+  assert.equal(first.checkpoint.nextPhase, "offers");
+  assert.equal(first.checkpoint.laterPhasesUntouched, true);
   assert.equal(first.checkpoint.databaseWriterRan, false);
   assert.equal((fakePrisma() as Record<string, unknown>).migrationRun !== undefined, true, "read client exposes count only, no mutation delegate is used");
+  for (const model of Object.values(fakePrisma() as Record<string, Record<string, unknown>>)) {
+    for (const mutation of ["create", "update", "delete", "upsert", "createMany", "updateMany", "deleteMany"]) {
+      assert.equal(mutation in model, false, `read client must not expose ${mutation}`);
+    }
+  }
+
+  // Different USER targetIds sharing one valid maskEmail-format key pass.
+  const maskedDistinct = await create({ userOverrides: (_key, i) => (i < 3 ? { targetNaturalKey: "a***@gmail.com" } : undefined) });
+  assert.deepEqual(maskedDistinct.checkpoint.completedCounts, { users: 563, businesses: 38, places: 78 });
+
+  // Duplicate USER targetId is still blocked, unaffected by the masked-key exemption.
+  await assert.rejects(
+    () => create({ userOverrides: (_key, i) => (i < 2 ? { targetId: "SHARED-USER-TARGET" } : undefined) }),
+    /DUPLICATE_TARGET_ID/,
+  );
+
+  // platform-owner-runtime-identity duplicated across two USER rows stays identity-bearing and blocks,
+  // even when both rows otherwise look like a fresh CREATE.
+  await assert.rejects(
+    () => create({ userOverrides: (_key, i) => (i < 2 ? { targetNaturalKey: "platform-owner-runtime-identity" } : undefined) }),
+    /DUPLICATE_NATURAL_KEY/,
+  );
+
+  // A malformed mask-like USER key (extra leading char) is not exempt and still blocks on duplication.
+  await assert.rejects(
+    () => create({ userOverrides: (_key, i) => (i < 2 ? { targetNaturalKey: "ab***@gmail.com" } : undefined) }),
+    /DUPLICATE_NATURAL_KEY/,
+  );
+
+  // A valid mask format with the wrong targetRole is not exempt.
+  await assert.rejects(
+    () => create({ userOverrides: (_key, i) => (i < 2 ? { targetNaturalKey: "a***@gmail.com", targetRole: "secondary" } : undefined) }),
+    /DUPLICATE_NATURAL_KEY/,
+  );
+
+  // A valid mask format with the wrong lastPlanAction (e.g. a LINK_EXISTING reactivation) is not exempt.
+  await assert.rejects(
+    () => create({ userOverrides: (_key, i) => (i < 2 ? { targetNaturalKey: "a***@gmail.com", lastPlanAction: "LINK_EXISTING" } : undefined) }),
+    /DUPLICATE_NATURAL_KEY/,
+  );
+
+  // BUSINESS natural-key duplicates keep failing closed — the exemption is USER-only.
+  await assert.rejects(
+    () => create({ businessOverrides: (_key, i) => (i < 2 ? { targetNaturalKey: "shared-business-slug" } : undefined) }),
+    /DUPLICATE_NATURAL_KEY/,
+  );
+
+  // PLACE natural-key duplicates keep failing closed — the exemption is USER-only.
+  await assert.rejects(
+    () => create({ placeOverrides: (_key, i) => (i < 2 ? { targetNaturalKey: "shared-place-slug" } : undefined) }),
+    /DUPLICATE_NATURAL_KEY/,
+  );
+
+  // The independently-audited DEV shape (75 masked-key groups / 462 rows) passes end to end,
+  // and completed counts (563 Users, 38 Businesses, 78 ordinary Places + 1 protected adoption) are unchanged.
+  const devShaped = await create({ userOverrides: devShapedUserOverrides() });
+  assert.deepEqual(devShaped.checkpoint.completedCounts, { users: 563, businesses: 38, places: 78 });
+  assert.equal(devShaped.checkpoint.protectedAdoption.sourceRecordKey, "wordpress-db:places:43023");
+  assert.equal(devShaped.checkpoint.nextPhase, "offers");
+  assert.equal(devShaped.checkpoint.firstExecutableSourceKey, FIRST_OFFER);
+  assert.equal(devShaped.checkpoint.laterPhasesUntouched, true);
   await assert.rejects(() => createLiveStateCheckpoint({ prisma: fakePrisma(), request: first.request, expected, outputPath: first.outputPath, evidencePins: first.evidencePins }), /OUTPUT_EXISTS/);
 
   const secondPath = join(first.dir, "checkpoint-2.json");
