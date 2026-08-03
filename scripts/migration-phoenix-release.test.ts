@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveCodeSha } from "./migration-phoenix-release";
+import { parseArgs, resolveCodeSha } from "./migration-phoenix-release";
 
 const VALID_SHA = "559240d77b36bada507318a35ffaf3ad442056de";
 const OTHER_VALID_SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678";
@@ -123,6 +123,76 @@ function testNeitherSourceAvailableProducesClearFailure() {
   );
 }
 
+const BASE_ARGV = ["--environment", "DEV", "--manifest", "manifest.json", "--apply"];
+
+function testContinuationFlagsRequireAllThreeTogether() {
+  assert.throws(
+    () => parseArgs([...BASE_ARGV, "--continue-from-report", "/tmp/dev.jsonl"]),
+    /--continue-from-report requires --continue-from-report-sha256 and --continue-from-code-sha/,
+  );
+  assert.throws(
+    () => parseArgs([...BASE_ARGV, "--continue-from-report-sha256", "a".repeat(64)]),
+    /--continue-from-report requires --continue-from-report-sha256 and --continue-from-code-sha/,
+  );
+  const full = parseArgs([
+    ...BASE_ARGV,
+    "--continue-from-report",
+    "/tmp/dev.jsonl",
+    "--continue-from-report-sha256",
+    "a".repeat(64),
+    "--continue-from-code-sha",
+    VALID_SHA,
+  ]);
+  assert.equal(full.continueFromReport, "/tmp/dev.jsonl");
+  assert.equal(full.continueFromReportSha256, "a".repeat(64));
+  assert.equal(full.continueFromCodeSha, VALID_SHA);
+}
+
+function testContinuationFlagsOnlyValidWithApply() {
+  assert.throws(
+    () =>
+      parseArgs([
+        "--environment",
+        "DEV",
+        "--manifest",
+        "manifest.json",
+        "--plan",
+        "--continue-from-report",
+        "/tmp/dev.jsonl",
+        "--continue-from-report-sha256",
+        "a".repeat(64),
+        "--continue-from-code-sha",
+        VALID_SHA,
+      ]),
+    /only valid with --apply/,
+  );
+}
+
+function testContinuationFlagsCannotCombineWithResumeFrom() {
+  assert.throws(
+    () =>
+      parseArgs([
+        ...BASE_ARGV,
+        "--continue-from-report",
+        "/tmp/dev.jsonl",
+        "--continue-from-report-sha256",
+        "a".repeat(64),
+        "--continue-from-code-sha",
+        VALID_SHA,
+        "--resume-from",
+        "users",
+      ]),
+    /cannot be combined with --resume-from/,
+  );
+}
+
+function testNoContinuationFlagsLeavesThemUndefined() {
+  const args = parseArgs(BASE_ARGV);
+  assert.equal(args.continueFromReport, undefined);
+  assert.equal(args.continueFromReportSha256, undefined);
+  assert.equal(args.continueFromCodeSha, undefined);
+}
+
 interface DockerfileStage {
   name: string;
   base: string;
@@ -217,6 +287,10 @@ function main() {
   testMalformedGitOutputFails();
   testNeitherSourceAvailableProducesClearFailure();
   testDockerfileStageGraphAndBakedShaContract();
+  testContinuationFlagsRequireAllThreeTogether();
+  testContinuationFlagsOnlyValidWithApply();
+  testContinuationFlagsCannotCombineWithResumeFrom();
+  testNoContinuationFlagsLeavesThemUndefined();
 }
 
 main();

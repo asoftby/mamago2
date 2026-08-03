@@ -13,7 +13,18 @@ export interface ExactRecordExecutor {
 }
 
 export class SequentialEntityPhaseAdapter implements PhoenixPhaseAdapter {
-  constructor(private readonly executor: ExactRecordExecutor) {}
+  /**
+   * `alreadyCompleted`, when supplied, must already be a live-DB-verified
+   * set (see `continuation.ts`) — records in it are skipped without ever
+   * calling `executor.execute()`, so a partially-applied phase can resume
+   * exactly where it stopped without re-deriving (and re-failing) a plan
+   * for records already proven complete. Every other record still goes
+   * through the unmodified fail-closed comparison below.
+   */
+  constructor(
+    private readonly executor: ExactRecordExecutor,
+    private readonly alreadyCompleted?: ReadonlySet<string>,
+  ) {}
 
   plan = async (phase: PhoenixReleasePhase): Promise<PhoenixRecordResult[]> =>
     phase.records
@@ -38,6 +49,10 @@ export class SequentialEntityPhaseAdapter implements PhoenixPhaseAdapter {
     const results: PhoenixRecordResult[] = [];
     for (const record of phase.records) {
       if (!allowed.has(record.sourceRecordKey)) continue;
+      if (this.alreadyCompleted?.has(record.sourceRecordKey)) {
+        results.push({ sourceRecordKey: record.sourceRecordKey, action: record.action, outcome: "SKIPPED" });
+        continue;
+      }
       const result = await this.executor.execute(record.sourceRecordKey, record.action);
       results.push(result);
       if (result.outcome === "FAILED") break;

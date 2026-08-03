@@ -24,6 +24,15 @@ export interface RunPhoenixReleaseInput {
   reportStore: PhoenixReportStore;
   resumeFrom?: PhoenixPhaseName;
   previousReports?: readonly PhoenixPhaseReport[];
+  /**
+   * Sanitized cross-code-SHA continuation provenance (see
+   * `continuation.ts`'s `buildContinuationEvidence`), merged into every
+   * report line's `resolvedIdentities` this run produces — success or
+   * failure alike, since a continuation attempt that fails again on a new
+   * record still needs its provenance recorded. `undefined` for every
+   * non-continuation run, which is unaffected.
+   */
+  continuationEvidence?: Record<string, string>;
 }
 
 function firstUnexpectedFailure(results: readonly PhoenixRecordResult[]): PhoenixRecordResult | undefined {
@@ -173,7 +182,7 @@ export async function runPhoenixRelease(input: RunPhoenixReleaseInput): Promise<
         firstFailure: `${failure.sourceRecordKey}:${failure.error ?? "unknown"}`,
         completedPrefix: [...completedPrefix],
         environmentFingerprint: input.environment,
-        resolvedIdentities: {},
+        resolvedIdentities: input.continuationEvidence ?? {},
       };
       await input.reportStore.append(failureReport);
       output.push(failureReport);
@@ -205,7 +214,7 @@ export async function runPhoenixRelease(input: RunPhoenixReleaseInput): Promise<
       firstFailure: null,
       completedPrefix: [...completedPrefix],
       environmentFingerprint: input.environment,
-      resolvedIdentities: {},
+      resolvedIdentities: input.continuationEvidence ?? {},
       ...reconciliation,
     };
     await input.reportStore.append(report);

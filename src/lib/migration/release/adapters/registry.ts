@@ -4,7 +4,8 @@ import type { PrismaClient } from "@prisma/client";
 import type { PlacesWriterPrismaClient } from "./placesProductionWiring";
 
 import { SequentialEntityPhaseAdapter } from "../adapter";
-import type { PhoenixPhaseAdapter, PhoenixPhaseName, PhoenixReleaseManifest } from "../types";
+import { resolveExactCompletedPrefix } from "../continuation";
+import type { PhoenixPhaseAdapter, PhoenixPhaseName, PhoenixPhaseReport, PhoenixReleaseManifest } from "../types";
 
 import { OffersPhaseExecutor } from "./offersAdapter";
 import { createOffersDependencyResolver, createOffersLoadCandidate, createOffersTargetStateResolver, createOffersWriter } from "./offersProductionWiring";
@@ -57,6 +58,19 @@ export interface BuildPhoenixAdapterRegistryInput {
   artifactRoot: string;
   manifest: PhoenixReleaseManifest;
   mediaPolicy?: { offers?: "NONE" | "METADATA" | "FULL" };
+  /**
+   * Set only when continuing a previously-authorized failed `--apply` (see
+   * `scripts/migration-phoenix-release.ts`'s `--continue-from-report` /
+   * `--continue-from-report-sha256` / `--continue-from-code-sha` and
+   * `continuation.ts`). `input.manifest` here must already reflect any
+   * applicable `applyReleaseActionExceptions` correction — this registry
+   * does not apply those itself. The failed phase's already-complete
+   * records (live-DB-verified as an *exact* prefix of the manifest's own
+   * deterministic record order, not merely a count match) are skipped
+   * without re-deriving a plan for them; every other record in that phase,
+   * and every other phase, is unaffected.
+   */
+  continuationReport?: PhoenixPhaseReport;
 }
 
 interface ScopeArtifact {
@@ -78,6 +92,12 @@ function scopeArtifactChecksum(entity: string): string {
 function domainHashMap(entity: string): Map<string, string> {
   const artifact = readScopeArtifact(entity);
   return new Map(artifact.records.map((record) => [record.sourceRecordKey, record.sourceHash]));
+}
+
+function mustFindPhase(manifest: PhoenixReleaseManifest, name: PhoenixPhaseName) {
+  const phase = manifest.phases.find((item) => item.name === name);
+  if (!phase) throw new Error(`RELEASE_BLOCKED:CONTINUATION_PHASE_NOT_IN_MANIFEST:${name}`);
+  return phase;
 }
 
 /**
@@ -168,17 +188,34 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
     update: {},
   });
 
+  // Resolved once, up front: the live-DB-verified *exact prefix* skip set
+  // for the one phase named in `continuationReport`, if any. Fails closed
+  // immediately (before any adapter is built) on an unsupported phase, a
+  // non-prefix or missing completed key, unrelated/duplicate lineage, or an
+  // ambiguous (non CREATE/UPDATE) record inside the claimed prefix — see
+  // `continuation.ts`.
+  const continuation = input.continuationReport
+    ? await resolveExactCompletedPrefix(
+        prisma,
+        source.sourceNamespace,
+        input.continuationReport,
+        mustFindPhase(input.manifest, input.continuationReport.phase),
+      )
+    : undefined;
+  const completedFor = (phase: PhoenixPhaseName): ReadonlySet<string> | undefined =>
+    continuation?.phase === phase ? continuation.alreadyCompleted : undefined;
+
   const registry: Partial<Record<PhoenixPhaseName, PhoenixPhaseAdapter>> = {};
 
   // --- Users ---
   {
     const rawSource = new FrozenUserSourceRepository(artifactRoot, scopeArtifactChecksum("users"));
     const deps = createUsersDependencies(prisma, rawSource, source.sourceNamespace);
-    registry.users = new SequentialEntityPhaseAdapter(new UsersPhaseExecutor(deps));
+    registry.users = new SequentialEntityPhaseAdapter(new UsersPhaseExecutor(deps), completedFor("users"));
   }
 
   // --- Places (depends on Users lineage) ---
-  registry.businesses = new SequentialEntityPhaseAdapter(new BusinessesProductionExecutor(prisma, source.id));
+  registry.businesses = new SequentialEntityPhaseAdapter(new BusinessesProductionExecutor(prisma, source.id), completedFor("businesses"));
 
   // --- Places (depends on Users and optional Business lineage) ---
   {
@@ -199,6 +236,7 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
         // `PlaceCommitWriter.ts`, not a runtime behavior change.
         write: createPlacesWriter(prisma as unknown as PlacesWriterPrismaClient, rawSource, source.id),
       }),
+      completedFor("places"),
     );
     registry.places = withProtectedPlaceAdoption(placesAdapter, prisma, source.id);
   }
@@ -214,6 +252,7 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
         resolveDependencies: createOffersDependencyResolver(prisma, source.id),
         write: createOffersWriter(prisma, rawSource, source.id, mediaPolicy),
       }),
+      completedFor("offers"),
     );
   }
 
@@ -226,6 +265,7 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
         resolveTargetState: createRoutesTargetStateResolver(prisma, source.id),
         write: createRoutesWriter(prisma, rawSource, source.id),
       }),
+      completedFor("routes"),
     );
   }
 
@@ -256,6 +296,7 @@ export async function buildPhoenixAdapterRegistry(input: BuildPhoenixAdapterRegi
         resolveTargetState: createArticlesTargetStateResolver(prisma, source.id),
         write: createArticlesWriter(prisma, rawSource, source.id),
       }),
+      completedFor("articles"),
     );
   }
 

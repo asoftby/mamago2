@@ -14,8 +14,16 @@ import {
   type PhoenixMode,
   type PhoenixPhaseName,
   type PhoenixPhaseReport,
+  type PhoenixReleaseManifest,
 } from "../src/lib/migration/release";
 import { buildPhoenixAdapterRegistry } from "../src/lib/migration/release/adapters/registry";
+import {
+  applyReleaseActionExceptions,
+  buildContinuationEvidence,
+  extractFailedKey,
+  loadCrossShaContinuationReport,
+} from "../src/lib/migration/release/continuation";
+import { exactExecutableKeys } from "../src/lib/migration/release/manifest";
 
 interface Args {
   environment: PhoenixEnvironment;
@@ -24,6 +32,9 @@ interface Args {
   confirmProduction: boolean;
   resumeFrom?: PhoenixPhaseName;
   reportPath: string;
+  continueFromReport?: string;
+  continueFromReportSha256?: string;
+  continueFromCodeSha?: string;
 }
 
 function value(argv: readonly string[], flag: string): string | undefined {
@@ -44,6 +55,23 @@ export function parseArgs(argv: readonly string[]): Args {
     argv.includes("--rerun") && "RERUN",
   ].filter(Boolean) as PhoenixMode[];
   if (modes.length !== 1) throw new Error("Exactly one of --plan|--apply|--rerun is required.");
+
+  const continueFromReport = value(argv, "--continue-from-report");
+  const continueFromReportSha256 = value(argv, "--continue-from-report-sha256");
+  const continueFromCodeSha = value(argv, "--continue-from-code-sha");
+  const continuationFlags = [continueFromReport, continueFromReportSha256, continueFromCodeSha];
+  if (continuationFlags.some(Boolean)) {
+    if (modes[0] !== "APPLY") {
+      throw new Error("--continue-from-report/--continue-from-report-sha256/--continue-from-code-sha are only valid with --apply.");
+    }
+    if (argv.includes("--resume-from")) throw new Error("--continue-from-report cannot be combined with --resume-from.");
+    if (!continuationFlags.every(Boolean)) {
+      throw new Error(
+        "--continue-from-report requires --continue-from-report-sha256 and --continue-from-code-sha together (all three or none).",
+      );
+    }
+  }
+
   return {
     environment,
     manifestPath,
@@ -51,6 +79,9 @@ export function parseArgs(argv: readonly string[]): Args {
     confirmProduction: argv.includes("--confirm-production"),
     resumeFrom: value(argv, "--resume-from") as PhoenixPhaseName | undefined,
     reportPath: value(argv, "--report") ?? `.phoenix-reports/${environment.toLowerCase()}.jsonl`,
+    continueFromReport,
+    continueFromReportSha256,
+    continueFromCodeSha,
   };
 }
 
@@ -185,23 +216,68 @@ async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL!;
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
   try {
-    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest });
+    const codeSha = resolveCodeSha();
+
+    // Applies any narrow, itemized release action exceptions (currently
+    // just `wordpress-db:user:38`, see `continuation.ts`) to an in-memory
+    // copy of the manifest used only for execution. Never touches the
+    // committed manifest file or `manifestHash`, which continue to refer
+    // to the pristine, unmodified manifest for every hash/identity check
+    // below — this is a runtime data correction, not a manifest edit.
+    // Applied unconditionally to every apply/rerun, continuation or not:
+    // it corrects a stale manifest record, independent of continuation.
+    const correctedManifest: PhoenixReleaseManifest = {
+      ...manifest,
+      phases: manifest.phases.map(applyReleaseActionExceptions),
+    };
+
+    let continuationReport: PhoenixPhaseReport | undefined;
+    let continuationEvidence: Record<string, string> | undefined;
+    if (args.continueFromReport) {
+      // Presence of any one continuation flag already implies all three
+      // (parseArgs enforces this), so these are always defined here.
+      const predecessor = loadCrossShaContinuationReport(
+        {
+          reportPath: args.continueFromReport,
+          reportSha256: args.continueFromReportSha256!,
+          predecessorCodeSha: args.continueFromCodeSha!,
+        },
+        { releaseId: manifest.releaseId, manifestHash, currentCodeSha: codeSha, environment },
+      );
+      const phase = correctedManifest.phases.find((item) => item.name === predecessor.phase);
+      if (!phase) throw new Error(`RELEASE_BLOCKED:CONTINUATION_PHASE_NOT_IN_MANIFEST:${predecessor.phase}`);
+      const failedKey = extractFailedKey(predecessor);
+      const skippedCompletedPrefixCount = exactExecutableKeys(phase).indexOf(failedKey);
+      if (skippedCompletedPrefixCount < 0) throw new Error("RELEASE_BLOCKED:CONTINUATION_FAILED_KEY_NOT_IN_MANIFEST");
+
+      continuationReport = predecessor;
+      continuationEvidence = buildContinuationEvidence({
+        predecessorCodeSha: args.continueFromCodeSha!,
+        predecessorReportSha256: args.continueFromReportSha256!,
+        predecessorTerminalFailedKey: failedKey,
+        skippedCompletedPrefixCount,
+        continuationStartKey: failedKey,
+      });
+    }
+
+    const adapters = await buildPhoenixAdapterRegistry({ prisma, artifactRoot, manifest: correctedManifest, continuationReport });
     const reportStore = new JsonLinesPhoenixReportStore(args.reportPath);
     const previousReports: PhoenixPhaseReport[] = args.resumeFrom
       ? [...((await reportStore.readCompletedPrefix?.()) ?? [])]
       : [];
 
     const reports = await runPhoenixRelease({
-      manifest,
+      manifest: correctedManifest,
       manifestPath: args.manifestPath,
       manifestHash,
       environment,
       mode: args.mode,
-      codeSha: resolveCodeSha(),
+      codeSha,
       adapters,
       reportStore,
       resumeFrom: args.resumeFrom,
       previousReports,
+      continuationEvidence,
     });
     console.log(JSON.stringify(reports, null, 2));
   } finally {

@@ -152,6 +152,168 @@ async function testExactScopeOfferSequenceAndStop(): Promise<void> {
   assert.equal(results.at(-1)?.outcome, "FAILED");
 }
 
+// --- Scenario 1: a fresh full apply (no continuation involved) still
+// completes every canonical record exactly once, including one whose
+// manifest-declared action correctly matches the live plan.
+async function testFreshFullApplyCompletesAllCanonicalRecords(): Promise<void> {
+  const calls: string[] = [];
+  const adapter = new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey, action) => {
+      calls.push(sourceRecordKey);
+      return { sourceRecordKey, action, outcome: "CREATED" };
+    },
+  });
+  const keys = Array.from({ length: 25 }, (_, i) => `wordpress-db:user:${i}`);
+  const usersPhase = { ...phase(keys.map((sourceRecordKey) => ({ sourceRecordKey, action: "CREATE" as const }))), name: "users" as const };
+  const results = await adapter.apply(usersPhase);
+  assert.deepEqual(calls, keys, "every canonical record is attempted exactly once, in order");
+  assert.equal(results.length, keys.length);
+  assert(results.every((r) => r.outcome === "CREATED"));
+}
+
+// --- Scenario 2: continuing with a live-DB-verified completed prefix skips
+// exactly those records (never calling the executor for them) and completes
+// the remaining suffix — including the record that previously failed —
+// exactly once each.
+async function testContinuationSkipsCompletedPrefixAndCompletesSuffix(): Promise<void> {
+  const executed: string[] = [];
+  const allKeys = Array.from({ length: 25 }, (_, i) => `wordpress-db:user:${i}`);
+  const completedPrefix = new Set(allKeys.slice(0, 20)); // matches the exact 20-key DEV partial state
+  const adapter = new SequentialEntityPhaseAdapter(
+    {
+      execute: async (sourceRecordKey, action) => {
+        executed.push(sourceRecordKey);
+        return { sourceRecordKey, action, outcome: "CREATED" };
+      },
+    },
+    completedPrefix,
+  );
+  const usersPhase = { ...phase(allKeys.map((sourceRecordKey) => ({ sourceRecordKey, action: "CREATE" as const }))), name: "users" as const };
+  const results = await adapter.apply(usersPhase);
+
+  assert.deepEqual(executed, allKeys.slice(20), "only the not-yet-completed suffix reaches the executor");
+  assert.equal(results.length, allKeys.length, "the skipped prefix still appears in the results, just without a live plan/write");
+  for (const key of allKeys.slice(0, 20)) {
+    const result = results.find((r) => r.sourceRecordKey === key);
+    assert.equal(result?.outcome, "SKIPPED", `${key} must be skipped, not re-derived`);
+  }
+  for (const key of allKeys.slice(20)) {
+    const result = results.find((r) => r.sourceRecordKey === key);
+    assert.equal(result?.outcome, "CREATED");
+  }
+}
+
+// --- Scenario 3: repeating a continuation whose completed set already
+// covers every executable record must create nothing new — CREATE 0, only
+// SKIPPED (the release-runner's NOOP-equivalent outcome for this adapter).
+async function testRepeatedContinuationCreatesNothingNew(): Promise<void> {
+  const executed: string[] = [];
+  const allKeys = Array.from({ length: 10 }, (_, i) => `wordpress-db:user:${i}`);
+  const adapter = new SequentialEntityPhaseAdapter(
+    {
+      execute: async (sourceRecordKey, action) => {
+        executed.push(sourceRecordKey);
+        return { sourceRecordKey, action, outcome: "CREATED" };
+      },
+    },
+    new Set(allKeys),
+  );
+  const usersPhase = { ...phase(allKeys.map((sourceRecordKey) => ({ sourceRecordKey, action: "CREATE" as const }))), name: "users" as const };
+  const results = await adapter.apply(usersPhase);
+
+  assert.deepEqual(executed, [], "the executor must never be called for an already-fully-completed phase");
+  assert.equal(results.length, allKeys.length);
+  assert(results.every((r) => r.outcome === "SKIPPED"), "every record resolves SKIPPED, matching CREATE 0");
+}
+
+// --- Scenario 7 (part 2): a fail-closed record outside the proven-complete
+// set is still attempted normally, and the sequential stop-on-first-error
+// behavior is unaffected by an unrelated completed set.
+async function testNonPrefixRecordStillFailsClosedNormally(): Promise<void> {
+  const executed: string[] = [];
+  const adapter = new SequentialEntityPhaseAdapter(
+    {
+      execute: async (sourceRecordKey, action) => {
+        executed.push(sourceRecordKey);
+        return { sourceRecordKey, action, outcome: sourceRecordKey === "wordpress-db:user:38" ? "FAILED" : "CREATED" };
+      },
+    },
+    new Set(["wordpress-db:user:1"]),
+  );
+  const usersPhase = {
+    ...phase([
+      { sourceRecordKey: "wordpress-db:user:1", action: "CREATE" },
+      { sourceRecordKey: "wordpress-db:user:38", action: "SKIP_UNCHANGED" },
+      { sourceRecordKey: "wordpress-db:user:39", action: "CREATE" },
+    ]),
+    name: "users" as const,
+  };
+  const results = await adapter.apply(usersPhase);
+  assert.deepEqual(executed, ["wordpress-db:user:38"], "the completed key is skipped; the phase still stops at the first real failure");
+  assert.equal(results.at(-1)?.outcome, "FAILED");
+  assert.equal(results.length, 2, "user:39 is never reached after the failure, exactly as stop-on-first-error requires");
+}
+
+// Section 5: continuation-chain evidence is recorded into every report line
+// this run produces — success or failure alike — via `resolvedIdentities`,
+// and is entirely absent for a non-continuation run.
+async function testContinuationEvidenceRecordedInReports(): Promise<void> {
+  const evidence = {
+    continuationPredecessorCodeSha: "f466c34c0cf095d054ae79d86a12505129719739",
+    continuationPredecessorReportSha256: "a".repeat(64),
+    continuationPredecessorTerminalFailedKey: "wordpress-db:user:38",
+    continuationSkippedCompletedPrefixCount: "20",
+    continuationStartKey: "wordpress-db:user:38",
+  };
+  const base = {
+    manifest: manifest([{ sourceRecordKey: "wordpress-db:user:38", action: "CREATE" as const }]),
+    manifestPath: "manifest.json",
+    manifestHash: "manifest-hash",
+    environment,
+    codeSha: "new-code-sha",
+    continuationEvidence: evidence,
+  };
+
+  const successReports: PhoenixPhaseReport[] = [];
+  const okAdapter = new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey, action) => ({ sourceRecordKey, action, outcome: "CREATED" }),
+  });
+  await runPhoenixRelease({
+    ...base,
+    mode: "APPLY",
+    adapters: { places: okAdapter },
+    reportStore: { append: async (report) => void successReports.push(report) },
+  });
+  assert.deepEqual(successReports[0].resolvedIdentities, evidence);
+
+  const failureReports: PhoenixPhaseReport[] = [];
+  const failingAdapter = new SequentialEntityPhaseAdapter({
+    execute: async (sourceRecordKey, action) => ({ sourceRecordKey, action, outcome: "FAILED", error: "injected" }),
+  });
+  await expectReject(
+    () =>
+      runPhoenixRelease({
+        ...base,
+        mode: "APPLY",
+        adapters: { places: failingAdapter },
+        reportStore: { append: async (report) => void failureReports.push(report) },
+      }),
+    /PHASE_FAILED/,
+  );
+  assert.deepEqual(failureReports[0].resolvedIdentities, evidence);
+
+  // A non-continuation run (no `continuationEvidence`) records nothing extra.
+  const plainReports: PhoenixPhaseReport[] = [];
+  await runPhoenixRelease({
+    ...base,
+    continuationEvidence: undefined,
+    mode: "APPLY",
+    adapters: { places: okAdapter },
+    reportStore: { append: async (report) => void plainReports.push(report) },
+  });
+  assert.deepEqual(plainReports[0].resolvedIdentities, {});
+}
+
 async function testCoordinatorReportsResumeAndRerun(): Promise<void> {
   const reports: PhoenixPhaseReport[] = [];
   const planAdapter = new SequentialEntityPhaseAdapter({
@@ -394,6 +556,11 @@ async function main(): Promise<void> {
   await testEnvironmentGates();
   await testIdentityCardinality();
   await testExactScopeOfferSequenceAndStop();
+  await testFreshFullApplyCompletesAllCanonicalRecords();
+  await testContinuationSkipsCompletedPrefixAndCompletesSuffix();
+  await testRepeatedContinuationCreatesNothingNew();
+  await testNonPrefixRecordStillFailsClosedNormally();
+  await testContinuationEvidenceRecordedInReports();
   await testCoordinatorReportsResumeAndRerun();
   await testResumeValidationHardening();
   testResolveSafeResumePoint();
