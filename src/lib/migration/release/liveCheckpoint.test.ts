@@ -54,7 +54,7 @@ function fixture() {
   const anchorRaw = [
     report({ phase: "users", codeSha: ANCHOR_SHA }),
     report({ phase: "businesses", codeSha: ANCHOR_SHA, completedPrefix: ["users", "businesses"] }),
-    report({ phase: "places", codeSha: ANCHOR_SHA, failed: 1, firstFailure: "wordpress-db:places:5528:FAILED", completedPrefix: ["users", "businesses"] }),
+    report({ phase: "places", codeSha: ANCHOR_SHA, failed: 1, firstFailure: "wordpress-db:places:5528:FAILED", completedPrefix: ["users", "businesses"], forbiddenTableAudit: "NOT_RUN" }),
   ].map((value) => JSON.stringify(value)).join("\n") + "\n";
   const partialRaw = [
     report({ phase: "users", codeSha: PARTIAL_SHA }),

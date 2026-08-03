@@ -143,7 +143,9 @@ function validateEvidence(request: LiveCheckpointEvidenceRequest, expected: Live
     if (report.releaseId !== expected.releaseId) throw blocked("RELEASE_ID_MISMATCH");
     if (report.manifestHash !== expected.manifestHash) throw blocked("MANIFEST_HASH_MISMATCH");
     if (JSON.stringify(report.environmentFingerprint) !== JSON.stringify(expected.environment)) throw blocked("ENVIRONMENT_MISMATCH");
-    if (report.forbiddenTableAudit !== "PASS" || report.mediaStorageDelta !== 0 || report.duplicateLineage !== 0 || report.duplicateTargets !== 0) {
+    const auditStatusValid = report.forbiddenTableAudit === "PASS" ||
+      (report.failed > 0 && report.forbiddenTableAudit === "NOT_RUN");
+    if (!auditStatusValid || report.mediaStorageDelta !== 0 || report.duplicateLineage !== 0 || report.duplicateTargets !== 0) {
       throw blocked("EVIDENCE_AUDIT_MISMATCH");
     }
   };
