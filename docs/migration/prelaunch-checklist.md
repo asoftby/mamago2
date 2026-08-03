@@ -905,6 +905,40 @@ preflight has **not** passed and requires a newly committed and built image.
 
 ---
 
+### K. Offers live-state checkpoint tooling selected — implementation complete, DEV generation pending
+
+The completed live state (Users 563, Businesses 38, ordinary Places 78 and
+protected `wordpress-db:places:43023` adoption 1) is ahead of the immutable
+`2dc00b602665` report boundary, while the immutable `4ff230dfad06` partial
+report has successful Users/Businesses lines but no terminal Places failure.
+Neither report may be edited or replaced with a manually authored/synthetic
+failure report. Continuation attempts remain 0 after the protected repair;
+next phase remains Offers and its first executable key remains
+`wordpress-db:hb-programs:18932`.
+
+Selected correction: fixed-image `--plan --create-live-checkpoint` validates
+the pinned anchor report, pinned partial report, protected supplemental
+manifest and referenced files, canonical manifest/environment/code identity,
+exact approved live source-key sets, protected Place target/lineage/ownership,
+City prerequisites, duplicate/extra lineage absence and untouched later
+phases. It may write only one new atomic mode-0600 checkpoint and has no Prisma
+mutation delegate, adapter, executor, progress-report or media writer.
+Checkpoint consumption is a separate same-image all-three-or-none contract,
+revalidates the full live state, and starts the coordinator directly at Offers
+without invoking Users, Businesses or Places. Existing report continuation,
+plain static plan, continuation-aware plan, apply and rerun contracts remain
+unchanged; there is no force/ignore option.
+
+Runtime/tests commit and docs commit are prepared in an isolated exact-
+`4ff230dfad060c6e0a1f914ab22bee6f658414ac` worktree. No DEV checkpoint has
+been generated yet, and no DEV/PROD/WordPress/database write, continuation,
+rerun, rollback, manifest edit, approved-artifact edit or capture edit was
+performed by this tooling implementation. A new exact-head image, exact-head
+CI, one DEV read-only checkpoint generation and one read-only checkpoint plan
+remain required before requesting Offers continuation authorization.
+
+---
+
 ## DEV rehearsal critical path
 
 - [x] Restore the agreed free-disk safety margin.
