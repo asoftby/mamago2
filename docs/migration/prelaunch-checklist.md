@@ -2,18 +2,664 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-**Обновлено:** 2026-07-29 — PRODUCT REGRESSION / RC READINESS complete
-**RC:** `codex/product-regression-rc-20260729@17c9dd29`, based on `release/integrated-rc@5edeaaac`
-**SEO closure branch:** `fix/seo-migration-closure` (worktree `mamago2-seo-migration-closure`), base `release/integrated-rc@5edeaaac`
-**Текущая фаза:** `PRODUCT REGRESSION / RC READINESS — TECHNICAL PASS`
-**Текущий кандидат для следующего шага:** `FINAL GO/NO-GO PREPARATION` с закрытием двух обязательных ручных evidence gates: mobile visual UAT и authenticated BUSINESS_OWNER end-to-end UAT.
-**Текущий gate:** confirmed product P0 defects `0`; launch всё ещё не разрешён без указанных UAT evidence, founder acceptance и production-only gates.
+> **Next one action:** `PHOENIX_DEV_PRE_APPLY_READY` — the final pre-apply
+> baseline is captured and the exact sequential DEV `--apply` command is
+> prepared (see §F below). **Awaiting explicit founder authorization before
+> the first write.** On authorization: run exactly one sequential DEV
+> `--apply`, stop on first error, no automatic retry/rollback. On
+> completion, stop before `--rerun` and perform the cumulative post-apply
+> audit.
 
-> Подробная история Slices 1–18 сохранена в Git и профильных proof-документах.
-> Этот файл содержит только актуальное состояние, обязательные gates и критический
-> путь до запуска.
+**Обновлено:** 2026-08-03
+**Текущая фаза:** `PHOENIX FINAL RELEASE BUNDLE — DEV REHEARSAL PREPARATION`
+**PR:** [#102 — feat(migration): final Phoenix release bundle](https://github.com/asoftby/mamago2/pull/102) — base `dev` — Draft / open / unmerged
+**Exact release code SHA:** `f466c34c0cf095d054ae79d86a12505129719739`
+**Canonical release manifest:** `docs/migration/releases/phoenix-approved-2026-07-30.json`
+**Manifest SHA-256:** `a0980ae387d7316327234c86b8355a8b439ffefd3cb5de58bb8238dec1a6768f`
+**Canonical public artifact inventory SHA-256:** `68909b9a499a3d201b794248a845c765a3b5e62c1c47f5e857be1c21214c30ec`
+**DEV migration image:** `mamago2-migrate:phoenix-f466c34c0cf0`
+**Image ID:** `sha256:8d505c6147d142e3231f172e3c4b71b1cf5ccd6b6b3c012b78d1475790fb1bdc`
 
-## INTEGRATED RC
+State:
+
+- image built locally;
+- image transferred and loaded on DEV;
+- baked code SHA verified;
+- Git and `.git` absent from the image;
+- canonical manifest verified;
+- no Phoenix plan/apply/rerun executed yet;
+- no migration DB writes executed;
+- temporary transfer archive removed;
+- DEV services remained unchanged;
+- disk-capacity housekeeping remains before DEV plan.
+
+> Более ранняя история (Slices 1–19, PRODUCT REGRESSION / RC READINESS,
+> FINAL GO/NO-GO PREPARATION 2026-07-29/30) сохранена в Git, в профильных
+> proof-документах и в журнале сессий внизу этого файла — это evidence, не
+> текущая фаза. Единственная актуальная фаза и единственное актуальное
+> следующее действие — те, что указаны выше.
+
+---
+
+## Release mode: operating rules
+
+1. The migration implementation phase is closed unless an actual regression
+   is proven.
+2. DEV is a rehearsal environment, not a second development phase.
+3. PROD repeats the already-proven DEV procedure using the same release SHA,
+   manifest, private bundle and environment contract.
+4. Use one prompt/run per complete phase, not one prompt per shell command.
+5. Do not reopen completed Docker, Git SHA, manifest, artifact or transfer
+   gates without concrete regression evidence.
+6. Non-P0 anomalies go to a documented backlog and do not stop the clean
+   scope.
+7. Housekeeping issues must be resolved narrowly and must not reopen
+   completed migration work.
+8. No additional migration architecture improvements after a successful DEV
+   apply + rerun proof.
+
+**Valid stop conditions (the only ones):**
+
+- environment identity mismatch;
+- canonical manifest or artifact hash mismatch;
+- missing or inconsistent private frozen-content bundle;
+- risk of target-data loss;
+- uncontrolled or broader-than-approved writes;
+- unexpected scope expansion;
+- lineage uniqueness violation;
+- failure of idempotency;
+- inability to determine whether a partial write occurred.
+
+**The following do NOT reopen completed work:**
+
+- intermittent SSH after a completed, independently verified operation;
+- harmless cleanup-marker loss when final state can be verified
+  idempotently;
+- documented P1/P2 content gaps;
+- media intentionally deferred by the approved environment policy;
+- non-P0 individual-record anomalies moved to backlog;
+- obsolete Docker/build cache housekeeping.
+
+---
+
+## Final canonical release scope
+
+| Entity | Approved action scope |
+| --- | ---: |
+| Users | 563 READY |
+| Businesses | 38 READY |
+| Places | 78 READY |
+| Offers | 63 READY |
+| Routes | 14 READY |
+| Events | 8 READY |
+| Articles | 26 READY |
+| Redirects | VALIDATION_ONLY |
+
+- This release scope supersedes older per-slice counts (§2, §3) as the
+  production execution contract; those historical counts remain evidence,
+  not the current runner input.
+- No automatic scope expansion is allowed during DEV or PROD execution.
+
+Protected/adoption rules:
+
+- founder ADMIN remains unchanged;
+- `wordpress-db:user:1` is adopted through the configured platform-owner
+  identity without account mutation;
+- `user:43` remains non-privileged;
+- `user:129` follows the proven business-owner path;
+- `user:27` remains an Events dependency;
+- Place 43023 uses protected adoption;
+- existing 15 Places and 20 Offers are preserved;
+- target UUIDs are not frozen into the release bundle;
+- lineage is logical and keyed by `sourceRecordKey`.
+
+---
+
+## Phoenix release bundle — completed, do not repeat
+
+- [x] Local golden proofs for all six vertical slices.
+- [x] Complete disposable full execution (`phoenix-full-bundle-clean-run.ts`).
+- [x] Zero conflicts and zero failed actions.
+- [x] Cumulative DB/storage checks.
+- [x] Full common rerun with `CREATE 0` and `SKIP`/`NOOP` only.
+- [x] Unique lineage proof.
+- [x] Forbidden-table checks.
+- [x] Canonical release manifest and public artifact verification.
+- [x] Exact code SHA baked into the migration image.
+- [x] Local image verification.
+- [x] DEV transfer verification.
+- [x] DEV image load and isolated verification.
+- [x] Git-independent code SHA resolution.
+- [x] No remote Docker build required.
+
+These gates are closed and may only be reopened by exact regression
+evidence — see "Release mode: operating rules" above.
+
+---
+
+## Current blockers before DEV apply
+
+### A. DEV capacity gate — COMPLETE
+
+- required minimum: `8589934592` bytes (8 GiB);
+- final free disk: `14164168704` bytes (~13.19 GiB);
+- exact narrow cleanup only — removed the obsolete broken old Phoenix image
+  (`mamago2-migrate:phoenix-559240d77b36`, reclaimed ~5.45 GiB) from DEV; kept
+  a local evidence copy on the build machine; no broad Docker prune, no
+  BuildKit cache prune, no PROD-scoped cleanup;
+- fixed image (`mamago2-migrate:phoenix-f466c34c0cf0`,
+  `sha256:8d505c6147d142e3231f172e3c4b71b1cf5ccd6b6b3c012b78d1475790fb1bdc`)
+  retained on DEV, identity and revision label re-verified after cleanup;
+  the image verification gate was not reopened;
+- DEV containers, database, networks, volumes and published ports confirmed
+  unchanged before and after cleanup.
+
+### B. DEV plan — PASS
+
+Executed on the fixed image (`mamago2-migrate:phoenix-f466c34c0cf0`,
+`sha256:8d505c6147d142e3231f172e3c4b71b1cf5ccd6b6b3c012b78d1475790fb1bdc`),
+2026-08-03, one disposable `--rm` container (`phoenix-dev-plan-f466c34c0cf0`,
+network `dev_dev_net`, read-only root + tmpfs `/tmp`, no host mounts, no
+ports, capabilities dropped).
+
+- exit code: `0`;
+- `releaseId`: `phoenix-approved-2026-07-30`;
+- `manifestHash`: `a0980ae387d7316327234c86b8355a8b439ffefd3cb5de58bb8238dec1a6768f`
+  (matches canonical);
+- `codeSha`: `f466c34c0cf095d054ae79d86a12505129719739` — resolved from the
+  baked `/app/.phoenix-code-sha`, no Git fallback needed (none available);
+- environment fingerprint: `DEV`, database `devmamago` (host `db`, schema
+  `public`, `currentDatabase` matches — no fingerprint mismatch), storage
+  provider `none` (media disabled for this DEV plan run) — no secrets or
+  `DATABASE_URL` printed at any point;
+- scope result — every phase exactly matches the canonical release scope,
+  no blockers:
+
+  | Entity | Result |
+  | --- | ---: |
+  | Users | 563 READY |
+  | Businesses | 38 READY |
+  | Places | 78 READY |
+  | Offers | 63 READY |
+  | Routes | 14 READY |
+  | Events | 8 READY |
+  | Articles | 26 READY |
+  | Redirects | VALIDATION_ONLY |
+
+- performed exactly one read-only DB fingerprint query;
+- performed no target-table writes, no apply, no rerun;
+- created no migration report requiring rollback;
+- DEV containers, database, networks, volumes and published ports confirmed
+  byte-for-byte unchanged before/after; plan container left no residue;
+  `dev-db-1` remained healthy throughout; free disk remained
+  `14164025344` bytes after (well above the `8589934592` minimum).
+
+### C. Private Phoenix inputs — verified locally, transferred to DEV (see §D for blockers)
+
+> **Corrects a previous false blocker.** An earlier pass reported
+> `BLOCKED_PRIVATE_BUNDLE_INTEGRITY`, concluding `users/capture.json` was
+> missing 3 required records. That check compared the file against the
+> full 563 executable Users scope — the wrong completeness boundary. The
+> Phoenix Users runtime deliberately splits its 563 inputs across **three
+> separate sources**, and the file was never meant to contain all 563. No
+> data was ever missing or corrupt; no recapture or repair was needed or
+> performed.
+
+**Exact runtime routing** (from `src/lib/migration/release/adapters/usersProductionWiring.ts`
+at the exact fixed source `f466c34c0cf095d054ae79d86a12505129719739`):
+
+| Source | Keys | Env var | Mechanism |
+| --- | ---: | --- | --- |
+| `users/capture.json` (clean track) | 560 | `PHOENIX_RELEASE_ARTIFACT_ROOT` | `rawSource.loadSourceCandidate(key)` |
+| Manual privileged capture (reused track) | 2 | `PHOENIX_MANUAL_PRIVILEGED_CAPTURE` | `loadReusedTrackCandidate(key)`, keys `wordpress-db:user:27` and `wordpress-db:user:129` |
+| Platform-owner adoption | 1 | `PHOENIX_PLATFORM_OWNER_EMAIL` | DB lookup by email + `MigrationLineage` link, key `wordpress-db:user:1` — no file read at all |
+| **Total** | **563** | | matches the approved Users scope exactly |
+
+Confirmed exhaustively from source: no other Users key is routed outside
+`users/capture.json`; the exclusion set (`wordpress-db:user:7/17/22/42`,
+handled separately by `EXCLUDED_USER_KEYS`) does not overlap with 1/27/129.
+
+**A. Main private release bundle** —
+`/Users/shapovalovalexey/.mamago2/migration-snapshots/phoenix-final-bundle-2026-07-31/`
+— **PASS**
+
+- structure: exact match, all 6 required files (`users`, `places`, `offers`,
+  `routes`, `events`, `articles`), no extra files, no symlinks anywhere;
+- checksums: all 6 match their canonical committed SHA-256 exactly;
+- `users/capture.json`: **exactly 560/560** clean-track keys — 0 missing,
+  0 extra, 0 duplicates, and correctly contains none of the 3
+  externally-routed keys;
+- other five entities: 100% source-record-key coverage, unchanged;
+- permissions: files `0600` (good); bundle root and entity subdirectories
+  are `0755` (not `0700`) — mitigated by `~/.mamago2` and
+  `~/.mamago2/migration-snapshots` both being `0700` (owner-only
+  traversal), but still worth tightening before transfer;
+- deterministic inventory SHA-256 (sorted `relpath\tsize\tsha256`):
+  `28745eeebb811f048cf4a0d3665feb5cdc41adbdec032b139ee36030f2e5d5d7`
+  (unchanged from the original verification — nothing in this bundle was
+  ever modified).
+
+**B. Manual privileged capture** —
+`/Users/shapovalovalexey/.mamago2/migration-snapshots/users/manual-privileged-14/raw-capture.json`
+— **PASS** (already existed, captured 2026-07-28, before this session —
+no new WordPress session was needed)
+
+- regular file, not a symlink, mode `0600`; parent directory mode `0700`;
+- structure matches the `ManualPrivilegedCapture` loader contract
+  (`users`/`userMeta`/`posts`, plus informational `capturedAt`/`legacyUserIds`);
+- exact fixed 14-legacy-ID scope present (0 missing, 0 extra) — **both
+  `wordpress-db:user:27` and `wordpress-db:user:129` present**;
+- no password/hash/secret/token/session/activation fields found;
+- size: 16,313 bytes; SHA-256:
+  `dd63ea2d560ce6ec0f13de8ee551341120b5d1eca2f088cc0e7396e139384d68`.
+
+**C. Platform-owner adoption** — **PASS** (source-only verification, no DB
+access)
+
+- `wordpress-db:user:1` requires no source capture record of any kind —
+  confirmed by exhaustive routing-branch review;
+- target resolved by exact-match lookup on `PHOENIX_PLATFORM_OWNER_EMAIL`
+  against the target DB, then linked via one `MigrationLineage` row —
+  never mutates the existing account;
+- `PHOENIX_PLATFORM_OWNER_EMAIL` must exist at apply time (fails closed if
+  absent); its value was never resolved, read, or printed in this task.
+
+**Exact future apply-time input contract** (documentation only — nothing
+transferred, mounted, or executed):
+
+1. `PHOENIX_RELEASE_ARTIFACT_ROOT` → mount the verified bundle root
+   read-only at the container path the runner expects; 6-file inventory
+   hash above is the pre-transfer evidence baseline.
+2. `PHOENIX_MANUAL_PRIVILEGED_CAPTURE` → mount/copy
+   `raw-capture.json` read-only; size/SHA-256 above is the pre-transfer
+   evidence baseline.
+3. `PHOENIX_PLATFORM_OWNER_EMAIL` → must be present in the DEV
+   environment at apply time; presence-only check, no value ever surfaced.
+
+No WordPress access, no artifact rebuild, no public manifest change, and no
+Docker image rebuild are required. The already-completed DEV `--plan` and
+the fixed image (`mamago2-migrate:phoenix-f466c34c0cf0`) remain current for
+execution.
+
+### D. DEV transfer — COMPLETE (two operational blockers found here; resolved in §E)
+
+Both private inputs transferred (2026-08-03) via a single tar.gz archive
+(504,024 bytes, SHA-256
+`0217b2730573976e00f696a8cd3a1300b428120ec311d54f2fc3bb10d90a46be`; local
+copy kept as reproducibility evidence), byte/hash-verified on arrival, then
+atomically placed into the final immutable location — **PASS**:
+
+- `PHOENIX_RELEASE_ARTIFACT_ROOT` source →
+  `/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/release/`
+  — all 6 files re-verified after placement, inventory SHA-256 unchanged
+  (`28745eeebb811f048cf4a0d3665feb5cdc41adbdec032b139ee36030f2e5d5d7`);
+- `PHOENIX_MANUAL_PRIVILEGED_CAPTURE` source →
+  `/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/manual/raw-capture.json`
+  — re-verified after placement, size `16313`, SHA-256
+  `dd63ea2d560ce6ec0f13de8ee551341120b5d1eca2f088cc0e7396e139384d68`;
+- permissions: every directory `0700`, every file `0600`, owned by the DEV
+  deploy user — matches the required bar exactly (tighter than the local
+  source, which had `0755` directories);
+- original DEV transfer archive removed after verified placement; incoming
+  staging directory removed.
+
+**Two findings block a real `--apply`, discovered by this task's own
+verification steps — neither requires touching the transferred files:**
+
+1. **`PHOENIX_PLATFORM_OWNER_EMAIL` is absent from `/opt/mamago/dev/.env`.**
+   Checked read-only, value never printed — confirmed twice, 0 matches for
+   the key in the file. `usersProductionWiring.ts` fails closed
+   (`MISSING_PHOENIX_PLATFORM_OWNER_EMAIL`) the moment the Users phase
+   reaches `wordpress-db:user:1` without it. `.env` was **not** modified by
+   this task. Needs the founder/admin email already resolvable in the DEV
+   DB added to `.env` (or supplied as an explicit apply-time override)
+   before `--apply` can succeed.
+
+2. **Capability-profile mismatch found during read-only mount
+   verification.** The fixed image runs as **root (UID 0) by default** (no
+   `USER` directive). An isolated verification container run with
+   `--cap-drop ALL` (matching this task's own specified hardened
+   inspection profile) could `stat`/see both mounted inputs but got
+   `Permission denied` trying to actually read their contents — because
+   dropping all capabilities also drops `CAP_DAC_OVERRIDE`, the specific
+   capability root needs to bypass file-owner checks on files it doesn't
+   own (here, owned by the DEV deploy user, mode `0600`/`0700`). This is
+   **not evidence the files are wrong** — a host-side `sha256sum` (run as
+   the owning deploy user, outside Docker) confirmed both files match
+   their canonical hashes exactly. It does mean: whatever capability
+   profile the real `--apply` container uses must either keep normal
+   (non-dropped) capabilities, or explicitly retain `CAP_DAC_OVERRIDE` if
+   full `--cap-drop ALL` hardening is still wanted.
+
+**Exact container mount/env arguments for the real future apply** (still
+documentation only — not executed):
+
+```
+--mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/release,target=/phoenix-private/release,readonly
+--mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/manual/raw-capture.json,target=/phoenix-private/manual/raw-capture.json,readonly
+-e PHOENIX_RELEASE_ARTIFACT_ROOT=/phoenix-private/release
+-e PHOENIX_MANUAL_PRIVILEGED_CAPTURE=/phoenix-private/manual/raw-capture.json
+```
+
+DEV non-interference reconfirmed after every transfer step: all 7 running
+containers unchanged (same IDs/`StartedAt`/`RestartCount 0`), `dev-db-1`
+healthy, networks/volumes/ports unchanged, no Phoenix process/container
+left behind, fixed image unchanged, free disk `14,160,257,024` bytes
+remaining (well above the 8 GiB minimum). No DB command, no plan/apply/
+rerun, no `/opt/mamago/prod` access occurred.
+
+### E. Both operational blockers resolved — `PHOENIX_PRIVATE_INPUTS_READY_ON_DEV`
+
+Neither fix touched the image, either private capture, `/opt/mamago/dev/.env`,
+or migration code. `CAP_DAC_OVERRIDE` was deliberately **not** granted, per
+explicit decision — the container instead runs as the deploy UID/GID with
+`--cap-drop ALL` retained.
+
+**Exact runtime environment variable names** (from
+`src/lib/migration/release/adapters/usersProductionWiring.ts` at the exact
+fixed source `f466c34c0cf095d054ae79d86a12505129719739` — resolved from the
+literal `process.env[...]` reads, not from prose):
+
+- `PHOENIX_RELEASE_ARTIFACT_ROOT`
+- `PHOENIX_MANUAL_PRIVILEGED_CAPTURE` — **not** `PHOENIX_MANUAL_PRIVILEGED_CAPTURE_ENV`;
+  that longer name is only the JS constant identifier, not the runtime key
+- `PHOENIX_PLATFORM_OWNER_EMAIL`
+
+All three are required identically for both `--apply` and `--rerun` (both
+modes build the adapter registry through the same code path in
+`scripts/migration-phoenix-release.ts`).
+
+**1. Platform-owner email — resolved uniquely, never printed.** One bounded
+read-only query against the DEV database (`SELECT COUNT(*) ... WHERE
+role='ADMIN' AND "deletedAt" IS NULL`, then the matching `email`, both via
+`docker exec dev-db-1 sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" ...'`
+— no password ever needed, no `DATABASE_URL` touched) found **exactly one**
+candidate. Its email was written directly into a new **protected runtime env
+file**, never through `/opt/mamago/dev/.env`:
+
+```
+/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/platform-owner.env
+```
+
+Created atomically (temp file + rename), single line
+(`PHOENIX_PLATFORM_OWNER_EMAIL=<value>`), mode `0600`, owned by the deploy
+user, no CRLF, not a symlink — verified structurally only (line count, key
+shape, mode, owner); the value itself was never printed, logged, or echoed
+at any point in this task.
+
+**2. Capability/permission mismatch — resolved by matching the container's
+runtime identity to the file owner, not by adding capabilities.** The fixed
+image runs as root by default, but the private-input files are owned by the
+DEV deploy user (uid `1000`) at `0600`/`0700`. Running the container with
+`--user 1000:1000` (instead of root) means standard Unix owner-read
+permissions apply directly — no `CAP_DAC_OVERRIDE` needed at all, even with
+`--cap-drop ALL` retained in full.
+
+**Hardened verification container** (`--rm --network none --read-only
+--tmpfs /tmp --user 1000:1000 --cap-drop ALL --security-opt
+no-new-privileges`, both inputs mounted read-only, protected env file via
+`--env-file`, no DEV `.env`, no database variables) — **all PASS**:
+
+- process identity: uid=1000, gid=1000 (confirmed non-root);
+- `/app` runtime files readable and executable under the deploy UID — proven
+  by running the image's own existing unit test suite
+  (`migration-phoenix-release tests: OK`), without invoking the Phoenix CLI;
+- both mounted inputs readable, neither writable;
+- all 6 main-bundle artifact hashes match canonical values exactly;
+- manual capture size (`16313`) and SHA-256
+  (`dd63ea2d560ce6ec0f13de8ee551341120b5d1eca2f088cc0e7396e139384d68`) match
+  exactly;
+- `PHOENIX_PLATFORM_OWNER_EMAIL` present inside the container (value never
+  printed);
+- baked code SHA exactly `f466c34c0cf095d054ae79d86a12505129719739`; Git
+  absent;
+- disposable container confirmed removed afterward.
+
+**Exact future full `--apply`/`--rerun` container contract** (documentation
+only — still not executed):
+
+```
+--user 1000:1000
+--cap-drop ALL
+--security-opt no-new-privileges:true
+--mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/release,target=/phoenix-private/release,readonly
+--mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/manual/raw-capture.json,target=/phoenix-private/manual/raw-capture.json,readonly
+--env-file /opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/platform-owner.env
+-e PHOENIX_RELEASE_ARTIFACT_ROOT=/phoenix-private/release
+-e PHOENIX_MANUAL_PRIVILEGED_CAPTURE=/phoenix-private/manual/raw-capture.json
+--env-file /opt/mamago/dev/.env   # APP_ENV, PHOENIX_DATABASE_ENV, PHOENIX_STORAGE_ENV, DATABASE_URL, etc. — already proven by the passing DEV --plan
+```
+
+No `CAP_DAC_OVERRIDE` is required anywhere in this contract.
+
+Final non-interference (same session): all 7 containers unchanged, `dev-db-1`
+healthy, networks/volumes/ports unchanged, no Phoenix container/process
+left behind, free disk `14,151,806,976` bytes remaining (well above 8 GiB).
+No DB write, no plan/apply/rerun, no `/opt/mamago/prod` access.
+
+### F. Final pre-apply baseline — `PHOENIX_DEV_PRE_APPLY_READY`
+
+Captured 2026-08-03, one SSH session, fully read-only except for creating
+one empty writable directory (see "report output" below — no code, data, or
+`.env` touched).
+
+**Infrastructure baseline:** all 7 containers unchanged (same IDs/
+`StartedAt`/`RestartCount 0` as every prior snapshot in this effort),
+`dev-db-1` healthy, networks/volumes/ports unchanged, fixed image identity
+exact (`sha256:8d505c6147d142e3231f172e3c4b71b1cf5ccd6b6b3c012b78d1475790fb1bdc`,
+revision `f466c34c0cf095d054ae79d86a12505129719739`), no Phoenix container or
+process present, free disk `14,151,852,032` bytes.
+
+**Private inputs re-confirmed:** main bundle inventory SHA-256
+`28745eeebb811f048cf4a0d3665feb5cdc41adbdec032b139ee36030f2e5d5d7`, manual
+capture SHA-256 `dd63ea2d560ce6ec0f13de8ee551341120b5d1eca2f088cc0e7396e139384d68`,
+platform-owner env file structurally valid (1 line, correct key, `0600`) —
+all unchanged since §E.
+
+**Read-only DB baseline** (one aggregate `psql` session via `docker exec
+dev-db-1`, local socket trust auth, no `DATABASE_URL` touched, no row
+content printed — counts only):
+
+| Table | Count |
+| --- | ---: |
+| User | 1 (the founder ADMIN account only) |
+| Business | 0 |
+| Place | 1 (the pre-seeded `atmosfera` reference used by protected-place adoption) |
+| Offer | 0 |
+| Route | 0 |
+| RouteStop | 0 |
+| Activity (Events target) | 0 |
+| Article | 0 |
+| MigrationLineage (active) | 1 |
+| MigrationRecord | 2 |
+| MigrationRun | 2 |
+| Session | 4 |
+| UserActionToken | 0 |
+| MediaAsset | 1 |
+
+**Invariants:** `founder_admin_count=1` (matches the platform-owner
+resolution in §E); `duplicate_lineage_natural_key_count=0`; **`phoenix_release_bundle_lineage_count=0`**
+— zero `MigrationLineage` rows exist yet under this release's own
+`MigrationSource` namespace (`phoenix-release-bundle`), which is the
+precise invariant proving no write has occurred *for this release*, even
+though the DB already carries a few unrelated pre-existing rows (1 active
+lineage, 2 runs, 2 records — from other, unrelated prior migration/import
+activity on this shared DEV instance, not Phoenix).
+
+**Expected apply actions**, derived from the canonical manifest plus this
+baseline (not yet executed — informational only):
+
+| Entity | Records | Classification |
+| --- | ---: | --- |
+| Users | 563 | 562 CREATE (new `User` rows) + 1 ADOPT (`wordpress-db:user:1` links the *existing* founder account via one `MigrationLineage` row — creates no new `User` row) |
+| Businesses | 38 | 38 CREATE |
+| Places | 78 | 78 CREATE, plus one separate PRESERVE/LINK side-effect: the protected-adoption wrapper links `wordpress-db:places:43023` to the existing `atmosfera` Place (4 `protectedSourceRecordKeys` are excluded from independent creation) |
+| Offers | 63 | 63 CREATE |
+| Routes | 14 | 14 CREATE |
+| Events | 8 | 8 CREATE (2 `excludedSourceRecordKeys` already excluded from the manifest's executable set) |
+| Articles | 26 | 26 CREATE |
+| Redirects | — | VALIDATE_ONLY, no adapter, no write |
+
+Known, already-documented deviation (not a new finding): the frozen
+manifest statically declares `wordpress-db:user:38` as `SKIP_UNCHANGED`
+(reflecting the state of the reference environment the manifest was
+validated against), but on this untouched DEV target its real live action
+will be `CREATE` — `scripts/phoenix-full-bundle-clean-run.ts` documents
+this exact deviation for first-pass runs against a clean target.
+
+Required and confirmed: blockers `0`, conflicts `0`, unexpected scope `0`,
+duplicate lineage `0`. No records were approved individually.
+
+**Report output — one necessary deviation from the `--plan` container
+profile:** `--apply` writes an append-only JSONL progress report
+(`JsonLinesPhoenixReportStore`, one line per completed phase) that
+`--plan` never touches. Under a fully `--read-only` root with only a
+tmpfs `/tmp`, that write would either fail or — if redirected into `/tmp`
+— vanish the moment the container is removed, defeating "preserve
+partial-write evidence" if the run fails partway. One additional **empty,
+writable** directory was created for exactly this purpose (the only
+non-read-only local change in this task):
+
+```
+/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/reports/   (0700, deploy-user owned)
+```
+
+**Exact prepared sequential `--apply` command** (not executed — no
+`DATABASE_URL` or platform-owner email appears in it; both are supplied
+only via `--env-file`):
+
+```bash
+docker run \
+  --rm \
+  --name phoenix-dev-apply-f466c34c0cf0 \
+  --network dev_dev_net \
+  --env-file /opt/mamago/dev/.env \
+  --env-file /opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/platform-owner.env \
+  -e APP_ENV=DEV \
+  -e PHOENIX_DATABASE_ENV=DEV \
+  -e PHOENIX_STORAGE_ENV=DEV \
+  -e PHOENIX_STORAGE_PROVIDER=none \
+  -e PHOENIX_STORAGE_LOCATION=dev-media-disabled \
+  -e MIGRATED_USER_ACTIVATION_EMAIL_ENABLED=false \
+  -e SITE_INDEXING_ENABLED=false \
+  -e SITE_NOINDEX_FORCE=true \
+  -e HOME=/tmp \
+  -e PHOENIX_RELEASE_ARTIFACT_ROOT=/phoenix-private/release \
+  -e PHOENIX_MANUAL_PRIVILEGED_CAPTURE=/phoenix-private/manual/raw-capture.json \
+  --user 1000:1000 \
+  --read-only \
+  --tmpfs /tmp \
+  --mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/release,target=/phoenix-private/release,readonly \
+  --mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/manual/raw-capture.json,target=/phoenix-private/manual/raw-capture.json,readonly \
+  --mount type=bind,source=/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/reports,target=/phoenix-private/reports \
+  --cap-drop ALL \
+  --security-opt no-new-privileges:true \
+  --restart no \
+  --pids-limit 512 \
+  --memory 1g \
+  --cpus 1.0 \
+  --entrypoint /bin/sh \
+  mamago2-migrate:phoenix-f466c34c0cf0 \
+  -lc 'cd /app && HOME=/tmp ./node_modules/.bin/tsx scripts/migration-phoenix-release.ts --environment DEV --manifest docs/migration/releases/phoenix-approved-2026-07-30.json --apply --report /phoenix-private/reports/dev.jsonl'
+```
+
+Expected execution behavior: one sequential run through
+`phaseOrder` (users → businesses → places → offers → routes → events →
+articles), stop on first writer error, no automatic retry, no automatic
+rollback, partial-write evidence preserved in the mounted `reports/`
+directory (survives container removal). Next action after a successful
+apply is the **cumulative post-apply audit**, not an immediate `--rerun`.
+
+**Stop conditions for the real apply** (unchanged from design, restated for
+this run): environment mismatch, image/revision mismatch, private artifact
+hash mismatch, platform-owner resolution mismatch, unexpected action or
+scope expansion, lineage uniqueness violation, target conflict, first
+writer error, or unknown partial-write state. Non-P0 individual content
+anomalies go to backlog and do not reopen the canonical scope unless they
+affect write safety.
+
+Final non-interference (same session): unchanged from the infrastructure
+baseline above — nothing was written to the database, no plan/apply/rerun
+executed, no `/opt/mamago/prod` access.
+
+---
+
+## DEV rehearsal critical path
+
+- [x] Restore the agreed free-disk safety margin.
+- [x] Run one fixed-image DEV `--plan`.
+- [x] Verify exact DEV environment fingerprint and expected plan output.
+- [x] Locate and verify the private frozen-content bundle.
+- [ ] Capture one pre-apply DEV DB/storage baseline.
+- [ ] Run one sequential DEV `--apply`, stop-on-first-error.
+- [ ] Perform one cumulative post-apply audit.
+- [ ] Run one common DEV `--rerun`.
+- [ ] Require `CREATE 0` and only expected `NOOP`/`SKIP_UNCHANGED` outcomes.
+- [ ] Perform product smoke checks for representative migrated entities.
+- [ ] Record anomalies in backlog without reopening clean scope.
+- [ ] Founder DEV rehearsal acceptance.
+
+There must not be per-record approval for clean canonical records.
+
+---
+
+## PROD cutover critical path
+
+- [ ] Complete capacity audit for DEV + PROD + migration bundle + media +
+      backups + rollback images.
+- [ ] Increase hosting disk before cutover when the calculated safety reserve
+      cannot be maintained.
+- [ ] Freeze the exact release SHA, image ID, manifest and private bundle
+      hash.
+- [ ] Create and verify the production DB backup.
+- [ ] Capture production DB/storage/container baseline.
+- [ ] Run production `--plan`.
+- [ ] Founder Go/No-Go.
+- [ ] Run sequential production `--apply`.
+- [ ] Perform cumulative audit.
+- [ ] Run one production `--rerun`.
+- [ ] Require `CREATE 0` and expected `NOOP`/`SKIP` results.
+- [ ] Verify users, ownership, Places, Offers, Routes, Events and Articles.
+- [ ] Verify redirects, canonical URLs, noindex/indexing configuration and
+      DNS.
+- [ ] Run product smoke/UAT.
+- [ ] Begin post-launch monitoring.
+- [ ] Retain rollback evidence for the defined retention window.
+
+Clarifications:
+
+- WordPress remains the read-only legacy source during validation/cutover;
+- WordPress is currently hosted separately and should not be assumed to
+  consume the DEV/PROD Docker-host disk;
+- however, frozen source artifacts, media import, DB backups, old/new Docker
+  images and rollback material require temporary additional capacity;
+- exact hosting-capacity requirement must come from a dedicated read-only
+  capacity audit — no unsupported storage number is hard-coded here.
+
+---
+
+## Launch readiness — three independent tracks
+
+| Track | Owner | Status | Next action | Exit criterion |
+| --- | --- | --- | --- | --- |
+| 1. Migration readiness | Agent + founder sign-off | DEV rehearsal preparation (see critical path above) | Narrow DEV capacity housekeeping, then one fixed-image DEV `--plan` | DEV apply + rerun proof, founder DEV rehearsal acceptance |
+| 2. Product/UAT readiness | Founder | PARTIAL — see appendix "Integrated RC (2026-07-29/30)" below | Mobile visual UAT and authenticated BUSINESS_OWNER end-to-end UAT evidence | Founder product acceptance, 0 confirmed P0 defects |
+| 3. Production infrastructure/cutover readiness | Founder | NOT STARTED | Dedicated read-only hosting-capacity audit | Capacity, backup, DNS and rollback readiness confirmed |
+
+- Completing the Phoenix migration alone does **not** automatically approve
+  launch.
+- Old product/UAT/SEO gates (§2, §5) remain valid where still unresolved.
+- Historical RC text (below) is evidence for track 2, not the current
+  Phoenix phase.
+- Each track needs its own founder Go/No-Go; all three must close before
+  production cutover.
+
+---
+
+## Appendix: Integrated RC (2026-07-29/30) — Product/UAT regression evidence
+
+> Historical evidence for Launch readiness track 2 (Product/UAT readiness).
+> Kept as proof, not as the current phase.
 
 ```text
 Status:             PRODUCT REGRESSION TECHNICAL PASS
@@ -1508,6 +2154,10 @@ Side findings from the bounded Route runtime audit:
 
 ## 8. Раздельная оценка готовности
 
+> Историческая оценка от 2026-07-29 (до Phoenix release bundle). Актуальный
+> статус по трём независимым трекам запуска — см. "Launch readiness — three
+> independent tracks" в начале документа.
+
 Это операционная оценка, не календарное обещание:
 
 ```text
@@ -1548,6 +2198,11 @@ Events, Routes, Places/Offers safe publication, Articles, Users migration and th
 ---
 
 ## 9. Следующее одно действие
+
+> Хронологический журнал сессий, самая свежая запись — внизу (последняя:
+> `PHOENIX RELEASE BUNDLE`, 2026-07-31). Единственное актуальное «следующее
+> действие» — в блоке `Next one action` в начале документа; записи ниже —
+> evidence, не текущая фаза.
 
 ```text
 Phase: PRODUCT REGRESSION / RC READINESS — TECHNICAL PASS
@@ -1748,4 +2403,41 @@ Next single action: founder decision on the Places owner-scope gap (exclude
 the 35 affected records vs. wire user:1/user:129 as resolvable dependencies
 vs. other), per the three options in
 docs/migration/phoenix-places-owner-scope-gap-2026-07-31.md.
+```
+
+```text
+Phase: DOCS — checklist top-of-file restructured to release-mode operating
+model
+2026-08-03, docs-only, worktree mamago2-phoenix-checklist, branch
+feat/phoenix-final-release-bundle (no commit/push performed).
+
+The top of this file still claimed `PRODUCT REGRESSION / RC READINESS` /
+`FINAL GO/NO-GO PREPARATION` (2026-07-29) as the current phase, while the
+actual state had moved to the Phoenix final release bundle: exact SHA
+`f466c34c0cf095d054ae79d86a12505129719739`, canonical manifest
+`docs/migration/releases/phoenix-approved-2026-07-30.json`, DEV migration
+image `mamago2-migrate:phoenix-f466c34c0cf0` built, transferred and loaded
+on DEV with no plan/apply/rerun executed yet.
+
+Replaced the header and added, in order: a single "Next one action"
+callout, "Release mode: operating rules" (stop conditions and what does
+NOT reopen closed work), "Final canonical release scope" (per-entity READY
+counts + protected/adoption rules), "Phoenix release bundle — completed, do
+not repeat", "Current blockers before DEV apply" (capacity gate / DEV plan
+/ private frozen-content bundle — the primary open uncertainty), "DEV
+rehearsal critical path", "PROD cutover critical path", and a three-track
+"Launch readiness" matrix (migration / product-UAT / production
+infrastructure). Moved the prior "INTEGRATED RC" block verbatim into an
+"Appendix" as historical Product/UAT evidence. Added short pointer notes to
+the pre-existing §8 (readiness percentages) and §9 (chronological handoff
+log) so there is exactly one authoritative "current phase" and one
+authoritative "next action" in the document; no historical content deleted.
+
+`git diff --check`: clean. No code, Prisma, Dockerfile, manifest or release
+artifact touched.
+
+Next single action (docs track only): none — this file itself is now
+current. The real next action is the one stated at the top: narrow DEV
+capacity housekeeping, then one fixed-image DEV `--plan`, then locate/verify
+the private frozen-content bundle.
 ```
