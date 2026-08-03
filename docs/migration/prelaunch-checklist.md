@@ -2,13 +2,23 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-> **Next one action:** `PHOENIX_DEV_PRE_APPLY_READY` — the final pre-apply
-> baseline is captured and the exact sequential DEV `--apply` command is
-> prepared (see §F below). **Awaiting explicit founder authorization before
-> the first write.** On authorization: run exactly one sequential DEV
-> `--apply`, stop on first error, no automatic retry/rollback. On
-> completion, stop before `--rerun` and perform the cumulative post-apply
-> audit.
+> **Next one action:** `PHOENIX_CONTINUATION_DESIGN_FINAL` (see §H below,
+> revised 2026-08-03 after an adversarial review pass). The safe
+> continuation design for the §G partial failure is implemented and tested
+> in an isolated worktree (`mamago2-phoenix-continuation-fix`, not yet
+> committed/pushed): an explicit three-flag CLI contract
+> (`--continue-from-report` + `--continue-from-report-sha256` +
+> `--continue-from-code-sha`) that resumes **directly from the original §G
+> report** — no throwaway intermediate failing apply needed — proves the
+> completed prefix as an exact positional match against live
+> `MigrationLineage` (not a count bound), and corrects the one known-stale
+> `wordpress-db:user:38` manifest record via a narrow, itemized exception,
+> leaving every other record/phase/mismatch-check byte-identical to today's
+> behavior. Runtime code changed — a **new commit SHA and a new migration
+> Docker image are required** before this can be used; the manifest,
+> canonical artifact hashes, and progress-report schema are
+> unchanged. No DEV write, Docker build/push, commit, or push has been
+> performed yet — awaiting explicit authorization for each of those steps.
 
 **Обновлено:** 2026-08-03
 **Текущая фаза:** `PHOENIX FINAL RELEASE BUNDLE — DEV REHEARSAL PREPARATION`
@@ -581,6 +591,256 @@ affect write safety.
 Final non-interference (same session): unchanged from the infrastructure
 baseline above — nothing was written to the database, no plan/apply/rerun
 executed, no `/opt/mamago/prod` access.
+
+### G. First DEV apply attempt — `PHOENIX_DEV_APPLY_PARTIAL_FAILURE`
+
+**Pre-apply docs commit:** `a9d2b17520ea7eb3f41c75e7231aa39455752093`
+(`docs(migration): record Phoenix DEV pre-apply readiness`, one file,
+uncommitted checklist evidence from §A–§F) — not pushed.
+
+**Founder authorization:** explicit, quoted: *"Подтверждаю запуск одного
+последовательного DEV --apply. Без автоматического retry, rollback и
+rerun. После завершения остановиться и выполнить cumulative audit."*
+
+**Execution:** `2026-08-03T11:04:34Z`–`2026-08-03T11:04:37Z` (3s), exit
+code `1`, container `phoenix-dev-apply-f466c34c0cf0` (auto-removed via
+`--rm` — data written to the DB is not affected by container removal).
+
+**Exact error:**
+```
+migration:phoenix-release failed: PHASE_FAILED: users:wordpress-db:user:38:UNEXPECTED_PLAN_ACTION:CREATE
+```
+
+**Root cause — confirmed from source, not a migration-engine bug.**
+`src/lib/migration/release/adapters/usersAdapter.ts` (`UsersPhaseExecutor.execute`)
+compares each record's live re-derived `plan.action` against the
+manifest's *static* `expectedAction`, and fails closed on any mismatch —
+by its own doc comment, deliberately: *"a plan that disagrees with what the
+frozen manifest expects is a FAILED outcome ... never silently reconciled
+to whichever action actually happened."* The committed manifest
+(`docs/migration/releases/phoenix-approved-2026-07-30.json`) declares
+`wordpress-db:user:38` as `SKIP_UNCHANGED` (frozen at generation time,
+reflecting whatever reference state existed then); the live plan against
+this genuinely untouched DEV target correctly resolves it to `CREATE`
+(the user doesn't exist yet). This is exactly the deviation flagged as
+"known" in §F — `scripts/phoenix-full-bundle-clean-run.ts` (a separate,
+one-off test script) already carries a manifest patch for precisely this
+key on a first/fresh-target pass; the general-purpose `--apply` CLI used
+here does not, and correctly refused to proceed rather than silently
+reinterpret the mismatch.
+
+**Progress report (preserved, not deleted):**
+`/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/reports/dev.jsonl`,
+965 bytes, SHA-256
+`77bc7f542ec816fcb8b5109085b5e0847ae021b9df27a34db3979a0f1fd7aeae`.
+
+**Actual partial-write state — clean and fully isolated to the Users phase:**
+
+| Table | Before | After | Delta |
+| --- | ---: | ---: | ---: |
+| User | 1 | 20 | **+19** |
+| Business | 0 | 0 | 0 |
+| Place | 1 | 1 | 0 |
+| Offer | 0 | 0 | 0 |
+| Route | 0 | 0 | 0 |
+| RouteStop | 0 | 0 | 0 |
+| Activity | 0 | 0 | 0 |
+| Article | 0 | 0 | 0 |
+| MigrationLineage (active) | 1 | 21 | +20 (19 CREATE + 1 ADOPT link) |
+| MigrationRecord | 2 | 21 | +19 |
+| MigrationRun | 2 | 21 | +19 |
+| Session | 4 | 4 | 0 |
+| UserActionToken | 0 | 0 | 0 |
+| MediaAsset | 1 | 1 | 0 |
+
+- **Forbidden/protected tables: zero unexpected writes** — Business, Place,
+  Offer, Route, RouteStop, Activity, Article, Session, UserActionToken,
+  MediaAsset all exactly unchanged, confirming write isolation held even
+  under this partial/failed run;
+- `phoenix_release_bundle_lineage_count`: `0` → `20`, all `targetType=USER`
+  (`phoenix_lineage_by_target_type=USER:20`);
+- `phoenix_platform_owner_link_exists=1` — the `wordpress-db:user:1`
+  ADOPT/link succeeded before the 19 clean-track CREATEs ran, consistent
+  with `phaseOrder`/record order;
+- `founder_admin_count=1` (unchanged), `duplicate_lineage_natural_key_count=0`;
+- one audit-query caveat, not a write-safety issue: `protected_atmosfera_place_still_single`
+  queried `Place` by `slug='atmosfera'` and got `0`, even though `Place`
+  count is unchanged at `1` (Places phase was never reached). This means
+  either the pre-seeded reference Place's actual slug differs from
+  `atmosfera`, or the query's assumption was imprecise — worth confirming
+  before the Places phase is ever attempted, but it is unrelated to this
+  apply's failure and nothing was written to `Place` in this run.
+- **No rollback, no retry, no rerun** was performed, per explicit
+  instruction and founder authorization scope.
+
+**Non-interference:** all 7 containers unchanged (same IDs/`StartedAt`/
+`RestartCount 0`), networks/volumes/ports unchanged, `dev-db-1` healthy,
+fixed image unchanged, free disk `14,151,725,056` bytes remaining (well
+above 8 GiB). No `/opt/mamago/prod` access, no manual SQL mutation, no
+Docker build/load/prune/removal, no service restart.
+
+### H. Safe continuation design for §G — `PHOENIX_PARTIAL_APPLY_CONTINUATION_READY`
+
+**Scope of this entry:** design + implementation only, in an isolated
+worktree. **No DEV write, no Docker build/push, no commit/push performed.**
+
+**Partial-prefix reconstruction (proved, not assumed).** Cross-checked the
+preserved `dev.jsonl` report against a bounded read-only DEV audit
+(`MigrationLineage`, `targetType=USER`, active rows, ordered by creation)
+and the canonical manifest's own `users` record order: exactly 20 completed
+keys (19 `CREATE` + the `wordpress-db:user:1` platform-owner `ADOPT` link,
+in manifest order), the 21st key (`wordpress-db:user:38`) is the proven
+terminal failure (`UNEXPECTED_PLAN_ACTION:CREATE`), and the remaining
+manifest suffix — the rest of `users` plus every phase after it — was never
+started. DB order and manifest order agree exactly for this prefix, so the
+reconstruction is exact, not inferred.
+
+**Why neither existing mechanism can safely complete this state (from
+source, not assumption):**
+- A second plain `--apply` re-derives and re-executes the *entire* phase
+  from record 1 — it does not know 20 records already succeeded, and would
+  immediately fail again on the same `wordpress-db:user:38` mismatch
+  before ever reaching new ground, since `--apply`/`--rerun` share one
+  `runSequential` loop in `SequentialEntityPhaseAdapter`
+  (`src/lib/migration/release/adapter.ts`) with no skip-prefix support.
+- `--resume-from <phase>` (`assertResume` in `coordinator.ts`) operates at
+  *phase* granularity only and explicitly rejects resuming into a phase
+  whose own report shows `failed > 0` (`RESUME_INTO_FAILED_PHASE`) — it
+  cannot resume *within* the failed `users` phase at all.
+- Changing only the manifest's declared action for `wordpress-db:user:38`
+  (§G's literal next-step note) is **not sufficient by itself**: even with
+  that one record fixed, a plain re-`apply` still has no notion of "skip
+  the 20 already-complete records" and would attempt to re-run the
+  `CREATE`/`ADOPT` logic for all of them again — safe only if every one of
+  those executors is perfectly idempotent against records that already
+  exist, which the fail-closed design explicitly does not assume.
+
+**Chosen design, revised 2026-08-03 (adversarial-review pass) — direct
+continuation from the original §G report, no intermediate failing apply:**
+a new, explicit three-flag CLI contract, valid only with `--apply`, mutually
+exclusive with `--resume-from`, all three required together or none:
+`--continue-from-report <path>`, `--continue-from-report-sha256 <sha256>`,
+`--continue-from-code-sha <predecessor-40-hex-sha>`. This resumes **directly
+from the original §G report** produced by predecessor code SHA
+`f466c34c0cf095d054ae79d86a12505129719739` — it does **not** require a
+throwaway intentionally-failing `--apply` under the new image merely to
+mint a report stamped with the new SHA (the earlier version of this design,
+superseded below, had exactly that gap).
+
+**Cross-code-SHA identity (`continuation.ts`'s `loadCrossShaContinuationReport`),
+every check fails closed:** the report file's SHA-256 must equal the
+explicitly supplied hash · the report's own `codeSha` must equal the
+explicitly supplied predecessor SHA · that predecessor SHA must be a member
+of a small hardcoded allowlist (`KNOWN_PREDECESSOR_CODE_SHAS`, exactly one
+entry today: `f466c34c...9739`) — **not** an open `--ignore-code-sha` escape
+hatch; extending the allowlist to a new predecessor requires a reviewed
+source change, never an operator-supplied flag · the currently-running
+code's own baked SHA must differ from the predecessor · `releaseId` /
+`manifestHash` / environment tier / full environment fingerprint
+(host/port/db/schema/storage) must all match the current run exactly · the
+report must genuinely describe a failure. The predecessor report file must
+be exactly one JSONL line (a captured artifact, not an ongoing journal).
+
+**Exact-prefix proof (`resolveExactCompletedPrefix`), replacing the earlier
+count-bounds design entirely:** no longer trusts the report's own
+`created + updated` count as authoritative (only as an advisory upper
+bound — the count may legitimately be *lower* than the proven prefix, e.g.
+a smaller chained report, but never higher). The authoritative proof is
+positional: live `MigrationLineage` rows are checked one-for-one against
+the manifest's own deterministic record order up to the failed key's exact
+index — every prefix position must have a matching live row (no missing
+key), no live-completed key may exist at or after the failed key's position
+(no non-prefix write, and the failed key itself must not already be
+complete), every live row must belong to a key actually in this phase's
+record set (no unrelated-namespace contamination), and no key may appear
+twice (no duplicate lineage). A prefix position whose manifest action is
+not `CREATE`/`UPDATE` (i.e. would leave no lineage row even when correctly
+processed) is rejected outright rather than guessed at
+(`CONTINUATION_PREFIX_AMBIGUOUS_ACTION`) — this mechanism only ever proves
+completion from evidence, never assumes it.
+
+**`wordpress-db:user:38` handling — narrow release-exception registry, not
+a general mismatch bypass:** `continuation.ts` now carries exactly one
+itemized entry (`PHOENIX_RELEASE_ACTION_EXCEPTIONS`): phase `users`, key
+`wordpress-db:user:38`, manifest-declared `SKIP_UNCHANGED` corrected to
+`CREATE`, with its root-cause reason inline. `applyReleaseActionExceptions`
+checks the manifest's *current* declared action for that exact key before
+overriding it — a manifest that no longer says what the exception expects
+fails closed (`CONTINUATION_RELEASE_EXCEPTION_STALE`) rather than silently
+re-applying a stale correction. Applied to an **in-memory copy** of the
+manifest only, unconditionally for every apply/rerun (continuation or not,
+since this corrects stale manifest data, not continuation-specific
+behavior) — the committed manifest file and `manifestHash` are never
+touched, and `--plan` output is deliberately unaffected (it must keep
+reflecting the raw frozen manifest). Every other record's manifest/live-plan
+mismatch still fails closed exactly as before in `UsersPhaseExecutor`, and
+every other entity executor is completely untouched — this is not a general
+"trust the live plan" behavior change anywhere in the codebase.
+
+**Continuation chain evidence:** every report line produced during a
+continuation run (success or a fresh failure alike) now carries sanitized
+provenance in its existing `resolvedIdentities` field — predecessor code
+SHA, predecessor report SHA-256, predecessor's terminal failed key, exact
+skipped-prefix count, and the exact continuation start key — alongside the
+run's own native `releaseId`/`manifestHash`/`codeSha`/`created`/`updated`/
+`failed`/`firstFailure`. No raw predecessor report lines or private data
+are copied, and it stays in the same durable JSONL file
+(`JsonLinesPhoenixReportStore`, unchanged, 0600, survives container exit).
+A non-continuation run records nothing extra in that field, as before.
+
+**Files changed (8, verified via `git status --short`) — still no
+manifest, artifact, Dockerfile, or Prisma file touched:**
+`src/lib/migration/release/continuation.ts` (rewritten),
+`src/lib/migration/release/continuation.test.ts` (rewritten),
+`src/lib/migration/release/adapter.ts` (unchanged from the first pass —
+additive optional constructor param), `src/lib/migration/release/adapters/registry.ts`
+(now calls the exact-prefix resolver), `src/lib/migration/release/coordinator.ts`
+(new, additive optional `continuationEvidence` input, merged into
+`resolvedIdentities` on both report branches — the one new file beyond the
+original six), `scripts/migration-phoenix-release.ts` (three-flag CLI
+contract + release-exception application), `scripts/migration-phoenix-release.test.ts`
+and `src/lib/migration/release/release.test.ts` (new coverage).
+
+**Tests/checks, all green in the isolated worktree:** every
+`src/lib/migration/release/**/*.test.ts` and both `scripts/migration-phoenix-release.test.ts`
+suites, `tsc --noEmit` clean, targeted ESLint clean, `git diff --check`
+clean. New/updated coverage: cross-SHA report accepted only with the exact
+explicit predecessor SHA + report SHA-256 (and rejected on an unknown
+predecessor SHA, a wrong report hash, a codeSha disagreement, an unchanged
+current SHA, any release-ID/manifest-hash/environment mismatch, a
+non-failure, or a malformed/empty/multi-line/unreadable report) · the exact
+20-key synthetic DEV-shaped prefix continues directly at `user:38` with no
+intermediate failing apply, and every non-prefix/missing/duplicate/
+unrelated/ambiguous-action/wrong-phase variation fails closed · the report
+count may be lower than the proven prefix but never higher · the release
+exception corrects exactly `user:38` and fails closed on a stale manifest
+action or outside the `users` phase · continuation evidence lands in
+`resolvedIdentities` on success and failure alike, and is absent otherwise ·
+CLI `parseArgs` enforces all-three-or-none, apply-only, and no combination
+with `--resume-from`.
+
+**Release-artifact impact — a new image is required before use:** runtime
+code changed (YES) → canonical manifest changed (NO) → public artifact
+hashes changed (NO) → progress-report JSONL *shape* unchanged (only
+`resolvedIdentities`, an existing free-form field, gains keys during
+continuation runs) → Docker image (**a NEW image is still required** —
+today's deployed `f466c34c0cf0` image has none of this CLI contract) → CLI
+contract (extended additively; every existing flag/behavior unchanged).
+Consequence: new commit SHA, new migration image build, and — per the
+standing DEV rehearsal process — one fresh fixed-image DEV `--plan` before
+any continuation `--apply` is authorized. The original §G `dev.jsonl`
+report remains exactly as captured (path and SHA-256 unchanged: `/opt/mamago/dev/.phoenix-private/phoenix-approved-2026-07-30/reports/dev.jsonl`,
+`77bc7f54...9a0f1fd7aeae`) and is now the direct, sole input to the first
+continuation attempt — no replacement report needs to be minted first.
+
+**Next single action:** review this revised design; on approval, commit +
+push from the isolated worktree, build and load the new migration image on
+DEV, run one fixed-image DEV `--plan`, then request explicit founder
+authorization for exactly one continuation `--apply` (`--continue-from-report`
+pointed at the original §G `dev.jsonl`, its known SHA-256, and predecessor
+SHA `f466c34c...9739` — same one-shot, no-retry/rollback/rerun discipline
+as §G). No DEV write, image build/push, or commit/push has been performed
+as part of this entry.
 
 ---
 
