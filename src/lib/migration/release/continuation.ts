@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import type { PrismaClient } from "@prisma/client";
 
 import { exactExecutableKeys, sha256Bytes } from "./manifest";
+import {
+  assertPhoenixProtectedPlaceAtmosferaAdoption,
+  PHOENIX_PROTECTED_PLACE_SOURCE_KEY,
+  type PhoenixProtectedPlaceLineageRow,
+} from "./protectedPlaceAdoption";
 import type {
   PhoenixEnvironmentContext,
   PhoenixExpectedRecord,
@@ -20,14 +25,18 @@ export interface PhoenixContinuationReadClient {
   city: { findMany: PrismaClient["city"]["findMany"] };
   migrationLineage: { findMany: PrismaClient["migrationLineage"]["findMany"] };
   /**
-   * Optional Offer/Place reads used only by the pinned Offers-partial hop
-   * (`1ae265…` report). Older continuation hops never call these members.
+   * Optional Offer/Place/Business reads used only by the pinned Offers-partial
+   * hop (`1ae265…` report). Older continuation hops never call these members.
    */
   offer?: {
     findMany: PrismaClient["offer"]["findMany"];
     findUnique: PrismaClient["offer"]["findUnique"];
   };
-  place?: { findUnique: PrismaClient["place"]["findUnique"] };
+  place?: {
+    findUnique: PrismaClient["place"]["findUnique"];
+    findMany: PrismaClient["place"]["findMany"];
+  };
+  business?: { findUnique: PrismaClient["business"]["findUnique"] };
 }
 
 type PhoenixLineageReadClient = Pick<PhoenixContinuationReadClient, "migrationLineage">;
@@ -503,6 +512,79 @@ export async function resolveFullPhaseCompletion(
   return resolvePhaseCompletion(prisma, sourceNamespace, phase, orderedKeys);
 }
 
+/**
+ * Offers-partial Places proof: exact executable Place set (78) plus exactly
+ * one protected Atmosfera adoption (`wordpress-db:places:43023`). Any other
+ * extra Place lineage remains fail-closed.
+ */
+export async function resolveOffersPartialPlacesCompletion(
+  prisma: PhoenixContinuationReadClient,
+  sourceNamespace: string,
+  phase: PhoenixReleasePhase,
+): Promise<ReadonlySet<string>> {
+  if (phase.name !== "places") throw blocked("CONTINUATION_OFFERS_PARTIAL_PLACES_PHASE_MISMATCH");
+  if (!prisma.place?.findMany || !prisma.business?.findUnique) {
+    throw blocked("CONTINUATION_OFFERS_PARTIAL_READ_CLIENT_INCOMPLETE");
+  }
+
+  const lineageSelect = {
+    sourceRecordKey: true,
+    targetType: true,
+    targetId: true,
+    targetRole: true,
+    targetNaturalKey: true,
+    lastSourceHash: true,
+    lastPlanAction: true,
+    isActive: true,
+  } as const;
+
+  const activeRows = (await prisma.migrationLineage.findMany({
+    where: {
+      isActive: true,
+      source: { sourceNamespace, adapterKey: "wordpress-db" },
+    },
+    select: lineageSelect,
+  })) as PhoenixProtectedPlaceLineageRow[];
+
+  const protectedPlaceRows = (await prisma.migrationLineage.findMany({
+    where: {
+      sourceRecordKey: PHOENIX_PROTECTED_PLACE_SOURCE_KEY,
+      targetType: "PLACE" as never,
+      source: { sourceNamespace, adapterKey: "wordpress-db" },
+    },
+    select: lineageSelect,
+  })) as PhoenixProtectedPlaceLineageRow[];
+
+  const placeWithoutProtected = activeRows
+    .filter((row) => row.targetType === "PLACE" && row.sourceRecordKey !== PHOENIX_PROTECTED_PLACE_SOURCE_KEY)
+    .map((row) => ({ sourceRecordKey: row.sourceRecordKey, targetId: row.targetId }));
+
+  const filteredPrisma = {
+    migrationLineage: {
+      findMany: async (args?: { where?: { targetType?: string; sourceRecordKey?: string } }) => {
+        let rows = placeWithoutProtected;
+        const where = args?.where ?? {};
+        if (where.targetType && where.targetType !== "PLACE") return [];
+        if (where.sourceRecordKey) {
+          rows = rows.filter((row) => row.sourceRecordKey === where.sourceRecordKey);
+        }
+        return rows.map(({ sourceRecordKey, targetId }) => ({ sourceRecordKey, targetId }));
+      },
+    },
+  } as PhoenixLineageReadClient;
+
+  const completed = await resolveFullPhaseCompletion(filteredPrisma, sourceNamespace, phase);
+
+  await assertPhoenixProtectedPlaceAtmosferaAdoption({
+    prisma: { place: prisma.place, business: prisma.business },
+    activeLineages: activeRows,
+    protectedPlaceRows,
+    block: (code) => blocked(`CONTINUATION_${code}`),
+  });
+
+  return completed;
+}
+
 // ---------------------------------------------------------------------------
 // Multi-phase continuation orchestration — resolves the skip set for every
 // phase a continuation chain covers: full skip sets for prior completed
@@ -521,7 +603,7 @@ export interface MultiPhaseContinuationResult {
 }
 
 export async function resolveMultiPhaseContinuation(
-  prisma: PhoenixLineageReadClient,
+  prisma: PhoenixContinuationReadClient,
   sourceNamespace: string,
   chain: CrossShaContinuationChain,
   manifest: PhoenixReleaseManifest,
@@ -555,7 +637,11 @@ export async function resolveMultiPhaseContinuation(
     for (const phaseName of PHOENIX_OFFERS_PARTIAL_PRIOR_PHASES) {
       const phase = manifest.phases.find((item) => item.name === phaseName);
       if (!phase) throw blocked(`CONTINUATION_PHASE_NOT_IN_MANIFEST:${phaseName}`);
-      phaseSkipSets.set(phase.name, await resolveFullPhaseCompletion(prisma, sourceNamespace, phase));
+      if (phaseName === "places") {
+        phaseSkipSets.set(phase.name, await resolveOffersPartialPlacesCompletion(prisma, sourceNamespace, phase));
+      } else {
+        phaseSkipSets.set(phase.name, await resolveFullPhaseCompletion(prisma, sourceNamespace, phase));
+      }
     }
   }
 
@@ -623,7 +709,7 @@ export async function assertPhoenixOffersPartialLiveInvariants(input: {
   alreadyCompletedOffers: ReadonlySet<string>;
   continuationStartKey: string;
 }): Promise<void> {
-  if (!input.prisma.offer || !input.prisma.place) {
+  if (!input.prisma.offer || !input.prisma.place?.findUnique) {
     throw blocked("CONTINUATION_OFFERS_PARTIAL_READ_CLIENT_INCOMPLETE");
   }
   if (input.continuationStartKey !== PHOENIX_OFFERS_PARTIAL_TERMINAL_KEY) {

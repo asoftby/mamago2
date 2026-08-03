@@ -5,15 +5,26 @@ import type { PrismaClient } from "@prisma/client";
 
 import { assertPhoenixPlaceCityPrerequisites, PHOENIX_RELEASE_SOURCE_NAMESPACE } from "./continuation";
 import { exactExecutableKeys, sha256Bytes } from "./manifest";
+import {
+  assertPhoenixProtectedPlaceAtmosferaAdoption,
+  PHOENIX_PROTECTED_PLACE_SOURCE_KEY,
+} from "./protectedPlaceAdoption";
 import type { PhoenixEnvironmentContext, PhoenixPhaseName, PhoenixPhaseReport, PhoenixReleaseManifest } from "./types";
+
+export {
+  assertPhoenixProtectedPlaceAtmosferaAdoption,
+  PHOENIX_PROTECTED_PLACE_ADOPTION_HASH,
+  PHOENIX_PROTECTED_PLACE_SOURCE_KEY,
+  type PhoenixProtectedPlaceLineageRow,
+} from "./protectedPlaceAdoption";
 
 const CHECKPOINT_TYPE = "PHOENIX_LIVE_STATE_CHECKPOINT" as const;
 const CHECKPOINT_SCHEMA_VERSION = 1 as const;
-const PROTECTED_SOURCE_KEY = "wordpress-db:places:43023";
-const PROTECTED_HASH = "protected-adoption:places-preview-2026-07-30";
+const PROTECTED_SOURCE_KEY = PHOENIX_PROTECTED_PLACE_SOURCE_KEY;
 const FIRST_OFFER_KEY = "wordpress-db:hb-programs:18932";
 const COMPLETED_PHASES = ["users", "businesses", "places"] as const;
 const EXPECTED_COUNTS = { users: 563, businesses: 38, places: 78 } as const;
+
 export interface LiveCheckpointEvidencePins {
   anchorReportSha256: string; anchorReportCodeSha: string;
   partialReportSha256: string; partialReportCodeSha: string;
@@ -264,25 +275,11 @@ async function proveLiveState(prisma: PhoenixLiveCheckpointReadClient, expected:
   const targets = lineages.filter((row) => row.targetId).map((row) => `${row.targetType}:${row.targetId}`);
   if (new Set(targets).size !== targets.length) throw blocked("DUPLICATE_TARGET_ID");
 
-  const protectedLines = allLineages.filter((row) => row.sourceRecordKey === PROTECTED_SOURCE_KEY && row.targetType === "PLACE");
-  if (protectedLines.length !== 1 || !protectedLines[0].isActive) throw blocked("PROTECTED_LINEAGE_COUNT_MISMATCH");
-  const protectedLine = protectedLines[0];
-  if (protectedLine.targetRole !== "primary" || protectedLine.targetNaturalKey !== "slug:atmosfera" ||
-      protectedLine.lastSourceHash !== PROTECTED_HASH || protectedLine.lastPlanAction !== "LINK_EXISTING" || !protectedLine.targetId) {
-    throw blocked("PROTECTED_LINEAGE_MISMATCH");
-  }
-  const places = await prisma.place.findMany({
-    where: { OR: [{ id: protectedLine.targetId }, { slug: "atmosfera" }, { title: { equals: "Атмосфера", mode: "insensitive" } }] },
-    select: { id: true, title: true, slug: true, status: true, city: { select: { slug: true, isActive: true } }, createdByUserId: true, ownerBusinessId: true },
-  }) as Array<{ id: string; title: string; slug: string | null; status: string; city: { slug: string | null; isActive: boolean } | null; createdByUserId: string; ownerBusinessId: string | null }>;
-  if (places.length !== 1 || places[0].id !== protectedLine.targetId) throw blocked("PROTECTED_TARGET_AMBIGUOUS");
-  const place = places[0];
-  if (place.slug !== "atmosfera" || place.title.trim().toLocaleLowerCase("ru") !== "атмосфера" || place.status !== "PUBLISHED" ||
-      place.city?.slug !== "minsk" || !place.city.isActive || !place.ownerBusinessId) throw blocked("PROTECTED_TARGET_MISMATCH");
-  const ownerLine = lineages.filter((row) => row.sourceRecordKey === "wordpress-db:user:525" && row.targetType === "USER" && row.targetRole === "primary");
-  if (ownerLine.length !== 1 || ownerLine[0].targetId !== place.createdByUserId) throw blocked("PROTECTED_OWNER_LINEAGE_MISMATCH");
-  const business = await prisma.business.findUnique({ where: { id: place.ownerBusinessId }, select: { id: true, ownerUserId: true } });
-  if (!business || business.ownerUserId !== place.createdByUserId) throw blocked("PROTECTED_BUSINESS_MISMATCH");
+  const protectedAdoption = await assertPhoenixProtectedPlaceAtmosferaAdoption({
+    prisma,
+    activeLineages: lineages,
+    protectedPlaceRows: allLineages.filter((row) => row.sourceRecordKey === PROTECTED_SOURCE_KEY && row.targetType === "PLACE"),
+  });
   await assertPhoenixPlaceCityPrerequisites(prisma);
 
   const offersPhase = expected.manifest.phases.find((phase) => phase.name === "offers");
@@ -293,10 +290,6 @@ async function proveLiveState(prisma: PhoenixLiveCheckpointReadClient, expected:
     offer: await prisma.offer.count(), route: await prisma.route.count(), routeStop: await prisma.routeStop.count(), activity: await prisma.activity.count(), article: await prisma.article.count(),
     migrationLineage: await prisma.migrationLineage.count(), migrationRecord: await prisma.migrationRecord.count(), migrationRun: await prisma.migrationRun.count(),
     migrationMediaAsset: await prisma.migrationMediaAsset.count(), mediaAsset: await prisma.mediaAsset.count(), session: await prisma.session.count(), userActionToken: await prisma.userActionToken.count(),
-  };
-  const protectedAdoption: LiveProof["protectedAdoption"] = {
-    sourceRecordKey: PROTECTED_SOURCE_KEY, action: "LINK_EXISTING", naturalKey: "slug:atmosfera", targetId: place.id,
-    targetSlug: "atmosfera", normalizedTitle: "атмосфера", citySlug: "minsk", ownerBusinessId: business.id, ownerUserId: place.createdByUserId,
   };
   return {
     keys,

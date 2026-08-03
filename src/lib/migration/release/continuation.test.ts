@@ -1009,17 +1009,45 @@ function testOffersPartialPinRejectsMultipleFailures(): void {
 function offersPartialLiveRows(manifest: PhoenixReleaseManifest) {
   const keys = (name: PhoenixPhaseName) => exactExecutableKeys(manifest.phases.find((phase) => phase.name === name)!);
   const offerPrefix = keys("offers").slice(0, 52);
+  const base = (sourceRecordKey: string, targetType: string, targetId: string) => ({
+    sourceRecordKey,
+    targetType,
+    targetId,
+    targetRole: "primary",
+    targetNaturalKey: `${targetType.toLowerCase()}:${targetId}`,
+    lastSourceHash: "hash",
+    lastPlanAction: "CREATE",
+    isActive: true,
+  });
   return {
     offerPrefix,
     lineages: [
-      ...keys("users").map((sourceRecordKey) => ({ sourceRecordKey, targetType: "USER", targetId: `u-${sourceRecordKey}` })),
-      ...keys("businesses").map((sourceRecordKey) => ({ sourceRecordKey, targetType: "BUSINESS", targetId: `b-${sourceRecordKey}` })),
-      ...keys("places").map((sourceRecordKey) => ({
-        sourceRecordKey,
+      ...keys("users").map((sourceRecordKey) =>
+        base(
+          sourceRecordKey,
+          "USER",
+          sourceRecordKey === "wordpress-db:user:525" ? "user-525" : `u-${sourceRecordKey}`,
+        ),
+      ),
+      ...keys("businesses").map((sourceRecordKey) => base(sourceRecordKey, "BUSINESS", `b-${sourceRecordKey}`)),
+      ...keys("places").map((sourceRecordKey) =>
+        base(
+          sourceRecordKey,
+          "PLACE",
+          sourceRecordKey === "wordpress-db:places:43635" ? "place-43635" : `p-${sourceRecordKey}`,
+        ),
+      ),
+      {
+        sourceRecordKey: "wordpress-db:places:43023",
         targetType: "PLACE",
-        targetId: sourceRecordKey === "wordpress-db:places:43635" ? "place-43635" : `p-${sourceRecordKey}`,
-      })),
-      ...offerPrefix.map((sourceRecordKey) => ({ sourceRecordKey, targetType: "OFFER", targetId: `o-${sourceRecordKey}` })),
+        targetId: "atmosfera-id",
+        targetRole: "primary",
+        targetNaturalKey: "slug:atmosfera",
+        lastSourceHash: "protected-adoption:places-preview-2026-07-30",
+        lastPlanAction: "LINK_EXISTING",
+        isActive: true,
+      },
+      ...offerPrefix.map((sourceRecordKey) => base(sourceRecordKey, "OFFER", `o-${sourceRecordKey}`)),
     ],
     offers: offerPrefix.map((createRequestId) => ({ createRequestId, id: `o-${createRequestId}` })),
   };
@@ -1028,17 +1056,22 @@ function offersPartialLiveRows(manifest: PhoenixReleaseManifest) {
 function offersPartialPrisma(manifest: PhoenixReleaseManifest, mutate?: (state: ReturnType<typeof offersPartialLiveRows>) => void) {
   const state = offersPartialLiveRows(manifest);
   mutate?.(state);
-  const lineages = state.lineages.filter(
-    (row, index, all) =>
-      all.findIndex((other) => other.sourceRecordKey === row.sourceRecordKey && other.targetType === row.targetType) === index,
-  );
+  const lineages = state.lineages;
   return {
     migrationLineage: {
-      findMany: async (args: { where: { targetType?: string; sourceRecordKey?: string } }) => {
+      findMany: async (args: {
+        where: {
+          targetType?: string;
+          sourceRecordKey?: string;
+          isActive?: boolean;
+          source?: { sourceNamespace?: string; adapterKey?: string };
+        };
+      }) => {
         let rows = lineages;
+        if (args.where.isActive === true) rows = rows.filter((row) => row.isActive !== false);
         if (args.where.targetType) rows = rows.filter((row) => row.targetType === args.where.targetType);
         if (args.where.sourceRecordKey) rows = rows.filter((row) => row.sourceRecordKey === args.where.sourceRecordKey);
-        return rows.map(({ sourceRecordKey, targetId }) => ({ sourceRecordKey, targetId }));
+        return rows.map((row) => ({ ...row }));
       },
     },
     offer: {
@@ -1051,7 +1084,33 @@ function offersPartialPrisma(manifest: PhoenixReleaseManifest, mutate?: (state: 
       findUnique: async (args: { where: { id: string } }) =>
         args.where.id === "place-43635"
           ? { id: "place-43635", cityId: "city-ratomka", city: { slug: "ratomka", name: "Ратомка", isActive: true } }
-          : null,
+          : args.where.id === "atmosfera-id"
+            ? {
+                id: "atmosfera-id",
+                cityId: "city-minsk",
+                city: { slug: "minsk", name: "Минск", isActive: true },
+              }
+            : null,
+      findMany: async (args: { where: { OR?: Array<Record<string, unknown>> } }) => {
+        const wantAtmosfera = JSON.stringify(args.where).includes("atmosfera") || JSON.stringify(args.where).includes("atmosfera-id");
+        if (!wantAtmosfera) return [];
+        if (!lineages.some((row) => row.targetId === "atmosfera-id" && row.isActive)) return [];
+        return [
+          {
+            id: "atmosfera-id",
+            title: "Атмосфера",
+            slug: "atmosfera",
+            status: "PUBLISHED",
+            city: { slug: "minsk", isActive: true },
+            createdByUserId: "user-525",
+            ownerBusinessId: "business-atmosfera",
+          },
+        ];
+      },
+    },
+    business: {
+      findUnique: async (args: { where: { id: string } }) =>
+        args.where.id === "business-atmosfera" ? { id: "business-atmosfera", ownerUserId: "user-525" } : null,
     },
     city: {
       findMany: async () => [
@@ -1096,9 +1155,105 @@ async function testOffersPartialExactApprovedReportReady(): Promise<void> {
   assert.equal(result.completed.offers?.length, 52);
   assert.equal(result.completed.users?.length, exactExecutableKeys(manifest.phases.find((p) => p.name === "users")!).length);
   assert.equal(result.completed.businesses?.length, exactExecutableKeys(manifest.phases.find((p) => p.name === "businesses")!).length);
-  assert.equal(result.completed.places?.length, exactExecutableKeys(manifest.phases.find((p) => p.name === "places")!).length);
+  assert.equal(result.completed.places?.length, 78);
   assert.equal(result.writesAttempted, 0);
   assert.equal(result.laterPhasesUntouched, true);
+}
+
+function offersPartialEval(
+  manifest: PhoenixReleaseManifest,
+  manifestHash: string,
+  prisma: import("@prisma/client").PrismaClient,
+) {
+  const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
+  return evaluateContinuationAwarePlan({
+    prisma,
+    request: {
+      reportPath: "unused",
+      reportSha256: OFFERS_PARTIAL_REPORT_SHA,
+      predecessorCodeSha: OFFERS_PARTIAL_CODE_SHA,
+    },
+    expected: {
+      releaseId: "phoenix-approved-2026-07-30",
+      manifestHash,
+      currentCodeSha: CURRENT_AFTER_OFFERS_PARTIAL,
+      environment: offersPartialEnv(),
+      manifest,
+    },
+    chain: { priorPhaseReports: [], failureReport: report },
+  });
+}
+
+async function testOffersPartialRejectsMissingProtected43023(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    state.lineages = state.lineages.filter((row) => row.sourceRecordKey !== "wordpress-db:places:43023");
+  });
+  await assert.rejects(() => offersPartialEval(manifest, manifestHash, prisma), /CONTINUATION_PROTECTED_LINEAGE_COUNT_MISMATCH/);
+}
+
+async function testOffersPartialRejectsDuplicateProtected43023(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    const protectedRow = state.lineages.find((row) => row.sourceRecordKey === "wordpress-db:places:43023")!;
+    state.lineages.push({ ...protectedRow, targetId: "atmosfera-dup" });
+  });
+  await assert.rejects(() => offersPartialEval(manifest, manifestHash, prisma), /CONTINUATION_PROTECTED_LINEAGE_COUNT_MISMATCH/);
+}
+
+async function testOffersPartialRejectsWrongProtectedRole(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    const row = state.lineages.find((item) => item.sourceRecordKey === "wordpress-db:places:43023")!;
+    row.targetRole = "secondary";
+  });
+  await assert.rejects(() => offersPartialEval(manifest, manifestHash, prisma), /CONTINUATION_PROTECTED_LINEAGE_MISMATCH/);
+}
+
+async function testOffersPartialRejectsMissingProtectedTarget(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    const row = state.lineages.find((item) => item.sourceRecordKey === "wordpress-db:places:43023")!;
+    row.targetId = "missing-atmosfera";
+  });
+  await assert.rejects(
+    () => offersPartialEval(manifest, manifestHash, prisma),
+    /CONTINUATION_PROTECTED_TARGET_AMBIGUOUS|CONTINUATION_PROTECTED_TARGET_MISMATCH/,
+  );
+}
+
+async function testOffersPartialRejectsAdditionalUnrelatedPlaceLineage(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    state.lineages.push({
+      sourceRecordKey: "wordpress-db:places:99999",
+      targetType: "PLACE",
+      targetId: "place-extra",
+      targetRole: "primary",
+      targetNaturalKey: "slug:extra",
+      lastSourceHash: "x",
+      lastPlanAction: "CREATE",
+      isActive: true,
+    });
+  });
+  await assert.rejects(() => offersPartialEval(manifest, manifestHash, prisma), /CONTINUATION_UNRELATED_LINEAGE:wordpress-db:places:99999/);
+}
+
+async function testOffersPartialRejectsOtherProtectedLookingKey(): Promise<void> {
+  const { manifest, manifestHash } = offersPartialApprovedManifest();
+  const prisma = offersPartialPrisma(manifest, (state) => {
+    state.lineages.push({
+      sourceRecordKey: "wordpress-db:places:437",
+      targetType: "PLACE",
+      targetId: "place-437",
+      targetRole: "primary",
+      targetNaturalKey: "slug:other",
+      lastSourceHash: "protected-adoption:places-preview-2026-07-30",
+      lastPlanAction: "LINK_EXISTING",
+      isActive: true,
+    });
+  });
+  await assert.rejects(() => offersPartialEval(manifest, manifestHash, prisma), /CONTINUATION_UNRELATED_LINEAGE:wordpress-db:places:437/);
 }
 
 async function testOffersPartialRejectsMissingLineageAmong52(): Promise<void> {
@@ -1134,7 +1289,16 @@ async function testOffersPartialRejectsWhenFailedOfferAlreadyExists(): Promise<v
   const { manifest, manifestHash } = offersPartialApprovedManifest();
   const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
   const prisma = offersPartialPrisma(manifest, (state) => {
-    state.lineages.push({ sourceRecordKey: OFFERS_PARTIAL_FAILED_KEY, targetType: "OFFER", targetId: "offer-43659" });
+    state.lineages.push({
+      sourceRecordKey: OFFERS_PARTIAL_FAILED_KEY,
+      targetType: "OFFER",
+      targetId: "offer-43659",
+      targetRole: "primary",
+      targetNaturalKey: "offer:43659",
+      lastSourceHash: "x",
+      lastPlanAction: "CREATE",
+      isActive: true,
+    });
     state.offers.push({ createRequestId: OFFERS_PARTIAL_FAILED_KEY, id: "offer-43659" });
   });
   await assert.rejects(
@@ -1163,7 +1327,16 @@ async function testOffersPartialRejectsLaterPhaseStarted(): Promise<void> {
   const { manifest, manifestHash } = offersPartialApprovedManifest();
   const report = offersPartialFailureReport({ manifestHash, environmentFingerprint: offersPartialEnv() });
   const prisma = offersPartialPrisma(manifest, (state) => {
-    state.lineages.push({ sourceRecordKey: "wordpress-db:routes:1", targetType: "ROUTE", targetId: "route-1" });
+    state.lineages.push({
+      sourceRecordKey: "wordpress-db:routes:1",
+      targetType: "ROUTE",
+      targetId: "route-1",
+      targetRole: "primary",
+      targetNaturalKey: "route:1",
+      lastSourceHash: "x",
+      lastPlanAction: "CREATE",
+      isActive: true,
+    });
   });
   await assert.rejects(
     () =>
@@ -1271,6 +1444,12 @@ async function main(): Promise<void> {
   testOffersPartialPinRejectsWrongFailedKey();
   testOffersPartialPinRejectsMultipleFailures();
   await testOffersPartialExactApprovedReportReady();
+  await testOffersPartialRejectsMissingProtected43023();
+  await testOffersPartialRejectsDuplicateProtected43023();
+  await testOffersPartialRejectsWrongProtectedRole();
+  await testOffersPartialRejectsMissingProtectedTarget();
+  await testOffersPartialRejectsAdditionalUnrelatedPlaceLineage();
+  await testOffersPartialRejectsOtherProtectedLookingKey();
   await testOffersPartialRejectsMissingLineageAmong52();
   await testOffersPartialRejectsWhenFailedOfferAlreadyExists();
   await testOffersPartialRejectsLaterPhaseStarted();
