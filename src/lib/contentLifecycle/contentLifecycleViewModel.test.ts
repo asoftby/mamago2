@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildContentLifecycleViewModel,
   resolveContentLifecycleEffectiveState,
 } from "./contentLifecycleViewModel";
 import { resolveLifecycleActions } from "./resolveLifecycleActions";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function statusIds(vm: ReturnType<typeof buildContentLifecycleViewModel>) {
   return vm.transitionActions.map((action) => action.id);
@@ -124,6 +129,33 @@ function testEffectiveStateArchiveWins() {
   );
 }
 
+function testAdminContentListEntityTypesResolve() {
+  // Admin content list pages call buildContentLifecycleViewModel per row.
+  // A production minify bug previously crashed these with
+  // ReferenceError: effectiveState is not defined.
+  for (const type of ["place", "offer", "event", "article", "route"] as const) {
+    const vm = buildContentLifecycleViewModel({
+      type,
+      surface: "admin",
+      status: "PUBLISHED",
+      actorRoles: ["ADMIN"],
+    });
+    assert.equal(typeof vm.effectiveState, "string", type);
+    assert.ok(Array.isArray(vm.transitionActions), type);
+    assert.ok(vm.badges.length > 0, type);
+  }
+}
+
+function testTransitionBindingAvoidsMinifyShorthandTrap() {
+  // Guard the source shape that SWC/webpack mangled into a bare identifier.
+  const source = readFileSync(join(__dirname, "resolveLifecycleActions.ts"), "utf8");
+  assert.match(source, /effectiveState:\s*state/);
+  assert.doesNotMatch(
+    source,
+    /getLifecycleTransitionsForState\(\{\s*contentType:[^,]+,\s*effectiveState,/,
+  );
+}
+
 function main() {
   testArchivedAdminRestoreAndDeleteArchived();
   testArchivedModeratorRestoreOnly();
@@ -132,6 +164,8 @@ function main() {
   testNavigationExcludedFromTransitionMenu();
   testBlockedArchivedDeleteShowsDisabled();
   testEffectiveStateArchiveWins();
+  testAdminContentListEntityTypesResolve();
+  testTransitionBindingAvoidsMinifyShorthandTrap();
   console.log("contentLifecycleViewModel tests passed");
 }
 
