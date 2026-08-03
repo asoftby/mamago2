@@ -2,23 +2,12 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-> **Next one action:** `PHOENIX_CONTINUATION_DESIGN_FINAL` (see §H below,
-> revised 2026-08-03 after an adversarial review pass). The safe
-> continuation design for the §G partial failure is implemented and tested
-> in an isolated worktree (`mamago2-phoenix-continuation-fix`, not yet
-> committed/pushed): an explicit three-flag CLI contract
-> (`--continue-from-report` + `--continue-from-report-sha256` +
-> `--continue-from-code-sha`) that resumes **directly from the original §G
-> report** — no throwaway intermediate failing apply needed — proves the
-> completed prefix as an exact positional match against live
-> `MigrationLineage` (not a count bound), and corrects the one known-stale
-> `wordpress-db:user:38` manifest record via a narrow, itemized exception,
-> leaving every other record/phase/mismatch-check byte-identical to today's
-> behavior. Runtime code changed — a **new commit SHA and a new migration
-> Docker image are required** before this can be used; the manifest,
-> canonical artifact hashes, and progress-report schema are
-> unchanged. No DEV write, Docker build/push, commit, or push has been
-> performed yet — awaiting explicit authorization for each of those steps.
+> **Next one action:** build and verify a new immutable migration image from
+> the exact CI-passing head, load it on DEV, and run one fixed-image DEV
+> `--plan` (see §J). The plan must report both unresolved active City
+> prerequisites — `Копище` and `Мир` — before any continuation write. Then
+> prepare a separate exact City bootstrap plan and stop for explicit founder
+> authorization before creating either City row.
 
 **Обновлено:** 2026-08-03
 **Текущая фаза:** `PHOENIX FINAL RELEASE BUNDLE — DEV REHEARSAL PREPARATION`
@@ -833,7 +822,7 @@ report remains exactly as captured (path and SHA-256 unchanged: `/opt/mamago/dev
 `77bc7f54...9a0f1fd7aeae`) and is now the direct, sole input to the first
 continuation attempt — no replacement report needs to be minted first.
 
-**Next single action:** review this revised design; on approval, commit +
+**Historical next action (completed and superseded by §J):** review this revised design; on approval, commit +
 push from the isolated worktree, build and load the new migration image on
 DEV, run one fixed-image DEV `--plan`, then request explicit founder
 authorization for exactly one continuation `--apply` (`--continue-from-report`
@@ -841,6 +830,57 @@ pointed at the original §G `dev.jsonl`, its known SHA-256, and predecessor
 SHA `f466c34c...9739` — same one-shot, no-retry/rollback/rerun discipline
 as §G). No DEV write, image build/push, or commit/push has been performed
 as part of this entry.
+
+### J. First continuation stopped safely; Place City recovery ready
+
+**Completed DEV writes (one authorized continuation, no retry).** The first
+continuation completed Users 563/563 and Businesses 38/38, then created
+exactly Places `wordpress-db:places:5457`, `wordpress-db:places:5492`, and
+`wordpress-db:places:5515`. It stopped cleanly at
+`wordpress-db:places:5528:PLACE_CITY_DEPENDENCY_NOT_FOUND`; the failed key
+has no lineage. Offers, Routes, Events, and Articles were never started.
+The durable three-line report and cumulative bounded audit agreed exactly:
+no duplicate lineage, forbidden-table write, storage/media write, founder
+record change, retry, rollback, rerun, or second continuation occurred.
+
+**Current blocker and root cause.** Bounded read-only investigation proved
+that Place `5528` has canonical City `Копище`, while later approved Place
+`32271` has canonical City `Мир`; DEV has neither active City. The existing
+Place City resolver is correct and unchanged: it requires exactly one active,
+case-insensitive canonical match and fails closed on zero or multiple matches.
+There is no default to Минск, no City creation inside the Place writer, no
+skipped source key, and approved counts remain 563/38/78/63/14/8/26.
+
+**Recovery contract.** Both `Копище` and `Мир` are checked together,
+read-only, before the registry's first release write. Zero or ambiguous active
+matches report all unsatisfied prerequisites and block. Continuation now
+derives each phase independently: Users and Businesses require exact full
+completed lineage sets; Places skips exactly `5457`, `5492`, and `5515` and
+first executes `5528`; Offers, Routes, Events, and Articles use empty skip
+sets. Missing prefix lineage, non-prefix completion, duplicate lineage, and
+unrelated release lineage all fail closed. A fully completed repeat is proven
+to emit CREATE 0 and UPDATE 0.
+
+**Exact second-hop identity.** The only authorized predecessor is code SHA
+`2dc00b6026651c0d1b1008598a19a6833930820f` with report SHA-256
+`257671d8dd039d803d5571cdcd0d00a8ddbdeaf4fba55c1a21b4f35850a9cfcc`,
+embedded predecessor SHA, canonical release ID, manifest hash, complete
+environment fingerprint, terminal key `wordpress-db:places:5528`, and exact
+completed phase prefix Users → Businesses. There is no ignore-SHA flag or
+arbitrary predecessor acceptance; the full chain remains
+`f466c34c0cf095d054ae79d86a12505129719739` →
+`2dc00b6026651c0d1b1008598a19a6833930820f` → the new fixed recovery SHA.
+
+**Exit-code observability and next gate.** Future execution must run detached
+without `--rm`, capture the container ID, record the exact exit code with
+`docker wait`, inspect the durable report, complete the cumulative audit, and
+only then run `docker rm`. This changes observability only, not migration
+semantics. Runtime changed, so a new immutable fixed-SHA image and fixed-image
+DEV plan are required. That read-only plan must report both missing active
+Cities before continuation. A separate City bootstrap plan then requires
+explicit founder authorization before either City row is created. Canonical
+manifests, captures, and artifact hashes remain unchanged; no Docker, DEV,
+City seed, retry, rollback, or rerun occurred during recovery implementation.
 
 ---
 
@@ -850,9 +890,10 @@ as part of this entry.
 - [x] Run one fixed-image DEV `--plan`.
 - [x] Verify exact DEV environment fingerprint and expected plan output.
 - [x] Locate and verify the private frozen-content bundle.
-- [ ] Capture one pre-apply DEV DB/storage baseline.
-- [ ] Run one sequential DEV `--apply`, stop-on-first-error.
-- [ ] Perform one cumulative post-apply audit.
+- [x] Capture one pre-apply DEV DB/storage baseline.
+- [x] Run one sequential DEV continuation `--apply`, stop-on-first-error —
+      partial completion recorded in §J.
+- [x] Perform the cumulative post-continuation audit for the partial state.
 - [ ] Run one common DEV `--rerun`.
 - [ ] Require `CREATE 0` and only expected `NOOP`/`SKIP_UNCHANGED` outcomes.
 - [ ] Perform product smoke checks for representative migrated entities.
