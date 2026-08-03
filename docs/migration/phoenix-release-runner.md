@@ -13,10 +13,35 @@ pnpm migration:phoenix-release \
   --plan
 ```
 
-`--plan` verifies the release manifest and every referenced artifact hash,
+Plain `--plan` verifies the release manifest and every referenced artifact hash,
 queries `current_database()` read-only, verifies the deployment, storage, email
 and indexing gates, and prints the exact executable, protected, excluded and
-blocked scope. It performs no migration or storage writes.
+blocked scope. It remains a static manifest summary: it does not load a
+predecessor report or inspect continuation lineage. It performs no migration or
+storage writes.
+
+To validate a predecessor and the live continuation boundary without executing
+any entity plan or writer, combine `--plan` with the complete continuation
+identity tuple:
+
+```bash
+pnpm migration:phoenix-release \
+  --environment DEV \
+  --manifest docs/migration/releases/phoenix-approved-2026-07-30.json \
+  --plan \
+  --continue-from-report <path to predecessor JSONL> \
+  --continue-from-report-sha256 <exact SHA-256> \
+  --continue-from-code-sha <exact predecessor code SHA>
+```
+
+This continuation-aware plan performs bounded reads only. It authorizes the
+predecessor identity, proves full prior phases and the exact partial phase
+prefix from active lineage, proves later phases untouched, and checks all Place
+City prerequisites together. A missing or ambiguous City produces structured
+`CONTINUATION_READ_ONLY_PLAN` output with status `BLOCKED` and exit code `2`;
+that is the expected pre-write result when prerequisites are absent. The path
+cannot construct adapters, executors, a report store, or call Prisma mutation
+delegates. All three continuation flags are required together.
 
 `--apply` and `--rerun` fail closed while the manifest contains any `BLOCKED`
 phase. PROD additionally requires `--confirm-production`.
@@ -88,7 +113,8 @@ pnpm migration:phoenix-release \
 ```
 
 All three continuation flags are required together (or omitted together); they
-are only valid with `--apply` and cannot combine with `--resume-from`. The
+are valid with the read-only continuation-aware `--plan` above or with
+`--apply`, and cannot combine with `--resume-from`. Under `--apply`, the
 predecessor code SHA must be a member of `KNOWN_PREDECESSOR_CODE_SHAS`
 (`src/lib/migration/release/continuation.ts`) — a fixed, reviewed allowlist,
 never an open "ignore this check" flag. Every phase the predecessor report's

@@ -2,9 +2,11 @@
 
 **Статус:** актуальный источник истины по оставшейся работе до production cutover mamaGo 2.0.
 
-> **Next one action:** build and verify a new immutable migration image from
-> the exact CI-passing head, load it on DEV, and run one fixed-image DEV
-> `--plan` (see §J). The plan must report both unresolved active City
+> **Next one action:** review the narrow continuation-aware read-only `--plan`
+> correction from exact source `bbf075c847b8c0011d30b827806ec8a33e38fcea`,
+> then commit and build a new immutable migration image. Only after that image
+> is loaded on DEV may one fixed-image continuation-aware `--plan` run (see
+> §J/K). The plan must report both unresolved active City
 > prerequisites — `Копище` and `Мир` — before any continuation write. Then
 > prepare a separate exact City bootstrap plan and stop for explicit founder
 > authorization before creating either City row.
@@ -881,6 +883,25 @@ Cities before continuation. A separate City bootstrap plan then requires
 explicit founder authorization before either City row is created. Canonical
 manifests, captures, and artifact hashes remain unchanged; no Docker, DEV,
 City seed, retry, rollback, or rerun occurred during recovery implementation.
+
+### K. Continuation-aware plan tooling correction selected (not yet run)
+
+The fixed image built from `bbf075c847b8c0011d30b827806ec8a33e38fcea`
+proved a tooling gap before its DEV plan was attempted: plain `--plan` returns
+the static manifest summary before Prisma, continuation-prefix validation, or
+the aggregated City prerequisite check. Passing continuation identity flags was
+also apply-only, so that image could not produce the required pre-write proof.
+No DEV plan, continuation, database mutation, City mutation, image load, or
+cleanup was performed after discovering the mismatch.
+
+The selected correction preserves plain `--plan` unchanged and adds an explicit
+live read-only mode only when `--plan` receives all three predecessor identity
+flags. The new path authorizes the report and environment, proves the exact
+multi-phase lineage boundary, proves all later phases untouched, and aggregates
+missing/ambiguous active Cities. Its Prisma surface exposes only City and
+MigrationLineage reads; it does not construct adapters, executors, report
+stores, or mutation delegates. This is tooling readiness only: the DEV
+preflight has **not** passed and requires a newly committed and built image.
 
 ---
 
