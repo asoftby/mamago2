@@ -937,6 +937,78 @@ performed by this tooling implementation. A new exact-head image, exact-head
 CI, one DEV read-only checkpoint generation and one read-only checkpoint plan
 remain required before requesting Offers continuation authorization.
 
+**Supplemental protected snapshot ready — no writes.** Missing-artifact
+evidence commit: `d7238c50549a37e93ccdf0e5d6a5ac41b19f0032`. No complete
+previous immutable raw record existed, so one bounded WordPress DB read-only
+capture queried exactly `wordpress-db:places:43023` through the established
+SSH/MySQL gate at `2026-08-03T15:27:31.760Z`. It returned exactly one published
+`places` record: title `Атмосфера`, normalized title `атмосфера`, canonical
+slug `atmosfera`, legacy owner `wordpress-db:user:525`. No media was downloaded
+and no unrelated Place was queried.
+
+Private snapshot root (mode 0700):
+`~/.mamago2/migration-snapshots/phoenix-protected-place-43023/`.
+`raw-capture.json` is 10140 bytes, SHA-256
+`1a1de57f23c6fba561e2b1d3bab6f23290722d80be3f43e3d678e9846e5cc32d`;
+`canonical-target.json` is 3587 bytes, SHA-256
+`a45ac32eae02b479177b4404671893cd37582c6e74714aa04624d99bb04046d8`;
+`manifest.json` is 1453 bytes, SHA-256
+`d303caa1e0c2e9ed5bd08023618aa412cf52e6f90540d32c94cbc1b7899a8821`.
+All files are mode 0600, source code SHA is
+`4ff230dfad060c6e0a1f914ab22bee6f658414ac`, purpose is protected Place
+repair only, and ordinary batch execution is explicitly prohibited. The
+approved six-file release bundle and aggregate hash remain unchanged.
+
+Exact current normalization produced a valid required Place draft. DEV
+read-only dependency resolution proved one active owner User lineage for
+`wordpress-db:user:525`, one owner Business, and exactly one active City
+`Минск` (`minsk`). Canonical lifecycle/identity is `PUBLISHED` /
+`slug:atmosfera`; media is disabled. Warnings are limited to
+`PLACE_LOGO_EXCLUDED` and two `PLACE_WORK_HOURS_UNSUPPORTED`; opening hours,
+logo/gallery writes, and Google identity are omitted from repair.
+
+**Protected Place repair executed once on DEV — PASS.** Founder-authorized
+atomic transaction revalidated zero `atmosfera` candidates, zero `places:43023`
+lineage, the frozen raw/canonical SHA-256 values, the exact baseline, and unique
+owner/business/City dependencies before creating exactly the
+`canonical-target.json` Place and one active primary `LINK_EXISTING` lineage
+with natural key `slug:atmosfera` and adoption hash
+`protected-adoption:places-preview-2026-07-30`. Counts changed from Place 79 to
+80 and MigrationLineage 680 to 681. MigrationRecord remained 564, MigrationRun
+564, City 4, User 563, Business 38, Offer/Route/RouteStop/Activity/Article 0,
+Session 4, UserActionToken 0, and MediaAsset 1: direct deltas were exactly Place
++1, MigrationLineage +1, all other audited tables 0. Existing 78 ordinary Place
+actions were not re-executed.
+
+Post-transaction protected audit passed. Exactly one subsequent bounded
+read-only protected/continuation readiness plan returned `READY`: protected
+guard `PASS`, ordinary Places complete 78, protected adoption complete 1,
+later phases untouched, next phase `offers`, first executable key
+`wordpress-db:hb-programs:18932`, and writers invoked 0. The failed
+continuation report remained byte-identical at SHA-256
+`c5c6b0f069f0b8f08d4a3b972539f2952e2a5fc1d6fd4c77f63c75c05ef449f8`.
+All pre-existing Compose service IDs, start times, restart counts, status,
+networks, mounts, and ports were unchanged; free space was 13,564,624,896 bytes
+before and 13,564,608,512 bytes after. No WordPress or PROD write occurred; no
+continuation or rerun was executed. Stop before continuation; no commit/push.
+
+**Offers continuation report-contract gap — fail closed, no attempt.** Founder
+authorized one sequential continuation beginning at
+`wordpress-db:hb-programs:18932`, but no write-capable invocation was started.
+The immutable `2dc00b602665` report ends at `places:5528` and represents only
+the original three-key Place prefix, while live state now contains all 78
+ordinary Place lineages. The immutable `4ff230dfad06` partial report contains
+only successful Users and Businesses lines and no terminal Places failure, so
+it is not a valid report-continuation predecessor. Existing CLI guards therefore
+correctly reject both inputs rather than re-executing completed actions or
+guessing a new boundary. Continuation attempts 0; retry/rerun/rollback 0; no
+post-repair DEV database delta; Users 563, Businesses 38, ordinary Places 78,
+protected adoption 1, total Places 80 and MigrationLineage 681 remain unchanged.
+Next phase remains Offers and the first executable key remains
+`wordpress-db:hb-programs:18932`. A narrow tool-generated live-state checkpoint
+is required; neither immutable report may be modified or replaced by a manually
+authored/synthetic failure report.
+
 ---
 
 ## DEV rehearsal critical path
