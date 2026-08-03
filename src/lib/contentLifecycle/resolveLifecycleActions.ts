@@ -136,11 +136,14 @@ function buildNavigationActions(
 
 function buildTransitionActions(
   context: LifecycleContext,
-  effectiveState: LifecycleEffectiveState,
+  /** Must not share the property name `effectiveState` — SWC/webpack minify
+   * can leave a bare shorthand identifier after inlining and crash admin
+   * content list pages with `ReferenceError: effectiveState is not defined`. */
+  state: LifecycleEffectiveState,
 ): ResolvedLifecycleAction[] {
   const transitions = getLifecycleTransitionsForState({
     contentType: context.contentType,
-    effectiveState,
+    effectiveState: state,
     surface: context.surface,
     actorRoles: context.actorRoles,
   });
@@ -150,8 +153,8 @@ function buildTransitionActions(
     const preflight = isPreflightAllowed(transition.actionId, context);
 
     const alwaysShowDisabled =
-      (transition.actionId === "deleteDraft" && effectiveState === "draft") ||
-      (transition.actionId === "deleteArchived" && effectiveState === "archived");
+      (transition.actionId === "deleteDraft" && state === "draft") ||
+      (transition.actionId === "deleteArchived" && state === "archived");
 
     if (!preflight.allowed && !alwaysShowDisabled) {
       return [];
