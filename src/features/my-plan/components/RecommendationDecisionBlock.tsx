@@ -8,7 +8,6 @@ type RecommendationDecisionBlockProps = {
   onCatalog: () => void;
   onIdeas: () => void;
   ideasCount?: number;
-  hasGenerated?: boolean;
   isGenerating?: boolean;
   compact?: boolean;
 };
@@ -23,7 +22,6 @@ export function RecommendationDecisionBlock({
   onDecide,
   onCatalog,
   onIdeas,
-  hasGenerated = false,
   isGenerating = false,
   compact = false,
 }: RecommendationDecisionBlockProps) {
@@ -78,8 +76,8 @@ export function RecommendationDecisionBlock({
             position: "relative", zIndex: 1,
             flexShrink: 0,
           }}>
-            {hasGenerated
-              ? <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+            {isGenerating
+              ? <RefreshCw className="h-4 w-4 animate-spin" />
               : <Sparkles className="h-4 w-4" />}
           </span>
 
@@ -94,7 +92,7 @@ export function RecommendationDecisionBlock({
             <span
               style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
             >
-              {hasGenerated ? "Ещё варианты" : "Реши за меня"}
+              Реши за меня
             </span>
             <span style={{ fontSize: 12, lineHeight: 1.45, color: "#3A332B" }}>
               Подберём идеи за пару секунд

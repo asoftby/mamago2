@@ -24,6 +24,7 @@ import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
+import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
@@ -928,17 +929,24 @@ export function PlanMainContent({
 
           {awaitingAgeAnswer ? (
             <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
-          ) : (
+          ) : suggestionsGeneration === 0 ? (
             <RecommendationDecisionBlock
               onDecide={handleDecideClick}
               onCatalog={handleOpenCatalog}
               onIdeas={handleOpenIdeasFlow}
-              hasGenerated={suggestionsGeneration > 0}
               isGenerating={isFetchingSuggestions}
             />
-          )}
+          ) : null}
 
           {renderRecommendationArea(false)}
+
+          {suggestionsGeneration > 0 ? (
+            <PlanRecommendationCta
+              onRegenerate={handleDecideClick}
+              onCatalog={handleOpenCatalog}
+              isRegenerating={isFetchingSuggestions}
+            />
+          ) : null}
 
           {renderBottomActions()}
         </div>
@@ -1010,18 +1018,26 @@ export function PlanMainContent({
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
-        ) : (
+        ) : suggestionsGeneration === 0 ? (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
             onCatalog={handleOpenCatalog}
             onIdeas={handleOpenIdeasFlow}
-            hasGenerated={suggestionsGeneration > 0}
             isGenerating={isFetchingSuggestions}
             compact
           />
-        )}
+        ) : null}
 
         {renderRecommendationArea(true)}
+
+        {suggestionsGeneration > 0 ? (
+          <PlanRecommendationCta
+            onRegenerate={handleDecideClick}
+            onCatalog={handleOpenCatalog}
+            isRegenerating={isFetchingSuggestions}
+            compact
+          />
+        ) : null}
 
         {renderBottomActions()}
       </div>
