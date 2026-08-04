@@ -16,19 +16,20 @@ import { WeekCalendarStrip } from "./WeekCalendarStrip";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
 import { QuickAddAdultModal } from "@/components/adults/QuickAddAdultModal";
-import { PlanAudienceCompact } from "./PlanAudienceCompact";
 import { DayScenarioModal } from "./DayScenarioModal";
 import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
-import { PlanOnboardingPromoBanner } from "./PlanOnboardingPromoBanner";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
+import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import {
   MAX_PLAN_ITEMS_PER_SLOT,
   pickItemForSlotExcluding,
 } from "../lib/recommendationPool";
+import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
+import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
 
 interface PlanChildChip {
   id: string;
@@ -75,6 +76,23 @@ function addDaysIso(iso: string, days: number): string {
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
   const dd = String(dt.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
+}
+
+/**
+ * Синтетический "ребёнок" только для клиентского демо-пула рекомендаций (recommendationPool.ts),
+ * когда в профиле нет ни одного реального ребёнка — ответ на единственный вопрос слоя 0
+ * (needs-age) не создаёт персону и не пишется в FamilyPersonaContext/профиль.
+ */
+function buildEphemeralAgeChild(ageGroupValue: string): {
+  id: string;
+  birthDate: string;
+  systemInterests: string[];
+} {
+  const group = getAgeGroupByValue(ageGroupValue);
+  const years = group?.min ?? 3;
+  const birthDate = new Date();
+  birthDate.setFullYear(birthDate.getFullYear() - years);
+  return { id: `needs-age:${ageGroupValue}`, birthDate: birthDate.toISOString(), systemInterests: [] };
 }
 
 function toGenitiveName(name: string): string {
@@ -335,11 +353,11 @@ export function PlanMainContent({
   const [showAddChildModal, setShowAddChildModal] = useState(false);
   const [showAddAdultModal, setShowAddAdultModal] = useState(false);
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
-  const [childPromoDismissed, setChildPromoDismissed] = useState(false);
-  const [adultPromoDismissed, setAdultPromoDismissed] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   const [showDayScenario, setShowDayScenario] = useState(false);
+  const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
+  const [needsAgeAnswerValue, setNeedsAgeAnswerValue] = useState<string | null>(null);
   const [autoPlanDraft, setAutoPlanDraft] = useState<
     Array<{ slot: "morning" | "afternoon" | "evening"; item: PlanItemWithActivity }>
   >([]);
@@ -373,36 +391,6 @@ export function PlanMainContent({
     if (!family?.personas) return [];
     return family.personas;
   }, [family?.personas]);
-
-  /** Дети из профиля в плане могут отставать от FamilyPersonaContext после QuickAddChildModal */
-  const hasChildren = useMemo(() => {
-    if (childrenList.length > 0) return true;
-    return personas.some((p) => p.kind === "child");
-  }, [childrenList.length, personas]);
-
-  const primaryAdultPersona = useMemo(
-    () => personas.find((p) => p.kind === "adult"),
-    [personas],
-  );
-  const adultProfileComplete = primaryAdultPersona?.isProfileComplete === true;
-
-  /**
-   * Один последовательный шаг: ребёнок → профиль взрослого → скрыто.
-   * Нет детей: всегда баннер про ребёнка (даже если имя взрослого не задано).
-   */
-  const promoStep = useMemo<"child" | "adult" | null>(() => {
-    if (!hasChildren) return "child";
-    if (!adultProfileComplete) return "adult";
-    return null;
-  }, [hasChildren, adultProfileComplete]);
-
-  const showChildPromo = promoStep === "child" && !childPromoDismissed;
-  const showAdultPromo = promoStep === "adult" && !adultPromoDismissed;
-
-  const handleAdultPromoPrimary = useCallback(() => {
-    onRequestClose?.();
-    window.setTimeout(() => setShowAdultParticipantModal(true), 0);
-  }, [onRequestClose]);
 
   /**
    * Полный список выбранных персон (взрослые + дети) из FamilyPersonaContext
@@ -591,7 +579,7 @@ export function PlanMainContent({
     };
   }, [dayItems, slotFromStartsAt, autoPlanLocalSlotAdds]);
 
-  const handleBuildAutoPlan = useCallback(() => {
+  const handleBuildAutoPlan = useCallback((ephemeralAgeGroupValue?: string | null) => {
     const allSlots: Array<"morning" | "afternoon" | "evening"> = [
       "morning",
       "afternoon",
@@ -608,11 +596,15 @@ export function PlanMainContent({
     const recChildren =
       selectedChildren.length > 0
         ? selectedChildren
-        : childrenList.map((c) => ({
-            id: c.id,
-            birthDate: c.birthDate ?? new Date().toISOString(),
-            systemInterests: [] as string[],
-          }));
+        : childrenList.length > 0
+          ? childrenList.map((c) => ({
+              id: c.id,
+              birthDate: c.birthDate ?? new Date().toISOString(),
+              systemInterests: [] as string[],
+            }))
+          : ephemeralAgeGroupValue
+            ? [buildEphemeralAgeChild(ephemeralAgeGroupValue)]
+            : [];
 
     const exclude = new Set([
       ...(planItemsByDate?.[selectedDate] ?? [])
@@ -647,9 +639,9 @@ export function PlanMainContent({
     selectedDate,
   ]);
 
-  const handleDecideRecommendations = useCallback(() => {
+  const handleDecideRecommendations = useCallback((ephemeralAgeGroupValue?: string | null) => {
     setIsAutoPlanGenerating(true);
-    handleBuildAutoPlan();
+    handleBuildAutoPlan(ephemeralAgeGroupValue);
     window.setTimeout(() => {
       document
         .getElementById("plan-recommendation-results")
@@ -659,6 +651,36 @@ export function PlanMainContent({
       setIsAutoPlanGenerating(false);
     }, 1300);
   }, [handleBuildAutoPlan]);
+
+  const defaultParticipants = useResolveDefaultParticipants();
+
+  /** Слой 0: «Реши за меня» — намерение сначала, состав правится после выдачи (M3). */
+  const handleDecideClick = useCallback(() => {
+    if (defaultParticipants.source === "needs-age") {
+      if (needsAgeAnswerValue) {
+        handleDecideRecommendations(needsAgeAnswerValue);
+        return;
+      }
+      setAwaitingAgeAnswer(true);
+      return;
+    }
+    family?.setSelectedPersonaIds(defaultParticipants.participants);
+    handleDecideRecommendations();
+  }, [defaultParticipants, needsAgeAnswerValue, family, handleDecideRecommendations]);
+
+  const handleAgeAnswerSelect = useCallback(
+    (value: string) => {
+      setNeedsAgeAnswerValue(value);
+      setAwaitingAgeAnswer(false);
+      onChangeSelectedAgeRanges([{ range: value, source: "manual" }]);
+      handleDecideRecommendations(value);
+    },
+    [onChangeSelectedAgeRanges, handleDecideRecommendations],
+  );
+
+  const handleAgeAnswerCancel = useCallback(() => {
+    setAwaitingAgeAnswer(false);
+  }, []);
 
   const handleRemoveIdea = async (activityId: string) => {
     if (!onRemoveIdea) return;
@@ -954,36 +976,17 @@ export function PlanMainContent({
             />
           ) : null}
 
-          <PlanAudienceCompact
-            selectedPersonaIds={selectedPersonaIds}
-            personas={personas}
-            audienceMode={audienceMode}
-            onTogglePersona={handleTogglePersona}
-            onToggleFreeMode={handleToggleFreeMode}
-            onAddClick={() => setShowAddPersonaTypeModal(true)}
-          />
-
-          {showChildPromo ? (
-            <PlanOnboardingPromoBanner
-              variant="child"
-              onPrimary={() => setShowAddChildModal(true)}
-              onSecondary={() => setChildPromoDismissed(true)}
+          {awaitingAgeAnswer ? (
+            <PlanNeedsAgeQuestion onSelect={handleAgeAnswerSelect} onCancel={handleAgeAnswerCancel} />
+          ) : (
+            <RecommendationDecisionBlock
+              onDecide={handleDecideClick}
+              onCatalog={handleOpenCatalog}
+              onIdeas={handleOpenIdeasFlow}
+              hasGenerated={autoPlanGeneration > 0}
+              isGenerating={isAutoPlanGenerating}
             />
-          ) : showAdultPromo ? (
-            <PlanOnboardingPromoBanner
-              variant="adult"
-              onPrimary={handleAdultPromoPrimary}
-              onSecondary={() => setAdultPromoDismissed(true)}
-            />
-          ) : null}
-
-          <RecommendationDecisionBlock
-            onDecide={handleDecideRecommendations}
-            onCatalog={handleOpenCatalog}
-            onIdeas={handleOpenIdeasFlow}
-            hasGenerated={autoPlanGeneration > 0}
-            isGenerating={isAutoPlanGenerating}
-          />
+          )}
 
           {renderRecommendationArea(false)}
 
@@ -1055,38 +1058,18 @@ export function PlanMainContent({
           />
         ) : null}
 
-        <PlanAudienceCompact
-          selectedPersonaIds={selectedPersonaIds}
-          personas={personas}
-          audienceMode={audienceMode}
-          onTogglePersona={handleTogglePersona}
-          onToggleFreeMode={handleToggleFreeMode}
-          onAddClick={() => setShowAddPersonaTypeModal(true)}
-          compact
-        />
-
-        {showChildPromo ? (
-          <PlanOnboardingPromoBanner
-            variant="child"
-            onPrimary={() => setShowAddChildModal(true)}
-            onSecondary={() => setChildPromoDismissed(true)}
+        {awaitingAgeAnswer ? (
+          <PlanNeedsAgeQuestion onSelect={handleAgeAnswerSelect} onCancel={handleAgeAnswerCancel} compact />
+        ) : (
+          <RecommendationDecisionBlock
+            onDecide={handleDecideClick}
+            onCatalog={handleOpenCatalog}
+            onIdeas={handleOpenIdeasFlow}
+            hasGenerated={autoPlanGeneration > 0}
+            isGenerating={isAutoPlanGenerating}
+            compact
           />
-        ) : showAdultPromo ? (
-          <PlanOnboardingPromoBanner
-            variant="adult"
-            onPrimary={handleAdultPromoPrimary}
-            onSecondary={() => setAdultPromoDismissed(true)}
-          />
-        ) : null}
-
-        <RecommendationDecisionBlock
-          onDecide={handleDecideRecommendations}
-          onCatalog={handleOpenCatalog}
-          onIdeas={handleOpenIdeasFlow}
-          hasGenerated={autoPlanGeneration > 0}
-          isGenerating={isAutoPlanGenerating}
-          compact
-        />
+        )}
 
         {renderRecommendationArea(true)}
 
