@@ -303,11 +303,18 @@ async function main() {
   await upsertDomainSignal("domain-recommendation", "Рекомендации", "RECOMMENDATION", -1);
 
   // ═══ PROFILE DOMAIN ═══
+  // Canonical fine-grained ages — must stay in sync with src/lib/config/ages.ts AGE_OPTIONS.
   await upsertSignalWithDomain("age", "Возраст", "PROFILE", ["USER"], 1, [
-    { value: "0-3",  label: "0–3 года",  order: 1 },
-    { value: "3-5",  label: "3–5 лет",   order: 2 },
-    { value: "5-8",  label: "6–10 лет",  order: 3 },
-    { value: "8-12", label: "10+ лет",   order: 4 },
+    { value: "0-1",   label: "0–1 год",   order: 1 },
+    { value: "1-3",   label: "1–3 года",  order: 2 },
+    { value: "3-5",   label: "3–5 лет",   order: 3 },
+    { value: "5-7",   label: "5–7 лет",   order: 4 },
+    { value: "7-9",   label: "7–9 лет",   order: 5 },
+    { value: "9-12",  label: "9–12 лет",  order: 6 },
+    { value: "12-14", label: "12–14 лет", order: 7 },
+    { value: "14-16", label: "14–16 лет", order: 8 },
+    { value: "16-18", label: "16–18 лет", order: 9 },
+    { value: "18+",   label: "18+",       order: 10 },
   ]);
 
   await upsertSignalWithDomain("interests", "Интересы", "PROFILE", ["USER"], 2, [
