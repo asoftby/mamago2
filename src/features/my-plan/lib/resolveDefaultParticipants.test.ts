@@ -13,6 +13,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
 {
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: [ADULT.id, CHILD_A.id],
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A, CHILD_B],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -26,6 +27,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
   // Явный пустой состав — осознанный выбор «свободного» режима, должен быть уважен как last-used.
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: [],
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -39,6 +41,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
   // Все сохранённые id больше не существуют в профиле (например, ребёнок удалён) — считаем сток протухшим.
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: ["deleted-child"],
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -49,6 +52,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
 {
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: [ADULT.id],
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -59,6 +63,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
 {
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: [CHILD_A.id],
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -66,11 +71,24 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
   console.log("last-used: child-only mode derivation — OK");
 }
 
+{
+  // Персона-состав приоритетнее диапазонов возраста, даже если оба сохранены.
+  const result = resolveDefaultParticipants({
+    lastUsedPersonaIds: [ADULT.id, CHILD_A.id],
+    lastUsedAgeRanges: ["5-7"],
+    personas: [ADULT, CHILD_A],
+    primaryAdultPersonaId: ADULT.id,
+  });
+  assert.equal(result.source, "last-used");
+  console.log("last-used: persona composition outranks stored age ranges — OK");
+}
+
 // ── Branch 2: profile (all children + "Я") ──────────────────────────────────
 
 {
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: null,
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A, CHILD_B],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -87,6 +105,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
   // Профиль с несколькими детьми (> MAX_ACTIVE_FAMILY_PERSONAS=3 суммарно) — кап до взрослого + 2 младших.
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: null,
+    lastUsedAgeRanges: null,
     personas: [ADULT, CHILD_A, CHILD_B, CHILD_C],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -102,11 +121,65 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
   console.log("profile: several children over cap picks adult + 2 youngest — OK");
 }
 
+// ── Branch: last-used-age-ranges (needs-age answered before, no child personas) ─
+
+{
+  // Восстановление из last-used: один ранее сохранённый диапазон — вопрос не переспрашиваем.
+  const result = resolveDefaultParticipants({
+    lastUsedPersonaIds: null,
+    lastUsedAgeRanges: ["3-5"],
+    personas: [ADULT],
+    primaryAdultPersonaId: ADULT.id,
+  });
+  assert.equal(result.source, "last-used-age-ranges");
+  assert.deepEqual("ageRanges" in result ? result.ageRanges : null, ["3-5"]);
+  console.log("last-used-age-ranges: restores a single previously answered range — OK");
+}
+
+{
+  // Восстановление из last-used: три диапазона сохраняются как есть.
+  const result = resolveDefaultParticipants({
+    lastUsedPersonaIds: null,
+    lastUsedAgeRanges: ["1-3", "3-5", "5-7"],
+    personas: [ADULT],
+    primaryAdultPersonaId: ADULT.id,
+  });
+  assert.equal(result.source, "last-used-age-ranges");
+  assert.deepEqual("ageRanges" in result ? result.ageRanges : null, ["1-3", "3-5", "5-7"]);
+  console.log("last-used-age-ranges: restores three previously answered ranges — OK");
+}
+
+{
+  // last-used-age-ranges приоритетнее profile — даже если позже завели персону-ребёнка,
+  // явный прошлый ответ на возраст остаётся первым приоритетом резолвера.
+  const result = resolveDefaultParticipants({
+    lastUsedPersonaIds: null,
+    lastUsedAgeRanges: ["7-9"],
+    personas: [ADULT, CHILD_A],
+    primaryAdultPersonaId: ADULT.id,
+  });
+  assert.equal(result.source, "last-used-age-ranges");
+  console.log("last-used-age-ranges: outranks profile branch per priority order — OK");
+}
+
+{
+  // Пустой сохранённый массив — как будто ничего не сохранено, падаем дальше в профиль/needs-age.
+  const result = resolveDefaultParticipants({
+    lastUsedPersonaIds: null,
+    lastUsedAgeRanges: [],
+    personas: [ADULT],
+    primaryAdultPersonaId: ADULT.id,
+  });
+  assert.equal(result.source, "needs-age");
+  console.log("last-used-age-ranges: empty stored array falls through to needs-age — OK");
+}
+
 // ── Branch 3: needs-age ──────────────────────────────────────────────────────
 
 {
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: null,
+    lastUsedAgeRanges: null,
     personas: [ADULT],
     primaryAdultPersonaId: ADULT.id,
   });
@@ -119,6 +192,7 @@ const CHILD_C: FamilyPersona = { id: "child-c", kind: "child", displayName: "В�
   // Полностью пустой профиль (нет ни взрослого, ни детей) — деградирует к needs-age, не падает.
   const result = resolveDefaultParticipants({
     lastUsedPersonaIds: null,
+    lastUsedAgeRanges: null,
     personas: [],
     primaryAdultPersonaId: null,
   });

@@ -29,6 +29,7 @@ import {
   pickItemForSlotExcluding,
 } from "../lib/recommendationPool";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
+import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
 import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
 
 interface PlanChildChip {
@@ -80,8 +81,9 @@ function addDaysIso(iso: string, days: number): string {
 
 /**
  * Синтетический "ребёнок" только для клиентского демо-пула рекомендаций (recommendationPool.ts),
- * когда в профиле нет ни одного реального ребёнка — ответ на единственный вопрос слоя 0
- * (needs-age) не создаёт персону и не пишется в FamilyPersonaContext/профиль.
+ * когда в профиле нет ни одного реального ребёнка — ответ на вопрос слоя 0 (needs-age, до
+ * 3 диапазонов) не создаёт персону и не пишется в FamilyPersonaContext/профиль, по одному
+ * синтетическому "ребёнку" на выбранный диапазон.
  */
 function buildEphemeralAgeChild(ageGroupValue: string): {
   id: string;
@@ -357,7 +359,7 @@ export function PlanMainContent({
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   const [showDayScenario, setShowDayScenario] = useState(false);
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
-  const [needsAgeAnswerValue, setNeedsAgeAnswerValue] = useState<string | null>(null);
+  const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   const [autoPlanDraft, setAutoPlanDraft] = useState<
     Array<{ slot: "morning" | "afternoon" | "evening"; item: PlanItemWithActivity }>
   >([]);
@@ -580,7 +582,7 @@ export function PlanMainContent({
   }, [dayItems, slotFromStartsAt, autoPlanLocalSlotAdds]);
 
   const handleBuildAutoPlan = useCallback(
-    (options?: { ephemeralAgeGroupValue?: string | null; explicitChildIds?: string[] }) => {
+    (options?: { ephemeralAgeGroupValues?: string[]; explicitChildIds?: string[] }) => {
       const allSlots: Array<"morning" | "afternoon" | "evening"> = [
         "morning",
         "afternoon",
@@ -604,8 +606,8 @@ export function PlanMainContent({
                 birthDate: c.birthDate ?? new Date().toISOString(),
                 systemInterests: [] as string[],
               }))
-            : options?.ephemeralAgeGroupValue
-              ? [buildEphemeralAgeChild(options.ephemeralAgeGroupValue)]
+            : options?.ephemeralAgeGroupValues && options.ephemeralAgeGroupValues.length > 0
+              ? options.ephemeralAgeGroupValues.map((value) => buildEphemeralAgeChild(value))
               : [];
 
       const exclude = new Set([
@@ -644,7 +646,7 @@ export function PlanMainContent({
   );
 
   const handleDecideRecommendations = useCallback(
-    (options?: { ephemeralAgeGroupValue?: string | null; explicitChildIds?: string[] }) => {
+    (options?: { ephemeralAgeGroupValues?: string[]; explicitChildIds?: string[] }) => {
       setIsAutoPlanGenerating(true);
       handleBuildAutoPlan(options);
       window.setTimeout(() => {
@@ -669,25 +671,30 @@ export function PlanMainContent({
    */
   const handleDecideClick = useCallback(() => {
     if (defaultParticipants.source === "needs-age") {
-      if (needsAgeAnswerValue) {
-        handleDecideRecommendations({ ephemeralAgeGroupValue: needsAgeAnswerValue });
+      if (needsAgeAnswerValues && needsAgeAnswerValues.length > 0) {
+        handleDecideRecommendations({ ephemeralAgeGroupValues: needsAgeAnswerValues });
         return;
       }
       setAwaitingAgeAnswer(true);
+      return;
+    }
+    if (defaultParticipants.source === "last-used-age-ranges") {
+      handleDecideRecommendations({ ephemeralAgeGroupValues: defaultParticipants.ageRanges });
       return;
     }
     const explicitChildIds = personas
       .filter((p) => p.kind === "child" && defaultParticipants.participants.includes(p.id))
       .map((p) => p.id);
     handleDecideRecommendations({ explicitChildIds });
-  }, [defaultParticipants, needsAgeAnswerValue, personas, handleDecideRecommendations]);
+  }, [defaultParticipants, needsAgeAnswerValues, personas, handleDecideRecommendations]);
 
-  const handleAgeAnswerSelect = useCallback(
-    (value: string) => {
-      setNeedsAgeAnswerValue(value);
+  const handleAgeAnswerConfirm = useCallback(
+    (ageRanges: string[]) => {
+      setNeedsAgeAnswerValues(ageRanges);
       setAwaitingAgeAnswer(false);
-      onChangeSelectedAgeRanges([{ range: value, source: "manual" }]);
-      handleDecideRecommendations({ ephemeralAgeGroupValue: value });
+      writeLastPlanAgeRanges(ageRanges);
+      onChangeSelectedAgeRanges(ageRanges.map((range) => ({ range, source: "manual" as const })));
+      handleDecideRecommendations({ ephemeralAgeGroupValues: ageRanges });
     },
     [onChangeSelectedAgeRanges, handleDecideRecommendations],
   );
@@ -991,7 +998,7 @@ export function PlanMainContent({
           ) : null}
 
           {awaitingAgeAnswer ? (
-            <PlanNeedsAgeQuestion onSelect={handleAgeAnswerSelect} onCancel={handleAgeAnswerCancel} />
+            <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
           ) : (
             <RecommendationDecisionBlock
               onDecide={handleDecideClick}
@@ -1073,7 +1080,7 @@ export function PlanMainContent({
         ) : null}
 
         {awaitingAgeAnswer ? (
-          <PlanNeedsAgeQuestion onSelect={handleAgeAnswerSelect} onCancel={handleAgeAnswerCancel} compact />
+          <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
         ) : (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
