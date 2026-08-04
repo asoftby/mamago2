@@ -38,13 +38,13 @@ export const desktopDialogShellLarge = [
  * === AUDIT: modal / sheet / overlay (кратко, 2026) ===
  *
  * Реализации Sheet (@/components/ui/sheet): MyPlanOverlay, AddRouteToPlanSheet,
- * AccountDropdownSurface, AdminHeader, DayScenarioModal, PlanAudienceSheet,
+ * AccountDropdownSurface, AdminHeader, DayScenarioModal,
  * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal,
  * NotificationsDropdown, MobileSelectSheet, when-select, MobileFilterSheet, SeoTemplatesClient,
  * MobileDateSheet, StructuredDataCenterClient, BirthdayBuilderStickyBar, OfferQuickView,
  * PartyForChildSection, ShareSheet, FilterControl.
  *
- * Пары Dialog+Sheet по media: AddRouteToPlanSheet, DayScenarioModal, PlanAudienceSheet,
+ * Пары Dialog+Sheet по media: AddRouteToPlanSheet, DayScenarioModal,
  * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal, ShareSheet,
  * OfferQuickView, PartyForChildSection (частично).
  *
