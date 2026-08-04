@@ -37,6 +37,7 @@ import {
   mapSuggestionToPlanItem,
   type PlanSuggestionItem,
 } from "../lib/fetchPlanSuggestions";
+import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
 
 interface PlanChildChip {
   id: string;
@@ -282,6 +283,33 @@ function formatRecommendationHeading(selectedDate: string, todayKey: string): st
   return `Вот что я рекомендую на ${dayMonth}`;
 }
 
+/**
+ * Узкий пул — частый случай, не край (проверено замером: ~30% дат в горизонте месяца
+ * дают 0 совпадений на dev-фикстуре). Сообщение объясняет причину предметно (дата,
+ * при наличии — возраст), а не отделывается общим «ничего не нашли».
+ */
+function buildEmptySuggestionsMessage(
+  selectedDate: string,
+  todayKey: string,
+  ageRangeValues: string[],
+): string {
+  const d = new Date(selectedDate + "T12:00:00");
+  const dayMonth = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  const whenPart =
+    selectedDate === todayKey
+      ? "На сегодня"
+      : selectedDate === addDaysIso(todayKey, 1)
+        ? "На завтра"
+        : `На ${dayMonth}`;
+
+  const ageLabels = ageRangeValues
+    .map((v) => getAgeGroupByValue(v)?.label)
+    .filter((label): label is string => Boolean(label));
+  const agePart = ageLabels.length > 0 ? ` для ${ageLabels.join(", ")}` : "";
+
+  return `${whenPart}${agePart} пока ничего не нашли.`;
+}
+
 function buildParticipantSummaryLabels(
   selectedPersonaIds: string[],
   personas: PersonaForCopy[],
@@ -508,6 +536,13 @@ export function PlanMainContent({
       router.push(href);
     }, 0);
   }, [buildFindAndAddHref, onRequestClose, router]);
+
+  /** M-B: узкий пул — частый случай, пустая выдача сразу предлагает сменить дату. */
+  const handleScrollToCalendar = useCallback(() => {
+    document
+      .getElementById("plan-week-calendar")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   /** M3.5: тап по sticky-счётчику «В плане: N» — на страницу плана целиком, не в саму модалку. */
   const handleOpenPlanPage = useCallback(() => {
@@ -890,8 +925,15 @@ export function PlanMainContent({
         ) : suggestions.length === 0 ? (
           <div className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
             <p className="text-sm text-neutral-600">
-              На этот день подходящего пока не нашли — попробуйте другой день или возраст.
+              {buildEmptySuggestionsMessage(selectedDate, todayKey, lastAgeRangeValuesRef.current)}
             </p>
+            <button
+              type="button"
+              onClick={handleScrollToCalendar}
+              className="mt-2 text-sm font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Выбрать другой день
+            </button>
           </div>
         ) : (
           <section className={compact ? "space-y-3" : "space-y-3"}>
@@ -928,12 +970,14 @@ export function PlanMainContent({
           className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-8 pb-6 pt-1"
         >
           {onChangeDate ? (
-            <WeekCalendarStrip
-              selectedDate={selectedDate}
-              onChangeDate={onChangeDate}
-              showArrows
-              plannedCountByDate={plannedCountByDate}
-            />
+            <div id="plan-week-calendar">
+              <WeekCalendarStrip
+                selectedDate={selectedDate}
+                onChangeDate={onChangeDate}
+                showArrows
+                plannedCountByDate={plannedCountByDate}
+              />
+            </div>
           ) : null}
 
           {awaitingAgeAnswer ? (
@@ -1021,12 +1065,14 @@ export function PlanMainContent({
         className="flex-1 space-y-4 overflow-y-auto bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
       >
         {onChangeDate ? (
-          <WeekCalendarStrip
-            selectedDate={selectedDate}
-            onChangeDate={onChangeDate}
-            compact
-            plannedCountByDate={plannedCountByDate}
-          />
+          <div id="plan-week-calendar">
+            <WeekCalendarStrip
+              selectedDate={selectedDate}
+              onChangeDate={onChangeDate}
+              compact
+              plannedCountByDate={plannedCountByDate}
+            />
+          </div>
         ) : null}
 
         {awaitingAgeAnswer ? (
