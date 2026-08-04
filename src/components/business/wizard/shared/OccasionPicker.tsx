@@ -31,7 +31,7 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/occasions/active")
+    fetch("/api/occasions/active", { cache: "no-store" })
       .then((r) => r.json())
       .then((data: unknown) => {
         if (cancelled) return;

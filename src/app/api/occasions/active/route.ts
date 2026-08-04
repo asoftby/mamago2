@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 import { getActiveOccasionsForEditor } from "@/lib/discovery/occasions";
 
 export const runtime = "nodejs";
-export const revalidate = 60; // cache for 1 minute
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
