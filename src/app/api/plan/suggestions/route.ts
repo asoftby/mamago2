@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       citySlug,
       excludeActivityIds,
       take: 6,
+      ...(date != null ? { date } : {}),
       ...(ageRangesParam.length > 0
         ? { ageRangeValues: ageRangesParam }
         : {}),

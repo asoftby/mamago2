@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RecommendationCard } from "./RecommendationCard";
 import type { PlanItemWithActivity } from "../types/event";
@@ -10,7 +10,10 @@ import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
-import type { AgeRangeSelection } from "@/features/filters/discovery/childrenScope.store";
+import {
+  deriveAgeRangesFromChildren,
+  type AgeRangeSelection,
+} from "@/features/filters/discovery/childrenScope.store";
 import { toast } from "@/lib/toast";
 import { WeekCalendarStrip } from "./WeekCalendarStrip";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -24,13 +27,13 @@ import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
-import {
-  MAX_PLAN_ITEMS_PER_SLOT,
-  pickItemForSlotExcluding,
-} from "../lib/recommendationPool";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
-import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
+import {
+  fetchPlanSuggestions,
+  mapSuggestionToPlanItem,
+  type PlanSuggestionItem,
+} from "../lib/fetchPlanSuggestions";
 
 interface PlanChildChip {
   id: string;
@@ -77,24 +80,6 @@ function addDaysIso(iso: string, days: number): string {
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
   const dd = String(dt.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
-}
-
-/**
- * Синтетический "ребёнок" только для клиентского демо-пула рекомендаций (recommendationPool.ts),
- * когда в профиле нет ни одного реального ребёнка — ответ на вопрос слоя 0 (needs-age, до
- * 3 диапазонов) не создаёт персону и не пишется в FamilyPersonaContext/профиль, по одному
- * синтетическому "ребёнку" на выбранный диапазон.
- */
-function buildEphemeralAgeChild(ageGroupValue: string): {
-  id: string;
-  birthDate: string;
-  systemInterests: string[];
-} {
-  const group = getAgeGroupByValue(ageGroupValue);
-  const years = group?.min ?? 3;
-  const birthDate = new Date();
-  birthDate.setFullYear(birthDate.getFullYear() - years);
-  return { id: `needs-age:${ageGroupValue}`, birthDate: birthDate.toISOString(), systemInterests: [] };
 }
 
 function toGenitiveName(name: string): string {
@@ -360,20 +345,13 @@ export function PlanMainContent({
   const [showDayScenario, setShowDayScenario] = useState(false);
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
-  const [autoPlanDraft, setAutoPlanDraft] = useState<
-    Array<{ slot: "morning" | "afternoon" | "evening"; item: PlanItemWithActivity }>
-  >([]);
-  const [autoPlanGeneration, setAutoPlanGeneration] = useState(0);
-  const [autoPlanCursor, setAutoPlanCursor] = useState(0);
-  const [autoPlanLocalAddedIds, setAutoPlanLocalAddedIds] = useState<string[]>([]);
-  const [autoPlanLocalSlotAdds, setAutoPlanLocalSlotAdds] = useState<
-    Record<"morning" | "afternoon" | "evening", number>
-  >({
-    morning: 0,
-    afternoon: 0,
-    evening: 0,
-  });
-  const [isAutoPlanGenerating, setIsAutoPlanGenerating] = useState(false);
+  /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
+  const [suggestions, setSuggestions] = useState<PlanSuggestionItem[]>([]);
+  const [suggestionsGeneration, setSuggestionsGeneration] = useState(0);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState(false);
+  const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
+  const lastAgeRangeValuesRef = useRef<string[]>([]);
 
   const handleRemoveFromPlan = async (itemId: string) => {
     if (!onRemoveItemFromPlan) return;
@@ -564,129 +542,75 @@ export function PlanMainContent({
     [],
   );
 
-  const daySlotCounts = useMemo(() => {
-    const counts: Record<"morning" | "afternoon" | "evening", number> = {
-      morning: 0,
-      afternoon: 0,
-      evening: 0,
-    };
-    for (const item of dayItems) {
-      const slot = slotFromStartsAt(item.startsAt);
-      if (slot) counts[slot] += 1;
-    }
-    return {
-      morning: counts.morning + autoPlanLocalSlotAdds.morning,
-      afternoon: counts.afternoon + autoPlanLocalSlotAdds.afternoon,
-      evening: counts.evening + autoPlanLocalSlotAdds.evening,
-    };
-  }, [dayItems, slotFromStartsAt, autoPlanLocalSlotAdds]);
-
-  const handleBuildAutoPlan = useCallback(
-    (options?: { ephemeralAgeGroupValues?: string[]; explicitChildIds?: string[] }) => {
-      const allSlots: Array<"morning" | "afternoon" | "evening"> = [
-        "morning",
-        "afternoon",
-        "evening",
-      ];
-      const slots = allSlots.filter((slot) => daySlotCounts[slot] < MAX_PLAN_ITEMS_PER_SLOT);
-      const resolvedChildIds = options?.explicitChildIds ?? effectiveSelectedChildIds;
-      const selectedChildren = childrenList
-        .filter((c) => resolvedChildIds.includes(c.id))
-        .map((c) => ({
-          id: c.id,
-          birthDate: c.birthDate ?? new Date().toISOString(),
-          systemInterests: [] as string[],
-        }));
-      const recChildren =
-        selectedChildren.length > 0
-          ? selectedChildren
-          : childrenList.length > 0
-            ? childrenList.map((c) => ({
-                id: c.id,
-                birthDate: c.birthDate ?? new Date().toISOString(),
-                systemInterests: [] as string[],
-              }))
-            : options?.ephemeralAgeGroupValues && options.ephemeralAgeGroupValues.length > 0
-              ? options.ephemeralAgeGroupValues.map((value) => buildEphemeralAgeChild(value))
-              : [];
-
-      const exclude = new Set([
-        ...(planItemsByDate?.[selectedDate] ?? [])
-          .map((i) => i.activityId)
-          .filter((v): v is string => Boolean(v)),
-        ...autoPlanLocalAddedIds,
-      ]);
-
-      const draft = slots.map((slot) => {
-        const item = pickItemForSlotExcluding(
-          slot,
-          recChildren,
-          "all",
-          autoPlanCursor,
-          selectedDate,
-          [...exclude],
-        );
-        if (item.activityId) exclude.add(item.activityId);
-        return { slot, item };
-      });
-
-      setAutoPlanDraft(draft);
-      setAutoPlanGeneration((v) => v + 1);
-      setAutoPlanCursor((v) => v + 1);
+  /**
+   * Реальный fetch /api/plan/suggestions (M2.4) — параметры передаются явно вызывающим
+   * кодом, не через реактивный стор, чтобы не зависеть от отстающего на кадр состояния
+   * (тот же принцип, что уже применён для family.setSelectedPersonaIds в M2).
+   */
+  const handleFetchSuggestions = useCallback(
+    async (ageRangeValues: string[]) => {
+      lastAgeRangeValuesRef.current = ageRangeValues;
+      setIsFetchingSuggestions(true);
+      setSuggestionsError(false);
+      try {
+        const exclude = [
+          ...(planItemsByDate?.[selectedDate] ?? [])
+            .map((i) => i.activityId)
+            .filter((v): v is string => Boolean(v)),
+          ...addedSuggestionActivityIds,
+        ];
+        const results = await fetchPlanSuggestions({
+          citySlug: city,
+          date: selectedDate,
+          excludeActivityIds: exclude,
+          ageRangeValues,
+        });
+        setSuggestions(results);
+        setSuggestionsGeneration((v) => v + 1);
+        window.setTimeout(() => {
+          document
+            .getElementById("plan-recommendation-results")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 120);
+      } catch {
+        setSuggestionsError(true);
+        setSuggestions([]);
+      } finally {
+        setIsFetchingSuggestions(false);
+      }
     },
-    [
-      autoPlanCursor,
-      autoPlanLocalAddedIds,
-      childrenList,
-      daySlotCounts,
-      effectiveSelectedChildIds,
-      planItemsByDate,
-      selectedDate,
-    ],
-  );
-
-  const handleDecideRecommendations = useCallback(
-    (options?: { ephemeralAgeGroupValues?: string[]; explicitChildIds?: string[] }) => {
-      setIsAutoPlanGenerating(true);
-      handleBuildAutoPlan(options);
-      window.setTimeout(() => {
-        document
-          .getElementById("plan-recommendation-results")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 120);
-      window.setTimeout(() => {
-        setIsAutoPlanGenerating(false);
-      }, 1300);
-    },
-    [handleBuildAutoPlan],
+    [city, selectedDate, planItemsByDate, addedSuggestionActivityIds],
   );
 
   const defaultParticipants = useResolveDefaultParticipants();
 
   /**
    * Слой 0: «Реши за меня» — намерение сначала, состав правится после выдачи (M3).
-   * Резолвленный состав передаётся генератору напрямую, а не через
-   * `family.setSelectedPersonaIds` — тот же клик иначе попадал под effect (ниже),
-   * который сбрасывает уже сгенерированный autoPlanDraft при смене selectedPersonaIds.
+   * Возраст для запроса выводится из резолвленного состава напрямую (не через
+   * family.setSelectedPersonaIds) — синхронный вызов setSelectedPersonaIds из этого
+   * клика попадал под effect ниже, который сбрасывает выдачу при смене selectedPersonaIds.
    */
   const handleDecideClick = useCallback(() => {
     if (defaultParticipants.source === "needs-age") {
       if (needsAgeAnswerValues && needsAgeAnswerValues.length > 0) {
-        handleDecideRecommendations({ ephemeralAgeGroupValues: needsAgeAnswerValues });
+        void handleFetchSuggestions(needsAgeAnswerValues);
         return;
       }
       setAwaitingAgeAnswer(true);
       return;
     }
     if (defaultParticipants.source === "last-used-age-ranges") {
-      handleDecideRecommendations({ ephemeralAgeGroupValues: defaultParticipants.ageRanges });
+      void handleFetchSuggestions(defaultParticipants.ageRanges);
       return;
     }
-    const explicitChildIds = personas
+    const resolvedChildIds = personas
       .filter((p) => p.kind === "child" && defaultParticipants.participants.includes(p.id))
       .map((p) => p.id);
-    handleDecideRecommendations({ explicitChildIds });
-  }, [defaultParticipants, needsAgeAnswerValues, personas, handleDecideRecommendations]);
+    const ageRangeValues = deriveAgeRangesFromChildren(childrenList, resolvedChildIds).map(
+      (r) => r.range,
+    );
+    void handleFetchSuggestions(ageRangeValues);
+  }, [defaultParticipants, needsAgeAnswerValues, personas, childrenList, handleFetchSuggestions]);
 
   const handleAgeAnswerConfirm = useCallback(
     (ageRanges: string[]) => {
@@ -694,9 +618,9 @@ export function PlanMainContent({
       setAwaitingAgeAnswer(false);
       writeLastPlanAgeRanges(ageRanges);
       onChangeSelectedAgeRanges(ageRanges.map((range) => ({ range, source: "manual" as const })));
-      handleDecideRecommendations({ ephemeralAgeGroupValues: ageRanges });
+      void handleFetchSuggestions(ageRanges);
     },
-    [onChangeSelectedAgeRanges, handleDecideRecommendations],
+    [onChangeSelectedAgeRanges, handleFetchSuggestions],
   );
 
   const handleAgeAnswerCancel = useCallback(() => {
@@ -760,7 +684,7 @@ export function PlanMainContent({
   );
 
   const handleAddSuggestionToPlan = useCallback(
-    async (activity: NonNullable<MyPlanIdea["activity"]>) => {
+    async (activity: PlanSuggestionItem) => {
       if (
         (planItemsByDate?.[selectedDate] ?? []).some(
           (i) => i.activityId === activity.id,
@@ -782,6 +706,10 @@ export function PlanMainContent({
               behavior: "smooth",
             });
           });
+          setAddedSuggestionActivityIds((prev) =>
+            prev.includes(activity.id) ? prev : [...prev, activity.id],
+          );
+          setSuggestions((prev) => prev.filter((s) => s.id !== activity.id));
           return true;
         }
       } catch {
@@ -822,9 +750,9 @@ export function PlanMainContent({
     const existingActivityIds = new Set(
       dayItems.map((item) => item.activityId).filter((value): value is string => Boolean(value)),
     );
-    const pendingLocalAdds = autoPlanLocalAddedIds.filter((id) => !existingActivityIds.has(id)).length;
+    const pendingLocalAdds = addedSuggestionActivityIds.filter((id) => !existingActivityIds.has(id)).length;
     return dayItems.length + pendingLocalAdds;
-  }, [dayItems, autoPlanLocalAddedIds]);
+  }, [dayItems, addedSuggestionActivityIds]);
 
   /** «Сценарий дня» — когда в дне больше двух событий (три и более). */
   const canOpenDayScenario = useMemo(() => {
@@ -839,11 +767,10 @@ export function PlanMainContent({
   };
 
   useEffect(() => {
-    setAutoPlanDraft([]);
-    setAutoPlanGeneration(0);
-    setAutoPlanCursor(0);
-    setAutoPlanLocalAddedIds([]);
-    setAutoPlanLocalSlotAdds({ morning: 0, afternoon: 0, evening: 0 });
+    setSuggestions([]);
+    setSuggestionsGeneration(0);
+    setSuggestionsError(false);
+    setAddedSuggestionActivityIds([]);
   }, [selectedDate, selectedPersonaIds]);
 
   const participantLabels = useMemo(
@@ -859,14 +786,9 @@ export function PlanMainContent({
   const recommendationAudienceLine =
     participantLabels.length > 0 ? participantLabels.join(" + ") : "Свободный поиск";
 
+  /** Только уже спланированные события — у них есть реальный startsAt, есть смысл группировать по слотам. */
   const dayPartSections = useMemo(() => {
-    const sections: Record<
-      "morning" | "afternoon" | "evening",
-      Array<
-        | { kind: "planned"; item: PlanItemWithActivity }
-        | { kind: "recommended"; item: PlanItemWithActivity }
-      >
-    > = {
+    const sections: Record<"morning" | "afternoon" | "evening", PlanItemWithActivity[]> = {
       morning: [],
       afternoon: [],
       evening: [],
@@ -874,23 +796,20 @@ export function PlanMainContent({
 
     for (const item of dayItemsSorted) {
       const slot = slotFromStartsAt(item.startsAt) ?? "afternoon";
-      sections[slot].push({ kind: "planned", item });
-    }
-
-    for (const draft of autoPlanDraft) {
-      sections[draft.slot].push({ kind: "recommended", item: draft.item });
+      sections[slot].push(item);
     }
 
     return (["morning", "afternoon", "evening"] as const)
       .map((slot) => ({
         slot,
         label: slotLabel[slot],
-        entries: sections[slot],
+        items: sections[slot],
       }))
-      .filter((section) => section.entries.length > 0);
-  }, [autoPlanDraft, dayItemsSorted, slotFromStartsAt]);
+      .filter((section) => section.items.length > 0);
+  }, [dayItemsSorted, slotFromStartsAt]);
 
-  const showRecommendationResults = dayPartSections.length > 0;
+  const hasRequestedSuggestions = suggestionsGeneration > 0 || isFetchingSuggestions;
+  const showRecommendationResults = dayPartSections.length > 0 || hasRequestedSuggestions;
 
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
@@ -907,15 +826,25 @@ export function PlanMainContent({
       return null;
     }
 
-    const recommendationCards = dayPartSections.flatMap((section) =>
-      section.entries.map((entry) => ({
-        ...entry,
-        slot: section.slot,
-      })),
-    );
-
     return (
       <div id="plan-recommendation-results" className="space-y-4">
+        {dayPartSections.length > 0 ? (
+          <section className={compact ? "space-y-3" : "space-y-3"} aria-label="В вашем плане">
+            {dayPartSections.map((section) => (
+              <div key={section.slot} className="space-y-3">
+                {section.items.map((item) => (
+                  <RecommendationCard
+                    key={item.id}
+                    item={item}
+                    isInPlan
+                    onRemoveFromPlan={() => handleRemoveFromPlan(item.id)}
+                  />
+                ))}
+              </div>
+            ))}
+          </section>
+        ) : null}
+
         <section
           className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
           aria-label="Подходит вашим детям"
@@ -928,43 +857,43 @@ export function PlanMainContent({
           </div>
         </section>
 
-        <section className={compact ? "space-y-3" : "space-y-3"}>
-          {recommendationCards.map((entry) => (
-              <RecommendationCard
-                key={`${entry.slot}-${entry.kind}-${entry.item.id}`}
-                item={entry.item}
-                isInPlan={entry.kind === "planned"}
-                onRemoveFromPlan={
-                  entry.kind === "planned"
-                    ? () => handleRemoveFromPlan(entry.item.id)
-                    : undefined
-                }
-                onAddToPlan={
-                  entry.kind === "recommended"
-                    ? async () => {
-                        if (!entry.item.activity) return;
-                        const ok = await handleAddSuggestionToPlan(entry.item.activity);
-                        if (!ok) return;
-                        if (entry.item.activityId) {
-                          setAutoPlanLocalAddedIds((prev) =>
-                            prev.includes(entry.item.activityId!)
-                              ? prev
-                              : [...prev, entry.item.activityId!],
-                          );
-                        }
-                        setAutoPlanLocalSlotAdds((prev) => ({
-                          ...prev,
-                          [entry.slot]: prev[entry.slot] + 1,
-                        }));
-                        setAutoPlanDraft((prev) =>
-                          prev.filter((draft) => draft.item.id !== entry.item.id),
-                        );
-                      }
-                    : undefined
-                }
+        {isFetchingSuggestions ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-24 animate-pulse rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm"
               />
             ))}
-        </section>
+          </div>
+        ) : suggestionsError ? (
+          <div className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
+            <p className="text-sm text-neutral-600">Не получилось загрузить рекомендации</p>
+            <button
+              type="button"
+              onClick={() => void handleFetchSuggestions(lastAgeRangeValuesRef.current)}
+              className="mt-2 text-sm font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : suggestions.length === 0 ? (
+          <div className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
+            <p className="text-sm text-neutral-600">
+              На этот день подходящего пока не нашли — попробуйте другой день или возраст.
+            </p>
+          </div>
+        ) : (
+          <section className={compact ? "space-y-3" : "space-y-3"}>
+            {suggestions.map((activity) => (
+              <RecommendationCard
+                key={activity.id}
+                item={mapSuggestionToPlanItem(activity, selectedDate)}
+                onAddToPlan={() => void handleAddSuggestionToPlan(activity)}
+              />
+            ))}
+          </section>
+        )}
       </div>
     );
   };
@@ -1004,8 +933,8 @@ export function PlanMainContent({
               onDecide={handleDecideClick}
               onCatalog={handleOpenCatalog}
               onIdeas={handleOpenIdeasFlow}
-              hasGenerated={autoPlanGeneration > 0}
-              isGenerating={isAutoPlanGenerating}
+              hasGenerated={suggestionsGeneration > 0}
+              isGenerating={isFetchingSuggestions}
             />
           )}
 
@@ -1086,8 +1015,8 @@ export function PlanMainContent({
             onDecide={handleDecideClick}
             onCatalog={handleOpenCatalog}
             onIdeas={handleOpenIdeasFlow}
-            hasGenerated={autoPlanGeneration > 0}
-            isGenerating={isAutoPlanGenerating}
+            hasGenerated={suggestionsGeneration > 0}
+            isGenerating={isFetchingSuggestions}
             compact
           />
         )}
