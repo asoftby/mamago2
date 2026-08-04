@@ -6,8 +6,6 @@ import { cn } from "@/lib/utils";
 type RecommendationDecisionBlockProps = {
   onDecide: () => void;
   onCatalog: () => void;
-  onIdeas: () => void;
-  ideasCount?: number;
   isGenerating?: boolean;
   compact?: boolean;
 };
@@ -21,7 +19,6 @@ const ArrowIcon = () => (
 export function RecommendationDecisionBlock({
   onDecide,
   onCatalog,
-  onIdeas,
   isGenerating = false,
   compact = false,
 }: RecommendationDecisionBlockProps) {
@@ -177,25 +174,6 @@ export function RecommendationDecisionBlock({
           }}>
             Выбрать <ArrowIcon />
           </span>
-        </button>
-      </div>
-
-      {/* Footer link */}
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <button
-          type="button"
-          onClick={onIdeas}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 13, fontWeight: 600,
-            color: "#C24E22",
-            background: "none", border: "none", cursor: "pointer",
-            transition: "gap .18s",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.gap = "10px"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.gap = "6px"; }}
-        >
-          Мои идеи <ArrowIcon />
         </button>
       </div>
     </section>

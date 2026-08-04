@@ -25,6 +25,7 @@ import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
+import { PlanStickyCounter } from "./PlanStickyCounter";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -490,10 +491,6 @@ export function PlanMainContent({
     return `/${city}/events?${qp.toString()}`;
   };
 
-  const buildIdeasHref = () => {
-    return `/my-ideas`;
-  };
-
   const handleFindAndAddClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     const href = buildFindAndAddHref();
@@ -512,13 +509,13 @@ export function PlanMainContent({
     }, 0);
   }, [buildFindAndAddHref, onRequestClose, router]);
 
-  const handleOpenIdeasFlow = useCallback(() => {
-    const href = buildIdeasHref();
+  /** M3.5: тап по sticky-счётчику «В плане: N» — на страницу плана целиком, не в саму модалку. */
+  const handleOpenPlanPage = useCallback(() => {
     onRequestClose?.();
     window.setTimeout(() => {
-      router.push(href);
+      router.push("/me/plan");
     }, 0);
-  }, [buildIdeasHref, onRequestClose, router]);
+  }, [onRequestClose, router]);
 
   const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
   const plannedCountByDate = useMemo(() => {
@@ -945,7 +942,6 @@ export function PlanMainContent({
             <RecommendationDecisionBlock
               onDecide={handleDecideClick}
               onCatalog={handleOpenCatalog}
-              onIdeas={handleOpenIdeasFlow}
               isGenerating={isFetchingSuggestions}
             />
           ) : null}
@@ -965,6 +961,8 @@ export function PlanMainContent({
 
           {renderBottomActions()}
         </div>
+
+        <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} />
 
         <AddPersonaTypeModal
           open={showAddPersonaTypeModal}
@@ -1037,7 +1035,6 @@ export function PlanMainContent({
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
             onCatalog={handleOpenCatalog}
-            onIdeas={handleOpenIdeasFlow}
             isGenerating={isFetchingSuggestions}
             compact
           />
@@ -1059,6 +1056,8 @@ export function PlanMainContent({
 
         {renderBottomActions()}
       </div>
+
+      <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} compact />
 
       <AddPersonaTypeModal
         open={showAddPersonaTypeModal}
