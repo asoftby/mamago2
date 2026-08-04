@@ -579,101 +579,115 @@ export function PlanMainContent({
     };
   }, [dayItems, slotFromStartsAt, autoPlanLocalSlotAdds]);
 
-  const handleBuildAutoPlan = useCallback((ephemeralAgeGroupValue?: string | null) => {
-    const allSlots: Array<"morning" | "afternoon" | "evening"> = [
-      "morning",
-      "afternoon",
-      "evening",
-    ];
-    const slots = allSlots.filter((slot) => daySlotCounts[slot] < MAX_PLAN_ITEMS_PER_SLOT);
-    const selectedChildren = childrenList
-      .filter((c) => effectiveSelectedChildIds.includes(c.id))
-      .map((c) => ({
-        id: c.id,
-        birthDate: c.birthDate ?? new Date().toISOString(),
-        systemInterests: [] as string[],
-      }));
-    const recChildren =
-      selectedChildren.length > 0
-        ? selectedChildren
-        : childrenList.length > 0
-          ? childrenList.map((c) => ({
-              id: c.id,
-              birthDate: c.birthDate ?? new Date().toISOString(),
-              systemInterests: [] as string[],
-            }))
-          : ephemeralAgeGroupValue
-            ? [buildEphemeralAgeChild(ephemeralAgeGroupValue)]
-            : [];
+  const handleBuildAutoPlan = useCallback(
+    (options?: { ephemeralAgeGroupValue?: string | null; explicitChildIds?: string[] }) => {
+      const allSlots: Array<"morning" | "afternoon" | "evening"> = [
+        "morning",
+        "afternoon",
+        "evening",
+      ];
+      const slots = allSlots.filter((slot) => daySlotCounts[slot] < MAX_PLAN_ITEMS_PER_SLOT);
+      const resolvedChildIds = options?.explicitChildIds ?? effectiveSelectedChildIds;
+      const selectedChildren = childrenList
+        .filter((c) => resolvedChildIds.includes(c.id))
+        .map((c) => ({
+          id: c.id,
+          birthDate: c.birthDate ?? new Date().toISOString(),
+          systemInterests: [] as string[],
+        }));
+      const recChildren =
+        selectedChildren.length > 0
+          ? selectedChildren
+          : childrenList.length > 0
+            ? childrenList.map((c) => ({
+                id: c.id,
+                birthDate: c.birthDate ?? new Date().toISOString(),
+                systemInterests: [] as string[],
+              }))
+            : options?.ephemeralAgeGroupValue
+              ? [buildEphemeralAgeChild(options.ephemeralAgeGroupValue)]
+              : [];
 
-    const exclude = new Set([
-      ...(planItemsByDate?.[selectedDate] ?? [])
-        .map((i) => i.activityId)
-        .filter((v): v is string => Boolean(v)),
-      ...autoPlanLocalAddedIds,
-    ]);
+      const exclude = new Set([
+        ...(planItemsByDate?.[selectedDate] ?? [])
+          .map((i) => i.activityId)
+          .filter((v): v is string => Boolean(v)),
+        ...autoPlanLocalAddedIds,
+      ]);
 
-    const draft = slots.map((slot) => {
-      const item = pickItemForSlotExcluding(
-        slot,
-        recChildren,
-        "all",
-        autoPlanCursor,
-        selectedDate,
-        [...exclude],
-      );
-      if (item.activityId) exclude.add(item.activityId);
-      return { slot, item };
-    });
+      const draft = slots.map((slot) => {
+        const item = pickItemForSlotExcluding(
+          slot,
+          recChildren,
+          "all",
+          autoPlanCursor,
+          selectedDate,
+          [...exclude],
+        );
+        if (item.activityId) exclude.add(item.activityId);
+        return { slot, item };
+      });
 
-    setAutoPlanDraft(draft);
-    setAutoPlanGeneration((v) => v + 1);
-    setAutoPlanCursor((v) => v + 1);
-  }, [
-    autoPlanCursor,
-    autoPlanLocalAddedIds,
-    childrenList,
-    daySlotCounts,
-    effectiveSelectedChildIds,
-    planItemsByDate,
-    selectedDate,
-  ]);
+      setAutoPlanDraft(draft);
+      setAutoPlanGeneration((v) => v + 1);
+      setAutoPlanCursor((v) => v + 1);
+    },
+    [
+      autoPlanCursor,
+      autoPlanLocalAddedIds,
+      childrenList,
+      daySlotCounts,
+      effectiveSelectedChildIds,
+      planItemsByDate,
+      selectedDate,
+    ],
+  );
 
-  const handleDecideRecommendations = useCallback((ephemeralAgeGroupValue?: string | null) => {
-    setIsAutoPlanGenerating(true);
-    handleBuildAutoPlan(ephemeralAgeGroupValue);
-    window.setTimeout(() => {
-      document
-        .getElementById("plan-recommendation-results")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    window.setTimeout(() => {
-      setIsAutoPlanGenerating(false);
-    }, 1300);
-  }, [handleBuildAutoPlan]);
+  const handleDecideRecommendations = useCallback(
+    (options?: { ephemeralAgeGroupValue?: string | null; explicitChildIds?: string[] }) => {
+      setIsAutoPlanGenerating(true);
+      handleBuildAutoPlan(options);
+      window.setTimeout(() => {
+        document
+          .getElementById("plan-recommendation-results")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+      window.setTimeout(() => {
+        setIsAutoPlanGenerating(false);
+      }, 1300);
+    },
+    [handleBuildAutoPlan],
+  );
 
   const defaultParticipants = useResolveDefaultParticipants();
 
-  /** Слой 0: «Реши за меня» — намерение сначала, состав правится после выдачи (M3). */
+  /**
+   * Слой 0: «Реши за меня» — намерение сначала, состав правится после выдачи (M3).
+   * Резолвленный состав передаётся генератору напрямую, а не через
+   * `family.setSelectedPersonaIds` — тот же клик иначе попадал под effect (ниже),
+   * который сбрасывает уже сгенерированный autoPlanDraft при смене selectedPersonaIds.
+   */
   const handleDecideClick = useCallback(() => {
     if (defaultParticipants.source === "needs-age") {
       if (needsAgeAnswerValue) {
-        handleDecideRecommendations(needsAgeAnswerValue);
+        handleDecideRecommendations({ ephemeralAgeGroupValue: needsAgeAnswerValue });
         return;
       }
       setAwaitingAgeAnswer(true);
       return;
     }
-    family?.setSelectedPersonaIds(defaultParticipants.participants);
-    handleDecideRecommendations();
-  }, [defaultParticipants, needsAgeAnswerValue, family, handleDecideRecommendations]);
+    const explicitChildIds = personas
+      .filter((p) => p.kind === "child" && defaultParticipants.participants.includes(p.id))
+      .map((p) => p.id);
+    handleDecideRecommendations({ explicitChildIds });
+  }, [defaultParticipants, needsAgeAnswerValue, personas, handleDecideRecommendations]);
 
   const handleAgeAnswerSelect = useCallback(
     (value: string) => {
       setNeedsAgeAnswerValue(value);
       setAwaitingAgeAnswer(false);
       onChangeSelectedAgeRanges([{ range: value, source: "manual" }]);
-      handleDecideRecommendations(value);
+      handleDecideRecommendations({ ephemeralAgeGroupValue: value });
     },
     [onChangeSelectedAgeRanges, handleDecideRecommendations],
   );
