@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { listPlanSuggestionsForCity } from "@/server/services/planSuggestions.service";
+import { SUGGESTIONS_PER_BATCH } from "@/features/my-plan/lib/suggestionsConfig";
 
 /**
  * GET /api/plan/suggestions?city=minsk&date=YYYY-MM-DD&exclude=id1,id2&ageRanges=1-3,3-5
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     const activities = await listPlanSuggestionsForCity({
       citySlug,
       excludeActivityIds,
-      take: 6,
+      take: SUGGESTIONS_PER_BATCH,
       ...(date != null ? { date } : {}),
       ...(ageRangesParam.length > 0
         ? { ageRangeValues: ageRangesParam }
