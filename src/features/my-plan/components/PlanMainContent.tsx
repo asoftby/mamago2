@@ -25,6 +25,7 @@ import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
+import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
@@ -353,6 +354,8 @@ export function PlanMainContent({
   const [suggestionsError, setSuggestionsError] = useState(false);
   const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
   const lastAgeRangeValuesRef = useRef<string[]>([]);
+  /** Все id, когда-либо показанные в подборках этого сеанса — не даём «Ещё варианты» повторяться. */
+  const shownSuggestionActivityIdsRef = useRef<Set<string>>(new Set());
 
   const handleRemoveFromPlan = async (itemId: string) => {
     if (!onRemoveItemFromPlan) return;
@@ -547,6 +550,8 @@ export function PlanMainContent({
    * Реальный fetch /api/plan/suggestions (M2.4) — параметры передаются явно вызывающим
    * кодом, не через реактивный стор, чтобы не зависеть от отстающего на кадр состояния
    * (тот же принцип, что уже применён для family.setSelectedPersonaIds в M2).
+   * Исключает не только уже добавленные в план, но и всё, что уже показывалось в
+   * этом сеансе (shownSuggestionActivityIdsRef) — «Ещё варианты» не повторяет офферы.
    */
   const handleFetchSuggestions = useCallback(
     async (ageRangeValues: string[]) => {
@@ -559,6 +564,7 @@ export function PlanMainContent({
             .map((i) => i.activityId)
             .filter((v): v is string => Boolean(v)),
           ...addedSuggestionActivityIds,
+          ...shownSuggestionActivityIdsRef.current,
         ];
         const results = await fetchPlanSuggestions({
           citySlug: city,
@@ -566,6 +572,9 @@ export function PlanMainContent({
           excludeActivityIds: exclude,
           ageRangeValues,
         });
+        for (const item of results) {
+          shownSuggestionActivityIdsRef.current.add(item.id);
+        }
         setSuggestions(results);
         setSuggestionsGeneration((v) => v + 1);
         window.setTimeout(() => {
@@ -772,6 +781,7 @@ export function PlanMainContent({
     setSuggestionsGeneration(0);
     setSuggestionsError(false);
     setAddedSuggestionActivityIds([]);
+    shownSuggestionActivityIdsRef.current = new Set();
   }, [selectedDate, selectedPersonaIds]);
 
   const participantLabels = useMemo(
@@ -811,6 +821,8 @@ export function PlanMainContent({
 
   const hasRequestedSuggestions = suggestionsGeneration > 0 || isFetchingSuggestions;
   const showRecommendationResults = dayPartSections.length > 0 || hasRequestedSuggestions;
+  /** Пул закончился раньше лимита подборок (включая «пусто уже с первой попытки»). */
+  const suggestionsExhausted = suggestionsGeneration > 0 && !isFetchingSuggestions && suggestions.length === 0;
 
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
@@ -945,6 +957,9 @@ export function PlanMainContent({
               onRegenerate={handleDecideClick}
               onCatalog={handleOpenCatalog}
               isRegenerating={isFetchingSuggestions}
+              batchNumber={suggestionsGeneration}
+              maxBatches={MAX_SUGGESTION_BATCHES}
+              isExhausted={suggestionsExhausted}
             />
           ) : null}
 
@@ -1035,6 +1050,9 @@ export function PlanMainContent({
             onRegenerate={handleDecideClick}
             onCatalog={handleOpenCatalog}
             isRegenerating={isFetchingSuggestions}
+            batchNumber={suggestionsGeneration}
+            maxBatches={MAX_SUGGESTION_BATCHES}
+            isExhausted={suggestionsExhausted}
             compact
           />
         ) : null}
