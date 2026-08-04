@@ -104,6 +104,7 @@
     "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/template-render.test.ts",
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",
+    "test:my-plan-default-participants": "tsx src/features/my-plan/lib/resolveDefaultParticipants.test.ts",
     "test:weather-provider": "tsx src/features/hero-weather/api/weather-provider.test.ts",
     "test:unp-verification": "tsx src/lib/verification/unpChecksum.test.ts && tsx src/lib/verification/companyNameMatch.test.ts && tsx src/server/egr/verifyUnp.test.ts",
     "test:redirect-manifest": "tsx src/lib/seo/redirectManifest.test.ts",
