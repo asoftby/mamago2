@@ -1,9 +1,27 @@
 import { redirect } from "next/navigation";
+import { Playfair_Display, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { Container } from "@/components/ui/Container";
 import { IdeasClient } from "./IdeasClient";
 import type { IdeaItem } from "./types";
+
+const ideasSerif = Playfair_Display({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+  variable: "--font-ideas-serif",
+});
+const ideasSans = Hanken_Grotesk({
+  subsets: ["latin", "cyrillic-ext"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-ideas-sans",
+});
+const ideasMono = JetBrains_Mono({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500"],
+  variable: "--font-ideas-mono",
+});
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { listOfferIdeas } from "@/server/services/idea.service";
@@ -454,7 +472,18 @@ export default async function IdeasPage() {
   const ideas = await getUserIdeas(user.id);
 
   return (
-    <div className="min-h-screen bg-[#FCFBF8]">
+    <div
+      className={`relative min-h-screen bg-[#F6F2EA] ${ideasSerif.variable} ${ideasSans.variable} ${ideasMono.variable}`}
+      style={{ fontFamily: "var(--font-ideas-sans)" }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[1000] opacity-[0.05] mix-blend-multiply"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
+        }}
+      />
       <Container className="max-w-[1200px] px-4 pb-28 pt-6 sm:px-6 sm:pb-32 sm:pt-8 lg:px-8 lg:pt-10">
         <IdeasClient initialIdeas={ideas} discoveryHref="/minsk" />
       </Container>

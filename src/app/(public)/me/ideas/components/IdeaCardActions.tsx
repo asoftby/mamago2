@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CalendarPlus, Check, ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { C } from "../theme";
 
 type IdeaCardActionsProps = {
   isPlanned: boolean;
@@ -35,7 +36,8 @@ export function IdeaCardActions({
         <Button
           type="button"
           asChild
-          className="h-10 flex-1 rounded-full border-0 bg-[rgba(20,18,16,0.06)] px-4 text-sm font-semibold text-[#141210] shadow-none transition-colors hover:bg-[rgba(20,18,16,0.09)]"
+          className="h-[46px] flex-1 rounded-full border px-4 text-sm font-semibold shadow-none transition-colors"
+          style={{ borderColor: C.line2, background: "transparent", color: C.ink }}
         >
           <Link href={publicHref}>
             <ExternalLink className="size-4" />
@@ -47,12 +49,12 @@ export function IdeaCardActions({
           type="button"
           onClick={onSchedule}
           disabled={scheduleDisabled}
-          className={cn(
-            "h-10 flex-1 rounded-full border-0 px-4 text-sm font-semibold shadow-none transition-colors",
+          className={cn("h-[46px] flex-1 rounded-full border-0 px-4 text-sm font-semibold shadow-none transition-colors")}
+          style={
             isPlanned
-              ? "bg-[rgba(20,18,16,0.06)] text-[#141210] hover:bg-[rgba(20,18,16,0.09)]"
-              : "bg-[#EF8759] text-white hover:bg-[#E07848]",
-          )}
+              ? { background: "rgba(20,18,16,0.06)", color: C.ink }
+              : { background: C.accent, color: "#fff" }
+          }
         >
           {isScheduling ? (
             <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -73,7 +75,8 @@ export function IdeaCardActions({
         disabled={removeDisabled}
         aria-label="Убрать из идей"
         title="Убрать из идей"
-        className="size-10 rounded-full border-[rgba(20,18,16,0.08)] bg-white text-[rgba(20,18,16,0.65)] shadow-none hover:bg-[rgba(20,18,16,0.04)] hover:text-[#141210]"
+        className="size-[46px] shrink-0 rounded-full border bg-transparent shadow-none transition-colors"
+        style={{ borderColor: C.line2, color: C.ink3 }}
       >
         {isRemoving ? (
           <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
