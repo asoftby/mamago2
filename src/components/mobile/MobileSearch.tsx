@@ -199,8 +199,14 @@ export function MobileSearch({
   }, [results, activeIndex]);
 
   return (
-    <div className="space-y-0">
-      <div className="px-4 pb-3 pt-2">
+    <div
+      className={cn(
+        showAutocomplete
+          ? "flex min-h-0 flex-1 flex-col"
+          : "space-y-0",
+      )}
+    >
+      <div className="shrink-0 px-4 pb-3 pt-2">
         <MobileSearchHeroRow
           value={searchText}
           onChange={onSearchTextChange}
@@ -212,8 +218,9 @@ export function MobileSearch({
       </div>
 
       {showAutocomplete ? (
-        <div className="px-4 pb-4">
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-2">
           <SearchResults
+            variant="sheet"
             query={searchText}
             trimmedQuery={queryTrim}
             loading={loading || debouncing}
@@ -266,7 +273,7 @@ export function MobileSearch({
                           {intentConfig.label}
                         </span>
                         {!intentConfig.navigationEnabled && intentConfig.comingSoon ? (
-                          <ComingSoonBadge className="px-1 py-0 text-[7px]" />
+                          <ComingSoonBadge className="px-1 py-0 text-[9px]" />
                         ) : null}
                       </span>
                     </>

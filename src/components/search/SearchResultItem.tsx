@@ -2,6 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 
 const TYPE_LABELS: Record<SearchResultItemType["type"], string> = {
   activity: "Событие",
@@ -29,6 +31,14 @@ function highlightText(text: string, query: string) {
   );
 }
 
+function MetaLine({ text }: { text: string }) {
+  return (
+    <p className="truncate text-xs text-neutral-500">
+      {renderCurrencyText(normalizeUiCurrencyText(text), { iconSize: "sm" })}
+    </p>
+  );
+}
+
 export function SearchResultItem({
   item,
   query,
@@ -40,6 +50,14 @@ export function SearchResultItem({
   active?: boolean;
   onNavigate: () => void;
 }) {
+  const isActivity = item.type === "activity";
+  const addressLine = isActivity ? item.summaryLine?.trim() || null : null;
+  const detailLine = item.metaLine?.trim() || null;
+  const fallbackSummary =
+    !isActivity && item.summaryLine?.trim()
+      ? item.summaryLine.trim()
+      : TYPE_LABELS[item.type];
+
   return (
     <button
       type="button"
@@ -64,14 +82,23 @@ export function SearchResultItem({
           </div>
         )}
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <p className="truncate text-sm font-semibold text-neutral-900">
           {highlightText(item.title, query)}
         </p>
-        <p className="line-clamp-2 text-xs text-muted-foreground">
-          {item.summaryLine?.trim() ? item.summaryLine.trim() : TYPE_LABELS[item.type]}
-        </p>
-        <p className="truncate text-xs text-neutral-500">{item.metaLine}</p>
+        {isActivity ? (
+          <>
+            {addressLine ? (
+              <p className="truncate text-xs text-muted-foreground">{addressLine}</p>
+            ) : null}
+            {detailLine ? <MetaLine text={detailLine} /> : null}
+          </>
+        ) : (
+          <>
+            <p className="line-clamp-2 text-xs text-muted-foreground">{fallbackSummary}</p>
+            {detailLine ? <MetaLine text={detailLine} /> : null}
+          </>
+        )}
       </div>
     </button>
   );

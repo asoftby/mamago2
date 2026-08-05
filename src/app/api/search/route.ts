@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import type { SearchResultItem, SearchResultType } from "@/lib/search/types";
 import { logSearchQuery } from "@/lib/search/logSearchQuery";
 import { getCurrentUser } from "@/lib/auth/server";
+import { activityAddressLine, activityMetaLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
 
 function entityTypeToResultType(t: string): SearchResultType {
   if (
@@ -49,15 +50,124 @@ export async function GET(request: Request) {
       },
     });
 
-    const results: SearchResultItem[] = docs.map((d) => ({
-      id: d.entityId,
-      type: entityTypeToResultType(d.entityType),
-      title: d.title,
-      url: d.urlPath,
-      imageUrl: d.imageUrl,
-      summaryLine: d.summaryLine,
-      metaLine: d.metaLine,
-    }));
+    const activityIds = docs
+      .filter((d) => d.entityType === "activity")
+      .map((d) => d.entityId);
+
+    const activityById = new Map<
+      string,
+      {
+        summaryLine: string | null;
+        metaLine: string;
+      }
+    >();
+
+    if (activityIds.length > 0) {
+      const activities = await prisma.activity.findMany({
+        where: { id: { in: activityIds } },
+        select: {
+          id: true,
+          cityId: true,
+          ageLabel: true,
+          ageTags: true,
+          ageMinMonths: true,
+          ageMaxMonths: true,
+          priceFrom: true,
+          priceText: true,
+          currency: true,
+          nextOccurrenceAt: true,
+          place: {
+            select: {
+              title: true,
+              shortAddress: true,
+              formattedAddr: true,
+              displayAddress: true,
+              customAddress: true,
+              city: { select: { name: true } },
+            },
+          },
+          venue: {
+            select: {
+              title: true,
+              addressLine: true,
+              place: {
+                select: {
+                  title: true,
+                  shortAddress: true,
+                  formattedAddr: true,
+                  displayAddress: true,
+                  customAddress: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const cityIds = [
+        ...new Set(
+          activities
+            .map((a) => a.cityId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
+      const cities =
+        cityIds.length > 0
+          ? await prisma.city.findMany({
+              where: { id: { in: cityIds } },
+              select: { id: true, name: true },
+            })
+          : [];
+      const cityNameById = new Map(cities.map((c) => [c.id, c.name]));
+
+      for (const activity of activities) {
+        const venuePlace = activity.venue?.place;
+        const cityName =
+          (activity.cityId ? cityNameById.get(activity.cityId) : null) ??
+          activity.place?.city?.name ??
+          null;
+        activityById.set(activity.id, {
+          summaryLine: activityAddressLine({
+            venueTitle: activity.venue?.title,
+            venueAddressLine: activity.venue?.addressLine,
+            placeTitle: venuePlace?.title ?? activity.place?.title,
+            placeShortAddress: venuePlace?.shortAddress ?? activity.place?.shortAddress,
+            placeFormattedAddr: venuePlace?.formattedAddr ?? activity.place?.formattedAddr,
+            placeDisplayAddress: venuePlace?.displayAddress ?? activity.place?.displayAddress,
+            placeCustomAddress: venuePlace?.customAddress ?? activity.place?.customAddress,
+            cityName,
+          }),
+          metaLine: activityMetaLine({
+            nextOccurrenceAt: activity.nextOccurrenceAt,
+            ageLabel: resolveActivityAgeLabel({
+              ageLabel: activity.ageLabel,
+              ageTags: activity.ageTags,
+              ageMinMonths: activity.ageMinMonths,
+              ageMaxMonths: activity.ageMaxMonths,
+            }),
+            priceFrom: activity.priceFrom,
+            currency: activity.currency,
+            priceText: activity.priceText,
+          }),
+        });
+      }
+    }
+
+    const results: SearchResultItem[] = docs.map((d) => {
+      const type = entityTypeToResultType(d.entityType);
+      const live = type === "activity" ? activityById.get(d.entityId) : undefined;
+      return {
+        id: d.entityId,
+        type,
+        title: d.title,
+        url: d.urlPath,
+        imageUrl: d.imageUrl,
+        // For activities prefer live fields even if address is null — never fall back
+        // to the legacy shortDesc stored in SearchDocument.summaryLine.
+        summaryLine: live ? live.summaryLine : d.summaryLine,
+        metaLine: live ? live.metaLine : d.metaLine,
+      };
+    });
 
     // Log search query (fire-and-forget)
     logSearchQuery({

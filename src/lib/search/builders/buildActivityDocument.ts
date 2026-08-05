@@ -1,8 +1,8 @@
 import type { PrismaClient, SearchEntityType } from "@prisma/client";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { SEARCH_BOOST } from "@/lib/search/constants";
-import { activityMetaLine } from "@/lib/search/metaLines";
-import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
+import { activityAddressLine, activityMetaLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
+import { buildSearchText } from "@/lib/search/sanitizeSearchText";
 import { normalizeRichTextCurrency } from "@/lib/formatters/format-price";
 
 export type SearchDocUpsertFields = {
@@ -28,7 +28,26 @@ export async function buildActivityDocument(
       place: {
         select: {
           title: true,
+          shortAddress: true,
+          formattedAddr: true,
+          displayAddress: true,
+          customAddress: true,
           city: { select: { name: true, slug: true } },
+        },
+      },
+      venue: {
+        select: {
+          title: true,
+          addressLine: true,
+          place: {
+            select: {
+              title: true,
+              shortAddress: true,
+              formattedAddr: true,
+              displayAddress: true,
+              customAddress: true,
+            },
+          },
         },
       },
       eventCategory: { select: { nameRu: true } },
@@ -53,9 +72,21 @@ export async function buildActivityDocument(
 
   const cityName = cityRow?.name ?? activity.place?.city?.name ?? null;
   const citySlugForPath = cityRow?.slug ?? activity.place?.city?.slug ?? null;
+  const venuePlace = activity.venue?.place;
 
   const programNames = activity.programCategoryLinks.map((l) => l.category.nameRu);
   const filterLabels = activity.filterOptions.map((f) => f.filterOption.label);
+
+  const addressLine = activityAddressLine({
+    venueTitle: activity.venue?.title,
+    venueAddressLine: activity.venue?.addressLine,
+    placeTitle: venuePlace?.title ?? activity.place?.title,
+    placeShortAddress: venuePlace?.shortAddress ?? activity.place?.shortAddress,
+    placeFormattedAddr: venuePlace?.formattedAddr ?? activity.place?.formattedAddr,
+    placeDisplayAddress: venuePlace?.displayAddress ?? activity.place?.displayAddress,
+    placeCustomAddress: venuePlace?.customAddress ?? activity.place?.customAddress,
+    cityName,
+  });
 
   const searchText = buildSearchText([
     activity.title,
@@ -71,15 +102,24 @@ export async function buildActivityDocument(
     ...programNames,
     ...filterLabels,
     activity.place?.title,
+    activity.venue?.title,
+    activity.venue?.addressLine,
+    addressLine,
     cityName,
     activity.metroStation?.name,
   ]);
 
   const metaLine = activityMetaLine({
     nextOccurrenceAt: activity.nextOccurrenceAt,
-    ageLabel: activity.ageLabel,
+    ageLabel: resolveActivityAgeLabel({
+      ageLabel: activity.ageLabel,
+      ageTags: activity.ageTags,
+      ageMinMonths: activity.ageMinMonths,
+      ageMaxMonths: activity.ageMaxMonths,
+    }),
     priceFrom: activity.priceFrom,
     currency: activity.currency,
+    priceText: activity.priceText,
   });
 
   const urlPath = publicActivityPath(activity.id, citySlugForPath ?? activity.cityId, activity.slug);
@@ -91,7 +131,7 @@ export async function buildActivityDocument(
     entityId: activity.id,
     title: activity.title,
     searchText: searchText || activity.title,
-    summaryLine: summarizeForSearchCard(activity.shortDesc),
+    summaryLine: addressLine,
     metaLine,
     imageUrl: activity.coverImageUrl,
     urlPath,

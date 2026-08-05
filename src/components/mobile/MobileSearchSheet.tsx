@@ -173,6 +173,7 @@ export function MobileSearchSheet({
   const router = useRouter();
   const { applied, actions } = useDiscoveryFilters();
   const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
+  const loadHeaderGeoFilters = headerGeoFilters?.loadGeoFilters;
 
   const [activeSection, setActiveSection] = useState<AccordionSection | null>(
     null,
@@ -252,11 +253,11 @@ export function MobileSearchSheet({
   const family = useFamilyPersona();
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !loadHeaderGeoFilters) {
       return;
     }
-    void headerGeoFilters?.loadGeoFilters(pendingCitySlug);
-  }, [headerGeoFilters, isOpen, pendingCitySlug]);
+    void loadHeaderGeoFilters(pendingCitySlug);
+  }, [isOpen, loadHeaderGeoFilters, pendingCitySlug]);
 
   const profileChildren = useMemo(
     () =>
@@ -880,10 +881,15 @@ export function MobileSearchSheet({
       <div
         ref={scrollRegionRef}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto",
-          isHubPickMode
-            ? "pb-[calc(1rem+env(safe-area-inset-bottom))]"
-            : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]",
+          "flex min-h-0 flex-1 flex-col",
+          searchText.trim().length >= 2
+            ? "overflow-hidden"
+            : cn(
+                "overflow-y-auto",
+                isHubPickMode
+                  ? "pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                  : "pb-[calc(5.5rem+env(safe-area-inset-bottom))]",
+              ),
         )}
       >
         {cityHubOnly && selectedIntent == null ? (

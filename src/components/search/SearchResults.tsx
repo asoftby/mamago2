@@ -67,6 +67,7 @@ export function SearchResults({
   activeIndex,
   onPopularPick,
   onSelectResult,
+  variant = "overlay",
 }: {
   query: string;
   trimmedQuery: string;
@@ -75,6 +76,8 @@ export function SearchResults({
   activeIndex: number;
   onPopularPick: (term: string) => void;
   onSelectResult: (item: SearchResultItemType) => void;
+  /** overlay — десктопный дропдаун (ограниченная высота); sheet — fullscreen mobile */
+  variant?: "overlay" | "sheet";
 }) {
   const lastSearch = useLastPublicSearchQuery();
   // Counts are not wired from SearchQueryLog yet → empty until threshold can be met.
@@ -86,7 +89,10 @@ export function SearchResults({
   return (
     <div
       className={cn(
-        "mt-3 max-h-[min(50vh,420px)] overflow-y-auto rounded-xl border border-neutral-100 bg-white/95 shadow-inner",
+        "overflow-y-auto rounded-xl border border-neutral-100 bg-white/95 shadow-inner",
+        variant === "sheet"
+          ? "mt-0 min-h-0 flex-1"
+          : "mt-3 max-h-[min(50vh,420px)]",
       )}
     >
       {showEmptyPanel ? (
