@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
+import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { BlogIndex } from "./BlogIndex";
 
@@ -15,9 +16,16 @@ export default async function BlogPage({
 }) {
   const { city: citySlug } = await searchParams;
 
-  // /blog?city=minsk would duplicate /{city}/blog — kill it at the route level.
-  // City-scoped blog listing lives exclusively at /{city}/blog.
-  if (citySlug) notFound();
+  // Preserve legacy/query-based links while keeping /{city}/blog as the only
+  // canonical city-scoped journal listing.
+  if (citySlug) {
+    permanentRedirect(
+      buildCityPublicPath({
+        citySlug,
+        type: "journal",
+      }),
+    );
+  }
 
   return (
     <main>
