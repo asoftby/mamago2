@@ -4,7 +4,7 @@ export type PublicSocialKey = "instagram" | "tiktok" | "telegram";
 const FALLBACK_SOCIAL: Record<PublicSocialKey, string> = {
   instagram: "https://www.instagram.com/mamago.by/",
   tiktok: "https://www.tiktok.com/@tanya_mamago",
-  telegram: "https://t.me/mamago_2_bot",
+  telegram: "https://t.me/mamagoby",
 };
 
 function telegramHrefFromBotConfig(): string | null {

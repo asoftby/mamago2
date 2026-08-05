@@ -33,8 +33,6 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
             <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Проект</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">О нас</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Команда</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Вакансии</Link>
             </div>
           </div>
 
@@ -42,8 +40,6 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
           <div className="flex flex-col gap-4">
             <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Партнёрам</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-primary transition-colors">Добавить место</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Реклама</Link>
               <Link href="#" className="hover:text-primary transition-colors">Бизнес-аккаунт</Link>
             </div>
           </div>
@@ -52,9 +48,6 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
           <div className="flex flex-col gap-4">
             <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Помощь</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-primary transition-colors">Поддержка</Link>
-              <Link href="#" className="hover:text-primary transition-colors">Контакты</Link>
-              <Link href="#" className="hover:text-primary transition-colors">FAQ</Link>
               <a
                 href="https://t.me/shapovalovalexey"
                 target="_blank"
@@ -68,7 +61,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
 
           {/* Column 4 */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Legal</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Информация</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Политика конфиденциальности</Link>
               <Link href="#" className="hover:text-primary transition-colors">Пользовательское соглашение</Link>
