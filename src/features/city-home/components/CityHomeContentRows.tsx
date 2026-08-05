@@ -288,7 +288,7 @@ export function CityHomeJournalSection({
               index === 0
                 ? "w-full min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]"
                 : "w-[calc((100%-0.75rem)/2)] min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]",
-              "rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors",
+              "rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors group",
             )}
           >
             <div
@@ -310,13 +310,12 @@ export function CityHomeJournalSection({
                 />
               )}
             </div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-              {a.category?.name ?? (a.contentType === "NEWS" ? "Новость" : "Статья")}
-            </p>
-            <p className="text-sm font-semibold text-neutral-900 leading-snug line-clamp-3 mt-2">
+            <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
               {a.title}
             </p>
-            <p className="text-xs text-neutral-400 mt-3">{a.readTime} мин чтения</p>
+            <p className="mt-3 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
+              {a.readTime} мин. чтения
+            </p>
           </Link>
         ))}
       </HorizontalCardRow>

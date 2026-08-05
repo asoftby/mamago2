@@ -91,7 +91,7 @@ export function MobileBottomNav({
             isHomeLogo
             size={NAV_ICON_SIZE}
             chrome="dark"
-            variant="bare"
+            className="border-2 border-white bg-white shadow-[0_4px_14px_rgba(0,0,0,0.14)]"
           />
 
           <PlanPillNavButton
