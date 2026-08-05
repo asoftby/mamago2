@@ -14,12 +14,13 @@ import { cn } from "@/lib/utils";
 import { MobileSearchHeroRow } from "@/components/mobile/MobileSearchHeroRow";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
-import { POPULAR, SearchResults } from "@/components/search/SearchResults";
+import { SearchResults } from "@/components/search/SearchResults";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import {
   PUBLIC_SEARCH_DEBOUNCE_MS,
   PUBLIC_SEARCH_RESULTS_LIMIT,
 } from "@/lib/search/constants";
+import { resolveVisiblePopularTags } from "@/lib/search/popularSearchTags";
 import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
 import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
 
@@ -158,6 +159,10 @@ export function MobileSearch({
 
   const showPopularBlock =
     searchState === "focused" && queryTrim.length < 2;
+  // Counts are not wired from SearchQueryLog yet → empty until threshold (≥20) can be met.
+  const popularTags = resolveVisiblePopularTags();
+  const showPopularHints =
+    showPopularBlock && (Boolean(lastSearch) || popularTags.length > 0);
 
   const showAutocomplete =
     searchState === "typing" && queryTrim.length >= 2;
@@ -282,7 +287,7 @@ export function MobileSearch({
             </div>
           ) : null}
 
-          {showPopularBlock ? (
+          {showPopularHints ? (
             <div
               className={cn(
                 "animate-in fade-in slide-in-from-top-1 px-4 pb-4 duration-200",
@@ -293,7 +298,7 @@ export function MobileSearch({
                   <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
                     Последний поиск
                   </p>
-                  <ul className="mb-5 flex flex-wrap gap-2">
+                  <ul className={cn("flex flex-wrap gap-2", popularTags.length > 0 && "mb-5")}>
                     <li className="max-w-full">
                       <button
                         type="button"
@@ -308,23 +313,27 @@ export function MobileSearch({
                   </ul>
                 </>
               ) : null}
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                Популярное
-              </p>
-              <ul className="flex flex-wrap gap-2">
-                {POPULAR.map((term) => (
-                  <li key={term}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handlePopularPick(term)}
-                      className="rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-sm font-medium text-neutral-800 transition-colors hover:border-border-brand-soft hover:bg-brand-soft active:scale-[0.98]"
-                    >
-                      {term}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {popularTags.length > 0 ? (
+                <>
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                    Популярное
+                  </p>
+                  <ul className="flex flex-wrap gap-2">
+                    {popularTags.map((term) => (
+                      <li key={term}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handlePopularPick(term)}
+                          className="rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-sm font-medium text-neutral-800 transition-colors hover:border-border-brand-soft hover:bg-brand-soft active:scale-[0.98]"
+                        >
+                          {term}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
             </div>
           ) : null}
 
