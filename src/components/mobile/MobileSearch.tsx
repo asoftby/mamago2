@@ -12,6 +12,7 @@ import {
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { MobileSearchHeroRow } from "@/components/mobile/MobileSearchHeroRow";
+import { ComingSoonBadge } from "@/components/city/ComingSoonBadge";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { SearchResults } from "@/components/search/SearchResults";
@@ -46,7 +47,7 @@ export function MobileSearch({
 }: MobileSearchProps) {
   const lastSearch = useLastPublicSearchQuery();
   const inputRef = useRef<HTMLInputElement>(null);
-  const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  const tabsRef = useRef<(HTMLElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [inputFocused, setInputFocused] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -68,6 +69,9 @@ export function MobileSearch({
   /** Фильтры показываем только при выбранном разделе и без длинного запроса (чтобы не дублировать с автодополнением). */
   const showFiltersSection =
     selectedIntent != null && queryTrim.length < 2;
+  const selectedIntentEnabled = DISCOVERY_INTENT_ITEMS.some(
+    (item) => item.id === selectedIntent && item.navigationEnabled,
+  );
 
   useLayoutEffect(() => {
     if (selectedIntent == null) {
@@ -225,27 +229,15 @@ export function MobileSearch({
             <div className="border-b border-gray-100 py-4">
               <div
                 ref={containerRef}
-                className="relative flex gap-4 overflow-x-auto px-4 no-scrollbar"
+                className="relative grid grid-cols-4 px-2"
               >
                 {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
                   const isActive =
+                    intentConfig.navigationEnabled &&
                     selectedIntent != null &&
                     intentConfig.id === selectedIntent;
-                  return (
-                    <button
-                      key={intentConfig.id}
-                      type="button"
-                      ref={(el) => {
-                        tabsRef.current[index] = el;
-                      }}
-                      onClick={() => onIntentSelect(intentConfig.id)}
-                      className={cn(
-                        "flex min-w-[80px] flex-col items-center gap-2 rounded-xl p-3 transition-all duration-200",
-                        isActive
-                          ? "text-gray-900"
-                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-95",
-                      )}
-                    >
+                  const content = (
+                    <>
                       {intentConfig.image ? (
                         <div className="relative flex h-9 w-9 items-center justify-center">
                           <Image
@@ -255,24 +247,61 @@ export function MobileSearch({
                             height={36}
                             className={cn(
                               "object-contain transition-all duration-200",
-                              isActive ? "scale-100" : "scale-90 opacity-80",
+                              isActive ? "scale-100" : "scale-90 opacity-60",
                             )}
                           />
                         </div>
                       ) : (
                         <div className="h-9 w-9 rounded-full bg-gray-200" />
                       )}
-                      <span
-                        className={cn(
-                          "text-center text-xs font-medium leading-tight transition-all duration-200",
-                          isActive
-                            ? "font-semibold text-gray-900"
-                            : "text-gray-500",
-                        )}
-                      >
-                        {intentConfig.label}
+                      <span className="flex min-w-0 flex-col items-center gap-1">
+                        <span
+                          className={cn(
+                            "whitespace-nowrap text-center text-[11px] font-medium leading-tight transition-all duration-200 min-[375px]:text-xs",
+                            isActive
+                              ? "font-semibold text-gray-900"
+                              : "text-gray-400",
+                          )}
+                        >
+                          {intentConfig.label}
+                        </span>
+                        {!intentConfig.navigationEnabled && intentConfig.comingSoon ? (
+                          <ComingSoonBadge className="px-1 py-0 text-[7px]" />
+                        ) : null}
                       </span>
+                    </>
+                  );
+
+                  return intentConfig.navigationEnabled ? (
+                    <button
+                      key={intentConfig.id}
+                      type="button"
+                      ref={(el) => {
+                        tabsRef.current[index] = el;
+                      }}
+                      onClick={() => onIntentSelect(intentConfig.id)}
+                      className={cn(
+                        "flex min-w-0 cursor-pointer flex-col items-center gap-2 rounded-xl px-1 py-2 transition-all duration-200",
+                        isActive
+                          ? "text-gray-900"
+                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 active:scale-95",
+                      )}
+                    >
+                      {content}
                     </button>
+                  ) : (
+                    <span
+                      key={intentConfig.id}
+                      ref={(el) => {
+                        tabsRef.current[index] = el;
+                      }}
+                      role="link"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      className="flex min-w-0 cursor-default flex-col items-center gap-2 rounded-xl px-1 py-2 text-gray-400"
+                    >
+                      {content}
+                    </span>
                   );
                 })}
                 <div
@@ -280,7 +309,7 @@ export function MobileSearch({
                   style={{
                     left: `${indicatorStyle.left}px`,
                     width: `${indicatorStyle.width}px`,
-                    opacity: selectedIntent == null ? 0 : 1,
+                    opacity: selectedIntentEnabled ? 1 : 0,
                   }}
                 />
               </div>
