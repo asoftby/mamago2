@@ -23,6 +23,9 @@ export type EventPageSession = {
 export type EventPageMedia = {
   posterUrl: string;
   posterAlt: string;
+  /** Intrinsic poster dimensions used to preserve its ratio before it loads. */
+  posterWidth?: number;
+  posterHeight?: number;
   /** 16:9 YouTube embed id — shown after poster. */
   trailerYoutubeId?: string;
   trailerLabel?: string;

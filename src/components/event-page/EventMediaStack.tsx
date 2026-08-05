@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import type { EventPageMedia } from "@/lib/event/eventPageTypes";
 
 export function EventMediaStack({
@@ -11,9 +13,14 @@ export function EventMediaStack({
   media: EventPageMedia;
   className?: string;
 }) {
-  const { posterUrl, posterAlt, reel, trailerYoutubeId, trailerLabel } = media;
+  const { posterUrl, posterAlt, posterWidth, posterHeight, reel, trailerYoutubeId, trailerLabel } = media;
+  const [displayPosterUrl, setDisplayPosterUrl] = useState(posterUrl);
   const trailerRef = useRef<HTMLDivElement>(null);
   const reelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setDisplayPosterUrl(posterUrl);
+  }, [posterUrl]);
 
   useEffect(() => {
     const targets = [trailerRef.current, reelRef.current].filter(Boolean) as Element[];
@@ -40,18 +47,18 @@ export function EventMediaStack({
 
   return (
     <aside className={cn("flex flex-col gap-3.5", className)}>
-      {/* Poster — 4:5 portrait */}
-      <div
-        className="relative overflow-hidden rounded-[18px] bg-[#E8E0D4]"
-        style={{ aspectRatio: "4/5" }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={posterUrl}
+      {/* Poster keeps its intrinsic ratio for portrait, landscape and square art. */}
+      <div className="overflow-hidden rounded-[18px] bg-[#E8E0D4]">
+        <Image
+          src={displayPosterUrl}
           alt={posterAlt}
-          className="h-full w-full object-cover"
-          loading="eager"
-          decoding="async"
+          width={displayPosterUrl === posterUrl ? (posterWidth ?? 1200) : 1200}
+          height={displayPosterUrl === posterUrl ? (posterHeight ?? 630) : 630}
+          className="block h-auto w-full"
+          sizes="(min-width: 1024px) 440px, calc(100vw - 32px)"
+          priority
+          unoptimized={isAppMediaUrl(displayPosterUrl)}
+          onError={() => setDisplayPosterUrl("/og-default.jpg")}
         />
       </div>
 

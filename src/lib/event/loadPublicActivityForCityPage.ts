@@ -64,8 +64,9 @@ export async function loadPublicActivityForCityPage(
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, url: true, mediaAssetId: true },
+        select: { id: true, url: true, mediaAssetId: true, width: true, height: true },
       },
+      coverImage: { select: { width: true, height: true } },
       sessions: {
         where: { startsAt: { gte: now } },
         orderBy: { startsAt: "asc" },
@@ -163,6 +164,7 @@ export async function loadPublicActivityForCityPage(
     faqItems: (activity.faqItems as unknown) ?? null,
     scheduleJson: activity.scheduleJson,
     coverImageId: activity.coverImageId,
+    coverImage: activity.coverImage,
     coverImageUrl: resolveActivityCoverUrl({
       coverImageId: activity.coverImageId,
       coverImageUrl: activity.coverImageUrl,
@@ -170,9 +172,17 @@ export async function loadPublicActivityForCityPage(
         id: img.id,
         url: img.url,
         mediaAssetId: img.mediaAssetId,
+        width: img.width,
+        height: img.height,
       })),
     }),
-    images: activity.images.map((img) => ({ id: img.id, url: img.url })),
+    images: activity.images.map((img) => ({
+      id: img.id,
+      url: img.url,
+      mediaAssetId: img.mediaAssetId,
+      width: img.width,
+      height: img.height,
+    })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
     place: place
       ? {

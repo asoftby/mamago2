@@ -45,7 +45,14 @@ export type ActivityForEventPageInput = {
   coverImageUrl: string | null;
   /** Primary media asset id for cover image. */
   coverImageId?: string | null;
-  images: Array<{ id: string; url: string; mediaAssetId?: string | null }>;
+  coverImage?: { width: number | null; height: number | null } | null;
+  images: Array<{
+    id: string;
+    url: string;
+    mediaAssetId?: string | null;
+    width?: number | null;
+    height?: number | null;
+  }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   /** Контактные телефоны события (собственные, до фоллбэка на площадку) */
   phone?: string | null;
@@ -449,6 +456,17 @@ export function buildEventPageDataFromPrismaActivity(
       coverImageUrl: activity.coverImageUrl,
       images: activity.images,
     }) ?? FALLBACK_POSTER;
+  const posterImage = activity.images.find(
+    (image) =>
+      image.url === poster ||
+      image.id === activity.coverImageId ||
+      image.mediaAssetId === activity.coverImageId,
+  );
+  const posterWidth = activity.coverImage?.width ?? posterImage?.width;
+  const posterHeight = activity.coverImage?.height ?? posterImage?.height;
+  const hasPosterDimensions =
+    typeof posterWidth === "number" && posterWidth > 0 &&
+    typeof posterHeight === "number" && posterHeight > 0;
 
   const sessions: EventPageData["sessions"] = activity.sessions.map((s) => ({
     id: s.id,
@@ -478,6 +496,8 @@ export function buildEventPageDataFromPrismaActivity(
     media: {
       posterUrl: poster,
       posterAlt: activity.title,
+      posterWidth: hasPosterDimensions ? posterWidth : 1200,
+      posterHeight: hasPosterDimensions ? posterHeight : 630,
     },
     sessions,
     venue: venueFromActivity(activity, citySlug),
