@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
+import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import {
   getIntentFromPath,
   getCityFromPath,
@@ -55,6 +56,8 @@ export function MobileHeader() {
   const displayIntent = searchIntent ?? (isCityHubRoute ? undefined : "kuda");
 
   const isDiscoveryPage = searchIntent !== null && currentCity !== null;
+  /** Городской хаб и 4 discovery-раздела — только они получают строку разделов. */
+  const showSectionTabs = isCityHubRoute || routeIntent !== null;
   const intentConfig = searchIntent
     ? DISCOVERY_INTENT_CONFIG[searchIntent]
     : null;
@@ -110,6 +113,15 @@ export function MobileHeader() {
                 )}
             </div>
           </div>
+
+          {showSectionTabs ? (
+            <DiscoveryIntentTabs
+              city={displayCity}
+              currentIntent={routeIntent}
+              variant="airbnb"
+              density="compact"
+            />
+          ) : null}
         </div>
       </header>
 
