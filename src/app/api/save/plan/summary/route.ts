@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsInRange } from "@/server/services/plan.service";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 function todayISO(): string {
-  return new Date().toISOString().split("T")[0]!;
+  return getLocalDateKey();
 }
 
 function addDaysIso(dateISO: string, days: number): string {
@@ -24,7 +25,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid range" }, { status: 400 });
   }
 
-  const items = await listPlanItemsInRange(user.id, from, to);
+  const now = new Date();
+  const items = (await listPlanItemsInRange(user.id, from, to)).filter(
+    (item) => item.date > from || item.startsAt == null || item.startsAt >= now,
+  );
   const countsByDate = items.reduce<Record<string, number>>((acc, item) => {
     acc[item.date] = (acc[item.date] ?? 0) + 1;
     return acc;
@@ -50,10 +54,18 @@ export async function GET(req: NextRequest) {
           },
         };
 
+  const nearestDate = items[0]?.date ?? null;
+  const nearestItems = nearestDate
+    ? items.filter((item) => item.date === nearestDate).slice(0, 2)
+    : [];
+
   return NextResponse.json({
     todayCount,
     weekItemsCount,
     nextPlanItem,
     countsByDate,
+    nearestDate,
+    nearestCount: nearestDate ? countsByDate[nearestDate] ?? 0 : 0,
+    nearestItems,
   });
 }

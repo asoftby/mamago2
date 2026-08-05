@@ -16,6 +16,8 @@ import {
 } from "@/features/filters/discovery/childrenScope.store";
 import { toast } from "@/lib/toast";
 import { WeekCalendarStrip } from "./WeekCalendarStrip";
+import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
+import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
 import { QuickAddAdultModal } from "@/components/adults/QuickAddAdultModal";
@@ -38,6 +40,16 @@ import {
   type PlanSuggestionItem,
 } from "../lib/fetchPlanSuggestions";
 import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
+import {
+  loadRecommendationDraft,
+  persistRecommendationDraft,
+  recommendationDraftKey,
+  reconcileAddedActivityIds,
+} from "../lib/planRecommendationDraftStorage";
+import {
+  focusPlanRecommendationResults,
+  PLAN_RECOMMENDATION_RESULTS_A11Y,
+} from "../lib/planRecommendationUi";
 
 interface PlanChildChip {
   id: string;
@@ -49,6 +61,11 @@ interface PlanMainContentProps {
   selectedDate: string;
   onChangeDate?: (date: string) => void;
   planItemsByDate?: Record<string, PlanItemWithActivity[]>;
+  nearestPlanDate?: string | null;
+  nearestPlanCount?: number;
+  nearestPlanItems?: PlanItemWithActivity[];
+  plannedCountByDate?: Record<string, number>;
+  serverPlanSnapshotConfirmed?: boolean;
   todayIso?: string;
   layout?: "default" | "desktop";
   onAddItemToPlan?: (item: PlanItemWithActivity) => void;
@@ -341,6 +358,11 @@ export function PlanMainContent({
   selectedDate,
   onChangeDate,
   planItemsByDate,
+  nearestPlanDate = null,
+  nearestPlanCount = 0,
+  nearestPlanItems = [],
+  plannedCountByDate = {},
+  serverPlanSnapshotConfirmed = false,
   todayIso,
   layout = "default",
   onAddItemToPlan,
@@ -385,6 +407,8 @@ export function PlanMainContent({
   const lastAgeRangeValuesRef = useRef<string[]>([]);
   /** Все id, когда-либо показанные в подборках этого сеанса — не даём «Ещё варианты» повторяться. */
   const shownSuggestionActivityIdsRef = useRef<Set<string>>(new Set());
+  const hydratedDraftKeyRef = useRef<string | null>(null);
+  const skipNextDraftPersistRef = useRef<string | null>(null);
 
   const handleRemoveFromPlan = async (itemId: string) => {
     if (!onRemoveItemFromPlan) return;
@@ -412,6 +436,10 @@ export function PlanMainContent({
     if (!family?.selectedPersonaIds) return [];
     return family.selectedPersonaIds;
   }, [family?.selectedPersonaIds]);
+  const recommendationDraftKeyValue = useMemo(
+    () => recommendationDraftKey({ citySlug: city, date: selectedDate, audienceIds: selectedPersonaIds }),
+    [city, selectedDate, selectedPersonaIds],
+  );
   const effectiveSelectedChildIds = useMemo(() => {
     if (selectedPersonaIds.length > 0) {
       const selectedChildSet = new Set(
@@ -553,15 +581,17 @@ export function PlanMainContent({
   }, [onRequestClose, router]);
 
   const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
-  const plannedCountByDate = useMemo(() => {
-    const result: Record<string, number> = {};
-
-    for (const [date, items] of Object.entries(planItemsByDate ?? {})) {
-      result[date] = items.length;
-    }
-
-    return result;
-  }, [planItemsByDate]);
+  const upcomingSelection = useMemo(
+    () => selectUpcomingPlanItems({
+      selectedDate,
+      todayIso: todayIso ?? new Date().toISOString().split("T")[0]!,
+      selectedDateItems: dayItems,
+      nearestDate: nearestPlanDate,
+      nearestCount: nearestPlanCount,
+      nearestItems: nearestPlanItems,
+    }),
+    [dayItems, nearestPlanCount, nearestPlanDate, nearestPlanItems, selectedDate, todayIso],
+  );
 
   const slotFromStartsAt = useCallback(
     (
@@ -610,9 +640,7 @@ export function PlanMainContent({
         setSuggestions(results);
         setSuggestionsGeneration((v) => v + 1);
         window.setTimeout(() => {
-          document
-            .getElementById("plan-recommendation-results")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          focusPlanRecommendationResults(document);
         }, 120);
       } catch {
         setSuggestionsError(true);
@@ -783,6 +811,19 @@ export function PlanMainContent({
     return ids;
   }, [dayItems]);
 
+  useEffect(() => {
+    setAddedSuggestionActivityIds((current) => {
+      const reconciled = reconcileAddedActivityIds(
+        current,
+        inPlanActivityIds,
+        serverPlanSnapshotConfirmed,
+      );
+      return reconciled.length === current.length && reconciled.every((id, i) => id === current[i])
+        ? current
+        : reconciled;
+    });
+  }, [inPlanActivityIds, serverPlanSnapshotConfirmed]);
+
   const dayItemsSorted = useMemo(
     () => sortPlanItemsForDay(dayItems),
     [dayItems],
@@ -809,12 +850,48 @@ export function PlanMainContent({
   };
 
   useEffect(() => {
+    const draft = loadRecommendationDraft(recommendationDraftKeyValue);
+    setSuggestions(draft?.suggestions ?? []);
+    setSuggestionsGeneration(draft?.batchNumber ?? 0);
+    setSuggestionsError(false);
+    setAddedSuggestionActivityIds(draft?.addedActivityIds ?? []);
+    lastAgeRangeValuesRef.current = draft?.ageRangeValues ?? [];
+    shownSuggestionActivityIdsRef.current = new Set(draft?.shownActivityIds ?? []);
+    hydratedDraftKeyRef.current = recommendationDraftKeyValue;
+    skipNextDraftPersistRef.current = recommendationDraftKeyValue;
+  }, [recommendationDraftKeyValue]);
+
+  useEffect(() => {
+    if (hydratedDraftKeyRef.current !== recommendationDraftKeyValue) return;
+    if (skipNextDraftPersistRef.current === recommendationDraftKeyValue) {
+      skipNextDraftPersistRef.current = null;
+      return;
+    }
+    if (suggestionsGeneration === 0) {
+      persistRecommendationDraft(recommendationDraftKeyValue, null, selectedDate);
+      return;
+    }
+    persistRecommendationDraft(
+      recommendationDraftKeyValue,
+      {
+        suggestions,
+        batchNumber: suggestionsGeneration,
+        addedActivityIds: addedSuggestionActivityIds,
+        shownActivityIds: [...shownSuggestionActivityIdsRef.current],
+        ageRangeValues: lastAgeRangeValuesRef.current,
+        lastSuccessfulFetchAt: new Date().toISOString(),
+      },
+      selectedDate,
+    );
+  }, [recommendationDraftKeyValue, selectedDate, suggestions, suggestionsGeneration, addedSuggestionActivityIds]);
+
+  const handleChangeChoice = useCallback(() => {
     setSuggestions([]);
     setSuggestionsGeneration(0);
     setSuggestionsError(false);
-    setAddedSuggestionActivityIds([]);
     shownSuggestionActivityIdsRef.current = new Set();
-  }, [selectedDate, selectedPersonaIds]);
+    persistRecommendationDraft(recommendationDraftKeyValue, null, selectedDate);
+  }, [recommendationDraftKeyValue, selectedDate]);
 
   const participantLabels = useMemo(
     () => buildParticipantSummaryLabels(selectedPersonaIds, personas),
@@ -872,7 +949,11 @@ export function PlanMainContent({
     }
 
     return (
-      <div id="plan-recommendation-results" className="space-y-4">
+      <div
+        id="plan-recommendation-results"
+        className="space-y-4 outline-none"
+        {...PLAN_RECOMMENDATION_RESULTS_A11Y}
+      >
         {dayPartSections.length > 0 ? (
           <section className={compact ? "space-y-3" : "space-y-3"} aria-label="В вашем плане">
             {dayPartSections.map((section) => (
@@ -958,6 +1039,27 @@ export function PlanMainContent({
     </div>
   );
 
+  const renderRecommendationContext = () =>
+    suggestionsGeneration > 0 ? (
+      <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#FFF4EE] px-3 py-2">
+        <div className="min-w-0">
+          <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-primary shadow-sm">
+            Реши за меня
+          </span>
+          <p className="mt-1 truncate text-xs text-neutral-600">
+            {suggestions.length} идеи · подборка {suggestionsGeneration}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleChangeChoice}
+          className="shrink-0 rounded-full px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          Изменить выбор
+        </button>
+      </div>
+    ) : null;
+
   if (isDesktop) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-white">
@@ -979,6 +1081,16 @@ export function PlanMainContent({
               />
             </div>
           ) : null}
+
+          {upcomingSelection ? (
+            <UpcomingPlanBlock
+              items={upcomingSelection.items}
+              totalCount={upcomingSelection.count}
+              onNavigate={onRequestClose}
+            />
+          ) : null}
+
+          {renderRecommendationContext()}
 
           {awaitingAgeAnswer ? (
             <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
@@ -1074,6 +1186,16 @@ export function PlanMainContent({
             />
           </div>
         ) : null}
+
+        {upcomingSelection ? (
+          <UpcomingPlanBlock
+            items={upcomingSelection.items}
+            totalCount={upcomingSelection.count}
+            onNavigate={onRequestClose}
+          />
+        ) : null}
+
+        {renderRecommendationContext()}
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />

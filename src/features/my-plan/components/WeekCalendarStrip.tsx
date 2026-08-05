@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 import {
   buildWeekMonthLabel,
   getNextWeekStart,
@@ -78,7 +79,7 @@ export function WeekCalendarStrip({
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
   const yearLabel = useMemo(() => new Date(`${visibleWeekStart}T12:00:00`).getFullYear(), [visibleWeekStart]);
-  const todayIso = new Date().toISOString().split("T")[0] ?? "";
+  const todayIso = getLocalDateKey();
 
   const shiftWeek = (dir: 1 | -1) => {
     const nextStart = dir === 1 ? getNextWeekStart(visibleWeekStart) : getPrevWeekStart(visibleWeekStart);
@@ -187,15 +188,12 @@ export function WeekCalendarStrip({
                       title={plannedLabel}
                       className={cn(
                         "absolute left-1/2 bottom-0.5 z-10 -translate-x-1/2 inline-flex items-center justify-center",
-                        plannedCount === 1
-                          ? "h-1.5 w-1.5 rounded-full"
-                          : "min-w-4 rounded-full px-1 text-[9px] font-semibold leading-4",
+                        "h-1.5 w-1.5 rounded-full",
                         selected
                           ? "bg-white text-[#141210]"
                           : "bg-[#EF8759] text-white",
                       )}
                     >
-                      {plannedCount > 1 ? plannedCount : null}
                     </span>
                   ) : null}
                   {/* Today dot */}
