@@ -311,7 +311,7 @@ export function CityHomeJournalSection({
               )}
             </div>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-              {a.category}
+              {a.category?.name ?? (a.contentType === "NEWS" ? "Новость" : "Статья")}
             </p>
             <p className="text-sm font-semibold text-neutral-900 leading-snug line-clamp-3 mt-2">
               {a.title}

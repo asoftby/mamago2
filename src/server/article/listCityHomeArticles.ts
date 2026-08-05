@@ -12,7 +12,17 @@ export type CityHomeJournalArticle = {
   href: string;
   title: string;
   subtitle: string | null;
-  category: string;
+  contentType: "ARTICLE" | "NEWS";
+  category: {
+    id: string;
+    slug: string;
+    name: string;
+  } | null;
+  tags: Array<{
+    id: string;
+    slug: string;
+    name: string;
+  }>;
   readTime: number;
   isBreakingNews: boolean;
   publishedAt: Date | null;
@@ -79,7 +89,12 @@ export async function listCityHomeArticles(city: {
       publishedAt: true,
       heroImage: true,
       coverImage: { select: { publicUrl: true } },
-      category: { select: { nameRu: true } },
+      category: { select: { id: true, slug: true, nameRu: true } },
+      tags: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+        select: { id: true, slug: true, title: true },
+      },
     },
   });
 
@@ -93,10 +108,19 @@ export async function listCityHomeArticles(city: {
           : buildNationalArticlePath(row.slug),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-      category:
-        row.subtitle === BREAKING_NEWS_SUBTITLE
-          ? "Новость"
-          : row.category?.nameRu ?? "Статья",
+      contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
+      category: row.category
+        ? {
+            id: row.category.id,
+            slug: row.category.slug,
+            name: row.category.nameRu,
+          }
+        : null,
+      tags: row.tags.map((tag) => ({
+        id: tag.id,
+        slug: tag.slug,
+        name: tag.title,
+      })),
       isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
       readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
       publishedAt: row.publishedAt,

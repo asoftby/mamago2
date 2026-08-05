@@ -1,8 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
+import {
+  filterBlogArticles,
+  getArticlesForType,
+  getAvailableContentTypes,
+  getAvailableTags,
+  parseBlogContentType,
+  type BlogContentType,
+} from "./blogFilters";
 
 const TONES = [
   "from-[#F2C8A7] to-[#E89460]",
@@ -16,17 +25,53 @@ function fmtDate(d: Date | null): string {
   return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
-const FILTERS = [
-  { key: "all", label: "Все" },
-  { key: "Статья", label: "Статьи" },
-  { key: "Новость", label: "Новости" },
+const TYPE_FILTERS: Array<{ key: BlogContentType; label: string }> = [
+  { key: "ALL", label: "Все материалы" },
+  { key: "ARTICLE", label: "Статьи" },
+  { key: "NEWS", label: "Новости" },
 ];
 
 export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) {
-  const [active, setActive] = useState("all");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const availableTypes = getAvailableContentTypes(articles);
+  const requestedTypeParam = searchParams.get("type");
+  const requestedType = parseBlogContentType(requestedTypeParam);
+  const activeContentType =
+    requestedType === "ALL" || availableTypes.has(requestedType) ? requestedType : "ALL";
+  const articlesForType = getArticlesForType(articles, activeContentType);
+  const availableTags = getAvailableTags(articlesForType);
+  const requestedTagSlug = searchParams.get("tag");
+  const activeTagSlug = availableTags.some((tag) => tag.slug === requestedTagSlug)
+    ? requestedTagSlug
+    : null;
+  const filtered = filterBlogArticles(articles, activeContentType, activeTagSlug);
+  const showTypeFilter = availableTypes.size > 1;
+  const showTagFilter = availableTags.length >= 2;
 
-  const filtered =
-    active === "all" ? articles : articles.filter((a) => a.category === active);
+  const updateFilters = (type: BlogContentType, tagSlug: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (type === "ALL") params.delete("type");
+    else params.set("type", type.toLowerCase());
+    if (tagSlug) params.set("tag", tagSlug);
+    else params.delete("tag");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  useEffect(() => {
+    const normalizedTypeParam =
+      activeContentType === "ALL" ? null : activeContentType.toLowerCase();
+    if (requestedTypeParam === normalizedTypeParam && requestedTagSlug === activeTagSlug) return;
+    const params = new URLSearchParams(searchParams.toString());
+    if (activeContentType === "ALL") params.delete("type");
+    else params.set("type", activeContentType.toLowerCase());
+    if (activeTagSlug) params.set("tag", activeTagSlug);
+    else params.delete("tag");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [activeContentType, activeTagSlug, pathname, requestedTagSlug, requestedTypeParam, router, searchParams]);
 
   const [featured, ...rest] = filtered;
 
@@ -47,9 +92,8 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
               className="font-serif m-0 leading-[.94] tracking-[-0.03em]"
               style={{ fontSize: "clamp(56px, 9vw, 124px)" }}
             >
-              Идеи
-              <br />
-              <span className="italic text-primary">и маршруты.</span>
+              Обзоры{" "}
+              <span className="italic text-primary">и статьи</span>
             </h1>
 
             <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground max-w-[520px]">
@@ -81,34 +125,74 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
       </section>
 
       {/* ── Filters ── */}
-      <section className="border-b border-border">
-        <div className="site-wrap px-6 sm:px-7 py-3.5 flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground mr-2">
-            Раздел
-          </span>
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setActive(f.key)}
-              className={[
-                "inline-flex items-center h-8 px-3 rounded-full border text-[13px] transition-all cursor-pointer",
-                active === f.key
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-transparent text-foreground border-border hover:border-foreground",
-              ].join(" ")}
+      <section className={showTypeFilter || showTagFilter ? "border-b border-border" : ""}>
+        <div className="site-wrap px-6 sm:px-7 py-3.5 space-y-4">
+          {showTypeFilter && (
+            <div
+              className="grid w-full grid-cols-3 rounded-xl border border-border bg-muted/40 p-1 sm:inline-grid sm:w-auto"
+              role="group"
+              aria-label="Тип материала"
             >
-              {f.label}
-            </button>
-          ))}
+              {TYPE_FILTERS.map((filter) => (
+                <button
+                  type="button"
+                  key={filter.key}
+                  aria-pressed={activeContentType === filter.key}
+                  onClick={() => updateFilters(filter.key, activeTagSlug)}
+                  className="min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium whitespace-nowrap transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4 sm:text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:shadow-sm aria-pressed:hover:bg-primary"
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {showTagFilter && (
+            <div>
+              <h2 className="mb-1 text-[11px] font-mono uppercase tracking-[.14em] text-muted-foreground">
+                Темы
+              </h2>
+              <div className="no-scrollbar flex gap-2 overflow-x-auto py-1" aria-label="Темы материалов">
+                <button
+                  type="button"
+                  aria-pressed={activeTagSlug === null}
+                  onClick={() => updateFilters(activeContentType, null)}
+                  className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-primary"
+                >
+                  Все темы
+                </button>
+                {availableTags.map((tag) => (
+                  <button
+                    type="button"
+                    key={tag.id}
+                    aria-pressed={activeTagSlug === tag.slug}
+                    onClick={() =>
+                      updateFilters(activeContentType, activeTagSlug === tag.slug ? null : tag.slug)
+                    }
+                    className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-primary"
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* ── Content ── */}
       <div className="site-wrap px-6 sm:px-7 pb-16">
         {filtered.length === 0 ? (
-          <p className="py-12 text-sm text-muted-foreground">
-            В журнале пока нет материалов в этой категории.
-          </p>
+          <div className="py-12">
+            <p className="text-sm text-muted-foreground">По выбранным фильтрам материалов пока нет.</p>
+            <button
+              type="button"
+              onClick={() => updateFilters("ALL", null)}
+              className="mt-4 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
         ) : (
           <>
             {featured && <FeaturedArticle article={featured} />}
@@ -171,7 +255,7 @@ function FeaturedArticle({ article }: { article: CityHomeJournalArticle }) {
             <BreakingPill />
           ) : (
             <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold font-mono uppercase tracking-[.12em]">
-              ● {article.category}
+              ● {article.category?.name ?? "Статья"}
             </span>
           )}
           {article.publishedAt && (
@@ -220,7 +304,7 @@ function ArticleRow({ article, idx }: { article: CityHomeJournalArticle; idx: nu
         <div className="flex items-center gap-2 flex-wrap">
           {article.isBreakingNews && <BreakingPill />}
           <span className="text-[11px] font-mono uppercase tracking-[.12em] text-primary">
-            ● {article.category}
+            ● {article.category?.name ?? (article.contentType === "NEWS" ? "Новость" : "Статья")}
           </span>
         </div>
         {article.publishedAt && (
