@@ -1,6 +1,7 @@
 export type StoryIntent =
   | "breaking_news"
   | "today"
+  | "tomorrow"
   | "weekend"
   | "free"
   | "near"
@@ -17,6 +18,8 @@ export type StoryItemType =
 
 export type StoryItem = {
   id: string;
+  /** Persisted identity for seen-state. Never use an occurrence/session id here. */
+  offerId: string;
   title: string;
   image: string;
   type?: StoryItemType;
@@ -40,9 +43,4 @@ export type StoryCollection = {
   /** Emoji or icon name shown in the ring */
   emoji?: string;
   items: StoryItem[];
-  /**
-   * Precomputed cover URLs for the ring collage (up to 4).
-   * If not set, resolveStoryRingCoverUrl falls back to items[0].image.
-   */
-  coverImageUrls?: string[];
 };
