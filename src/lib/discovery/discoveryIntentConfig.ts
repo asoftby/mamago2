@@ -8,6 +8,20 @@ export interface DiscoveryIntentConfig {
   hasFilters: boolean;
   icon?: string;
   image?: string;
+  /**
+   * Доступность раздела в primary navigation (desktop header + mobile landing
+   * header, обе поверхности рендерятся через `DiscoveryIntentTabs`) — и только
+   * там. Не влияет на route, loader'ы, API, sitemap, canonical, robots,
+   * индексацию, redirect-манифест или внутреннюю перелинковку вне этих двух
+   * поверхностей.
+   */
+  navigationEnabled: boolean;
+  /**
+   * Визуальное состояние «Скоро» для пункта в primary navigation. Требует
+   * `navigationEnabled: false` — раздел не может одновременно быть кликабельным
+   * и помечен как «Скоро» (см. `discoveryIntentConfig.test.ts`).
+   */
+  comingSoon: boolean;
 }
 
 export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
@@ -19,6 +33,8 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     href: (city) => `/${city}/events`,
     hasFilters: true,
     image: "/compass.svg",
+    navigationEnabled: true,
+    comingSoon: false,
   },
   classes: {
     id: "classes",
@@ -27,6 +43,8 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     href: (city) => `/${city}/classes`,
     hasFilters: true,
     image: "/palette.svg",
+    navigationEnabled: false,
+    comingSoon: true,
   },
   birthday: {
     id: "birthday",
@@ -35,6 +53,8 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     href: (city) => `/${city}/birthday`,
     hasFilters: true,
     image: "/hb.svg",
+    navigationEnabled: false,
+    comingSoon: true,
   },
   routes: {
     id: "routes",
@@ -43,6 +63,8 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
     href: (city) => `/${city}/routes`,
     hasFilters: true,
     image: "/routes.svg",
+    navigationEnabled: false,
+    comingSoon: true,
   },
 };
 
