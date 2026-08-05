@@ -102,6 +102,7 @@
     "build-migration-manifest": "tsx scripts/build-migration-manifest.ts",
     "test:unit": "tsx src/lib/slugifyLabelToValue.test.ts",
     "test:discovery-intent-config": "tsx src/lib/discovery/discoveryIntentConfig.test.ts",
+    "test:discovery-intent-tabs": "tsx src/components/city/DiscoveryIntentTabs.test.tsx",
     "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/template-render.test.ts",
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",

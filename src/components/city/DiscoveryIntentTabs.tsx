@@ -9,6 +9,7 @@ import { Intent } from "@/lib/intent";
 import { Label } from "@/components/ui/typography";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { appendCityQuery } from "@/lib/city/appendCityQuery";
+import { ComingSoonBadge } from "@/components/city/ComingSoonBadge";
 
 // Map intent IDs to icons (fallback if no image)
 const TAB_ICONS = {
@@ -34,7 +35,7 @@ function DiscoveryIntentTabsContent({
   variant = "default",
 }: DiscoveryIntentTabsProps) {
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
-  const tabsRef = useRef<(HTMLAnchorElement | null)[]>([]);
+  const tabsRef = useRef<(HTMLAnchorElement | HTMLSpanElement | null)[]>([]);
 
   const activeIndex =
     currentIntent === null
@@ -85,6 +86,54 @@ function DiscoveryIntentTabsContent({
           {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
             const isActive = activeIndex >= 0 && index === activeIndex;
             const Icon = TAB_ICONS[intentConfig.id];
+
+            if (!intentConfig.navigationEnabled) {
+              return (
+                <span
+                  key={intentConfig.id}
+                  role="link"
+                  aria-disabled="true"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    tabsRef.current[index] = el;
+                  }}
+                  className={cn(
+                    "group flex min-w-[68px] max-w-[120px] cursor-default flex-col items-center gap-0.5 border-b-2 px-2 pb-2 pt-1 select-none md:min-w-[80px] md:px-3",
+                    isActive
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground",
+                  )}
+                >
+                  {intentConfig.image ? (
+                    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center md:h-9 md:w-9">
+                      <Image
+                        src={intentConfig.image}
+                        alt={intentConfig.label}
+                        width={36}
+                        height={36}
+                        className={cn(
+                          "h-full w-full object-contain grayscale",
+                          isActive ? "opacity-90" : "opacity-60",
+                        )}
+                      />
+                    </div>
+                  ) : (
+                    <Icon className={cn("h-8 w-8 shrink-0", isActive ? "opacity-90" : "opacity-60")} />
+                  )}
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <span
+                      className={cn(
+                        "text-[11px] leading-tight tracking-normal normal-case md:text-xs",
+                        isActive ? "font-semibold" : "font-medium",
+                      )}
+                    >
+                      {intentConfig.label}
+                    </span>
+                    <ComingSoonBadge />
+                  </span>
+                </span>
+              );
+            }
 
             return (
               <Link
@@ -144,6 +193,50 @@ function DiscoveryIntentTabsContent({
         {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
           const isActive = activeIndex >= 0 && index === activeIndex;
           const Icon = TAB_ICONS[intentConfig.id];
+
+          if (!intentConfig.navigationEnabled) {
+            return (
+              <span
+                key={intentConfig.id}
+                role="link"
+                aria-disabled="true"
+                tabIndex={-1}
+                ref={(el) => {
+                  tabsRef.current[index] = el;
+                }}
+                className={cn(
+                  "group flex min-w-[80px] cursor-default flex-col items-center justify-center gap-0.5 px-3 select-none",
+                  isActive ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {intentConfig.image ? (
+                  <div className="relative h-[40px] w-[40px] flex items-center justify-center">
+                    <Image
+                      src={intentConfig.image}
+                      alt={intentConfig.label}
+                      width={40}
+                      height={40}
+                      className={cn("object-contain grayscale", isActive ? "opacity-90" : "opacity-60")}
+                    />
+                  </div>
+                ) : (
+                  <Icon className={cn("h-4 w-4", isActive ? "opacity-90" : "opacity-60")} />
+                )}
+                <span className="mb-[7px] flex items-center gap-1 whitespace-nowrap">
+                  <Label
+                    as="span"
+                    className={cn(
+                      "text-[12px] leading-none normal-case tracking-normal text-current",
+                      isActive ? "font-bold" : "font-medium",
+                    )}
+                  >
+                    {intentConfig.label}
+                  </Label>
+                  <ComingSoonBadge />
+                </span>
+              </span>
+            );
+          }
 
           return (
             <Link
