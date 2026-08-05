@@ -418,7 +418,7 @@ export const GROUP_RANKING: AdminSidebarGroup = {
   children: [
     {
       id: "ranking-stories-intents",
-      label: "Stories Intents",
+      label: "Stories на главной",
       href: adminPath("/ranking/stories-intents"),
       matchers: [{ type: "prefix", value: adminPath("/ranking/stories-intents") }],
     },

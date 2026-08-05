@@ -20,6 +20,7 @@ import {
   replaceActivitySessionsFromScheduleJson,
 } from "@/lib/business/syncEventActivitySessions";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
+import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -244,6 +245,7 @@ export async function POST(
       perf.mark("slug-ensure-published");
     }
 
+    await syncEventHomeStories(event.id);
     const { publicPath } = await revalidateEventMutationPaths(event.id, "publish");
     perf.mark("revalidate");
 

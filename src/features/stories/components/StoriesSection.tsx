@@ -1,15 +1,8 @@
 import { StoryRings } from "./StoryRings";
 import { listBreakingNewsArticles } from "../lib/listBreakingNews";
 import prisma from "@/lib/prisma";
-import { ActivityType, ActivityFormat } from "@prisma/client";
 import type { StoryCollection, StoryIntent, StoryItem } from "../types/story";
-import {
-  getPublicListingActivityWhere,
-  getPublicPublishedPlaceWhere,
-} from "@/server/public/publicContentVisibility";
-import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
-import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
 import { getCityTimeZone } from "@/lib/stories/getCityTimeZone";
 import {
@@ -21,6 +14,12 @@ import {
 } from "@/lib/stories/ranges";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import type { DateRange, ResolveContext } from "@/lib/stories/types";
+import {
+  listPublicFreeHomeStoryItems,
+  listPublicHomeStoryItems,
+  MAX_HOME_STORY_ITEMS_PER_DATE,
+} from "@/server/stories/homeStoryItems";
+import { getPublicStoryIntentConfigs } from "@/server/stories/storyIntentConfig";
 
 type StoriesSectionProps = {
   cityId: string;
@@ -32,29 +31,9 @@ const NEW_PLACES_WINDOW_DAYS = 30;
 /** Временно выключено: Place.createdAt пока не даёт честный freshness-сигнал. */
 const ENABLE_STORY_NEW_PLACES = false;
 
-function mapFormatToAge(format: ActivityFormat): string | undefined {
-  if (format === ActivityFormat.OFFLINE) return "Офлайн";
-  if (format === ActivityFormat.ONLINE) return "Онлайн";
-  if (format === ActivityFormat.HYBRID) return "Гибрид";
-  return undefined;
-}
-
 function formatDayTime(date: Date | null | undefined, prefix: string): string {
   if (!date) return prefix;
   return `${prefix}, ${date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
-}
-
-function mapPriceLabel(input: {
-  priceFrom: number | null;
-  priceTo: number | null;
-  priceText: string | null;
-}): string | undefined {
-  if (input.priceText?.trim()) return input.priceText.trim();
-  if (input.priceFrom == null) return undefined;
-  if (input.priceTo != null && input.priceTo === input.priceFrom) {
-    return formatPrice(input.priceFrom);
-  }
-  return formatPriceFrom(input.priceFrom);
 }
 
 function normalizeStoryDescription(
@@ -86,110 +65,6 @@ function collectionFromItems(input: {
     emoji: input.emoji,
     items: input.items,
   };
-}
-
-async function loadEventsInRange(input: {
-  cityId: string;
-  citySlug: string;
-  range: DateRange;
-  eyebrow: string;
-  datetimePrefix: string;
-}): Promise<StoryItem[]> {
-  const now = new Date();
-  const pub = getPublicListingActivityWhere(now);
-  const pubParts = Array.isArray(pub.AND) ? pub.AND : pub.AND ? [pub.AND] : [];
-  const { start, end } = input.range;
-
-  const rows = await prisma.activity.findMany({
-    where: {
-      AND: [
-        { type: ActivityType.EVENT },
-        activityInAnyOfCitiesWhere([input.cityId]),
-        ...pubParts,
-        {
-          OR: [
-            {
-              sessions: {
-                some: {
-                  startsAt: { gte: start, lt: end },
-                },
-              },
-            },
-            {
-              nextOccurrenceAt: { gte: start, lt: end },
-            },
-          ],
-        },
-      ],
-    },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      format: true,
-      shortDesc: true,
-      priceFrom: true,
-      priceTo: true,
-      priceText: true,
-      coverImageId: true,
-      coverImageUrl: true,
-      images: {
-        select: { id: true, url: true, mediaAssetId: true },
-        orderBy: { sortOrder: "asc" },
-      },
-      nextOccurrenceAt: true,
-      sessions: {
-        where: { startsAt: { gte: start, lt: end } },
-        orderBy: { startsAt: "asc" },
-        select: { startsAt: true },
-      },
-      place: { select: { title: true, formattedAddr: true } },
-      venue: { select: { title: true, addressLine: true } },
-    },
-    take: 20,
-  });
-
-  const withStartTime = rows.map((row) => {
-    const sessionStart = row.sessions[0]?.startsAt ?? null;
-    const effectiveStart: Date | null = sessionStart ?? row.nextOccurrenceAt;
-    return { row, effectiveStart };
-  });
-
-  withStartTime.sort((a, b) => {
-    if (!a.effectiveStart && !b.effectiveStart) return 0;
-    if (!a.effectiveStart) return 1;
-    if (!b.effectiveStart) return -1;
-    return a.effectiveStart.getTime() - b.effectiveStart.getTime();
-  });
-
-  return withStartTime.slice(0, MAX_ITEMS_PER_STORY).map(({ row, effectiveStart }) => ({
-    id: row.id,
-    offerId: row.id,
-    type: "event" as const,
-    title: row.title,
-    eyebrow: input.eyebrow,
-    description: normalizeStoryDescription(row.shortDesc),
-    image:
-      resolveActivityCoverUrl({
-        coverImageId: row.coverImageId,
-        coverImageUrl: row.coverImageUrl,
-        images: row.images,
-      }) ?? "",
-    age: mapFormatToAge(row.format),
-    location:
-      row.venue?.title ??
-      row.place?.title ??
-      row.venue?.addressLine ??
-      row.place?.formattedAddr ??
-      undefined,
-    datetime: formatDayTime(effectiveStart, input.datetimePrefix),
-    price: mapPriceLabel({
-      priceFrom: row.priceFrom,
-      priceTo: row.priceTo,
-      priceText: row.priceText,
-    }),
-    href: `/${input.citySlug}/events/${row.slug ?? row.id}`,
-  }));
 }
 
 async function loadNewPlaces(input: {
@@ -264,6 +139,8 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
   const todayRangeValue = zonedDayRange(todayKey, 1, timeZone);
   const tomorrowRangeValue = tomorrowRange(ctx);
   const weekendRangeValue = weekendRange(ctx);
+  const projectionEnd = weekendRangeValue?.end ?? tomorrowRangeValue.end;
+  const freeRangeValue = zonedDayRange(todayKey, 7, timeZone);
 
   const newPlacesSince = new Date(now);
   newPlacesSince.setDate(newPlacesSince.getDate() - NEW_PLACES_WINDOW_DAYS);
@@ -273,36 +150,48 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
     return [];
   });
 
-  const [breakingNews, todayItems, tomorrowItems, weekendItems, newPlaceItems] =
+  const [breakingNews, projectedItems, freeProjectedItems, newPlaceItems, intentConfigs] =
     await Promise.all([
       breakingNewsPromise,
-      loadEventsInRange({
-        cityId,
-        citySlug,
-        range: todayRangeValue,
-        eyebrow: "сегодня",
-        datetimePrefix: "Сегодня",
-      }),
-      loadEventsInRange({
-        cityId,
-        citySlug,
-        range: tomorrowRangeValue,
-        eyebrow: "завтра",
-        datetimePrefix: "Завтра",
-      }),
-      weekendRangeValue
-        ? loadEventsInRange({
-            cityId,
-            citySlug,
-            range: weekendRangeValue,
-            eyebrow: "выходные",
-            datetimePrefix: "Выходные",
-          })
-        : Promise.resolve([]),
+      listPublicHomeStoryItems({ cityId, from: todayRangeValue.start, until: projectionEnd, now }),
+      listPublicFreeHomeStoryItems({ cityId, from: freeRangeValue.start, until: freeRangeValue.end, now }),
       ENABLE_STORY_NEW_PLACES
         ? loadNewPlaces({ cityId, citySlug, since: newPlacesSince })
         : Promise.resolve([]),
+      getPublicStoryIntentConfigs(),
     ]);
+
+  const mapProjected = (range: DateRange, eyebrow: string, prefix: string): StoryItem[] =>
+    projectedItems
+      .filter((item) => item.storyDate >= range.start && item.storyDate < range.end)
+      .slice(0, MAX_HOME_STORY_ITEMS_PER_DATE)
+      .map((item) => ({
+        id: item.id,
+        offerId: item.id,
+        type: item.sourceType === "OFFER" ? "offer" : "event",
+        title: item.titleSnapshot,
+        description: normalizeStoryDescription(item.subtitleSnapshot),
+        image: item.coverUrlSnapshot ?? "",
+        eyebrow,
+        datetime: formatDayTime(item.startsAt, prefix),
+        href: item.hrefSnapshot,
+      }));
+  const todayItems = mapProjected(todayRangeValue, "сегодня", "Сегодня");
+  const tomorrowItems = mapProjected(tomorrowRangeValue, "завтра", "Завтра");
+  const weekendItems = weekendRangeValue
+    ? mapProjected(weekendRangeValue, "выходные", "Выходные")
+    : [];
+  const freeItems: StoryItem[] = freeProjectedItems.map((item) => ({
+    id: item.id,
+    offerId: item.id,
+    type: "event",
+    title: item.titleSnapshot,
+    description: normalizeStoryDescription(item.subtitleSnapshot),
+    image: item.coverUrlSnapshot ?? "",
+    eyebrow: "бесплатно",
+    datetime: formatDayTime(item.startsAt, "Ближайшее"),
+    href: item.hrefSnapshot,
+  }));
 
   const breakingNewsStory: StoryCollection | null =
     breakingNews.length > 0
@@ -338,6 +227,7 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
         : "на выходных"
       : "на выходных";
 
+  const intentConfigByKey = new Map(intentConfigs.map((config) => [config.intent, config]));
   const stories: StoryCollection[] = [
     breakingNewsStory,
     collectionFromItems({
@@ -361,6 +251,13 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
       emoji: "🎉",
       items: weekendItems,
     }),
+    collectionFromItems({
+      id: "free",
+      intent: "free",
+      title: "бесплатно",
+      emoji: "🎟️",
+      items: freeItems,
+    }),
     ENABLE_STORY_NEW_PLACES
       ? collectionFromItems({
           id: "new-places",
@@ -370,7 +267,11 @@ export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) 
           items: newPlaceItems,
         })
       : null,
-  ].filter((story): story is StoryCollection => story != null);
+  ]
+    .filter((story): story is StoryCollection => story != null)
+    .filter((story) => intentConfigByKey.get(story.intent)?.enabled !== false)
+    .map((story) => ({ ...story, title: intentConfigByKey.get(story.intent)?.title || story.title }))
+    .sort((a, b) => (intentConfigByKey.get(a.intent)?.order ?? 999) - (intentConfigByKey.get(b.intent)?.order ?? 999));
   if (stories.length === 0) {
     return null;
   }

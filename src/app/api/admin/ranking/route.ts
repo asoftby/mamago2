@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
+import { STORY_INTENTS_CACHE_TAG } from "@/server/stories/storyIntentConfig";
 
 const DEFAULT_INTENTS = [
-  { intent: "today",   title: "Сегодня",    order: 0, allowedTypes: ["events", "offers"] },
-  { intent: "weekend", title: "Выходные",   order: 1, allowedTypes: ["events", "offers"] },
-  { intent: "free",    title: "Бесплатно",  order: 2, allowedTypes: ["events", "places"] },
-  { intent: "near",    title: "Рядом",      order: 3, allowedTypes: ["events", "places"] },
-  { intent: "age_3_5", title: "3–5 лет",    order: 4, allowedTypes: ["events", "offers"] },
-  { intent: "new",     title: "Новое",      order: 5, allowedTypes: ["events", "offers", "places"] },
+  { intent: "today",        title: "Сегодня",       order: 0, allowedTypes: ["events"] },
+  { intent: "tomorrow",     title: "Завтра",        order: 1, allowedTypes: ["events"] },
+  { intent: "weekend",      title: "Выходные",      order: 2, allowedTypes: ["events"] },
+  { intent: "breaking_news", title: "Breaking news", order: 3, allowedTypes: ["articles"] },
+  { intent: "free",         title: "Бесплатно",      order: 4, allowedTypes: ["events"] },
 ];
+const ACTIVE_STORY_INTENTS = DEFAULT_INTENTS.map((item) => item.intent);
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -31,9 +33,13 @@ export async function GET() {
       update: {},
     });
   }
+  await prisma.storyIntentConfig.updateMany({
+    where: { intent: { notIn: ACTIVE_STORY_INTENTS }, enabled: true },
+    data: { enabled: false },
+  });
 
   const [intents, ranking, boost] = await Promise.all([
-    prisma.storyIntentConfig.findMany({ orderBy: { order: "asc" } }),
+    prisma.storyIntentConfig.findMany({ where: { intent: { in: ACTIVE_STORY_INTENTS } }, orderBy: { order: "asc" } }),
     prisma.rankingSettings.upsert({
       where: { id: "singleton" },
       create: { id: "singleton" },
@@ -80,6 +86,7 @@ export async function POST(req: Request) {
       where: { id },
       data: rest,
     });
+    revalidateTag(STORY_INTENTS_CACHE_TAG, "max");
     return NextResponse.json(updated);
   }
 

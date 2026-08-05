@@ -1703,6 +1703,56 @@ model AdminAuditLog {
   @@index([createdAt])
 }
 
+enum HomeStorySourceType {
+  EVENT
+  OFFER
+}
+
+enum HomeStoryPlacementType {
+  AUTO
+  FORCE_INCLUDE
+  EXCLUDE
+}
+
+enum HomeStoryItemStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Small, query-ready projection used by the home page. Source content is
+/// deliberately snapshotted so the public read path never expands schedules.
+model HomeStoryItem {
+  id                String                 @id @default(cuid())
+  cityId            String
+  storyDate         DateTime
+  sourceType        HomeStorySourceType
+  sourceId          String
+  occurrenceKey     String
+  placementType     HomeStoryPlacementType
+  status            HomeStoryItemStatus    @default(ACTIVE)
+  inactiveReason    String?
+  startsAt          DateTime?
+  endsAt            DateTime?
+  manualOrder       Int?
+  pinned            Boolean                @default(false)
+  isFree            Boolean                @default(false)
+  titleSnapshot     String
+  subtitleSnapshot  String?
+  hrefSnapshot      String
+  coverUrlSnapshot  String?
+  displayFrom       DateTime?
+  displayUntil      DateTime?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@unique([cityId, sourceType, sourceId, occurrenceKey, storyDate])
+  @@index([cityId, storyDate, status, pinned, manualOrder, startsAt])
+  @@index([cityId, status, isFree, startsAt])
+  @@index([sourceType, sourceId])
+}
+
 model EmailTemplate {
   id         String                 @id @default(cuid())
   name       String

@@ -33,6 +33,8 @@ type WeekCalendarStripProps = {
   showArrows?: boolean;
   itemsByDate?: Record<string, unknown[]>;
   plannedCountByDate?: Record<string, number>;
+  countLabelByDate?: Record<string, string>;
+  allowPastDates?: boolean;
 };
 
 function pluralizePlanEvents(count: number): string {
@@ -54,6 +56,8 @@ export function WeekCalendarStrip({
   showArrows = true,
   itemsByDate,
   plannedCountByDate,
+  countLabelByDate,
+  allowPastDates = false,
 }: WeekCalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -140,12 +144,12 @@ export function WeekCalendarStrip({
                   key={iso}
                   ref={selected ? selectedRef : undefined}
                   type="button"
-                  disabled={isPast && !selected}
-                  onClick={() => !isPast && onChangeDate?.(iso)}
+                  disabled={!allowPastDates && isPast && !selected}
+                  onClick={() => (allowPastDates || !isPast) && onChangeDate?.(iso)}
                   style={{
                     flex: "1 1 0",
                     minWidth: 0,
-                    minHeight: compact ? 52 : 56,
+                    minHeight: countLabelByDate ? 70 : compact ? 52 : 56,
                     padding: compact ? "6px 4px 10px" : "7px 4px 11px",
                     display: "flex",
                     flexDirection: "column",
@@ -155,10 +159,10 @@ export function WeekCalendarStrip({
                     color: selected ? "#FAF7F1" : isPast ? "rgba(20,18,16,.35)" : "#141210",
                     border: selected ? "1px solid #141210" : "1px solid transparent",
                     borderRadius: 10,
-                    cursor: isPast && !selected ? "default" : "pointer",
+                    cursor: !allowPastDates && isPast && !selected ? "default" : "pointer",
                     transition: "all .15s",
                     position: "relative",
-                    opacity: isPast && !selected ? 0.45 : 1,
+                    opacity: !allowPastDates && isPast && !selected ? 0.45 : 1,
                   }}
                   onMouseEnter={(e) => {
                     if (!selected && !isPast) (e.currentTarget as HTMLButtonElement).style.background = "rgba(20,18,16,.04)";
@@ -182,6 +186,11 @@ export function WeekCalendarStrip({
                   >
                     {d.getDate()}
                   </span>
+                  {countLabelByDate ? (
+                    <span style={{ fontSize: 9, lineHeight: 1.1, whiteSpace: "nowrap", color: selected ? "rgba(250,247,241,.72)" : "rgba(20,18,16,.58)" }}>
+                      {countLabelByDate[iso] ?? "0 историй"}
+                    </span>
+                  ) : null}
                   {hasPlannedItems ? (
                     <span
                       aria-label={plannedLabel}

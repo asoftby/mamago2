@@ -17,6 +17,7 @@ import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFrom
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { mergeEventScheduleJson } from "@/lib/business/eventScheduleJsonMerge";
 import { deleteActivity } from "@/server/services/activity.service";
+import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
 import {
   isContentLifecycleOperationError,
   lifecycleErrorResponsePayload,
@@ -664,6 +665,7 @@ export async function PATCH(
         prisma,
         activityId: saved.id,
       });
+      await syncEventHomeStories(saved.id);
 
       if (isServerSavePerfEnabled()) {
         console.info("[event-patch-timing] activity-sessions-sync", {
@@ -909,6 +911,7 @@ export async function DELETE(
     }
 
     await deleteActivity(id, user.role);
+    await syncEventHomeStories(id);
 
     revalidatePath("/admin/moderation/events");
     revalidatePath("/admin/content/events");

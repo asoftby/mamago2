@@ -6,6 +6,6 @@ export function resolveStoryRingCoverUrl(
   story: StoryCollection,
   seenOfferIds: ReadonlySet<string>,
 ): string | null {
-  const selected = orderBySeen(story.items, seenOfferIds)[0];
-  return selected?.image?.trim() || null;
+  const selected = orderBySeen(story.items, seenOfferIds).find((item) => item.image?.trim());
+  return selected?.image.trim() || null;
 }

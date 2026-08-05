@@ -81,6 +81,33 @@ assert.equal(
   "/poster-a.jpg",
   "a new occurrence of a seen offer does not replace the source-order cover",
 );
+const firstWithoutImage = bucket([
+  { ...item("occurrence-empty", "offer-empty"), image: "" },
+  { ...item("occurrence-with-cover", "offer-cover"), image: "/poster-available.jpg" },
+]);
+assert.equal(
+  resolveStoryRingCoverUrl(firstWithoutImage, new Set()),
+  "/poster-available.jpg",
+  "the next available image is used when the selected event has no image",
+);
+assert.equal(
+  resolveStoryRingCoverUrl(
+    bucket([
+      { ...item("empty-a", "offer-empty-a"), image: "" },
+      { ...item("empty-b", "offer-empty-b"), image: "   " },
+    ]),
+    new Set(),
+  ),
+  null,
+  "the neutral fallback is used only when the whole bucket has no image",
+);
+const restoredStorage = new MemoryStorage();
+writeSeen(restoredStorage, new Set(["offer-A"]));
+assert.equal(
+  resolveStoryRingCoverUrl(covers, readSeen(restoredStorage)),
+  "/poster-b.jpg",
+  "restoring seen state preserves deterministic cover selection on rerender",
+);
 
 seen = markSeen(seen, "offer-B");
 assert.equal(unseenCount([item("a", "offer-A"), item("b", "offer-B"), item("c", "offer-C")], seen), 1);

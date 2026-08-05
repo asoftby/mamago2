@@ -13,6 +13,7 @@ import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { syncOfferHomeStoryPlacements } from "@/server/stories/homeStoryItems";
 import {
   campMealKeySchema,
   campProgramTypeSchema,
@@ -583,6 +584,10 @@ export async function PATCH(
       }
     }
 
+    // Refresh only placements that an admin explicitly created. This function
+    // never auto-enrolls Offer sessions into Stories.
+    await syncOfferHomeStoryPlacements(offer.id);
+
     timer.mark("response");
     timer.log({ status: offer.status });
 
@@ -657,6 +662,7 @@ export async function DELETE(
     await prisma.offer.delete({
       where: { id },
     });
+    await syncOfferHomeStoryPlacements(id);
 
     return NextResponse.json({ success: true });
 
