@@ -30,12 +30,18 @@ import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBea
 import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/article/articleMvpRenderData";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   incrementPublishedArticleViews,
   shouldCountPublishedArticleViewRequest,
 } from "@/lib/article/articleViews";
+import {
+  findNextArticlePreviewInSection,
+  loadArticleContinuousContext,
+} from "@/lib/article/nextArticleInSection";
+import { buildContinuousArticleSeed } from "@/lib/article/buildContinuousArticleSeed";
 
 /**
  * Redirect to canonical city-scoped URL if the article is CITY-scoped.
@@ -148,6 +154,7 @@ async function getArticleSchemaData(articleId: string) {
       updatedAt: true,
       seoCanonicalUrl: true,
       seoJsonLdOverride: true,
+      seoTitle: true,
     },
   });
 }
@@ -382,6 +389,78 @@ export default async function ArticlePage({
       );
     }
 
+    const continuous = await loadArticleContinuousContext(mvp.id);
+    const articleView = (
+      <ArticleMvpView
+        title={mvp.title}
+        subtitle={mvp.subtitle}
+        excerpt={mvp.excerpt}
+        publishedAt={mvp.publishedAt}
+        blocks={mvp.blocks}
+        tags={mvp.tags}
+        categoryLabel={mvp.categoryLabel}
+        editHref={editHref}
+        continuousVariant={continuous?.enabled ? "first" : "standalone"}
+        journalFooterHref="/blog"
+        articleAriaLabel={mvp.title}
+      />
+    );
+
+    if (
+      continuous?.enabled &&
+      continuous.section &&
+      continuous.geoScope === "COUNTRY"
+    ) {
+      const nextPreview = await findNextArticlePreviewInSection({
+        currentArticleId: mvp.id,
+        sectionId: continuous.section.id,
+        cityId: null,
+        geoScope: "COUNTRY",
+        excludeIds: [],
+      });
+      const seed = buildContinuousArticleSeed({
+        id: mvp.id,
+        title: mvp.title,
+        excerpt: mvp.excerpt,
+        subtitle: mvp.subtitle,
+        slug: mvp.slug ?? slug,
+        publishedAt: mvp.publishedAt,
+        heroUrl: mvp.heroUrl,
+        heroAlt: mvp.heroAlt,
+        blocks: [],
+        categoryLabel: mvp.categoryLabel,
+        tags: mvp.tags,
+        section: continuous.section,
+        geoScope: "COUNTRY",
+        cityId: null,
+        citySlug: null,
+        documentTitle: schemaArticle?.seoTitle?.trim() || `${mvp.title} — mamaGo`,
+      });
+      const { blocks: _blocks, ...seedWithoutBlocks } = seed;
+      void _blocks;
+
+      return (
+        <>
+          <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+          <JsonLd
+            data={[articleJsonLd, breadcrumbJsonLd].filter(
+              (item): item is Record<string, unknown> => Boolean(item),
+            )}
+          />
+          <ContinuousArticleReader
+            seed={seedWithoutBlocks}
+            citySlug={null}
+            cityId={null}
+            geoScope="COUNTRY"
+            section={continuous.section}
+            initialNextPreview={nextPreview.preview}
+            initialExhausted={nextPreview.exhausted}
+            firstArticleSlot={articleView}
+          />
+        </>
+      );
+    }
+
     return (
       <>
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
@@ -390,16 +469,7 @@ export default async function ArticlePage({
             (item): item is Record<string, unknown> => Boolean(item),
           )}
         />
-        <ArticleMvpView
-          title={mvp.title}
-          subtitle={mvp.subtitle}
-          excerpt={mvp.excerpt}
-          publishedAt={mvp.publishedAt}
-          blocks={mvp.blocks}
-          tags={mvp.tags}
-          categoryLabel={mvp.categoryLabel}
-          editHref={editHref}
-        />
+        {articleView}
       </>
     );
   }
@@ -462,7 +532,10 @@ export default async function ArticlePage({
       <ArticleHeader
         title={article.title}
         subtitle={article.subtitle}
+        journalLabel="Обзоры и статьи"
+        journalHref="/blog"
         category={article.category}
+        categoryHref="/blog"
         readTime={article.readTime}
         publishedAt={article.publishedAt}
         editHref={legacyEditHref}

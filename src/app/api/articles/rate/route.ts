@@ -7,17 +7,34 @@ import {
   ratingVoterIdentifier,
 } from "@/lib/content-rating/emojiRating";
 
+async function assertPublicArticle(articleId: string) {
+  return prisma.article.findFirst({
+    where: {
+      id: articleId,
+      status: "PUBLISHED",
+      OR: [{ publishedAt: null }, { publishedAt: { lte: new Date() } }],
+    },
+    select: { id: true },
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
-      routeId?: unknown;
+      articleId?: unknown;
       ratingType?: unknown;
     };
-    const routeId = typeof body.routeId === "string" ? body.routeId.trim() : "";
+    const articleId =
+      typeof body.articleId === "string" ? body.articleId.trim() : "";
     const ratingType = body.ratingType;
 
-    if (!routeId || !isEmojiRatingType(ratingType)) {
+    if (!articleId || !isEmojiRatingType(ratingType)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const article = await assertPublicArticle(articleId);
+    if (!article) {
+      return NextResponse.json({ error: "Article not found" }, { status: 404 });
     }
 
     const user = await getCurrentUser();
@@ -27,32 +44,34 @@ export async function POST(req: NextRequest) {
       realIp: req.headers.get("x-real-ip"),
     });
 
-    const existing = await prisma.routeRating.findUnique({
-      where: { routeId_identifier: { routeId, identifier } },
+    const existing = await prisma.articleRating.findUnique({
+      where: { articleId_identifier: { articleId, identifier } },
     });
-
     if (existing) {
       return NextResponse.json({ error: "Already voted" }, { status: 409 });
     }
 
-    await prisma.routeRating.create({
+    await prisma.articleRating.create({
       data: {
-        routeId,
+        articleId,
         ratingType,
         identifier,
         userId: user?.id ?? null,
       },
     });
 
-    const counts = await prisma.routeRating.groupBy({
+    const counts = await prisma.articleRating.groupBy({
       by: ["ratingType"],
-      where: { routeId },
+      where: { articleId },
       _count: true,
     });
 
-    return NextResponse.json({ ok: true, counts: countsFromGroupBy(counts) });
+    return NextResponse.json({
+      ok: true,
+      counts: countsFromGroupBy(counts),
+    });
   } catch (error) {
-    console.error("Failed to rate route:", error);
+    console.error("Failed to rate article:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

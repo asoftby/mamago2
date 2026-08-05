@@ -100,6 +100,7 @@ model User {
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
   routeRatings                      RouteRating[]
+  articleRatings                    ArticleRating[]
   sessions                          Session[]
   tempMedia                         TempMedia[]
   telegramConnections               TelegramConnection[]
@@ -2641,6 +2642,8 @@ model Article {
   /// Managed Discovery tags attached to this publication (many-to-many).
   tags DiscoveryTag[]
 
+  ratings ArticleRating[]
+
   /// Partial unique index created via raw SQL migration:
   /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
   @@unique([cityId, slug])
@@ -4466,6 +4469,24 @@ model RouteRating {
   @@unique([routeId, identifier])
   @@index([routeId])
   @@index([routeId, ratingType])
+  @@index([identifier])
+  @@index([userId])
+}
+
+/// Оценки статей (тот же UX, что у маршрутов; уникальный голос на статью от пользователя/IP)
+model ArticleRating {
+  id         String   @id @default(cuid())
+  articleId  String
+  ratingType String // "like" | "neutral" | "dislike"
+  identifier String
+  userId     String?
+  createdAt  DateTime @default(now())
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([articleId, identifier])
+  @@index([articleId])
+  @@index([articleId, ratingType])
   @@index([identifier])
   @@index([userId])
 }

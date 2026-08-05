@@ -9,13 +9,27 @@ import {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ routeId: string }> },
+  { params }: { params: Promise<{ articleId: string }> },
 ) {
   try {
-    const { routeId } = await params;
+    const { articleId: rawId } = await params;
+    const articleId = rawId?.trim() ?? "";
+    if (!articleId) {
+      return NextResponse.json({ error: "Missing articleId" }, { status: 400 });
+    }
 
-    if (!routeId) {
-      return NextResponse.json({ error: "Missing routeId" }, { status: 400 });
+    const article = await prisma.article.findFirst({
+      where: {
+        id: articleId,
+        status: "PUBLISHED",
+      },
+      select: { id: true },
+    });
+    if (!article) {
+      return NextResponse.json({
+        ...emptyEmojiRatingCounts(),
+        myVote: null,
+      });
     }
 
     const user = await getCurrentUser();
@@ -26,13 +40,13 @@ export async function GET(
     });
 
     const [counts, existing] = await Promise.all([
-      prisma.routeRating.groupBy({
+      prisma.articleRating.groupBy({
         by: ["ratingType"],
-        where: { routeId },
+        where: { articleId },
         _count: true,
       }),
-      prisma.routeRating.findUnique({
-        where: { routeId_identifier: { routeId, identifier } },
+      prisma.articleRating.findUnique({
+        where: { articleId_identifier: { articleId, identifier } },
         select: { ratingType: true },
       }),
     ]);
@@ -42,7 +56,7 @@ export async function GET(
       myVote: existing?.ratingType ?? null,
     });
   } catch (error) {
-    console.error("Failed to get route ratings:", error);
+    console.error("Failed to get article ratings:", error);
     return NextResponse.json({
       ...emptyEmojiRatingCounts(),
       myVote: null,

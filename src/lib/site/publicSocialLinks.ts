@@ -36,3 +36,11 @@ export function getPublicSocialLinks(): { key: PublicSocialKey; href: string }[]
     { key: "telegram", href: telegram },
   ];
 }
+
+/** Публичный Telegram-канал / бот для CTA (футер, intermission статей). */
+export function getPublicTelegramHref(): string {
+  return (
+    getPublicSocialLinks().find((l) => l.key === "telegram")?.href ??
+    FALLBACK_SOCIAL.telegram
+  );
+}

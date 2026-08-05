@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
@@ -8,6 +9,7 @@ import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticlePlaceCardBlock } from "@/components/article/blocks/ArticlePlaceCardBlock";
 import {
+  deriveArticleLeadHtml,
   deriveArticleLeadPlainText,
   type ArticleBlockMvp,
 } from "@/lib/publications/articleMvp";
@@ -32,9 +34,11 @@ import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
   if (branches.length === 0) return null;
   return (
-    <nav aria-label="Содержание статьи" className="not-prose max-w-[720px] mb-8 md:mb-10">
-      <p className="text-sm font-semibold text-foreground mb-2.5">Содержание</p>
-      <ul className="list-none m-0 p-0 space-y-1.5 text-sm text-foreground/90">
+    <nav aria-label="Содержание статьи" className="not-prose max-w-[720px] mb-8 md:mb-10 font-sans">
+      <p className="text-[20px] font-bold tracking-tight text-foreground mb-2.5">
+        Содержание
+      </p>
+      <ul className="list-none m-0 p-0 space-y-0.5 text-[18px] font-normal leading-snug tracking-tight text-foreground/90">
         {branches.map((branch) => (
           <li key={branch.entry.id}>
             <a
@@ -77,11 +81,19 @@ export function ArticleMvpView({
   citySlug,
   /** Доп. scroll-padding (напр. панель предпросмотра под хедером). */
   readingScrollPaddingExtraRem,
+  /**
+   * continuous: first = SSR-статья в ленте; continuation = подгруженная;
+   * standalone = одиночная страница (по умолчанию).
+   */
+  continuousVariant = "standalone",
+  articleAriaLabel,
+  /** Переопределение ссылки «Все материалы» (городский журнал). */
+  journalFooterHref,
 }: {
   title: string;
   subtitle: string | null;
   excerpt: string | null;
-  publishedAt: Date | null;
+  publishedAt: Date | null | string;
   blocks: ArticleMvpResolvedBlock[];
   tags?: Array<{ slug: string; title: string }>;
   editHref?: string;
@@ -89,6 +101,9 @@ export function ArticleMvpView({
   categoryLabel?: string | null;
   citySlug?: string | null;
   readingScrollPaddingExtraRem?: number;
+  continuousVariant?: "standalone" | "first" | "continuation";
+  articleAriaLabel?: string;
+  journalFooterHref?: string;
 }) {
   // Detect Breaking News by the subtitle marker.
   const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
@@ -99,12 +114,20 @@ export function ArticleMvpView({
 
   // Filter out the Breaking News marker — never show it as visible subtitle text.
   const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
+  const leadHtml = !isBreakingNews
+    ? deriveArticleLeadHtml({ blocks: blocks as ArticleBlockMvp[] })
+    : null;
   const leadPlain =
     deriveArticleLeadPlainText({ blocks: blocks as ArticleBlockMvp[] }) || "";
   const excerptTrim = excerpt?.trim() || "";
   const cityHomeHref = getCityHomeHref(citySlug);
-  /** Лид в шапке (ArticleHeader subtitle): editorial subtitle → intro → excerpt */
-  const headerDek = subtitleTrim || leadPlain || excerptTrim;
+  const journalHref = citySlug?.trim()
+    ? `/${citySlug.trim()}/blog`
+    : "/blog";
+  /** Лид в шапке: editorial subtitle (plain) → intro HTML → excerpt plain */
+  const headerDekHtml = !subtitleTrim ? leadHtml : null;
+  const headerDekPlain =
+    subtitleTrim || (!headerDekHtml ? excerptTrim || leadPlain : "") || "";
 
   // For Breaking News: extract gallery image URLs to display above the body.
   // The first gallery block is promoted to a hero preview; it will be skipped in the main loop.
@@ -119,16 +142,26 @@ export function ArticleMvpView({
       })()
     : [];
 
+  const isContinuation = continuousVariant === "continuation";
+  const showChromeBack = continuousVariant !== "continuation";
+  const showJournalFooter = continuousVariant === "standalone";
+  const footerHref = journalFooterHref?.trim() || journalHref;
+
   return (
-    <div className="min-h-screen bg-white">
-      <div
-        className="max-w-3xl mx-auto px-4 sm:px-6 py-10 md:py-16 scroll-smooth"
-        role="article"
+    <div className={cn(continuousVariant === "standalone" && "min-h-screen bg-white")}>
+      <article
+        className={cn(
+          "max-w-3xl mx-auto px-4 sm:px-6 scroll-smooth",
+          isContinuation ? "pt-2 md:pt-4 pb-6 md:pb-10" : "py-10 md:py-16",
+        )}
+        aria-label={articleAriaLabel?.trim() || title}
       >
       <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
-      <div className="mb-4 md:mb-0">
-        <MobileSmartBackButton fallbackHref={cityHomeHref} />
-      </div>
+      {showChromeBack ? (
+        <div className="mb-4 md:mb-0">
+          <MobileSmartBackButton fallbackHref={cityHomeHref} />
+        </div>
+      ) : null}
       {draftWatermark ? (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           Черновик / предпросмотр — так видят только редакторы
@@ -136,8 +169,12 @@ export function ArticleMvpView({
       ) : null}
       <ArticleHeader
         title={title}
-        subtitle={headerDek}
-        category={categoryLabel?.trim() || "Журнал"}
+        subtitle={headerDekPlain || undefined}
+        subtitleHtml={headerDekHtml || undefined}
+        journalLabel="Обзоры и статьи"
+        journalHref={journalHref}
+        category={categoryLabel?.trim() || undefined}
+        categoryHref={categoryLabel?.trim() ? journalHref : undefined}
         readTime={5}
         publishedAt={publishedAt ?? undefined}
         editHref={editHref}
@@ -313,12 +350,14 @@ export function ArticleMvpView({
         })}
       </ArticleContent>
 
-      <footer className="mt-14 md:mt-16 pt-8 border-t border-border/60 text-sm text-muted-foreground">
-        <Link href="/blog" className="text-primary hover:underline underline-offset-2">
-          ← Все материалы
-        </Link>
-      </footer>
-      </div>
+      {showJournalFooter ? (
+        <footer className="mt-14 md:mt-16 pt-8 border-t border-border/60 text-sm text-muted-foreground">
+          <Link href={footerHref} className="text-primary hover:underline underline-offset-2">
+            ← Все материалы
+          </Link>
+        </footer>
+      ) : null}
+      </article>
     </div>
   );
 }

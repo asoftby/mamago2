@@ -3,6 +3,7 @@ import {
   extractPlainTextFromHtml,
   extractPlainTextLinesFromHtml,
 } from "@/lib/richtext/utils";
+import { articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { randomId } from "@/lib/utils/randomId";
 
 /** Версия формата `Article.contentJson` */
@@ -98,6 +99,17 @@ export function deriveArticleLeadPlainText(
   if (!intro || intro.type !== "intro") return null;
   const text = extractPlainTextFromHtml(intro.text);
   return text || null;
+}
+
+/** HTML лида (intro) с разметкой редактора — для шапки без потери bold/italic/br. */
+export function deriveArticleLeadHtml(
+  content: ArticleContentPayload | { blocks: ArticleBlockMvp[] },
+): string | null {
+  const intro = content.blocks.find((b) => b.type === "intro");
+  if (!intro || intro.type !== "intro") return null;
+  const html = articleBlockHtmlForPublic(intro.text, "intro");
+  if (!extractPlainTextFromHtml(html).trim()) return null;
+  return html;
 }
 
 /** Превью статьи: первые строки блока intro (лид). */
