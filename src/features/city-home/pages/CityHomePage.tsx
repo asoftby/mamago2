@@ -11,7 +11,6 @@ import {
   CityHomeKudaSection,
   CityHomeRoutesSection,
 } from "@/features/city-home/components/CityHomeContentRows";
-import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
@@ -22,12 +21,14 @@ import { listNearbyCities } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
 
 interface CityHomePageProps {
   citySlug: string;
 }
 
 export default async function CityHomePage({ citySlug }: CityHomePageProps) {
+  const sectionAvailability = getHomeSectionAvailability();
   const [city, user] = await Promise.all([
     findCityBySlug(citySlug),
     getCurrentUser(),
@@ -45,7 +46,10 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
     personaMode: user ? "self" : "guest",
   });
 
-  const nearbyCities = await listNearbyCities(city);
+  const nearbyCities =
+    sectionAvailability.classes || sectionAvailability.routes
+      ? await listNearbyCities(city)
+      : [];
   const weatherRanking = {
     scenario: heroModel.weatherDayScenario,
     timeOfDay: heroModel.timeOfDay,
@@ -56,15 +60,21 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
       take: 8,
       weather: weatherRanking,
     }),
-    listPublicRoutesByCity(city.id).catch(() => []),
+    sectionAvailability.routes ? listPublicRoutesByCity(city.id).catch(() => []) : [],
     listCityHomeArticles(city),
-    getClassesDiscoveryFeed(city.id, city.slug, { take: 8 }).catch(() => []),
-    listPublicRoutesByCityIds(nearbyCities.map((c) => c.id)).catch(() => []),
-    Promise.all(
-      nearbyCities.map((nearbyCity) =>
-        getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: 8 }).catch(() => []),
-      ),
-    ).then((groups) => groups.flat()),
+    sectionAvailability.classes
+      ? getClassesDiscoveryFeed(city.id, city.slug, { take: 8 }).catch(() => [])
+      : [],
+    sectionAvailability.routes
+      ? listPublicRoutesByCityIds(nearbyCities.map((c) => c.id)).catch(() => [])
+      : [],
+    sectionAvailability.classes
+      ? Promise.all(
+          nearbyCities.map((nearbyCity) =>
+            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: 8 }).catch(() => []),
+          ),
+        ).then((groups) => groups.flat())
+      : [],
   ]);
 
   const mapRoutePreview = (r: (typeof localRoutes)[number]): PublicRouteCardModel => {
@@ -106,8 +116,8 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";
   const hasHomeContent =
     kudaPreview.length > 0 ||
-    classesMode !== "empty" ||
-    routesMode !== "empty" ||
+    (sectionAvailability.classes && classesMode !== "empty") ||
+    (sectionAvailability.routes && routesMode !== "empty") ||
     journalArticles.length > 0;
 
   return (
@@ -135,18 +145,22 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
 
         <CityHomeKudaSection activities={kudaPreview} />
 
-        <CityHomeClassesSection
-          cityName={getCityNominativeName(city.slug)}
-          activities={classesMode === "local" ? localClasses : nearbyClasses}
-          mode={classesMode}
-        />
+        {sectionAvailability.classes ? (
+          <CityHomeClassesSection
+            cityName={getCityNominativeName(city.slug)}
+            activities={classesMode === "local" ? localClasses : nearbyClasses}
+            mode={classesMode}
+          />
+        ) : null}
 
-        <CityHomeBirthdayCta />
+        {sectionAvailability.birthday ? <CityHomeBirthdayCta /> : null}
 
-        <CityHomeRoutesSection
-          routes={routesMode === "local" ? localRouteItems : nearbyRouteItems}
-          mode={routesMode}
-        />
+        {sectionAvailability.routes ? (
+          <CityHomeRoutesSection
+            routes={routesMode === "local" ? localRouteItems : nearbyRouteItems}
+            mode={routesMode}
+          />
+        ) : null}
 
         <CityHomeJournalSection articles={journalArticles} />
       </Container>

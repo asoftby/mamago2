@@ -124,11 +124,6 @@ export function HeroGreeting({ model }: HeroGreetingProps) {
         </p>
       ) : null}
 
-      <div className="mt-2 flex items-start">
-        <h1 className="min-w-0 flex-1 leading-tight [text-wrap:balance]" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 40, color: "#141210", letterSpacing: "-.02em" }}>
-          <span className="whitespace-pre-wrap">{model.title}</span>
-        </h1>
-      </div>
     </motion.div>
   );
 }

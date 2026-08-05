@@ -7,6 +7,7 @@ import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
+import { CityHomeAllLink } from "@/features/city-home/components/SectionHeader";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
@@ -88,14 +89,17 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     [activities, family?.personas, family?.selectedPersonaIds],
   );
 
+  const eventsHref = appendCityQuery(`/${citySlug}/events`);
+  const eventsLabel = "[все события]";
+
   if (preview.length === 0) {
     return (
       <CityHomeSection
         className="pt-[5px]"
         title={title}
-        actionLabel="Смотреть все"
-        actionHref={appendCityQuery(`/${citySlug}/events`)}
-        actionIconButton
+        actionLabel={eventsLabel}
+        actionHref={eventsHref}
+        actionInlineText
       >
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
           Пока нет опубликованных событий — загляните позже в раздел «Куда пойти».
@@ -108,11 +112,21 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     <CityHomeSection
       className="pt-[5px]"
       title={title}
-      actionLabel="Смотреть все"
-      actionHref={appendCityQuery(`/${citySlug}/events`)}
-      actionIconButton
+      actionLabel={eventsLabel}
+      actionHref={eventsHref}
+      actionInlineText
+      // На lg ссылка уезжает к стрелкам карусели — скрываем дубль в заголовке
+      headerActionClassName="lg:hidden"
     >
-      <HorizontalCardRow>
+      <HorizontalCardRow
+        navLeading={
+          <CityHomeAllLink
+            href={eventsHref}
+            label={eventsLabel}
+            className="hidden lg:inline-flex"
+          />
+        }
+      >
         {preview.map((activity) => (
           <div key={activity.id} className={kudaCardShell}>
             <EventCard {...activityMockToEventCard(activity, citySlug)} />
@@ -236,7 +250,7 @@ export function CityHomeJournalSection({
 }: {
   articles: CityHomeJournalArticle[];
 }) {
-  const { appendCityQuery } = useCity();
+  const { appendCityQuery, citySlug } = useCity();
 
   const visibleArticles = articles.filter((a) => !a.isBreakingNews);
 
@@ -244,14 +258,27 @@ export function CityHomeJournalSection({
     return null;
   }
 
+  const blogHref = appendCityQuery(`/${citySlug}/blog`);
+  const blogLabel = "[все статьи и обзоры]";
+
   return (
     <CityHomeSection
       title="Статьи и обзоры"
-      actionLabel="В журнал"
-      actionHref={appendCityQuery("/blog")}
-      actionIconButton
+      actionLabel={blogLabel}
+      actionHref={blogHref}
+      actionInlineText
+      headerActionClassName="lg:hidden"
     >
-      <HorizontalCardRow className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory">
+      <HorizontalCardRow
+        navLeading={
+          <CityHomeAllLink
+            href={blogHref}
+            label={blogLabel}
+            className="hidden lg:inline-flex"
+          />
+        }
+        className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory"
+      >
         {visibleArticles.map((a, index) => (
           <Link
             key={a.slug}

@@ -9,6 +9,8 @@ type HorizontalCardRowProps = {
   className?: string;
   /** Доп. отступ снизу для тени скролла */
   padded?: boolean;
+  /** Контент слева от стрелок карусели (например текстовая ссылка «все события») */
+  navLeading?: React.ReactNode;
 };
 
 /**
@@ -18,6 +20,7 @@ export function HorizontalCardRow({
   children,
   className,
   padded = true,
+  navLeading,
 }: HorizontalCardRowProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
@@ -59,9 +62,12 @@ export function HorizontalCardRow({
     <div
       className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}
     >
-      {/* Desktop nav buttons (Airbnb-style) */}
-      <div className="hidden lg:flex items-center justify-end absolute right-0 -top-12">
-        <div className="flex items-center gap-2">
+      {/* Desktop nav: optional leading link + Airbnb-style arrows */}
+      <div className="absolute right-0 -top-12 flex items-center justify-end gap-3">
+        {navLeading ? (
+          <div className="flex h-8 items-center">{navLeading}</div>
+        ) : null}
+        <div className="hidden lg:flex items-center gap-2">
           <button
             type="button"
             onClick={() => scrollByPage("left")}
