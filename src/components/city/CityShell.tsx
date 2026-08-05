@@ -62,6 +62,15 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   let budgetConfig: BudgetConfig = null;
 
   if (intent === "kuda" || intent === "birthday") {
+    // DEFECT (not a TODO): intent === "birthday" reuses getKudaDiscoveryFeed and
+    // renders event/kuda discovery content (Activity/EVENT rows) — content outside
+    // the birthday domain, not the intended architecture for this section. This is
+    // a stand-in, not the target design: when the birthday section is activated,
+    // its feed must be built on party-specific entities (PartyCategory,
+    // PartyOccasion, PartyLocationType) and PARTY_SERVICE/PARTY_PACKAGE Offer rows
+    // — none of which currently have a read-side consumer anywhere in the codebase.
+    // Do not extend getKudaDiscoveryFeed itself with birthday-specific behavior;
+    // the fix is a separate feed function, not a branch added here.
     const formatParam = Array.isArray(searchParams.format)
       ? searchParams.format[0]
       : searchParams.format;
