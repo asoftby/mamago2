@@ -6,11 +6,12 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { MediaEntityType } from "@prisma/client";
+import { MediaEntityType, type PrismaClient } from "@prisma/client";
 import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { extractArticleContentMediaIds } from "@/lib/publications/articleContentMedia";
 
 function mediaUsageDedupKey(u: {
   entityType: MediaEntityType;
@@ -708,6 +709,80 @@ export async function syncOfferMediaUsage(offerId: string) {
   }
 
   return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+}
+
+/**
+ * The `MediaUsage.field` value every content-derived (inline image/gallery
+ * block) row is tagged with — deliberately distinct from `"coverImageId"`/
+ * `"seoImageId"` (used elsewhere, including the synthetic rows
+ * `getMediaUsagesWithDetails()` derives directly from those columns) so a
+ * `deleteMany` scoped to this field can never remove a cover/SEO usage row,
+ * a usage row for another Article, or a usage row for another entity type.
+ */
+export const ARTICLE_CONTENT_MEDIA_USAGE_FIELD = "content" as const;
+
+/** The narrow, transaction-compatible slice of `PrismaClient` the sync below needs — satisfied by both a real `PrismaClient` and a `$transaction` callback's `tx` argument. */
+export interface ArticleContentMediaUsageSyncTxClient {
+  mediaUsage: Pick<PrismaClient["mediaUsage"], "deleteMany" | "createMany">;
+}
+
+export interface SyncArticleContentMediaUsagesInput {
+  tx: ArticleContentMediaUsageSyncTxClient;
+  articleId: string;
+  /** Raw, not-yet-validated `Article.contentJson` — invalid/malformed content safely yields zero usages via `extractArticleContentMediaIds`'s fail-closed behavior. */
+  contentJson: unknown;
+}
+
+export interface SyncArticleContentMediaUsagesResult {
+  mediaIds: readonly string[];
+}
+
+/**
+ * Transaction-scoped, idempotent sync of `MediaUsage` rows for exactly the
+ * media an Article's body (`contentJson` image/gallery blocks) references —
+ * never `coverImageId`/`seoImageId` (already directly FK-checked by
+ * `hasPublishedPublicLinkage()`, independent of `MediaUsage`), never another
+ * Article's rows, never another entity type's rows.
+ *
+ * Idempotency is achieved by controlled `deleteMany` (scoped to this exact
+ * `articleId` + `field`) followed by `createMany` of the freshly extracted
+ * unique id set, both inside the caller's transaction — not by diffing
+ * against the previous set. `MediaUsage` has no compound unique index on
+ * `(mediaId, entityType, entityId, field)`, so this function does not add
+ * one; a repeat call with unchanged `contentJson` still issues the same
+ * delete+recreate, but the resulting row *set* (by mediaId/entityType/
+ * entityId/field) is byte-equivalent — no logical duplicates survive.
+ *
+ * Callers are expected to invoke this only after the `contentJson` write it
+ * describes has itself been staged in the same transaction (e.g. right
+ * after a successful `article.update`/`updateMany`), so a rollback of one
+ * rolls back the other.
+ */
+export async function syncArticleContentMediaUsages(
+  input: SyncArticleContentMediaUsagesInput,
+): Promise<SyncArticleContentMediaUsagesResult> {
+  const mediaIds = extractArticleContentMediaIds(input.contentJson);
+
+  await input.tx.mediaUsage.deleteMany({
+    where: {
+      entityType: MediaEntityType.ARTICLE,
+      entityId: input.articleId,
+      field: ARTICLE_CONTENT_MEDIA_USAGE_FIELD,
+    },
+  });
+
+  if (mediaIds.length > 0) {
+    await input.tx.mediaUsage.createMany({
+      data: mediaIds.map((mediaId) => ({
+        mediaId,
+        entityType: MediaEntityType.ARTICLE,
+        entityId: input.articleId,
+        field: ARTICLE_CONTENT_MEDIA_USAGE_FIELD,
+      })),
+    });
+  }
+
+  return { mediaIds };
 }
 
 /**

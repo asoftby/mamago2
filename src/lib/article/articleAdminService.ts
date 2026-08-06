@@ -11,6 +11,7 @@ import { resolveArticleSlugOnSave } from "@/lib/slug/resolvePublicationSlug";
 import { ensurePublishedArticleHasSlug } from "@/lib/slug/publishSlugGuards";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { syncArticleContentMediaUsages } from "@/server/services/media/media-usage.service";
 import {
   ARTICLE_GEO_SCOPE_MESSAGES,
   isPublishLikeStatus,
@@ -346,34 +347,43 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
   }
   await assertArticleCategoryValid(input.categoryId);
 
-  const created = await prisma.article.create({
-    data: {
-      title: input.title,
-      subtitle: input.subtitle,
-      excerpt: input.excerpt,
-      contentJson: serializeArticleContent(input.content) as object,
-      heroImage: coverUrl,
-      status: input.status,
-      publishedAt,
-      scheduledAt,
-      seoTitle: input.seoTitle,
-      seoDescription: input.seoDescription,
-      seoCanonicalUrl: input.seoCanonicalUrl,
-      seoOgTitle: input.seoOgTitle,
-      seoOgDescription: input.seoOgDescription,
-      seoOgImage: seoOgImageResolved,
-      seoRobots: input.noindex ? "noindex, nofollow" : input.seoRobots,
-      authorUserId: input.authorUserId,
-      authorLabel: input.authorLabel,
-      coverImageId: input.coverImageId,
-      cityContext: input.cityContext,
-      categoryId: input.categoryId,
-      noindex: input.noindex,
-      tags: input.tagIds && input.tagIds.length > 0
-        ? { connect: input.tagIds.map((id) => ({ id })) }
-        : undefined,
-    },
-    select: { id: true },
+  const contentJsonForCreate = serializeArticleContent(input.content) as object;
+  const created = await prisma.$transaction(async (tx) => {
+    const row = await tx.article.create({
+      data: {
+        title: input.title,
+        subtitle: input.subtitle,
+        excerpt: input.excerpt,
+        contentJson: contentJsonForCreate,
+        heroImage: coverUrl,
+        status: input.status,
+        publishedAt,
+        scheduledAt,
+        seoTitle: input.seoTitle,
+        seoDescription: input.seoDescription,
+        seoCanonicalUrl: input.seoCanonicalUrl,
+        seoOgTitle: input.seoOgTitle,
+        seoOgDescription: input.seoOgDescription,
+        seoOgImage: seoOgImageResolved,
+        seoRobots: input.noindex ? "noindex, nofollow" : input.seoRobots,
+        authorUserId: input.authorUserId,
+        authorLabel: input.authorLabel,
+        coverImageId: input.coverImageId,
+        cityContext: input.cityContext,
+        categoryId: input.categoryId,
+        noindex: input.noindex,
+        tags: input.tagIds && input.tagIds.length > 0
+          ? { connect: input.tagIds.map((id) => ({ id })) }
+          : undefined,
+      },
+      select: { id: true },
+    });
+    // Same transaction as the create above: a MediaUsage failure rolls the
+    // Article creation back too, and hasPublishedPublicLinkage() (the
+    // public media-file gate) can then trust MediaUsage for this Article's
+    // inline/gallery images from the moment it exists.
+    await syncArticleContentMediaUsages({ tx, articleId: row.id, contentJson: contentJsonForCreate });
+    return row;
   });
   perf.mark("db");
 
@@ -430,27 +440,32 @@ export async function saveArticleDraft(
   const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
 
   /** `select: { id: true }` — иначе Prisma вернёт все колонки модели в RETURNING, включая отсутствующие в БД (coverImageId и т.д.). */
-  await prisma.article.update({
-    where: { id },
-    data: {
-      title: input.title,
-      subtitle: input.subtitle,
-      excerpt: input.excerpt,
-      contentJson: serializeArticleContent(input.content) as object,
-      heroImage: coverUrl,
-      status: input.status,
-      publishedAt,
-      seoTitle: input.seoTitle,
-      seoDescription: input.seoDescription,
-      seoCanonicalUrl: input.seoCanonicalUrl,
-      seoOgTitle: input.seoOgTitle,
-      seoOgDescription: input.seoOgDescription,
-      seoOgImage: seoOgImageResolved,
-      seoRobots: input.noindex ? "noindex, nofollow" : input.seoRobots,
-      categoryId: input.categoryId,
-      tags: { set: (input.tagIds ?? []).map((tagId) => ({ id: tagId })) },
-    },
-    select: { id: true },
+  const contentJsonForUpdate = serializeArticleContent(input.content) as object;
+  await prisma.$transaction(async (tx) => {
+    await tx.article.update({
+      where: { id },
+      data: {
+        title: input.title,
+        subtitle: input.subtitle,
+        excerpt: input.excerpt,
+        contentJson: contentJsonForUpdate,
+        heroImage: coverUrl,
+        status: input.status,
+        publishedAt,
+        seoTitle: input.seoTitle,
+        seoDescription: input.seoDescription,
+        seoCanonicalUrl: input.seoCanonicalUrl,
+        seoOgTitle: input.seoOgTitle,
+        seoOgDescription: input.seoOgDescription,
+        seoOgImage: seoOgImageResolved,
+        seoRobots: input.noindex ? "noindex, nofollow" : input.seoRobots,
+        categoryId: input.categoryId,
+        tags: { set: (input.tagIds ?? []).map((tagId) => ({ id: tagId })) },
+      },
+      select: { id: true },
+    });
+    // Same transaction as the update above — see createArticleFromSaveInput's comment.
+    await syncArticleContentMediaUsages({ tx, articleId: id, contentJson: contentJsonForUpdate });
   });
   perf.mark("db");
 

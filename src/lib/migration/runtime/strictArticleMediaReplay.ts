@@ -41,6 +41,15 @@
  * preflight (mirrors `strictEventMediaReplay.ts`'s
  * `TargetChangedDuringReplayError` pattern). No other `Article` column is
  * ever part of the update.
+ *
+ * That same transaction also calls `syncArticleContentMediaUsages()` right
+ * after the CAS succeeds, so every inline/gallery `MediaAsset` this replay
+ * just wrote into `contentJson` gets a matching `MediaUsage` row atomically
+ * with it — `hasPublishedPublicLinkage()` (the public media-file gate)
+ * already trusts `MediaUsage` for `ARTICLE`, it just never had rows to
+ * find here before. A `MediaUsage` write failure rolls back the `Article`
+ * update in the same transaction; a CAS failure never reaches the usage
+ * sync at all.
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { ArticleBlockMvp, ArticleContentPayload } from "@/lib/publications/articleMvp";
@@ -56,6 +65,7 @@ import type {
   ExistingAttachmentLineageState,
   ResolveAndImportArticleAttachmentsInput,
 } from "../commit/article/ArticleMediaReplaySyncer";
+import { syncArticleContentMediaUsages } from "@/server/services/media/media-usage.service";
 
 export interface StrictArticleMediaImporter {
   checkAttachmentLineageStates(input: {
@@ -65,9 +75,18 @@ export interface StrictArticleMediaImporter {
   resolveAndImportAttachments(input: ResolveAndImportArticleAttachmentsInput): Promise<Map<number, ArticleAttachmentImportOutcome>>;
 }
 
-/** The narrow slice of Prisma needed for the final atomic apply — shape-compatible with both a real `PrismaClient` and its `$transaction` callback argument. */
+/**
+ * The narrow slice of Prisma needed for the final atomic apply —
+ * shape-compatible with both a real `PrismaClient` and its `$transaction`
+ * callback argument. `mediaUsage` is required here (not optional) so that
+ * every real caller is forced to wire the same transaction into
+ * `syncArticleContentMediaUsages()` below — a `contentJson` write without a
+ * matching `MediaUsage` sync in the same transaction is exactly the bug
+ * this module closes.
+ */
 export interface StrictArticleMediaReplayTxClient {
   article: Pick<PrismaClient["article"], "updateMany">;
+  mediaUsage: Pick<PrismaClient["mediaUsage"], "deleteMany" | "createMany">;
 }
 
 export interface StrictArticleMediaReplayPrismaClient extends StrictArticleMediaReplayTxClient {
@@ -377,6 +396,11 @@ export async function runStrictArticleMediaReplay(
       if (applyResult.count !== 1) {
         throw new TargetChangedDuringReplayError();
       }
+      // Same transaction as the CAS above: a failure here rolls back the
+      // Article update too (see this module's doc comment), and the CAS
+      // having already thrown above means this line is only ever reached
+      // once the new contentJson is the one actually being committed.
+      await syncArticleContentMediaUsages({ tx, articleId: input.articleId, contentJson: finalContentJson });
     });
   } catch (error) {
     if (error instanceof TargetChangedDuringReplayError) {

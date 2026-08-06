@@ -76,6 +76,8 @@ interface HarnessOptions {
   initialContentJson?: ArticleContentPayload;
   /** Attachment ids beyond ALLOWLIST the harness's WordPress attachment resolver should also know about — e.g. a featured/cover image that never appears inline in the content. */
   extraAttachmentIds?: readonly number[];
+  /** Simulates `tx.mediaUsage.createMany` throwing inside the same transaction as the Article CAS apply. */
+  failMediaUsageCreate?: boolean;
 }
 
 function createHarness(options: HarnessOptions = {}) {
@@ -162,6 +164,9 @@ function createHarness(options: HarnessOptions = {}) {
   const updateCalls: { data: Record<string, unknown> }[] = [];
   const updateManyAttempts: { where: Record<string, unknown>; data: Record<string, unknown> }[] = [];
 
+  let mediaUsageRows: { mediaId: string; entityType: string; entityId: string; field: string }[] = [];
+  const mediaUsageCreateManyCalls: { data: { mediaId: string; entityType: string; entityId: string; field: string }[] }[] = [];
+
   const txClient: StrictArticleMediaReplayTxClient = {
     article: {
       updateMany: (async (args: {
@@ -182,14 +187,48 @@ function createHarness(options: HarnessOptions = {}) {
         return { count: 1 };
       }) as unknown as StrictArticleMediaReplayTxClient["article"]["updateMany"],
     },
+    mediaUsage: {
+      deleteMany: (async (args: { where: { entityType: string; entityId: string; field: string } }) => {
+        const before = mediaUsageRows.length;
+        mediaUsageRows = mediaUsageRows.filter(
+          (r) => !(r.entityType === args.where.entityType && r.entityId === args.where.entityId && r.field === args.where.field),
+        );
+        return { count: before - mediaUsageRows.length };
+      }) as unknown as StrictArticleMediaReplayTxClient["mediaUsage"]["deleteMany"],
+      createMany: (async (args: { data: { mediaId: string; entityType: string; entityId: string; field: string }[] }) => {
+        mediaUsageCreateManyCalls.push(args);
+        if (options.failMediaUsageCreate) {
+          throw new Error("Simulated MediaUsage.createMany failure");
+        }
+        mediaUsageRows.push(...args.data);
+        return { count: args.data.length };
+      }) as unknown as StrictArticleMediaReplayTxClient["mediaUsage"]["createMany"],
+    },
   };
 
   const prismaWithTx: StrictArticleMediaReplayPrismaClient = {
     ...txClient,
     $transaction: async <T>(fn: (tx: StrictArticleMediaReplayTxClient) => Promise<T>): Promise<T> => {
-      // The fake updateMany performs the same predicate-and-write atomically
-      // against articleState; a zero-count CAS never mutates it.
-      return fn(txClient);
+      // Real Postgres rolls back only THIS transaction's own writes on
+      // throw — never a concurrent transaction's already-committed write
+      // that happened to land inside our window (that's exactly what the
+      // CAS-race tests model via `harness.setArticleState()` from outside
+      // `txClient`). So rollback-on-throw here is scoped to state this very
+      // `fn(txClient)` invocation itself mutated (tracked via whether our
+      // own `updateCalls` grew), not a blanket "restore to whatever it was
+      // before `fn` ran".
+      const articleSnapshotBeforeAttempt = articleState;
+      const usageSnapshotBeforeAttempt = mediaUsageRows;
+      const updateCallsBeforeAttempt = updateCalls.length;
+      try {
+        return await fn(txClient);
+      } catch (error) {
+        if (updateCalls.length > updateCallsBeforeAttempt) {
+          articleState = articleSnapshotBeforeAttempt;
+          mediaUsageRows = usageSnapshotBeforeAttempt;
+        }
+        throw error;
+      }
     },
   };
 
@@ -206,6 +245,8 @@ function createHarness(options: HarnessOptions = {}) {
     getLineageCount: () => lineages.size,
     updateCalls,
     updateManyAttempts,
+    getMediaUsageRows: () => mediaUsageRows,
+    mediaUsageCreateManyCalls,
     attachmentImportCoordinator,
   };
 }
@@ -281,6 +322,57 @@ async function testSuccessfulReplayAppliesOnlyContentJsonAndCover() {
   const types = (finalState.contentJson as ArticleContentPayload).blocks.map((b) => b.type);
   assert.deepEqual(types, ["intro", "image", "image", "text"], "images land at their interleaved position");
   assert.equal(finalState.coverImageId, result.coverMediaId);
+
+  // The public media-file gate (hasPublishedPublicLinkage) trusts MediaUsage
+  // for inline Article media — a successful replay must leave exactly one
+  // usage row per inline image block's resolved mediaId, tagged with the
+  // dedicated content field, in the very same transaction as the Article write.
+  const usageRows = harness.getMediaUsageRows();
+  const inlineMediaIds = (finalState.contentJson as ArticleContentPayload).blocks
+    .filter((b): b is Extract<ArticleBlockMvp, { type: "image" }> => b.type === "image")
+    .map((b) => b.mediaId);
+  assert.equal(usageRows.length, inlineMediaIds.length, "one MediaUsage row per inline image block");
+  assert.deepEqual(usageRows.map((r) => r.mediaId).sort(), [...inlineMediaIds].sort());
+  assert.ok(usageRows.every((r) => r.entityType === "ARTICLE" && r.entityId === ARTICLE_ID && r.field === "content"));
+}
+
+async function testCoverOnlyArticleCreatesNoContentUsage() {
+  // No inline images at all — only a featuredAttachmentId. See
+  // strictArticleMediaReplay.ts's own doc comment (PR #68 P1 #1): a cover
+  // frequently never appears inline, and that must remain a fully valid,
+  // APPLIED case that simply never touches content-field MediaUsage.
+  const rawContentWithoutImages = ["<p>Intro paragraph.</p>", "<p>Final paragraph.</p>"].join("\n");
+  const currentForThisContent: ArticleContentPayload = {
+    version: 1,
+    blocks: [
+      { id: "a", type: "intro", text: "Intro paragraph." },
+      { id: "b", type: "text", text: "Final paragraph." },
+    ],
+  };
+  const harness = createHarness({ extraAttachmentIds: [999], initialContentJson: currentForThisContent });
+  const result = await runStrictArticleMediaReplay(
+    baseInput(harness, {
+      rawContent: rawContentWithoutImages,
+      featuredAttachmentId: 999,
+      inlineAttachmentAllowlist: [],
+      current: { contentJson: currentForThisContent, coverImageId: null },
+    }),
+  );
+
+  assert.equal(result.status, "APPLIED");
+  if (result.status !== "APPLIED") return;
+  assert.equal(result.imageBlockCount, 0);
+  assert.ok(result.coverMediaId, "cover was still resolved and applied");
+  assert.deepEqual(harness.getMediaUsageRows(), [], "a cover-only Article creates zero content-field MediaUsage rows");
+}
+
+async function testMediaUsageFailureRollsBackArticleUpdate() {
+  const harness = createHarness({ failMediaUsageCreate: true });
+  await assert.rejects(() => runStrictArticleMediaReplay(baseInput(harness)), /Simulated MediaUsage.createMany failure/);
+
+  assert.equal(harness.updateManyAttempts.length, 1, "the CAS was attempted and matched");
+  assert.deepEqual(harness.getArticleState(), { contentJson: CURRENT_TEXT_ONLY_CONTENT, coverImageId: null }, "Article contentJson/coverImageId rolled back to their pre-replay values despite the CAS having matched");
+  assert.deepEqual(harness.getMediaUsageRows(), [], "no MediaUsage row survives the rollback");
 }
 
 async function testIdempotentReplayIsNoop() {
@@ -288,6 +380,8 @@ async function testIdempotentReplayIsNoop() {
   const first = await runStrictArticleMediaReplay(baseInput(harness));
   assert.equal(first.status, "APPLIED");
 
+  const usageRowsAfterFirst = harness.getMediaUsageRows();
+  const createManyCallsAfterFirst = harness.mediaUsageCreateManyCalls.length;
   const importCallsAfterFirst = harness.importCalls.length;
   const second = await runStrictArticleMediaReplay(
     baseInput(harness, { current: { contentJson: harness.getArticleState().contentJson, coverImageId: harness.getArticleState().coverImageId } }),
@@ -297,6 +391,8 @@ async function testIdempotentReplayIsNoop() {
   assert.equal(harness.importCalls.length, importCallsAfterFirst, "zero new downloads on repeat replay");
   assert.equal(harness.updateCalls.length, 1, "no second Article update — still just the one from the first run");
   assert.equal(harness.updateManyAttempts.length, 1, "NOOP replay never attempts a second CAS update");
+  assert.equal(harness.mediaUsageCreateManyCalls.length, createManyCallsAfterFirst, "NOOP never re-enters the transaction, so MediaUsage sync is not called again");
+  assert.deepEqual(harness.getMediaUsageRows(), usageRowsAfterFirst, "MediaUsage rows from the first run are left exactly as they were");
 }
 
 async function testUnexpectedAttachmentOutsideAllowlistRefuses() {
@@ -761,6 +857,7 @@ async function testConcurrentArticleChangeInCasWindowIsNotOverwritten() {
     { contentJson: editorContent, coverImageId: editorCoverImageId },
     "the editor's contentJson and coverImageId survive; replay payload is not applied",
   );
+  assert.deepEqual(harness.getMediaUsageRows(), [], "a failed CAS never reaches the MediaUsage sync");
 }
 
 async function testConcurrentContentOnlyChangeFailsCas() {
@@ -786,11 +883,14 @@ async function testConcurrentContentOnlyChangeFailsCas() {
   assert.equal(harness.updateManyAttempts.length, 1);
   assert.equal(harness.updateCalls.length, 0);
   assert.deepEqual(harness.getArticleState(), { contentJson: editorContent, coverImageId: null });
+  assert.deepEqual(harness.getMediaUsageRows(), [], "a failed CAS never reaches the MediaUsage sync");
 }
 
 async function main() {
   await testFeaturedCoverAbsentFromContentStillSucceeds();
   await testSuccessfulReplayAppliesOnlyContentJsonAndCover();
+  await testCoverOnlyArticleCreatesNoContentUsage();
+  await testMediaUsageFailureRollsBackArticleUpdate();
   await testIdempotentReplayIsNoop();
   await testUnexpectedAttachmentOutsideAllowlistRefuses();
   await testContentDivergenceRefusesBeforeImport();
