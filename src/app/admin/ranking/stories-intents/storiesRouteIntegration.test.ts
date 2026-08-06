@@ -8,7 +8,7 @@ const contentNav = read("src/lib/admin/contentSidebarConfig.ts");
 const adminNav = read("src/lib/admin/adminSidebarConfig.ts");
 const adminLayout = read("src/app/admin/layout.tsx");
 const publicStories = read("src/features/stories/components/StoriesSection.tsx");
-const rankingApi = read("src/app/api/admin/ranking/route.ts");
+const rankingApi = read("src/server/services/ranking/adminRankingHandlers.ts");
 const rulesPanel = read("src/app/admin/ranking/stories-intents/StoryIntentRulesPanel.tsx");
 const homeStoryItems = read("src/server/stories/homeStoryItems.ts");
 

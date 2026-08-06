@@ -13,6 +13,7 @@ type StoryIntent = {
   order: number;
   itemLimit: number;
   allowedTypes: string[];
+  updatedAt: string;
 };
 
 const INTENT_META: Record<string, { description: string }> = {
@@ -53,7 +54,13 @@ export function StoryIntentRulesPanel() {
         body: JSON.stringify({ type: "intent", data: intent }),
       });
       if (res.ok) {
+        const updated = await res.json();
+        setIntents((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
         toast.success("Сохранено");
+      } else if (res.status === 409) {
+        const body = await res.json().catch(() => null);
+        toast.error(body?.error ?? "Настройка изменена другим администратором, обновите страницу");
+        await load();
       } else {
         toast.error("Ошибка сохранения");
       }
