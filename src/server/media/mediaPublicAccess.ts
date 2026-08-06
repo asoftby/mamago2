@@ -10,6 +10,7 @@ import {
   MediaAssetStatus,
   MediaEntityType,
   OfferStatus,
+  Prisma,
   RouteStatus,
   RouteVisibility,
 } from "@prisma/client";
@@ -17,6 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
+import { articleContentBlocksReferenceMediaId } from "@/server/media/articleContentMediaLinkage";
 import type { MediaAccessDenyPayload } from "@/server/media/mediaAccessDenyLog";
 import {
   buildMediaFilePublicUrl,
@@ -420,6 +422,43 @@ async function userSharesBusinessCabinetWithUploader(
   return false;
 }
 
+/**
+ * Inline body images/galleries live only inside `Article.contentJson.blocks`
+ * (no MediaUsage row is written for them) — jsonb_path_exists narrows to the
+ * few candidate rows in Postgres, `articleContentBlocksReferenceMediaId`
+ * makes the authoritative call in JS so the check stays in sync with the
+ * canonical block schema.
+ */
+async function isMediaReferencedInPublishedArticleContent(
+  mediaId: string,
+): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ contentJson: unknown }>>(
+    Prisma.sql`
+      SELECT "contentJson" FROM "Article"
+      WHERE status = ANY(ARRAY[${Prisma.join(LIVE_CONTENT)}]::"ContentStatus"[])
+        AND "contentJson" IS NOT NULL
+        AND (
+          jsonb_path_exists(
+            "contentJson"::jsonb,
+            '$.blocks[*] ? (@.type == "image" && @.mediaId == $mid)',
+            jsonb_build_object('mid', to_jsonb(${mediaId}::text)),
+            true
+          )
+          OR jsonb_path_exists(
+            "contentJson"::jsonb,
+            '$.blocks[*] ? (@.type == "gallery" && @.mediaIds[*] == $mid)',
+            jsonb_build_object('mid', to_jsonb(${mediaId}::text)),
+            true
+          )
+        )
+      LIMIT 5
+    `,
+  );
+  return rows.some((row) =>
+    articleContentBlocksReferenceMediaId(row.contentJson, mediaId),
+  );
+}
+
 async function hasPublishedPublicLinkage(media: MediaAsset): Promise<boolean> {
   const mediaId = media.id;
 
@@ -431,6 +470,10 @@ async function hasPublishedPublicLinkage(media: MediaAsset): Promise<boolean> {
     select: { id: true },
   });
   if (articleLinked) {
+    return true;
+  }
+
+  if (await isMediaReferencedInPublishedArticleContent(mediaId)) {
     return true;
   }
 
