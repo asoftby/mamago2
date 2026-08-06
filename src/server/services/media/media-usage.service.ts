@@ -785,60 +785,73 @@ export async function syncArticleContentMediaUsages(
   return { mediaIds };
 }
 
+/** Every `MediaUsage.field` value this function owns and is therefore allowed to delete/recreate for an Article. Anything else — a still-unknown future field, or a field some other sync owns — must survive a call to this function untouched. */
+const ARTICLE_KNOWN_DIRECT_FIELDS = ["coverImageId", "seoImageId"] as const;
+
 /**
- * Sync media usage for an Article
- * Collects all media references and updates MediaUsage records
+ * Sync media usage for an Article: `coverImageId`, `seoImageId`, and (via
+ * `syncArticleContentMediaUsages()`) every inline/gallery `contentJson`
+ * image — the exact same three fields `hasPublishedPublicLinkage()` can act
+ * on for an `ARTICLE` `MediaUsage` row. Deliberately transaction-scoped and
+ * field-scoped rather than a blanket `deleteMany({entityType, entityId})`:
+ * the old blanket delete predates `field: "content"` and would otherwise
+ * silently erase it (and any other field this function was never taught
+ * about) on every call — including from the "safe, no deletions" admin
+ * recompute-usage endpoint (`recomputeAllMediaUsageCounts()` ->
+ * `POST /api/admin/media/recompute-usage`), which is this function's one
+ * real production caller today.
  */
 export async function syncArticleMediaUsage(articleId: string) {
-  const article = await prisma.article.findUnique({
-    where: { id: articleId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const article = await tx.article.findUnique({
+      where: { id: articleId },
+      select: { coverImageId: true, seoImageId: true, contentJson: true },
+    });
 
-  if (!article) {
-    throw new Error(`Article ${articleId} not found`);
-  }
+    if (!article) {
+      throw new Error(`Article ${articleId} not found`);
+    }
 
-  const mediaIds = new Set<string>();
-  const usageRecords: Array<{ mediaId: string; field: string }> = [];
+    const directFieldRecords: Array<{ mediaId: string; field: (typeof ARTICLE_KNOWN_DIRECT_FIELDS)[number] }> = [];
+    if (article.coverImageId) {
+      directFieldRecords.push({ mediaId: article.coverImageId, field: "coverImageId" });
+    }
+    if (article.seoImageId) {
+      directFieldRecords.push({ mediaId: article.seoImageId, field: "seoImageId" });
+    }
 
-  // Cover image (proper relation)
-  if (article.coverImageId) {
-    mediaIds.add(article.coverImageId);
-    usageRecords.push({ mediaId: article.coverImageId, field: "coverImageId" });
-  }
+    // Only ever remove the exact known-field rows this function owns —
+    // never every row for this Article regardless of field.
+    await tx.mediaUsage.deleteMany({
+      where: {
+        entityType: MediaEntityType.ARTICLE,
+        entityId: articleId,
+        field: { in: [...ARTICLE_KNOWN_DIRECT_FIELDS] },
+      },
+    });
 
-  // SEO image (proper relation)
-  if (article.seoImageId) {
-    mediaIds.add(article.seoImageId);
-    usageRecords.push({ mediaId: article.seoImageId, field: "seoImageId" });
-  }
-
-  // Remove old usage records for this article
-  await prisma.mediaUsage.deleteMany({
-    where: {
-      entityType: MediaEntityType.ARTICLE,
-      entityId: articleId,
-    },
-  });
-
-  // Create new usage records (deduplicated by field)
-  const seen = new Set<string>();
-  for (const record of usageRecords) {
-    const key = `${record.mediaId}:${record.field}`;
-    if (!seen.has(key)) {
-      await prisma.mediaUsage.create({
-        data: {
+    if (directFieldRecords.length > 0) {
+      await tx.mediaUsage.createMany({
+        data: directFieldRecords.map((record) => ({
           mediaId: record.mediaId,
           entityType: MediaEntityType.ARTICLE,
           entityId: articleId,
           field: record.field,
-        },
+        })),
       });
-      seen.add(key);
     }
-  }
 
-  return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+    // Same transaction, same delete+recreate idempotency guarantee, for the
+    // `content` field — never a second, parallel implementation of it.
+    const { mediaIds: contentMediaIds } = await syncArticleContentMediaUsages({
+      tx,
+      articleId,
+      contentJson: article.contentJson,
+    });
+
+    const mediaIds = [...new Set([...directFieldRecords.map((r) => r.mediaId), ...contentMediaIds])];
+    return { mediaIds, usageCount: directFieldRecords.length + contentMediaIds.length };
+  });
 }
 
 /**
