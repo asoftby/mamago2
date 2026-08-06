@@ -117,6 +117,7 @@
     "test:auth-cookie": "tsx src/lib/auth/cookie.test.ts",
     "test:branding-media-asset-usage": "NODE_OPTIONS=--conditions=react-server tsx src/server/media/brandingMediaAssetUsage.test.ts",
     "test:article-media-replay": "tsx src/lib/migration/runtime/articleMediaOnlyReplay.test.ts && tsx src/lib/migration/runtime/strictArticleMediaReplay.test.ts",
+    "test:article-content-media-linkage": "tsx src/server/media/articleContentMediaLinkage.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "prepare": "husky",
     "check:push": "pnpm build",
