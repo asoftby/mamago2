@@ -473,7 +473,7 @@ export default async function IdeasPage() {
 
   return (
     <div
-      className={`relative min-h-screen bg-[#F6F2EA] ${ideasSerif.variable} ${ideasSans.variable} ${ideasMono.variable}`}
+      className={`relative min-h-screen bg-white ${ideasSerif.variable} ${ideasSans.variable} ${ideasMono.variable}`}
       style={{ fontFamily: "var(--font-ideas-sans)" }}
     >
       <div

@@ -30,6 +30,7 @@ const TYPE_FILTERS: Array<{ key: BlogContentType; label: string }> = [
   { key: "ARTICLE", label: "Статьи" },
   { key: "NEWS", label: "Новости" },
 ];
+const SHOW_NEWSLETTER_CTA = false;
 
 export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) {
   const pathname = usePathname();
@@ -96,31 +97,11 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
               <span className="italic text-primary">и статьи</span>
             </h1>
 
-            <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground max-w-[520px]">
+            <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground w-full">
               Вдохновение для семейных прогулок, событий и открытий — в одной редакторской подборке.
             </p>
           </div>
 
-          {articles.length > 0 && (
-            <div className="flex flex-col gap-1.5 items-end text-right p-4 bg-card border border-border rounded-2xl min-w-[200px] self-end sm:mb-1">
-              <span className="text-[10px] font-mono uppercase tracking-[.14em] text-primary">
-                ● На этой неделе
-              </span>
-              <div
-                className="font-serif leading-tight tracking-tight"
-                style={{ fontSize: "clamp(24px, 3vw, 32px)" }}
-              >
-                {articles.length} новых
-              </div>
-              <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-[.08em]">
-                ●{" "}
-                {articles.filter((a) => a.isBreakingNews).length > 0
-                  ? `${articles.filter((a) => a.isBreakingNews).length} breaking · `
-                  : ""}
-                {articles.filter((a) => !a.isBreakingNews).length} статей
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
@@ -217,7 +198,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
         )}
       </div>
 
-      <NewsletterCTA />
+      {SHOW_NEWSLETTER_CTA && <NewsletterCTA />}
     </>
   );
 }
