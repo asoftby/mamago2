@@ -20,9 +20,11 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 2 — Search Ranking (COMPLETE)
+Active task:        Task 2 — Search Ranking (COMPLETE_PENDING_BROWSER_SMOKE)
 Last updated:       2026-08-08
-Last updated by:    Claude Code (Task 2 audit + word-order search fix)
+Last updated by:    Claude Code (Task 2 audit + word-order search fix; status
+                     corrected pending owner-controlled DEV deploy + real-DEV
+                     smoke of the fix itself)
 Unresolved P0/P1:   none from Task 1 or Task 2 — Tasks 3–15 remain TODO, not started
 ```
 
@@ -554,7 +556,7 @@ for a full visual smoke of the main sections.
 
 Priority: `P0`
 
-STATUS: `COMPLETE`
+STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
 AUDIT:
 EXISTING — Real, live public search: `SearchDocument` (Prisma model,
 `entityType|entityId|title|searchText|summaryLine|metaLine|imageUrl|urlPath|
@@ -673,22 +675,46 @@ index needed at this scale (noted as a P3 forward-looking item only, not
 current risk); zero-results/admin routes already bounded and parameterized;
 RBAC on all admin search/ranking routes verified correct; no new dependency
 or external API call introduced.
-DEV SMOKE: Read-only golden-set evaluation against real
-`https://dev.mamago.by` (Browser pane, cookies declined to
-non-essential) proved the bug (exact match, partial match, category word,
-"free"-text match, and the word-order/multi-word failures all reproduced
-live). The fix itself was verified against the local dev server (already
-running on `localhost:3000` from a separate session — reused rather than
-started a second instance) via direct `/api/search` fetch calls
-(before/after) and a full UI pass: typed `балет три поросенка` into the
-real `SearchOverlay` and confirmed "С. Кибирова балет «Три поросенка»"
-renders correctly; `read_console_messages` showed no new errors (the only
-console errors present were pre-existing, unrelated 401s from the guest
-`/api/save/status` endpoint). Fix not yet deployed to `dev.mamago.by`
-itself (no deployment performed, per task scope) — the code-level +
-local-DB-level verification is the full extent of what's verifiable without
-an owner-controlled DEV deploy.
-BLOCKERS: none.
+DEV SMOKE: **Incomplete — this is the sole remaining step.** Read-only
+golden-set evaluation against real `https://dev.mamago.by` (Browser pane,
+cookies declined to non-essential) proved the *bug* (exact match, partial
+match, category word, "free"-text match, and the word-order/multi-word
+failures all reproduced live). The *fix* was verified only against the
+local dev server (`localhost:3000`, already running from a separate
+session — reused rather than starting a second instance) via direct
+`/api/search` fetch calls (before/after) and a full local UI pass: typed
+`балет три поросенка` into the real `SearchOverlay` and confirmed
+"С. Кибирова балет «Три поросенка»" renders correctly; `read_console_messages`
+showed no new errors (only pre-existing, unrelated 401s from the guest
+`/api/save/status` endpoint). Commits `68917508`/`7f7cc66d` are local to
+this working tree only — not pushed, not deployed. Actual `dev.mamago.by`
+still runs the pre-fix image and therefore still exhibits the word-order
+bug right now. Per Task 2 Exit Criteria ("Search works reliably on real DEV
+data"), this cannot be marked `COMPLETE` until the fix is verified on
+actual DEV after an owner-controlled deploy — see BLOCKERS.
+BLOCKERS: **DEV deploy pending (owner-controlled).** Task 2 status is held
+at `COMPLETE_PENDING_BROWSER_SMOKE` until: (1) the project owner deploys
+commits `68917508`+`7f7cc66d` (or whatever supersedes them) to
+`dev.mamago.by`, and (2) a coding agent re-runs the same read-only
+golden-set queries against actual `dev.mamago.by` and confirms the
+word-order fix is live there. No other blocker.
+
+**Git Release Safety — Pending DEV Update (2026-08-08, read-only check,
+no push/deploy performed):** branch `dev`, local HEAD `7f7cc66d`.
+`git fetch origin dev` → `origin/dev` = `2ecebe1b`, which is the exact
+merge-base with local `dev` — i.e. a **clean fast-forward**, local `dev` is
+12 commits ahead of `origin/dev` with zero divergence/conflict risk. Those
+12 local-only commits (oldest→newest: `5c76bc85` checklist creation through
+`7f7cc66d` this Task 2 closure) are all legitimate prior-session Task 1 +
+admin-pagination + Task 2 work — nothing unexpected. `git status --short`:
+only `next-env.d.ts` (known foreign, untouched) and this checklist file
+(this status-correction edit) are modified; no untracked files. Confirmed
+`next-env.d.ts` is not present in either `68917508` or `7f7cc66d` (`git show
+--stat` on each). Task 2's own diff (`cfa5a536..7f7cc66d`) touches exactly
+4 files: `docs/engineering/backlog.md`, `docs/release/dev-to-prod-checklist.md`,
+`src/app/api/search/route.ts`, `src/app/api/search/route.test.ts` — no
+unexpected files. **Not pushed, not deployed** — per instruction, deployment
+is owner-controlled via Telegram; this agent does not push or deploy.
 BACKLOG/NOTES: BACKLOG-022 (transliteration/layout/typo — real but
 deferred, no proven necessity yet for new fuzzy-matching infrastructure),
 BACKLOG-023 (mock admin stats), BACKLOG-024 (dead search-adjacent
