@@ -72,6 +72,7 @@ Permissions: `0700` для директорий, `0600` для файлов. Raw
 
 15. Тесты не зависят от `/tmp` или приватных home-directory snapshots: только committed sanitized fixtures либо self-generated temporary fixtures.
 16. Content-bearing entities (Article/Place/Event/Route/Offer) не могут быть полностью смигрированы из lightweight dependency-snapshot'ов — их SSH-based vertical slice (exact `--source-record-key`, один exact-key read) остаётся единственным источником `title`/`content`/postmeta/terms и разрешён без отдельного нового "snapshot capture" gate.
+17. Все migration/worktree/subagent операции также подчиняются обязательному разделу `Git / Worktree Safety` из корневого `CLAUDE.md`. Перед использованием результата любого worktree необходимо проверить его base SHA и актуальность относительно текущего HEAD.
 
 ---
 
