@@ -7,6 +7,8 @@ import { Image as ImageIcon, AlertCircle, Archive, Trash2, HardDrive } from "luc
 import { AdminMediaUploader } from "@/components/admin/media/AdminMediaUploader";
 import { AdminMediaTableClient } from "@/components/admin/media/AdminMediaTableClient";
 import { MediaStatusFilter } from "@/components/admin/media/MediaStatusFilter";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { parseAdminPage } from "@/lib/admin/pagination";
 
 // Force dynamic rendering to avoid caching issues
 export const dynamic = "force-dynamic";
@@ -15,7 +17,7 @@ export const revalidate = 0;
 export default async function AdminMediaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
 }) {
   const user = await getCurrentUser();
 
@@ -25,6 +27,7 @@ export default async function AdminMediaPage({
 
   const params = await searchParams;
   const statusFilter = params.status || "active";
+  const page = parseAdminPage(params.page);
 
   // Determine which statuses to show
   let statusesToShow: string[];
@@ -37,9 +40,13 @@ export default async function AdminMediaPage({
   }
 
   const [mediaList, stats] = await Promise.all([
-    getAdminMediaList({ status: statusesToShow }, { page: 1, limit: 50 }),
+    getAdminMediaList({ status: statusesToShow }, { page, limit: 50 }),
     getMediaStats(),
   ]);
+
+  const { limit, total, totalPages } = mediaList.pagination;
+  const start = total === 0 ? 0 : (mediaList.pagination.page - 1) * limit + 1;
+  const end = total === 0 ? 0 : Math.min(mediaList.pagination.page * limit, total);
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -116,25 +123,15 @@ export default async function AdminMediaPage({
       <AdminMediaTableClient items={mediaList.items} />
 
       {/* Pagination */}
-      {mediaList.pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600">
-            Показано {mediaList.items.length} из {mediaList.pagination.total}
-          </p>
-          <div className="flex gap-2">
-            {mediaList.pagination.hasPrev && (
-              <button className="h-10 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                Назад
-              </button>
-            )}
-            {mediaList.pagination.hasNext && (
-              <button className="h-10 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                Далее
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <AdminPagination
+        page={mediaList.pagination.page}
+        totalPages={totalPages}
+        total={total}
+        start={start}
+        end={end}
+        basePath="/admin/media"
+        params={params}
+      />
     </div>
   );
 }
