@@ -279,3 +279,91 @@ P3 — cleanup / polish / optional
   + verify no broken images regression.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 1 audit (Import
   Images Into DEV)
+
+## [BACKLOG-016] Place FULL media backfill blocked — TARGET_MODIFIED_AFTER_IMPORT
+
+- Status: OPEN
+- Priority: P1
+- Area: Migration / Media / Places
+- Added: 2026-08-07
+- Reason deferred: real, systemic safety-gate block discovered while
+  executing Task 1's approved write phase — not something to bypass
+  unilaterally; the tool's own error says "needs manual reconciliation — no
+  automatic override exists."
+- Context: `classifyPlaceUpdateSafety()`
+  (`src/lib/migration/commit/place/classifyPlaceUpdateSafety.ts:84`) refuses
+  any Place UPDATE (and, since media sync only runs after a successful
+  UPDATE/CREATE in `PlaceCommitRunner.execute()`, therefore also refuses
+  media sync) whenever `Place.updatedAt > MigrationLineage.lastImportedAt`.
+  The 2026-07-29 mass Place publication session
+  (`prelaunch-checklist.md`, "canonical-table (76 unconditional UPDATEs) and
+  search-index (76 unconditional upserts) writes did occur, value-neutral
+  (timestamp-only)") bumped `updatedAt` on essentially every published
+  Place, so this now fires for the entire remaining corpus — confirmed by
+  testing `--force-reprocess --media-policy FULL` on 3 separate clean
+  source keys (`wordpress-db:places:5457/5492/5515`), all three failed
+  identically with `PLACE_UPDATE_CONFLICT: TARGET_MODIFIED_AFTER_IMPORT`.
+  Net effect: 68 of 78 clean Places (with real source media evidence) could
+  not be backfilled this session; Place gallery coverage stayed at 5/83
+  (only the pre-existing sample + 1 partial). No code change was attempted
+  to bypass this — that would risk exactly the "silent overwrite of a
+  possibly-manually-edited record" this gate exists to prevent.
+- Current state: not started. 0 Places touched by this session's Place
+  media attempts (confirmed via unchanged `PlaceImage` row count, 51,
+  before/after).
+- Dependencies: founder decision on how to safely reconcile — options
+  include (a) a one-off script that resyncs `MigrationLineage.lastImportedAt`
+  to "now" for records confirmed value-neutral-touched-only (requires
+  auditing each of the 78 to rule out real manual edits), (b) a smarter
+  content-hash-based conflict check for Place mirroring the
+  hash-equality approach `strictEventMediaReplay.ts`/
+  `strictArticleMediaReplay.ts` already use successfully (real but scoped
+  new code), or (c) accept current Place media coverage as the DEV
+  baseline and revisit at PROD cutover time (Place production media import
+  is separately still `GATED` per `prelaunch-checklist.md`).
+- Acceptance criteria: founder picks an option; if (a) or (b), implement,
+  verify idempotency, re-run against the remaining clean Place corpus.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 1 write-phase
+  execution (Import Images Into DEV)
+
+## [BACKLOG-017] Route/RouteStop media has no safe narrow replay path
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Media / Routes
+- Added: 2026-08-07
+- Reason deferred: not attempted this session — real, unverified risk found
+  during Task 1's audit, not a quick fix.
+- Context: unlike Event (`--force-media-reprocess`, hash-equality gated,
+  proven safe this session) and Article (`--force-article-media-replay`,
+  same hash-equality gate, proven safe this session), Route has no dedicated
+  narrow media-only replay CLI path — `RouteStopMediaSyncer`/
+  `MediaPolicyGatedRouteStopMediaSyncer` are only reachable through the
+  generic `RouteCommitRunner` UPDATE path, and `RouteCommitRunner.ts` has
+  **no** `TARGET_MODIFIED_AFTER_IMPORT`-equivalent (or hash-equality)
+  conflict guard at all (confirmed by reading the file — no
+  `classifyRouteUpdateSafety` module exists, unlike Place). A plain
+  `--entity route --media-policy FULL` run would therefore UPDATE every
+  matched Route's content fields unconditionally, with no protection
+  against clobbering a manual edit made since import. Separately, the
+  read-only preview CLI (`migration-preview-wordpress-db.ts`) only wires its
+  ledger lookup for `--entity place` (`includesPlacePreview()` gate,
+  confirmed by reading the file) — so `--entity route`/`--entity article`
+  preview output showing `action: CREATE` for already-imported records is a
+  **preview-tool-only blind spot**, not evidence of the commit script's real
+  behavior (the commit script wires `MigrationLedgerRepository`
+  unconditionally for every entity) — worth fixing for future migration
+  sessions so preview output isn't misleading, but not itself a blocker.
+- Current state: not attempted. 0 Routes/RouteStops touched this session.
+  All 14 Routes/90 RouteStops render cleanly with no images today (no
+  broken `<img>`, confirmed via code read of `RouteCard`/`RouteDetailClient`
+  — see Task 1 audit), so this is not a P0/P1 visual-breakage risk, just an
+  incomplete production-like dataset for this one entity type.
+- Dependencies: needs either (a) a `classifyRouteUpdateSafety`-equivalent
+  guard added to `RouteCommitRunner` (mirroring Place), or (b) a dedicated
+  `--force-route-media-replay` narrow path (mirroring Event/Article) before
+  any Route media backfill is safe to run.
+- Acceptance criteria: safety net built and verified; then Route/RouteStop
+  media backfill can run safely.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 1 audit (Import
+  Images Into DEV)
