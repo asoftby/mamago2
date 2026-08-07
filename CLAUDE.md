@@ -186,6 +186,16 @@ git diff --cached --check
 
 **Core rule:** Agent output is a diff, not a source of truth. Актуальный `HEAD` основного репозитория всегда имеет приоритет над содержимым старого worktree. Никогда не заменять актуальный файл старой версией только потому, что она содержит нужное изменение агента. Нужное изменение должно быть переприменено поверх актуального кода.
 
+## DEV → PROD Readiness
+
+For any DEV → PROD readiness work, read `docs/release/dev-to-prod-checklist.md`
+first and treat it as the release coordination source of truth. Use AUDIT
+FIRST, implement only confirmed gaps, use risk-based verification, make
+atomic commits after completed verified phases, route non-blocking P2/P3
+engineering work to `docs/engineering/backlog.md`, and update checklist
+status/proof after completion. Do not expand the frozen release scope with
+non-blocking work.
+
 ## Engineering Backlog
 
 Any consciously deferred engineering task must be recorded in
