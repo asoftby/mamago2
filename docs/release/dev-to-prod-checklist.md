@@ -20,10 +20,10 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 1 — Import Images Into DEV (COMPLETE)
+Active task:        Task 2 — Search Ranking (COMPLETE)
 Last updated:       2026-08-08
-Last updated by:    Cursor (Task 1 media metadata audit/backfill follow-up)
-Unresolved P0/P1:   none from Task 1 — Tasks 2–15 remain TODO, not started
+Last updated by:    Claude Code (Task 2 audit + word-order search fix)
+Unresolved P0/P1:   none from Task 1 or Task 2 — Tasks 3–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -554,15 +554,148 @@ for a full visual smoke of the main sections.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE`
+AUDIT:
+EXISTING — Real, live public search: `SearchDocument` (Prisma model,
+`entityType|entityId|title|searchText|summaryLine|metaLine|imageUrl|urlPath|
+isPublished|boost|updatedAt`, unique on `[entityType,entityId]`, indexed on
+`isPublished`) is the actual search index, kept current by
+`SearchIndexerService`/`prismaSearchExtension.ts` (Prisma Client Extension
+firing on every `activity/offer/place/route/article` write) and per-entity
+builders under `src/lib/search/builders/`. Public endpoint
+`src/app/api/search/route.ts` (`GET /api/search?q=&limit=&cityId=`) queries
+`SearchDocument` with a case-insensitive substring match, orders by
+`boost desc, updatedAt desc`, live-enriches `activity` results from current
+DB state, and fire-and-forget logs every query to `SearchQueryLog` via
+`src/lib/search/logSearchQuery.ts`. UI: `SearchOverlay`/`SearchInput`/
+`SearchResults`/`SearchResultItem` (desktop) + `MobileSearchSheet`/
+`MobileSearch*` (mobile), 250 ms debounce, both wired to the same endpoint.
+Ranking is a real, understandable, deterministic formula: hardcoded
+per-entity-type multiplier in `src/lib/search/constants.ts`
+(`SEARCH_BOOST = {activity:1.25, offer:1.15, place:1.1, route:1.0,
+article:0.85}`) applied as `SearchDocument.boost`, tie-broken by recency
+(`updatedAt desc`). No hidden/dynamic scoring — fully predictable.
+Zero-result demand is already fully detectable: `SearchQueryLog`
+(`query|resultsCount|clickedEntityId?|cityId?|userId?|sessionId?|createdAt`,
+indexed on `query`, `resultsCount`, `[query,resultsCount]`, `createdAt`) is
+written on every real search; `GET /api/admin/search/zero-results`
+(admin-only, `src/app/api/admin/search/zero-results/route.ts`) does a
+bounded (`parsePaginationParams`, capped `limit`), parameterized
+(`$queryRaw` tagged template — no injection risk) `GROUP BY query WHERE
+resultsCount=0` aggregation with a working `/admin/search/zero-results` UI.
+Admin cannot arbitrarily break organic ranking: confirmed as already true,
+found and fixed by a **prior 2026-08 audit session** (self-documented in
+code comments, not this session's work) — `RankingSettings`/`BoostSettings`
+(`/admin/ranking/weights`, `/admin/ranking/boost`) and the separately
+modeled `SearchRankingSettings` (`/admin/search/ranking`) are two
+independent duplicate ranking-weight systems, **neither read by any
+production ranking code** (confirmed again this session by re-reading
+`src/lib/search/constants.ts` and both admin handler files end-to-end); both
+are locked to HTTP 403 on every mutation with an explicit Russian-language
+"does not affect production ranking" banner in the admin UI. `StoryIntentConfig`
+(today/tomorrow/weekend/breaking_news/free story-rail intents, unrelated to
+the search text box) is real, live, and correctly admin-editable with
+optimistic-concurrency (`updatedAt` check) + audit logging
+(`logAdminAudit`). RBAC verified correct: `isRankingAdmin` requires
+ADMIN/MODERATOR, `isSearchRankingAdmin` and the zero-results route require
+ADMIN, all checked before any DB read/write.
+PARTIAL/BROKEN — Confirmed via a representative golden-set evaluation
+against real DEV data (`https://dev.mamago.by`, read-only, Browser pane):
+(1) **Word-order-sensitive matching (the real, significant gap — fixed this
+session, see IMPLEMENTATION)**: the single `contains` substring match meant
+a query only matched if its exact character sequence appeared in the
+indexed blob — e.g. `q=балет три поросенка` matched, but the equally
+natural `q=три поросенка балет` and `q=детский сад` (target contains
+"детский" and "сад" separately, not adjacent) returned **zero** results
+even though every individual word was present. This affects ordinary
+Russian-language queries, not just edge cases. (2) Transliteration/wrong
+keyboard layout/typo tolerance genuinely do not exist (`q=teatr`,
+`q=ntfnh`, `q=театор`, `q=мулберри` all → 0 results against a corpus that
+has an obvious real match for each) — real but lower-severity, deferred,
+see GAPS/BACKLOG. (3) `SearchQuickTag`/`SearchSynonym` admin CRUD exist but
+have zero runtime consumers; `/admin/search` overview page shows hardcoded
+mock stats; `SearchIndexRecord`/`indexManager.ts`/`/admin/search/index`
+dashboard reads a table nothing populates (the real index is
+`SearchDocument`, unaffected) — all inert admin-surface debt, not
+production-search-breaking.
+MISSING — No seasonal-boost subsystem (confirmed not needed: existing
+`StoryIntentConfig` + `SEARCH_BOOST` already cover the real product need at
+this scale, per the task's own "do not build a separate seasonal subsystem
+if existing intents/settings suffice" guidance). No `PopularQuery`/
+`FrequentQuery`/`ZeroResult` dedicated models — not needed, `SearchQueryLog`
+already derives both ad hoc and cheaply.
+DO NOT TOUCH — `SearchIndexerService`/`prismaSearchExtension.ts`/builders
+(real, live, correct); `SearchQueryLog` + zero-results admin flow (real,
+live, correctly bounded/parameterized); `StoryIntentConfig` +
+`/admin/ranking/stories-intents` (real, live, correctly audited);
+`SEARCH_BOOST` ranking formula (simple, predictable, adequate at current
+catalog size — no proven need for a more complex/dynamic model); the
+already-locked `RankingSettings`/`BoostSettings`/`SearchRankingSettings`
+read-only guard (correctly prevents admin from silently believing they
+affect ranking — do not re-enable without first wiring them to real
+scoring, per the existing code comments).
+IMPLEMENTATION SCOPE: fix the confirmed, reproducible word-order matching
+gap with the minimal safe change — split the query into whitespace tokens
+and require each token to match independently (AND) instead of one
+whole-string substring match; single-token queries are byte-for-byte
+unchanged (no regression). Add a bounded query length (200 chars) and token
+count (10) cap as cheap, low-risk input hardening (previously unbounded).
+No schema change, no new engine, no new dependency, reuses the exact same
+`SearchDocument`/Prisma query shape.
+
+GAPS: Transliteration/keyboard-layout/typo tolerance (BACKLOG-022), mock
+admin search-overview stats (BACKLOG-023), dead
+`SearchIndexRecord`/`SearchQuickTag`/`SearchSynonym`/debug-route
+scaffolding (BACKLOG-024), uncalled `logSearchClick()` (BACKLOG-025) — all
+confirmed real via this audit, none block Task 2 Exit Criteria, all routed
+to backlog per §14/§24 (none is a proven P0/P1: search already works
+reliably for the word-order-corrected common case, ranking is already
+predictable, admin already cannot break organic ranking).
+IMPLEMENTATION: `src/app/api/search/route.ts` — added `buildSearchTextWhere()`
+(AND-of-tokens for multi-word queries, unchanged single-`contains` for
+single-token queries) and `MAX_QUERY_LENGTH`/`MAX_QUERY_TOKENS` caps. No
+other files changed; no migration; no admin/API surface added.
+COMMITS: `<see git log — code fix + test>`, `<see git log — checklist/backlog
+closure>` (recorded below after commit).
+VERIFICATION: New targeted test
+`src/app/api/search/route.test.ts` (self-contained fixture, created/torn
+down within the test, real local dev DB) — 5 cases: out-of-order multi-word
+query matches, single-token query unaffected (no regression), a token
+genuinely absent from the document correctly excludes it (AND, not OR),
+oversized query (5000 chars) handled gracefully, 50-token query handled
+gracefully. All pass (`npx tsx src/app/api/search/route.test.ts` →
+`/api/search word-order tests: OK`). `npx tsc --noEmit` clean. `npx eslint
+src/app/api/search/route.ts src/app/api/search/route.test.ts` clean.
+Performance/security sanity: `SearchDocument` corpus is small (~276
+published entities across all 5 types per Task 1 counts) so the added
+`AND` of `contains` clauses is still a single cheap sequential scan, no
+index needed at this scale (noted as a P3 forward-looking item only, not
+current risk); zero-results/admin routes already bounded and parameterized;
+RBAC on all admin search/ranking routes verified correct; no new dependency
+or external API call introduced.
+DEV SMOKE: Read-only golden-set evaluation against real
+`https://dev.mamago.by` (Browser pane, cookies declined to
+non-essential) proved the bug (exact match, partial match, category word,
+"free"-text match, and the word-order/multi-word failures all reproduced
+live). The fix itself was verified against the local dev server (already
+running on `localhost:3000` from a separate session — reused rather than
+started a second instance) via direct `/api/search` fetch calls
+(before/after) and a full UI pass: typed `балет три поросенка` into the
+real `SearchOverlay` and confirmed "С. Кибирова балет «Три поросенка»"
+renders correctly; `read_console_messages` showed no new errors (the only
+console errors present were pre-existing, unrelated 401s from the guest
+`/api/save/status` endpoint). Fix not yet deployed to `dev.mamago.by`
+itself (no deployment performed, per task scope) — the code-level +
+local-DB-level verification is the full extent of what's verifiable without
+an owner-controlled DEV deploy.
+BLOCKERS: none.
+BACKLOG/NOTES: BACKLOG-022 (transliteration/layout/typo — real but
+deferred, no proven necessity yet for new fuzzy-matching infrastructure),
+BACKLOG-023 (mock admin stats), BACKLOG-024 (dead search-adjacent
+scaffolding cleanup), BACKLOG-025 (uncalled `logSearchClick`). Search
+click-through/CTR-as-a-ranking-signal work intentionally left for Task 5
+(Content Analytics & Ranking) per this checklist's own task boundaries —
+not started here.
 
 AUDIT FIRST existing Search / Ranking infrastructure: Search API, search
 ranking, search analytics, normalization, intents, transliteration, wrong

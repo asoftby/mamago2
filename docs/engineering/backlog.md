@@ -470,3 +470,140 @@ P3 — cleanup / polish / optional
   drop/archive truly unused attachments) then run the same idempotent
   metadata backfill; still never overwrite curated metadata.
 - Source: Task 1 media metadata audit/backfill follow-up
+
+## [BACKLOG-022] Search: no transliteration / keyboard-layout / typo tolerance
+
+- Status: OPEN
+- Priority: P2
+- Area: Search
+- Added: 2026-08-08
+- Reason deferred: confirmed real via a representative golden-set evaluation
+  against real DEV data (`https://dev.mamago.by`), but Task 2's own scope
+  guardrails explicitly say not to build a fuzzy-matching engine without
+  proven necessity, and there is no real user query-volume evidence yet
+  (pre-PROD, `SearchQueryLog` traffic so far is test/agent-generated, not
+  organic) that this is frequent enough to justify new infrastructure now.
+- Context: `/api/search` matches via plain Postgres `ILIKE`-style `contains`
+  on `SearchDocument.searchText` (built by `src/lib/search/sanitizeSearchText.ts`,
+  which only strips HTML/collapses whitespace). No transliteration
+  (RU↔LAT), no wrong-keyboard-layout correction, no fuzzy/typo tolerance,
+  no `pg_trgm` anywhere in the repo. Reproduced on real DEV: `q=театр` → 8
+  relevant results; `q=teatr` (transliteration) → 0; `q=ntfnh` (same word
+  typed on the wrong keyboard layout) → 0; `q=театор` (one-letter typo) →
+  0; `q=мулберри` (alternate transliteration of an existing "Малберри
+  Клаб") → 0.
+- Current state: not started. `SearchSynonym` (Prisma model + full
+  `/admin/search/synonyms` CRUD UI) already exists and could serve as the
+  first, cheapest mitigation (admin manually maps a known bad spelling to
+  the correct term) but is not currently consulted by `/api/search/route.ts`
+  — see BACKLOG-024.
+- Dependencies: none blocking. `/admin/search/zero-results` (live) is the
+  right place to observe whether this is a real, frequent problem once
+  organic PROD traffic exists.
+- Acceptance criteria: once real zero-result query volume shows this
+  matters, either (a) wire `SearchSynonym` into the query path (cheapest,
+  fully reuses existing admin UI), or (b) add a small deterministic
+  RU↔LAT keyboard-layout remap as a fallback query, or (c) add `pg_trgm` +
+  a GIN index for real fuzzy matching if volume justifies the new
+  infrastructure. Do not build (c) speculatively.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 2 audit (Search
+  Ranking) — golden-set DEV evaluation
+
+## [BACKLOG-023] Search admin: hardcoded mock stats on `/admin/search` overview
+
+- Status: OPEN
+- Priority: P2
+- Area: Search / Admin
+- Added: 2026-08-08
+- Reason deferred: misleading but not unsafe — doesn't affect production
+  search or ranking behavior, purely a display issue on an internal admin
+  page.
+- Context: `src/app/admin/search/page.tsx` renders hardcoded mock arrays
+  (e.g. `"Searches Today": "12,847"`) instead of real `SearchQueryLog`
+  aggregates, and a "Popular Queries" table that is also mock data. An
+  admin reading this page today sees fabricated numbers with no visual
+  indication they're fake.
+- Current state: not started. The real data source (`SearchQueryLog`) is
+  live and already has a working query pattern to copy from
+  `src/app/api/admin/search/zero-results/route.ts`.
+- Dependencies: none.
+- Acceptance criteria: either wire the tiles/table to real
+  `SearchQueryLog` aggregates, or remove the page/mark it clearly as a
+  placeholder, so admins never see fabricated numbers presented as real.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 2 audit (Search
+  Ranking)
+
+## [BACKLOG-024] Search: dead/unused search-adjacent infrastructure cleanup
+
+- Status: OPEN
+- Priority: P3
+- Area: Search
+- Added: 2026-08-08
+- Reason deferred: none of this is broken or unsafe in production today —
+  it's inert scaffolding that doesn't affect the live search path
+  (`SearchDocument` / `/api/search`). Pure cleanup, no release risk.
+- Context (confirmed via code read, each independently, 2026-08):
+  - `SearchIndexRecord` model + `src/lib/search/indexManager.ts` +
+    `/admin/search/index` health dashboard — nothing in the live write path
+    populates `SearchIndexRecord` (the real index is `SearchDocument`, kept
+    current by `SearchIndexerService`/`prismaSearchExtension.ts`), so the
+    dashboard reads a table that stays empty/stale forever despite the real
+    index being fully populated and correct.
+  - `SearchQuickTag` (full CRUD UI at `/admin/search/quick-tags`) has no
+    public consumer — `src/lib/search/popularSearchTags.ts`'s
+    `resolveVisiblePopularTags()` uses a separate hardcoded candidate list
+    gated on real counts that are never supplied (`SearchResults.tsx`
+    always calls it with an empty counts map), so the "Популярное" block is
+    permanently hidden in production regardless of `SearchQuickTag` state.
+  - `SearchSynonym` (full CRUD UI at `/admin/search/synonyms`) is not read
+    by `/api/search/route.ts` — admin-entered synonyms currently have zero
+    runtime effect. (Wiring this one in is the actionable option tracked
+    separately in BACKLOG-022, not pure cleanup.)
+  - `src/app/api/search/debug/route.ts` carries its own
+    `TODO: remove or restrict before production hardening` comment; already
+    gated by `requireAdminOrModeratorApiUser()` and returns 404 outside
+    `NODE_ENV=production`, so not unsafe as-is, just dead weight.
+  - `RankingSettings`/`BoostSettings` (`/admin/ranking/weights`,
+    `/admin/ranking/boost`) and the separately-modeled `SearchRankingSettings`
+    (`/admin/search/ranking`) are two independently-built, differently-shaped
+    ranking-weight admin panels; a prior 2026-08 audit (code comments in
+    `src/server/services/ranking/adminRankingHandlers.ts` and
+    `src/server/services/search/adminSearchRankingHandlers.ts`) already
+    found neither is read by production ranking and locked both to
+    read-only (mutations return 403) — correctly prevents admin from
+    silently believing they affect ranking. Confirmed still in that state.
+    Picking one design (or a real one) and deleting the other is the
+    eventual cleanup; not urgent since both are already inert and clearly
+    labeled read-only in the UI.
+- Current state: not started.
+- Dependencies: none blocking each other; can be tackled independently.
+- Acceptance criteria: for each item, either wire it to something real or
+  delete it — do not leave dead admin UI surfaces that look functional but
+  aren't.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 2 audit (Search
+  Ranking)
+
+## [BACKLOG-025] Search: `logSearchClick()` has no confirmed caller
+
+- Status: OPEN
+- Priority: P2
+- Area: Search / Analytics
+- Added: 2026-08-08
+- Reason deferred: click-through tracking is an analytics/ranking-signal
+  concern that belongs to Task 3 (Publication Analytics) / Task 5 (Content
+  Analytics & Ranking), not Task 2's core exit criteria (Task 2 only
+  requires zero-result demand to be detectable, which already works via
+  `SearchQueryLog`/`resultsCount=0`).
+- Context: `src/lib/search/logSearchQuery.ts` exports `logSearchClick()` to
+  backfill `SearchQueryLog.clickedEntityId` when a user clicks a search
+  result, but no caller was found anywhere in `src/` in this audit pass.
+  Search click-through data is therefore not actually being collected
+  today, even though the schema/plumbing exists.
+- Current state: not started.
+- Dependencies: best picked up alongside Task 3/5 (shared analytics/signal
+  layer), not in isolation.
+- Acceptance criteria: either wire `logSearchClick()` into the actual
+  result-click handler (`SearchResultItem.tsx` / mobile equivalents) or
+  remove the dead export, decided together with Task 3/5 scope.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 2 audit (Search
+  Ranking)
