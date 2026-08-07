@@ -282,7 +282,7 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-016] Place FULL media backfill blocked — TARGET_MODIFIED_AFTER_IMPORT
 
-- Status: OPEN
+- Status: DONE (2026-08-07, commit `32be8beb`)
 - Priority: P1
 - Area: Migration / Media / Places
 - Added: 2026-08-07
@@ -323,6 +323,22 @@ P3 — cleanup / polish / optional
   is separately still `GATED` per `prelaunch-checklist.md`).
 - Acceptance criteria: founder picks an option; if (a) or (b), implement,
   verify idempotency, re-run against the remaining clean Place corpus.
+- Resolution: chose a narrower variant of option (b) — instead of loosening
+  `classifyPlaceUpdateSafety()`'s timestamp check itself (kept fully
+  intact, still protects the real content-commit path), added a separate,
+  explicit `--force-place-media-replay` CLI path
+  (`src/lib/migration/runtime/placeMediaOnlyReplay.ts`) that calls
+  `PlaceMediaSyncer.sync()` directly, bypassing the conflict gate
+  entirely — safe by construction because `PlaceMediaSyncer` never writes
+  to the `Place` row itself (only `PlaceImage`/`MediaAsset`/
+  `MigrationLineage(MEDIA_ASSET)`), confirmed both by reading the class
+  and empirically (byte-identical `Place` row diff, including
+  `updatedAt`, before/after on golden-proof + full-batch runs). Ran
+  against all 68 clean Place source keys with real source media: 61
+  applied (new imports) + 7 already-synced (`NOOP_ALREADY_SYNCED`), 0
+  refused, 0 failed. Place gallery coverage: 5/83 → 68/83. The remaining
+  15 either have no media in the WP source at all, or are the 1
+  non-WP-origin Place — not a gap this mechanism can or should close.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 1 write-phase
   execution (Import Images Into DEV)
 
@@ -365,5 +381,13 @@ P3 — cleanup / polish / optional
   any Route media backfill is safe to run.
 - Acceptance criteria: safety net built and verified; then Route/RouteStop
   media backfill can run safely.
+- Severity review (2026-08-07, Task 1 closure): confirmed **not** P0/P1.
+  Routes are a small, secondary entity (14 total, vs. 83 Places/26
+  Articles), already render cleanly with no broken images or layout
+  regression, and are not one of Task 1's core "main sections" (Places,
+  Articles, Events). Lack of Route/RouteStop imported media does not
+  materially prevent production-like DEV testing of the core discovery
+  flows and does not make first PROD unsafe. Stays P2, does not block
+  Task 1 `COMPLETE`.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 1 audit (Import
   Images Into DEV)

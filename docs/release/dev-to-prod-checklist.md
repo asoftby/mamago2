@@ -20,12 +20,10 @@ two documents or their processes.
 DEV:   NOT VERIFIED
 PROD:  NOT READY
 
-Active task:        Task 1 — Import Images Into DEV (BLOCKED — see BACKLOG-016)
+Active task:        none — Task 1 (Import Images Into DEV) reached COMPLETE
 Last updated:       2026-08-07
-Last updated by:    Claude Code (Task 1 write-phase execution)
-Unresolved P0/P1:   Task 1 blocked on a founder decision (BACKLOG-016, Place
-                     media backfill) before it can reach COMPLETE — Tasks
-                     2–15 are all TODO, not started
+Last updated by:    Claude Code (Task 1 closure — Place media blocker resolved)
+Unresolved P0/P1:   none — Tasks 2–15 are all TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -293,7 +291,7 @@ BACKLOG/NOTES: links to non-blocking follow-up
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `BLOCKED`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — `MediaAsset`/`MediaUsage` model, storage abstraction
 (`src/server/media/media-storage.ts`, env-overridable `MEDIA_STORAGE_ROOT`),
@@ -336,24 +334,43 @@ gracefully with no images; import for these is a separate historical
 `ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED` decision, not required for Task 1
 exit criteria). `MediaAsset`/storage/serving layer itself — works, not
 touched.
-GAPS: Event and Article gaps closed this session (see VERIFICATION) via the
-existing importer's narrow, hash-gated replay paths — no code change
-needed. Place gallery gap (78/83, now confirmed 68/78 have real source
-media worth importing) remains open: blocked by a real tooling safety gate
-(BACKLOG-016), not a missing feature — needs a founder decision, not more
-engineering effort from this task. Route/RouteStop gap (13/14, 80/90) also
-remains open: no safe path exists to close it yet (BACKLOG-017).
-IMPLEMENTATION: Owner approved the write phase (2026-08-07). No application
-code changes made — used the existing importer exactly as designed:
-`pnpm migration:commit:wordpress-db --entity event --force-media-reprocess
---media-policy FULL --source-record-key <key> ...` for Events, and
-`--entity article --force-article-media-replay --media-policy FULL
---media-owner-user-id <id> --source-record-key <key> ...` for Articles, both
-hash-equality-gated single-record replay paths. Place FULL backfill
-(`--force-reprocess --media-policy FULL`) was attempted and found blocked —
-see GAPS/BLOCKERS. Route was not attempted — see GAPS/BLOCKERS.
-COMMITS: `bf5a1557` (audit docs); write-phase DB/storage changes are DEV
-data operations, not source-controlled — see VERIFICATION below for proof.
+GAPS: Event, Article, and Place gaps closed this session (see VERIFICATION).
+Event/Article used the existing importer's narrow, hash-gated replay paths
+unmodified. Place required one narrow, scoped addition (see IMPLEMENTATION)
+after the original `--force-reprocess` path was found systemically blocked
+(BACKLOG-016, now resolved). Route/RouteStop gap (13/14 Routes, 80/90
+RouteStops without media) remains open: no safe replay path exists yet
+(BACKLOG-017) — reviewed for severity and confirmed **not** P0/P1 (small,
+secondary entity, already renders cleanly with no broken images, not one of
+the core main sections) — does not block this task's Exit Criteria. Offer
+gap (0/63) remains open by a pre-existing, unrelated founder P1-defer
+decision (BACKLOG-015) — Offers render cleanly via an approved fallback.
+IMPLEMENTATION: Owner approved the write phase (2026-08-07), then explicitly
+directed resolving the Place blocker as in-scope Task 1 work rather than a
+deferred backlog item. No changes to `classifyPlaceUpdateSafety()` (the
+generic Place UPDATE conflict guard stays fully intact, protecting the real
+content-commit path). Added one narrow, explicit CLI path,
+`--force-place-media-replay` (`src/lib/migration/runtime/
+placeMediaOnlyReplay.ts`, wired into `scripts/migration-commit-wordpress-db.ts`,
+commit `32be8beb`), that calls `PlaceMediaSyncer.sync()` directly —
+bypassing the conflict gate only for this path, which is safe by
+construction because `PlaceMediaSyncer` structurally never writes to the
+`Place` row (only `PlaceImage`/`MediaAsset`/`MigrationLineage(MEDIA_ASSET)`),
+confirmed by reading the class and empirically (byte-identical `Place` row
+diff, including `updatedAt`, before/after). Identity/mapping is verified via
+active `PLACE` `MigrationLineage` + a live WP fetch before any write, same
+posture as the existing Event/Article replay guards. Targeted tests added
+(`placeMediaOnlyReplay.test.ts`, 16 cases, all pass); `tsc --noEmit` and
+`eslint` clean on all changed/new files.
+For Events/Articles: `pnpm migration:commit:wordpress-db --entity event
+--force-media-reprocess --media-policy FULL --source-record-key <key> ...`
+and `--entity article --force-article-media-replay --media-policy FULL
+--media-owner-user-id <id> --source-record-key <key> ...`, both pre-existing
+hash-equality-gated single-record replay paths, unmodified.
+COMMITS: `bf5a1557` (audit docs), `f1d1505d` (write-phase results + two
+blockers), `32be8beb` (Place media-only replay code + tests). Write-phase
+DB/storage changes are DEV data operations, not source-controlled — see
+VERIFICATION below for proof.
 VERIFICATION:
 Event — all 10 source-eligible Activities attempted (5 already had a cover
 from a prior session): 4 newly `APPLIED` (real download → `MediaAsset` +
@@ -373,47 +390,71 @@ edited after import; replay correctly refused rather than risk overwriting
 an editorial change). Net: 12/26 Articles now have a cover (was 9/26); one
 verified sample rendered 30 real inline+cover image URLs server-side, all
 200. Idempotency proven the same way (`NOOP_ALREADY_SYNCED` on rerun).
-Place — 3 representative clean source keys tested
-(`wordpress-db:places:5457/5492/5515`), all 3 failed identically with
-`PLACE_UPDATE_CONFLICT: TARGET_MODIFIED_AFTER_IMPORT` — confirmed systemic
-(caused by the 2026-07-29 mass Place publication session's value-neutral
-`updatedAt` bump, see BACKLOG-016), not record-specific. Stopped after
-confirming the pattern rather than repeating a known-failing operation 65
-more times. 0 Places touched (0 writes) — `PlaceImage` row count unchanged
-at 51 before/after. Protected places 437/895/5389/43023 correctly stayed
-`BLOCKED`/untouched throughout (confirmed via `PlaceCommitRunner.execute()`
-code read: a `BLOCKED` classification returns before `mediaSyncer.sync()` is
-ever reached — zero blast radius).
-Route/RouteStop — not attempted. Found `RouteCommitRunner` has no
-Place-style conflict guard at all (no `classifyRouteUpdateSafety`), and no
-narrow media-only replay path exists (unlike Event/Article) — running the
-generic `--entity route --media-policy FULL` path carries an unverified
-risk of silently overwriting Route content. See BACKLOG-017. Confirmed all
-14 Routes/90 RouteStops render cleanly with no broken images regardless
-(code-read verified, `RouteCard`/`RouteDetailClient` fallbacks).
-Offer — untouched, as decided (BACKLOG-015).
-Storage/DB deltas (before → after this session):
-`MediaAsset` 181 → 656, `storage/uploads` 542 files (43MB) → 1,979 files
-(213MB), `ActivityImage` 4 → 11, `PlaceImage` 51 → 51 (unchanged, as
-expected). No duplicate `MediaAsset` rows possible (`storageKey` has a DB
-`@unique` constraint) and no orphan files/rows found in a full
-DB-vs-disk filename diff performed before the write phase.
-DEV SMOKE: Targeted, not full — 2 representative pages fetched directly
-from the running DEV server (`curl` against `localhost:3000`, HTTP 200
-both): 1 Event detail page (new cover renders, verified in HTML), 1 Article
-detail page (new cover + inline gallery renders, 30 image URLs verified in
-HTML, cover URL independently verified 200). Full interactive/mobile
-browser smoke across all main sections not yet run — see STOP CONDITION
-note below before deciding next step.
-BLOCKERS: Place FULL media backfill blocked by a real tooling safety gate,
-requires a founder decision (BACKLOG-016) before it can proceed — Place
-gallery coverage remains 5/83 (only the pre-existing 4 protected +
-partially-covered places). This directly affects Exit Criteria: Places are
-a main section and most still show no gallery photos.
-BACKLOG/NOTES: BACKLOG-015 (Offer media, pre-existing founder P1 defer),
-BACKLOG-016 (Place FULL backfill blocked, needs founder decision),
-BACKLOG-017 (Route/RouteStop needs a safety net before any media backfill
-is attempted).
+Place — initial attempt with the generic `--force-reprocess --media-policy
+FULL` path on 3 representative clean source keys
+(`wordpress-db:places:5457/5492/5515`) failed identically with
+`PLACE_UPDATE_CONFLICT: TARGET_MODIFIED_AFTER_IMPORT` — root-caused to the
+2026-07-29 mass Place publication session's value-neutral `updatedAt` bump
+(BACKLOG-016). Audited 3 representative blocked Places field-by-field
+against a fresh WP-source preview: confirmed the source-content hash itself
+is unchanged (preview action: `SKIP_UNCHANGED`) but DB state has genuinely
+drifted from the original import in places (one had a manually-edited
+`customAddress`/`formattedAddr` = "Test address"; two had slug spelling
+drift from a transliteration-library change) — proving the conflict guard
+is correctly protecting real, if minor, divergence, not just noise. Built
+`--force-place-media-replay` (see IMPLEMENTATION), which sidesteps this
+safely because it never touches any content field regardless of whether
+content drifted. Golden proof: 3 records (5457/5492/5515) — full chain
+verified (WP source → download → `storage/uploads` → `MediaAsset` →
+`PlaceImage` → public `/api/media/file/...` URL → 200 → rendered in
+server HTML at the canonical `/places/{slug}` URL, confirmed via Browser
+pane screenshot, desktop + mobile 375×812, 0 console errors); `Place` row
+byte-identical before/after including `updatedAt` (`diff` exit 0); 0
+duplicate `PlaceImage` rows; rerun of all 3 returned `NOOP_ALREADY_SYNCED`
+with 0 new writes. Full batch: remaining 65 clean Place source keys with
+real source media — 58 `APPLIED`, 7 `NOOP_ALREADY_SYNCED`, 0 `PARTIAL`, 0
+`REFUSED`, 0 hard failures. Net: Place gallery coverage 5/83 → **68/83**.
+The 15 remaining have no source media at all or are the 1 non-WP-origin
+Place (verified by cross-checking against the source preview's
+`mediaRefCount`) — not closable by this or any importer.
+Route/RouteStop — not attempted (unchanged from audit). `RouteCommitRunner`
+has no Place-style conflict guard and no narrow media-only replay path
+exists — running the generic `--entity route --media-policy FULL` path
+carries an unverified risk of silently overwriting Route content (see
+BACKLOG-017). Reviewed for severity per Task 1 Exit Criteria: **not**
+P0/P1 — see BACKLOG-017 for the recorded reasoning. All 14 Routes/90
+RouteStops confirmed rendering cleanly with no broken images (code-read
+verified, `RouteCard`/`RouteDetailClient` fallbacks) — accepted as-is for
+this release.
+Offer — untouched, as decided (pre-existing, BACKLOG-015).
+Storage/DB deltas (full session, before → after):
+`MediaAsset` 181 → 1073, `storage/uploads` 542 files (43MB) → 3327 files
+(316MB), `ActivityImage` 4 → 11, `PlaceImage` 51 → 478 (+427, all via the
+new replay path). No duplicate `MediaAsset` rows possible (`storageKey` has
+a DB `@unique` constraint); no duplicate `PlaceImage` rows found (checked
+directly); no orphan files/rows found in the pre-write-phase DB-vs-disk
+filename diff.
+DEV SMOKE: Targeted, via the Browser pane against the running DEV server
+(not the full Task 15 site-wide smoke). Place detail
+(`/places/kofta-na-pr-t-mira-1`, then `/places/malberri-klab-mulberry-club`):
+gallery of real photos renders correctly on desktop and mobile (375×812),
+breadcrumb/address/CTA all correct, 0 relevant console errors. Article
+detail (cover + inline gallery, 30 image URLs verified present and 200) and
+Event detail (`immersivnaya-vystavka-neboreka-planeta-posle-shuma`, new
+cover renders) both confirmed via screenshot — clean, no broken images. One
+transient burst of `ERR_CONNECTION_REFUSED` was observed on a page load
+that coincided with the heavy background batch script + a webpack
+recompile; confirmed non-reproducing (immediate reload succeeded, and a
+`read_network_requests` check showed the same resources retried
+successfully to 200) — not a real defect, not the DEV app's normal
+behavior.
+BLOCKERS: none remaining. Place blocker (BACKLOG-016) resolved this
+session — see IMPLEMENTATION/VERIFICATION/COMMITS.
+BACKLOG/NOTES: BACKLOG-015 (Offer media, pre-existing founder P1 defer, not
+reopened). BACKLOG-016 (Place FULL backfill blocked) — **DONE**, resolved
+this session via `--force-place-media-replay`. BACKLOG-017 (Route/RouteStop
+has no safe replay path) — stays P2/OPEN, reviewed and confirmed
+non-blocking for this release.
 
 AUDIT FIRST the existing media migration/import architecture and the real
 DEV state. Check: MediaAsset, storage, media linkage, existing import
