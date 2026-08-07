@@ -132,6 +132,12 @@ import {
   ArticleMediaReplaySyncer,
   PrismaArticleMediaAttachmentImportCoordinator,
 } from "../src/lib/migration/commit/article/ArticleMediaReplaySyncer";
+import {
+  parsePlacePostIdFromSourceRecordKey,
+  runPlaceMediaOnlyReplay,
+  validatePlaceMediaOnlyReplayArgs,
+  validatePlaceMediaOnlyReplayRuntime,
+} from "../src/lib/migration/runtime/placeMediaOnlyReplay";
 import { MediaPolicyGatedEventMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedEventMediaSyncer";
 import { MediaPolicyGatedPlaceMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedPlaceMediaSyncer";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "../src/lib/migration/runtime/MediaPolicyGatedRouteStopMediaSyncer";
@@ -165,6 +171,7 @@ export interface CommitCliArgs {
   forceReprocess: boolean;
   forceMediaReprocess: boolean;
   forceArticleMediaReplay: boolean;
+  forcePlaceMediaReplay: boolean;
   mediaOwnerUserId?: string;
   allowRemoteReadonly: boolean;
   out?: string;
@@ -215,6 +222,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const forceReprocess = argv.includes("--force-reprocess");
   const forceMediaReprocess = argv.includes("--force-media-reprocess");
   const forceArticleMediaReplay = argv.includes("--force-article-media-replay");
+  const forcePlaceMediaReplay = argv.includes("--force-place-media-replay");
 
   const mediaOwnerUserIdIndex = argv.indexOf("--media-owner-user-id");
   const mediaOwnerUserId = mediaOwnerUserIdIndex !== -1 ? argv[mediaOwnerUserIdIndex + 1] : undefined;
@@ -286,6 +294,20 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     }
   }
 
+  if (forcePlaceMediaReplay) {
+    const guard = validatePlaceMediaOnlyReplayArgs({
+      entity,
+      sourceRecordKeyCount,
+      mediaPolicyName: mediaPolicyName ?? undefined,
+      forceReprocess,
+      forceMediaReprocess,
+      forceArticleMediaReplay,
+    });
+    if (!guard.ok) {
+      throw new Error(guard.reason);
+    }
+  }
+
   const seoPolicyIndex = argv.indexOf("--seo-policy");
   const rawSeoPolicy = seoPolicyIndex !== -1 ? argv[seoPolicyIndex + 1] : undefined;
   const seoPolicyName = rawSeoPolicy !== undefined ? parseSeoPolicyName(rawSeoPolicy) : undefined;
@@ -316,6 +338,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     forceReprocess,
     forceMediaReprocess,
     forceArticleMediaReplay,
+    forcePlaceMediaReplay,
     mediaOwnerUserId,
     allowRemoteReadonly,
     out,
@@ -876,6 +899,84 @@ async function main(): Promise<void> {
       } else {
         console.log(`coverMediaId (unchanged): ${result.coverMediaId ?? "(none)"}`);
         console.log(`imageBlockCount (unchanged): ${result.imageBlockCount}`);
+      }
+      return;
+    }
+
+    // `--force-place-media-replay`: a narrow, separate replay path for a
+    // single Place's media only (see placeMediaOnlyReplay.ts's doc comment
+    // for why this exists instead of widening `--force-reprocess` to
+    // Place — that flag sends the record through the full content-commit
+    // path, which `classifyPlaceUpdateSafety()` correctly refuses whenever
+    // `Place.updatedAt` has drifted past `MigrationLineage.lastImportedAt`,
+    // including from value-neutral touches like the canonical/search-index
+    // resync). This branch never reaches
+    // `createMigrationRunExecutionPlan`/`runCommitExecutionPlan`/
+    // `PlaceCommitRunner`/`classifyPlaceUpdateSafety` at all — it calls
+    // `PlaceMediaSyncer.sync()` directly, which only ever writes
+    // `PlaceImage`/`MediaAsset`/`MigrationLineage(MEDIA_ASSET)`, never a
+    // `Place` content field.
+    if (args.forcePlaceMediaReplay && args.sourceRecordKey) {
+      const wpPostId = parsePlacePostIdFromSourceRecordKey(args.sourceRecordKey);
+      if (wpPostId === null) {
+        throw new Error(`--force-place-media-replay: invalid Place sourceRecordKey "${args.sourceRecordKey}".`);
+      }
+      const bundle = await wordpressRepository.getPublishedPlaceById(wpPostId);
+      const lineage = await prisma.migrationLineage.findFirst({
+        where: { sourceRecordKey: args.sourceRecordKey, targetType: "PLACE", isActive: true },
+      });
+      const target = lineage?.targetId
+        ? await prisma.place.findUnique({
+            where: { id: lineage.targetId },
+            select: { id: true, createdByUserId: true },
+          })
+        : null;
+
+      const runtimeGuard = validatePlaceMediaOnlyReplayRuntime({
+        bundle,
+        lineage: lineage ? { sourceId: lineage.sourceId, isActive: lineage.isActive, targetId: lineage.targetId } : null,
+        targetExists: target !== null,
+      });
+      if (!runtimeGuard.ok) {
+        throw new Error(`--force-place-media-replay refused: ${runtimeGuard.reason}`);
+      }
+
+      const placeMediaSyncerDirect = new PlaceMediaSyncer({
+        prisma,
+        attachmentResolver: wordpressRepository,
+        mediaImporterFactory,
+        lineageWriter,
+      });
+
+      const result = await runPlaceMediaOnlyReplay({
+        sourceId: lineage!.sourceId,
+        sourceRecordKey: args.sourceRecordKey,
+        placeId: target!.id,
+        ownerUserId: target!.createdByUserId,
+        candidate: runtimeGuard.candidate,
+        sourceHash: lineage!.lastSourceHash,
+        mediaSyncer: placeMediaSyncerDirect,
+      });
+
+      console.log("Place media-only replay");
+      console.log();
+      console.log(`sourceRecordKey: ${args.sourceRecordKey}`);
+      console.log(`placeId: ${target!.id}`);
+      console.log(`result: ${result.status}`);
+
+      if (args.out) {
+        writeFileSync(args.out, JSON.stringify({ sourceRecordKey: args.sourceRecordKey, placeId: target!.id, result }, null, 2));
+        console.log(`\nJSON report written to ${args.out}`);
+      }
+
+      if (result.status === "REFUSED") {
+        throw new Error(`--force-place-media-replay refused: ${result.code}: ${result.message}`);
+      }
+      console.log(`imported: ${"imported" in result ? result.imported : 0}`);
+      console.log(`reused: ${"reused" in result ? result.reused : 0}`);
+      console.log(`skipped: ${"skipped" in result ? result.skipped : 0}`);
+      if (result.status === "PARTIAL") {
+        console.log(`failed: ${result.failed}`);
       }
       return;
     }
