@@ -5,6 +5,7 @@ import { ChevronsUpDown } from "lucide-react";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
 import type { AnalyticsContentPerformanceResult } from "@/lib/analytics/analyticsContentPerformanceTypes";
 import { cn } from "@/lib/utils";
+import { TableContainer } from "@/components/ui/table";
 
 function buildQuery(
   filters: AnalyticsOverviewFilters,
@@ -161,8 +162,9 @@ export function AdminAnalyticsContentPerformance({
           {data.performanceTotal.toLocaleString()} entities (max 400). Page{" "}
           {data.page} of {totalPages}.
         </p>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[1100px] border-collapse text-left text-xs">
+        <div className="mt-3">
+          <TableContainer minWidthClassName="min-w-[1100px]" scrollLabel="Таблица показателей контента, прокручивается по горизонтали">
+          <table className="w-full border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/90">
                 {TABLE_SORT_KEYS.map((k) => (
@@ -219,6 +221,7 @@ export function AdminAnalyticsContentPerformance({
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
           <button

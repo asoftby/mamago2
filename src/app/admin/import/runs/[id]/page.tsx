@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { RunDetailActions } from "../_components/RunDetailActions";
 import { RematchButton } from "../_components/RematchButton";
+import { TableContainer } from "@/components/ui/table";
 import {
   formatImportEntity,
   importEntityBadgeClasses,
@@ -245,6 +246,10 @@ export default async function RunDetailPage({
           </div>
         ) : (
           <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+            <TableContainer
+              minWidthClassName="min-w-[1020px]"
+              scrollLabel="Импортированные объекты прогона, прокручивается по горизонтали"
+            >
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -316,6 +321,7 @@ export default async function RunDetailPage({
                 })}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         )}
       </div>

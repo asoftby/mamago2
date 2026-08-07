@@ -11,6 +11,7 @@ import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { AlertTriangle, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
+import { TableContainer } from "@/components/ui/table";
 
 export default async function AdminBusinessBillingPage({
   params,
@@ -176,7 +177,7 @@ export default async function AdminBusinessBillingPage({
             Вся история →
           </Link>
         </div>
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[640px]" scrollLabel="История транзакций, прокручивается по горизонтали">
           <table className="w-full">
             <thead className="border-b border-gray-200">
               <tr>
@@ -207,7 +208,7 @@ export default async function AdminBusinessBillingPage({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       </div>
 
       {/* Manual Actions - Now Working */}

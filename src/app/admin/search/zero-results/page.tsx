@@ -6,6 +6,7 @@ import { AlertCircle, TrendingUp, Plus, Tag, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import type { ZeroResultQuery } from "@/types/search-query-log";
+import { TableContainer } from "@/components/ui/table";
 
 interface ZeroResultsData {
   queries: ZeroResultQuery[];
@@ -185,7 +186,10 @@ export default function ZeroResultsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
+            <TableContainer
+              minWidthClassName="min-w-[640px]"
+              scrollLabel="Запросы без результатов, прокручивается по горизонтали"
+            >
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -275,7 +279,7 @@ export default function ZeroResultsPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
         )}
 

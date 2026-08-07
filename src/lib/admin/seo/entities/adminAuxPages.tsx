@@ -44,7 +44,7 @@ export async function renderEntityRedirectsPage(kind: SeoEntityType, id: string)
         subtitle={entity ? `${kind}: ${entity.title}` : kind}
       />
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="min-w-0 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-gray-100 px-5 py-3 text-sm font-semibold">
           Текущий slug:{" "}
           <span className="font-mono text-xs">{redirects.currentSlug ?? "—"}</span>
@@ -52,7 +52,7 @@ export async function renderEntityRedirectsPage(kind: SeoEntityType, id: string)
         {redirects.history.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-gray-600">Истории редиректов нет</div>
         ) : (
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-0 text-left text-sm">
             <thead className="bg-gray-50/80 border-b border-gray-200">
               <tr>
                 <th className="px-5 py-3 font-semibold text-gray-700">Old slug</th>

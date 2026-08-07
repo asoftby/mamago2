@@ -8,6 +8,7 @@ import { TransactionAmount } from "./TransactionAmount";
 import { TransactionDetailsDrawer } from "./TransactionDetailsDrawer";
 import { TransactionStatusBadge } from "./TransactionStatusBadge";
 import { TransactionTypeBadge } from "./TransactionTypeBadge";
+import { TableContainer } from "@/components/ui/table";
 
 interface TransactionListItem {
   id: string;
@@ -146,7 +147,7 @@ export function AdminBillingTransactionsClient({ transactions }: Props) {
   return (
     <>
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[820px]" scrollLabel="Транзакции, таблица">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -209,7 +210,7 @@ export function AdminBillingTransactionsClient({ transactions }: Props) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
 
         {transactions.length === 0 && (
           <div className="py-12 text-center text-gray-500">

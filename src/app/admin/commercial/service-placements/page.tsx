@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Star, MapPin, Calendar, Gift, Megaphone, BookOpen } from "lucide-react";
 import { CommercialToolbarFilterSelects } from "@/components/admin/commercial/CommercialToolbarFilterSelects";
+import { TableContainer } from "@/components/ui/table";
 
 export default async function AdminServicePlacementsPage() {
   const user = await getCurrentUser();
@@ -110,7 +111,7 @@ export default async function AdminServicePlacementsPage() {
 
       {/* AdminPageContent */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[840px]" scrollLabel="Таблица размещений услуг, прокручивается по горизонтали">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -185,7 +186,7 @@ export default async function AdminServicePlacementsPage() {
               })}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       </div>
 
       {servicePlacements.length === 0 && (

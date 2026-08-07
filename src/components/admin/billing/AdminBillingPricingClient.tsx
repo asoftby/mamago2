@@ -21,6 +21,7 @@ import {
 } from "@/lib/billing/actionPricing";
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { TableContainer } from "@/components/ui/table";
 
 type RateWithNumbers = {
   id: string;
@@ -609,7 +610,7 @@ export function AdminBillingPricingClient({
                   Индивидуальные цены не настроены. Применяются глобальные правила.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <TableContainer minWidthClassName="min-w-[720px]" scrollLabel="Индивидуальные правила ценообразования, таблица">
                   <table className="min-w-full text-sm">
                     <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                       <tr>
@@ -643,7 +644,7 @@ export function AdminBillingPricingClient({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableContainer>
               )}
             </div>
           </div>

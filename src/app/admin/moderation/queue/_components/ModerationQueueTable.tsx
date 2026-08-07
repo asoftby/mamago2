@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FileText, RefreshCw, Calendar, Tag } from "lucide-react";
 import { ModerationQueueRowActions } from "./ModerationQueueRowActions";
+import { TableContainer } from "@/components/ui/table";
 
 export type ModerationQueueTableItem = {
   id: string;
@@ -78,7 +79,10 @@ export function ModerationQueueTable({
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-      <div className="overflow-x-auto">
+      <TableContainer
+        minWidthClassName="min-w-[720px]"
+        scrollLabel="Очередь модерации, прокручивается по горизонтали"
+      >
         <table className="min-w-[900px] w-full text-sm">
         <thead className="border-b border-stone-200 bg-stone-50/80">
           <tr>
@@ -107,7 +111,7 @@ export function ModerationQueueTable({
           ))}
         </tbody>
         </table>
-      </div>
+      </TableContainer>
     </div>
   );
 }

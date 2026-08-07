@@ -8,6 +8,7 @@ import type {
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableContainer } from "@/components/ui/table";
 import { adminPath } from "@/lib/routing/surface";
 import { prisma } from "@/lib/prisma";
 
@@ -205,7 +206,11 @@ export default async function AdminNotificationDeliveriesPage({
             Показываем последние 100 delivery attempts по текущим фильтрам.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
+          <TableContainer
+            minWidthClassName="min-w-[820px]"
+            scrollLabel="Таблица доставок уведомлений, прокручивается по горизонтали"
+          >
           <table className="min-w-full text-sm">
             <thead className="text-left text-stone-500">
               <tr className="border-b border-stone-200">
@@ -288,6 +293,7 @@ export default async function AdminNotificationDeliveriesPage({
               )}
             </tbody>
           </table>
+          </TableContainer>
         </CardContent>
       </Card>
     </div>

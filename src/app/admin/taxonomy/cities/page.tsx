@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { TableContainer } from "@/components/ui/table";
 
 type AdminCityRow = {
   id: string;
@@ -97,8 +98,8 @@ export default function CitiesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <div className="min-w-[900px] overflow-hidden rounded-lg border border-gray-200">
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <TableContainer minWidthClassName="min-w-[900px]" scrollLabel="Список городов, прокручивается по горизонтали">
               <div className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,0.8fr)_minmax(100px,0.7fr)_minmax(140px,0.9fr)_80px_150px_80px_80px] gap-3 border-b bg-gray-50 p-4 text-sm font-medium text-gray-700">
                 <div>Город</div>
                 <div>Область</div>
@@ -172,7 +173,7 @@ export default function CitiesPage() {
                   );
                 })}
               </div>
-            </div>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>

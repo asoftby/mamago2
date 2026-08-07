@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { formatImportEntity, importEntityBadgeClasses, runStatusClasses, runStatusLabels } from "./_lib/import-admin-ui";
+import { TableContainer } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -263,7 +264,10 @@ export default async function ImportDashboardPage() {
           {dashboard.recentRuns.length === 0 ? (
             <div className="px-5 py-12 text-center text-sm text-gray-500">Пока не было ни одного прогона.</div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer
+              minWidthClassName="min-w-[560px]"
+              scrollLabel="Последние прогоны импорта, прокручивается по горизонтали"
+            >
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr className="border-b border-gray-200">
@@ -307,7 +311,7 @@ export default async function ImportDashboardPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </section>
 

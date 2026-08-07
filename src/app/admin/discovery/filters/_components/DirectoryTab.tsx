@@ -180,7 +180,10 @@ export function DirectoryTab() {
           description="Создайте первый фильтр и настройте опции на странице редактирования."
         />
       ) : (
-        <DiscoveryTaxonomyTable>
+        <DiscoveryTaxonomyTable
+          minWidthClassName="min-w-[800px]"
+          scrollLabel="Таблица справочника фильтров, прокручивается по горизонтали"
+        >
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className={discoveryTh()}>Название</th>

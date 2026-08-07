@@ -22,6 +22,15 @@ import {
   buildAdminLifecycleViewModel,
   buildAdminOfferLifecycleInput,
 } from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
+import { TableContainer } from "@/components/ui/table";
+import {
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardBody,
+  DataCardRow,
+  DataCardActions,
+} from "@/components/ui/data-card-list";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -124,124 +133,157 @@ function OffersTable({
     );
   }
 
+  const rows = offers.map((offer) => {
+    const isArchived = Boolean(offer.archivedAt);
+    const rowMeta = offerMetaById.get(offer.id) ?? {
+      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      deletePreflight: {
+        allowed: offer.status === OfferStatus.DRAFT && !isArchived,
+        reasons: [],
+        message: undefined,
+        dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      },
+      archivedDeletePreflight: {
+        allowed: false,
+        reasons: ["notArchived"],
+        message: undefined,
+        dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      },
+    };
+    const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
+    const lifecycleViewModel = buildAdminLifecycleViewModel({
+      ...buildAdminOfferLifecycleInput({
+        status: offer.status,
+        archivedAt: offer.archivedAt,
+        deletePreflight: rowMeta.deletePreflight,
+        archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+      }),
+      navigationLinks: {
+        edit: true,
+        preview: true,
+        review: offer.status === "PENDING",
+      },
+    });
+    const publicOfferHref =
+      !isArchived &&
+      !offer.place.archivedAt &&
+      offer.status === "PUBLISHED" &&
+      offer.slug &&
+      offer.place.city?.slug
+        ? getOfferPublicUrl(offer, offer.place.city.slug)
+        : null;
+    const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);
+
+    const actionsMenu = (
+      <ContentLifecycleActionsMenu
+        viewModel={lifecycleViewModel}
+        contentId={offer.id}
+        contentType="offer"
+        surface="admin"
+        links={{
+          edit: {
+            href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
+            label: "Открыть в редакторе",
+          },
+          preview: {
+            href: viewOfferHref,
+            newTab: true,
+            label: publicOfferHref ? "Открыть публичную страницу" : "Открыть предпросмотр",
+          },
+        }}
+        deletePreflight={{
+          deleteDraft: {
+            blockedDialog: !rowMeta.deletePreflight.allowed
+              ? {
+                  title: "Нельзя удалить черновик",
+                  description: rowMeta.deletePreflight.message,
+                  items: blockingItems,
+                }
+              : null,
+          },
+          deleteArchived: {
+            blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+              ? {
+                  title: "Нельзя удалить из архива",
+                  description: rowMeta.archivedDeletePreflight.message,
+                  items: blockingItems,
+                }
+              : null,
+          },
+        }}
+      />
+    );
+
+    return { offer, lifecycleViewModel, actionsMenu };
+  });
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Место</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {offers.map((offer) => {
-            const isArchived = Boolean(offer.archivedAt);
-            const rowMeta = offerMetaById.get(offer.id) ?? {
-              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              deletePreflight: {
-                allowed: offer.status === OfferStatus.DRAFT && !isArchived,
-                reasons: [],
-                message: undefined,
-                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              },
-              archivedDeletePreflight: {
-                allowed: false,
-                reasons: ["notArchived"],
-                message: undefined,
-                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              },
-            };
-            const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
-            const lifecycleViewModel = buildAdminLifecycleViewModel({
-              ...buildAdminOfferLifecycleInput({
-                status: offer.status,
-                archivedAt: offer.archivedAt,
-                deletePreflight: rowMeta.deletePreflight,
-                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
-              }),
-              navigationLinks: {
-                edit: true,
-                preview: true,
-                review: offer.status === "PENDING",
-              },
-            });
-            const publicOfferHref =
-              !isArchived &&
-              !offer.place.archivedAt &&
-              offer.status === "PUBLISHED" &&
-              offer.slug &&
-              offer.place.city?.slug
-                ? getOfferPublicUrl(offer, offer.place.city.slug)
-                : null;
-            const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);
-            return (
-              <tr key={offer.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{offer.title}</td>
-                <td className="px-4 py-3 text-gray-600">{offer.place.title}</td>
-                <td className="px-4 py-3 text-gray-600">{offer.place.city?.name || "—"}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  {offer.place.ownerBusiness?.name ||
-                    offer.place.ownerBusiness?.owner?.email ||
-                    "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleActionsMenu
-                    viewModel={lifecycleViewModel}
-                    contentId={offer.id}
-                    contentType="offer"
-                    surface="admin"
-                    links={{
-                      edit: {
-                        href: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
-                        label: "Открыть в редакторе",
-                      },
-                      preview: {
-                        href: viewOfferHref,
-                        newTab: true,
-                        label: publicOfferHref
-                          ? "Открыть публичную страницу"
-                          : "Открыть предпросмотр",
-                      },
-                    }}
-                    deletePreflight={{
-                      deleteDraft: {
-                        blockedDialog: !rowMeta.deletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить черновик",
-                              description: rowMeta.deletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                      },
-                      deleteArchived: {
-                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить из архива",
-                              description: rowMeta.archivedDeletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                      },
-                    }}
-                  />
-                </td>
+    <>
+      {/* Desktop: table */}
+      <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
+        <TableContainer minWidthClassName="min-w-[920px]" scrollLabel="Список предложений, прокручивается по горизонтали">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Место</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {rows.map(({ offer, lifecycleViewModel, actionsMenu }) => (
+                <tr key={offer.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">{offer.title}</td>
+                  <td className="px-4 py-3 text-gray-600">{offer.place.title}</td>
+                  <td className="px-4 py-3 text-gray-600">{offer.place.city?.name || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {offer.place.ownerBusiness?.name ||
+                      offer.place.ownerBusiness?.owner?.email ||
+                      "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
+                  </td>
+                  <td className="px-4 py-3">{actionsMenu}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableContainer>
+      </div>
+
+      {/* Mobile: cards — same rows, same actions menu */}
+      <DataCardList>
+        {rows.map(({ offer, lifecycleViewModel, actionsMenu }) => (
+          <DataCard key={offer.id}>
+            <DataCardHeader
+              title={offer.title}
+              badge={<ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />}
+            />
+            <DataCardBody>
+              <DataCardRow label="Место" value={offer.place.title} />
+              <DataCardRow label="Город" value={offer.place.city?.name} />
+              <DataCardRow
+                label="Бизнес"
+                value={offer.place.ownerBusiness?.name || offer.place.ownerBusiness?.owner?.email}
+              />
+              <DataCardRow
+                label="Создано"
+                value={formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
+              />
+            </DataCardBody>
+            <DataCardActions>{actionsMenu}</DataCardActions>
+          </DataCard>
+        ))}
+      </DataCardList>
+    </>
   );
 }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { BusinessVerificationSidePanel } from "./BusinessVerificationSidePanel";
 import { LoadingBlock, EmptyBlock, ErrorBlock } from "@/components/admin/ui/StateBlock";
+import { TableContainer } from "@/components/ui/table";
 
 type Business = {
   id: string;
@@ -159,6 +160,10 @@ export function BusinessVerificationRequestsPage({
         {/* Business list */}
         {!loading && !error && businesses.length > 0 && (
           <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <TableContainer
+              minWidthClassName="min-w-[720px]"
+              scrollLabel="Заявки на верификацию, прокручивается по горизонтали"
+            >
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -245,6 +250,7 @@ export function BusinessVerificationRequestsPage({
                 ))}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         )}
       </div>

@@ -25,6 +25,15 @@ import {
   buildAdminEventLifecycleInput,
   buildAdminLifecycleViewModel,
 } from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
+import { TableContainer } from "@/components/ui/table";
+import {
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardBody,
+  DataCardRow,
+  DataCardActions,
+} from "@/components/ui/data-card-list";
 
 /** Список после DELETE из API должен перечитываться; иначе RSC может отдавать закэшированный снимок. */
 export const dynamic = "force-dynamic";
@@ -141,157 +150,186 @@ function ActivitiesTable({
     );
   }
 
+  const rows = activities.map((activity) => {
+    const rowMeta = activityMetaById.get(activity.id) ?? {
+      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      deletePreflight: {
+        allowed: activity.status === ContentStatus.DRAFT,
+        reasons: [],
+        message: undefined,
+        dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      },
+      archivedDeletePreflight: {
+        allowed: false,
+        reasons: ["notArchived"],
+        message: undefined,
+        dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      },
+    };
+    const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
+    const lifecycleViewModel = buildAdminLifecycleViewModel({
+      ...buildAdminEventLifecycleInput({
+        status: activity.status,
+        deletePreflight: rowMeta.deletePreflight,
+        archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+      }),
+      navigationLinks: {
+        edit: true,
+        preview: true,
+        review: activity.status === ContentStatus.PENDING,
+      },
+    });
+    const temporalState = getEventTemporalState({
+      scheduleMode: activity.scheduleMode,
+      nextOccurrenceAt: activity.nextOccurrenceAt,
+      sessions: activity.sessions,
+    });
+    const temporalLabel =
+      activity.status === ContentStatus.PUBLISHED
+        ? temporalState === "PAST"
+          ? "Уже прошло"
+          : temporalState === "UPCOMING" || temporalState === "ONGOING"
+            ? "Актуально"
+            : null
+        : null;
+    const cityLabel =
+      activity.place?.city?.name ||
+      (activity.cityId ? cityNameById.get(activity.cityId) : undefined) ||
+      "—";
+    const publicHref =
+      activity.status === ContentStatus.PUBLISHED ||
+      activity.status === ContentStatus.PENDING_UPDATE ||
+      activity.status === ContentStatus.SCHEDULED
+        ? toAbsolutePublicUrl(
+            publicActivityPath(
+              activity.id,
+              activity.place?.city?.slug ?? null,
+              activity.slug ?? null,
+            ),
+          )
+        : null;
+
+    const statusBadge = (
+      <ContentLifecycleStatusBadge
+        viewModel={lifecycleViewModel}
+        secondary={
+          temporalLabel
+            ? [
+                {
+                  label: temporalLabel,
+                  className: cn(
+                    temporalState === "PAST"
+                      ? "text-muted-foreground"
+                      : "text-emerald-600",
+                  ),
+                },
+              ]
+            : undefined
+        }
+      />
+    );
+
+    const actionsMenu = (
+      <ContentLifecycleActionsMenu
+        viewModel={lifecycleViewModel}
+        contentId={activity.id}
+        contentType="event"
+        surface="admin"
+        links={{
+          edit: {
+            href: `/editor/event/${activity.id}/edit?returnTo=${encodeURIComponent("/admin/content/events")}`,
+            label: "Редактировать",
+          },
+          preview: publicHref
+            ? {
+                href: publicHref,
+                newTab: true,
+                label: "Открыть публичную страницу",
+              }
+            : {
+                href: `/me/events/${activity.id}/preview`,
+                label: "Открыть предпросмотр",
+              },
+        }}
+        deletePreflight={{
+          deleteDraft: {
+            blockedDialog: !rowMeta.deletePreflight.allowed
+              ? {
+                  title: "Нельзя удалить черновик",
+                  description: rowMeta.deletePreflight.message,
+                  items: blockingItems,
+                }
+              : null,
+          },
+          deleteArchived: {
+            blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+              ? {
+                  title: "Нельзя удалить из архива",
+                  description: rowMeta.archivedDeletePreflight.message,
+                  items: blockingItems,
+                }
+              : null,
+          },
+        }}
+      />
+    );
+
+    const businessLabel = activity.owner?.business?.name || activity.owner?.email || "—";
+
+    return { activity, cityLabel, businessLabel, statusBadge, actionsMenu };
+  });
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {activities.map((activity) => {
-            const rowMeta = activityMetaById.get(activity.id) ?? {
-              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              deletePreflight: {
-                allowed: activity.status === ContentStatus.DRAFT,
-                reasons: [],
-                message: undefined,
-                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              },
-              archivedDeletePreflight: {
-                allowed: false,
-                reasons: ["notArchived"],
-                message: undefined,
-                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              },
-            };
-            const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
-            const lifecycleViewModel = buildAdminLifecycleViewModel({
-              ...buildAdminEventLifecycleInput({
-                status: activity.status,
-                deletePreflight: rowMeta.deletePreflight,
-                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
-              }),
-              navigationLinks: {
-                edit: true,
-                preview: true,
-                review: activity.status === ContentStatus.PENDING,
-              },
-            });
-            const temporalState = getEventTemporalState({
-              scheduleMode: activity.scheduleMode,
-              nextOccurrenceAt: activity.nextOccurrenceAt,
-              sessions: activity.sessions,
-            });
-            const temporalLabel =
-              activity.status === ContentStatus.PUBLISHED
-                ? temporalState === "PAST"
-                  ? "Уже прошло"
-                  : temporalState === "UPCOMING" || temporalState === "ONGOING"
-                    ? "Актуально"
-                    : null
-                : null;
-            const cityLabel =
-              activity.place?.city?.name ||
-              (activity.cityId ? cityNameById.get(activity.cityId) : undefined) ||
-              "—";
-            const publicHref =
-              activity.status === ContentStatus.PUBLISHED ||
-              activity.status === ContentStatus.PENDING_UPDATE ||
-              activity.status === ContentStatus.SCHEDULED
-                ? toAbsolutePublicUrl(
-                    publicActivityPath(
-                      activity.id,
-                      activity.place?.city?.slug ?? null,
-                      activity.slug ?? null,
-                    ),
-                  )
-                : null;
-            return (
-              <tr key={activity.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{activity.title}</td>
-                <td className="px-4 py-3 text-gray-600">{cityLabel}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  {activity.owner?.business?.name || activity.owner?.email || "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleStatusBadge
-                    viewModel={lifecycleViewModel}
-                    secondary={
-                      temporalLabel
-                        ? [
-                            {
-                              label: temporalLabel,
-                              className: cn(
-                                temporalState === "PAST"
-                                  ? "text-muted-foreground"
-                                  : "text-emerald-600",
-                              ),
-                            },
-                          ]
-                        : undefined
-                    }
-                  />
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleActionsMenu
-                    viewModel={lifecycleViewModel}
-                    contentId={activity.id}
-                    contentType="event"
-                    surface="admin"
-                    links={{
-                      edit: {
-                        href: `/editor/event/${activity.id}/edit?returnTo=${encodeURIComponent("/admin/content/events")}`,
-                        label: "Редактировать",
-                      },
-                      preview: publicHref
-                        ? {
-                            href: publicHref,
-                            newTab: true,
-                            label: "Открыть публичную страницу",
-                          }
-                        : {
-                            href: `/me/events/${activity.id}/preview`,
-                            label: "Открыть предпросмотр",
-                          },
-                    }}
-                    deletePreflight={{
-                      deleteDraft: {
-                        blockedDialog: !rowMeta.deletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить черновик",
-                              description: rowMeta.deletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                      },
-                      deleteArchived: {
-                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить из архива",
-                              description: rowMeta.archivedDeletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                      },
-                    }}
-                  />
-                </td>
+    <>
+      {/* Desktop: table */}
+      <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
+        <TableContainer minWidthClassName="min-w-[880px]" scrollLabel="Список событий, прокручивается по горизонтали">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {rows.map(({ activity, cityLabel, businessLabel, statusBadge, actionsMenu }) => (
+                <tr key={activity.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">{activity.title}</td>
+                  <td className="px-4 py-3 text-gray-600">{cityLabel}</td>
+                  <td className="px-4 py-3 text-gray-600">{businessLabel}</td>
+                  <td className="px-4 py-3">{statusBadge}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
+                  </td>
+                  <td className="px-4 py-3">{actionsMenu}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableContainer>
+      </div>
+
+      {/* Mobile: cards — same rows, same actions menu */}
+      <DataCardList>
+        {rows.map(({ activity, cityLabel, businessLabel, statusBadge, actionsMenu }) => (
+          <DataCard key={activity.id}>
+            <DataCardHeader title={activity.title} subtitle={cityLabel === "—" ? undefined : cityLabel} badge={statusBadge} />
+            <DataCardBody>
+              <DataCardRow label="Бизнес" value={businessLabel === "—" ? null : businessLabel} />
+              <DataCardRow
+                label="Создано"
+                value={formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
+              />
+            </DataCardBody>
+            <DataCardActions>{actionsMenu}</DataCardActions>
+          </DataCard>
+        ))}
+      </DataCardList>
+    </>
   );
 }
 

@@ -6,6 +6,7 @@ import { ThreadNumber } from "@/components/direct/ThreadNumber";
 import { StatusBadge } from "@/components/direct/StatusBadge";
 import { UnreadBadge } from "@/components/direct/UnreadBadge";
 import { DialogSearchForm } from "./DialogSearchForm";
+import { TableContainer } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -56,6 +57,7 @@ export default async function AdminDirectDialogsPage({
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-stone-200">
+        <TableContainer minWidthClassName="min-w-[900px]" scrollLabel="Таблица диалогов, прокручивается по горизонтали">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
@@ -117,6 +119,7 @@ export default async function AdminDirectDialogsPage({
             )}
           </tbody>
         </table>
+        </TableContainer>
       </div>
     </div>
   );

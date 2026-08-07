@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
+import { TableContainer } from "@/components/ui/table";
 import { AdminPagination, type AdminPaginationProps } from "@/components/admin/AdminPagination";
 import { buildAdminPageHref } from "@/lib/admin/pagination";
 import type {
@@ -159,8 +160,8 @@ export function RedirectCenterClient({
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <TableContainer minWidthClassName="min-w-[900px]" scrollLabel="Таблица автоматических редиректов, прокручивается по горизонтали">
+              <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-slate-50/90">
                     <th className="px-4 py-3 font-semibold text-gray-800">Source URL</th>
@@ -222,7 +223,7 @@ export function RedirectCenterClient({
                   )}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
 
           <AdminPagination
@@ -251,8 +252,8 @@ export function RedirectCenterClient({
               </div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px] border-collapse text-left text-sm">
+                <TableContainer minWidthClassName="min-w-[800px]" scrollLabel="Таблица ручных редиректов, прокручивается по горизонтали">
+                  <table className="w-full border-collapse text-left text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 bg-slate-50/90">
                         <th className="px-4 py-3 font-semibold text-gray-800">From</th>
@@ -276,7 +277,7 @@ export function RedirectCenterClient({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableContainer>
               </div>
             )}
           </div>

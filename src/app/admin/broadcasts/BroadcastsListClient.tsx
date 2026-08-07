@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { toast } from "@/lib/toast";
 import type { AdminBroadcast } from "@prisma/client";
+import { TableContainer } from "@/components/ui/table";
 
 const TYPE_LABELS: Record<string, string> = {
   NEWS: "Новость",
@@ -130,7 +131,10 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
       </div>
 
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        <TableContainer
+          minWidthClassName="min-w-[820px]"
+          scrollLabel="Таблица рассылок, прокручивается по горизонтали"
+        >
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -245,7 +249,7 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
 
         {items.length === 0 && (
           <div className="py-12 text-center text-gray-500">

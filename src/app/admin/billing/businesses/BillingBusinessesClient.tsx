@@ -10,6 +10,7 @@ import { HistoryModal } from "./HistoryModal";
 import { SuspendModal } from "./SuspendModal";
 import { ReactivateModal } from "./ReactivateModal";
 import { FirstTopUpModal } from "./FirstTopUpModal";
+import { TableContainer } from "@/components/ui/table";
 
 interface BillingAccount {
   id: string;
@@ -115,7 +116,7 @@ export function BillingBusinessesClient({ accounts: initialAccounts }: Props) {
           </div>
         ) : (
           <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-            <div className="overflow-x-auto">
+            <TableContainer minWidthClassName="min-w-[820px]" scrollLabel="Billing-аккаунты, таблица">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -245,7 +246,7 @@ export function BillingBusinessesClient({ accounts: initialAccounts }: Props) {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
         )}
       </div>

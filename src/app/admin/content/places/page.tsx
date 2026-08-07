@@ -25,6 +25,15 @@ import {
   buildAdminLifecycleViewModel,
   buildAdminPlaceLifecycleInput,
 } from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
+import { TableContainer } from "@/components/ui/table";
+import {
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardBody,
+  DataCardRow,
+  DataCardActions,
+} from "@/components/ui/data-card-list";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -156,168 +165,203 @@ function PlacesTable({
     );
   }
 
+  const rows = places.map((place) => {
+    const isArchived = Boolean(place.archivedAt);
+    const hasPreviewVersion =
+      isArchived ||
+      place.status !== "PUBLISHED" ||
+      place.revisions.some((revision) =>
+        ["DRAFT", "PENDING", "NEEDS_REVISION"].includes(revision.status),
+      );
+    const editHref = `/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(returnTo)}`;
+    const publicPlaceHref = !hasPreviewVersion
+      ? getAbsolutePlacePublicUrl({ slug: place.slug, id: place.id })
+      : null;
+    const viewPlaceHref = publicPlaceHref ?? getPlacePreviewPath(place.id);
+
+    const fullAddress = place.formattedAddr || place.customAddress || "";
+    const addressParts = fullAddress.split(",").map(p => p.trim());
+    const streetAddress = addressParts[0] || "";
+    const rowMeta = placeMetaById.get(place.id) ?? {
+      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      deletePreflight: {
+        allowed: place.status !== ContentStatus.DRAFT,
+        reasons: [],
+        dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      },
+      archivedDeletePreflight: {
+        allowed: false,
+        reasons: ["notArchived"],
+        dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+      },
+    };
+    const blockingItems = blockingDependencyItems(
+      rowMeta.dependencySummary,
+    );
+    const lifecycleViewModel = buildAdminLifecycleViewModel({
+      ...buildAdminPlaceLifecycleInput({
+        status: place.status,
+        archivedAt: place.archivedAt,
+        deletePreflight: rowMeta.deletePreflight,
+        archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+      }),
+      navigationLinks: {
+        edit: true,
+        preview: true,
+        review: place.status === ContentStatus.PENDING,
+      },
+    });
+
+    const businessLabel =
+      place.ownerBusiness?.name ||
+      place.ownerBusiness?.owner?.email ||
+      place.createdBy?.email || "—";
+
+    const actionsMenu = (
+      <ContentLifecycleActionsMenu
+        viewModel={lifecycleViewModel}
+        contentId={place.id}
+        contentType="place"
+        surface="admin"
+        links={{
+          edit: {
+            href: editHref,
+            label: "Открыть в редакторе",
+          },
+          preview: {
+            href: viewPlaceHref,
+            newTab: true,
+            label: publicPlaceHref
+              ? "Открыть публичную страницу"
+              : "Открыть предпросмотр",
+          },
+          review:
+            place.status === ContentStatus.PENDING
+              ? {
+                  href: getPlaceDetailHref(place.id, returnTo),
+                  label: "Открыть модерацию",
+                }
+              : undefined,
+        }}
+        deletePreflight={{
+          deleteDraft: {
+            blockedDialog: !rowMeta.deletePreflight.allowed
+              ? {
+                  title: "Нельзя удалить черновик",
+                  description: rowMeta.deletePreflight.message,
+                  items: blockingItems,
+                }
+              : null,
+            cascadeNote: rowMeta.deletePreflight.allowed
+              ? buildCascadeNote(rowMeta.dependencySummary)
+              : null,
+          },
+          deleteArchived: {
+            blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+              ? {
+                  title: "Нельзя удалить из архива",
+                  description: rowMeta.archivedDeletePreflight.message,
+                  items: blockingItems,
+                }
+              : null,
+          },
+        }}
+      />
+    );
+
+    return { place, streetAddress, businessLabel, rowMeta, lifecycleViewModel, actionsMenu };
+  });
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Название
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Город
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Бизнес
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Статус
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Связи
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Создано
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">
-              Действия
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {places.map((place) => {
-            const isArchived = Boolean(place.archivedAt);
-            const hasPreviewVersion =
-              isArchived ||
-              place.status !== "PUBLISHED" ||
-              place.revisions.some((revision) =>
-                ["DRAFT", "PENDING", "NEEDS_REVISION"].includes(revision.status),
-              );
-            const editHref = `/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(returnTo)}`;
-            const publicPlaceHref = !hasPreviewVersion
-              ? getAbsolutePlacePublicUrl({ slug: place.slug, id: place.id })
-              : null;
-            const viewPlaceHref = publicPlaceHref ?? getPlacePreviewPath(place.id);
-            
-            const fullAddress = place.formattedAddr || place.customAddress || "";
-            const addressParts = fullAddress.split(",").map(p => p.trim());
-            const streetAddress = addressParts[0] || "";
-            const rowMeta = placeMetaById.get(place.id) ?? {
-              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              deletePreflight: {
-                allowed: place.status !== ContentStatus.DRAFT,
-                reasons: [],
-                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              },
-              archivedDeletePreflight: {
-                allowed: false,
-                reasons: ["notArchived"],
-                dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-              },
-            };
-            const blockingItems = blockingDependencyItems(
-              rowMeta.dependencySummary,
-            );
-            const lifecycleViewModel = buildAdminLifecycleViewModel({
-              ...buildAdminPlaceLifecycleInput({
-                status: place.status,
-                archivedAt: place.archivedAt,
-                deletePreflight: rowMeta.deletePreflight,
-                archivedDeletePreflight: rowMeta.archivedDeletePreflight,
-              }),
-              navigationLinks: {
-                edit: true,
-                preview: true,
-                review: place.status === ContentStatus.PENDING,
-              },
-            });
-            
-            return (
-              <tr key={place.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  {place.title}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  <div>
-                    <div className="font-medium">{place.city?.name || "-"}</div>
-                    {streetAddress && (
-                      <div className="text-xs text-gray-500 mt-0.5">{streetAddress}</div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {place.ownerBusiness?.name ||
-                    place.ownerBusiness?.owner?.email ||
-                    place.createdBy?.email || "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
-                </td>
-                <td className="px-4 py-3">
-                  <AdminContentRelationsIndicator
-                    summary={rowMeta.dependencySummary}
-                  />
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleActionsMenu
-                    viewModel={lifecycleViewModel}
-                    contentId={place.id}
-                    contentType="place"
-                    surface="admin"
-                    links={{
-                      edit: {
-                        href: editHref,
-                        label: "Открыть в редакторе",
-                      },
-                      preview: {
-                        href: viewPlaceHref,
-                        newTab: true,
-                        label: publicPlaceHref
-                          ? "Открыть публичную страницу"
-                          : "Открыть предпросмотр",
-                      },
-                      review:
-                        place.status === ContentStatus.PENDING
-                          ? {
-                              href: getPlaceDetailHref(place.id, returnTo),
-                              label: "Открыть модерацию",
-                            }
-                          : undefined,
-                    }}
-                    deletePreflight={{
-                      deleteDraft: {
-                        blockedDialog: !rowMeta.deletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить черновик",
-                              description: rowMeta.deletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                        cascadeNote: rowMeta.deletePreflight.allowed
-                          ? buildCascadeNote(rowMeta.dependencySummary)
-                          : null,
-                      },
-                      deleteArchived: {
-                        blockedDialog: !rowMeta.archivedDeletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить из архива",
-                              description: rowMeta.archivedDeletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                      },
-                    }}
-                  />
-                </td>
+    <>
+      {/* Desktop: table */}
+      <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
+        <TableContainer minWidthClassName="min-w-[960px]" scrollLabel="Список мест, прокручивается по горизонтали">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Название
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Город
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Бизнес
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Статус
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Связи
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Создано
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">
+                  Действия
+                </th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {rows.map(({ place, streetAddress, businessLabel, rowMeta, lifecycleViewModel, actionsMenu }) => (
+                <tr key={place.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {place.title}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <div>
+                      <div className="font-medium">{place.city?.name || "-"}</div>
+                      {streetAddress && (
+                        <div className="text-xs text-gray-500 mt-0.5">{streetAddress}</div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{businessLabel}</td>
+                  <td className="px-4 py-3">
+                    <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <AdminContentRelationsIndicator
+                      summary={rowMeta.dependencySummary}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
+                  </td>
+                  <td className="px-4 py-3">{actionsMenu}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableContainer>
+      </div>
+
+      {/* Mobile: cards — same rows, same actions menu */}
+      <DataCardList>
+        {rows.map(({ place, streetAddress, businessLabel, rowMeta, lifecycleViewModel, actionsMenu }) => (
+          <DataCard key={place.id}>
+            <DataCardHeader
+              title={place.title}
+              subtitle={[place.city?.name, streetAddress].filter(Boolean).join(", ") || undefined}
+              badge={<ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />}
+            />
+            <DataCardBody>
+              <DataCardRow label="Бизнес" value={businessLabel === "—" ? null : businessLabel} />
+              <DataCardRow
+                label="Связи"
+                value={<AdminContentRelationsIndicator summary={rowMeta.dependencySummary} />}
+              />
+              <DataCardRow
+                label="Создано"
+                value={formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
+              />
+            </DataCardBody>
+            <DataCardActions>{actionsMenu}</DataCardActions>
+          </DataCard>
+        ))}
+      </DataCardList>
+    </>
   );
 }
 

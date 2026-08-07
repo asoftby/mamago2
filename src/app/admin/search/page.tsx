@@ -2,6 +2,7 @@
 
 import { SearchLayout } from "@/components/admin/search/SearchLayout";
 import { Search, TrendingUp, AlertCircle, MousePointerClick } from "lucide-react";
+import { TableContainer } from "@/components/ui/table";
 
 // Mock data
 const stats = [
@@ -106,7 +107,10 @@ export default function SearchOverviewPage() {
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          <TableContainer
+            minWidthClassName="min-w-[560px]"
+            scrollLabel="Популярные поисковые запросы, прокручивается по горизонтали"
+          >
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -171,7 +175,7 @@ export default function SearchOverviewPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         </div>
 
         {/* Info Card */}

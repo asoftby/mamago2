@@ -32,6 +32,7 @@ import type {
   ValidationIssueCategory,
 } from "@/lib/admin/seo/domain/types";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
+import { TableContainer } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -246,8 +247,11 @@ export function StructuredDataCenterClient({
             через карту полей и превью; сырой JSON не является основным сценарием.
           </p>
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+            <TableContainer
+              minWidthClassName="min-w-[640px]"
+              scrollLabel="Таблица шаблонов structured data, прокручивается по горизонтали"
+            >
+              <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-slate-50/90">
                     <th className="px-4 py-3 font-semibold text-gray-800">
@@ -306,7 +310,7 @@ export function StructuredDataCenterClient({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
         </TabsContent>
 
@@ -440,8 +444,8 @@ export function StructuredDataCenterClient({
                     <p className="text-xs text-muted-foreground">
                       Сводка привязки полей schema.org к данным приложения.
                     </p>
-                    <div className="overflow-hidden rounded-lg border">
-                      <table className="w-full text-left text-xs">
+                    <div className="min-w-0 overflow-hidden rounded-lg border">
+                      <table className="w-full min-w-0 text-left text-xs">
                         <thead className="bg-muted/50">
                           <tr>
                             <th className="px-3 py-2 font-medium">Schema field</th>

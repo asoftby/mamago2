@@ -7,6 +7,7 @@ import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewType
 import type { AnalyticsSegmentRow } from "@/lib/analytics/analyticsSegmentsTypes";
 import { segmentTitle } from "@/lib/analytics/segmentCatalog";
 import { cn } from "@/lib/utils";
+import { TableContainer } from "@/components/ui/table";
 
 type SortKey =
   | "name"
@@ -165,8 +166,9 @@ export function AdminAnalyticsAudienceSegments({
           {totalProfiles.toLocaleString()}
         </span>
       </p>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <TableContainer minWidthClassName="min-w-[900px]" scrollLabel="Таблица аудиторных сегментов, прокручивается по горизонтали">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/90">
               <Th
@@ -260,6 +262,7 @@ export function AdminAnalyticsAudienceSegments({
             ))}
           </tbody>
         </table>
+        </TableContainer>
       </div>
     </div>
   );

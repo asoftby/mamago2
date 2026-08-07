@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { EditorialRequestStatusBadge } from "@/components/admin/editorial/EditorialRequestStatusBadge";
 import { listEditorialRequests } from "@/server/editorial/editorialRequestService";
+import { TableContainer } from "@/components/ui/table";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -36,6 +37,7 @@ export default async function AdminEditorialRequestsPage() {
       />
 
       <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+        <TableContainer minWidthClassName="min-w-[880px]" scrollLabel="Таблица редакционных запросов, прокручивается по горизонтали">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-stone-200 bg-stone-50 text-stone-600">
             <tr>
@@ -94,6 +96,7 @@ export default async function AdminEditorialRequestsPage() {
             )}
           </tbody>
         </table>
+        </TableContainer>
       </div>
     </div>
   );

@@ -217,7 +217,7 @@ export function CategoriesTab() {
                     Нет дополнительных фильтров для этой категории.
                   </p>
                 ) : (
-                  <DiscoveryTaxonomyTable>
+                  <DiscoveryTaxonomyTable scrollLabel="Таблица категорий фильтров, прокручивается по горизонтали">
                     <thead className="bg-gray-100 border-b border-gray-200">
                       <tr>
                         <th className={discoveryTh("w-12")}>#</th>

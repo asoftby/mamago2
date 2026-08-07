@@ -189,7 +189,10 @@ export function DiscoveryTagsAdminPage() {
             description="Добавьте первый тег, чтобы использовать его в публикациях и теговых страницах."
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable
+            minWidthClassName="min-w-[1000px]"
+            scrollLabel="Таблица тегов, прокручивается по горизонтали"
+          >
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh("min-w-[180px]")}>Название</th>

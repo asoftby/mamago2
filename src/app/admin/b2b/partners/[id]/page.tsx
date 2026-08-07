@@ -11,6 +11,7 @@ import { UnpVerificationSection } from "@/components/admin/business/UnpVerificat
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
 import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
 import { PartnerFinanceSection } from "@/components/admin/business/PartnerFinanceSection";
+import { TableContainer } from "@/components/ui/table";
 import { getBillingAccountByBusinessId } from "@/server/services/billing/billingAccount.service";
 import {
   getBillingTransactions,
@@ -635,7 +636,7 @@ export default async function PartnerDetailPage({
           {places.length === 0 ? (
             <div className="text-center py-8 text-gray-500">Нет мест</div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer minWidthClassName="min-w-[720px]" scrollLabel="Список мест партнёра, прокручивается по горизонтали">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -658,7 +659,7 @@ export default async function PartnerDetailPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </div>
 
@@ -670,7 +671,7 @@ export default async function PartnerDetailPage({
           {places.every((place) => place.activities.length === 0) ? (
             <div className="text-center py-8 text-gray-500">Нет предложений</div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer minWidthClassName="min-w-[560px]" scrollLabel="Список предложений партнёра, прокручивается по горизонтали">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -695,7 +696,7 @@ export default async function PartnerDetailPage({
                   )}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </div>
 
@@ -707,7 +708,7 @@ export default async function PartnerDetailPage({
           {events.length === 0 ? (
             <div className="text-center py-8 text-gray-500">Нет событий</div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer minWidthClassName="min-w-[860px]" scrollLabel="Список событий партнёра, прокручивается по горизонтали">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -746,7 +747,7 @@ export default async function PartnerDetailPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </div>
 

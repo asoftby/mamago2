@@ -274,7 +274,10 @@ export function OccasionsAdminPage() {
             }
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable
+            minWidthClassName="min-w-[880px]"
+            scrollLabel="Таблица поводов Discovery, прокручивается по горизонтали"
+          >
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh()}>Название</th>

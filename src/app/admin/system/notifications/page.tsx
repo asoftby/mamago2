@@ -19,6 +19,7 @@ import {
   AdminNotificationTestButtons,
   ResendDeliveryButton,
 } from "./AdminNotificationsDiagnosticsClient";
+import { TableContainer } from "@/components/ui/table";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -220,7 +221,11 @@ export default async function AdminSystemNotificationsPage({
 
       <section className="rounded-3xl border border-stone-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-stone-950">Последние Notification</h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4">
+          <TableContainer
+            minWidthClassName="min-w-[720px]"
+            scrollLabel="Таблица последних уведомлений, прокручивается по горизонтали"
+          >
           <table className="min-w-full text-sm">
             <thead className="text-left text-stone-500">
               <tr>
@@ -258,12 +263,17 @@ export default async function AdminSystemNotificationsPage({
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       </section>
 
       <section className="rounded-3xl border border-stone-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-stone-950">NotificationDelivery</h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4">
+          <TableContainer
+            minWidthClassName="min-w-[820px]"
+            scrollLabel="Таблица доставок уведомлений, прокручивается по горизонтали"
+          >
           <table className="min-w-full text-sm">
             <thead className="text-left text-stone-500">
               <tr>
@@ -302,6 +312,7 @@ export default async function AdminSystemNotificationsPage({
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       </section>
     </div>

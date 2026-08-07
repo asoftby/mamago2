@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { getAdminOccasions, type AdminOccasionFilter } from "@/server/services/direct/directAdmin.service";
 import { ThreadNumber } from "@/components/direct/ThreadNumber";
 import { DialogSearchForm } from "../dialogs/DialogSearchForm";
+import { TableContainer } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -98,6 +99,7 @@ export default async function AdminDirectOccasionsPage({
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-stone-200">
+        <TableContainer minWidthClassName="min-w-[880px]" scrollLabel="Таблица поводов, прокручивается по горизонтали">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
@@ -146,6 +148,7 @@ export default async function AdminDirectOccasionsPage({
             )}
           </tbody>
         </table>
+        </TableContainer>
       </div>
     </div>
   );

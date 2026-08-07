@@ -5,6 +5,7 @@ import { adminPath } from "@/lib/routing/surface";
 import { cn } from "@/lib/utils";
 import { ThreadNumber } from "@/components/direct/ThreadNumber";
 import { StatusBadge } from "@/components/direct/StatusBadge";
+import { TableContainer } from "@/components/ui/table";
 import {
   getDirectSafetyDashboard,
   type SafetySignalRow,
@@ -56,6 +57,7 @@ const BASE_PATH = adminPath("/communications/direct/security");
 function SignalTable({ rows, emptyLabel }: { rows: SafetySignalRow[]; emptyLabel: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-stone-200">
+      <TableContainer minWidthClassName="min-w-[720px]" scrollLabel="Таблица risk-сигналов, прокручивается по горизонтали">
       <table className="w-full text-sm">
         <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
           <tr>
@@ -99,6 +101,7 @@ function SignalTable({ rows, emptyLabel }: { rows: SafetySignalRow[]; emptyLabel
           )}
         </tbody>
       </table>
+      </TableContainer>
     </div>
   );
 }
@@ -139,6 +142,7 @@ export default async function AdminDirectSecurityPage({
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-2xl border border-stone-200">
+            <TableContainer minWidthClassName="min-w-[680px]" scrollLabel="Диалоги высокого риска, прокручивается по горизонтали">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
@@ -178,6 +182,7 @@ export default async function AdminDirectSecurityPage({
                 )}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>
@@ -189,6 +194,7 @@ export default async function AdminDirectSecurityPage({
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-2xl border border-stone-200">
+            <TableContainer minWidthClassName="min-w-[560px]" scrollLabel="Повторные нарушители, прокручивается по горизонтали">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
@@ -214,6 +220,7 @@ export default async function AdminDirectSecurityPage({
                 )}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>
@@ -255,6 +262,7 @@ export default async function AdminDirectSecurityPage({
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-2xl border border-stone-200">
+            <TableContainer minWidthClassName="min-w-[560px]" scrollLabel="Заблокированные диалоги, прокручивается по горизонтали">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
@@ -295,6 +303,7 @@ export default async function AdminDirectSecurityPage({
                 )}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>
@@ -306,6 +315,7 @@ export default async function AdminDirectSecurityPage({
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-2xl border border-stone-200">
+            <TableContainer minWidthClassName="min-w-[760px]" scrollLabel="Скрытые сообщения, прокручивается по горизонтали">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
@@ -347,6 +357,7 @@ export default async function AdminDirectSecurityPage({
                 )}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>
@@ -358,6 +369,7 @@ export default async function AdminDirectSecurityPage({
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-2xl border border-stone-200">
+            <TableContainer minWidthClassName="min-w-[680px]" scrollLabel="Открытые жалобы, прокручивается по горизонтали">
             <table className="w-full text-sm">
               <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
                 <tr>
@@ -398,6 +410,7 @@ export default async function AdminDirectSecurityPage({
                 )}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>

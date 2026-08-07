@@ -7,6 +7,7 @@ import { Tag, Plus, GripVertical, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickTagModal } from "@/components/admin/search/QuickTagModal";
 import type { SearchQuickTagWithCity } from "@/types/search-quick-tag";
+import { TableContainer } from "@/components/ui/table";
 
 export default function QuickTagsPage() {
   const searchParams = useSearchParams();
@@ -258,7 +259,10 @@ export default function QuickTagsPage() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer
+              minWidthClassName="min-w-[820px]"
+              scrollLabel="Быстрые теги, прокручивается по горизонтали"
+            >
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -355,7 +359,7 @@ export default function QuickTagsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </div>
       </div>

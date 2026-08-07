@@ -7,6 +7,7 @@ import { PageType, PageStatus, PageVisibility } from "@prisma/client";
 import { getPagePublicUrl } from "@/lib/pagePublicUrl";
 import { toast } from "sonner";
 import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
+import { TableContainer } from "@/components/ui/table";
 
 type Page = {
   id: string;
@@ -213,6 +214,7 @@ export function AdminPagesClient() {
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <TableContainer minWidthClassName="min-w-[640px]" scrollLabel="Таблица страниц, прокручивается по горизонтали">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -308,6 +310,7 @@ export function AdminPagesClient() {
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       )}
     </div>

@@ -212,7 +212,10 @@ export default function SignalsPage() {
                 description="Создайте корневую группу сигнала или под-сигнал с помощью формы выше."
               />
             ) : (
-              <DiscoveryTaxonomyTable>
+              <DiscoveryTaxonomyTable
+                minWidthClassName="min-w-[1120px]"
+                scrollLabel="Таблица сигналов, прокручивается по горизонтали"
+              >
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className={discoveryTh()}>Название</th>

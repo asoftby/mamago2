@@ -15,6 +15,7 @@ import { DashboardPeriodSwitcher } from "@/components/business/dashboard/Dashboa
 import { DashboardOnboarding } from "@/components/business/dashboard/DashboardOnboarding";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
+import { TableContainer } from "@/components/ui/table";
 import type { DashboardPeriod } from "@/server/services/business/businessWorkspace.service";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -357,7 +358,7 @@ function PublicationsSection({
           </Link>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[520px]" scrollLabel="Таблица публикаций, прокручивается по горизонтали">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100">
@@ -389,7 +390,7 @@ function PublicationsSection({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       )}
     </BusinessSurfaceCard>
   );

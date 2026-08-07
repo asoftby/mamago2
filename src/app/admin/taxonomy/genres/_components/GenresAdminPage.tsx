@@ -249,7 +249,7 @@ export function GenresAdminPage() {
             }
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable scrollLabel="Таблица жанров, прокручивается по горизонтали">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh()}>Название</th>

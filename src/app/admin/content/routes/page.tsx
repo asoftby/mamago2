@@ -5,6 +5,7 @@ import { ru } from "date-fns/locale";
 import { Prisma, RouteStatus, RouteVisibility } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
+import { TableContainer } from "@/components/ui/table";
 import {
   blockingDependencyItems,
   buildContentDependencySummary,
@@ -287,8 +288,9 @@ function RoutesTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full min-w-[1120px] text-sm">
+    <div className="rounded-lg border border-gray-200 overflow-hidden">
+      <TableContainer minWidthClassName="min-w-[1120px]" scrollLabel="Таблица маршрутов, прокручивается по горизонтали">
+        <table className="w-full text-sm">
         <thead className="border-b border-gray-200 bg-gray-50">
           <tr>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
@@ -387,6 +389,7 @@ function RoutesTable({
           })}
         </tbody>
       </table>
+      </TableContainer>
     </div>
   );
 }

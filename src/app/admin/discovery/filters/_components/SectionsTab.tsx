@@ -205,7 +205,10 @@ export function SectionsTab() {
             description="Добавьте фильтры из справочника ниже."
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable
+          minWidthClassName="min-w-[880px]"
+          scrollLabel="Таблица секций фильтров, прокручивается по горизонтали"
+        >
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh("w-20")}>Порядок</th>

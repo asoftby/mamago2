@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { getAdminComplaints } from "@/server/services/direct/directAdmin.service";
 import { ThreadNumber } from "@/components/direct/ThreadNumber";
 import { ComplaintResolveForm } from "./ComplaintResolveForm";
+import { TableContainer } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -52,6 +53,7 @@ export default async function AdminDirectComplaintsPage({
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-stone-200">
+        <TableContainer minWidthClassName="min-w-[760px]" scrollLabel="Таблица жалоб, прокручивается по горизонтали">
         <table className="w-full text-sm">
           <thead className="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
             <tr>
@@ -104,6 +106,7 @@ export default async function AdminDirectComplaintsPage({
             )}
           </tbody>
         </table>
+        </TableContainer>
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ import type {
   SearchIndexStatus,
 } from "@/types/search-index";
 import type { SearchIndexRecord } from "@prisma/client";
+import { TableContainer } from "@/components/ui/table";
 
 interface IndexData {
   records: SearchIndexRecordWithEntity[];
@@ -314,7 +315,10 @@ export default function SearchIndexPage() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
+            <TableContainer
+              minWidthClassName="min-w-[720px]"
+              scrollLabel="Записи поискового индекса, прокручивается по горизонтали"
+            >
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -426,7 +430,7 @@ export default function SearchIndexPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
         )}
 
