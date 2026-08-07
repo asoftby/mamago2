@@ -391,3 +391,49 @@ P3 — cleanup / polish / optional
   Task 1 `COMPLETE`.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 1 audit (Import
   Images Into DEV)
+
+## [BACKLOG-018] Local dev database/storage is not the real DEV target — no documented safe access path
+
+- Status: OPEN
+- Priority: P0
+- Area: Migration / Environment / Process
+- Added: 2026-08-07
+- Reason deferred: not deferred — flagged as release-process-critical, but
+  the fix (deciding/documenting the real DEV access path) is the project
+  owner's decision, not something an agent session can resolve unilaterally
+  without credentials/scope it doesn't have.
+- Context: Task 1 (Import Images Into DEV) ran a full write session against
+  `DATABASE_URL=postgresql://mamago:mamago@localhost:5433/mamago2`
+  (container `mamago2-db`) under the working assumption that this local
+  Docker Postgres + local `storage/uploads/` constituted "DEV" per this
+  checklist. The owner later checked the real `https://dev.mamago.by`
+  (DNS: `134.17.17.134`, confirmed distinct from `localhost:5433`) and
+  found the imported media absent. Read-only reconciliation confirmed: (1)
+  the local Postgres container is a purely local Docker volume created
+  2026-06-22, not shared/remote storage; (2) real `dev.mamago.by` Place
+  pages that were legitimately published in the 2026-07-28/29 sessions
+  show correct content but none of this session's newly-imported gallery
+  images; (3) an Event and an Article present in the local DB do not exist
+  on real DEV at all (404), meaning the local DB has diverged from real
+  DEV in content, not just media. No credentialed path from this
+  environment to the real DEV Postgres/storage or admin panel was found;
+  the one plausible network route (SSH to `134.17.17.134`) is locally
+  aliased `mamago-prod` in `~/.ssh/config`, which was deliberately not
+  used without explicit owner confirmation of scope/safety.
+- Current state: not started. Every future coding-agent session that
+  writes to "DEV" under the current `.env`/docs setup risks repeating this
+  exact mistake — this is a systemic gap, not specific to media import.
+- Dependencies: owner decision on (a) what the real DEV access path is for
+  an agent session (DB URL, storage target, or a documented sync
+  mechanism), and (b) whether `~/.ssh/config`'s `mamago-prod` alias for
+  `134.17.17.134` is correctly named (it currently reads as "prod" for a
+  host that DNS says is "dev", which is itself worth the owner's
+  attention independent of this backlog item).
+- Acceptance criteria: `docs/release/dev-to-prod-checklist.md` (or
+  `CLAUDE.md`) updated with an explicit, unambiguous description of how an
+  agent session reaches the real DEV database/storage safely — or an
+  explicit statement that local Docker Postgres is the intentional
+  working tier and a separate, owner-run sync step deploys it to real DEV
+  (in which case *that* sync step becomes the actual Task 1 gap).
+- Source: `docs/release/dev-to-prod-checklist.md` Task 1 environment
+  reconciliation (owner-reported media not visible in actual DEV)
