@@ -249,3 +249,33 @@ P3 — cleanup / polish / optional
 - Dependencies: подтверждение, что владеющая session завершена/неактивна.
 - Acceptance criteria: fresh read-only аудит непосредственно перед любым действием (HEAD, dirty-состояние, process/session liveness); удаление worktree только после этого и только обычным `git worktree remove` (без `--force`).
 - Source: audit (Category C worktree audit — analytics-truth-worktree)
+
+## [BACKLOG-015] Offer media (cover/gallery) — implement real importer
+
+- Status: OPEN
+- Priority: P1
+- Area: Media / Offers
+- Added: 2026-08-07
+- Reason deferred: explicit founder decision (`docs/migration/prelaunch-checklist.md`
+  line 1040, applied 2026-07-29): "Offer media Option B, explicit P1 defer" —
+  approved only after fixing a real defect (broken 49-byte `og-default.jpg`
+  placeholder replaced with a real 1200×630 JPEG), so all 63 PUBLISHED
+  Offers currently render cleanly via existing fallbacks (card: placeholder
+  pattern in `OfferCard.tsx`; detail hero/OG: `og-default.jpg` via
+  `src/lib/media/mapOfferPageMedia.ts`) — not a broken-image state.
+- Context: `Offer.coverImage`/`galleryImages` are plain string/JSON fields,
+  no `OfferImage` relational table (unlike `PlaceImage`). No delegate exists
+  for `OfferMediaSyncer`; `scripts/migration-commit-wordpress-db.ts` hard-
+  blocks `--entity offer --media-policy FULL` in code (line 261). Building a
+  real importer means designing a storage/dedup model (mirroring
+  `PlaceMediaSyncer`) — a genuinely new, scoped piece of architecture, not a
+  Task 1 (DEV media import) minimal-scope fix. Confirmed via DEV DB
+  read-only audit 2026-08-07: 0/63 Offers (all PUBLISHED) have any image.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: founder chooses Option A (minimal source-backed
+  cover-image importer reusing `PlaceMediaSyncer`'s dedup/storage pattern)
+  or reconfirms Option B indefinitely; if A, implement + verify idempotency
+  + verify no broken images regression.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 1 audit (Import
+  Images Into DEV)

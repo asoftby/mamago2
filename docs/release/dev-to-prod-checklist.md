@@ -20,10 +20,10 @@ two documents or their processes.
 DEV:   NOT VERIFIED
 PROD:  NOT READY
 
-Active task:        none (checklist just created, execution not started)
+Active task:        Task 1 — Import Images Into DEV (audit in progress)
 Last updated:       2026-08-07
-Last updated by:    Claude Code (checklist creation)
-Unresolved P0/P1:   none tracked yet — Tasks 1–15 are all TODO
+Last updated by:    Claude Code (Task 1 audit start)
+Unresolved P0/P1:   none tracked yet — Tasks 2–15 are all TODO
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -291,15 +291,69 @@ BACKLOG/NOTES: links to non-blocking follow-up
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
+STATUS: `AUDIT_COMPLETE`
+AUDIT:
+EXISTING — `MediaAsset`/`MediaUsage` model, storage abstraction
+(`src/server/media/media-storage.ts`, env-overridable `MEDIA_STORAGE_ROOT`),
+public serving routes (`/api/media/[filename]`, `/api/media/file/[...path]`),
+upload pipeline. Real WP-image import pipeline proven end-to-end:
+`PlaceMediaSyncer` (download → checksum/lineage dedup → `MediaAsset` +
+`PlaceImage`, idempotent, never deletes rows, URL+lineage-keyed reuse) and
+`EventMediaSyncer`, both driven by `scripts/migration-commit-wordpress-db.ts`
+(`--entity place|event --media-policy FULL --limit N --context-config
+<path> --confirm-writes`, WP SSH read-only via `--allow-remote-readonly`).
+`--media-policy FULL` explicitly overrides the LOCAL/DEV sampled-policy gate
+(`shouldSampleMedia()`/`resolveSampledMediaPolicy`) with **no code change
+needed** — confirmed by direct code read of
+`scripts/migration-commit-wordpress-db.ts:339-343,605-668`. DEV Postgres
+(`mamago2-db`, port 5433) + `storage/uploads` (542 files, 43MB) already hold
+real migrated + admin-uploaded media (181 `MediaAsset` rows, all ACTIVE, 0
+orphans). Place/Route/RouteStop/Event/Offer card+detail components already
+render missing images gracefully (placeholder or omitted block, confirmed
+via `MediaCover`, `RouteDetailClient`, `OfferCard`, `mapOfferPageMedia.ts`
+`og-default.jpg` fallback) — no broken `<img>` anywhere today.
+PARTIAL — Place: only 5/83 have gallery images (3 sample WP keys + place 437
+partial + one more); 78 clean Places are METADATA-only (no images) purely
+because of the LOCAL/DEV 9-key sample allowlist, not a pipeline defect.
+Event (Activity, all 10 are type EVENT): 5/10 have `coverImageId`, 1/10 has
+gallery, same sample-allowlist cause. Article: 9/26 have `coverImageId`,
+9/26 have ≥1 inline image block, 1/26 has a gallery block — remaining gap is
+documented as source-side (`PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS`), not a
+pipeline defect.
+MISSING — Offer: 0/63 (all PUBLISHED) have `coverImage`/`galleryImages`; no
+`OfferImage` table, no delegate; `--entity offer --media-policy FULL` is
+hard-blocked in code (`migration-commit-wordpress-db.ts:261`). This is a
+**deliberate founder decision** (`prelaunch-checklist.md` line 1040:
+"Founder decision (applied 2026-07-29): Offer media Option B, explicit P1
+defer"), applied only after fixing a real defect (broken 49-byte
+`og-default.jpg` placeholder → real 1200×630 JPEG) so Offers already render
+cleanly with a graceful fallback everywhere. Not reopened here — see
+`docs/engineering/backlog.md` BACKLOG-015.
+DO NOT TOUCH — Route/RouteStop media (small entity count, already renders
+gracefully with no images; import for these is a separate historical
+`ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED` decision, not required for Task 1
+exit criteria). `MediaAsset`/storage/serving layer itself — works, not
+touched.
+GAPS: Place (78/83) and Event (5/10) galleries/covers are the only
+confirmed, mechanically-ready, in-scope gap: real production-like media
+missing purely due to a deliberate LOCAL/DEV sampling gate, with a proven,
+idempotent, already-used importer able to close it via an existing CLI flag.
+IMPLEMENTATION: Planned — run
+`pnpm migration:commit:wordpress-db --entity place --media-policy FULL
+--context-config <path> --confirm-writes --allow-remote-readonly` (batched
+via `--limit`) for the remaining clean Places, then the equivalent for
+`--entity event`, against the WP SSH source already configured in `.env`.
+No application code changes required. Awaiting go-ahead (real external
+network/SSH cost against the legacy WP host using temporary pre-release
+credentials) before executing — see chat for full audit report presented to
+the project owner.
 COMMITS: —
 VERIFICATION: —
 DEV SMOKE: —
 BLOCKERS: —
-BACKLOG/NOTES: —
+BACKLOG/NOTES: Offer media P1 defer — see `docs/engineering/backlog.md`
+BACKLOG-015 (cross-references founder decision in
+`prelaunch-checklist.md`).
 
 AUDIT FIRST the existing media migration/import architecture and the real
 DEV state. Check: MediaAsset, storage, media linkage, existing import
