@@ -5,6 +5,25 @@ import { logSearchQuery } from "@/lib/search/logSearchQuery";
 import { getCurrentUser } from "@/lib/auth/server";
 import { activityAddressLine, activityMetaLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
 
+const MAX_QUERY_LENGTH = 200;
+const MAX_QUERY_TOKENS = 10;
+
+/** Match every whitespace-separated token independently (AND), so word order
+ * doesn't matter — e.g. "балет три поросенка" must match the same document
+ * as "три поросенка балет". A single-token query keeps the plain substring
+ * match (identical to prior behavior). */
+function buildSearchTextWhere(q: string) {
+  const tokens = q.split(/\s+/).filter(Boolean).slice(0, MAX_QUERY_TOKENS);
+  if (tokens.length <= 1) {
+    return { searchText: { contains: q, mode: "insensitive" as const } };
+  }
+  return {
+    AND: tokens.map((t) => ({
+      searchText: { contains: t, mode: "insensitive" as const },
+    })),
+  };
+}
+
 function entityTypeToResultType(t: string): SearchResultType {
   if (
     t === "activity" ||
@@ -20,7 +39,7 @@ function entityTypeToResultType(t: string): SearchResultType {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q")?.trim() ?? "";
+  const q = (searchParams.get("q")?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
   const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "8", 10), 1), 20);
   const cityId = searchParams.get("cityId") || undefined;
 
@@ -35,7 +54,7 @@ export async function GET(request: Request) {
     const docs = await prisma.searchDocument.findMany({
       where: {
         isPublished: true,
-        searchText: { contains: q, mode: "insensitive" },
+        ...buildSearchTextWhere(q),
       },
       take: limit,
       orderBy: [{ boost: "desc" }, { updatedAt: "desc" }],
