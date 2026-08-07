@@ -20,10 +20,13 @@ two documents or their processes.
 DEV:   NOT VERIFIED
 PROD:  NOT READY
 
-Active task:        none — Task 1 (Import Images Into DEV) reached COMPLETE
+Active task:        Task 1 — Import Images Into DEV (REOPENED — owner reports
+                     imported images not visible in actual DEV media library;
+                     environment-target discrepancy under investigation)
 Last updated:       2026-08-07
-Last updated by:    Claude Code (Task 1 closure — Place media blocker resolved)
-Unresolved P0/P1:   none — Tasks 2–15 are all TODO, not started
+Last updated by:    Claude Code (Task 1 environment reconciliation)
+Unresolved P0/P1:   Task 1 target-environment discrepancy — Tasks 2–15 are
+                     all TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -291,7 +294,7 @@ BACKLOG/NOTES: links to non-blocking follow-up
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `COMPLETE`
+STATUS: `BLOCKED — ACTUAL DEV MEDIA VERIFICATION`
 AUDIT:
 EXISTING — `MediaAsset`/`MediaUsage` model, storage abstraction
 (`src/server/media/media-storage.ts`, env-overridable `MEDIA_STORAGE_ROOT`),
