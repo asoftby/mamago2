@@ -17,18 +17,13 @@ two documents or their processes.
 ## RELEASE STATUS (update this block as work proceeds)
 
 ```
-DEV:   NOT VERIFIED
+DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 1 — Import Images Into DEV (BLOCKED — confirmed
-                     target-environment discrepancy: this session's local
-                     Docker Postgres/storage is NOT the real dev.mamago.by;
-                     see BACKLOG-018)
+Active task:        Task 1 — Import Images Into DEV (COMPLETE)
 Last updated:       2026-08-07
-Last updated by:    Claude Code (Task 1 environment reconciliation)
-Unresolved P0/P1:   Task 1 blocked on owner providing/confirming safe access
-                     to the real DEV target — Tasks 2–15 are all TODO, not
-                     started
+Last updated by:    Cursor (Task 1 actual-DEV media import)
+Unresolved P0/P1:   none from Task 1 — Tasks 2–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -296,7 +291,7 @@ BACKLOG/NOTES: links to non-blocking follow-up
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `BLOCKED — ACTUAL DEV MEDIA VERIFICATION`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — `MediaAsset`/`MediaUsage` model, storage abstraction
 (`src/server/media/media-storage.ts`, env-overridable `MEDIA_STORAGE_ROOT`),
@@ -453,85 +448,69 @@ recompile; confirmed non-reproducing (immediate reload succeeded, and a
 `read_network_requests` check showed the same resources retried
 successfully to 200) — not a real defect, not the DEV app's normal
 behavior.
-BLOCKERS (2026-08-07, environment reconciliation — REOPENED):
-Owner reported the imported media is not visible in the actual DEV media
-library. Read-only reconciliation confirmed a **target-environment
-discrepancy**, not a media-library display bug:
-
-- `DATABASE_URL` in this repo's `.env` is
-  `postgresql://mamago:mamago@localhost:5433/mamago2` → container
-  `mamago2-db`, a **local Docker container** on this development Mac
-  (`docker inspect`: local volume `mamago2_mamago2_pg`, physical path
-  `/var/lib/docker/volumes/...`, created 2026-06-22, i.e. this developer's
-  long-running local dev database). `MEDIA_STORAGE_ROOT` was unset, so
-  files went to this repo's local `storage/uploads/` on this same Mac.
-  Neither is shared network storage; both are local-machine-only.
-- `dev.mamago.by` resolves via DNS to `134.17.17.134` — a distinct, real,
-  network-reachable host, confirmed unrelated to `localhost:5433`. (Note:
-  this Mac's `~/.ssh/config` labels that IP's host alias `mamago-prod`,
-  not `mamago-dev` — a discrepancy worth the owner's attention separately,
-  and specifically why this investigation did not attempt an SSH
-  connection to it — see below.)
-- Direct HTTPS check against the real `https://dev.mamago.by` (Browser
-  pane, not the local dev server) for the exact 3 golden-proof Place
-  records: content matches (title/address/hours render correctly — these
-  Places were part of the legitimate 2026-07-28/29 published-to-DEV batch),
-  but **zero gallery images render**, network tab shows no failed/404
-  image requests (i.e. the page never even attempts to load them — the
-  live DB simply has no `PlaceImage` rows there). Response header
-  confirmed `cache-control: private, no-cache, no-store, max-age=0,
-  must-revalidate` — rules out stale caching as an alternative
-  explanation.
-- The Event (`immersivnaya-vystavka-neboreka-planeta-posle-shuma`) and
-  Article (`pervaya-v-belarusi-shkola-talantov-v-novoy-borovoy`) used for
-  this session's DEV smoke **do not exist at all** on the real
-  `dev.mamago.by` (confirmed 404/"not found" on both, via direct page
-  fetch, not a filter/permission issue) — meaning the divergence between
-  this local database and the real DEV database is **broader than media**:
-  this local Postgres instance contains Event/Article content that was
-  never deployed to the real DEV environment at all, alongside Place
-  content that mostly was (from the July 28/29 sessions) but is now
-  missing this session's newly-imported galleries.
-- **Verdict:** all of this session's writes — the ~1073 `MediaAsset` rows,
-  the 3327 files in `storage/uploads/`, and the Place/Event/Article content
-  read/verified during this and the prior Task 1 session — live entirely
-  in this local Docker Postgres + local filesystem. None of it reached the
-  real deployed DEV environment. The DEV media library shows nothing
-  because there is genuinely nothing there to show — not a query/filter
-  bug.
-- **Not investigated further, by design:** step 2 (DB-level count
-  comparison against the real DEV database) and step 3 (auditing the real
-  admin media-library query/UI for hiding filters) require either direct
-  DB access to the real DEV Postgres or authenticated admin access to
-  `https://dev.mamago.by/admin` — neither of which this session has
-  credentials for, and the one plausible network path found (SSH to
-  `134.17.17.134`) is locally aliased `mamago-prod`, which this session
-  will not connect to without explicit owner confirmation of what that
-  host actually is and safe scope for touching it. Per instruction: not
-  worked around; reporting instead.
-- **Minimal next action required:** this is a target-environment
-  configuration problem, not a re-import-with-the-same-tooling problem.
-  The already-proven idempotent `--force-place-media-replay` /
-  `--force-media-reprocess` / `--force-article-media-replay` mechanisms
-  are safe to reuse once pointed at the real DEV `DATABASE_URL`/
-  `MEDIA_STORAGE_ROOT` (or run from wherever the real DEV app/DB actually
-  lives) — no new code needed. The owner needs to either (a) provide/
-  confirm safe, scoped access to the real DEV DB + storage target (or
-  perform the source-access step via Cursor as noted), or (b) clarify
-  whether this local Docker Postgres is actually meant to be a separate
-  "LOCAL" tier that periodically syncs to real DEV via some other
-  mechanism this session hasn't found — in which case that sync step,
-  not a re-import, is the actual gap.
-BACKLOG/NOTES: BACKLOG-015 (Offer media, pre-existing founder P1 defer, not
-reopened). BACKLOG-016 (Place FULL backfill blocked) — code fix (the
-`--force-place-media-replay` mechanism) is DONE and verified correct in
-principle, but its *target* was wrong this session — see BLOCKERS above;
-not re-closing until re-run against the real DEV target. BACKLOG-017
-(Route/RouteStop has no safe replay path) — stays P2/OPEN, reviewed and
-confirmed non-blocking for this release. **New: BACKLOG-018** (this
-local-DB-vs-real-DEV target discrepancy — see below) recorded as a
-release-process risk affecting any future "DEV" work in this repo, not
-just Task 1.
+BLOCKERS: none — prior ACTUAL-DEV target discrepancy resolved this session
+(see VERIFICATION addendum below). Task 2 was not started.
+ACTUAL DEV VERIFICATION (2026-08-07, Cursor — closes Task 1):
+Physical host `ubuntu` at `134.17.17.134` (DNS for `dev.mamago.by`; SSH alias
+on this Mac is still named `mamago-prod` — name is misleading, not used as
+environment proof). Traefik routes `Host(dev.mamago.by|admin.dev.mamago.by|
+business.dev.mamago.by)` → compose project `dev` / container `dev-app-1`
+(`ghcr.io/asoftby/mamago2:dev-259`). Same host also runs isolated PROD stack
+`prod-app-1` / `prod-db-1` for `prod.mamago.by` — never written.
+DEV DB: Postgres `dev-db-1`, database/user `devmamago`, volume
+`dev_db_dev_data`. DEV storage: Docker volume `dev_mamago2_storage` →
+`/app/storage` in `dev-app-1` (distinct from `prod_mamago2_storage`).
+PROD isolation proof (read-only after import): PROD `PlaceImage=0`,
+`MediaAsset=0`, article/event covers=0, PROD storage ~12KB / 0 upload
+files. Deployed DEV image lacks the newer local replay CLI sources; import
+ran from this Mac against DEV via SSH tunnel to `dev-db-1:5432` + staged
+`MEDIA_STORAGE_ROOT` synced into `dev_mamago2_storage` only (no app deploy,
+no PROD touch). WP source `134.17.16.78` reachable from Mac (not from DEV
+host TCP/22).
+Before (actual DEV): Place 80 / PlaceImage 0 / MediaAsset 2 / Article 26
+(0 covers) / Event 8 (1 cover) / storage ~6 files ~192KB.
+Place proof (5 unique-lineage keys 5492/5515/63360/10343/10370): APPLIED;
+Place business fields byte-stable including `updatedAt`; public media 200;
+canonical `/places/{slug}` HTML contains gallery URLs; rerun
+`NOOP_ALREADY_SYNCED`. Skipped duplicate active lineage
+`wordpress-db:places:5457` (two Place rows) — non-deterministic
+`findFirst` target.
+Place full unique-lineage remaining 73: APPLIED 57, NOOP 6,
+SOURCE_MEDIA_MISSING 10 (genuine; not forced). Net Place gallery coverage
+**64/80** with images; PlaceImage **445**; skipped-without-media / no
+unique lineage remain as documented gaps.
+Event: 3-proof then full 8 — APPLIED/NOOP covers → **6/8** with cover;
+2 WP posts no longer published; 1 existing cover refused
+`EVENT_MEDIA_ONLY_TARGET_MEDIA_DIVERGENCE` (safety correct). Idempotent
+rerun `NOOP_ALREADY_SYNCED`. Note: several Events have `cityId=null`, so
+`/{city}/events/{slug}` shows "Событие не найдено" even though cover
+`MediaAsset` public URL returns 200 — pre-existing routing/data gap, not
+an importer defect (P2 residual).
+Article: actual DEV corpus differs from prior local DB. Proof 3 APPLIED
+(title/slug/status/author unchanged); idempotent `NOOP_ALREADY_SYNCED`.
+Remaining without cover 23: APPLIED 9, CONTENT_DIVERGENCE 5 (refuse —
+preserve edits), IMPORT_INCOMPLETE/missing attachments 9 (article left
+untouched). Net **10/26** Articles with `coverImageId`. All DEV Articles
+remain `PENDING`, so anonymous `/api/media/file/...` correctly returns
+`access denied` for article-only media; Place/Event published linkage
+serves 200. Admin media library query (`getAdminMediaList`) has **no**
+filter excluding `sourceType=MIGRATED`; DEV now has **1055 MIGRATED + 2
+ADMIN_UPLOAD** ACTIVE `MediaAsset` rows — visibility gap was empty-target
+data, not a query bug. Admin UI itself not browser-logged-in (auth wall).
+After: MediaAsset **1057**, PlaceImage **445**, storage uploads **3326**
+files / **~321MB** on `dev_mamago2_storage`.
+DEV SMOKE (actual `https://dev.mamago.by`, Browser): Place detail+gallery
+desktop and mobile 375×812 for Mulberry Club and «Кофта» на Мстиславца, 2 —
+images render, naturalWidth>0, HTTP 200, usable layout. Event city page
+not found (cityId null). Article public pages not applicable while
+PENDING. Media library: data/query-level OK; UI needs admin session.
+BACKLOG/NOTES: BACKLOG-015 unchanged. BACKLOG-016 DONE and re-proven on
+actual DEV via `--force-place-media-replay`. BACKLOG-017 unchanged P2.
+BACKLOG-018 root cause resolved this session (safe actual-DEV access path
+documented + used) — status updated in `docs/engineering/backlog.md`.
+Non-blocking residuals (P2): Event `cityId=null` public routing; duplicate
+Place lineage `places:5457`; SSH alias `mamago-prod` naming for the DEV IP;
+Articles remaining PENDING / source-attachment gaps.
 
 AUDIT FIRST the existing media migration/import architecture and the real
 DEV state. Check: MediaAsset, storage, media linkage, existing import

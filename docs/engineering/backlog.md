@@ -394,46 +394,58 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-018] Local dev database/storage is not the real DEV target — no documented safe access path
 
-- Status: OPEN
-- Priority: P0
+- Status: DONE (2026-08-07 — actual DEV access path proven and used for Task 1)
+- Priority: P0 (resolved)
 - Area: Migration / Environment / Process
 - Added: 2026-08-07
-- Reason deferred: not deferred — flagged as release-process-critical, but
-  the fix (deciding/documenting the real DEV access path) is the project
-  owner's decision, not something an agent session can resolve unilaterally
-  without credentials/scope it doesn't have.
-- Context: Task 1 (Import Images Into DEV) ran a full write session against
-  `DATABASE_URL=postgresql://mamago:mamago@localhost:5433/mamago2`
-  (container `mamago2-db`) under the working assumption that this local
-  Docker Postgres + local `storage/uploads/` constituted "DEV" per this
-  checklist. The owner later checked the real `https://dev.mamago.by`
-  (DNS: `134.17.17.134`, confirmed distinct from `localhost:5433`) and
-  found the imported media absent. Read-only reconciliation confirmed: (1)
-  the local Postgres container is a purely local Docker volume created
-  2026-06-22, not shared/remote storage; (2) real `dev.mamago.by` Place
-  pages that were legitimately published in the 2026-07-28/29 sessions
-  show correct content but none of this session's newly-imported gallery
-  images; (3) an Event and an Article present in the local DB do not exist
-  on real DEV at all (404), meaning the local DB has diverged from real
-  DEV in content, not just media. No credentialed path from this
-  environment to the real DEV Postgres/storage or admin panel was found;
-  the one plausible network route (SSH to `134.17.17.134`) is locally
-  aliased `mamago-prod` in `~/.ssh/config`, which was deliberately not
-  used without explicit owner confirmation of scope/safety.
-- Current state: not started. Every future coding-agent session that
-  writes to "DEV" under the current `.env`/docs setup risks repeating this
-  exact mistake — this is a systemic gap, not specific to media import.
-- Dependencies: owner decision on (a) what the real DEV access path is for
-  an agent session (DB URL, storage target, or a documented sync
-  mechanism), and (b) whether `~/.ssh/config`'s `mamago-prod` alias for
-  `134.17.17.134` is correctly named (it currently reads as "prod" for a
-  host that DNS says is "dev", which is itself worth the owner's
-  attention independent of this backlog item).
-- Acceptance criteria: `docs/release/dev-to-prod-checklist.md` (or
-  `CLAUDE.md`) updated with an explicit, unambiguous description of how an
-  agent session reaches the real DEV database/storage safely — or an
-  explicit statement that local Docker Postgres is the intentional
-  working tier and a separate, owner-run sync step deploys it to real DEV
-  (in which case *that* sync step becomes the actual Task 1 gap).
-- Source: `docs/release/dev-to-prod-checklist.md` Task 1 environment
-  reconciliation (owner-reported media not visible in actual DEV)
+- Context: Earlier Task 1 write session targeted local Docker Postgres
+  (`localhost:5433` / `mamago2-db`) and local `storage/uploads/`, which are
+  **not** `https://dev.mamago.by`. Owner correctly reported missing media in
+  actual DEV.
+- Resolution: Real DEV lives on physical host `134.17.17.134` (`ubuntu`)
+  alongside an isolated PROD stack. Mapping proven read-only then used for
+  writes: Traefik `Host(dev.mamago.by…)` → `dev-app-1`; DB `dev-db-1` /
+  `devmamago` / volume `dev_db_dev_data`; storage volume
+  `dev_mamago2_storage` → `/app/storage`. Safe agent path used without
+  deploying the app: SSH + local tunnel to DEV Postgres + local
+  `MEDIA_STORAGE_ROOT` staging synced **only** into `dev_mamago2_storage`
+  (never `prod_*`). WP source remains `134.17.16.78` from the Mac (DEV host
+  cannot TCP to WP:22). Note: this Mac's SSH alias `mamago-prod` still
+  points at the DEV IP — rename is a remaining hygiene item, not a blocker
+  once Traefik/compose identity is verified before any write.
+- Acceptance criteria: met via Task 1 ACTUAL DEV verification in
+  `docs/release/dev-to-prod-checklist.md`.
+- Source: Task 1 environment reconciliation + actual-DEV media import session
+
+## [BACKLOG-019] DEV Events with null cityId not reachable on /{city}/events/{slug}
+
+- Status: OPEN
+- Priority: P2
+- Area: Content / Events / Routing
+- Added: 2026-08-07
+- Reason deferred: does not block first PROD readiness of media dataset;
+  Place galleries (core Task 1 surface) already smoke green on actual DEV.
+  Event cover MediaAssets import and serve 200; city-scoped public page
+  returns "Событие не найдено" when `Activity.cityId` is null.
+- Context: Observed on actual `devmamago` after Task 1 media import
+  (e.g. `immersivnaya-vystavka-neboreka-planeta-posle-shuma`). Pre-existing
+  data/routing gap, not introduced by the media importer.
+- Acceptance criteria: published Events used for public DEV testing have a
+  resolvable city binding (or public route tolerates null city safely).
+- Source: Task 1 actual-DEV browser smoke
+
+## [BACKLOG-020] Duplicate active PLACE lineage for wordpress-db:places:5457
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Places / Lineage
+- Added: 2026-08-07
+- Reason deferred: only one source key; media replay uses `findFirst` and
+  would be non-deterministic. Skipped during Task 1 actual-DEV import
+  rather than risk wrong Place. Does not block overall DEV media dataset.
+- Context: Two active `MigrationLineage` PLACE rows for the same
+  `sourceRecordKey`, targeting two Place rows that share slug
+  `kofta-na-pr-t-mira-1`.
+- Acceptance criteria: one active lineage (or explicit disambiguation
+  rule) before media replay for that key.
+- Source: Task 1 actual-DEV Place batch
