@@ -21,8 +21,8 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 1 — Import Images Into DEV (COMPLETE)
-Last updated:       2026-08-07
-Last updated by:    Cursor (Task 1 actual-DEV media import)
+Last updated:       2026-08-08
+Last updated by:    Cursor (Task 1 media metadata audit/backfill follow-up)
 Unresolved P0/P1:   none from Task 1 — Tasks 2–15 remain TODO, not started
 ```
 
@@ -510,7 +510,33 @@ BACKLOG-018 root cause resolved this session (safe actual-DEV access path
 documented + used) — status updated in `docs/engineering/backlog.md`.
 Non-blocking residuals (P2): Event `cityId=null` public routing; duplicate
 Place lineage `places:5457`; SSH alias `mamago-prod` naming for the DEV IP;
-Articles remaining PENDING / source-attachment gaps.
+Articles remaining PENDING / source-attachment gaps; orphan migrated
+MediaAssets without entity link (BACKLOG-021).
+
+METADATA FOLLOW-UP (2026-08-08, Cursor — audit then metadata-only backfill;
+does **not** reopen Task 1 Exit Criteria / binary import):
+AUDIT verdict — **not UI-only**. Admin «Файл» shows
+`effectiveMetadata.title || displayFilename`; many stored `title` values
+were raw WP `post_title` (camera/hash/numeric). Importer never set
+`alt`/`caption`; `MediaUsage` was not created for migrated links, so
+admin auto-gen could not help. `originalName`/`filename`/lineage correctly
+preserved. Public Place gallery already uses place `title` as `<img alt>`
+(`mapPlacePageMedia`) — independent of MediaAsset.alt.
+EXISTING: meaningful WP titles kept (e.g. Mulberry «…02»); lineage +
+originalFilename preserved; Place public alts already semantic.
+BROKEN/MISSING (pre-backfill): alt/caption null on migrated assets;
+technical titles where WP post_title was technical; 0 MediaUsage on
+migrated links.
+SAFE BACKFILL: `pnpm media:backfill-migrated-metadata` — metadata +
+MediaUsage only; no binary/storage/entity content writes; preserves
+non-empty alt/caption and meaningful titles; orphans without discoverable
+entity link left unchanged (BACKLOG-021). Eligible linked set after
+extend discovery (Place gallery, Event cover/gallery, Article
+cover/seo/content): **699/1055** with alt + usage; full rerun
+`SKIP_UNCHANGED` / usageAlready. Samples: Place Mulberry title kept +
+alt filled; Event Nebo.Reka title decoded + alt; Article Pets Fest cover
++ inline semantic titles; `originalName` unchanged; Mulberry file
+`content-length` still 65336 (= `sizeBytes`).
 
 AUDIT FIRST the existing media migration/import architecture and the real
 DEV state. Check: MediaAsset, storage, media linkage, existing import

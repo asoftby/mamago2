@@ -449,3 +449,24 @@ P3 — cleanup / polish / optional
 - Acceptance criteria: one active lineage (or explicit disambiguation
   rule) before media replay for that key.
 - Source: Task 1 actual-DEV Place batch
+
+## [BACKLOG-021] Orphan migrated MediaAssets without entity linkage
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Media metadata
+- Added: 2026-08-08
+- Reason deferred: after Task 1 metadata backfill, ~356/1055 MIGRATED
+  assets still have no PlaceImage / Activity cover|gallery / Article
+  cover|seo|contentJson link. Inventing titles/alt without entity context
+  would violate the no-keyword-stuffing policy. Does not block visual
+  smoke of linked Place/Event/Article media.
+- Context: Owner-visible library names like `IMG_4888`, `DSC_9765`,
+  `10793767_0` are often these orphans — `originalName`/attachment lineage
+  intact, but no discoverable mamaGo entity. Likely WP attachments imported
+  for articles that stayed PENDING / refused content replay, or unused
+  gallery members.
+- Acceptance criteria: resolve parent entity via WP `post_parent` (or
+  drop/archive truly unused attachments) then run the same idempotent
+  metadata backfill; still never overwrite curated metadata.
+- Source: Task 1 media metadata audit/backfill follow-up
