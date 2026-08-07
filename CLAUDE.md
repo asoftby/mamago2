@@ -1,5 +1,14 @@
 # mamaGo — заметки для агентов
 
+## Engineering Backlog
+
+Any consciously deferred engineering task must be recorded in
+`docs/engineering/backlog.md` before the current task is considered complete.
+This is separate from `docs/migration/prelaunch-checklist.md` (release-blocking
+migration work) — the backlog is for deferred work / technical debt / cleanup
+/ follow-up decisions. See that file's own rules for format and status
+conventions.
+
 ## Миграция WordPress (Project Phoenix)
 
 - Прогресс и порядок работ: **`docs/migration/prelaunch-checklist.md`** —
