@@ -20,17 +20,13 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 2 — Search Ranking (IN_PROGRESS — ADMIN SEARCH
-                     COMPLETION)
+Active task:        Task 2 — Search Ranking (COMPLETE)
 Last updated:       2026-08-08
-Last updated by:    Claude Code (owner review reopened Admin Search scope
-                     immediately before deploy smoke: mock data, English UI,
-                     mock-dashboard banner on /admin/search must be fixed
-                     before Task 2 can close. Deployed runtime-search smoke
-                     from 047c1c07 stays GREEN and is not being redone or
-                     reverted.)
-Unresolved P0/P1:   none from Task 1 or Task 2 runtime — Admin Search UI
-                     corrective scope in progress; Tasks 3–15 remain TODO
+Last updated by:    Claude Code (Admin Search corrective phase deployed to
+                     DEV at 84114c10, CI + Docker Build & Push green,
+                     authenticated six-tab smoke on actual admin.dev.mamago.by
+                     all green — Task 2 closed)
+Unresolved P0/P1:   none from Task 1 or Task 2 — Tasks 3–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -561,7 +557,7 @@ for a full visual smoke of the main sections.
 
 Priority: `P0`
 
-STATUS: `IN_PROGRESS — ADMIN SEARCH COMPLETION`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — Real, live public search: `SearchDocument` (Prisma model,
 `entityType|entityId|title|searchText|summaryLine|metaLine|imageUrl|urlPath|
@@ -856,25 +852,56 @@ English UI copy across all six tabs + both modals: clean (only intentional
 check:push` (`pnpm build`) — exit 0, "Compiled successfully in 2.8min".
 Re-ran `src/app/api/search/route.test.ts` (the word-order fix's own test)
 to confirm the runtime fix is untouched — still passes.
-DEV SMOKE: Unauthenticated `GET /api/admin/search/overview` on the local
-dev server returns `401 {"success":false,"error":"Unauthorized"}` (not a
-500), confirming the new route is wired correctly; `/admin/search`
-correctly redirects to `/auth` (login) for an unauthenticated session, same
-as every other admin route — no crash. **Full authenticated visual
-verification of the six admin tabs was not performed**: no admin
-credentials are available to this session, and entering a password to
-authenticate is a prohibited action under this session's safety rules (the
-project owner must do that manually) — this is the same limitation
-recorded during Task 1's audit ("Admin UI itself not browser-logged-in").
-Verification for this phase therefore rests on: full-repo typecheck, lint,
-a new targeted DB-level test proving the real-data claims, a clean
-production build, and a full text audit for remaining English/false
-claims — not a logged-in screenshot pass.
-BLOCKERS: Task 2 stays `IN_PROGRESS — ADMIN SEARCH COMPLETION`, not
-`COMPLETE`, until an authenticated owner (or an agent with owner-provided
-admin access) visually confirms the six tabs render correctly — no mock
-data, all Russian, honest disclosures visible — on deployed DEV. No push/
-deploy performed automatically this phase, per explicit instruction.
+DEV SMOKE (pre-deploy): Unauthenticated `GET /api/admin/search/overview` on
+the local dev server returned `401 {"success":false,"error":"Unauthorized"}`
+(not a 500), confirming the new route is wired correctly; `/admin/search`
+correctly redirected to `/auth` (login) for an unauthenticated session.
+
+DEV SMOKE (post-deploy, actual `admin.dev.mamago.by`, 2026-08-08 — closes
+Task 2): Admin Search corrective phase (`23e1b006`, `84114c10`) pushed
+(`7dc3a285..84114c10`), CI `success`, Docker Build & Push `success`, owner
+deployed via Telegram. Owner manually authenticated in the Browser pane at
+`admin.dev.mamago.by` (this session never saw/entered/stored any
+credential); once confirmed, ran a read-only smoke of all six tabs against
+that live authenticated session:
+- **Обзор** — no mock banner; real 7-day stats (46 queries / 34 unique / 21
+  zero-result, cross-checked against the Zero Results tab's own 21); real
+  popular-queries table showing this session's own actual test queries
+  ("три поросенка балет", "малберри", "детский сад", "ntfnh", "teatr" —
+  literal proof of real `SearchQueryLog` data, not fabrication); CTR tile
+  honestly reads "Не отслеживается" with an explanation, no fake percentage.
+- **Быстрые теги** — Russian; real CRUD (0 tags, real empty state "Быстрых
+  тегов пока нет"); honest amber disclosure that tags aren't yet shown
+  publicly, replacing the old false "Preview (as shown to users)" claim.
+- **Синонимы** — Russian; real CRUD (0 synonyms, real empty state); honest
+  amber "Сейчас не влияет на живой поиск" disclosure naming `/api/search`
+  directly, replacing the old false "How Synonyms Work" claim.
+- **Без результата** — Russian; real `SearchQueryLog` data (21 total / 17
+  unique, matching Overview), table rows are this session's actual test
+  queries including the transliteration/layout probes ("ntfnh", "teatr");
+  honest closing note that synonyms/quick tags aren't wired to live search.
+- **Индекс** — Russian; explicit disclosure that `SearchIndexRecord` isn't
+  the real index (`SearchDocument` is, updated automatically); health
+  correctly renders `—` (not a false 100%) with 0/0/0/0/0 stats and an
+  honest "Нет данных в этой таблице" state — no misleading "healthy"
+  claim on empty/dead data.
+- **Ранжирование** — Russian; existing read-only disclosure intact
+  ("Только для чтения... нигде не читаются production-кодом"); all six
+  boost cards render as static, non-interactive bars — no edit control
+  exists in the UI at all (matches the API's existing 403-on-mutation
+  lock, unchanged) — admin cannot mutate `RankingSettings`/`BoostSettings`.
+- **Cross-cutting**: tab navigation works across all six tabs; tables,
+  stat cards, and empty states all render correctly; verified again at a
+  375px mobile viewport (Overview, Quick Tags) — cards stack, tabs scroll
+  horizontally, no broken layout; `read_network_requests` confirmed every
+  `/api/admin/search/*` call returned 200 (`overview`, `index?page=1`,
+  `ranking`) — zero 500s; the only console error seen (`401`) was not from
+  any `/api/admin/search/*` endpoint on any of the six pages (unrelated,
+  pre-existing, not investigated further as out of Task 2 scope).
+No settings/data were modified during this smoke (read-only, per
+instruction) — did not click "Создать первый тег"/"Создать первый
+синоним" or attempt any mutation against the locked Ranking API.
+BLOCKERS: none. All six deployed Admin Search tabs passed.
 
 AUDIT FIRST existing Search / Ranking infrastructure: Search API, search
 ranking, search analytics, normalization, intents, transliteration, wrong
