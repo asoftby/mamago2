@@ -20,11 +20,17 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 2 — Search Ranking (COMPLETE)
+Active task:        Task 2 — Search Ranking (IN_PROGRESS — ADMIN SEARCH
+                     COMPLETION)
 Last updated:       2026-08-08
-Last updated by:    Claude Code (Task 2 closed — fix verified live on actual
-                     dev.mamago.by after owner Telegram deploy of `7dc3a285`)
-Unresolved P0/P1:   none from Task 1 or Task 2 — Tasks 3–15 remain TODO, not started
+Last updated by:    Claude Code (owner review reopened Admin Search scope
+                     immediately before deploy smoke: mock data, English UI,
+                     mock-dashboard banner on /admin/search must be fixed
+                     before Task 2 can close. Deployed runtime-search smoke
+                     from 047c1c07 stays GREEN and is not being redone or
+                     reverted.)
+Unresolved P0/P1:   none from Task 1 or Task 2 runtime — Admin Search UI
+                     corrective scope in progress; Tasks 3–15 remain TODO
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -555,7 +561,7 @@ for a full visual smoke of the main sections.
 
 Priority: `P0`
 
-STATUS: `COMPLETE`
+STATUS: `IN_PROGRESS — ADMIN SEARCH COMPLETION`
 AUDIT:
 EXISTING — Real, live public search: `SearchDocument` (Prisma model,
 `entityType|entityId|title|searchText|summaryLine|metaLine|imageUrl|urlPath|
@@ -738,11 +744,137 @@ unexpected files. **Not pushed, not deployed** — per instruction, deployment
 is owner-controlled via Telegram; this agent does not push or deploy.
 BACKLOG/NOTES: BACKLOG-022 (transliteration/layout/typo — real but
 deferred, no proven necessity yet for new fuzzy-matching infrastructure),
-BACKLOG-023 (mock admin stats), BACKLOG-024 (dead search-adjacent
-scaffolding cleanup), BACKLOG-025 (uncalled `logSearchClick`). Search
-click-through/CTR-as-a-ranking-signal work intentionally left for Task 5
-(Content Analytics & Ranking) per this checklist's own task boundaries —
-not started here.
+BACKLOG-024 (remaining dead search-adjacent scaffolding: `SearchIndexRecord`/
+`indexManager.ts`, `SearchQuickTag`/`SearchSynonym` still have no runtime
+consumer — now honestly disclosed in-UI instead of removed, see ADMIN
+SEARCH CORRECTIVE PHASE below), BACKLOG-025 (uncalled `logSearchClick`).
+BACKLOG-023 (mock admin stats) is **no longer deferred** — owner pulled it
+back into Task 2 scope, see below. Search click-through/CTR-as-a-ranking-
+signal work intentionally left for Task 5 (Content Analytics & Ranking) per
+this checklist's own task boundaries — not started here.
+
+ADMIN SEARCH CORRECTIVE PHASE (2026-08-08, Claude Code — owner reopened
+scope immediately before the deployed-DEV browser smoke; the runtime search
+fix itself, verified live on `dev.mamago.by` at `7dc3a285`, is NOT reverted
+or redone here):
+AUDIT — Full read of all six `/admin/search/*` tabs (Overview, Quick Tags,
+Synonyms, Zero Results, Index, Ranking) plus `SearchLayout.tsx`,
+`QuickTagModal.tsx`, `SynonymModal.tsx`, `src/types/search-ranking.ts`.
+Findings:
+(1) Overview (`src/app/admin/search/page.tsx`) — **fully mock**: hardcoded
+`stats` array (`"Searches Today": "12,847"` etc.), hardcoded fake
+`popularQueries` array with fabricated CTR percentages, and an explicit
+English "This is a mock dashboard... Backend integration... will be added
+in the next phase" banner. Confirmed zero connection to real
+`SearchQueryLog` data. English UI throughout.
+(2) Quick Tags / Synonyms — real CRUD against real `SearchQuickTag`/
+`SearchSynonym` tables (not mock data), but English UI throughout, and each
+had a **false behavioral claim**: Quick Tags labeled its preview "Preview
+(as shown to users)" when in fact `resolveVisiblePopularTags()` always
+returns `[]` in production (confirmed in Task 2's original audit,
+`popularSearchTags.ts`) — tags are never shown publicly today. Synonyms had
+an "How Synonyms Work" card asserting "the search engine will also include
+results for all its synonyms" — false; `/api/search/route.ts` does not
+consult `SearchSynonym` at all (confirmed again by re-reading the route).
+(3) Zero Results — real data (`SearchQueryLog` via
+`/api/admin/search/zero-results`, unchanged), English UI only.
+(4) Index — built entirely around `SearchIndexRecord`, which nothing in the
+live write path populates (confirmed again). With 0 rows, its "Index
+Health" calculation (`total>0 ? indexed/total : 100`) rendered a misleading
+**100%** "healthy" figure for an empty, disconnected table. English UI.
+(5) Ranking — already correctly locked read-only with an honest Russian
+disclosure banner from a prior 2026-08 audit session (unchanged, confirmed
+still accurate); only the surrounding labels (header, "Weight", boost
+level words, `RANKING_BOOSTS` label/description strings) were still
+English.
+GAPS CONFIRMED IN SCOPE: mock/fabricated Overview data (BACKLOG-023, now
+in-scope), false "already works" claims on Quick Tags/Synonyms, misleading
+100%-health Index display, English UI across all six tabs and both modals.
+IMPLEMENTATION (minimum safe correction — no new engine, no schema changes
+beyond one new read-only aggregation, no deletion of existing dead
+tables/CRUD):
+- New `computeSearchOverview()` (`src/server/services/search/
+  adminSearchOverviewHandlers.ts`) — real `SearchQueryLog` aggregates for a
+  7-day window: total queries, unique queries, zero-result queries, and a
+  top-10 "popular queries" list (`groupBy` + `orderBy: {_count}` — no raw
+  SQL needed). Deliberately reports **no CTR** field anywhere (click-
+  through isn't tracked — BACKLOG-025) rather than inventing one. New route
+  `GET /api/admin/search/overview` (`src/app/api/admin/search/overview/
+  route.ts`, ADMIN-only, same auth pattern as the sibling zero-results/
+  synonyms routes).
+- `src/app/admin/search/page.tsx` rewritten: removed all mock arrays and
+  the "mock dashboard" banner; renders the real 7-day stats, a real
+  popular-queries table (query/count/last-searched only — no fabricated
+  CTR/status columns), an honest "CTR — не отслеживается" tile instead of
+  a fake percentage, and a Russian info card stating what actually drives
+  ranking (the fixed `SEARCH_BOOST` constants).
+- Quick Tags / Synonyms pages: added an honest amber disclosure banner each
+  (matching the Ranking tab's existing pattern) stating the current
+  non-connected status; corrected "Preview (as shown to users)" →
+  "Предпросмотр (когда подключение появится)"; rewrote the false "How
+  Synonyms Work" claim into an accurate "Сейчас не влияет на живой поиск"
+  notice; full Russian localization of both pages and both modals
+  (`QuickTagModal.tsx`, `SynonymModal.tsx`).
+- Index page: added an honest amber disclosure explaining
+  `SearchIndexRecord` is not populated by the real indexing pipeline (the
+  real index is `SearchDocument`, managed automatically) and that 0
+  records / "—" health means "no data," not "everything indexed"; health
+  score now renders "—" instead of a misleading 100% when `total === 0`;
+  full Russian localization. Table/actions kept (not deleted) — inert but
+  harmless, matches the "do not delete legacy infrastructure without
+  necessity" principle; Task 2's own §7 guidance and the existing
+  `RankingSettings`/`BoostSettings` precedent (disclose + lock, don't
+  delete) was followed rather than removing the tab.
+- Ranking page + `src/types/search-ranking.ts`: translated remaining
+  English labels (header, "Weight", boost-level words, all six
+  `RANKING_BOOSTS` label/description strings) to Russian; the existing
+  read-only lock and its disclosure banner were untouched.
+- `SearchLayout.tsx` tab labels translated to Russian (Обзор / Быстрые
+  теги / Синонимы / Без результата / Индекс / Ранжирование).
+- Fixed three residual English fallback error strings that could reach the
+  admin ("Failed to save tag/synonym", "Action failed").
+DO NOT TOUCH: the runtime search fix (`src/app/api/search/route.ts`,
+`68917508`) — not modified, not reverted, its own test still passes
+unchanged (confirmed by rerun). `RankingSettings`/`BoostSettings`/
+`SearchRankingSettings` read-only lock — unchanged, still correctly
+prevents admin from affecting production ranking. `SearchQueryLog`/
+zero-results aggregation — unchanged, only reused (proven pattern) for the
+new overview endpoint.
+COMMITS: `<see git log — Admin Search corrective changes>` (recorded below
+after commit).
+VERIFICATION: New targeted test `src/server/services/search/
+adminSearchOverviewHandlers.test.ts` (self-contained fixture, real local
+dev DB) — 2 cases: real counts reflect actual `SearchQueryLog` rows (not
+fabricated), and no `ctr` field is ever present in the response (proving
+the "don't invent CTR" instruction is honored in code, not just prose).
+Both pass. `npx tsc --noEmit` clean across the whole repo. `npx eslint` on
+all changed/new admin-search files: 0 errors (6 pre-existing warnings,
+none introduced by this phase — unused-var/hook-dependency warnings
+predating this change, confirmed by diff). Grep sweep for remaining
+English UI copy across all six tabs + both modals: clean (only intentional
+`<code>` references to literal Prisma model names remain). Full `pnpm
+check:push` (`pnpm build`) — exit 0, "Compiled successfully in 2.8min".
+Re-ran `src/app/api/search/route.test.ts` (the word-order fix's own test)
+to confirm the runtime fix is untouched — still passes.
+DEV SMOKE: Unauthenticated `GET /api/admin/search/overview` on the local
+dev server returns `401 {"success":false,"error":"Unauthorized"}` (not a
+500), confirming the new route is wired correctly; `/admin/search`
+correctly redirects to `/auth` (login) for an unauthenticated session, same
+as every other admin route — no crash. **Full authenticated visual
+verification of the six admin tabs was not performed**: no admin
+credentials are available to this session, and entering a password to
+authenticate is a prohibited action under this session's safety rules (the
+project owner must do that manually) — this is the same limitation
+recorded during Task 1's audit ("Admin UI itself not browser-logged-in").
+Verification for this phase therefore rests on: full-repo typecheck, lint,
+a new targeted DB-level test proving the real-data claims, a clean
+production build, and a full text audit for remaining English/false
+claims — not a logged-in screenshot pass.
+BLOCKERS: Task 2 stays `IN_PROGRESS — ADMIN SEARCH COMPLETION`, not
+`COMPLETE`, until an authenticated owner (or an agent with owner-provided
+admin access) visually confirms the six tabs render correctly — no mock
+data, all Russian, honest disclosures visible — on deployed DEV. No push/
+deploy performed automatically this phase, per explicit instruction.
 
 AUDIT FIRST existing Search / Ranking infrastructure: Search API, search
 ranking, search analytics, normalization, intents, transliteration, wrong
