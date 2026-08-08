@@ -20,11 +20,10 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 2 — Search Ranking (COMPLETE_PENDING_BROWSER_SMOKE)
+Active task:        Task 2 — Search Ranking (COMPLETE)
 Last updated:       2026-08-08
-Last updated by:    Claude Code (Task 2 audit + word-order search fix; status
-                     corrected pending owner-controlled DEV deploy + real-DEV
-                     smoke of the fix itself)
+Last updated by:    Claude Code (Task 2 closed — fix verified live on actual
+                     dev.mamago.by after owner Telegram deploy of `7dc3a285`)
 Unresolved P0/P1:   none from Task 1 or Task 2 — Tasks 3–15 remain TODO, not started
 ```
 
@@ -556,7 +555,7 @@ for a full visual smoke of the main sections.
 
 Priority: `P0`
 
-STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — Real, live public search: `SearchDocument` (Prisma model,
 `entityType|entityId|title|searchText|summaryLine|metaLine|imageUrl|urlPath|
@@ -675,29 +674,51 @@ index needed at this scale (noted as a P3 forward-looking item only, not
 current risk); zero-results/admin routes already bounded and parameterized;
 RBAC on all admin search/ranking routes verified correct; no new dependency
 or external API call introduced.
-DEV SMOKE: **Incomplete — this is the sole remaining step.** Read-only
-golden-set evaluation against real `https://dev.mamago.by` (Browser pane,
-cookies declined to non-essential) proved the *bug* (exact match, partial
-match, category word, "free"-text match, and the word-order/multi-word
-failures all reproduced live). The *fix* was verified only against the
-local dev server (`localhost:3000`, already running from a separate
-session — reused rather than starting a second instance) via direct
-`/api/search` fetch calls (before/after) and a full local UI pass: typed
-`балет три поросенка` into the real `SearchOverlay` and confirmed
-"С. Кибирова балет «Три поросенка»" renders correctly; `read_console_messages`
-showed no new errors (only pre-existing, unrelated 401s from the guest
-`/api/save/status` endpoint). Commits `68917508`/`7f7cc66d` are local to
-this working tree only — not pushed, not deployed. Actual `dev.mamago.by`
-still runs the pre-fix image and therefore still exhibits the word-order
-bug right now. Per Task 2 Exit Criteria ("Search works reliably on real DEV
-data"), this cannot be marked `COMPLETE` until the fix is verified on
-actual DEV after an owner-controlled deploy — see BLOCKERS.
-BLOCKERS: **DEV deploy pending (owner-controlled).** Task 2 status is held
-at `COMPLETE_PENDING_BROWSER_SMOKE` until: (1) the project owner deploys
-commits `68917508`+`7f7cc66d` (or whatever supersedes them) to
-`dev.mamago.by`, and (2) a coding agent re-runs the same read-only
-golden-set queries against actual `dev.mamago.by` and confirms the
-word-order fix is live there. No other blocker.
+DEV SMOKE: **Complete — verified live on actual `https://dev.mamago.by`
+after owner Telegram deployment (2026-08-08).** Deployed-version evidence:
+no public SHA/build header is exposed (`/api/health` → `{"status":"ok",
+"db":"ok"}`, no version field; `/admin/system/build` correctly redirects to
+login, not bypassed per instruction) — proof is therefore **behavioral**:
+the word-order fix (which provably did not exist in the pre-deploy image —
+reproduced broken in this same task's earlier phase) is now live, which is
+only possible if `7dc3a285`'s image is what's actually serving traffic.
+Golden-set queries via direct `/api/search` fetch against real DEV:
+`балет три поросенка` → 200, ["С. Кибирова балет «Три поросенка»"] ✓;
+`три поросенка балет` (reordered — the critical regression case) → 200,
+same single correct result ✓ (previously 0 results, confirmed broken
+earlier this session); `детский сад` (multi-word) → 200, 4 relevant results
+(previously 0) ✓; `три поросенка` (exact/short) → 200, correct result,
+unregressed ✓; `малберри` → 200, correct results, unregressed ✓;
+`asdkjfhaskdjfh9182z` (zero-result) → 200, `[]`, no 500 ✓. Desktop UI: typed
+`три поросенка балет` into the real `SearchOverlay` at 1280×720 — correct
+result card rendered, clicking it navigated to
+`/minsk/events/s-kibirova-balet-tri-porosenka` and the Event detail page
+loaded correctly (title, date, price, cover image). Zero-result UI: typed
+`asdkjfhaskdjfh9182z` — clean "Ничего не найдено / Попробуйте изменить
+запрос" empty state, no crash. Mobile UI (375×812, `MobileSearchSheet`):
+opened the sheet (`MobileSearchEntry` → `Поиск` full-screen panel) and
+typed `три поросенка балет` (via a direct DOM `input`/`change` event
+dispatch — the Browser pane's coordinate-based `computer` click tool hit a
+transient timeout specifically on this full-screen sheet transition,
+reproduced on both the original and a fresh tab; confirmed to be a
+tool-delivery quirk, not an app defect, since the same button's native
+`.click()` DOM call — a faithful simulation of a real click — opened the
+sheet correctly and the console showed no error either time) — same
+correct single-result card rendered, no layout break. `read_console_messages`
+on both desktop and mobile passes showed **no new errors**, only the same
+pre-existing, unrelated guest-session 401s from `/api/save/status` (present
+before this session's changes, confirmed via `read_network_requests` —
+nothing to do with search). No `/api/search` request returned non-200 on
+either viewport. Cheap regression sanity: Place
+`/minsk/places/malberri-klab-mulberry-club` (imported gallery, Task 1 work)
+renders its full gallery (9 images, 6 shown + "+6") with all
+`/api/media/file/...` requests returning 200 — no regression from the
+pushed stack. `/admin/media` correctly redirects to login when
+unauthenticated (not bypassed, per instruction) — Admin pagination check
+not performed (no authenticated session naturally available), not treated
+as a blocker per instruction not to spend time bypassing auth.
+BLOCKERS: none — resolved. Prior blocker (fix unverified on actual DEV)
+closed by this session's post-deploy read-only smoke.
 
 **Git Release Safety — Pending DEV Update (2026-08-08, read-only check,
 no push/deploy performed):** branch `dev`, local HEAD `7f7cc66d`.
