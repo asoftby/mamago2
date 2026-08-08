@@ -52,18 +52,18 @@ export default function RankingPage() {
   }
 
   function getBoostLabel(value: number): string {
-    if (value === 0) return "Disabled";
-    if (value <= 20) return "Low";
-    if (value <= 40) return "Medium";
-    if (value <= 70) return "High";
-    return "Maximum";
+    if (value === 0) return "Отключено";
+    if (value <= 20) return "Низкий";
+    if (value <= 40) return "Средний";
+    if (value <= 70) return "Высокий";
+    return "Максимум";
   }
 
   if (loading) {
     return (
       <SearchLayout>
         <div className="text-center py-12">
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">Загрузка...</p>
         </div>
       </SearchLayout>
     );
@@ -73,7 +73,7 @@ export default function RankingPage() {
     return (
       <SearchLayout>
         <div className="text-center py-12">
-          <p className="text-red-600">Failed to load settings</p>
+          <p className="text-red-600">Не удалось загрузить настройки</p>
         </div>
       </SearchLayout>
     );
@@ -84,9 +84,9 @@ export default function RankingPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Ranking Settings</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Настройки ранжирования</h2>
           <p className="text-gray-600 mt-1">
-            Search and recommendation ranking weights
+            Веса ранжирования поиска и рекомендаций
           </p>
         </div>
 
@@ -138,7 +138,7 @@ export default function RankingPage() {
 
                 {/* Value Display */}
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-700">Weight</span>
+                  <span className="text-sm font-medium text-gray-700">Вес</span>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                       value === 0
@@ -164,9 +164,9 @@ export default function RankingPage() {
                     />
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>0 (Off)</span>
-                    <span>50 (Balanced)</span>
-                    <span>100 (Max)</span>
+                    <span>0 (выкл.)</span>
+                    <span>50 (баланс)</span>
+                    <span>100 (макс.)</span>
                   </div>
                 </div>
               </div>

@@ -48,7 +48,7 @@ export default function ZeroResultsPage() {
     // High frequency = needs content or synonym
     if (count >= 10) {
       return {
-        label: "Add content or create synonym",
+        label: "Добавить контент или синоним",
         icon: <AlertCircle className="w-4 h-4" />,
         color: "text-red-600",
       };
@@ -57,7 +57,7 @@ export default function ZeroResultsPage() {
     // Medium frequency = consider quick tag
     if (count >= 5) {
       return {
-        label: "Consider quick tag",
+        label: "Рассмотреть быстрый тег",
         icon: <Tag className="w-4 h-4" />,
         color: "text-orange-600",
       };
@@ -65,7 +65,7 @@ export default function ZeroResultsPage() {
 
     // Low frequency = create synonym
     return {
-      label: "Create synonym",
+      label: "Создать синоним",
       icon: <TrendingUp className="w-4 h-4" />,
       color: "text-blue-600",
     };
@@ -85,7 +85,7 @@ export default function ZeroResultsPage() {
     return (
       <SearchLayout>
         <div className="text-center py-12">
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">Загрузка...</p>
         </div>
       </SearchLayout>
     );
@@ -95,7 +95,7 @@ export default function ZeroResultsPage() {
     return (
       <SearchLayout>
         <div className="text-center py-12">
-          <p className="text-red-600">Failed to load data</p>
+          <p className="text-red-600">Не удалось загрузить данные</p>
         </div>
       </SearchLayout>
     );
@@ -106,9 +106,9 @@ export default function ZeroResultsPage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Zero Results</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Запросы без результата</h2>
           <p className="text-gray-600 mt-1">
-            What users are searching for but mamaGo can&apos;t find
+            Что ищут пользователи, но mamaGo не может найти
           </p>
         </div>
 
@@ -120,9 +120,9 @@ export default function ZeroResultsPage() {
                 <AlertCircle className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Zero Results</p>
+                <p className="text-sm text-gray-600">Всего запросов без результата</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {data.stats.totalZeroResults.toLocaleString()}
+                  {data.stats.totalZeroResults.toLocaleString("ru-RU")}
                 </p>
               </div>
             </div>
@@ -134,9 +134,9 @@ export default function ZeroResultsPage() {
                 <TrendingUp className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Unique Queries</p>
+                <p className="text-sm text-gray-600">Уникальных запросов</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {data.stats.uniqueQueries.toLocaleString()}
+                  {data.stats.uniqueQueries.toLocaleString("ru-RU")}
                 </p>
               </div>
             </div>
@@ -148,7 +148,7 @@ export default function ZeroResultsPage() {
                 <Tag className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Avg per Query</p>
+                <p className="text-sm text-gray-600">В среднем на запрос</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">
                   {data.stats.uniqueQueries > 0
                     ? (data.stats.totalZeroResults / data.stats.uniqueQueries).toFixed(1)
@@ -162,12 +162,14 @@ export default function ZeroResultsPage() {
         {/* Product Intelligence Message */}
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            Product Intelligence Panel
+            Панель продуктовых сигналов
           </h3>
           <p className="text-sm text-gray-700">
-            This is not a technical log. This shows what&apos;s missing from mamaGo&apos;s content
-            and search capabilities. Each query represents a user need that wasn&apos;t met.
-            Use this data to prioritize content creation, synonyms, and quick tags.
+            Это не технический лог. Здесь видно, чего не хватает в контенте и
+            возможностях поиска mamaGo. Каждый запрос — это потребность
+            пользователя, которая не была удовлетворена. Используйте эти
+            данные, чтобы приоритизировать создание контента, синонимов и
+            быстрых тегов.
           </p>
         </div>
 
@@ -178,10 +180,10 @@ export default function ZeroResultsPage() {
               <TrendingUp className="w-8 h-8 text-green-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No Zero Results!
+              Запросов без результата нет!
             </h3>
             <p className="text-gray-600">
-              All search queries are returning results. Great job! 🎉
+              Все поисковые запросы возвращают результаты. Отлично! 🎉
             </p>
           </div>
         ) : (
@@ -194,19 +196,19 @@ export default function ZeroResultsPage() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Query
+                      Запрос
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Count
+                      Количество
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Last Searched
+                      Последний раз
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Suggested Action
+                      Предлагаемое действие
                     </th>
                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Actions
+                      Действия
                     </th>
                   </tr>
                 </thead>
@@ -225,7 +227,7 @@ export default function ZeroResultsPage() {
                             </span>
                             {item.count >= 10 && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                High Priority
+                                Высокий приоритет
                               </span>
                             )}
                           </div>
@@ -261,7 +263,7 @@ export default function ZeroResultsPage() {
                               className="text-xs"
                             >
                               <Plus className="w-3 h-3 mr-1" />
-                              Synonym
+                              Синоним
                             </Button>
                             <Button
                               variant="outline"
@@ -270,7 +272,7 @@ export default function ZeroResultsPage() {
                               className="text-xs"
                             >
                               <Tag className="w-3 h-3 mr-1" />
-                              Quick Tag
+                              Быстрый тег
                             </Button>
                           </div>
                         </td>
@@ -286,7 +288,7 @@ export default function ZeroResultsPage() {
         {/* Action Guide */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            How to Address Zero Results
+            Как реагировать на запросы без результата
           </h3>
           <div className="space-y-4">
             <div className="flex items-start gap-4">
@@ -294,10 +296,11 @@ export default function ZeroResultsPage() {
                 <AlertCircle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900">High Frequency (10+)</h4>
+                <h4 className="font-semibold text-gray-900">Высокая частота (10+)</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Users really want this content. Consider adding new places/activities
-                  or creating a synonym to existing content.
+                  Пользователям действительно нужен этот контент. Стоит
+                  добавить новые места/занятия или создать синоним к
+                  существующему контенту.
                 </p>
               </div>
             </div>
@@ -307,10 +310,10 @@ export default function ZeroResultsPage() {
                 <Tag className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900">Medium Frequency (5-9)</h4>
+                <h4 className="font-semibold text-gray-900">Средняя частота (5–9)</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Popular enough to warrant a quick tag. Make it easy for users to
-                  discover related content.
+                  Достаточно популярно для быстрого тега. Так пользователям
+                  будет проще найти похожий контент.
                 </p>
               </div>
             </div>
@@ -320,14 +323,19 @@ export default function ZeroResultsPage() {
                 <TrendingUp className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900">Low Frequency (1-4)</h4>
+                <h4 className="font-semibold text-gray-900">Низкая частота (1–4)</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Likely a synonym issue. Map this query to existing content with a
-                  synonym rule.
+                  Похоже на проблему с синонимом. Свяжите этот запрос с
+                  существующим контентом через правило синонима.
                 </p>
               </div>
             </div>
           </div>
+          <p className="text-xs text-gray-500 mt-4 pt-4 border-t border-gray-100">
+            Обратите внимание: синонимы и быстрые теги пока не подключены к
+            живому поиску (см. соответствующие вкладки) — эти рекомендации
+            готовят данные на будущее.
+          </p>
         </div>
       </div>
     </SearchLayout>

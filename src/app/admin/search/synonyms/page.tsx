@@ -57,14 +57,14 @@ export default function SynonymsPage() {
     const result = await response.json();
 
     if (!result.success) {
-      throw new Error(result.error || "Failed to save synonym");
+      throw new Error(result.error || "Не удалось сохранить синоним");
     }
 
     await loadSynonyms();
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this synonym?")) return;
+    if (!confirm("Удалить этот синоним?")) return;
 
     try {
       const response = await fetch(`/api/admin/search/synonyms/${id}`, {
@@ -76,11 +76,11 @@ export default function SynonymsPage() {
       if (result.success) {
         await loadSynonyms();
       } else {
-        alert(result.error || "Failed to delete synonym");
+        alert(result.error || "Не удалось удалить синоним");
       }
     } catch (error) {
       console.error("Failed to delete synonym:", error);
-      alert("Failed to delete synonym");
+      alert("Не удалось удалить синоним");
     }
   }
 
@@ -97,11 +97,11 @@ export default function SynonymsPage() {
       if (result.success) {
         await loadSynonyms();
       } else {
-        alert(result.error || "Failed to update synonym");
+        alert(result.error || "Не удалось обновить синоним");
       }
     } catch (error) {
       console.error("Failed to update synonym:", error);
-      alert("Failed to update synonym");
+      alert("Не удалось обновить синоним");
     }
   }
 
@@ -114,9 +114,9 @@ export default function SynonymsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Search Synonyms</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Синонимы поиска</h2>
             <p className="text-gray-600 mt-1">
-              Manage synonym groups to improve search relevance
+              Управление группами синонимов
             </p>
           </div>
           <Button
@@ -127,46 +127,47 @@ export default function SynonymsPage() {
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Synonym
+            Добавить синоним
           </Button>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <p className="text-sm text-gray-600">Synonym Groups</p>
+            <p className="text-sm text-gray-600">Групп синонимов</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{synonyms.length}</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <p className="text-sm text-gray-600">Total Synonyms</p>
+            <p className="text-sm text-gray-600">Всего синонимов</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{totalTargets}</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <p className="text-sm text-gray-600">Active Groups</p>
+            <p className="text-sm text-gray-600">Активных групп</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{activeSynonyms.length}</p>
           </div>
         </div>
 
-        {/* Info Card */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6">
-          <h3 className="text-sm font-semibold text-blue-900">
-            How Synonyms Work
+        {/* Honest disclosure: NOT actually applied to the live search query today */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <h3 className="text-sm font-semibold text-amber-900">
+            Сейчас не влияет на живой поиск
           </h3>
-          <p className="text-sm text-blue-700 mt-1">
-            When users search for a source term, the search engine will also include results
-            for all its synonyms, improving search results and consistency.
+          <p className="text-sm text-amber-800 mt-1">
+            Синонимы сохраняются здесь, но публичный поиск (<code className="mx-1 px-1 py-0.5 rounded bg-amber-100">/api/search</code>)
+            их пока не читает — расширения запроса по синонимам не происходит.
+            Список ниже — подготовка данных на будущее, а не действующее правило поиска.
           </p>
         </div>
 
         {/* Synonyms List */}
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Loading...</p>
+            <p className="text-gray-500">Загрузка...</p>
           </div>
         ) : synonyms.length === 0 ? (
           <div className="bg-gray-50 rounded-2xl p-12 text-center">
             <ArrowRight className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No synonyms yet</p>
+            <p className="text-gray-600">Синонимов пока нет</p>
             <Button
               onClick={() => {
                 setEditingSynonym(null);
@@ -174,7 +175,7 @@ export default function SynonymsPage() {
               }}
               className="mt-4"
             >
-              Create your first synonym
+              Создать первый синоним
             </Button>
           </div>
         ) : (
@@ -192,17 +193,17 @@ export default function SynonymsPage() {
                       </span>
                       {synonym.isActive ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Active
+                          Активен
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          Inactive
+                          Неактивен
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-sm text-gray-600">Synonyms:</span>
+                      <span className="text-sm text-gray-600">Синонимы:</span>
                       {synonym.targets.map((target, index) => (
                         <div key={index} className="flex items-center gap-2">
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700">
@@ -216,7 +217,7 @@ export default function SynonymsPage() {
                     </div>
 
                     <div className="mt-3 text-xs text-gray-500">
-                      Updated {new Date(synonym.updatedAt).toLocaleDateString("ru-RU")}
+                      Обновлено {new Date(synonym.updatedAt).toLocaleDateString("ru-RU")}
                     </div>
                   </div>
 
@@ -226,7 +227,7 @@ export default function SynonymsPage() {
                       size="sm"
                       onClick={() => handleToggleActive(synonym)}
                     >
-                      {synonym.isActive ? "Deactivate" : "Activate"}
+                      {synonym.isActive ? "Деактивировать" : "Активировать"}
                     </Button>
                     <Button
                       variant="ghost"

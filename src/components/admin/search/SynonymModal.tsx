@@ -74,12 +74,12 @@ export function SynonymModal({
     setError(null);
 
     if (!source.trim()) {
-      setError("Source is required");
+      setError("Укажите исходный термин");
       return;
     }
 
     if (targets.length === 0) {
-      setError("At least one synonym is required");
+      setError("Добавьте хотя бы один синоним");
       return;
     }
 
@@ -94,7 +94,7 @@ export function SynonymModal({
 
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save synonym");
+      setError(err instanceof Error ? err.message : "Не удалось сохранить синоним");
     } finally {
       setIsSaving(false);
     }
@@ -126,10 +126,10 @@ export function SynonymModal({
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {synonym ? "Edit Synonym" : "Create Synonym"}
+                {synonym ? "Изменить синоним" : "Создать синоним"}
               </h2>
               <p className="text-gray-600 mt-1">
-                Map search terms to their synonyms for better results
+                Свяжите поисковый термин с его синонимами
               </p>
             </div>
 
@@ -141,7 +141,7 @@ export function SynonymModal({
 
             {/* Source */}
             <div className="space-y-2">
-              <Label htmlFor="source">Source Term *</Label>
+              <Label htmlFor="source">Исходный термин *</Label>
               <Input
                 id="source"
                 value={source}
@@ -150,13 +150,13 @@ export function SynonymModal({
                 required
               />
               <p className="text-xs text-gray-500">
-                The original search term that users might enter
+                Исходный запрос, который может ввести пользователь
               </p>
             </div>
 
             {/* Targets (Tags Input) */}
             <div className="space-y-2">
-              <Label htmlFor="targets">Synonyms *</Label>
+              <Label htmlFor="targets">Синонимы *</Label>
               <div className="border border-gray-300 rounded-lg p-2 min-h-[100px] focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
                 <div className="flex flex-wrap gap-2 mb-2">
                   {targets.map((target, index) => (
@@ -182,7 +182,7 @@ export function SynonymModal({
                   onChange={(e) => setCurrentInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onBlur={handleAddTarget}
-                  placeholder={targets.length === 0 ? "батутный центр, батутная арена..." : "Add more..."}
+                  placeholder={targets.length === 0 ? "батутный центр, батутная арена..." : "Добавить ещё..."}
                   className="w-full outline-none text-sm"
                 />
               </div>
@@ -191,13 +191,15 @@ export function SynonymModal({
               </p>
             </div>
 
-            {/* Example */}
+            {/* Example — describes the intended future behavior, not current live search */}
             {source && targets.length > 0 && (
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                <p className="text-sm font-medium text-blue-900 mb-2">Example:</p>
+                <p className="text-sm font-medium text-blue-900 mb-2">
+                  Когда подключение появится:
+                </p>
                 <p className="text-sm text-blue-700">
-                  When users search for <span className="font-semibold">&quot;{source}&quot;</span>,
-                  the search will also include results for:{" "}
+                  При поиске <span className="font-semibold">«{source}»</span>{" "}
+                  результаты будут дополняться синонимами:{" "}
                   <span className="font-semibold">{targets.join(", ")}</span>
                 </p>
               </div>
@@ -213,7 +215,7 @@ export function SynonymModal({
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
               <Label htmlFor="isActive" className="cursor-pointer">
-                Active (apply to search results)
+                Активен
               </Label>
             </div>
 
@@ -224,7 +226,7 @@ export function SynonymModal({
                 disabled={isSaving}
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
-                {isSaving ? "Saving..." : synonym ? "Update Synonym" : "Create Synonym"}
+                {isSaving ? "Сохранение..." : synonym ? "Сохранить синоним" : "Создать синоним"}
               </Button>
               <Button
                 type="button"
@@ -232,7 +234,7 @@ export function SynonymModal({
                 onClick={onClose}
                 disabled={isSaving}
               >
-                Cancel
+                Отмена
               </Button>
             </div>
           </form>

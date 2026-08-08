@@ -92,7 +92,7 @@ export function QuickTagModal({
         try {
           parsedFilters = JSON.parse(formData.filters);
         } catch (err) {
-          setError("Invalid JSON in filters field");
+          setError("Некорректный JSON в поле фильтров");
           setIsSaving(false);
           return;
         }
@@ -110,7 +110,7 @@ export function QuickTagModal({
 
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save tag");
+      setError(err instanceof Error ? err.message : "Не удалось сохранить тег");
     } finally {
       setIsSaving(false);
     }
@@ -150,10 +150,10 @@ export function QuickTagModal({
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {tag ? "Edit Quick Tag" : "Create Quick Tag"}
+                {tag ? "Изменить быстрый тег" : "Создать быстрый тег"}
               </h2>
               <p className="text-gray-600 mt-1">
-                Quick tags appear under the search bar
+                Быстрые теги показываются под строкой поиска
               </p>
             </div>
 
@@ -165,7 +165,7 @@ export function QuickTagModal({
 
             {/* Title */}
             <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
+              <Label htmlFor="title">Название *</Label>
               <Input
                 id="title"
                 value={formData.title}
@@ -187,7 +187,7 @@ export function QuickTagModal({
                   size="sm"
                   onClick={generateSlug}
                 >
-                  Generate from title
+                  Сгенерировать из названия
                 </Button>
               </div>
               <Input
@@ -203,7 +203,7 @@ export function QuickTagModal({
 
             {/* Query */}
             <div className="space-y-2">
-              <Label htmlFor="query">Search Query *</Label>
+              <Label htmlFor="query">Поисковый запрос *</Label>
               <Input
                 id="query"
                 value={formData.query}
@@ -214,13 +214,13 @@ export function QuickTagModal({
                 required
               />
               <p className="text-xs text-gray-500">
-                The search query that will be executed when user clicks this tag
+                Запрос, который выполнится при клике пользователя по тегу
               </p>
             </div>
 
             {/* Filters */}
             <div className="space-y-2">
-              <Label htmlFor="filters">Filters (JSON, optional)</Label>
+              <Label htmlFor="filters">Фильтры (JSON, необязательно)</Label>
               <Textarea
                 id="filters"
                 value={formData.filters}
@@ -232,13 +232,13 @@ export function QuickTagModal({
                 className="font-mono text-sm"
               />
               <p className="text-xs text-gray-500">
-                Optional JSON object with additional search filters
+                Необязательный JSON-объект с дополнительными фильтрами поиска
               </p>
             </div>
 
             {/* City */}
             <div className="space-y-2">
-              <Label htmlFor="cityId">City (optional)</Label>
+              <Label htmlFor="cityId">Город (необязательно)</Label>
               <select
                 id="cityId"
                 value={formData.cityId}
@@ -247,7 +247,7 @@ export function QuickTagModal({
                 }
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All cities</option>
+                <option value="">Все города</option>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
@@ -258,7 +258,7 @@ export function QuickTagModal({
 
             {/* Sort Order */}
             <div className="space-y-2">
-              <Label htmlFor="sortOrder">Sort Order</Label>
+              <Label htmlFor="sortOrder">Порядок сортировки</Label>
               <Input
                 id="sortOrder"
                 type="number"
@@ -271,7 +271,7 @@ export function QuickTagModal({
                 }
               />
               <p className="text-xs text-gray-500">
-                Lower numbers appear first (can also drag-and-drop in the table)
+                Меньшее число — выше в списке (можно также перетаскивать в таблице)
               </p>
             </div>
 
@@ -287,7 +287,7 @@ export function QuickTagModal({
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
               <Label htmlFor="isActive" className="cursor-pointer">
-                Active (visible to users)
+                Активен (виден пользователям)
               </Label>
             </div>
 
@@ -298,7 +298,7 @@ export function QuickTagModal({
                 disabled={isSaving}
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
-                {isSaving ? "Saving..." : tag ? "Update Tag" : "Create Tag"}
+                {isSaving ? "Сохранение..." : tag ? "Сохранить тег" : "Создать тег"}
               </Button>
               <Button
                 type="button"
@@ -306,7 +306,7 @@ export function QuickTagModal({
                 onClick={onClose}
                 disabled={isSaving}
               >
-                Cancel
+                Отмена
               </Button>
             </div>
           </form>

@@ -15,8 +15,8 @@ export interface RankingBoost {
 export const RANKING_BOOSTS: RankingBoost[] = [
   {
     key: "nearbyBoost",
-    label: "Nearby Boost",
-    description: "Prioritize content close to user's location",
+    label: "Буст близости",
+    description: "Приоритет контенту рядом с пользователем",
     icon: "MapPin",
     min: 0,
     max: 100,
@@ -24,8 +24,8 @@ export const RANKING_BOOSTS: RankingBoost[] = [
   },
   {
     key: "freshnessBoost",
-    label: "Freshness Boost",
-    description: "Prioritize recently added or updated content",
+    label: "Буст свежести",
+    description: "Приоритет недавно добавленному или обновлённому контенту",
     icon: "Sparkles",
     min: 0,
     max: 100,
@@ -33,8 +33,8 @@ export const RANKING_BOOSTS: RankingBoost[] = [
   },
   {
     key: "popularityBoost",
-    label: "Popularity Boost",
-    description: "Prioritize content with high views and bookings",
+    label: "Буст популярности",
+    description: "Приоритет контенту с высокими просмотрами и бронированиями",
     icon: "TrendingUp",
     min: 0,
     max: 100,
@@ -42,8 +42,8 @@ export const RANKING_BOOSTS: RankingBoost[] = [
   },
   {
     key: "partnerBoost",
-    label: "Partner Boost",
-    description: "Prioritize verified partner content",
+    label: "Буст партнёров",
+    description: "Приоритет контенту от проверенных партнёров",
     icon: "Award",
     min: 0,
     max: 100,
@@ -51,8 +51,8 @@ export const RANKING_BOOSTS: RankingBoost[] = [
   },
   {
     key: "ageBoost",
-    label: "Age Matching Boost",
-    description: "Prioritize content matching child's age",
+    label: "Буст соответствия возрасту",
+    description: "Приоритет контенту, подходящему по возрасту ребёнка",
     icon: "Users",
     min: 0,
     max: 100,
@@ -60,8 +60,8 @@ export const RANKING_BOOSTS: RankingBoost[] = [
   },
   {
     key: "cityBoost",
-    label: "City Matching Boost",
-    description: "Prioritize content in user's city",
+    label: "Буст соответствия городу",
+    description: "Приоритет контенту в городе пользователя",
     icon: "Building2",
     min: 0,
     max: 100,

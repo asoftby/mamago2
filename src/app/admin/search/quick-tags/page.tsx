@@ -73,14 +73,14 @@ export default function QuickTagsPage() {
     const result = await response.json();
 
     if (!result.success) {
-      throw new Error(result.error || "Failed to save tag");
+      throw new Error(result.error || "Не удалось сохранить тег");
     }
 
     await loadTags();
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this quick tag?")) return;
+    if (!confirm("Удалить этот быстрый тег?")) return;
 
     try {
       const response = await fetch(`/api/admin/search/quick-tags/${id}`, {
@@ -92,11 +92,11 @@ export default function QuickTagsPage() {
       if (result.success) {
         await loadTags();
       } else {
-        alert(result.error || "Failed to delete tag");
+        alert(result.error || "Не удалось удалить тег");
       }
     } catch (error) {
       console.error("Failed to delete tag:", error);
-      alert("Failed to delete tag");
+      alert("Не удалось удалить тег");
     }
   }
 
@@ -154,9 +154,9 @@ export default function QuickTagsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Quick Tags</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Быстрые теги</h2>
             <p className="text-gray-600 mt-1">
-              Manage quick search tags that appear under the search bar
+              Управление быстрыми тегами под строкой поиска
             </p>
           </div>
           <Button
@@ -167,8 +167,18 @@ export default function QuickTagsPage() {
             className="bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Quick Tag
+            Добавить тег
           </Button>
+        </div>
+
+        {/* Honest disclosure: not yet wired to the public "Популярное" block */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <p className="text-sm text-amber-800">
+            Эти теги пока не показываются на публичном сайте: блок
+            «Популярное» под строкой поиска ещё не подключён к этому списку.
+            Предпросмотр ниже показывает, как теги будут выглядеть, когда
+            подключение появится.
+          </p>
         </div>
 
         {/* Stats */}
@@ -179,7 +189,7 @@ export default function QuickTagsPage() {
                 <Tag className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Tags</p>
+                <p className="text-sm text-gray-600">Всего тегов</p>
                 <p className="text-2xl font-bold text-gray-900">{tags.length}</p>
               </div>
             </div>
@@ -191,7 +201,7 @@ export default function QuickTagsPage() {
                 <Tag className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Active Tags</p>
+                <p className="text-sm text-gray-600">Активных</p>
                 <p className="text-2xl font-bold text-gray-900">{activeTags.length}</p>
               </div>
             </div>
@@ -203,7 +213,7 @@ export default function QuickTagsPage() {
                 <Tag className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Inactive Tags</p>
+                <p className="text-sm text-gray-600">Неактивных</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {tags.length - activeTags.length}
                 </p>
@@ -216,7 +226,7 @@ export default function QuickTagsPage() {
         {activeTags.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">
-              Preview (as shown to users)
+              Предпросмотр (когда подключение появится)
             </h3>
             <div className="flex flex-wrap gap-2">
               {activeTags.map((tag) => (
@@ -234,20 +244,20 @@ export default function QuickTagsPage() {
         {/* Tags Table */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">All Tags</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Все теги</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Drag and drop to reorder tags
+              Перетащите строку, чтобы изменить порядок
             </p>
           </div>
 
           {loading ? (
             <div className="p-12 text-center">
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-gray-500">Загрузка...</p>
             </div>
           ) : tags.length === 0 ? (
             <div className="p-12 text-center">
               <Tag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No quick tags yet</p>
+              <p className="text-gray-600">Быстрых тегов пока нет</p>
               <Button
                 onClick={() => {
                   setEditingTag(null);
@@ -255,7 +265,7 @@ export default function QuickTagsPage() {
                 }}
                 className="mt-4"
               >
-                Create your first tag
+                Создать первый тег
               </Button>
             </div>
           ) : (
@@ -268,22 +278,22 @@ export default function QuickTagsPage() {
                   <tr>
                     <th className="w-12"></th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Title
+                      Название
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Query
+                      Запрос
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      City
+                      Город
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Статус
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sort
+                      Порядок
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      Действия
                     </th>
                   </tr>
                 </thead>
@@ -318,17 +328,17 @@ export default function QuickTagsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-500">
-                          {tag.city?.name || "All cities"}
+                          {tag.city?.name || "Все города"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {tag.isActive ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Active
+                            Активен
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Inactive
+                            Неактивен
                           </span>
                         )}
                       </td>
