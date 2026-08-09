@@ -1,4 +1,4 @@
-import { Prisma, type UserEventType } from "@prisma/client";
+import { Prisma, type AnalyticsEntityType, type UserEventType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
 import type {
@@ -7,6 +7,8 @@ import type {
   ContentPerformanceConverterRow,
   ContentPerformanceEntityRow,
   ContentPerformanceTopItem,
+  PublicationAnalyticsDetail,
+  PublicationCtaBreakdownRow,
 } from "@/lib/analytics/analyticsContentPerformanceTypes";
 import {
   analyticsEventWhereSql,
@@ -19,6 +21,7 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import { labelForCtaTargetAction } from "@/lib/analytics/ctaTargetActionLabels";
 
 const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
 
@@ -43,6 +46,11 @@ function toNum(b: bigint | undefined): number {
   return Number(b ?? BigInt(0));
 }
 
+/** null when the denominator is 0 — never render a fake 0% for an unmeasured rate. */
+function rate(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? numerator / denominator : null;
+}
+
 function rowToEntity(
   r: AggRow,
   meta: Map<string, MetaRow>,
@@ -56,11 +64,11 @@ function rowToEntity(
   const saves = toNum(r.saves);
   const planAdds = toNum(r.plan_adds);
   const cta = toNum(r.cta_clicks);
-  const openRate = views > 0 ? opens / views : 0;
-  const saveRate = opens > 0 ? saves / opens : 0;
-  const planRate = saves > 0 ? planAdds / saves : 0;
-  const clickRateVsOpens = opens > 0 ? cta / opens : 0;
-  const clickRateVsPlans = planAdds > 0 ? cta / planAdds : 0;
+  const openRate = rate(opens, views);
+  const saveRate = rate(saves, opens);
+  const planRate = rate(planAdds, saves);
+  const clickRateVsOpens = rate(cta, opens);
+  const clickRateVsPlans = rate(cta, planAdds);
   const cityId = m?.cityId ?? null;
   return {
     entityType: r.entity_type,
@@ -124,8 +132,9 @@ function sortRows(
     if (k === "title") {
       return mult * a.title.localeCompare(b.title, "en");
     }
-    const va = a[k as keyof ContentPerformanceEntityRow] as number;
-    const vb = b[k as keyof ContentPerformanceEntityRow] as number;
+    // null (unmeasured rate) sorts as lowest, never as if it were a real 0.
+    const va = (a[k as keyof ContentPerformanceEntityRow] as number | null) ?? -1;
+    const vb = (b[k as keyof ContentPerformanceEntityRow] as number | null) ?? -1;
     return mult * (va - vb);
   });
 }
@@ -263,7 +272,7 @@ export async function getAnalyticsContentPerformance(
   };
 
   const worstConverters = [...allRows]
-    .filter((r) => r.views >= 35 && r.saveRate < 0.12 && r.opens >= 5)
+    .filter((r) => r.views >= 35 && r.opens >= 5 && r.saveRate != null && r.saveRate < 0.12)
     .sort((a, b) => b.views - a.views)
     .slice(0, 8);
 
@@ -292,11 +301,11 @@ export async function getAnalyticsContentPerformance(
 
 function pickBest(
   rows: ContentPerformanceEntityRow[],
-  score: (r: ContentPerformanceEntityRow) => number,
+  score: (r: ContentPerformanceEntityRow) => number | null,
   take: number,
 ): ContentPerformanceConverterRow[] {
   return [...rows]
-    .sort((a, b) => score(b) - score(a))
+    .sort((a, b) => (score(b) ?? -1) - (score(a) ?? -1))
     .slice(0, take)
     .map((r) => ({ ...r }));
 }
@@ -326,9 +335,9 @@ function buildEntityTypeComparison(
   }
   return Object.entries(by)
     .map(([key, m]) => {
-      const saveRate = m.opens > 0 ? m.saves / m.opens : 0;
-      const planRate = m.saves > 0 ? m.planAdds / m.saves : 0;
-      const clickRateVsOpens = m.opens > 0 ? m.cta / m.opens : 0;
+      const saveRate = rate(m.saves, m.opens);
+      const planRate = rate(m.planAdds, m.saves);
+      const clickRateVsOpens = rate(m.cta, m.opens);
       return {
         key,
         label: key,
@@ -389,9 +398,9 @@ async function buildVerticalComparison(
       saves: m.saves,
       planAdds: m.planAdds,
       ctaClicks: m.cta,
-      saveRate: m.opens > 0 ? m.saves / m.opens : 0,
-      planRate: m.saves > 0 ? m.planAdds / m.saves : 0,
-      clickRateVsOpens: m.opens > 0 ? m.cta / m.opens : 0,
+      saveRate: rate(m.saves, m.opens),
+      planRate: rate(m.planAdds, m.saves),
+      clickRateVsOpens: rate(m.cta, m.opens),
     }))
     .sort((a, b) => b.views - a.views);
 }
@@ -425,5 +434,109 @@ function emptyResult(
     worstConverters: [],
     entityTypeComparison: [],
     verticalComparison: [],
+  };
+}
+
+/**
+ * Per-publication drill-down (Task 3 MVP follow-up). Bounded aggregate query
+ * scoped to one entityType+entityId, reusing the same UserEvent pipeline —
+ * not a new analytics system. Respects the caller's dateRange/city filter
+ * (the same period selected in Content Performance), not segment/childAgeBand
+ * (not meaningful when already looking at one specific publication).
+ * Returns aggregate counts only — never individual UserEvent rows, no
+ * userId/sessionId/IP/UA in the result shape.
+ */
+export async function getPublicationAnalyticsDetail(params: {
+  entityType: AnalyticsEntityType;
+  entityId: string;
+  filters: Pick<AnalyticsOverviewFilters, "dateRange" | "city">;
+}): Promise<PublicationAnalyticsDetail> {
+  const { entityType, entityId } = params;
+  const { start, end } = resolveAnalyticsDateRange(params.filters.dateRange);
+  const cityId = await resolveCityIdFromSlug(params.filters.city);
+
+  const baseWhere: Prisma.UserEventWhereInput = {
+    entityType,
+    entityId,
+    createdAt: { gte: start, lte: end },
+    ...(cityId ? { cityId } : {}),
+  };
+
+  const [countRows, ctaRows, titles, latestEvent] = await Promise.all([
+    prisma.userEvent.groupBy({
+      by: ["eventType"],
+      where: baseWhere,
+      _count: { _all: true },
+    }),
+    prisma.$queryRaw<Array<{ action: string; cnt: bigint }>>`
+      SELECT COALESCE(meta->>'targetAction', '') AS action, COUNT(*)::bigint AS cnt
+      FROM "UserEvent"
+      WHERE "entityType" = ${entityType}::"AnalyticsEntityType"
+        AND "entityId" = ${entityId}
+        AND "eventType" = 'CTA_CLICK'
+        AND "createdAt" >= ${start}
+        AND "createdAt" <= ${end}
+        ${cityId ? Prisma.sql`AND "cityId" = ${cityId}` : Prisma.empty}
+      GROUP BY action
+      ORDER BY cnt DESC
+    `,
+    loadAllEntityTitles([{ entityType, entityId }]),
+    prisma.userEvent.findFirst({
+      where: baseWhere,
+      orderBy: { createdAt: "desc" },
+      select: { vertical: true, cityId: true },
+    }),
+  ]);
+
+  let impressions = 0;
+  let opens = 0;
+  let saves = 0;
+  let planAdds = 0;
+  let ctaClicks = 0;
+  for (const r of countRows) {
+    const c = r._count._all;
+    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW") impressions += c;
+    else if (r.eventType === "DETAIL_OPEN") opens += c;
+    else if (r.eventType === "SAVE") saves += c;
+    else if (r.eventType === "PLAN_ADD") planAdds += c;
+    else if (r.eventType === "CTA_CLICK") ctaClicks += c;
+  }
+
+  const cityName = latestEvent?.cityId
+    ? ((await prisma.city.findUnique({
+        where: { id: latestEvent.cityId },
+        select: { name: true },
+      }))?.name ?? null)
+    : null;
+
+  const ctaBreakdown: PublicationCtaBreakdownRow[] = ctaRows
+    .map((r) => {
+      const action = r.action ? r.action : null;
+      return {
+        action,
+        label: labelForCtaTargetAction(action),
+        count: toNum(r.cnt),
+      };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  const key = `${entityType}:${entityId}`;
+  const title = titles.get(key) ?? `${entityType} ${entityId.slice(0, 8)}…`;
+
+  return {
+    entityType,
+    entityId,
+    title,
+    vertical: latestEvent?.vertical ?? null,
+    cityName,
+    range: { start: start.toISOString(), end: end.toISOString() },
+    metrics: { impressions, opens, saves, planAdds, ctaClicks },
+    rates: {
+      openRate: rate(opens, impressions),
+      saveRate: rate(saves, opens),
+      planRate: rate(planAdds, saves),
+      ctaRateVsOpens: rate(ctaClicks, opens),
+    },
+    ctaBreakdown,
   };
 }
