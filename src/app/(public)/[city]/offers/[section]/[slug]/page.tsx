@@ -246,7 +246,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
         entityType="OFFER"
         entityId={data.id}
         vertical="CITY"
-        cityId={offer.placeId}
+        citySlug={actualCitySlug}
       />
       <JsonLd
         data={
