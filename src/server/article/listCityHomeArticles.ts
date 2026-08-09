@@ -7,6 +7,7 @@ import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 export type CityHomeJournalArticle = {
+  id: string;
   slug: string;
   /** Pre-computed canonical public href (/{city}/blog/{slug} or /blog/{slug}) */
   href: string;
@@ -80,6 +81,7 @@ export async function listCityHomeArticles(city: {
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
     take: 6,
     select: {
+      id: true,
       slug: true,
       geoScope: true,
       title: true,
@@ -101,6 +103,7 @@ export async function listCityHomeArticles(city: {
   return rows
     .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
     .map((row) => ({
+      id: row.id,
       slug: row.slug,
       href:
         row.geoScope === "CITY"

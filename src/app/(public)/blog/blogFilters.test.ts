@@ -14,6 +14,7 @@ function article(
   tags: CityHomeJournalArticle["tags"],
 ): CityHomeJournalArticle {
   return {
+    id: `id-${slug}`,
     slug,
     href: `/minsk/blog/${slug}`,
     title: slug,

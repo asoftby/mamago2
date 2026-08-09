@@ -19,6 +19,7 @@ import type { ActivityMock } from "@/types/activity";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import {
   buildAudienceLabel,
@@ -190,20 +191,28 @@ export function CityHomeClassesSection({
                 : undefined;
           return (
             <div key={activity.id} className={cardShell}>
-              <OfferCard
-                id={activity.id}
-                title={activity.title}
-                href={href}
-                imageUrl={activity.image}
-                categoryLabel={[
-                  activity.badge || null,
-                  activity.format ? getActivityFormatLabel(activity.format) : null,
-                ].filter(Boolean).join(" · ") || undefined}
-                dateLabel={dateLabel || undefined}
-                priceLabel={priceLabel}
-                saveDateISO={activity.dateStart ?? null}
-                saveDateEndISO={activity.dateEnd ?? null}
-              />
+              <AnalyticsCardViewTracker
+                entityType="OFFER"
+                entityId={activity.id}
+                vertical="CITY"
+                citySlug={activity.citySlug ?? citySlug}
+                meta={{ section: "classes" }}
+              >
+                <OfferCard
+                  id={activity.id}
+                  title={activity.title}
+                  href={href}
+                  imageUrl={activity.image}
+                  categoryLabel={[
+                    activity.badge || null,
+                    activity.format ? getActivityFormatLabel(activity.format) : null,
+                  ].filter(Boolean).join(" · ") || undefined}
+                  dateLabel={dateLabel || undefined}
+                  priceLabel={priceLabel}
+                  saveDateISO={activity.dateStart ?? null}
+                  saveDateEndISO={activity.dateEnd ?? null}
+                />
+              </AnalyticsCardViewTracker>
             </div>
           );
         })}
@@ -280,8 +289,15 @@ export function CityHomeJournalSection({
         className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory"
       >
         {visibleArticles.map((a, index) => (
-          <Link
+          <AnalyticsCardViewTracker
             key={a.slug}
+            entityType="ARTICLE"
+            entityId={a.id}
+            vertical="CITY"
+            citySlug={citySlug}
+            meta={{ section: "journal", position: index }}
+          >
+          <Link
             href={a.href}
             className={cn(
               cardShell,
@@ -317,6 +333,7 @@ export function CityHomeJournalSection({
               {a.readTime} мин. чтения
             </p>
           </Link>
+          </AnalyticsCardViewTracker>
         ))}
       </HorizontalCardRow>
     </CityHomeSection>

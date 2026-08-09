@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { useOptionalCity } from "@/contexts/CityContext";
 import {
   filterBlogArticles,
   getArticlesForType,
@@ -36,6 +38,8 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const cityCtx = useOptionalCity();
+  const citySlug = cityCtx?.citySlug;
   const availableTypes = getAvailableContentTypes(articles);
   const requestedTypeParam = searchParams.get("type");
   const requestedType = parseBlogContentType(requestedTypeParam);
@@ -176,7 +180,17 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
           </div>
         ) : (
           <>
-            {featured && <FeaturedArticle article={featured} />}
+            {featured && (
+              <AnalyticsCardViewTracker
+                entityType="ARTICLE"
+                entityId={featured.id}
+                vertical="CITY"
+                citySlug={citySlug}
+                meta={{ section: "journal", position: "featured" }}
+              >
+                <FeaturedArticle article={featured} />
+              </AnalyticsCardViewTracker>
+            )}
 
             {rest.length > 0 && (
               <div>
@@ -190,7 +204,16 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                   </span>
                 </div>
                 {rest.map((a, i) => (
-                  <ArticleRow key={a.slug} article={a} idx={i + 1} />
+                  <AnalyticsCardViewTracker
+                    key={a.slug}
+                    entityType="ARTICLE"
+                    entityId={a.id}
+                    vertical="CITY"
+                    citySlug={citySlug}
+                    meta={{ section: "journal", position: i + 1 }}
+                  >
+                    <ArticleRow article={a} idx={i + 1} />
+                  </AnalyticsCardViewTracker>
                 ))}
               </div>
             )}

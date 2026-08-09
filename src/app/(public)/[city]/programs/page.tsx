@@ -6,6 +6,7 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { resolveActivityVertical } from "@/lib/public/publicVerticalResolver";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 
 interface ProgramsPageProps {
   params: Promise<{
@@ -126,15 +127,23 @@ export default async function ProgramsPage({ params }: ProgramsPageProps) {
                 ? formatPriceFrom(program.priceFrom)
                 : undefined;
               return (
-                <OfferCard
+                <AnalyticsCardViewTracker
                   key={program.id}
-                  id={program.id}
-                  title={program.title}
-                  href={href}
-                  imageUrl={program.coverImageUrl}
-                  dateLabel={metaLabel}
-                  priceLabel={priceLabel}
-                />
+                  entityType="OFFER"
+                  entityId={program.id}
+                  vertical="EDUCATION"
+                  citySlug={city}
+                  meta={{ section: "programs" }}
+                >
+                  <OfferCard
+                    id={program.id}
+                    title={program.title}
+                    href={href}
+                    imageUrl={program.coverImageUrl}
+                    dateLabel={metaLabel}
+                    priceLabel={priceLabel}
+                  />
+                </AnalyticsCardViewTracker>
               );
             })}
           </div>
