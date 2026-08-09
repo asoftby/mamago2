@@ -716,30 +716,29 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-030] `/business/analytics` is an empty "under development" placeholder
 
-- Status: OPEN
+- Status: DONE (2026-08-09)
 - Priority: P2
 - Area: Business / Analytics
 - Added: 2026-08-08
-- Reason deferred: explicitly allowed to defer per
-  `docs/release/dev-to-prod-checklist.md` Task 3 §18 ("Business dashboard
-  не входит фактически в Task 3 Exit Criteria — зафиксировать и оставить
-  расширение в backlog"); a materially similar, correctly business-scoped
-  per-publication performance view already exists on `/business/dashboard`
-  (`getBusinessWorkspaceData`/`getPerformanceMetricsByEntity`, server-side
-  scoped by `businessId`/`ownerUserId` — verified no cross-business leak).
-  An empty page cannot leak data, so this is a UX gap, not a security gap.
-- Context: `src/app/business/(protected)/analytics/page.tsx` is a 14-line
-  file rendering only `<BusinessSectionHeader ... description="Раздел в
-  разработке" />` — no data fetching at all.
-- Current state: not started.
-- Dependencies: product decision on whether to build a dedicated Business
-  Analytics page or redirect/fold this route into the existing Dashboard
-  view.
-- Acceptance criteria: either a real per-business analytics page (reusing
-  `getBusinessWorkspaceData` / the same query patterns already proven safe)
-  or the route is removed/redirected — decided by product owner.
+- Resolution: owner reopened this specifically for Task 3 (Business
+  Analytics MVP follow-up). `/business/analytics` now renders a real page:
+  own Event/Offer/Place publications with real aggregate metrics (Показы/
+  Открытия/Сохранения/В план/Целевые действия), a 5-option date range, and
+  a per-publication drill-down (same report + CTA target-action breakdown
+  already built for Admin, via the shared `PublicationAnalyticsDrawer`/
+  `getPublicationAnalyticsDetail`). Server-side ownership is re-verified per
+  request (`businessOwnsPublication()`) before any aggregation runs —
+  foreign/nonexistent publication -> 404, zero metric leakage. Tests:
+  `businessAnalyticsAccess.test.ts` (own/foreign Event/Offer/Place,
+  nonexistent id, Article/Route always rejected). The Dashboard's own
+  Top-5 (`getBusinessWorkspaceData`/`TopPublicationList`) is unchanged,
+  now links to `/business/analytics` instead of duplicating the full report.
+- Context (original): `src/app/business/(protected)/analytics/page.tsx` was
+  a 14-line file rendering only `<BusinessSectionHeader ... description=
+  "Раздел в разработке" />` — no data fetching at all.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
-  (Publication Analytics)
+  (Publication Analytics) — resolved under Task 3's Business Analytics MVP
+  follow-up.
 
 ## [BACKLOG-031] `/api/publication-stats/[entityId]` always returns nulls — real aggregator not wired
 

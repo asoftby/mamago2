@@ -20,19 +20,22 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 3 — Publication Analytics (IN_PROGRESS — MVP
-                     PUBLICATION ANALYTICS DRILL-DOWN)
+Active task:        Task 3 — Publication Analytics
+                     (COMPLETE_PENDING_BROWSER_SMOKE)
 Last updated:       2026-08-09
-Last updated by:    Claude Code — owner requested a final MVP scope
-                     addition (per-publication interaction drill-down +
-                     comparable core impression metrics) before Task 3
-                     closes; implemented (aggregate service, RBAC API,
-                     admin drawer UI, CTA targetAction breakdown,
-                     BACKLOG-026 nullable-rate fix, Offer/Article
-                     impression tracking), tested, gated, committed
-                     locally (f84e081c..f37937d8) — not yet pushed;
-                     awaiting push + CI/Docker + owner-controlled DEV
-                     deploy + final smoke before Task 3 -> COMPLETE
+Last updated by:    Claude Code — two MVP scope additions completed on top
+                     of the base Task 3 work: (1) Admin publication
+                     drill-down (aggregate service, RBAC API, admin drawer
+                     UI, CTA targetAction breakdown, BACKLOG-026 nullable-
+                     rate fix, Offer/Article impression tracking); (2)
+                     Business Analytics MVP (/business/analytics real page,
+                     ownership-verified detail API reusing the exact same
+                     aggregate as Admin, own Event/Offer/Place only,
+                     BACKLOG-030 closed). All tested, gated, committed
+                     locally (f84e081c..18340b9e) — not yet pushed; awaiting
+                     push + CI/Docker + owner-controlled DEV deploy + final
+                     smoke (both Admin and Business surfaces) before Task 3
+                     -> COMPLETE
 Unresolved P0/P1:   none from Task 1, 2, or 3 — Tasks 4–15 remain TODO, not started
 ```
 
@@ -925,7 +928,7 @@ are understandable; an admin cannot arbitrarily break organic ranking.
 
 Priority: `P0`
 
-STATUS: `IN_PROGRESS — MVP PUBLICATION ANALYTICS DRILL-DOWN`
+STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
 AUDIT:
 EXISTING — A real, substantial, DB-backed first-party analytics system
 already exists, not just search-adjacent scaffolding. `UserEvent` (Prisma
@@ -1231,6 +1234,83 @@ cohorts, and exports all explicitly left alone, per instruction §16/§17.
 COMMITS: `f84e081c` (feat: aggregate service + API + nullable rates),
 `256e279a` (feat: admin drill-down UI), `588e21b1` (feat: impression
 tracking for Offer/Article listing surfaces), `f37937d8` (chore: tests).
+
+BUSINESS ANALYTICS MVP (2026-08-09, Claude Code — owner reopened Task 3
+before deployment: `/business/analytics` was still the "Раздел в
+разработке" placeholder; the earlier MVP drill-down follow-up above covered
+only Admin):
+IMPLEMENTATION — Moved `PublicationAnalyticsDrawer`/`PublicationAnalyticsDetails`
+from `components/admin/analytics` to the neutral `components/analytics`
+(alongside `AnalyticsDetailBeacon`/`AnalyticsCardViewTracker`) and added a
+`fetchBasePath` prop, so Admin and Business share the exact same drill-down
+report component/fetch/loading/error handling — no second implementation.
+Extended `getPerformanceMetricsByEntity()` (already powering the Dashboard's
+Top-5) with `opens` (`DETAIL_OPEN`, previously untracked there), an optional
+`places` param, and an optional `dateRange` filter — all additive, the
+Dashboard's own all-time call is unchanged. Added
+`getBusinessPublicationsPerformance()` (full list, not top-5, of a
+business's own Event/Offer/Place with real metrics, reusing the exact same
+ownership queries as `getBusinessWorkspaceData`). Publication types: Event
+and Offer per instruction; Place included too after confirming its
+ownership query is already identical/free (same `ownerBusinessId`/
+`createdByUserId` OR-pattern already used elsewhere in this same file) —
+no scope expansion. Article/Route excluded — businesses do not own them in
+the current model.
+OWNERSHIP (mandatory) — New `businessOwnsPublication()`
+(`src/server/services/business/businessAnalyticsAccess.ts`): every business
+analytics detail request re-verifies server-side, from the authenticated
+session's own business, that the client-supplied `entityId` actually
+belongs to that business, before any `UserEvent` aggregation runs. Mirrors
+the exact existing ownership rules (`canManageActivityById`-equivalent for
+Event; `src/app/api/business/offers/[id]/route.ts`'s
+`place.ownerBusinessId`/`createdByUserId` pattern for Offer; Place's own
+fields) rather than inventing new rules. Foreign or nonexistent publication
+→ 404, zero metric leakage (never a 200 with empty/zeroed data, which would
+itself confirm/deny existence).
+NEW ENDPOINTS — `GET /api/business/analytics/publications` (the business's
+own list, `getCurrentUser()`+`getMyBusiness()`, same pattern as
+`/api/business/bookings/analytics`); `GET /api/business/analytics/
+publications/[entityType]/[entityId]` (ownership-checked drill-down,
+reuses `getPublicationAnalyticsDetail()` — the exact same aggregate/CTA-
+label mapping already built for Admin — only after ownership passes).
+UI — `/business/analytics` (`src/app/business/(protected)/analytics/
+page.tsx`) replaced; `BusinessAnalyticsClient.tsx`: 5-option date range
+(same canonical ranges as Admin), row list with real Показы/Открытия/
+Сохранения/В план/Целевые действия, row click opens the shared drawer.
+Entirely Russian, no audience segmentation, no cross-business comparison,
+no new BI charts — aggregate counts only, matching the "answer 5 questions"
+brief. Dashboard's `TopPublicationList` gained one "Вся аналитика" link to
+`/business/analytics` — Dashboard itself otherwise untouched (still all-
+time Top-5, as before).
+PRIVACY — Same `getPublicationAnalyticsDetail()` shape as Admin: aggregate
+counts only, no `userId`/`sessionId`/`ip`/`userAgent`/raw event rows ever
+in the response (proven by the existing no-PII test, reused unmodified
+since the response shape is identical for both callers).
+TESTS — `businessAnalyticsAccess.test.ts` (new): real two-business fixture
+(separate owner/business/place/event/offer each) — own Event allowed, own
+Offer allowed, own Place allowed, foreign Event rejected, foreign Offer
+rejected, foreign Place rejected, nonexistent entityId rejected, Article/
+Route always rejected even when reusing a real id of a different type (no
+type-confusion leak). `businessWorkspace.service.test.ts` (extended):
+`opens` tracked correctly, `places` param honored, `dateRange` correctly
+excludes a year-old event from a 24h-scoped query. All existing analytics
+tests re-run — no regressions.
+GATES — `npx tsc --noEmit` clean (whole repo). `npx eslint` on all 12
+changed/new files — 0 errors, 0 new warnings. `git diff --check` clean.
+Full `pnpm build` — exit 0, "Compiled successfully in 106s", full route
+manifest generated including `/business/analytics`, `/api/business/
+analytics/publications`, `/api/business/analytics/publications/
+[entityType]/[entityId]` — no errors.
+BACKLOG — BACKLOG-030 → DONE.
+COMMITS: `ff2d54b8` (refactor: share drill-down UI), `1866b5b4` (feat:
+ownership-verified service + API), `51b5c9fe` (feat: Business Analytics
+MVP page), `18340b9e` (chore: ownership isolation tests).
+DEV SMOKE: not yet performed on actual `dev.mamago.by` — pending owner
+deployment. Must now cover both Admin (Content Performance, drill-down, CTA
+breakdown, impression/open/rates) and Business (`/business/analytics` real
+data, own publications only, drill-down, CTA breakdown, foreign-business
+access rejected, desktop + narrow viewport, no relevant 500s) before Task 3
+can move to `COMPLETE`.
 
 AUDIT FIRST existing analytics/tracking infrastructure: `/admin/analytics`,
 business analytics, analytics models, impressions, views, unique views, CTA,
