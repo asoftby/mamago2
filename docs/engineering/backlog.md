@@ -607,3 +607,310 @@ P3 — cleanup / polish / optional
   remove the dead export, decided together with Task 3/5 scope.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 2 audit (Search
   Ranking)
+
+## [BACKLOG-026] Content Performance "Open %" misleading for entity types without impression tracking
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / Admin
+- Added: 2026-08-08
+- Reason deferred: raw `Opens`/`Saves`/`CTA` columns in
+  `/admin/analytics` Content Performance are real and correct for every
+  entity type today (Task 3 exit criteria — "assess publication
+  effectiveness" — is already satisfiable from those raw columns), so this
+  is a derived-metric polish issue, not a missing-data blocker.
+- Context: `analyticsContentPerformance.service.ts` computes
+  `openRate = views > 0 ? opens / views : 0`, where `views` sums only
+  `PAGE_VIEW`/`CARD_VIEW` events. `CARD_VIEW` (listing-card impression) is
+  only wired for Event/Route listing cards (`DiscoveryActivitiesGrid`,
+  `RouteCard`), not Place/Offer/Article. `PAGE_VIEW` is never emitted
+  anywhere. So for Place/Offer/Article, `views` is always 0 and the "Open
+  %" column in `AdminAnalyticsContentPerformance.tsx` always renders
+  "0.0%" even when the real `Opens` column (from `DETAIL_OPEN`, which does
+  fire for all 5 types) shows real, positive engagement — misleading if
+  read in isolation from the raw Opens number.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: either render `openRate` as "—" (not "0.0%") when
+  `views === 0`, or wire `CARD_VIEW` onto Place/Offer listing cards
+  (`AnalyticsCardViewTracker` already exists and is reusable) so the ratio
+  is meaningful. Either is a small, isolated change.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-027] `Article.views` is a second, uncorrelated view counter parallel to `UserEvent`
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / Article
+- Added: 2026-08-08
+- Reason deferred: pre-existing architecture (not introduced by Task 3);
+  does not corrupt any admin/business analytics number today because no
+  admin dashboard reads `Article.views` (confirmed:
+  `analyticsContentPerformance.service.ts` derives "views" purely from
+  `UserEvent`). Fixing it is an architecture-consolidation change, not a
+  correctness fix, so it does not block PROD per Task 3's own "do not
+  create a parallel analytics architecture" instruction (which is about not
+  adding a *new* one — this one already existed).
+- Context: `src/lib/article/articleViews.ts` →
+  `incrementPublishedArticleViews()` does a raw
+  `prisma.article.updateMany({ data: { views: { increment: 1 } } } })` on
+  every real `/blog/[slug]` request, entirely outside the `UserEvent` /
+  `AnalyticsEntityType.ARTICLE` pipeline that `DETAIL_OPEN` already covers
+  for articles. Two different "how many times was this Article viewed"
+  numbers exist in the codebase with no reconciliation.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: decide whether `Article.views` should be retired in
+  favor of the `UserEvent`-derived `Opens` count (Task 3's canonical view
+  metric) or kept as a distinct, differently-scoped counter — and document
+  the decision. Not urgent; no incorrect number is currently shown to any
+  user as a result of the duplication.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-028] `PAGE_VIEW`, `UNSAVE`, `PLAN_REMOVE` UserEventType values defined but never emitted
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics
+- Added: 2026-08-08
+- Reason deferred: dead enum values with no functional impact — nothing in
+  the product currently needs "unsave"/"remove from plan"/"raw page view
+  distinct from card view" as a tracked signal; the metrics that matter for
+  Task 3's exit criteria (Opens, Saves, PlanAdds, CTA) already work via
+  `DETAIL_OPEN`/`SAVE`/`PLAN_ADD`/`CTA_CLICK`.
+- Context: `UserEventType` enum (`prisma/schema.prisma`) includes
+  `PAGE_VIEW`, `UNSAVE`, `PLAN_REMOVE`. Grep of `src/` found zero emitters
+  for any of the three. `analyticsContentPerformance.service.ts` already
+  treats `VIEW_TYPES = ["PAGE_VIEW", "CARD_VIEW"]` defensively (i.e. it
+  would pick up `PAGE_VIEW` automatically if it were ever emitted).
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: either wire real emitters (e.g. fire `UNSAVE`/
+  `PLAN_REMOVE` from the existing DELETE handlers in `/api/save/idea` and
+  `/api/save/plan`, which currently call `trackUserEvent` on create but not
+  on remove) or remove the unused enum values, as a deliberate follow-up
+  decision.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-029] No `SHARE` analytics signal despite live Share UI
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics
+- Added: 2026-08-08
+- Reason deferred: requires a new `UserEventType` enum value (schema
+  migration, hand-written per this repo's Prisma rules), a materially
+  bigger and riskier change than the phone/website/CTA fixes made in this
+  task; existing View+CTA+Save+PlanAdd signals already satisfy Task 3's
+  exit criteria without it.
+- Context: `ShareModal.tsx` / `ShareSheet.tsx` (used from
+  `MarketplacePlacePage.tsx`, `PlaceSidebarCard.tsx`, `BreakingNewsView.tsx`,
+  Route detail) are real, live share actions with zero analytics
+  instrumentation — no `SHARE` `UserEventType` exists in the schema at all.
+- Current state: not started.
+- Dependencies: a new, hand-written Prisma migration adding a `SHARE` value
+  to the `UserEventType` enum (see `CLAUDE.md` Prisma-migration rules —
+  `prisma migrate dev` does not work in this repo).
+- Acceptance criteria: add `SHARE` to `UserEventType`, emit it from the
+  existing Share components with entity context, surface it in
+  `analyticsContentPerformance.service.ts` alongside `ctaClicks`.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-030] `/business/analytics` is an empty "under development" placeholder
+
+- Status: OPEN
+- Priority: P2
+- Area: Business / Analytics
+- Added: 2026-08-08
+- Reason deferred: explicitly allowed to defer per
+  `docs/release/dev-to-prod-checklist.md` Task 3 §18 ("Business dashboard
+  не входит фактически в Task 3 Exit Criteria — зафиксировать и оставить
+  расширение в backlog"); a materially similar, correctly business-scoped
+  per-publication performance view already exists on `/business/dashboard`
+  (`getBusinessWorkspaceData`/`getPerformanceMetricsByEntity`, server-side
+  scoped by `businessId`/`ownerUserId` — verified no cross-business leak).
+  An empty page cannot leak data, so this is a UX gap, not a security gap.
+- Context: `src/app/business/(protected)/analytics/page.tsx` is a 14-line
+  file rendering only `<BusinessSectionHeader ... description="Раздел в
+  разработке" />` — no data fetching at all.
+- Current state: not started.
+- Dependencies: product decision on whether to build a dedicated Business
+  Analytics page or redirect/fold this route into the existing Dashboard
+  view.
+- Acceptance criteria: either a real per-business analytics page (reusing
+  `getBusinessWorkspaceData` / the same query patterns already proven safe)
+  or the route is removed/redirected — decided by product owner.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-031] `/api/publication-stats/[entityId]` always returns nulls — real aggregator not wired
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / Analytics
+- Added: 2026-08-08
+- Reason deferred: self-documented honest-empty-state stub (not fake data —
+  satisfies Task 3's "no fake analytics" hard requirement already); Task
+  3's exit criteria for real admin publication analytics is already met via
+  the working `/admin/analytics/content-performance` dashboard, so this
+  redundant, unfinished surface does not block PROD.
+- Context: `src/app/api/publication-stats/[entityId]/route.ts:37-42`
+  unconditionally calls `buildEmptyPublicationStats()` with an explicit
+  code comment that the real aggregator isn't connected yet. Full
+  production-ready UI exists around it (`PublicationStatsDrawer`,
+  `PublicationStatsDetails`, period switcher, 8 accordion sections,
+  role-based visibility for ADMIN/BUSINESS_OWNER) wired to a backend with
+  zero real aggregation logic — renders an honest "Данных пока нет" state,
+  not fabricated numbers.
+- Current state: not started.
+- Dependencies: decide whether to build the real aggregator (likely
+  reusing the same `UserEvent` queries as `analyticsContentPerformance.
+  service.ts`) or retire this parallel feature in favor of the working
+  Content Performance dashboard.
+- Acceptance criteria: either a real aggregator behind this endpoint, or
+  the feature is consciously retired — not left as permanent dead UI.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-032] `CARD_VIEW` impression tracking missing for Place/Offer listing cards
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics
+- Added: 2026-08-08
+- Reason deferred: Task 3's own instructions explicitly say impressions are
+  not automatically mandatory ("Не считать impression автоматически
+  обязательным, если существующая система его не использует — сначала
+  определить стоимость и ценность"); the critical Open/View signal
+  (`DETAIL_OPEN`) already works for Place/Offer, satisfying the exit
+  criteria without this.
+- Context: `AnalyticsCardViewTracker` (IntersectionObserver-based,
+  fire-once, cheap) is already built and proven on `DiscoveryActivitiesGrid`
+  (Event) and `RouteCard` (Route), but not wired into Place or Offer
+  listing-card components.
+- Current state: not started.
+- Dependencies: none — reuses an existing, already-cheap component.
+- Acceptance criteria: wire `AnalyticsCardViewTracker` into Place/Offer
+  listing cards if/when impression-rate reporting for those types becomes
+  a real product need (e.g. feeds BACKLOG-026's Open % fix).
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-033] `SAVE`/`PLAN_ADD` not tracked for Route entity type
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics / Routes
+- Added: 2026-08-08
+- Reason deferred: Route is a small, secondary content type (per Task 1's
+  own prior classification); `/api/save/plan`'s `routeId` branch exists and
+  works functionally, it just doesn't call `trackUserEvent` — a narrow,
+  isolated, low-value gap relative to the P1 CTA gaps fixed in Task 3.
+- Context: `src/app/api/save/plan/route.ts` has a `routeId` branch (around
+  line 89-97) with no `trackUserEvent` call, unlike its `placeId`/
+  `activityId` siblings. `src/app/api/save/idea/route.ts` has no `routeId`
+  branch at all (Routes cannot be saved as "ideas" today, so there is
+  nothing to track there).
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add a `trackUserEvent({eventType: "PLAN_ADD",
+  entityType: "ROUTE", ...})` call to the existing `routeId` branch,
+  matching the `place`/`activity` pattern already in the same file.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-034] No rate limiting on `POST /api/analytics/events`
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics / Security
+- Added: 2026-08-08
+- Reason deferred: ingestion is already bounded (zod-validated enum
+  fields, 4096-byte meta cap, single indexed row write, fire-and-forget);
+  the repo's only reusable rate limiter (`src/lib/security/rateLimit.ts`)
+  is Postgres-backed and would itself double the write cost of every
+  analytics event (an extra `RateLimitEntry` upsert per event) — directly
+  against Task 3's "server cost — critical" instruction. Not a proven P0/P1
+  abuse vector at current scale; a cheaper mechanism (if ever needed) should
+  be chosen deliberately, not bolted on reactively.
+- Context: `src/app/api/analytics/events/route.ts` has no rate limiting and
+  does not verify `entityId` refers to a real row before writing a
+  `UserEvent`. Worst case today is analytics-table noise (extra rows with
+  a nonexistent entityId), not a security or correctness issue —
+  `entityId`/`entityType` are still enum/string-validated so no SQL
+  injection or arbitrary-schema risk exists.
+- Current state: not started.
+- Dependencies: pick a cheap (non-DB-write) rate-limiting mechanism if this
+  is ever prioritized (e.g. a short in-memory per-instance token bucket
+  keyed by session/IP, accepting best-effort accuracy across instances).
+- Acceptance criteria: a documented decision either way; add limiting only
+  if real abuse is observed.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-035] `recomputeAllBehaviorSegments()` has no cron/scheduled caller
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics
+- Added: 2026-08-08
+- Reason deferred: `UserBehaviorProfile.segmentKeys` recomputation on each
+  individual event already happens synchronously in
+  `applyUserBehaviorEvent()` (via `SegmentResolverService`), so segments
+  are not stale for *active* users. The batch `recomputeAllBehaviorSegments`
+  entry point exists for e.g. time-based segment transitions (a user who
+  stops being "active this week") for users who generate no new events —
+  a secondary, non-blocking concern for Task 3's view/CTA measurement
+  scope; more relevant to Task 5 (Content Analytics & Ranking).
+- Context: `SegmentResolverService.ts` exports
+  `recomputeSegmentsForUser`/`recomputeAllBehaviorSegments`; no caller was
+  found in `src/server/jobs`, `src/server/notifications/jobs`, or anywhere
+  else in `src/`.
+- Current state: not started.
+- Dependencies: best picked up alongside Task 5 if/when segment freshness
+  becomes a proven product need.
+- Acceptance criteria: either wire a scheduled job calling
+  `recomputeAllBehaviorSegments()` on a sane cadence (e.g. daily) or
+  document that per-event recomputation is sufficient and the batch
+  function is intentionally manual/on-demand.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics)
+
+## [BACKLOG-036] New Place CTA_CLICK events (call/website/instagram) have no cityId
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics / Place
+- Added: 2026-08-09
+- Reason deferred: the new phone/website/Instagram `CTA_CLICK` tracking
+  added in Task 3 (Publication Analytics) correctly records entity, event
+  type, and `targetAction` — proven via a controlled proof on real local
+  data (`cityId: null` was the only gap, confirmed by direct DB read of the
+  written row). Threading `place.cityId` down to `PlaceHero.tsx`
+  (marketplace) / `PlaceSidebarCard.tsx` (premium) would need a new prop on
+  both components' page-level parents (`PremiumPlacePageProps`,
+  `MarketplacePlacePage`'s place type), which goes beyond Task 3's minimal
+  fix for "is this CTA tracked at all" (now: yes) into a secondary
+  refinement of "is it also city-tagged" — not required to satisfy Task 3's
+  exit criteria, since these events are still fully visible/usable in the
+  unfiltered (all-cities) admin view.
+- Context: `src/components/place/marketplace/PlaceHero.tsx` and
+  `src/components/place/premium/PlaceSidebarCard.tsx` both call
+  `postAnalyticsEvent({eventType:"CTA_CLICK", entityType:"PLACE", ...,
+  vertical:"CITY"})` without a `cityId`/`citySlug`, unlike the same Place's
+  own `DETAIL_OPEN` beacon (which correctly uses `place.cityId`) and unlike
+  `EventDecisionPanel`'s new phone-CTA tracking (which does pass
+  `citySlug={data.citySlug}`, since `EventPageView`'s `data` already carried
+  it).
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add a `placeCityId`/`citySlug` prop to `PlaceHero`
+  and `PlaceSidebarCard`, threaded from their respective parent pages
+  (which already resolve `place.cityId` for the `DETAIL_OPEN` beacon), and
+  pass it into the existing `trackCta()` helpers in both files.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 implementation
+  (Publication Analytics)

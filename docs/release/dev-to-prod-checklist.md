@@ -20,13 +20,17 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 2 — Search Ranking (COMPLETE)
-Last updated:       2026-08-08
-Last updated by:    Claude Code (Admin Search corrective phase deployed to
-                     DEV at 84114c10, CI + Docker Build & Push green,
-                     authenticated six-tab smoke on actual admin.dev.mamago.by
-                     all green — Task 2 closed)
-Unresolved P0/P1:   none from Task 1 or Task 2 — Tasks 3–15 remain TODO, not started
+Active task:        Task 3 — Publication Analytics (COMPLETE_PENDING_BROWSER_SMOKE)
+Last updated:       2026-08-09
+Last updated by:    Claude Code (audit found a real, substantial, DB-backed
+                     UserEvent analytics pipeline + real admin dashboards
+                     already exist, no mock data; fixed one confirmed
+                     correctness bug (Offer DETAIL_OPEN cityId) and one
+                     confirmed live-CTA tracking gap (phone/website/
+                     Instagram/offer primary CTA); added critical test
+                     coverage; controlled proof green on local dev DB +
+                     server; pending owner-controlled DEV deploy + smoke)
+Unresolved P0/P1:   none from Task 1, 2, or 3 — Tasks 4–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -918,15 +922,202 @@ are understandable; an admin cannot arbitrarily break organic ranking.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+AUDIT:
+EXISTING — A real, substantial, DB-backed first-party analytics system
+already exists, not just search-adjacent scaffolding. `UserEvent` (Prisma
+model: `userId?|sessionId?|eventType: UserEventType|entityType?|entityId?|
+vertical?|cityId?|meta: Json?|createdAt`, indexed on
+`[userId,createdAt]|[sessionId,createdAt]|[eventType,createdAt]|
+[entityType,entityId,createdAt]|[vertical,createdAt]|[cityId,createdAt]`) is
+the single event log, written via `trackUserEvent()`
+(`src/server/services/analytics/AnalyticsEventService.ts`, fire-and-forget,
+never throws) from a validated public endpoint (`POST /api/analytics/events`,
+zod-validated enum fields, meta capped 4096 bytes, no IP/UA stored — only
+optional `userId`/client-generated `sessionId`). `UserEventType` covers
+`PAGE_VIEW|CARD_VIEW|DETAIL_OPEN|SAVE|UNSAVE|PLAN_ADD|PLAN_REMOVE|CTA_CLICK|
+SEARCH_APPLY|FILTER_APPLY|BOOKING_*|FEEDBACK_LEFT`; `AnalyticsEntityType`
+covers all 5 target content types (`EVENT|PLACE|OFFER|ROUTE|ARTICLE`).
+**The critical Open/View signal already fires for real**: `AnalyticsDetailBeacon`
+(server component, writes `DETAIL_OPEN`) is wired into every one of the 5
+content types' real detail pages (confirmed by reading each: events, places,
+offers incl. programs, routes, articles incl. city-scoped blog) — the
+historical risk named in this task's own instructions ("View/Open event
+реально не эмитится") is **not** the case here; it was already fixed before
+this session. `CARD_VIEW` (listing impression, `AnalyticsCardViewTracker`,
+IntersectionObserver ≥35% visibility, fires once via a `useRef` guard — no
+double-count risk, including under React StrictMode double-invoke) is wired
+for Event and Route listing cards. `SAVE`/`PLAN_ADD` are tracked for
+Place/Event (`/api/save/idea`, `/api/save/plan`); `CTA_CLICK` is tracked for
+Event's plan/buy actions (`EventPageView.handlePlan/handleBuy`). Admin
+`/admin/analytics` is a real, 5-tab (Overview/Audience Segments/Behavior/
+Content Performance/Funnels), RBAC-gated (`requireRole([ADMIN,MODERATOR])`)
+dashboard suite — every tab fetches its own bounded/parameterized
+`/api/admin/analytics/*` endpoint backed by real `UserEvent`
+aggregation (`analyticsOverview/ContentPerformance/Funnels/Behavior/
+Segments.service.ts`); grep for mock/fake/placeholder markers across all 10
+admin-analytics components found nothing — **no mock data**, unlike the
+Search overview's pre-fix state in Task 2. Business-facing per-publication
+performance is real too, just not under a page named "Analytics":
+`/business/dashboard` (`getBusinessWorkspaceData`/`getPerformanceMetricsByEntity`,
+`src/server/services/business/businessWorkspace.service.ts`) shows a real
+"top publications" table (views/saves/planAdds/ctaClicks per Event/Offer)
+and `getBookingAnalytics(businessId)` shows real rolling-30-day booking
+stats — both **server-side scoped** (`OR:[{businessId},{ownerUserId}]` /
+`ownerBusinessId` directly in the Prisma `WHERE`, confirmed by reading the
+query code, not just the UI) — no cross-business data-isolation risk found.
+PARTIAL/BROKEN — Confirmed via direct code reads (not assumption):
+(1) **Offer `DETAIL_OPEN` events are tagged with the wrong `cityId`** —
+`src/app/(public)/[city]/offers/[section]/[slug]/page.tsx:249` passes
+`cityId={offer.placeId}` (a Place id) into `AnalyticsDetailBeacon`, not a
+real City id; every city-scoped admin-analytics filter/breakdown silently
+mis-buckets or drops real Offer view events. Isolated to this one file —
+Place's own beacon correctly uses `place.cityId`; the `programs/[slug]`
+Offer variant correctly passes `cityId={null}`. (2) **Phone/contact-reveal
+CTA — a signal category this task explicitly names — is completely
+untracked** despite being a real, live action: the shared `CallActionButton`
+(`src/components/shared/CallActionButton.tsx`, used by both Place's
+"Позвонить" button in two page variants — premium `PlaceSidebarCard.tsx`
+and marketplace `PlaceHero.tsx` — and Event's `EventDecisionPanel.tsx`) has
+no analytics call at all. (3) **Offer's primary CTA (book/call,
+`OfferPageView.handlePrimary`) fires zero analytics** — confirmed the real
+production render path (`[city]/offers/[section]/[slug]/page.tsx:259`) uses
+no `onPrimary` override, so this default handler is what actually runs; Offer
+already has `SAVE` tracked but not its main conversion action. (4) **Place's
+"Сайт"/Instagram link CTAs are untracked** — same shared-component pattern
+(`SidebarCardContactRow` in `src/components/shared/SidebarCard.tsx`, used by
+both Place variants) has no onClick hook. (5) Content Performance's derived
+"Open %" column reads as misleading 0% for Place/Offer/Article (no
+`CARD_VIEW`⇒`views` always 0 for those types) even though the raw `Opens`
+column (from `DETAIL_OPEN`) is real and correct — a cosmetic derived-metric
+issue, not a missing-data one (BACKLOG-026). (6) `Article.views` is a second,
+uncorrelated raw counter parallel to `UserEvent`, pre-existing, not read by
+any admin dashboard (BACKLOG-027). (7) `PAGE_VIEW`/`UNSAVE`/`PLAN_REMOVE`
+enum values defined, never emitted (BACKLOG-028). (8) No `SHARE` signal
+despite live Share UI on Route/Place/Article — would need a new enum value
++ hand-written migration, deferred (BACKLOG-029). (9) `/business/analytics`
+is a 14-line "Раздел в разработке" placeholder — explicitly allowed to
+defer per this task's own §18 guidance since `/business/dashboard` already
+covers real, correctly-scoped per-publication data (BACKLOG-030). (10)
+`/api/publication-stats/[entityId]` unconditionally returns
+`buildEmptyPublicationStats()` (self-documented in code: "реальный
+агрегатор ещё не подключён") behind a full, production-ready admin+business
+UI (period switcher, 8 sections) — an **honest empty state**, not fake data,
+so it does not violate the "no fake analytics" hard requirement; redundant
+with the already-working Content Performance dashboard (BACKLOG-031). (11)
+Zero test coverage existed anywhere in the analytics stack before this
+session (services, routes, components) — addressed minimally in
+IMPLEMENTATION/VERIFICATION below, not left to backlog, since Exit
+Criterion 11 requires "relevant tests green."
+MISSING — No dedicated event-warehouse/streaming infra (correctly not
+needed at this scale — `UserEvent` + on-the-fly aggregation is adequate,
+matches "do not build a data platform"). `CARD_VIEW` impressions for
+Place/Offer listings (BACKLOG-032, explicitly optional per this task's own
+"impression not automatically mandatory" guidance). `SAVE`/`PLAN_ADD` for
+Route (BACKLOG-033, small/secondary entity). Rate limiting on the ingestion
+endpoint (BACKLOG-034 — deliberately not added: the repo's only reusable
+limiter is Postgres-backed and would double the write cost of every
+analytics event, directly against this task's server-cost principle; not a
+proven abuse vector at current scale). Scheduled recompute of
+`UserBehaviorProfile.segmentKeys` for inactive users (BACKLOG-035, Task
+5-adjacent, out of Task 3's view/CTA measurement scope).
+DO NOT TOUCH — `UserEvent` schema/ingestion pipeline; `DETAIL_OPEN`/
+`CARD_VIEW`/`SAVE`/`PLAN_ADD` emitters that already work correctly;
+`UserBehaviorProfile`/`SegmentResolverService` aggregation internals; the
+entire `/admin/analytics` 5-tab dashboard suite and its 6 backing API
+routes (real, RBAC-correct, no mock data); `/business/dashboard`'s
+per-publication table and its server-side business scoping;
+`getBookingAnalytics`; `SearchQueryLog`/search analytics (Task 2, out of
+this task's boundary per §24 of this task's own instructions).
+IMPLEMENTATION SCOPE: (a) fix the confirmed Offer `cityId` correctness bug
+— one file, switch to the same `citySlug` fallback resolution already built
+into `trackUserEvent`/`resolveCityId`, zero schema change; (b) add
+`CTA_CLICK` tracking for the 3 confirmed live-but-untracked CTA categories
+(phone/contact-reveal, website link, Offer primary action) by adding a
+single optional `onClick` hook to the 2 already-shared, already-reused
+components (`CallActionButton`, `SidebarCardContactRow`) and wiring it from
+the 4 call sites that have the needed entity context in scope, plus one
+direct `postAnalyticsEvent` call in `OfferPageView.handlePrimary` matching
+the exact pattern already proven in `EventPageView.handlePlan/handleBuy`;
+(c) add critical tests per §29 (event ingestion validation, content-
+performance aggregation correctness including the cityId fix, business
+isolation). No schema/migration, no new model, no new dependency, no new
+analytics pipeline — 100% reuse of the existing `UserEvent`/`trackUserEvent`/
+`postAnalyticsEvent`/`CTA_CLICK` machinery.
+GAPS: All P1 gaps from IMPLEMENTATION SCOPE closed this session (see
+IMPLEMENTATION/VERIFICATION below). Remaining findings are P2/P3, routed to
+`docs/engineering/backlog.md` (BACKLOG-026 through BACKLOG-036) — none
+blocks Task 3's Exit Criteria, none reopens Task 1/2.
+IMPLEMENTATION: `AnalyticsDetailBeacon` on the Offer city-scoped detail page
+now passes `citySlug` instead of the wrong `cityId={offer.placeId}`
+(`src/app/(public)/[city]/offers/[section]/[slug]/page.tsx`). `CallActionButton`
+and `SidebarCardContactRow` (`src/components/shared/`) gained a backward-
+compatible optional `onClick` hook, wired from 4 call sites that already had
+the needed entity context: `PlacePhoneActions.tsx`/`PlaceSidebarCard.tsx`
+(premium Place), `PlaceHero.tsx` (marketplace Place, phone+website+
+Instagram), and `EventDecisionPanel.tsx` (Event phone CTA, the one gap in
+an otherwise-tracked Event CTA surface). `OfferPageView.handlePrimary`
+(Offer's main book/call CTA) now fires `CTA_CLICK` directly, matching
+`EventPageView.handleBuy`'s exact existing pattern. `PremiumPlacePage.tsx`
+threads `placeId` into `PlaceSidebarCard` (new required prop; only caller
+updated, confirmed via grep). No schema/migration, no new dependency.
+COMMITS: `8f3f9383` (fix: Offer cityId correctness), `7077f8f0` (feat:
+CTA_CLICK tracking for phone/website/Instagram/offer CTAs), `56c1727f`
+(chore: critical analytics tests).
+VERIFICATION: `npx tsc --noEmit` clean (whole repo). `npx eslint` on all
+9 changed/new application files: 0 errors (7 pre-existing warnings on
+unrelated lines, none introduced by this diff — confirmed by reading each
+warning's line against the diff). `git diff --check` clean. Full `pnpm
+check:push` (`pnpm build`) — exit 0, full route manifest compiled. 3 new
+targeted test files, all passing against the real local dev DB
+(`npx tsx <file>` per this repo's convention): `/api/analytics/events`
+ingestion validation (invalid eventType/oversized meta/malformed JSON all
+correctly rejected without writing a row); `analyticsContentPerformance`
+aggregation (written DETAIL_OPEN/CTA_CLICK/SAVE counts match exactly what
+the admin dashboard's real query returns; citySlug→cityId resolution,
+the same fallback the Offer cityId fix now depends on, proven end-to-end);
+business publication-performance isolation (`getPerformanceMetricsByEntity`
+never returns a foreign entity's metrics when not explicitly requested —
+the mechanism `getBusinessWorkspaceData`'s server-side businessId/
+ownerUserId scoping relies on). Controlled proof against the real local
+dev DB + running dev server (Place "«Молекула»", real published entity,
+via the Browser pane): baseline `DETAIL_OPEN=21, CTA_CLICK=0` → one fresh
+full-page reload → `DETAIL_OPEN=22` (exactly +1, confirming one open per
+real page load, no double-count) → clicked the newly-tracked "Позвонить"
+button (`ref_13`, real `tel:` link) → network tab showed
+`POST /api/analytics/events → 200` → DB confirmed `CTA_CLICK=1` with
+`meta: {source:"detail", targetAction:"call"}`, exactly matching the new
+code. (Mid-proof, the local Postgres/Docker daemon briefly became
+unresponsive — a host-level Docker Desktop hiccup, confirmed via
+`docker exec ... pg_isready` and even `docker inspect` timing out/erroring
+independent of this session's code; waited for recovery rather than
+treating it as a code defect; DB was healthy again within minutes and the
+proof completed cleanly.)
+DEV SMOKE: Not yet performed on actual `dev.mamago.by` — pending owner
+deployment per the standing DEPLOYMENT LOOP process (this agent does not
+deploy). Local dev-server + local dev-DB verification above stands in for
+the pre-deploy portion; the deployed-DEV portion (repeat the same
+open→CTA-click proof against `https://dev.mamago.by`, plus an authenticated
+`/admin/analytics` Content Performance check if the owner logs in) remains
+open.
+BLOCKERS: None code/logic-side. Deployment-dependent final smoke requires
+owner-controlled DEV deploy via Telegram (per standing process) before this
+task can move to `COMPLETE`.
+BACKLOG/NOTES: BACKLOG-026 (misleading 0% Open Rate for Place/Offer/Article
+in admin Content Performance — raw Opens/Saves/CTA numbers remain correct),
+BACKLOG-027 (`Article.views` parallel counter, pre-existing), BACKLOG-028
+(dead `PAGE_VIEW`/`UNSAVE`/`PLAN_REMOVE` enum values), BACKLOG-029 (no
+`SHARE` signal — needs new enum value/migration), BACKLOG-030
+(`/business/analytics` empty placeholder — explicitly deferrable per this
+task's own §18), BACKLOG-031 (`/api/publication-stats/[entityId]` honest-
+empty stub, redundant with the working Content Performance dashboard),
+BACKLOG-032 (`CARD_VIEW` impressions missing for Place/Offer listings —
+explicitly optional per this task's own guidance), BACKLOG-033 (Route
+`SAVE`/`PLAN_ADD` untracked), BACKLOG-034 (no rate limiting on the
+ingestion endpoint — deliberately not added, would double write cost),
+BACKLOG-035 (`recomputeAllBehaviorSegments()` has no scheduled caller),
+BACKLOG-036 (new Place CTA_CLICK events lack cityId — this session's own
+minor follow-up). None blocks Task 3's Exit Criteria.
 
 AUDIT FIRST existing analytics/tracking infrastructure: `/admin/analytics`,
 business analytics, analytics models, impressions, views, unique views, CTA,
