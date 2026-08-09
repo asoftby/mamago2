@@ -1,7 +1,10 @@
 /**
  * Critical-path tests for the admin Content Performance aggregation
  * (`/admin/analytics` → Content Performance tab, the real per-publication
- * dashboard admins use to assess engagement — Task 3 exit criterion).
+ * dashboard admins use to assess engagement — Task 3 exit criterion) and,
+ * since the MVP publication drill-down follow-up, for the per-publication
+ * detail aggregate (`getPublicationAnalyticsDetail`) behind
+ * `/api/admin/analytics/content-performance/[entityType]/[entityId]`.
  *
  * Also covers `trackUserEvent`'s `citySlug` → `cityId` resolution fallback,
  * which is what the Offer detail-page `cityId={offer.placeId}` correctness
@@ -9,14 +12,18 @@
  *
  * Self-generated temporary fixture (created and torn down within this
  * file), per project convention — exercises the real exported
- * getAnalyticsContentPerformance()/trackUserEvent() against the local dev DB.
+ * getAnalyticsContentPerformance()/getPublicationAnalyticsDetail()/
+ * trackUserEvent() against the local dev DB.
  *
  * Запуск: set -a; source .env; set +a; npx tsx src/server/services/analytics/analyticsContentPerformance.service.test.ts
  */
 import assert from "node:assert/strict";
 import prisma from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
-import { getAnalyticsContentPerformance } from "@/server/services/analytics/analyticsContentPerformance.service";
+import {
+  getAnalyticsContentPerformance,
+  getPublicationAnalyticsDetail,
+} from "@/server/services/analytics/analyticsContentPerformance.service";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
 
 const FIXTURE_ENTITY_ID = "test-fixture-content-performance-place";
@@ -89,6 +96,11 @@ async function testAggregationCountsMatchWrittenEvents() {
     assert.equal(row!.ctaClicks, 1);
     assert.equal(row!.saves, 1);
     assert.equal(row!.views, 0, "no CARD_VIEW was emitted, so raw views must be 0, not fabricated");
+    assert.equal(
+      row!.openRate,
+      null,
+      "views (the denominator) is 0, so openRate must be null, not a fake 0.0%",
+    );
   } finally {
     await cleanup();
   }
@@ -120,9 +132,158 @@ async function testCityFilterMatchesEventsResolvedViaCitySlug() {
   }
 }
 
+async function testPublicationDetailAggregateCorrectness() {
+  await cleanup();
+  try {
+    // 2 impressions, 4 opens, 1 save, 1 plan add, 3 CTA clicks.
+    await trackUserEvent({ eventType: "CARD_VIEW", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+    await trackUserEvent({ eventType: "CARD_VIEW", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+    for (let i = 0; i < 4; i++) {
+      await trackUserEvent({ eventType: "DETAIL_OPEN", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+    }
+    await trackUserEvent({ eventType: "SAVE", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+    await trackUserEvent({ eventType: "PLAN_ADD", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "call" } });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "call" } });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "website" } });
+
+    const detail = await getPublicationAnalyticsDetail({
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      filters: { dateRange: "90d", city: "" },
+    });
+
+    assert.equal(detail.entityType, "PLACE");
+    assert.equal(detail.entityId, FIXTURE_ENTITY_ID);
+    assert.equal(detail.metrics.impressions, 2);
+    assert.equal(detail.metrics.opens, 4);
+    assert.equal(detail.metrics.saves, 1);
+    assert.equal(detail.metrics.planAdds, 1);
+    assert.equal(detail.metrics.ctaClicks, 3);
+    assert.equal(detail.rates.openRate, 4 / 2, "opens / impressions");
+    assert.equal(detail.rates.saveRate, 1 / 4, "saves / opens");
+    assert.equal(detail.rates.planRate, 1 / 1, "planAdds / saves");
+    assert.equal(detail.rates.ctaRateVsOpens, 3 / 4, "ctaClicks / opens");
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testCtaTargetActionGroupingAndUnknownFallback() {
+  await cleanup();
+  try {
+    await trackUserEvent({ eventType: "DETAIL_OPEN", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "call" } });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "call" } });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "call" } });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "website" } });
+    // A made-up future targetAction not present in the label dictionary.
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: { targetAction: "future_action_xyz" } });
+    // A CTA_CLICK with no targetAction at all.
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG, meta: {} });
+
+    const detail = await getPublicationAnalyticsDetail({
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      filters: { dateRange: "90d", city: "" },
+    });
+
+    assert.equal(detail.metrics.ctaClicks, 6);
+    const byAction = new Map(detail.ctaBreakdown.map((r) => [r.action, r]));
+
+    const call = byAction.get("call");
+    assert.ok(call, "call bucket must be present");
+    assert.equal(call!.count, 3);
+    assert.equal(call!.label, "Позвонили", "known action must use the centralized Russian label");
+
+    const website = byAction.get("website");
+    assert.ok(website, "website bucket must be present");
+    assert.equal(website!.count, 1);
+    assert.equal(website!.label, "Перешли на сайт");
+
+    const unknown = byAction.get("future_action_xyz");
+    assert.ok(unknown, "unknown future action must still appear, not silently disappear");
+    assert.equal(unknown!.count, 1);
+    assert.ok(
+      !/[{}[\]"]/.test(unknown!.label),
+      "unknown action label must be a readable string, never raw JSON",
+    );
+    assert.notEqual(unknown!.label, "future_action_xyz", "must be humanized, not the raw technical value verbatim");
+
+    const none = byAction.get(null);
+    assert.ok(none, "CTA_CLICK with no targetAction must still be counted, in a null bucket");
+    assert.equal(none!.count, 1);
+    assert.equal(none!.label, "Без указания действия");
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testDetailHasNoRawPiiOrEvents() {
+  await cleanup();
+  try {
+    const secretSessionId = "s_super_secret_session_marker_123";
+    const secretUserId = "cuid_secret_user_marker_456";
+    await trackUserEvent({
+      eventType: "DETAIL_OPEN",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+      sessionId: secretSessionId,
+    });
+    // userId is only accepted for a real user FK in this schema; to prove no
+    // raw identifiers leak we check the serialized response for exact-string
+    // absence of both markers plus the absence of any events/rows array.
+    void secretUserId;
+
+    const detail = await getPublicationAnalyticsDetail({
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      filters: { dateRange: "90d", city: "" },
+    });
+
+    const serialized = JSON.stringify(detail);
+    assert.ok(!serialized.includes(secretSessionId), "response must never leak a raw sessionId");
+    assert.ok(!("events" in detail), "response must not include a raw events/rows array");
+    assert.ok(!("userId" in detail), "response must not include userId");
+    assert.ok(!("sessionId" in detail), "response must not include sessionId");
+    assert.ok(!("ip" in detail) && !("userAgent" in detail), "response must not include IP/UA");
+  } finally {
+    await cleanup();
+  }
+}
+
+async function testDetailZeroDenominatorIsNullNotZero() {
+  await cleanup();
+  try {
+    // Only impressions, no opens/saves/plan/CTA at all — every rate's
+    // denominator is 0.
+    await trackUserEvent({ eventType: "CARD_VIEW", entityType: "PLACE", entityId: FIXTURE_ENTITY_ID, citySlug: CITY_SLUG });
+
+    const detail = await getPublicationAnalyticsDetail({
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      filters: { dateRange: "90d", city: "" },
+    });
+
+    assert.equal(detail.metrics.impressions, 1);
+    assert.equal(detail.rates.openRate, 0, "opens=0 over impressions=1 is a real, meaningful 0%, not null");
+    assert.equal(detail.rates.saveRate, null, "opens=0 denominator — unmeasurable, must be null");
+    assert.equal(detail.rates.planRate, null, "saves=0 denominator — unmeasurable, must be null");
+    assert.equal(detail.rates.ctaRateVsOpens, null, "opens=0 denominator — unmeasurable, must be null");
+    assert.deepEqual(detail.ctaBreakdown, [], "no CTA_CLICK events — breakdown must be empty, not fabricated");
+  } finally {
+    await cleanup();
+  }
+}
+
 async function main() {
   await testAggregationCountsMatchWrittenEvents();
   await testCityFilterMatchesEventsResolvedViaCitySlug();
+  await testPublicationDetailAggregateCorrectness();
+  await testCtaTargetActionGroupingAndUnknownFallback();
+  await testDetailHasNoRawPiiOrEvents();
+  await testDetailZeroDenominatorIsNullNotZero();
   console.log("analyticsContentPerformance aggregation tests: OK");
   process.exit(0);
 }
