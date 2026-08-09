@@ -6,7 +6,7 @@ import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewType
 import type { AnalyticsContentPerformanceResult } from "@/lib/analytics/analyticsContentPerformanceTypes";
 import { cn } from "@/lib/utils";
 import { TableContainer } from "@/components/ui/table";
-import { PublicationAnalyticsDrawer } from "./PublicationAnalyticsDrawer";
+import { PublicationAnalyticsDrawer } from "@/components/analytics/PublicationAnalyticsDrawer";
 
 function buildQuery(
   filters: AnalyticsOverviewFilters,
@@ -339,6 +339,7 @@ export function AdminAnalyticsContentPerformance({
         onOpenChange={setDrawerOpen}
         publication={selected}
         filters={{ dateRange: filters.dateRange, city: filters.city }}
+        fetchBasePath="/api/admin/analytics/content-performance"
       />
     </div>
   );

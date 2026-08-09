@@ -10,6 +10,8 @@ interface PublicationAnalyticsDetailsProps {
   entityId: string;
   title: string;
   filters: Pick<AnalyticsOverviewFilters, "dateRange" | "city">;
+  /** e.g. "/api/admin/analytics/content-performance" or "/api/business/analytics/publications" — the shared drill-down endpoint shape is `${fetchBasePath}/${entityType}/${entityId}`. */
+  fetchBasePath: string;
 }
 
 const ENTITY_TYPE_LABEL_RU: Record<string, string> = {
@@ -84,15 +86,17 @@ function RateRow({ label, value }: { label: string; value: number | null }) {
 
 /**
  * Отчёт по одной публикации — загружается lazy только после открытия drawer.
- * Использует новый bounded aggregate endpoint
- * (/api/admin/analytics/content-performance/[entityType]/[entityId]) —
- * тот же UserEvent pipeline, без отдельного API/пайплайна.
+ * Общий компонент для Admin (Content Performance) и Business
+ * (/business/analytics) — оба используют один и тот же bounded aggregate
+ * (getPublicationAnalyticsDetail) через разные, RBAC/ownership-защищённые
+ * endpoints (fetchBasePath), без второй реализации расчёта или CTA-группировки.
  */
 export function PublicationAnalyticsDetails({
   entityType,
   entityId,
   title,
   filters,
+  fetchBasePath,
 }: PublicationAnalyticsDetailsProps) {
   const [data, setData] = useState<PublicationAnalyticsDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,13 +112,17 @@ export function PublicationAnalyticsDetails({
       try {
         const qs = new URLSearchParams({ dateRange: filters.dateRange, city: filters.city });
         const res = await fetch(
-          `/api/admin/analytics/content-performance/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}?${qs}`,
+          `${fetchBasePath}/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}?${qs}`,
           { credentials: "include" },
         );
         if (cancelled) return;
 
         if (res.status === 401 || res.status === 403) {
           setError("Недостаточно прав для просмотра отчёта");
+          return;
+        }
+        if (res.status === 404) {
+          setError("Публикация не найдена");
           return;
         }
         if (!res.ok) {
@@ -135,7 +143,7 @@ export function PublicationAnalyticsDetails({
     return () => {
       cancelled = true;
     };
-  }, [entityType, entityId, filters.dateRange, filters.city, retryKey]);
+  }, [entityType, entityId, filters.dateRange, filters.city, fetchBasePath, retryKey]);
 
   return (
     <div className={cn("space-y-4 p-4", loading && data && "opacity-60 pointer-events-none")}>

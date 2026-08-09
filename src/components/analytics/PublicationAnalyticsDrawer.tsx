@@ -32,20 +32,24 @@ export interface PublicationAnalyticsDrawerProps {
     entityId: string;
     title: string;
   } | null;
-  /** Тот же период/город, что выбран в Content Performance. */
+  /** Тот же период/город, что выбран в списке публикаций. */
   filters: Pick<AnalyticsOverviewFilters, "dateRange" | "city">;
+  /** Shared with PublicationAnalyticsDetails — see that component for the endpoint shape. */
+  fetchBasePath: string;
 }
 
 /**
- * Drawer/Modal с отчётом по одной публикации (Content Performance → drill-down).
- * Desktop → Dialog, mobile → bottom Sheet (через ResponsiveOverlay), как
- * PublicationStatsDrawer. Данные грузятся lazy только после открытия.
+ * Drawer/Modal с отчётом по одной публикации — общий для Admin (Content
+ * Performance) и Business (/business/analytics). Desktop → Dialog, mobile →
+ * bottom Sheet (через ResponsiveOverlay), как PublicationStatsDrawer. Данные
+ * грузятся lazy только после открытия.
  */
 export function PublicationAnalyticsDrawer({
   open,
   onOpenChange,
   publication,
   filters,
+  fetchBasePath,
 }: PublicationAnalyticsDrawerProps) {
   return (
     <ResponsiveOverlay
@@ -71,6 +75,7 @@ export function PublicationAnalyticsDrawer({
             entityId={publication.entityId}
             title={publication.title}
             filters={filters}
+            fetchBasePath={fetchBasePath}
           />
         </Suspense>
       )}
