@@ -6,6 +6,7 @@ import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewType
 import type { AnalyticsContentPerformanceResult } from "@/lib/analytics/analyticsContentPerformanceTypes";
 import { cn } from "@/lib/utils";
 import { TableContainer } from "@/components/ui/table";
+import { PublicationAnalyticsDrawer } from "./PublicationAnalyticsDrawer";
 
 function buildQuery(
   filters: AnalyticsOverviewFilters,
@@ -24,7 +25,8 @@ function buildQuery(
   return q.toString();
 }
 
-function pct(x: number): string {
+function pct(x: number | null): string {
+  if (x == null) return "—";
   return `${(x * 100).toFixed(1)}%`;
 }
 
@@ -58,6 +60,12 @@ export function AdminAnalyticsContentPerformance({
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<string>("views");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selected, setSelected] = useState<{
+    entityType: string;
+    entityId: string;
+    title: string;
+  } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +116,11 @@ export function AdminAnalyticsContentPerformance({
       setSortDir(key === "title" ? "asc" : "desc");
     }
     setPage(1);
+  };
+
+  const openDetails = (row: { entityType: string; entityId: string; title: string }) => {
+    setSelected({ entityType: row.entityType, entityId: row.entityId, title: row.title });
+    setDrawerOpen(true);
   };
 
   if (loading && !data) {
@@ -185,13 +198,15 @@ export function AdminAnalyticsContentPerformance({
                     </button>
                   </th>
                 ))}
+                <th className="whitespace-nowrap px-2 py-2 font-semibold text-gray-700" />
               </tr>
             </thead>
             <tbody>
               {data.performanceTable.map((row) => (
                 <tr
                   key={`${row.entityType}-${row.entityId}`}
-                  className="border-b border-gray-100 hover:bg-gray-50/80"
+                  className="cursor-pointer border-b border-gray-100 hover:bg-gray-50/80"
+                  onClick={() => openDetails(row)}
                 >
                   <td className="max-w-[200px] truncate px-2 py-1.5 font-medium text-gray-900">
                     {row.title}
@@ -216,6 +231,18 @@ export function AdminAnalyticsContentPerformance({
                   </td>
                   <td className="px-2 py-1.5 tabular-nums">
                     {pct(row.clickRateVsPlans)}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDetails(row);
+                      }}
+                      className="whitespace-nowrap rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-100"
+                    >
+                      Подробнее
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -306,6 +333,13 @@ export function AdminAnalyticsContentPerformance({
           rows={data.verticalComparison}
         />
       </div>
+
+      <PublicationAnalyticsDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        publication={selected}
+        filters={{ dateRange: filters.dateRange, city: filters.city }}
+      />
     </div>
   );
 }
