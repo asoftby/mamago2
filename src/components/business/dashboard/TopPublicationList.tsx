@@ -54,13 +54,22 @@ export function TopPublicationList({
             Список собран по реальным действиям: лиды, сохранения и интерес к публикации.
           </p>
         </div>
-        <Link
-          href={promotionHref}
-          className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
-        >
-          Продвижение
-          <Megaphone className="h-4 w-4" />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/business/analytics"
+            className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
+          >
+            Вся аналитика
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href={promotionHref}
+            className="inline-flex items-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
+          >
+            Продвижение
+            <Megaphone className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6 space-y-3">
