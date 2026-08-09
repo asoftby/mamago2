@@ -87,8 +87,57 @@ async function testForeignEntityMetricsAreNotReturned() {
   }
 }
 
+const MY_PLACE_ID = "test-fixture-business-isolation-my-place";
+
+async function cleanupPlaceAndDateRange() {
+  await prisma.userEvent.deleteMany({ where: { entityId: MY_PLACE_ID } });
+}
+
+async function testOpensAndPlacesAndDateRange() {
+  await cleanupPlaceAndDateRange();
+  try {
+    const now = new Date();
+    const longAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+    // Within range: 1 DETAIL_OPEN. Out of range: 1 more DETAIL_OPEN a year ago.
+    await trackUserEvent({ eventType: "DETAIL_OPEN", entityType: "PLACE", entityId: MY_PLACE_ID });
+    await prisma.userEvent.create({
+      data: { eventType: "DETAIL_OPEN", entityType: "PLACE", entityId: MY_PLACE_ID, createdAt: longAgo },
+    });
+
+    const metricsAllTime = await getPerformanceMetricsByEntity({
+      events: [],
+      offers: [],
+      places: [{ id: MY_PLACE_ID, title: "My place", updatedAt: now, status: "PUBLISHED" }],
+    });
+    assert.equal(
+      metricsAllTime.get(`PLACE:${MY_PLACE_ID}`)?.opens,
+      2,
+      "opens (DETAIL_OPEN) must now be tracked, and places param must be honored, all-time",
+    );
+
+    const metricsScoped = await getPerformanceMetricsByEntity({
+      events: [],
+      offers: [],
+      places: [{ id: MY_PLACE_ID, title: "My place", updatedAt: now, status: "PUBLISHED" }],
+      dateRange: {
+        start: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+        end: new Date(now.getTime() + 60 * 1000),
+      },
+    });
+    assert.equal(
+      metricsScoped.get(`PLACE:${MY_PLACE_ID}`)?.opens,
+      1,
+      "dateRange must exclude the year-old event, only the recent one counts",
+    );
+  } finally {
+    await cleanupPlaceAndDateRange();
+  }
+}
+
 async function main() {
   await testForeignEntityMetricsAreNotReturned();
+  await testOpensAndPlacesAndDateRange();
   console.log("business publication-performance isolation tests: OK");
   process.exit(0);
 }
