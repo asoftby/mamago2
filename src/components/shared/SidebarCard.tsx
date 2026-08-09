@@ -142,11 +142,13 @@ export function SidebarCardContactRow({
   href,
   value,
   external = false,
+  onClick,
 }: {
   label: string;
   href: string;
   value: string;
   external?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <div
@@ -173,6 +175,7 @@ export function SidebarCardContactRow({
         href={href}
         target={external ? "_blank" : undefined}
         rel={external ? "noopener noreferrer" : undefined}
+        onClick={onClick}
         style={{
           fontWeight: 500,
           color: "#141210",

@@ -192,6 +192,7 @@ export function PremiumPlacePage({
 
           <aside className="min-w-0">
             <PlaceSidebarCard
+              placeId={place.id}
               phones={place.phones}
               website={place.website}
               instagramUrl={place.instagramUrl}

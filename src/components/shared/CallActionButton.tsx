@@ -9,11 +9,14 @@ export function CallActionButton({
   subtitle,
   className,
   children,
+  onClick,
 }: {
   phones: NormalizedPhone[];
   subtitle?: string;
   className?: string;
   children: ReactNode;
+  /** Optional analytics hook, fired before the call/tel: action, e.g. a CTA_CLICK track call. */
+  onClick?: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -21,7 +24,7 @@ export function CallActionButton({
 
   if (phones.length === 1) {
     return (
-      <a href={phones[0].href} className={className}>
+      <a href={phones[0].href} className={className} onClick={onClick}>
         {children}
       </a>
     );
@@ -29,7 +32,14 @@ export function CallActionButton({
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className={className}
+        onClick={() => {
+          onClick?.();
+          setOpen(true);
+        }}
+      >
         {children}
       </button>
 

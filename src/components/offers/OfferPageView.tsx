@@ -23,6 +23,7 @@ import { toast } from "@/lib/toast";
 import { CallModal } from "@/components/shared/CallModal";
 import { FaqSection } from "@/components/public/FaqSection";
 import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
 
 export interface OfferDirectCtaInfo {
   offerId: string;
@@ -214,6 +215,14 @@ export function OfferPageView({
   }, []);
 
   const handlePrimary = useCallback(() => {
+    void postAnalyticsEvent({
+      eventType: "CTA_CLICK",
+      entityType: "OFFER",
+      entityId: data.id,
+      vertical: "CITY",
+      citySlug: data.citySlug,
+      meta: { source: "detail", targetAction: "primary" },
+    });
     if (onPrimary) {
       onPrimary();
       return;
@@ -232,7 +241,7 @@ export function OfferPageView({
     if (phone && typeof window !== "undefined") {
       window.location.href = `tel:${phone}`;
     }
-  }, [data.cta.phone, data.cta.phones, onPrimary, openBookingForShift, shiftOptions]);
+  }, [data.citySlug, data.cta.phone, data.cta.phones, data.id, onPrimary, openBookingForShift, shiftOptions]);
 
   const handleSave = useCallback(() => {
     if (onSave) {

@@ -10,14 +10,16 @@ export function PlacePhoneActionButton({
   placeTitle,
   className,
   children,
+  onClick,
 }: {
   phones: NormalizedPlacePhone[];
   placeTitle?: string;
   className?: string;
   children: ReactNode;
+  onClick?: () => void;
 }) {
   return (
-    <CallActionButton phones={phones} subtitle={placeTitle} className={className}>
+    <CallActionButton phones={phones} subtitle={placeTitle} className={className} onClick={onClick}>
       {children}
     </CallActionButton>
   );

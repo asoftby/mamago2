@@ -8,6 +8,7 @@ import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { OwnerPlaceEditDropdown } from "./OwnerPlaceEditDropdown";
 import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
 import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
 import {
   SidebarCard,
   SidebarCardSection,
@@ -93,6 +94,16 @@ export function PlaceHero({
   const instagramDisplay = instagramUrl
     ? "@" + instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\/?/, "").replace(/\/$/, "")
     : null;
+
+  const trackCta = (targetAction: string) => {
+    void postAnalyticsEvent({
+      eventType: "CTA_CLICK",
+      entityType: "PLACE",
+      entityId: placeId,
+      vertical: "CITY",
+      meta: { source: "detail", targetAction },
+    });
+  };
 
   const summaryLines =
     workingHoursSummary
@@ -291,6 +302,7 @@ export function PlaceHero({
                       href={website.startsWith("http") ? website : `https://${website}`}
                       value={websiteDisplay}
                       external
+                      onClick={() => trackCta("website")}
                     />
                   )}
                   {instagramUrl && instagramDisplay && (
@@ -299,6 +311,7 @@ export function PlaceHero({
                       href={instagramUrl}
                       value={instagramDisplay}
                       external
+                      onClick={() => trackCta("instagram")}
                     />
                   )}
                 </div>
@@ -313,6 +326,7 @@ export function PlaceHero({
                     phones={phones}
                     placeTitle={title}
                     className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white transition-colors hover:bg-[#E86A3A]"
+                    onClick={() => trackCta("call")}
                   >
                     <Phone className="h-4 w-4 shrink-0" />
                     Позвонить

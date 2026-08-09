@@ -12,6 +12,7 @@ import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
 import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { CallActionButton } from "@/components/shared/CallActionButton";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
 
 /**
  * Переформатирует адрес из Google-формата «Улица Дом, Город, Область»
@@ -47,6 +48,7 @@ type EventDecisionPanelProps = {
   data: Pick<
     EventPageData,
     | "id"
+    | "citySlug"
     | "breadcrumbs"
     | "ageFromBadge"
     | "categoryLabel"
@@ -345,6 +347,16 @@ export function EventDecisionPanel({
               phones={data.cta.phones}
               subtitle={data.title}
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.65)] transition-colors hover:border-[#141210] hover:text-[#141210]"
+              onClick={() =>
+                void postAnalyticsEvent({
+                  eventType: "CTA_CLICK",
+                  entityType: "EVENT",
+                  entityId: data.id,
+                  vertical: "CITY",
+                  citySlug: data.citySlug,
+                  meta: { source: "detail", section: "afisha", targetAction: "call" },
+                })
+              }
             >
               <Phone size={20} strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Позвонить</span>
