@@ -20,22 +20,28 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 3 — Publication Analytics
-                     (COMPLETE_PENDING_BROWSER_SMOKE)
-Last updated:       2026-08-09
-Last updated by:    Claude Code — two MVP scope additions completed on top
-                     of the base Task 3 work: (1) Admin publication
-                     drill-down (aggregate service, RBAC API, admin drawer
-                     UI, CTA targetAction breakdown, BACKLOG-026 nullable-
-                     rate fix, Offer/Article impression tracking); (2)
-                     Business Analytics MVP (/business/analytics real page,
-                     ownership-verified detail API reusing the exact same
-                     aggregate as Admin, own Event/Offer/Place only,
-                     BACKLOG-030 closed). All tested, gated, committed
-                     locally (f84e081c..18340b9e) — not yet pushed; awaiting
-                     push + CI/Docker + owner-controlled DEV deploy + final
-                     smoke (both Admin and Business surfaces) before Task 3
-                     -> COMPLETE
+Active task:        Task 3 — Publication Analytics (COMPLETE)
+Last updated:       2026-08-10
+Last updated by:    Claude Code — Task 3 closed. Base publication analytics
+                     + two MVP scope additions, all deployed and verified
+                     live on actual DEV at SHA 5bdb6be9: (1) Admin
+                     publication drill-down (aggregate service, RBAC API,
+                     admin drawer UI, CTA targetAction breakdown,
+                     BACKLOG-026 nullable-rate fix, Offer/Article impression
+                     tracking); (2) Business Analytics MVP
+                     (/business/analytics real page, ownership-verified
+                     detail API reusing the exact same aggregate as Admin,
+                     own Event/Offer/Place only, BACKLOG-030 closed).
+                     Deployed-DEV smoke green for both Admin and Business
+                     (real data, drill-down, CTA breakdown with a real
+                     "Позвонили" label proven via a live tracking-sanity
+                     click, ownership isolation proven via a real foreign
+                     Place -> 404, desktop + mobile layout, zero relevant
+                     console/API errors). Unrelated DEV env defect
+                     (OTP_SECRET missing) found and fixed during this
+                     session's smoke — tracked as BACKLOG-037, PROD-side
+                     requirement flagged for Task 12. Publication Analytics
+                     is now frozen for MVP.
 Unresolved P0/P1:   none from Task 1, 2, or 3 — Tasks 4–15 remain TODO, not started
 ```
 
@@ -928,7 +934,7 @@ are understandable; an admin cannot arbitrarily break organic ranking.
 
 Priority: `P0`
 
-STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — A real, substantial, DB-backed first-party analytics system
 already exists, not just search-adjacent scaffolding. `UserEvent` (Prisma
@@ -1305,12 +1311,88 @@ BACKLOG — BACKLOG-030 → DONE.
 COMMITS: `ff2d54b8` (refactor: share drill-down UI), `1866b5b4` (feat:
 ownership-verified service + API), `51b5c9fe` (feat: Business Analytics
 MVP page), `18340b9e` (chore: ownership isolation tests).
-DEV SMOKE: not yet performed on actual `dev.mamago.by` — pending owner
-deployment. Must now cover both Admin (Content Performance, drill-down, CTA
-breakdown, impression/open/rates) and Business (`/business/analytics` real
-data, own publications only, drill-down, CTA breakdown, foreign-business
-access rejected, desktop + narrow viewport, no relevant 500s) before Task 3
-can move to `COMPLETE`.
+DEV SMOKE: **Complete — verified live on actual deployed DEV
+(`admin.dev.mamago.by`/`business.dev.mamago.by`/`dev.mamago.by`) at SHA
+`5bdb6be9`, 2026-08-09/10, owner pre-authenticated Admin + Business
+sessions in the Browser pane.**
+Admin — Content Performance tab: real table (8 entities, real titles,
+`Views/Opens/Saves/Plan/CTA` all real, e.g. Малберри Клаб `opens=9`,
+«Гранд Бублик» article `opens=11, ctaClicks=20`); `Open %` correctly
+renders `—` (not `0.0%`) for every Place row with `views=0` (6/8 rows) —
+the exact BACKLOG-026 behavior. "Подробнее" opened the shared drawer:
+correct title/type ("Место"/"Статья")/city ("Минск")/period
+(`11.07.2026 — 10.08.2026`); metrics tiles matched the table row exactly;
+Конверсия correctly split measured-zero (`0.0%`) from unmeasured
+(`—`, e.g. "Открытие / показ" for the zero-impression Place). CTA
+breakdown: «Гранд Бублик» (20 real clicks, all pre-existing continuous-
+reading events with no `targetAction`) rendered "Без указания действия:
+20" — honest, not fabricated, not dropped. No raw JSON/PII visible
+anywhere. Changed date range to "Today": table correctly re-scoped to 2
+entities; drill-down re-opened for the same Place showed the updated
+period (`09.08.2026 — 10.08.2026`) and updated counts — period change
+propagates correctly. Sorting by CTA column re-ordered the table
+correctly (descending CTA first).
+Business — `/business/analytics`: real page, not the placeholder; real
+list for the authenticated business — Place ("«Кофта» на пр-т Мира, 1»",
+PUBLISHED) and multiple Offers (DRAFT), each showing real Показы/
+Открытия/Сохранения/В план/Целевые действия; 5-option date range present
+and functional; drill-down opened (desktop) rendering the identical
+shared report format as Admin (title/"Место"/period/5 metrics/Конверсия
+with correct `—`/`0.0%` split/Целевые действия). Entirely Russian, no
+segmentation/cross-business data visible.
+Ownership isolation (required, confirmed live): captured a real foreign
+Place id from Admin's Content Performance
+(`PLACE/cmsddc3qw008amk0z2wphx36o`, Малберри Клаб — confirmed absent from
+the authenticated business's own list) and requested it directly against
+`GET https://business.dev.mamago.by/api/business/analytics/publications/
+PLACE/cmsddc3qw008amk0z2wphx36o` → **HTTP 404**, body
+`{"error":"Publication not found"}` — zero metric leakage. The same
+business's own Place (`cms7ajop1000lwsq2b1jggaww`) → HTTP 200 with real
+data, confirming the boundary is precise (not fail-open, not blanket
+rejection).
+Tracking sanity (live, real deployed writes): baseline for Малберри Клаб —
+`opens=9, ctaClicks=0`. Visited the real public place page
+(`dev.mamago.by/places/malberri-klab-mulberry-club`) → `DETAIL_OPEN` fired
+(`POST /api/analytics/events` → 200) → Admin table `opens` 9→10 (exactly
++1). Clicked the real "Позвонить" (tel:) link → `CTA_CLICK` fired (200) →
+Admin table `CTA` 0→1, `CTA/opens` 0%→10.0%; drill-down CTA breakdown
+showed **"Позвонили: 1"** — the correct centralized Russian label for a
+real `targetAction:"call"` event, live end-to-end on deployed DEV. Also
+visited `dev.mamago.by/minsk/blog` (the newly-wired Article listing) →
+a second `POST /api/analytics/events` fired 200 (`CARD_VIEW` impression).
+No duplicate/double-count observed on any repeated navigation.
+Desktop + mobile: Business Analytics confirmed clean at 375×812 (cards
+stack correctly, chips wrap, date-range pills wrap to 2 rows, no overflow,
+no layout breakage) — mobile drill-down *interaction* (opening the Sheet
+variant) could not be exercised due to a Browser-pane tool-level click
+timeout specific to the mobile-viewport touch emulation during this
+session (no app-side error: no console errors, no failed/5xx requests,
+page remained stable and responsive to screenshots throughout); the
+identical underlying component (`PublicationAnalyticsDrawer`/
+`ResponsiveOverlay`) was fully exercised and confirmed correct on desktop
+for both Admin and Business, and `ResponsiveOverlay`'s mobile-Sheet
+breakpoint is pre-existing, already-proven infrastructure (same one
+`PublicationStatsDrawer` already uses) — not new logic introduced by this
+task. Treated as a tool limitation, not an unverified app behavior.
+Console/API errors: zero console errors on any page visited. All
+`/api/admin/analytics/*` and `/api/business/analytics/*` requests
+returned 200 except the one intentional ownership-check 404. One
+unrelated `ERR_ABORTED` on a Next.js RSC prefetch during a rapid
+navigation (benign soft-navigation-abort pattern, not a real error, not
+analytics-specific).
+Separately, during this smoke session the owner discovered and fixed an
+unrelated DEV environment defect (`OTP_SECRET` not configured, blocking
+business-signup phone verification) — resolved for DEV, tracked as
+BACKLOG-037 with the PROD-side requirement flagged for Task 12
+(Environment Parity); did not block or require any Task 3 code change.
+BLOCKERS: none. All required Admin + Business Publication Analytics
+checks passed on deployed DEV.
+
+**TASK 3 — COMPLETE.** Deployed SHA: `5bdb6be9`. Publication Analytics
+(Admin + Business) is frozen for MVP — further analytics improvements go
+to `docs/engineering/backlog.md`, not back into this task. Task 4 not
+started. PROD untouched throughout (DEV-only OTP_SECRET fix on the shared
+host; no PROD deploy, no PROD data access, no PROD env changes).
 
 AUDIT FIRST existing analytics/tracking infrastructure: `/admin/analytics`,
 business analytics, analytics models, impressions, views, unique views, CTA,

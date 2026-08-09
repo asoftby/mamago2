@@ -924,3 +924,43 @@ P3 — cleanup / polish / optional
   pass it into the existing `trackCta()` helpers in both files.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 3 implementation
   (Publication Analytics)
+
+## [BACKLOG-037] `OTP_SECRET` environment variable — DEV resolved, PROD still needs its own independent value
+
+- Status: PARTIALLY RESOLVED (DEV done 2026-08-09; PROD portion OPEN, P1)
+- Priority: P1 (PROD readiness — must be verified before first PROD deploy)
+- Area: Environment Parity / Business Onboarding / Secrets
+- Added: 2026-08-09
+- DEV resolution (2026-08-09): a DEV-only `OTP_SECRET` (generated with
+  `openssl rand -base64 48`, never printed/logged/committed) was added to
+  `dev-app-1`'s existing env mechanism on the shared host. Verified
+  read-only post-restart via `docker exec dev-app-1 sh -c 'printenv | grep
+  -c "^OTP_SECRET="'` → `1` (presence only, value never revealed). Owner
+  independently confirmed the business signup phone-verification flow
+  (`business.dev.mamago.by`, УНП/Юридическое название/Телефон ->
+  "Подтвердить") now works end-to-end with no `OTP_SECRET environment
+  variable is not configured` error. `prod-app-1`/`prod-db-1` on the same
+  host were not touched.
+- Original context: submitting the business-signup phone-verification step
+  returned the literal error `OTP_SECRET environment variable is not
+  configured. Please set a secure random string.` — DEV's environment was
+  missing the value entirely. Discovered incidentally by the owner while
+  looking for a second business account on deployed DEV for the Task 3
+  Business Analytics ownership-isolation smoke.
+- **Remaining requirement (P1, blocks first PROD deploy):** PROD must
+  receive its **own independent** `OTP_SECRET` value — never the same
+  secret as DEV's, never copied between environments. Not yet verified
+  whether PROD already has one set (this session did not check PROD's
+  environment — DEV-only per owner instruction). This must be explicitly
+  covered by **Task 12 — Environment Parity / PROD Configuration**'s own
+  audit (`docs/release/dev-to-prod-checklist.md`) when that task starts —
+  add `OTP_SECRET` to Task 12's env-variable parity matrix
+  (LOCAL/DEV/PROD requirement/verified) rather than assuming DEV's fix
+  extends to PROD.
+- Acceptance criteria (remaining): PROD confirmed to have its own
+  independently-generated `OTP_SECRET` (existence checked the same
+  read-only way — never comparing/printing values), verified as part of
+  Task 12, before first PROD deployment.
+- Source: owner-reported and owner-directed fix, during Task 3 (Publication
+  Analytics) deployed-DEV smoke.
+  smoke session.
