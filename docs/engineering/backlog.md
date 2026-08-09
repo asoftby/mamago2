@@ -610,33 +610,27 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-026] Content Performance "Open %" misleading for entity types without impression tracking
 
-- Status: OPEN
+- Status: RESOLVED (2026-08-09)
 - Priority: P2
 - Area: Analytics / Admin
 - Added: 2026-08-08
-- Reason deferred: raw `Opens`/`Saves`/`CTA` columns in
-  `/admin/analytics` Content Performance are real and correct for every
-  entity type today (Task 3 exit criteria — "assess publication
-  effectiveness" — is already satisfiable from those raw columns), so this
-  is a derived-metric polish issue, not a missing-data blocker.
-- Context: `analyticsContentPerformance.service.ts` computes
-  `openRate = views > 0 ? opens / views : 0`, where `views` sums only
-  `PAGE_VIEW`/`CARD_VIEW` events. `CARD_VIEW` (listing-card impression) is
-  only wired for Event/Route listing cards (`DiscoveryActivitiesGrid`,
-  `RouteCard`), not Place/Offer/Article. `PAGE_VIEW` is never emitted
-  anywhere. So for Place/Offer/Article, `views` is always 0 and the "Open
-  %" column in `AdminAnalyticsContentPerformance.tsx` always renders
-  "0.0%" even when the real `Opens` column (from `DETAIL_OPEN`, which does
-  fire for all 5 types) shows real, positive engagement — misleading if
-  read in isolation from the raw Opens number.
-- Current state: not started.
-- Dependencies: none.
-- Acceptance criteria: either render `openRate` as "—" (not "0.0%") when
-  `views === 0`, or wire `CARD_VIEW` onto Place/Offer listing cards
-  (`AnalyticsCardViewTracker` already exists and is reusable) so the ratio
-  is meaningful. Either is a small, isolated change.
+- Resolution: Task 3 MVP publication-analytics-drill-down follow-up made
+  two changes together: (1) `openRate`/`saveRate`/`planRate`/
+  `clickRateVsOpens`/`clickRateVsPlans` on `ContentPerformanceEntityRow`/
+  `ContentPerformanceComparisonRow` are now `number | null` — `null`
+  whenever the real denominator is 0, rendered as `—` (not a fake `0.0%`)
+  by `pct()` in `AdminAnalyticsContentPerformance.tsx` and the new
+  publication drill-down; (2) `CARD_VIEW` impression tracking was wired
+  onto the real Offer (`[city]/programs/page.tsx`, homepage "Занятия" row)
+  and Article (`/blog` journal index, homepage "Статьи и обзоры" row)
+  discovery surfaces, closing the "no impressions tracked at all" root
+  cause for those two types (see BACKLOG-032). Place still has no public
+  listing/catalog surface at all (confirmed by routing audit — remains
+  open, see BACKLOG-032), so Place's `views`/`openRate` stay legitimately
+  `0`/`—` until such a surface exists — now correctly rendered as `—`
+  instead of a misleading `0.0%`.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
-  (Publication Analytics)
+  (Publication Analytics) + MVP drill-down follow-up
 
 ## [BACKLOG-027] `Article.views` is a second, uncorrelated view counter parallel to `UserEvent`
 
@@ -778,25 +772,42 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-032] `CARD_VIEW` impression tracking missing for Place/Offer listing cards
 
-- Status: OPEN
+- Status: PARTIALLY RESOLVED (2026-08-09) — Offer/Article done, Place open
 - Priority: P3
 - Area: Analytics
 - Added: 2026-08-08
-- Reason deferred: Task 3's own instructions explicitly say impressions are
-  not automatically mandatory ("Не считать impression автоматически
-  обязательным, если существующая система его не использует — сначала
-  определить стоимость и ценность"); the critical Open/View signal
-  (`DETAIL_OPEN`) already works for Place/Offer, satisfying the exit
-  criteria without this.
-- Context: `AnalyticsCardViewTracker` (IntersectionObserver-based,
-  fire-once, cheap) is already built and proven on `DiscoveryActivitiesGrid`
-  (Event) and `RouteCard` (Route), but not wired into Place or Offer
-  listing-card components.
-- Current state: not started.
-- Dependencies: none — reuses an existing, already-cheap component.
-- Acceptance criteria: wire `AnalyticsCardViewTracker` into Place/Offer
-  listing cards if/when impression-rate reporting for those types becomes
-  a real product need (e.g. feeds BACKLOG-026's Open % fix).
+- Resolution (Offer, Article): Task 3 MVP drill-down follow-up audited the
+  real listing/card surfaces for Place/Offer/Article and wired
+  `AnalyticsCardViewTracker` onto every real one found for Offer and
+  Article: `src/app/(public)/[city]/programs/page.tsx` (the "Занятия"
+  full listing), `src/features/city-home/components/
+  CityHomeContentRows.tsx`'s `CityHomeClassesSection` (homepage "Занятия"
+  preview row, Offer) and `CityHomeJournalSection` (homepage "Статьи и
+  обзоры" preview row, Article), and `src/app/(public)/blog/BlogIndex.tsx`
+  (the canonical `/blog` journal index, both the featured article and the
+  article list). `listCityHomeArticles.ts` gained the article's own `id`
+  field (previously not selected at all — a real, separate gap this fix
+  surfaced) since impression tracking needs the real Article id, not just
+  its slug.
+- Remaining (Place): confirmed by routing audit — `/[city]/places` has
+  only a `[slug]` detail route, no listing `page.tsx`; no component search
+  (`PlaceCard`, homepage, tag pages, `where-to-go`/`kuda` — both pure
+  redirects) found any public Place browsing/catalog surface. Place is
+  today only reachable via direct link, search, or embedded article
+  content blocks (`ArticlePlaceCardBlock`). There is genuinely nothing to
+  wire impression tracking onto for Place yet — inventing a new listing
+  page would be a real scope expansion, explicitly out of bounds for this
+  follow-up ("do not invent a new impression system" / reuse existing
+  surfaces only).
+- Current state: Offer + Article done and deployed-pending; Place not
+  started (blocked on a Place listing/catalog page existing at all — a
+  product surface decision, not an analytics one).
+- Dependencies (Place): a real Place listing/catalog page would need to
+  exist first; out of Task 3's scope to build one.
+- Acceptance criteria (Place): once/if a Place listing surface exists,
+  wire `AnalyticsCardViewTracker` onto it the same way.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
+  (Publication Analytics) + MVP drill-down follow-up
 - Source: `docs/release/dev-to-prod-checklist.md` Task 3 audit
   (Publication Analytics)
 

@@ -20,16 +20,19 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 3 — Publication Analytics (COMPLETE_PENDING_BROWSER_SMOKE)
+Active task:        Task 3 — Publication Analytics (IN_PROGRESS — MVP
+                     PUBLICATION ANALYTICS DRILL-DOWN)
 Last updated:       2026-08-09
-Last updated by:    Claude Code (audit found a real, substantial, DB-backed
-                     UserEvent analytics pipeline + real admin dashboards
-                     already exist, no mock data; fixed one confirmed
-                     correctness bug (Offer DETAIL_OPEN cityId) and one
-                     confirmed live-CTA tracking gap (phone/website/
-                     Instagram/offer primary CTA); added critical test
-                     coverage; controlled proof green on local dev DB +
-                     server; pending owner-controlled DEV deploy + smoke)
+Last updated by:    Claude Code — owner requested a final MVP scope
+                     addition (per-publication interaction drill-down +
+                     comparable core impression metrics) before Task 3
+                     closes; implemented (aggregate service, RBAC API,
+                     admin drawer UI, CTA targetAction breakdown,
+                     BACKLOG-026 nullable-rate fix, Offer/Article
+                     impression tracking), tested, gated, committed
+                     locally (f84e081c..f37937d8) — not yet pushed;
+                     awaiting push + CI/Docker + owner-controlled DEV
+                     deploy + final smoke before Task 3 -> COMPLETE
 Unresolved P0/P1:   none from Task 1, 2, or 3 — Tasks 4–15 remain TODO, not started
 ```
 
@@ -922,7 +925,7 @@ are understandable; an admin cannot arbitrarily break organic ranking.
 
 Priority: `P0`
 
-STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+STATUS: `IN_PROGRESS — MVP PUBLICATION ANALYTICS DRILL-DOWN`
 AUDIT:
 EXISTING — A real, substantial, DB-backed first-party analytics system
 already exists, not just search-adjacent scaffolding. `UserEvent` (Prisma
@@ -1118,6 +1121,116 @@ ingestion endpoint — deliberately not added, would double write cost),
 BACKLOG-035 (`recomputeAllBehaviorSegments()` has no scheduled caller),
 BACKLOG-036 (new Place CTA_CLICK events lack cityId — this session's own
 minor follow-up). None blocks Task 3's Exit Criteria.
+
+MVP PUBLICATION ANALYTICS DRILL-DOWN (2026-08-09, Claude Code — owner
+follow-up decision: complete Task 3 with a per-publication interaction
+report + comparable core impression metrics, then freeze analytics scope
+for MVP; `d2cfb23c` preserved, not deployed until this lands):
+IMPLEMENTATION — reused the existing `UserEvent` pipeline exclusively, no
+new analytics system: (1) new `getPublicationAnalyticsDetail()`
+(`analyticsContentPerformance.service.ts`) — a bounded aggregate query
+scoped to one `entityType`+`entityId`+period+optional city (indexed on
+`[entityType,entityId,createdAt]`), returning counts/rates/CTA breakdown
+only, never raw `UserEvent` rows/userId/sessionId/IP/UA; (2) new RBAC-gated
+route `GET /api/admin/analytics/content-performance/[entityType]/
+[entityId]` (`requireRole([ADMIN,MODERATOR])`, identical pattern to its 6
+sibling admin-analytics routes); (3) centralized Russian CTA
+`targetAction` → label mapping (`src/lib/analytics/
+ctaTargetActionLabels.ts`) — known values (`call/website/instagram/buy/
+plan/primary/book`) get real labels, unknown/future values degrade to a
+readable `Действие «…»` fallback, never raw JSON, never silently dropped;
+(4) new `PublicationAnalyticsDrawer`/`PublicationAnalyticsDetails`
+(`src/components/admin/analytics/`) reusing the exact same
+`ResponsiveOverlay` (desktop Dialog / mobile Sheet) + lazy-load-on-open
+pattern already proven by `PublicationStatsDrawer` — deliberately a new,
+separate, small drawer rather than extending the existing
+`PublicationStatsDrawer`/`/api/publication-stats` (per instruction: do not
+expand that parallel, still-stub feature); (5) `AdminAnalyticsContentPerformance.tsx`
+table rows are now clickable (row click + an explicit "Подробнее" button,
+`e.stopPropagation()`'d, for keyboard/screen-reader access) — existing
+sort/pagination untouched; (6) closed the confirmed BACKLOG-026 gap:
+`openRate`/`saveRate`/`planRate`/`clickRateVsOpens`/`clickRateVsPlans`
+are now `number | null` end-to-end (service, types, `pickBest`/
+`worstConverters`/`sortRows`/both comparison builders, the new detail
+endpoint) — `null` renders as `—`, never a fabricated `0.0%`; (7) audited
+real listing/card surfaces for Place/Offer/Article and wired the existing
+`AnalyticsCardViewTracker` onto every real one found for Offer
+(`[city]/programs/page.tsx`, homepage "Занятия" row) and Article (`/blog`
+journal index — featured + list, homepage "Статьи и обзоры" row);
+`listCityHomeArticles.ts` gained the article's own `id` (previously not
+even selected — a real gap this surfaced). Place confirmed to have **no**
+public listing/catalog surface at all (routing audit: `/[city]/places`
+has only `[slug]`, no listing page; no PlaceCard usage anywhere in
+`src/app/(public)`) — nothing legitimate exists to wire, not fabricated;
+recorded honestly rather than invented. Event/Route's own existing
+tracking untouched, per instruction.
+CTA TARGETACTION CATEGORIES FOUND (live grep of every `targetAction:`
+call site, cross-checked against real local DB data): `call` (phone
+reveal — Place/Event), `website`/`instagram` (Place), `buy` (Event ticket
+purchase), `plan` (Event "add to plan" CTA click), `primary` (Offer main
+booking/call CTA). `book` exists in code but is emitted on
+`BOOKING_CREATED`, not `CTA_CLICK` — confirmed via source read, does not
+pollute the CTA breakdown. Real historical data on a live article (24
+pre-existing `CTA_CLICK` rows from the continuous-reading tracker,
+predating `targetAction`) correctly bucketed to "Без указания действия"
+by the new grouping — proves the null/fallback path against real data,
+not just fixtures.
+API/QUERY COST: detail endpoint is 3 small queries (one indexed
+`groupBy`, one indexed raw `GROUP BY` for the CTA breakdown, one
+`loadAllEntityTitles` reuse) fired only when an admin opens a specific
+row (lazy-loaded, per instruction — no N+1 on the main table, no
+eager-loaded per-row detail). No new write path, no new high-frequency
+event — the only new writes are the same cheap, already-proven
+`CARD_VIEW` fire-once-per-exposure pattern, now reaching 2 more real
+surfaces.
+PRIVACY/RBAC: detail response shape contains no userId/sessionId/IP/UA/
+raw events (test-verified, see below); RBAC identical to the 6 existing
+sibling admin-analytics routes (ADMIN/MODERATOR only); no new public
+endpoint.
+CONTROLLED PROOF (local dev DB + running dev server, Browser pane,
+2026-08-09): real published article "Чем заняться на зимних каникулах"
+(`cms37q1ca0006ws27z75ug52h`) on real content — baseline `CARD_VIEW=4,
+DETAIL_OPEN=67, CTA_CLICK=24` → visited `/minsk/blog` (real featured-card
+exposure, ~60% viewport-visible, confirmed via DOM geometry read) →
+`CARD_VIEW=5` (exactly +1, correct `meta: {source:"listing",
+section:"journal", position:"featured"}`, correct resolved `cityId`) →
+opened the article detail page → `DETAIL_OPEN=68` (exactly +1). Cross-
+validation: called `getAnalyticsContentPerformance()` and
+`getPublicationAnalyticsDetail()` directly for the same entity/period —
+**numbers agreed exactly** (views/opens/ctaClicks all matched between the
+existing trusted Content Performance table and the new detail endpoint).
+No double-count observed on repeated navigation/HMR reloads during the
+session.
+TESTS: extended `analyticsContentPerformance.service.test.ts` (existing
+file from the earlier Task 3 phase) with 4 new cases, all passing against
+the real local dev DB: per-entity aggregate correctness (impressions/
+opens/saves/planAdds/ctaClicks + all 4 rates match hand-computed values);
+CTA targetAction grouping + unknown-value fallback (readable, non-JSON,
+not silently dropped) + null-action bucket; no-PII assertion (JSON-
+serialized response checked for absence of a planted fake sessionId, and
+for absence of `userId`/`sessionId`/`ip`/`userAgent`/`events` keys
+entirely); zero-denominator semantics (measured-zero `0` vs unmeasured
+`null`, both distinguished correctly). No dedicated route-level test for
+the new API route's RBAC, matching the harness limitation already
+documented for its 6 sibling routes (`getCurrentUser()`/`cookies()`
+throws outside a real Next.js request scope when invoked directly) —
+RBAC correctness instead rests on identical-pattern reuse, verified by
+direct source comparison. Re-ran all pre-existing analytics/search tests
+(ingestion, business isolation, search word-order) — no regressions.
+GATES: `npx tsc --noEmit` clean (whole repo, twice — before and after the
+final edits); `npx eslint` on all 14 changed/new files — 0 errors (3
+pre-existing `<img>`-vs-`<Image>` warnings, none introduced); `git diff
+--check` clean; full `pnpm build` — exit 0, "Compiled successfully in
+2.6min", full 386-page route manifest generated with no errors.
+BACKLOG: BACKLOG-026 marked RESOLVED. BACKLOG-032 marked PARTIALLY
+RESOLVED (Offer+Article done, Place blocked on a Place listing surface
+existing at all — not an analytics gap). No new scope taken on beyond
+this follow-up's explicit brief — Share, Business Analytics redesign,
+publication-stats parallel feature, Route save tracking, warehouse,
+cohorts, and exports all explicitly left alone, per instruction §16/§17.
+COMMITS: `f84e081c` (feat: aggregate service + API + nullable rates),
+`256e279a` (feat: admin drill-down UI), `588e21b1` (feat: impression
+tracking for Offer/Article listing surfaces), `f37937d8` (chore: tests).
 
 AUDIT FIRST existing analytics/tracking infrastructure: `/admin/analytics`,
 business analytics, analytics models, impressions, views, unique views, CTA,
