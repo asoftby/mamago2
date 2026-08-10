@@ -20,62 +20,42 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 5 — Content Analytics & Ranking (IN_PROGRESS —
-                     AUDIT_COMPLETE + narrow owner-approved correction
-                     implemented, DEV deploy pending)
+Active task:        Task 5 — Content Analytics & Ranking (COMPLETE)
 Last updated:       2026-08-10
-Last updated by:    Claude Code — Task 5 audit found a real, already-shared
-                     UserEvent-derived ranking engine (kudaDiscoveryFeed /
-                     classesDiscoveryFeed / planSuggestions, plus the real
-                     Boost model for paid Offer visibility) already meeting
-                     the task's exit criteria, alongside a confirmed
-                     PLAN_ADD/SAVE weight-ordering bug and a dead, conflicting
-                     second weight table. Owner narrowed scope to: fix the
-                     weight ordering, consolidate to one canonical weight
-                     table, retire the dead one — explicitly no
+Last updated by:    Claude Code — Task 5 closed. Audit found a real,
+                     already-shared UserEvent-derived ranking engine
+                     (kudaDiscoveryFeed / classesDiscoveryFeed /
+                     planSuggestions, plus the real Boost model for paid
+                     Offer visibility) already meeting the task's exit
+                     criteria, alongside a confirmed PLAN_ADD/SAVE
+                     weight-ordering bug and a dead, conflicting second
+                     weight table. Owner narrowed scope to a formalize-and-
+                     correct-only change: fixed the weight ordering
+                     (PLAN_ADD now outranks SAVE), consolidated to one
+                     canonical weight table (`engagementWeights.ts`),
+                     retired the dead `discoverySignalWeights.ts` — no
                      personalization, no new ranking layer, no ratings
-                     wiring, no Stories-rail changes. Implemented + tested
-                     + committed (`d5b149bc`); pushed for CI/Docker, SHA to
-                     follow once green. Prior session (Task 4 closure):
-                     Audited the full Event
-                     Wizard address flow end-to-end before touching code,
-                     proved the root cause was NOT the autocomplete dropdown
-                     (it worked fine) but silent data loss — googlePlaceId,
-                     Google address components, and auto district/metro
-                     were dropped at client-side type boundaries and
-                     hardcoded to null when a new Place was created at
-                     publish time, even though the visible address
-                     text/coordinates were always correct. Fixed by
-                     threading the already-captured Google data through and
-                     reusing Place Wizard's existing `/api/geo/enrich-location`
-                     endpoint for district/metro (`de4d694a`). During DEV
-                     verification, separately discovered and fixed a
-                     pre-existing build-pipeline gap affecting ALL Google
-                     Maps features on every previously-built DEV/PROD image
-                     (not Task-4-specific — proven via the untouched Place
-                     Wizard failing identically): `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`/
-                     `MAP_ID` were never passed as Docker build-args, so
-                     Next.js baked `undefined` into the client bundle
-                     regardless of the container's runtime env. Fixed
-                     `Dockerfile` + `.github/workflows/docker.yml`, set the
-                     two GH Actions secrets from local `.env.local` (values
-                     never printed), pushed (`5bd4371b`), CI+Docker Build &
-                     Push green (`dev-269`). Owner redeployed DEV; SHA
-                     confirmed live via `docker inspect`. Full DEV smoke
-                     green on actual `business.dev.mamago.by` with real
-                     Google Places API + real Minsk addresses: existing-Place
-                     flow, new-Place-via-Google (DB-verified googlePlaceId/
-                     addressJson/district/metro/coords), address-change
-                     (second Place correctly created, original untouched,
-                     EventVenue repointed), no-result graceful state, zero
-                     console/network errors on a clean tab. All DEV test
-                     records cleaned up. Three smaller non-blocking
-                     follow-ups (address-component format mismatch in the
-                     geo-enrichment fallback path; `EventLocationPicker.tsx`
-                     dead code; Place Wizard's deprecated Autocomplete
-                     widget) recorded as BACKLOG-038/039/040.
-Unresolved P0/P1:   none from Task 1, 2, 3, 4, or 5 (Task 5's own audit found
-                     zero P0/P1) — Task 5 IN_PROGRESS (narrow scope), Tasks
+                     wiring, no Stories-rail changes. Implemented + 4
+                     targeted DB tests + committed (`d5b149bc`), audit/
+                     backlog docs committed (`33fdb234`), pushed, CI +
+                     Docker Build & Push green (`dev-270`), owner deployed.
+                     Deployed-DEV regression smoke green: Kuda feed ranks
+                     normally, Classes/Offers loads (genuinely 0 PUBLISHED
+                     Offers today, unrelated to this change), My Plan
+                     suggestions return real data via the corrected scoring
+                     function, Search unchanged, zero ranking-related
+                     errors (one unrelated, pre-existing, non-ranking
+                     console error investigated and ruled out as a
+                     regression — see Task 5 DEV SMOKE for detail).
+                     Ratings/reviews explicitly deferred to an optional
+                     future quality/trust layer per owner decision, updated
+                     in place as BACKLOG-041 (not duplicated). Prior
+                     session (Task 4 closure): fixed silent address data
+                     loss in the Event Wizard (`de4d694a`) and a
+                     pre-existing Docker build-arg gap affecting all Google
+                     Maps features (`5bd4371b`, `dev-269`) — full detail in
+                     Task 4's own section below.
+Unresolved P0/P1:   none from Task 1, 2, 3, 4, or 5 — Task 5 CLOSED, Tasks
                      6–15 remain TODO, not started
 ```
 
@@ -1611,7 +1591,7 @@ Place, or creates a new Place inside the Event Wizard.
 
 Priority: `P0`
 
-STATUS: `IN_PROGRESS`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — A real, working, shared engagement-ranking layer already exists
 and is already reused across the two main discovery surfaces plus My Plan
@@ -1792,35 +1772,93 @@ clean. Full `pnpm check:push` (`pnpm build`) run twice — exit 0 both times,
 `git status --short`/`git diff --cached --name-status` confirmed only the
 intended 7 files changed (3 new/modified + 4 deleted), no foreign diff
 present or touched.
-DEV SMOKE: Not applicable in the usual browser sense — this is a
-backend-only ranking-weight correction with no new UI surface; its effect
-(Events with more `PLAN_ADD`s now correctly outranking otherwise-equal
-Events with more `SAVE`s) is proven by the DB-backed targeted tests above,
-not something a single-session browser click-through could reliably
-demonstrate without fabricating a large synthetic event volume. Pending:
-push to `origin/dev`, CI + Docker Build & Push green, owner-controlled DEV
-deploy per standing process (this agent does not deploy) — SHA to be
-recorded here once pushed.
-BLOCKERS: none code-side. Deployment is owner-controlled via the standing
-process.
-BACKLOG/NOTES: BACKLOG-041 (ratings/reactions not wired into ranking —
-needs a normalized/signed quality-signal design, deliberately deferred:
-treating mere feedback existence as a positive signal would incorrectly
-boost negative `PlaceReview`/`RouteRating`/`ArticleRating` submissions),
-BACKLOG-042 (`UserBehaviorProfile.segmentKeys` unused for ranking
-personalization — deliberately deferred, no `NEW_USER`/`SAVER`/`PLANNER`
-feed branching this task), BACKLOG-043 (second dead Stories-rail redesign —
-needs a separate owner decision: finish wiring or delete), BACKLOG-044
-(`Occasion.boostScore` only applied to Events, not Offers/Places/Articles/
-Routes), BACKLOG-045 (duplicated today/weekend date-range logic, Stories vs.
-discovery filters), BACKLOG-046 (`StoryIntentConfig.itemLimit`/
-`allowedTypes` dead sub-fields), BACKLOG-047 (`SignalDefinition.isFeatured`/
-`EventCategory.isFeatured` dead admin flags), BACKLOG-048
-(`Plan.hasPriorityBoost`/`PRIORITY_BOOST` scaffolding with zero callers and
-zero business-facing marketing surface — confirmed not currently sold,
-verified by grep across all business UI/API directories, so not a
-false-advertising risk, just dead plumbing). None blocks Task 5's Exit
-Criteria; none reopens Tasks 1–4.
+DEV SMOKE: **Complete — verified live on actual `https://dev.mamago.by`
+after owner-confirmed deployment (2026-08-10).** Deployed image confirmed:
+`ghcr.io/asoftby/mamago2:dev-270`, OCI `revision` label
+`33fdb234c31175e9a3a6573308a285c5e51fbf1d` (exact match to the pushed
+commit), read directly from the green `Docker Build & Push` GitHub Actions
+run (`31385342913`) — `/admin/system/build` itself exposes no build
+SHA/version field (a version-history/changelog editor, not a build-info
+page, confirmed by direct visit with a real authenticated ADMIN session),
+so this is the same behavioral/pipeline-metadata proof pattern used in
+Task 2's closure. `GET /api/health` → `{"status":"ok","db":"ok"}`.
+This is a regression smoke (per instruction), not an attempt to prove exact
+score ordering through the UI — that is what the targeted DB tests already
+prove.
+- **Events / «Куда пойти» (`/minsk/kuda`)**: loads and ranks normally — real
+  published Event ("С. Кибирова балет «Три поросенка»") renders correctly
+  with cover image, price, age label, date; screenshot-verified. All
+  network requests 200 except benign `net::ERR_ABORTED` soft-navigation
+  aborts (the same pre-existing, already-documented pattern from Task 2's
+  own DEV smoke — duplicate in-flight RSC prefetches during rapid
+  client-side navigation, not a real error).
+- **Classes / Offers discovery (`/minsk/classes`)**: loads normally,
+  correctly renders the real empty state ("Пока нет занятий по вашему
+  запросу") — confirmed via `/admin/content/offers?status=PUBLISHED` →
+  "Предложения не найдены" that DEV genuinely has **zero `PUBLISHED`
+  Offers** right now (all existing Offers are `DRAFT`, matching the
+  pre-existing migration-era data state) — not a regression, and provably
+  cannot be one: `classesDiscoveryFeed.ts` was not touched by this task's
+  diff at all (it doesn't even call `getEventEngagementScores()` — its own
+  `Boost`-model-driven ranking is separate and untouched).
+- **My Plan suggestions**: `GET /api/plan/suggestions?city=minsk` → 200,
+  returns the same real published Event, ranked via the corrected
+  `getEventEngagementScores()` — confirmed this is the live, deployed,
+  canonical-weight code path (not stale), end-to-end, no error. (Date-
+  scoped queries for specific days returned an empty list — a pre-existing
+  day-availability filter nuance in `listPlanSuggestionsForCity()`,
+  unrelated to and untouched by this task's diff, not investigated further
+  as it's outside this smoke's regression scope.)
+- **Search Ranking**: `GET /api/search?q=три поросенка` → 200, correct
+  single real result, unchanged from Task 2's behavior — no regression.
+- **Occasion boost / `Boost` / `businessQualityBoost`**: code paths
+  structurally untouched by this task's diff (confirmed by direct read,
+  see IMPLEMENTATION SCOPE); `kudaDiscoveryFeed.ts` (which composes all
+  three on top of the corrected engagement score) rendered its real content
+  with zero server errors — the strongest available proof at current DEV
+  data volume (no active `Occasion`/`Boost` rows exist right now to
+  visually distinguish their effect, consistent with this being a
+  regression smoke, not a score-ordering proof).
+- **Console/errors**: zero ranking-related errors or 500s anywhere in this
+  smoke. One unrelated, pre-existing finding surfaced and investigated for
+  due diligence: a `Minified React error #310` fires in the console on
+  *every* page visited during this session (`/minsk`, `/minsk/kuda`,
+  `/minsk/classes` alike) under the owner's persisted authenticated ADMIN
+  browser session — confirmed **not** a Task 5 regression because (a) it is
+  identical on non-ranking pages (the plain homepage `/minsk`), (b) this
+  task's diff contains zero React/frontend files, and (c) the page still
+  renders full, correct content despite it in every case observed. Not
+  filed as a new backlog item per this session's narrow closure
+  instructions — surfaced here for the record; owner may want it looked at
+  separately.
+BLOCKERS: none. All required regression-smoke checks passed on deployed
+DEV.
+BACKLOG/NOTES: BACKLOG-041 (ratings/reviews as ranking input — owner
+decided 2026-08-10 this is **not** a raw ranking-boost signal; retitled to
+"Design optional quality/trust layer from ratings and reviews," gated on
+PROD evidence, updated in place, not duplicated), BACKLOG-042
+(`UserBehaviorProfile.segmentKeys` unused for ranking personalization —
+deliberately deferred, no `NEW_USER`/`SAVER`/`PLANNER` feed branching this
+task), BACKLOG-043 (second dead Stories-rail redesign — needs a separate
+owner decision: finish wiring or delete), BACKLOG-044 (`Occasion.boostScore`
+only applied to Events, not Offers/Places/Articles/Routes), BACKLOG-045
+(duplicated today/weekend date-range logic, Stories vs. discovery filters),
+BACKLOG-046 (`StoryIntentConfig.itemLimit`/`allowedTypes` dead sub-fields),
+BACKLOG-047 (`SignalDefinition.isFeatured`/`EventCategory.isFeatured` dead
+admin flags), BACKLOG-048 (`Plan.hasPriorityBoost`/`PRIORITY_BOOST`
+scaffolding with zero callers and zero business-facing marketing surface —
+confirmed not currently sold, verified by grep across all business UI/API
+directories, so not a false-advertising risk, just dead plumbing). None
+blocks Task 5's Exit Criteria; none reopens Tasks 1–4.
+
+**TASK 5 — COMPLETE.** Deployed SHA: `33fdb234c31175e9a3a6573308a285c5e51fbf1d`
+(image `ghcr.io/asoftby/mamago2:dev-270`). PLAN_ADD now correctly outranks
+SAVE in the shared engagement-ranking formula reused by the Kuda discovery
+feed and My Plan suggestions; the dead, conflicting weight table is gone;
+zero P0/P1 found; ratings/reviews explicitly deferred to an optional
+future quality/trust layer per owner decision (BACKLOG-041), not wired
+into ranking this task. Task 6 not started. PROD untouched throughout —
+DEV-only deploy, no PROD access, no PROD env/data changes.
 
 AUDIT FIRST existing content ranking/engagement infrastructure and its
 overlap with Publication Analytics, Search ranking, Stories ranking, content

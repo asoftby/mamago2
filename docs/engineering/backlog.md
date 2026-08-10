@@ -1052,7 +1052,7 @@ P3 — cleanup / polish / optional
   fallback).
 - Source: Task 4 (Event Wizard address dropdown) Phase 2 comparison audit.
 
-## [BACKLOG-041] Ratings/reactions (PlaceReview/RouteRating/ArticleRating) don't feed the engagement-ranking engine
+## [BACKLOG-041] Design optional quality/trust layer from ratings and reviews
 
 - Status: OPEN
 - Priority: P2
@@ -1066,6 +1066,16 @@ P3 — cleanup / polish / optional
   positive `UserEventType.FEEDBACK_LEFT`-style signal on submission would
   incorrectly boost content with negative reviews/dislikes, exactly the
   failure mode this deferral avoids.
+- Owner decision (2026-08-10): ratings/reviews do **not** belong in the
+  base engagement-ranking formula. Any future use must be an optional,
+  weak quality/trust layer — separate from and applied on top of the base
+  engagement score, not merged into it. That layer must: distinguish
+  mamaGo first-party reviews from Google reviews (different trust/
+  provenance), account for source/confidence/sentiment, and must never
+  let negative feedback boost content. Implementation is gated on PROD
+  data showing this layer is actually useful — do not build ahead of that
+  evidence. No Task 5 runtime code was changed for this decision; it is
+  docs-only.
 - Context: `PlaceReview` (`prisma/schema.prisma:1277`, rating+text+
   moderation+owner reply, live at `POST /api/places/[id]/reviews`),
   `RouteRating`/`ArticleRating` (`prisma/schema.prisma:4458/4477`, one
@@ -1074,17 +1084,23 @@ P3 — cleanup / polish / optional
   code read. `UserEventType.FEEDBACK_LEFT` is only emitted from
   `BookingFeedback` (`src/server/analytics/trackBookingEvent.ts:176`),
   which is a genuine 1–5 star positive-only signal, unlike the other
-  three.
-- Current state: not started.
-- Dependencies: none blocking.
-- Acceptance criteria: a normalized/signed quality-signal design — e.g. a
-  new `UserEventType` (or a signed `meta` field on `FEEDBACK_LEFT`)
-  distinguishing positive from negative/neutral feedback, so
-  `getEventEngagementScores()`-style aggregation can weight them correctly
-  (positive ratings boost, negative ratings should not) — decided and
-  implemented as a deliberate follow-up, not bolted on reactively.
+  three. Google reviews are also surfaced in-product (separate
+  provenance from mamaGo first-party `PlaceReview`), which the future
+  design must account for explicitly.
+- Current state: not started — decision above defines direction only, no
+  design doc yet.
+- Dependencies: PROD engagement/ranking data showing the base formula
+  needs this layer (blocking — do not implement before this evidence
+  exists).
+- Acceptance criteria: a design (not the old naive wiring) for an
+  optional, signed, source-aware quality/trust layer applied on top of
+  the base engagement score — normalized/signed signal distinguishing
+  positive from negative/neutral feedback, mamaGo-first-party vs Google
+  provenance kept distinct, confidence/sentiment accounted for, negative
+  feedback never boosts — decided and implemented as a deliberate
+  follow-up only after PROD data justifies it.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
-  Analytics & Ranking).
+  Analytics & Ranking); owner clarification 2026-08-10.
 
 ## [BACKLOG-042] `UserBehaviorProfile.segmentKeys` computed but never consulted by ranking/recommendation code
 
