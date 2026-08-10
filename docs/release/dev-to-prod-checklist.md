@@ -20,29 +20,34 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 3 — Publication Analytics (COMPLETE)
+Active task:        Task 4 — Event Wizard Address Dropdown (COMPLETE locally;
+                     DEV deploy pending owner action)
 Last updated:       2026-08-10
-Last updated by:    Claude Code — Task 3 closed. Base publication analytics
-                     + two MVP scope additions, all deployed and verified
-                     live on actual DEV at SHA 5bdb6be9: (1) Admin
-                     publication drill-down (aggregate service, RBAC API,
-                     admin drawer UI, CTA targetAction breakdown,
-                     BACKLOG-026 nullable-rate fix, Offer/Article impression
-                     tracking); (2) Business Analytics MVP
-                     (/business/analytics real page, ownership-verified
-                     detail API reusing the exact same aggregate as Admin,
-                     own Event/Offer/Place only, BACKLOG-030 closed).
-                     Deployed-DEV smoke green for both Admin and Business
-                     (real data, drill-down, CTA breakdown with a real
-                     "Позвонили" label proven via a live tracking-sanity
-                     click, ownership isolation proven via a real foreign
-                     Place -> 404, desktop + mobile layout, zero relevant
-                     console/API errors). Unrelated DEV env defect
-                     (OTP_SECRET missing) found and fixed during this
-                     session's smoke — tracked as BACKLOG-037, PROD-side
-                     requirement flagged for Task 12. Publication Analytics
-                     is now frozen for MVP.
-Unresolved P0/P1:   none from Task 1, 2, or 3 — Tasks 4–15 remain TODO, not started
+Last updated by:    Claude Code — Task 4 done: audited the full Event Wizard
+                     address flow end-to-end before touching code, proved the
+                     root cause was NOT the autocomplete dropdown (it worked
+                     fine) but silent data loss — googlePlaceId, Google
+                     address components, and auto district/metro were
+                     dropped at client-side type boundaries and hardcoded to
+                     null when a new Place was created at publish time, even
+                     though the visible address text/coordinates were always
+                     correct (which is why nobody had noticed). Fixed by
+                     threading the already-captured Google data through, and
+                     reusing Place Wizard's existing `/api/geo/enrich-location`
+                     endpoint for district/metro instead of building a new
+                     mechanism. Focused test green (5 scenarios), `tsc`
+                     clean, lint clean (no new warnings), full `pnpm
+                     check:push` build green, and 4 manual scenarios
+                     (A/B/C/D) proven against a real local Postgres with the
+                     real Google Places API and Minsk addresses — DB-verified
+                     at every step, all test data cleaned up afterward. Three
+                     non-blocking follow-ups (address-component format
+                     mismatch in the geo-enrichment fallback path;
+                     `EventLocationPicker.tsx` dead code; Place Wizard's
+                     deprecated Autocomplete widget) recorded as
+                     BACKLOG-038/039/040. Not yet deployed to DEV — awaits
+                     owner-controlled deploy per this checklist's process.
+Unresolved P0/P1:   none from Task 1, 2, 3, or 4 — Tasks 5–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -1409,15 +1414,92 @@ engagement data without excessive backend/storage load.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE (local); DEV deploy pending owner action`
+AUDIT: Traced full flow end-to-end (`EventLocationSearchInput` →
+`QuickPlaceCreate` → `Step2Location` → `EventFormData.pendingLocation` →
+`resolvePendingLocationOnPublish` (publish-time, in-transaction) → `Place`/
+`EventVenue` → edit hydration via `mapEventToFormData`). Google Places
+autocomplete UI itself (dropdown rendering, `gmp-select` wiring,
+`fetchFields`, debounce) was found fully functional — no dropdown-rendering
+or form-state bug. mamaGo-internal Place search (`PlaceSearchAutocomplete`)
+also fully functional. Compared against the reference implementation (Place
+Wizard's `PlaceLocationPicker`/`PlaceSearchInput`): Place Wizard persists
+immediately and calls `/api/geo/enrich-location` right after address
+selection; Event Wizard defers Place creation to publish time via
+`pendingLocation` and never called that enrichment endpoint.
+GAPS (root cause, proven not guessed): the human-readable address text and
+lat/lng survive correctly end-to-end for a new venue — but `googlePlaceId`
+and `addressJson` (Google address components) returned by the selection
+callback were silently dropped at two client-side type boundaries
+(`QuickPlaceCreate`'s `LocationData` interface, then
+`EventFormData.PendingLocation`), and `resolvePendingLocationOnPublish.ts`
+hardcoded `googlePlaceId: null`, `addressJson: Prisma.JsonNull`,
+`districtAutoId: null`, `metroAutoId: null` when creating the `Place` row —
+even though the data existed one layer up. Net effect: every new venue
+created through the Event Wizard permanently lost its Google place
+identity, structured address components, and auto district/metro (no
+crash, no visible blank field — the address text looked fine, which is why
+it went unnoticed).
+IMPLEMENTATION: (1) extended `PendingLocation` (both
+`src/components/business/wizard/event/types.ts` and the duplicate interface
+in `src/lib/business/resolvePendingLocationOnPublish.ts`) with optional
+`googlePlaceId`/`addressJson`/`districtAutoId`/`metroAutoId`/
+`metroAutoDistanceM`; (2) `QuickPlaceCreate.tsx` now calls the existing
+`/api/geo/enrich-location` endpoint (same one Place Wizard uses — reused,
+not reinvented) right after a Google address selection or map-pin
+confirmation, and carries `googlePlaceId`/`addressJson` plus the enriched
+city/district/metro through to `onPlaceCreated`; (3) `Step2Location.tsx`
+threads those fields into `pendingLocation`; (4)
+`resolvePendingLocationOnPublish.ts` now uses them when creating the new
+`Place` instead of hardcoded nulls, with a defensive validity check
+(district/metro id must still exist and belong to the resolved city at
+publish time, since selection and publish can be minutes apart) rather than
+trusting stale client-supplied ids blindly.
+COMMITS: `de4d694a` (fix: preserve googlePlaceId/addressJson/district/metro
+for Event Wizard new venues)
+VERIFICATION: focused test `src/lib/business/resolvePendingLocationOnPublish.test.ts`
+(`pnpm test:event-wizard-pending-location`) — 5 scenarios: NEW_PLACE with
+full Google data persists googlePlaceId/addressJson/district/metro;
+PARSED_LOCATION (no Google data) keeps prior null behavior, no regression;
+stale/cross-city district/metro ids are dropped, not blindly trusted;
+EXISTING_PLACE mode unaffected (no Place created); empty/invalid selection
+does not create a corrupted Place. `npx tsc --noEmit` clean. Targeted
+ESLint on all changed files: 0 new warnings/errors (3 pre-existing unused-var
+warnings confirmed present at baseline `HEAD` `baba727c`, unrelated to this
+change). `git diff --check` clean. Full `pnpm check:push` (production
+build) green.
+DEV SMOKE: not yet — DEV deploy is owner-controlled per this checklist's
+process; will be run read-only after owner deploys.
+LOCAL MANUAL PROOF (2026-08-10, real dev server + real business account +
+real Google Places API against Minsk addresses, local Postgres only — no
+DEV/PROD data touched): Scenario A (existing-Place edit hydration) —
+confirmed correct on wizard re-open. Scenario B (new venue via Google
+autocomplete, "ул. Притыцкого 12") — DB-verified: `Place.googlePlaceId`,
+`addressJson`, `locationSource=GOOGLE`, `districtAutoId` (Октябрьский),
+`metroAutoId` (Пушкинская, 1047m), `cityId`, `lat`/`lng` all correctly
+persisted (previously would all have been null/MANUAL). Scenario C (change
+address to "ул. Немига 5" on the same event, resubmit) — DB-verified: a
+second `Place` created with its own correct googlePlaceId/district
+(Центральный)/metro (Немига, 474m); `Activity.placeId` and `EventVenue`
+correctly repointed to the new Place; the original Place left untouched
+(no orphan corruption). Scenario D (nonexistent address/place name) — both
+the mamaGo-internal search and the Google address field show a clear
+"not found" state, "Сохранить место" stays disabled, no corrupted/partial
+Place can be saved. All test data (1 Activity, 1 EventVenue, 2 Place rows)
+deleted from local DB after verification.
+BLOCKERS: none.
+BACKLOG/NOTES: three items deferred to `docs/engineering/backlog.md`
+(BACKLOG-038/039/040) — none block this task's exit criteria: (038, P2)
+`/api/geo/enrich-location`'s address-component fallback matcher reads the
+legacy `long_name` field shape and never matches the new
+`PlaceAutocompleteElement`'s `longText`/`shortText` shape (only affects the
+fallback path when centroid-based district/metro lookup misses — the
+primary path was proven working in both manual scenarios above); (039, P3)
+`EventLocationPicker.tsx` is dead code (zero importers), safe to delete;
+(040, P3) Place Wizard's `PlaceSearchInput.tsx` still uses the deprecated
+Google `Autocomplete` widget (already had its own tracked TODO) while Event
+Wizard now uses the modern `PlaceAutocompleteElement` — a drifted
+duplicate implementation worth unifying later.
 
 AUDIT FIRST and reproduce the current problem. Check: Event Wizard, Place
 selector, existing Place, new Place creation, autocomplete, Google Places

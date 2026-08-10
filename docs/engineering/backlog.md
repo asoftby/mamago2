@@ -964,3 +964,90 @@ P3 — cleanup / polish / optional
 - Source: owner-reported and owner-directed fix, during Task 3 (Publication
   Analytics) deployed-DEV smoke.
   smoke session.
+
+## [BACKLOG-038] `/api/geo/enrich-location` fallback name-matching reads legacy `long_name`, never matches new `PlaceAutocompleteElement` address components
+
+- Status: OPEN
+- Priority: P2
+- Area: Google Maps / Geo Enrichment
+- Added: 2026-08-10
+- Reason deferred: only affects the fallback path (when centroid-based
+  district/metro lookup fails to find a match within radius); the primary
+  path was proven working during Task 4 manual verification, so this is a
+  latent robustness gap, not a blocking correctness bug for the address
+  round-trip Task 4 was scoped to fix. Fixing it correctly means
+  normalizing two different Google address-component shapes in a shared
+  endpoint also used by Place Wizard — out of Task 4's narrow scope
+  ("Place Wizard is DO NOT TOUCH").
+- Context: `src/app/api/geo/enrich-location/route.ts`
+  (`extractDistrictNameFromAddressJson`/`extractMetroNameFromAddressJson`,
+  ~line 56-89) reads `comp?.long_name` — the legacy Google Places
+  JS `Autocomplete` widget's `address_components` shape, still produced by
+  `src/components/business/place/PlaceSearchInput.tsx` (Place Wizard).
+  But `src/components/business/wizard/event/steps/location/EventLocationSearchInput.tsx`
+  (Event Wizard, uses the new `PlaceAutocompleteElement`) captures
+  `place.addressComponents` in the **new** shape, where each component has
+  `longText`/`shortText` instead of `long_name`/`short_name` — confirmed by
+  inspecting live `pendingLocation.addressJson` written during Task 4
+  manual testing (entries like `{"types":["route"],"longText":"улица
+  Немига","shortText":"ул. Немига"}`). Any event-wizard-created place whose
+  district/metro can't be resolved by centroid/radius distance will
+  silently fail the address-component fallback match.
+- Current state: not started. Primary centroid-based resolution (the
+  common case) is unaffected and was verified working end-to-end
+  (district/metro correctly resolved for two different Minsk addresses
+  during Task 4 QA).
+- Dependencies: none.
+- Acceptance criteria: `extractNamedComponentFromAddressJson` (or its
+  callers) accepts both `long_name`/`short_name` and `longText`/`shortText`
+  shapes, with a regression test covering both Google API response
+  formats.
+- Source: discovered during Task 4 (Event Wizard address dropdown) manual
+  proof, DB inspection of `Activity.scheduleJson.pendingLocation.addressJson`.
+
+## [BACKLOG-039] `EventLocationPicker.tsx` — dead code, zero importers
+
+- Status: OPEN
+- Priority: P3
+- Area: Event Wizard / Cleanup
+- Added: 2026-08-10
+- Reason deferred: pure cleanup, no behavior change; kept out of Task 4's
+  diff to keep that change reviewable and scoped to the proven address
+  data-loss root cause.
+- Context: `src/components/business/wizard/event/steps/location/EventLocationPicker.tsx`
+  sits alongside the live `EventLocationSearchInput.tsx`/`QuickPlaceCreate.tsx`
+  in the same `location/` folder but has zero importers anywhere in the
+  codebase (confirmed via repo-wide grep during Task 4 audit) — appears to
+  be an abandoned/superseded component from an earlier iteration.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: confirm zero importers still holds, delete the file.
+- Source: Task 4 (Event Wizard address dropdown) Phase 1 audit.
+
+## [BACKLOG-040] Place Wizard's `PlaceSearchInput.tsx` still uses deprecated Google `Autocomplete` widget
+
+- Status: OPEN
+- Priority: P3
+- Area: Google Maps / Place Wizard
+- Added: 2026-08-10
+- Reason deferred: Place Wizard is explicitly out of scope for Task 4
+  ("DO NOT TOUCH" — it's the working reference implementation Task 4
+  compared against). The code already carries its own tracked TODO for
+  this migration.
+- Context: `src/components/business/place/PlaceSearchInput.tsx:41-42` has
+  an existing comment: `// TODO(google-maps-tech-debt): migrate from
+  deprecated Autocomplete to PlaceAutocompleteElement after we finish
+  stabilizing the geo options + enrichment flow in Place Wizard step 2.`
+  Event Wizard's `EventLocationSearchInput.tsx` already uses the modern
+  `PlaceAutocompleteElement` (migrated independently), so the two wizards
+  now use two different Google Places widgets for the same job — a
+  drifted/duplicated implementation confirmed during Task 4's Phase 2
+  comparison audit.
+- Current state: not started.
+- Dependencies: none — the migration path is already proven working in
+  Event Wizard's implementation and can be used as a reference.
+- Acceptance criteria: `PlaceSearchInput.tsx` migrated to
+  `PlaceAutocompleteElement`, Place Wizard address flow regression-tested
+  (existing Place edit, new Place create, duplicate detection, map
+  fallback).
+- Source: Task 4 (Event Wizard address dropdown) Phase 2 comparison audit.
