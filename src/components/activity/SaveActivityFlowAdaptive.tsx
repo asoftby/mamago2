@@ -22,7 +22,7 @@ import {
   trackAuthCompleted,
 } from "@/lib/post-auth";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
-import type { ProfileStatePayload } from "@/lib/post-auth/types";
+import type { PendingEntityType, ProfileStatePayload } from "@/lib/post-auth/types";
 
 export type SaveActivityFlowAdaptiveProps = {
   open: boolean;
@@ -34,12 +34,16 @@ export type SaveActivityFlowAdaptiveProps = {
   planDate?: string | null;
   planStartsAt?: string | null;
   planItemId?: string | null;
-  /** Activity ID for pending action persistence across auth */
+  /** Activity ID for pending action persistence across auth (back-compat; use pendingEntityId for non-activity entities) */
   activityId?: string;
   /** Activity title for pending action (optional, for UX) */
   activityTitle?: string;
   /** Cover image URL for pending action (optional, for UX) */
   coverImageUrl?: string | null;
+  /** Entity kind for guest pending-action resume; defaults to "activity" (paired with activityId for back-compat) */
+  pendingEntityType?: PendingEntityType;
+  /** Entity id for guest pending-action resume; falls back to activityId when omitted */
+  pendingEntityId?: string;
   source?: string;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
@@ -98,6 +102,8 @@ export function SaveActivityFlowAdaptive({
   activityId,
   activityTitle,
   coverImageUrl,
+  pendingEntityType = "activity",
+  pendingEntityId,
   source,
   onPersist,
   nextHref,
@@ -146,21 +152,22 @@ export function SaveActivityFlowAdaptive({
       setPending(result);
 
       // Build pending action for automatic execution after auth
-      if (typeof window !== "undefined" && activityId) {
+      const entityId = pendingEntityId ?? activityId;
+      if (typeof window !== "undefined" && entityId) {
         const pendingAction =
           result.action === "ideas"
             ? {
                 kind: "save_idea" as const,
-                entityType: "activity" as const,
-                entityId: activityId,
+                entityType: pendingEntityType,
+                entityId,
                 title: activityTitle,
                 coverImageUrl: coverImageUrl,
               }
             : result.action === "plan"
               ? {
                   kind: "save_plan" as const,
-                  entityType: "activity" as const,
-                  entityId: activityId,
+                  entityType: pendingEntityType,
+                  entityId,
                   plannedDate: result.dateISO,
                   timeSlotId: result.timeSlotId,
                   title: activityTitle,
@@ -176,7 +183,16 @@ export function SaveActivityFlowAdaptive({
       }
       setPhase("auth");
     },
-    [isAuthenticated, onOpenChange, runPersist, activityId, activityTitle, coverImageUrl],
+    [
+      isAuthenticated,
+      onOpenChange,
+      runPersist,
+      activityId,
+      activityTitle,
+      coverImageUrl,
+      pendingEntityType,
+      pendingEntityId,
+    ],
   );
 
   const finishSuccess = React.useCallback(() => {

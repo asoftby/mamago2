@@ -22,6 +22,7 @@ import {
   type ArticleTocBranch,
 } from "@/lib/article/articleHeadingAnchors";
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
+import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
@@ -89,6 +90,10 @@ export function ArticleMvpView({
   articleAriaLabel,
   /** Переопределение ссылки «Все материалы» (городский журнал). */
   journalFooterHref,
+  /** Save/Share actions — опущены на preview (нет id/href для реального сохранения). */
+  articleId,
+  articleHref,
+  coverImageUrl,
 }: {
   title: string;
   subtitle: string | null;
@@ -104,6 +109,9 @@ export function ArticleMvpView({
   continuousVariant?: "standalone" | "first" | "continuation";
   articleAriaLabel?: string;
   journalFooterHref?: string;
+  articleId?: string;
+  articleHref?: string;
+  coverImageUrl?: string | null;
 }) {
   // Detect Breaking News by the subtitle marker.
   const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
@@ -179,6 +187,17 @@ export function ArticleMvpView({
         publishedAt={publishedAt ?? undefined}
         editHref={editHref}
       />
+
+      {articleId && articleHref ? (
+        <ArticleDetailActions
+          articleId={articleId}
+          title={title}
+          href={articleHref}
+          coverImageUrl={coverImageUrl}
+          source={`article-detail-${continuousVariant}`}
+          className="mb-6 md:mb-8"
+        />
+      ) : null}
 
       <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
 

@@ -4,8 +4,8 @@ import { extendPrismaWithSearchIndexing } from "@/lib/search/prismaSearchExtensi
 
 // Increment this version whenever the Prisma schema changes in a way
 // that requires a fresh PrismaClient in the dev hot-reload cycle.
-// Bump: ArticleRating (2026-08-05)
-const PRISMA_CACHE_VERSION = "v7";
+// Bump: ArticleIdea + PlanItem.articleId (2026-08-11)
+const PRISMA_CACHE_VERSION = "v8";
 
 const globalForPrisma = globalThis as unknown as {
   [key: string]: unknown;

@@ -11,8 +11,8 @@ export type AuthEntryPoint =
 
 export type AuthAction = "login" | "signup";
 
-/** Сущность для сохранения после входа (активность или маршрут). */
-export type PendingEntityType = "activity" | "route";
+/** Сущность для сохранения после входа (активность, маршрут или статья). */
+export type PendingEntityType = "activity" | "route" | "article";
 
 export type PendingSaveIdeaAction = {
   kind: "save_idea";

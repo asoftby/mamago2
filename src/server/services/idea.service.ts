@@ -302,3 +302,47 @@ export async function hasPlaceIdea(userId: string, placeId: string): Promise<boo
   });
   return row !== null;
 }
+
+/** Сохранить статью в «Идеи» (idempotent). */
+export async function addArticleIdea(userId: string, articleId: string) {
+  return prisma.articleIdea.upsert({
+    where: {
+      userId_articleId: { userId, articleId },
+    },
+    create: { userId, articleId },
+    update: {},
+  });
+}
+
+/** Удалить статью из «Идей». */
+export async function removeArticleIdea(userId: string, articleId: string): Promise<void> {
+  await prisma.articleIdea.deleteMany({
+    where: { userId, articleId },
+  });
+}
+
+/** Проверить, сохранена ли статья в «Идеях». */
+export async function hasArticleIdea(userId: string, articleId: string): Promise<boolean> {
+  const row = await prisma.articleIdea.findUnique({
+    where: {
+      userId_articleId: { userId, articleId },
+    },
+  });
+  return row !== null;
+}
+
+/**
+ * Проверить, какие из переданных статей сохранены в «Идеях» — один запрос,
+ * без N+1 (используется батч-статусом для карточек статей).
+ */
+export async function hasArticleIdeasBatch(
+  userId: string,
+  articleIds: string[],
+): Promise<Set<string>> {
+  if (articleIds.length === 0) return new Set();
+  const rows = await prisma.articleIdea.findMany({
+    where: { userId, articleId: { in: articleIds } },
+    select: { articleId: true },
+  });
+  return new Set(rows.map((r) => r.articleId));
+}

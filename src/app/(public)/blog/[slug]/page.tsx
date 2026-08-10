@@ -403,6 +403,9 @@ export default async function ArticlePage({
         continuousVariant={continuous?.enabled ? "first" : "standalone"}
         journalFooterHref="/blog"
         articleAriaLabel={mvp.title}
+        articleId={mvp.id}
+        articleHref={canonicalPath}
+        coverImageUrl={mvp.heroUrl}
       />
     );
 

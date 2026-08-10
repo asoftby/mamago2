@@ -482,6 +482,9 @@ export function ContinuousArticleReader({
                 continuousVariant="continuation"
                 articleAriaLabel={article.title}
                 journalFooterHref={journalHref}
+                articleId={article.id}
+                articleHref={article.href}
+                coverImageUrl={article.heroUrl}
               />
             </div>
             <ArticleIntermission

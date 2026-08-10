@@ -5,10 +5,12 @@ import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import {
+  addArticleIdea,
   addIdea,
   addOfferIdea,
   addPlaceIdea,
   hasOfferIdeaSupport,
+  removeArticleIdea,
   removeIdea,
   removeOfferIdea,
   removePlaceIdea,
@@ -22,17 +24,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, offerId, placeId } = body as {
+    const { activityId, offerId, placeId, articleId } = body as {
       activityId?: string;
       offerId?: string;
       placeId?: string;
+      articleId?: string;
     };
 
-    if (!activityId && !offerId && !placeId) {
+    if (!activityId && !offerId && !placeId && !articleId) {
       return NextResponse.json(
-        { error: "activityId, offerId or placeId is required" },
+        { error: "activityId, offerId, placeId or articleId is required" },
         { status: 400 }
       );
+    }
+
+    if (articleId) {
+      const idea = await addArticleIdea(user.id, articleId);
+      const article = await prisma.article.findUnique({
+        where: { id: articleId },
+        select: { cityId: true },
+      });
+      const sessionRowId = await getSessionRowIdFromCookies();
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "SAVE",
+        entityType: "ARTICLE",
+        entityId: articleId,
+        vertical: "CITY",
+        cityId: article?.cityId ?? null,
+        meta: { source: "detail", section: "journal", targetAction: "ideas" },
+      });
+      return NextResponse.json({ success: true, idea });
     }
 
     if (placeId) {
@@ -121,15 +144,18 @@ export async function DELETE(request: NextRequest) {
     const offerId = searchParams.get("offerId");
     const routeId = searchParams.get("routeId");
     const placeId = searchParams.get("placeId");
+    const articleId = searchParams.get("articleId");
 
-    if (!activityId && !offerId && !routeId && !placeId) {
+    if (!activityId && !offerId && !routeId && !placeId && !articleId) {
       return NextResponse.json(
-        { error: "activityId, offerId, routeId or placeId is required" },
+        { error: "activityId, offerId, routeId, placeId or articleId is required" },
         { status: 400 }
       );
     }
 
-    if (placeId) {
+    if (articleId) {
+      await removeArticleIdea(user.id, articleId);
+    } else if (placeId) {
       await removePlaceIdea(user.id, placeId);
     } else if (activityId) {
       await removeIdea(user.id, activityId);

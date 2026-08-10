@@ -20,6 +20,8 @@ import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { ArticleSaveHeart } from "@/features/save/ArticleSaveHeart";
+import { useArticleSaveStatusBatch } from "@/features/save/useArticleSaveStatusBatch";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import {
   buildAudienceLabel,
@@ -262,6 +264,7 @@ export function CityHomeJournalSection({
   const { appendCityQuery, citySlug } = useCity();
 
   const visibleArticles = articles.filter((a) => !a.isBreakingNews);
+  const saveStatuses = useArticleSaveStatusBatch(visibleArticles.map((a) => a.id));
 
   if (visibleArticles.length === 0) {
     return null;
@@ -297,6 +300,7 @@ export function CityHomeJournalSection({
             citySlug={citySlug}
             meta={{ section: "journal", position: index }}
           >
+          <div className="relative">
           <Link
             href={a.href}
             className={cn(
@@ -333,6 +337,19 @@ export function CityHomeJournalSection({
               {a.readTime} мин. чтения
             </p>
           </Link>
+          <div className="absolute right-2 top-2 z-10">
+            <ArticleSaveHeart
+              articleId={a.id}
+              articleTitle={a.title}
+              coverImageUrl={a.coverImageUrl}
+              initialStatus={saveStatuses[a.id]}
+              skipOwnFetch
+              source="city-home-journal-card"
+              className="h-8 w-8 bg-[rgba(250,247,241,0.85)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[4px]"
+              iconClassName="h-4 w-4"
+            />
+          </div>
+          </div>
           </AnalyticsCardViewTracker>
         ))}
       </HorizontalCardRow>

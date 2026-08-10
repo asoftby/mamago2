@@ -292,6 +292,93 @@ export async function addPlacePlanItem(
   });
 }
 
+type ResolvedArticleForSave = {
+  id: string;
+  title: string;
+  coverImageUrl: string | null;
+};
+
+async function resolveArticleForUserSave(articleId: string): Promise<ResolvedArticleForSave | null> {
+  const row = await prisma.article.findUnique({
+    where: { id: articleId },
+    select: { id: true, title: true, heroImage: true },
+  });
+  if (!row) return null;
+  return { id: row.id, title: row.title, coverImageUrl: row.heroImage };
+}
+
+/**
+ * Добавить статью в план на дату (дедупликация по userId + articleId).
+ */
+export async function addArticlePlanItem(
+  userId: string,
+  articleId: string,
+  date: string,
+  options?: { title?: string | null; coverImageUrl?: string | null },
+): Promise<{ id: string }> {
+  const resolved = await resolveArticleForUserSave(articleId);
+  if (!resolved) {
+    throw new Error("Article not found");
+  }
+
+  const title = options?.title ?? resolved.title;
+  const coverImageUrl = options?.coverImageUrl ?? resolved.coverImageUrl;
+
+  const existing = await prisma.planItem.findFirst({
+    where: { userId, articleId: resolved.id },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return prisma.planItem.update({
+      where: { id: existing.id },
+      data: {
+        date,
+        title,
+        coverImageUrl,
+        activityId: null,
+        routeId: null,
+        planRouteSlug: null,
+        placeId: null,
+        planPlaceSlug: null,
+      },
+      select: { id: true },
+    });
+  }
+
+  return prisma.planItem.create({
+    data: {
+      userId,
+      articleId: resolved.id,
+      activityId: null,
+      routeId: null,
+      planRouteSlug: null,
+      placeId: null,
+      planPlaceSlug: null,
+      date,
+      title,
+      coverImageUrl,
+    },
+    select: { id: true },
+  });
+}
+
+/**
+ * Список plan-items по набору статей — один запрос, без N+1
+ * (используется батч-статусом для карточек статей).
+ */
+export async function listArticlePlanItemsBatch(
+  userId: string,
+  articleIds: string[],
+): Promise<Array<{ id: string; articleId: string | null; date: string; startsAt: Date | null }>> {
+  if (articleIds.length === 0) return [];
+  return prisma.planItem.findMany({
+    where: { userId, articleId: { in: articleIds } },
+    select: { id: true, articleId: true, date: true, startsAt: true },
+    orderBy: { date: "asc" },
+  });
+}
+
 /**
  * Remove a plan item by ID
  */

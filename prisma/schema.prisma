@@ -79,6 +79,7 @@ model User {
   createdImprovementRequests        ImprovementRequest[]             @relation("ImprovementRequestCreator")
   uploadedMediaAssets               MediaAsset[]
   authoredArticles                  Article[]                        @relation("ArticleAuthor")
+  articleIdeas                      ArticleIdea[]
   createdEmailTemplateVersions      EmailTemplateVersion[]           @relation("EmailTemplateVersionCreatedBy")
   moderationLogs                    ModerationLog[]                  @relation("ModerationReviewer")
   notifications                     Notification[]
@@ -380,9 +381,12 @@ model PlanItem {
   /// Место в плане (визит без привязки к событию)
   placeId       String?
   planPlaceSlug String?
+  /// Статья в плане (сохранённое чтение без привязки к событию/месту)
+  articleId     String?
   activity      Activity? @relation(fields: [activityId], references: [id])
   route         Route?    @relation(fields: [routeId], references: [id])
   place         Place?    @relation(fields: [placeId], references: [id])
+  article       Article?  @relation(fields: [articleId], references: [id])
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
@@ -392,6 +396,7 @@ model PlanItem {
   @@index([userId, planRouteSlug])
   @@index([placeId])
   @@index([userId, planPlaceSlug])
+  @@index([articleId])
 }
 
 /// Сохранённые маршруты в «Идеи» (отдельно от Idea с activityId)
@@ -2135,6 +2140,20 @@ model PlaceIdea {
   @@index([placeId])
 }
 
+/// Сохранённые статьи в «Идеи»
+model ArticleIdea {
+  id        String   @id @default(cuid())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId])
+  @@index([articleId])
+}
+
 model OfferSlugHistory {
   id        String   @id @default(cuid())
   offerId   String
@@ -2643,6 +2662,9 @@ model Article {
   tags DiscoveryTag[]
 
   ratings ArticleRating[]
+
+  ideas     ArticleIdea[]
+  planItems PlanItem[]
 
   /// Partial unique index created via raw SQL migration:
   /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL

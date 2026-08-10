@@ -242,6 +242,9 @@ export default async function CityArticlePage({ params }: PageProps) {
       continuousVariant={continuous?.enabled ? "first" : "standalone"}
       journalFooterHref={journalHref}
       articleAriaLabel={mvp.title}
+      articleId={mvp.id}
+      articleHref={canonicalPath}
+      coverImageUrl={mvp.heroUrl}
     />
   );
 

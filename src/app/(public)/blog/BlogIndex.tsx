@@ -5,6 +5,8 @@ import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { ArticleSaveHeart, type ArticleSaveStatus } from "@/features/save/ArticleSaveHeart";
+import { useArticleSaveStatusBatch } from "@/features/save/useArticleSaveStatusBatch";
 import { useOptionalCity } from "@/contexts/CityContext";
 import {
   filterBlogArticles,
@@ -79,6 +81,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   }, [activeContentType, activeTagSlug, pathname, requestedTagSlug, requestedTypeParam, router, searchParams]);
 
   const [featured, ...rest] = filtered;
+  const saveStatuses = useArticleSaveStatusBatch(filtered.map((a) => a.id));
 
   return (
     <>
@@ -188,7 +191,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                 citySlug={citySlug}
                 meta={{ section: "journal", position: "featured" }}
               >
-                <FeaturedArticle article={featured} />
+                <FeaturedArticle article={featured} saveStatus={saveStatuses[featured.id]} />
               </AnalyticsCardViewTracker>
             )}
 
@@ -212,7 +215,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                     citySlug={citySlug}
                     meta={{ section: "journal", position: i + 1 }}
                   >
-                    <ArticleRow article={a} idx={i + 1} />
+                    <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
                   </AnalyticsCardViewTracker>
                 ))}
               </div>
@@ -226,8 +229,15 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   );
 }
 
-function FeaturedArticle({ article }: { article: CityHomeJournalArticle }) {
+function FeaturedArticle({
+  article,
+  saveStatus,
+}: {
+  article: CityHomeJournalArticle;
+  saveStatus?: ArticleSaveStatus;
+}) {
   return (
+    <div className="relative">
     <Link
       href={article.href}
       className="group grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12 py-12 border-b border-border"
@@ -292,13 +302,43 @@ function FeaturedArticle({ article }: { article: CityHomeJournalArticle }) {
         </div>
       </div>
     </Link>
+
+    {/* Heart overlay — mirrors the Link's own grid so it lands on the image corner without nesting inside <a> */}
+    <div
+      aria-hidden={false}
+      className="pointer-events-none absolute inset-0 grid grid-cols-1 py-12 sm:grid-cols-2 sm:gap-12"
+    >
+      <div className="relative">
+        <div className="pointer-events-auto absolute right-3 top-3 z-10">
+          <ArticleSaveHeart
+            articleId={article.id}
+            articleTitle={article.title}
+            coverImageUrl={article.coverImageUrl}
+            initialStatus={saveStatus}
+            skipOwnFetch
+            source="blog-index-featured"
+            className="h-9 w-9 bg-white/90 shadow-sm backdrop-blur-[4px]"
+          />
+        </div>
+      </div>
+    </div>
+    </div>
   );
 }
 
-function ArticleRow({ article, idx }: { article: CityHomeJournalArticle; idx: number }) {
+function ArticleRow({
+  article,
+  idx,
+  saveStatus,
+}: {
+  article: CityHomeJournalArticle;
+  idx: number;
+  saveStatus?: ArticleSaveStatus;
+}) {
   const tone = TONES[idx % TONES.length];
 
   return (
+    <div className="relative">
     <Link
       href={article.href}
       className="group grid grid-cols-1 sm:grid-cols-[200px_1fr_180px] gap-4 sm:gap-9 py-8 border-t border-border last:border-b items-center transition-[padding] duration-200 hover:sm:pl-2"
@@ -359,6 +399,25 @@ function ArticleRow({ article, idx }: { article: CityHomeJournalArticle; idx: nu
         )}
       </div>
     </Link>
+
+    {/* Heart overlay — mirrors the Link's own grid so it lands in the meta column without nesting inside <a> */}
+    <div className="pointer-events-none absolute inset-0 grid grid-cols-1 gap-4 py-8 sm:grid-cols-[200px_1fr_180px] sm:gap-9">
+      <div className="relative">
+        <div className="pointer-events-auto absolute right-0 top-0 z-10">
+          <ArticleSaveHeart
+            articleId={article.id}
+            articleTitle={article.title}
+            coverImageUrl={article.coverImageUrl}
+            initialStatus={saveStatus}
+            skipOwnFetch
+            source="blog-index-row"
+            className="h-8 w-8 bg-white/90 shadow-sm backdrop-blur-[4px]"
+            iconClassName="h-4 w-4"
+          />
+        </div>
+      </div>
+    </div>
+    </div>
   );
 }
 
