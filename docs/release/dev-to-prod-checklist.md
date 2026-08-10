@@ -1827,10 +1827,9 @@ prove.
   browser session — confirmed **not** a Task 5 regression because (a) it is
   identical on non-ranking pages (the plain homepage `/minsk`), (b) this
   task's diff contains zero React/frontend files, and (c) the page still
-  renders full, correct content despite it in every case observed. Not
-  filed as a new backlog item per this session's narrow closure
-  instructions — surfaced here for the record; owner may want it looked at
-  separately.
+  renders full, correct content despite it in every case observed. Filed
+  as BACKLOG-049 (P2, investigation only, not fixed here) per owner
+  direction.
 BLOCKERS: none. All required regression-smoke checks passed on deployed
 DEV.
 BACKLOG/NOTES: BACKLOG-041 (ratings/reviews as ranking input — owner
@@ -1848,8 +1847,11 @@ BACKLOG-047 (`SignalDefinition.isFeatured`/`EventCategory.isFeatured` dead
 admin flags), BACKLOG-048 (`Plan.hasPriorityBoost`/`PRIORITY_BOOST`
 scaffolding with zero callers and zero business-facing marketing surface —
 confirmed not currently sold, verified by grep across all business UI/API
-directories, so not a false-advertising risk, just dead plumbing). None
-blocks Task 5's Exit Criteria; none reopens Tasks 1–4.
+directories, so not a false-advertising risk, just dead plumbing),
+BACKLOG-049 (`Minified React error #310` reproduces globally on deployed
+DEV, ranking and non-ranking pages alike — confirmed not introduced by
+Task 5, tested user flows still work, investigation only, not fixed here).
+None blocks Task 5's Exit Criteria; none reopens Tasks 1–4.
 
 **TASK 5 — COMPLETE.** Deployed SHA: `33fdb234c31175e9a3a6573308a285c5e51fbf1d`
 (image `ghcr.io/asoftby/mamago2:dev-270`). PLAN_ADD now correctly outranks

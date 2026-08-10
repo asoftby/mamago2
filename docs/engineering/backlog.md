@@ -1285,3 +1285,44 @@ P3 — cleanup / polish / optional
   uses it).
 - Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
   Analytics & Ranking).
+
+## [BACKLOG-049] `Minified React error #310` fires globally on deployed DEV
+
+- Status: OPEN
+- Priority: P2
+- Area: Frontend / Investigation
+- Added: 2026-08-10
+- Reason deferred: surfaced incidentally during Task 5's deployed-DEV
+  regression smoke, not investigated or fixed there — out of that task's
+  scope (Task 5's diff contains zero React/frontend files) and not
+  something to debug live during a closure smoke. Needs its own dedicated
+  investigation.
+- Context: `read_console_messages` showed `Uncaught {stack: Error:
+  Minified React error #310; ...}` (pointing into chunk
+  `2fac11ac-eed2b5b701c87048.js`) on **every** page visited during the
+  Task 5 DEV smoke on `https://dev.mamago.by` — `/minsk` (plain homepage,
+  no ranking-specific code), `/minsk/kuda` (Events discovery), and
+  `/minsk/classes` (Offers discovery) all reproduced it identically, under
+  the owner's persisted authenticated ADMIN browser session. Confirmed
+  **not** introduced by Task 5: it appears on non-ranking pages just as
+  much as ranking pages, and Task 5's entire diff (`d5b149bc`) touches only
+  `src/server/discovery/engagementWeights.ts`/`eventEngagementScores.ts`
+  and deletes a dead, non-imported folder — no React/component/frontend
+  file. Despite the console error, every page rendered its full, correct
+  content in every case observed (Kuda feed card, Classes empty state, My
+  Plan page, admin Offers list) — not blocking, not a visible breakage.
+  Root cause not identified (not investigated this session, per
+  instruction) — candidates to check first: whether it reproduces for a
+  logged-out/guest session (this smoke only had an authenticated ADMIN
+  session available), and what specifically in the shared app/layout
+  bundle (`2fac11ac-...js`, loaded on every page) throws it.
+- Current state: not started. Not reproduced/tested against a guest
+  (unauthenticated) session — unknown whether it's session-specific.
+- Dependencies: none blocking.
+- Acceptance criteria: root-caused via the unminified React error message
+  (decode via https://react.dev/errors/310 or a dev-mode build), reproduced
+  reliably (including checking guest vs. authenticated sessions), and
+  either fixed or explicitly confirmed benign/expected with a documented
+  reason.
+- Source: Task 5 (Content Analytics & Ranking) deployed-DEV regression
+  smoke, 2026-08-10.
