@@ -20,9 +20,24 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 4 — Event Wizard Address Dropdown (COMPLETE)
+Active task:        Task 5 — Content Analytics & Ranking (IN_PROGRESS —
+                     AUDIT_COMPLETE + narrow owner-approved correction
+                     implemented, DEV deploy pending)
 Last updated:       2026-08-10
-Last updated by:    Claude Code — Task 4 closed. Audited the full Event
+Last updated by:    Claude Code — Task 5 audit found a real, already-shared
+                     UserEvent-derived ranking engine (kudaDiscoveryFeed /
+                     classesDiscoveryFeed / planSuggestions, plus the real
+                     Boost model for paid Offer visibility) already meeting
+                     the task's exit criteria, alongside a confirmed
+                     PLAN_ADD/SAVE weight-ordering bug and a dead, conflicting
+                     second weight table. Owner narrowed scope to: fix the
+                     weight ordering, consolidate to one canonical weight
+                     table, retire the dead one — explicitly no
+                     personalization, no new ranking layer, no ratings
+                     wiring, no Stories-rail changes. Implemented + tested
+                     + committed (`d5b149bc`); pushed for CI/Docker, SHA to
+                     follow once green. Prior session (Task 4 closure):
+                     Audited the full Event
                      Wizard address flow end-to-end before touching code,
                      proved the root cause was NOT the autocomplete dropdown
                      (it worked fine) but silent data loss — googlePlaceId,
@@ -59,7 +74,9 @@ Last updated by:    Claude Code — Task 4 closed. Audited the full Event
                      geo-enrichment fallback path; `EventLocationPicker.tsx`
                      dead code; Place Wizard's deprecated Autocomplete
                      widget) recorded as BACKLOG-038/039/040.
-Unresolved P0/P1:   none from Task 1, 2, 3, or 4 — Tasks 5–15 remain TODO, not started
+Unresolved P0/P1:   none from Task 1, 2, 3, 4, or 5 (Task 5's own audit found
+                     zero P0/P1) — Task 5 IN_PROGRESS (narrow scope), Tasks
+                     6–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -1594,15 +1611,216 @@ Place, or creates a new Place inside the Event Wizard.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `IN_PROGRESS`
+AUDIT:
+EXISTING — A real, working, shared engagement-ranking layer already exists
+and is already reused across the two main discovery surfaces plus My Plan
+suggestions, built entirely on Task 3's `UserEvent` log (no parallel
+analytics/ranking pipeline): `src/server/discovery/kudaDiscoveryFeed.ts`
+(Events "Куда пойти" feed) ranks its DB candidate pool
+(`cityId`/status-filtered, `orderBy nextOccurrenceAt/createdAt desc`) by
+`getEventEngagementScores()` (`src/server/discovery/
+eventEngagementScores.ts`, a single bounded raw-SQL `GROUP BY` scoped to the
+candidate `entityId`s — cheap, no full-table scan) + `Occasion.boostScore`
+(admin-curated seasonal boost, MAX-aggregated, `src/lib/discovery/
+occasions.ts`) + `businessQualityBoost.ts` (merit-based multiplier, up to
+×1.10, from booking response/confirm/complete rate, min 5 bookings/30d) + a
+weather boost, tie-broken by `dateStart`.
+`src/server/services/planSuggestions.service.ts` (My Plan suggestions)
+reuses the exact same `getEventEngagementScores()` after filtering
+candidates by city + published + `Child`-derived `ageTags` (graceful
+OR-fallback to unfiltered if the age filter would return 0 rows — genuine
+reuse, not a second engine).
+`src/server/discovery/classesDiscoveryFeed.ts` (Offers "Занятия" feed) has
+its own, simpler ranking: the real `Boost` model (`Offer.boosts`, an
+active-window relation) drives real, live, paid-visibility ranking — any
+Offer with an active `Boost` row gets a flat `engagementScore=1000` that
+dominates the sort (quality boost is deliberately not applied on top, to
+avoid double-boosting); non-boosted Offers get `businessQualityBoost` only
+(no `UserEvent`-derived engagement score is used for Offers today — an
+asymmetry vs. Events, not a defect). This corrects an earlier pass in this
+session's own research that initially concluded the `Boost` model was
+unwired into ranking (it had only grepped `contentDependencySummary.
+service.ts`'s deletion-dependency count and missed `classesDiscoveryFeed.
+ts`'s own `boosts: { where: { startAt: {lte: now}, endAt: {gte: now} } } }`
+select + `isBoosted` check) — corrected by direct code read before writing
+this section.
+`src/lib/search/constants.ts` `SEARCH_BOOST` (Task 2, unchanged) — flat
+per-entity-type multiplier + `updatedAt` tie-break, deliberately simple,
+already accepted as adequate at current catalog size (~276 published
+entities).
+Stories rail (`StoriesSection.tsx` + `HomeStoryItem`) is a working editorial
+rail by design — ordered by `pinned/placementType/manualOrder/startsAt`,
+**no** `UserEvent`/analytics signal, not meant to be signal-ranked.
+`StoryIntentConfig.title/enabled/order` (5 legacy intents:
+today/tomorrow/weekend/free/breaking_news) is genuinely admin-editable and
+live via `/admin/ranking/stories-intents?tab=rules`, with optimistic
+concurrency + audit log.
+`RankingSettings`/`BoostSettings`/`SearchRankingSettings` (3 admin panels,
+`/admin/ranking/weights`, `/admin/ranking/boost`, `/admin/search/ranking`)
+are already correctly remediated by a prior 2026-08 session: all three are
+self-documented dead in their own handler files, locked to HTTP 403 on any
+mutation, with matching amber "does not affect production ranking" banners
+— confirmed still accurate, nothing to fix.
+Ratings/reactions exist and are live per entity type: `PlaceReview`
+(rating+text+moderation+owner reply, Google-sync — Places), `RouteRating`/
+`ArticleRating` (like/neutral/dislike, one vote per identifier — Routes,
+Articles), `BookingFeedback` (1–5 stars, completed bookings only, feeds
+`FEEDBACK_LEFT` into `UserEvent`).
+PARTIAL/BROKEN — `UserBehaviorProfile.segmentKeys` (20 rule-based segments,
+e.g. `NEW_USER`/`SAVER`/`PLANNER`, recomputed synchronously on every
+`UserEvent` write, no cron needed) is fully live and correct but has **zero**
+ranking/recommendation readers anywhere in `src/` — every consumer is an
+admin analytics dashboard. `Child`-age relevance filters My Plan
+suggestions but does not rank within the filtered set (ranking there is
+population-level engagement + freshness only); the main Kuda feed takes no
+age/family parameter at all (age relevance there is client-side only, per
+an existing code comment). `Occasion.boostScore` is applied only to Events,
+not Offers/Places/Articles/Routes. `PlaceReview`/`RouteRating`/
+`ArticleRating` submissions do **not** emit any `UserEvent` — a real, live
+quality signal is invisible to the engagement-ranking engine.
+MISSING — No `EventRating`/`OfferRating` model (2 of 5 entity types have no
+public rating/reaction mechanism). No ranking signal applied to Place/
+Article listings (plain `createdAt`/`updatedAt desc` only; Place also has no
+public listing/catalog page at all — pre-existing, BACKLOG-032). No geo-
+distance ranking (city scoping is exact-`cityId`-match only; `Place.lat/lng`
+used only for map display). No explicit/named cold-start code path (de
+facto handled by population-ranked + freshness-tie-broken ordering, which
+is reasonable but not designed/tested as such — `NEW_USER` segment sits
+computed and unused right next to where it would be consulted). No cron/
+scheduled recalculation exists anywhere in this codebase for anything —
+correctly not needed here, since engagement scores and behavior segments
+are both computed live/on-write against small, indexed, bounded query
+shapes at current scale.
+DUPLICATED/CONFLICTING (root cause of this task's confirmed P1-adjacent
+correction) — `eventEngagementScores.ts` hardcoded its weights inline in
+raw SQL (`SAVE=5, PLAN_ADD=4, CTA_CLICK=3, DETAIL_OPEN/PAGE_VIEW=2,
+CARD_VIEW=1`) while a second, unused, self-documented-dead weight scheme
+(`src/features/discovery/signals/discoverySignalWeights.ts`,
+`DISCOVERY_SIGNAL_WEIGHTS`, explicit header: "NOT used in runtime
+calculations or feed ranking") sat parallel to it with different values and
+zero importers outside its own folder — two disagreeing opinions about
+signal weight existed in the repo, only one live. Also found: a second,
+fully-built, tested Stories-rail redesign (`resolveStoryRail.ts`/
+`loadStoryRailCandidatePool.ts`/`STORY_SLOTS` registry with
+`today`/`running`/`lastchance` intents) sits dead in the codebase, never
+imported by `CityHomePage.tsx` or any real route — an abandoned in-progress
+redesign of the live rail, using a different intent vocabulary. Duplicated
+"today/weekend" date-range logic exists independently in
+`src/lib/stories/ranges.ts` (Stories) vs. `whenLabel.ts`'s own local
+`computeWeekendRange()` (discovery filters) — same concept, two
+implementations, zero shared imports.
+DO NOT TOUCH — `UserEvent` ingestion (Task 3); `kudaDiscoveryFeed.ts`/
+`classesDiscoveryFeed.ts`/`businessQualityBoost.ts`/`Occasion` boost —
+real, live, working ranking engines, structurally unchanged by this task
+(only the numeric weights `getEventEngagementScores()` plugs in were
+corrected — its signature/return type is unchanged, so every caller is
+unaffected); `SEARCH_BOOST`/`/api/search` (Task 2, frozen);
+`RankingSettings`/`BoostSettings`/`SearchRankingSettings` locks (correctly
+inert, already disclosed — reopening "admin-tunable global weights" is
+exactly the "ranking → ML platform" scope creep this checklist's §15 warns
+against); `StoriesSection.tsx`/`HomeStoryItem`/manual placement admin
+(working editorial rail, out of scope); `PlaceReview`/`RouteRating`/
+`ArticleRating`/`BookingFeedback` (working UGC features — not touched, not
+wired into ranking this task, see IMPLEMENTATION SCOPE below);
+`Promotion`/`PromotionAction` billing (real revenue feature, unrelated to
+ranking); `UserBehaviorProfile`/`SegmentResolverService` internals (Task 3
+— correct as computed, only its "unused for ranking" gap is noted, not its
+computation).
+P0/P1 FINDINGS: none. The two real discovery surfaces (Events, Offers) and
+My Plan suggestions already rank content using a shared, cheap,
+understandable `UserEvent`-derived signal — this task's exit criteria was
+already substantially met before any code changed. Everything else found
+was either already-correctly-locked dead admin scaffolding (no release
+risk, already disclosed to admins) or a genuine but non-blocking
+signal/consistency gap. Nothing threatens security, data integrity, auth,
+or a critical production flow.
+PRODUCT DECISION (owner, 2026-08-10): `PLAN_ADD` is a stronger user-intent
+signal than `SAVE` (committing an item to a concrete day beats
+bookmarking it) — the previous runtime formula had this inverted
+(`SAVE=5 > PLAN_ADD=4`). Corrected canonical ladder: `CARD_VIEW=1,
+DETAIL_OPEN/PAGE_VIEW=2, CTA_CLICK=3, SAVE=4, PLAN_ADD=5`. Scope explicitly
+narrowed by the owner to formalizing/correcting the existing live ranking
+system only — no personalization, no new ranking layer, no models, no cron,
+no materialized scores, no ML, no admin-tunable global weights, no
+ratings/reactions wiring, no Stories-rail changes this task.
+IMPLEMENTATION SCOPE: (1) new canonical shared constant
+`src/server/discovery/engagementWeights.ts` (`ENGAGEMENT_WEIGHTS`, typed
+against the real `UserEventType` enum) with the corrected ladder; (2)
+`eventEngagementScores.ts` now builds its SQL `CASE` from that table
+(`Prisma.sql`/`Prisma.join` fragment composition) instead of a hardcoded
+inline copy — same function signature/return type, zero change to any
+caller; (3) removed the dead, conflicting `discoverySignalWeights.ts`
+scaffold and its self-contained folder (`src/features/discovery/signals/`
+— `index.ts`/`types.ts`/`utils.ts` all existed only to re-export/consume the
+now-removed table; confirmed zero importers anywhere outside that folder
+before deletion) — one source of truth for engagement weights now exists.
+Occasion boost, `businessQualityBoost`, weather boost, freshness tie-break,
+existing candidate filtering, and Search Ranking are all untouched. No new
+models, no cron, no materialized scores, no ML, no admin-tunable weights.
+Ratings/reactions and `UserBehaviorProfile.segmentKeys` deliberately NOT
+wired into ranking this task (see BACKLOG-041, BACKLOG-042). The second
+dead Stories rail deliberately NOT wired or deleted this task (see
+BACKLOG-043) — the live editorial rail is unchanged.
+COMMITS: `d5b149bc` (fix: canonical engagement weight table, PLAN_ADD
+outranks SAVE; retires the dead `discoverySignalWeights.ts`; adds 4 new
+targeted tests).
+VERIFICATION: New test `src/server/discovery/eventEngagementScores.test.ts`
+(self-contained fixture, created/torn down within the test, real local dev
+DB, `npx tsx` per this repo's convention) — 4 cases, all passing: (a)
+scoring a fixture entity with one event of every weighted type sums to
+exactly `Object.values(ENGAGEMENT_WEIGHTS)`'s total — computed dynamically
+from the imported canonical table, not a hardcoded number in the test, so
+it fails if the SQL generation ever drifts from the table; (b) a
+single-`PLAN_ADD` entity scores strictly higher than a single-`SAVE` entity,
+each matching its own canonical weight exactly; (c) an unlisted real
+`UserEventType` (`SEARCH_APPLY`) contributes exactly 0 — proves the `ELSE 0`
+branch still works and no speculative weight was invented; (d) repeated
+calls against unchanged fixture data return identical scores (determinism).
+Re-ran the pre-existing `activityVisibilityPhase2.test.ts` (same
+`src/server/discovery/` module) — no regression. `Occasion`/
+`businessQualityBoost`/weather/freshness composition in
+`kudaDiscoveryFeed.ts`/`classesDiscoveryFeed.ts` verified unregressed by
+direct code read (not by a new heavy integration test, per §13 risk-based
+verification for a small, isolated change): `getEventEngagementScores()`'s
+call sites, parameter shape, and return type (`Promise<Map<string,
+number>>`) are byte-identical to before — only the numeric values placed in
+that map changed, exactly as intended. `npx tsc --noEmit` clean (whole
+repo). `npx eslint` on all 3 changed/new files: 0 errors. `git diff --check`
+clean. Full `pnpm check:push` (`pnpm build`) run twice — exit 0 both times,
+"Compiled successfully in 104s", full route manifest generated, no errors.
+`git status --short`/`git diff --cached --name-status` confirmed only the
+intended 7 files changed (3 new/modified + 4 deleted), no foreign diff
+present or touched.
+DEV SMOKE: Not applicable in the usual browser sense — this is a
+backend-only ranking-weight correction with no new UI surface; its effect
+(Events with more `PLAN_ADD`s now correctly outranking otherwise-equal
+Events with more `SAVE`s) is proven by the DB-backed targeted tests above,
+not something a single-session browser click-through could reliably
+demonstrate without fabricating a large synthetic event volume. Pending:
+push to `origin/dev`, CI + Docker Build & Push green, owner-controlled DEV
+deploy per standing process (this agent does not deploy) — SHA to be
+recorded here once pushed.
+BLOCKERS: none code-side. Deployment is owner-controlled via the standing
+process.
+BACKLOG/NOTES: BACKLOG-041 (ratings/reactions not wired into ranking —
+needs a normalized/signed quality-signal design, deliberately deferred:
+treating mere feedback existence as a positive signal would incorrectly
+boost negative `PlaceReview`/`RouteRating`/`ArticleRating` submissions),
+BACKLOG-042 (`UserBehaviorProfile.segmentKeys` unused for ranking
+personalization — deliberately deferred, no `NEW_USER`/`SAVER`/`PLANNER`
+feed branching this task), BACKLOG-043 (second dead Stories-rail redesign —
+needs a separate owner decision: finish wiring or delete), BACKLOG-044
+(`Occasion.boostScore` only applied to Events, not Offers/Places/Articles/
+Routes), BACKLOG-045 (duplicated today/weekend date-range logic, Stories vs.
+discovery filters), BACKLOG-046 (`StoryIntentConfig.itemLimit`/
+`allowedTypes` dead sub-fields), BACKLOG-047 (`SignalDefinition.isFeatured`/
+`EventCategory.isFeatured` dead admin flags), BACKLOG-048
+(`Plan.hasPriorityBoost`/`PRIORITY_BOOST` scaffolding with zero callers and
+zero business-facing marketing surface — confirmed not currently sold,
+verified by grep across all business UI/API directories, so not a
+false-advertising risk, just dead plumbing). None blocks Task 5's Exit
+Criteria; none reopens Tasks 1–4.
 
 AUDIT FIRST existing content ranking/engagement infrastructure and its
 overlap with Publication Analytics, Search ranking, Stories ranking, content

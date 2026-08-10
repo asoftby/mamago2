@@ -1051,3 +1051,221 @@ P3 — cleanup / polish / optional
   (existing Place edit, new Place create, duplicate detection, map
   fallback).
 - Source: Task 4 (Event Wizard address dropdown) Phase 2 comparison audit.
+
+## [BACKLOG-041] Ratings/reactions (PlaceReview/RouteRating/ArticleRating) don't feed the engagement-ranking engine
+
+- Status: OPEN
+- Priority: P2
+- Area: Ranking / Ratings
+- Added: 2026-08-10
+- Reason deferred: Task 5's own scope was narrowed by the owner to
+  formalizing/correcting the existing engagement-weight table only. Wiring
+  ratings/reactions in naively would be actively wrong: `PlaceReview`
+  carries a `rating` value (can be low/negative) and `RouteRating`/
+  `ArticleRating` carry like/neutral/dislike semantics — simply emitting a
+  positive `UserEventType.FEEDBACK_LEFT`-style signal on submission would
+  incorrectly boost content with negative reviews/dislikes, exactly the
+  failure mode this deferral avoids.
+- Context: `PlaceReview` (`prisma/schema.prisma:1277`, rating+text+
+  moderation+owner reply, live at `POST /api/places/[id]/reviews`),
+  `RouteRating`/`ArticleRating` (`prisma/schema.prisma:4458/4477`, one
+  vote per identifier, live via `RouteRatingBlock.tsx`/`/api/articles/
+  rate`) do not call `trackUserEvent()` on submission — confirmed by
+  code read. `UserEventType.FEEDBACK_LEFT` is only emitted from
+  `BookingFeedback` (`src/server/analytics/trackBookingEvent.ts:176`),
+  which is a genuine 1–5 star positive-only signal, unlike the other
+  three.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: a normalized/signed quality-signal design — e.g. a
+  new `UserEventType` (or a signed `meta` field on `FEEDBACK_LEFT`)
+  distinguishing positive from negative/neutral feedback, so
+  `getEventEngagementScores()`-style aggregation can weight them correctly
+  (positive ratings boost, negative ratings should not) — decided and
+  implemented as a deliberate follow-up, not bolted on reactively.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-042] `UserBehaviorProfile.segmentKeys` computed but never consulted by ranking/recommendation code
+
+- Status: OPEN
+- Priority: P2
+- Area: Ranking / Personalization
+- Added: 2026-08-10
+- Reason deferred: owner explicitly scoped Task 5 to formalizing/correcting
+  the existing ranking system, not adding personalization. `segmentKeys`
+  (20 rule-based segments: `NEW_USER`/`RETURNING_USER`/`ACTIVE_USER`/
+  `DORMANT_USER`, `BROWSER`/`SAVER`/`PLANNER`/`BUYER_INTENT`,
+  `LAST_MINUTE`/`ADVANCE_PLANNER`/`WEEKEND_ORIENTED`/`WEEKDAY_ORIENTED`,
+  `ONE_CHILD`/`MULTI_CHILD`, `PREFERS_*`, `PRICE_SENSITIVE`) is recomputed
+  synchronously on every `UserEvent` write (`UserBehaviorAggregationService.
+  ts` → `SegmentResolverService.ts`) and is fully live/correct — but every
+  reader found (`analyticsBehavior/Segments/Overview.service.ts`) is an
+  admin dashboard, never a ranking/discovery-feed/recommendation code path.
+- Context: exhaustive grep across `src/` for `segmentKeys`/
+  `UserBehaviorProfile` readers found zero hits in
+  `kudaDiscoveryFeed.ts`/`classesDiscoveryFeed.ts`/`planSuggestions.
+  service.ts` or anywhere else outside `src/app/api/admin/analytics/*` and
+  `src/app/api/user/delete/route.ts` (deletion cascade only).
+- Current state: not started.
+- Dependencies: none blocking; a real product decision on whether/how to
+  personalize (e.g. `NEW_USER`-aware cold-start ordering, `SAVER`/
+  `PLANNER`-aware weighting) should precede implementation.
+- Acceptance criteria: a deliberate product/design decision on which
+  segments (if any) should influence ranking, and how, before any code
+  change — explicitly not automatic just because the data exists.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-043] Second, fully-built Stories-rail redesign exists dead in the codebase, never wired
+
+- Status: OPEN
+- Priority: P2
+- Area: Stories / Home Page
+- Added: 2026-08-10
+- Reason deferred: owner explicitly excluded Stories-rail changes from
+  Task 5's narrowed scope — the live editorial rail (`StoriesSection.tsx`/
+  `HomeStoryItem`) is working and untouched; this item needs its own
+  separate owner decision (finish wiring the redesign, or delete it),
+  mirroring the shape of the existing worktree-recovery backlog items
+  (BACKLOG-001/002/010/011/012 — real prior effort sitting unintegrated).
+- Context: `src/server/stories/resolveStoryRail.ts` +
+  `loadStoryRailCandidatePool.ts` + `src/lib/stories/registry.ts`
+  (`STORY_SLOTS` registry, intents `today`/`running`/`lastchance` — a
+  materially different vocabulary from the live rail's
+  `today`/`tomorrow`/`weekend`/`free`/`breaking_news`) implement a real,
+  tested (`resolveSlots.test.ts`, `dateRangeWhere.test.ts`), DB-querying
+  rail with real classification/caching logic — but `buildStoryRailData`/
+  `loadStorySlotContent` are imported nowhere outside `resolveStoryRail.ts`
+  itself. `CityHomePage.tsx` only ever imports the live `StoriesSection`.
+  Appears to be an abandoned in-progress redesign.
+- Current state: not started. Confirmed still unwired as of this audit.
+- Dependencies: none blocking; needs an explicit owner decision before
+  either finishing the wiring or deleting the module.
+- Acceptance criteria: owner decides — either the redesign is finished and
+  wired into `CityHomePage.tsx` (replacing or complementing the live rail),
+  or the dead module is deleted. Not left ambiguous indefinitely.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-044] `Occasion.boostScore` seasonal boost only applied to Events, not Offers/Places/Articles/Routes
+
+- Status: OPEN
+- Priority: P2
+- Area: Ranking / Seasonality
+- Added: 2026-08-10
+- Reason deferred: not a defect — `Occasion` boost is a real, live,
+  admin-curated seasonal signal, just scoped to one entity type today;
+  extending it is a deliberate follow-up, not part of Task 5's narrowed
+  weight-correction scope.
+- Context: `getActivityOccasionBoosts()` (`src/lib/discovery/occasions.ts`)
+  is consumed only by `kudaDiscoveryFeed.ts:97` (MAX-aggregated, "soft
+  contextual ranking signal, not a visibility rule" per its own comment).
+  `classesDiscoveryFeed.ts` (Offers) and any future Place/Article/Route
+  ranking do not consult it at all.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: a product decision on whether seasonal/occasion
+  boosting should extend to Offers (and, if Place/Article/Route ever gain
+  ranked listings, to those too), then implement by reusing
+  `getActivityOccasionBoosts()`'s existing pattern — no new model.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-045] Duplicated "today/weekend" date-range logic — Stories vs. discovery filters
+
+- Status: OPEN
+- Priority: P3
+- Area: Ranking / Cleanup
+- Added: 2026-08-10
+- Reason deferred: pure cleanup, no behavior difference currently observed
+  between the two implementations; not urgent, out of Task 5's narrowed
+  scope.
+- Context: `src/lib/stories/ranges.ts` (`todayRange`/`tomorrowRange`/
+  `weekendRange`/`nextWeekRange`, timezone-aware, used by Stories) and
+  `src/features/filters/discovery/whenLabel.ts`'s own local
+  `computeWeekendRange()` (used by the discovery "when" filter) implement
+  the same concept independently — confirmed via grep that neither file
+  imports from the other.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: consolidate into one shared date-range utility,
+  used by both Stories and discovery filters.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-046] `StoryIntentConfig.itemLimit`/`allowedTypes` — dead sub-fields on an otherwise-live model
+
+- Status: OPEN
+- Priority: P3
+- Area: Stories / Admin
+- Added: 2026-08-10
+- Reason deferred: low value, no behavior impact — the model's other
+  fields (`title`/`enabled`/`order`) are genuinely live and admin-edited;
+  these two are simply unused.
+- Context: `StoryIntentConfig.itemLimit`/`.allowedTypes` are defined in the
+  Prisma model and typed in `StoryIntentRulesPanel.tsx`'s TS type, but the
+  admin UI never renders/edits them and the public reader
+  `getPublicStoryIntentConfigs()` (`src/server/stories/
+  storyIntentConfig.ts:10-14`) only selects `{intent, title, enabled,
+  order}` — confirmed via grep these two fields appear only in seed
+  defaults and the UI type declaration.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: either wire `itemLimit`/`allowedTypes` into the
+  rail's rendering (cap items per intent, restrict entity types) or remove
+  them from the model/admin type.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-047] `SignalDefinition.isFeatured`/`EventCategory.isFeatured` — admin-editable, never read publicly
+
+- Status: OPEN
+- Priority: P3
+- Area: Admin / Taxonomy
+- Added: 2026-08-10
+- Reason deferred: decorative/dead flags, no release risk, low value
+  cleanup.
+- Context: both fields are editable via their respective admin CRUD
+  screens (`/admin/taxonomy/signals/[slug]`, `/admin/taxonomy/
+  event-categories/[id]`) but have zero reads anywhere outside their own
+  admin CRUD — confirmed the corresponding public routes
+  (`api/public/signals/*`, `api/public/event-categories/route.ts`) don't
+  select or order by either field.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: either wire `isFeatured` into real public
+  ordering/highlighting, or remove the field and its admin UI control.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
+
+## [BACKLOG-048] `Plan.hasPriorityBoost`/`PRIORITY_BOOST` commercial-feature scaffolding — zero callers, not sold
+
+- Status: OPEN
+- Priority: P3
+- Area: Billing / Commercial
+- Added: 2026-08-10
+- Reason deferred: dead scaffolding, not urgent. Explicitly checked and
+  confirmed **not** a false-advertising risk before filing as low
+  priority: grepped all business-facing UI/API directories
+  (`src/app/business`, `src/components/business`, `src/app/api/business`)
+  for "приоритет"/"priority" — no marketing copy references this feature,
+  so nothing currently promises businesses a capability that doesn't work.
+- Context: `Plan.hasPriorityBoost` (`prisma/schema.prisma:2201`) →
+  `commercialAccess.service.ts` computes a `PRIORITY_BOOST` feature flag
+  ("Priority in search results") and exposes `canUsePriorityBoost` via
+  `getBusinessFeatureCapabilities()` — which has zero callers anywhere
+  else in `src/` (confirmed by grep). No query branches on
+  `canUsePriorityBoost` today. Distinct from the real, live `Boost` model
+  (`Offer.boosts`) that already drives real paid-visibility ranking in
+  `classesDiscoveryFeed.ts` — this is separate, unfinished scaffolding for
+  a plan-tier entitlement concept that was never connected to anything.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: either build the real paid-boost mechanism this
+  scaffolding implies (a product/pricing decision) or remove the dead
+  flag/plumbing (`hasPriorityBoost`, `PRIORITY_BOOST`,
+  `canUsePriorityBoost`, `getBusinessFeatureCapabilities()` if nothing else
+  uses it).
+- Source: `docs/release/dev-to-prod-checklist.md` Task 5 audit (Content
+  Analytics & Ranking).
