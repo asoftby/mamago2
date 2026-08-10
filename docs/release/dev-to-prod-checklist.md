@@ -20,33 +20,45 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 4 — Event Wizard Address Dropdown (COMPLETE locally;
-                     DEV deploy pending owner action)
+Active task:        Task 4 — Event Wizard Address Dropdown (COMPLETE)
 Last updated:       2026-08-10
-Last updated by:    Claude Code — Task 4 done: audited the full Event Wizard
-                     address flow end-to-end before touching code, proved the
-                     root cause was NOT the autocomplete dropdown (it worked
-                     fine) but silent data loss — googlePlaceId, Google
-                     address components, and auto district/metro were
-                     dropped at client-side type boundaries and hardcoded to
-                     null when a new Place was created at publish time, even
-                     though the visible address text/coordinates were always
-                     correct (which is why nobody had noticed). Fixed by
-                     threading the already-captured Google data through, and
+Last updated by:    Claude Code — Task 4 closed. Audited the full Event
+                     Wizard address flow end-to-end before touching code,
+                     proved the root cause was NOT the autocomplete dropdown
+                     (it worked fine) but silent data loss — googlePlaceId,
+                     Google address components, and auto district/metro
+                     were dropped at client-side type boundaries and
+                     hardcoded to null when a new Place was created at
+                     publish time, even though the visible address
+                     text/coordinates were always correct. Fixed by
+                     threading the already-captured Google data through and
                      reusing Place Wizard's existing `/api/geo/enrich-location`
-                     endpoint for district/metro instead of building a new
-                     mechanism. Focused test green (5 scenarios), `tsc`
-                     clean, lint clean (no new warnings), full `pnpm
-                     check:push` build green, and 4 manual scenarios
-                     (A/B/C/D) proven against a real local Postgres with the
-                     real Google Places API and Minsk addresses — DB-verified
-                     at every step, all test data cleaned up afterward. Three
-                     non-blocking follow-ups (address-component format
-                     mismatch in the geo-enrichment fallback path;
-                     `EventLocationPicker.tsx` dead code; Place Wizard's
-                     deprecated Autocomplete widget) recorded as
-                     BACKLOG-038/039/040. Not yet deployed to DEV — awaits
-                     owner-controlled deploy per this checklist's process.
+                     endpoint for district/metro (`de4d694a`). During DEV
+                     verification, separately discovered and fixed a
+                     pre-existing build-pipeline gap affecting ALL Google
+                     Maps features on every previously-built DEV/PROD image
+                     (not Task-4-specific — proven via the untouched Place
+                     Wizard failing identically): `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`/
+                     `MAP_ID` were never passed as Docker build-args, so
+                     Next.js baked `undefined` into the client bundle
+                     regardless of the container's runtime env. Fixed
+                     `Dockerfile` + `.github/workflows/docker.yml`, set the
+                     two GH Actions secrets from local `.env.local` (values
+                     never printed), pushed (`5bd4371b`), CI+Docker Build &
+                     Push green (`dev-269`). Owner redeployed DEV; SHA
+                     confirmed live via `docker inspect`. Full DEV smoke
+                     green on actual `business.dev.mamago.by` with real
+                     Google Places API + real Minsk addresses: existing-Place
+                     flow, new-Place-via-Google (DB-verified googlePlaceId/
+                     addressJson/district/metro/coords), address-change
+                     (second Place correctly created, original untouched,
+                     EventVenue repointed), no-result graceful state, zero
+                     console/network errors on a clean tab. All DEV test
+                     records cleaned up. Three smaller non-blocking
+                     follow-ups (address-component format mismatch in the
+                     geo-enrichment fallback path; `EventLocationPicker.tsx`
+                     dead code; Place Wizard's deprecated Autocomplete
+                     widget) recorded as BACKLOG-038/039/040.
 Unresolved P0/P1:   none from Task 1, 2, 3, or 4 — Tasks 5–15 remain TODO, not started
 ```
 
@@ -1414,7 +1426,7 @@ engagement data without excessive backend/storage load.
 
 Priority: `P0`
 
-STATUS: `COMPLETE (local); DEV deploy pending owner action`
+STATUS: `COMPLETE`
 AUDIT: Traced full flow end-to-end (`EventLocationSearchInput` →
 `QuickPlaceCreate` → `Step2Location` → `EventFormData.pendingLocation` →
 `resolvePendingLocationOnPublish` (publish-time, in-transaction) → `Place`/
@@ -1456,7 +1468,10 @@ threads those fields into `pendingLocation`; (4)
 publish time, since selection and publish can be minutes apart) rather than
 trusting stale client-supplied ids blindly.
 COMMITS: `de4d694a` (fix: preserve googlePlaceId/addressJson/district/metro
-for Event Wizard new venues)
+for Event Wizard new venues); `5a5b401b` (docs); `5bd4371b` (fix: pass
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/MAP_ID as Docker build-args — separate,
+DEV-smoke-discovered build-pipeline gap, see DEV SMOKE below). **Deployed
+SHA on actual DEV: `5bd4371b`** (`dev-app-1`, image `dev-269`).
 VERIFICATION: focused test `src/lib/business/resolvePendingLocationOnPublish.test.ts`
 (`pnpm test:event-wizard-pending-location`) — 5 scenarios: NEW_PLACE with
 full Google data persists googlePlaceId/addressJson/district/metro;
@@ -1468,8 +1483,65 @@ ESLint on all changed files: 0 new warnings/errors (3 pre-existing unused-var
 warnings confirmed present at baseline `HEAD` `baba727c`, unrelated to this
 change). `git diff --check` clean. Full `pnpm check:push` (production
 build) green.
-DEV SMOKE: not yet — DEV deploy is owner-controlled per this checklist's
-process; will be run read-only after owner deploys.
+DEV SMOKE: **Complete — verified live on actual `https://business.dev.mamago.by`
+(2026-08-10, real business account, real Minsk addresses via the real Google
+Places API, deployed image `dev-269` = SHA `5bd4371b`).**
+Mid-smoke discovery (separate from the app-code fix above, fixed the same
+session): typing a real address into the Event Wizard's Google field on DEV
+produced **no predictions at all** — console: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+is missing`. Verified this was NOT a Task 4 regression by reproducing the
+identical failure in the untouched Place Wizard (`PlaceSearchInput` — same
+error) and its map-pin fallback (blank map, same error) — proving every
+Google Maps feature was broken on every previously-built DEV/PROD image, not
+just the new code. Root cause: `Dockerfile`'s `RUN pnpm build:ci` never
+received `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`/`NEXT_PUBLIC_GOOGLE_MAP_ID` as
+build args — Next.js inlines `NEXT_PUBLIC_*` vars into the client bundle at
+`next build` time, not from the container's runtime env (which *did* have
+the var set, misleadingly). Fixed: `Dockerfile` (`ARG`/`ENV` for both vars
+in the builder stage) + `.github/workflows/docker.yml` (`build-args` now
+passes both from GitHub Actions repo secrets — same single key/map-id used
+for DEV and PROD builds, per explicit owner decision, no separate DEV/PROD
+Google credentials exist yet). Secrets `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and
+`NEXT_PUBLIC_GOOGLE_MAP_ID` set from the existing local `.env.local` values
+(verified present/non-empty first, values never printed/logged). Committed
+`5bd4371b`, pushed, CI green (2m5s), Docker Build & Push green (15m46s,
+`dev-269`), owner redeployed `dev-app-1` → confirmed via
+`docker inspect` label `org.opencontainers.image.revision` = `5bd4371b`.
+Scenario A (existing Place) — created event, selected existing place "SREDA"
+from "Мои места", published. DB-verified: `Activity.placeId` →
+`cmsddc3ju006amk0zfwir8i83` (SREDA), `EventVenue` correctly linked.
+Scenario B (new Place via real Google address, "ул. Октябрьская 16, Минск")
+— after the build-pipeline fix, predictions appeared correctly; selected,
+saved, published. DB-verified on the actual `Place` row: `googlePlaceId`
+`ChIJxXMs2tHP20YRpDz2mLwDp0Q`, `locationSource` `GOOGLE`, `addressJson`
+populated, `districtAutoId`/`metroAutoId` resolved (Центральный / м.
+Пролетарская, 1006m), `cityId` (Минск), `lat`/`lng` correct — all
+previously would have been null/MANUAL. `EventVenue` correctly linked.
+Scenario C (edit hydration + address change) — reopened the published
+event, Step 2 correctly hydrated the just-created venue including
+district/metro; changed address to "ул. Немига 5, Минск", resaved,
+resubmitted. DB-verified: a **second** `Place` created with its own correct
+`googlePlaceId` (`ChIJAepu4evP20YRJJTmArTmwIA`), district (Центральный),
+metro (Немига, 474m), `cityId`; `Activity.placeId` and `EventVenue`
+correctly repointed to the new `Place`; the original "Октябрьская 16"
+`Place` left untouched (no orphan corruption).
+Scenario D (nonexistent address) — both the mamaGo-internal search
+("Место не найдено") and the Google field (empty predictions, no crash)
+showed a clear no-result state; "Сохранить место" stayed disabled
+throughout — no corrupted/partial Place could be saved.
+Console/network: confirmed **zero** console errors and zero non-200 network
+responses on a freshly-opened tab with the Google widget actively
+initialized (prior errors in the same long-lived tab were stale, from
+before the build-pipeline fix deployed — reproduced clean on a fresh tab to
+rule out stale-log false negatives).
+Layout: this session's browser pane rendered at a fixed native 424×808
+viewport throughout — narrow enough to double as an informal mobile/narrow
+sanity check; Step 2 Location rendered cleanly with no overflow/breakage at
+that width across all four scenarios.
+Cleanup: all DEV test records created during this smoke deleted after
+verification — 2 `Activity` rows, 2 `EventVenue` rows, 2 `Place` rows
+(the pre-existing "SREDA" place used for Scenario A was never modified or
+deleted, only referenced).
 LOCAL MANUAL PROOF (2026-08-10, real dev server + real business account +
 real Google Places API against Minsk addresses, local Postgres only — no
 DEV/PROD data touched): Scenario A (existing-Place edit hydration) —
@@ -1487,8 +1559,16 @@ the mamaGo-internal search and the Google address field show a clear
 "not found" state, "Сохранить место" stays disabled, no corrupted/partial
 Place can be saved. All test data (1 Activity, 1 EventVenue, 2 Place rows)
 deleted from local DB after verification.
-BLOCKERS: none.
-BACKLOG/NOTES: three items deferred to `docs/engineering/backlog.md`
+BLOCKERS: none. Task 4 exit criteria all met: address autocomplete works on
+actual DEV, new venue from Event Wizard stores correct location (including
+googlePlaceId/district/metro), existing venue flow remains correct,
+edit/reload round-trip is correct, no malformed/partial Place records were
+created in any scenario, focused tests green, full gate green, actual DEV
+smoke green after owner-controlled deploy, no unresolved P0/P1 in Task 4.
+BACKLOG/NOTES: the `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`/`MAP_ID` build-arg gap
+described above was fixed and deployed within this task, not deferred — it
+is not a backlog item. Three separate, smaller items remain deferred to
+`docs/engineering/backlog.md`
 (BACKLOG-038/039/040) — none block this task's exit criteria: (038, P2)
 `/api/geo/enrich-location`'s address-component fallback matcher reads the
 legacy `long_name` field shape and never matches the new
