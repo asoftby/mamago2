@@ -25,7 +25,19 @@ interface LocationData {
   metroId: string | null;
   metroName: string | null;
   metroDistanceM: number | null;
+  googlePlaceId: string | null;
+  addressJson: unknown[] | null;
 }
+
+type EnrichedGeo = {
+  cityId: string | null;
+  cityName: string | null;
+  districtAutoId: string | null;
+  districtName: string | null;
+  metroAutoId: string | null;
+  metroName: string | null;
+  metroAutoDistanceM: number | null;
+};
 
 type ResolvedLocation = {
   googlePlaceId: string | null;
@@ -64,7 +76,8 @@ export function QuickPlaceCreate({
   const [name, setName] = useState(initialName);
   const [addressInputText, setAddressInputText] = useState(initialAddress);
   const [resolvedLocation, setResolvedLocation] = useState<ResolvedLocation | null>(null);
-  
+  const [enrichedGeo, setEnrichedGeo] = useState<EnrichedGeo | null>(null);
+
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -87,9 +100,41 @@ export function QuickPlaceCreate({
     setName(initialName);
     setAddressInputText(initialAddress);
     setResolvedLocation(null);
+    setEnrichedGeo(null);
     setError(null);
     setIsMapModalOpen(false);
   }, [initialAddress, initialName]);
+
+  /** Резолвит cityId/districtAutoId/metroAutoId по координатам, не создавая Place. */
+  const enrichLocation = useCallback(
+    async (lat: number, lng: number, addressJson: unknown[] | null) => {
+      try {
+        const response = await fetch("/api/geo/enrich-location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lng, addressJson }),
+        });
+        if (!response.ok) {
+          setEnrichedGeo(null);
+          return;
+        }
+        const result = await response.json();
+        setEnrichedGeo({
+          cityId: result.cityId ?? null,
+          cityName: result.cityName ?? null,
+          districtAutoId: result.districtAutoId ?? null,
+          districtName: result.districtName ?? null,
+          metroAutoId: result.metroAutoId ?? null,
+          metroName: result.metroName ?? null,
+          metroAutoDistanceM: result.metroAutoDistanceM ?? null,
+        });
+      } catch (err) {
+        console.error("[QuickPlaceCreate] Geo enrichment error:", err);
+        setEnrichedGeo(null);
+      }
+    },
+    [],
+  );
 
   const handleAddressSelect = useCallback((placeData: {
     googlePlaceId: string;
@@ -107,8 +152,10 @@ export function QuickPlaceCreate({
       addressJson: placeData.addressJson,
       source: "google",
     });
+    setEnrichedGeo(null);
     setError(null);
-  }, []);
+    void enrichLocation(placeData.lat, placeData.lng, placeData.addressJson);
+  }, [enrichLocation]);
 
   const handleAddressInputChange = useCallback((value: string) => {
     setAddressInputText(value);
@@ -117,7 +164,11 @@ export function QuickPlaceCreate({
       if (!current) {
         return null;
       }
-      return value === current.formattedAddr ? current : null;
+      if (value === current.formattedAddr) {
+        return current;
+      }
+      setEnrichedGeo(null);
+      return null;
     });
   }, []);
 
@@ -138,8 +189,10 @@ export function QuickPlaceCreate({
       addressJson: [],
       source: "map",
     });
+    setEnrichedGeo(null);
     setError(null);
-  }, []);
+    void enrichLocation(mapData.lat, mapData.lng, null);
+  }, [enrichLocation]);
 
   const handleCreate = async () => {
     // Validation
@@ -166,16 +219,18 @@ export function QuickPlaceCreate({
           title: name.trim(),
           address: resolvedLocation.formattedAddr,
           fullAddress: resolvedLocation.formattedAddr,
-          cityId: null,
-          cityName: null,
+          cityId: enrichedGeo?.cityId ?? null,
+          cityName: enrichedGeo?.cityName ?? null,
           citySlug: null,
           lat: resolvedLocation.lat,
           lng: resolvedLocation.lng,
-          districtId: null,
-          districtName: null,
-          metroId: null,
-          metroName: null,
-          metroDistanceM: null,
+          districtId: enrichedGeo?.districtAutoId ?? null,
+          districtName: enrichedGeo?.districtName ?? null,
+          metroId: enrichedGeo?.metroAutoId ?? null,
+          metroName: enrichedGeo?.metroName ?? null,
+          metroDistanceM: enrichedGeo?.metroAutoDistanceM ?? null,
+          googlePlaceId: resolvedLocation.googlePlaceId,
+          addressJson: resolvedLocation.addressJson,
         });
         return;
       }
@@ -208,6 +263,8 @@ export function QuickPlaceCreate({
         metroDistanceM: place.metroManualId
           ? place.metroManualDistanceM || null
           : place.metroAutoDistanceM || null,
+        googlePlaceId: resolvedLocation.googlePlaceId,
+        addressJson: resolvedLocation.addressJson,
       });
     } catch (err) {
       console.error("[QuickPlaceCreate] Save error:", err);

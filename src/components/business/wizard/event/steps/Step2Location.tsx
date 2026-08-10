@@ -152,6 +152,8 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
     metroId: string | null;
     metroName: string | null;
     metroDistanceM: number | null;
+    googlePlaceId: string | null;
+    addressJson: unknown[] | null;
   }) => {
     const pending: PendingLocation = {
       mode: "NEW_PLACE",
@@ -166,6 +168,11 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
       lat: location.lat ?? undefined,
       lng: location.lng ?? undefined,
       source: "manual",
+      googlePlaceId: location.googlePlaceId,
+      addressJson: location.addressJson,
+      districtAutoId: location.districtId,
+      metroAutoId: location.metroId,
+      metroAutoDistanceM: location.metroDistanceM,
     };
 
     onChange({

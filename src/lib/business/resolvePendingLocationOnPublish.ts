@@ -30,6 +30,14 @@ export interface PendingLocation {
   lng?: number;
   source?: "manual" | "parser";
   raw?: unknown;
+  /** Google Places identifier resolved at selection time (NEW_PLACE only). */
+  googlePlaceId?: string | null;
+  /** Google address_components, kept for future enrichment/dedup use. */
+  addressJson?: unknown[] | null;
+  /** Auto-resolved district/metro from /api/geo/enrich-location (NEW_PLACE only). */
+  districtAutoId?: string | null;
+  metroAutoId?: string | null;
+  metroAutoDistanceM?: number | null;
 }
 
 /** Максимальное расстояние (метры) для считания мест дублями по гео */
@@ -193,6 +201,11 @@ export async function resolvePendingLocationOnPublish(
     const cityRaw = typeof pl.city === "string" ? pl.city.trim() : undefined;
     const lat = typeof pl.lat === "number" ? pl.lat : undefined;
     const lng = typeof pl.lng === "number" ? pl.lng : undefined;
+    const googlePlaceId = typeof pl.googlePlaceId === "string" ? pl.googlePlaceId : null;
+    const addressJson = Array.isArray(pl.addressJson) ? pl.addressJson : null;
+    const districtAutoId = typeof pl.districtAutoId === "string" ? pl.districtAutoId : null;
+    const metroAutoId = typeof pl.metroAutoId === "string" ? pl.metroAutoId : null;
+    const metroAutoDistanceM = typeof pl.metroAutoDistanceM === "number" ? pl.metroAutoDistanceM : null;
 
     if (!title) {
       // Нет названия — не можем создать Place
@@ -212,6 +225,28 @@ export async function resolvePendingLocationOnPublish(
         });
         cityId = bySlug?.id ?? null;
       }
+    }
+
+    // Валидируем districtAutoId/metroAutoId: они могли устареть между выбором адреса и
+    // публикацией (город изменился, справочник почистили) — используем только если запись
+    // всё ещё существует и относится к резолвленному городу.
+    let validDistrictAutoId: string | null = null;
+    let validMetroAutoId: string | null = null;
+    let validMetroAutoDistanceM: number | null = null;
+    if (cityId && districtAutoId) {
+      const district = await tx.district.findFirst({
+        where: { id: districtAutoId, cityId },
+        select: { id: true },
+      });
+      validDistrictAutoId = district?.id ?? null;
+    }
+    if (cityId && metroAutoId) {
+      const metro = await tx.metroStation.findFirst({
+        where: { id: metroAutoId, cityId },
+        select: { id: true },
+      });
+      validMetroAutoId = metro?.id ?? null;
+      validMetroAutoDistanceM = validMetroAutoId ? metroAutoDistanceM : null;
     }
 
     // Поиск дубля
@@ -262,16 +297,16 @@ export async function resolvePendingLocationOnPublish(
         activityTypes: [],
         lat: lat ?? null,
         lng: lng ?? null,
-        googlePlaceId: null,
+        googlePlaceId,
         formattedAddr: address ?? null,
-        addressJson: Prisma.JsonNull,
+        addressJson: addressJson ? (addressJson as Prisma.InputJsonValue) : Prisma.JsonNull,
         customAddress: null,
-        locationSource: LocationSource.MANUAL,
+        locationSource: googlePlaceId ? LocationSource.GOOGLE : LocationSource.MANUAL,
         cityId,
-        districtAutoId: null,
+        districtAutoId: validDistrictAutoId,
         districtManualId: null,
-        metroAutoId: null,
-        metroAutoDistanceM: null,
+        metroAutoId: validMetroAutoId,
+        metroAutoDistanceM: validMetroAutoDistanceM,
         metroManualId: null,
         metroManualDistanceM: null,
         placeKind: PlaceKind.STANDALONE,

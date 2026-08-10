@@ -119,6 +119,7 @@
     "test:branding-media-asset-usage": "NODE_OPTIONS=--conditions=react-server tsx src/server/media/brandingMediaAssetUsage.test.ts",
     "test:article-media-replay": "tsx src/lib/migration/runtime/articleMediaOnlyReplay.test.ts && tsx src/lib/migration/runtime/strictArticleMediaReplay.test.ts",
     "test:article-content-media-linkage": "tsx src/server/media/articleContentMediaLinkage.test.ts",
+    "test:event-wizard-pending-location": "tsx src/lib/business/resolvePendingLocationOnPublish.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "media:backfill-migrated-metadata": "tsx scripts/backfill-migrated-media-metadata.ts",
     "test:media-metadata-backfill": "tsx src/lib/media/isTechnicalMediaTitle.test.ts && tsx src/lib/media/decideMigratedMediaMetadataPatch.test.ts",

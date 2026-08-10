@@ -35,6 +35,14 @@ export interface PendingLocation {
   lng?: number;
   source?: "manual" | "parser";
   raw?: unknown;
+  /** Google Places identifier resolved at selection time (NEW_PLACE only). */
+  googlePlaceId?: string | null;
+  /** Google address_components, kept for future enrichment/dedup use. */
+  addressJson?: unknown[] | null;
+  /** Auto-resolved district/metro from /api/geo/enrich-location (NEW_PLACE only). */
+  districtAutoId?: string | null;
+  metroAutoId?: string | null;
+  metroAutoDistanceM?: number | null;
 }
 
 /**
