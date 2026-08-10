@@ -15,6 +15,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG REDIRECT_MANIFEST_MIN_ROWS=850
 ENV REDIRECT_MANIFEST_MIN_ROWS=${REDIRECT_MANIFEST_MIN_ROWS}
 ENV REQUIRE_REDIRECT_MANIFEST=1
+# NEXT_PUBLIC_* vars are inlined into the client bundle at `next build` time,
+# not read from the running container's environment — they must be passed as
+# build args, not just runtime env vars on the host.
+ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+ARG NEXT_PUBLIC_GOOGLE_MAP_ID
+ENV NEXT_PUBLIC_GOOGLE_MAP_ID=${NEXT_PUBLIC_GOOGLE_MAP_ID}
 RUN pnpm build:ci
 
 FROM node:22-alpine AS runner

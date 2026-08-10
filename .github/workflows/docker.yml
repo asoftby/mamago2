@@ -52,7 +52,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # 850 = static WP map (893 rows in manifest.csv) with headroom for curation;
           # DB-derived slug_history rows only add on top.
+          # NEXT_PUBLIC_* vars must be passed as build-args (not just runtime env
+          # vars on the host) — Next.js inlines them into the client bundle at
+          # `next build` time. Same key used for both dev and prod builds.
           build-args: |
             REDIRECT_MANIFEST_MIN_ROWS=850
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_GOOGLE_MAP_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_MAP_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
