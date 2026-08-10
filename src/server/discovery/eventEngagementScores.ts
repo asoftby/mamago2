@@ -1,9 +1,12 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { ENGAGEMENT_WEIGHTS } from "./engagementWeights";
 
 /**
  * Rule-based engagement для ранжирования discovery (UserEvent).
- * SAVE / PLAN_ADD / CTA сильнее просмотров.
+ * Weights come from the canonical ENGAGEMENT_WEIGHTS table (the single
+ * source of truth) — PLAN_ADD outranks SAVE, both outrank passive
+ * view/click signals.
  */
 export async function getEventEngagementScores(
   activityIds: string[],
@@ -11,16 +14,15 @@ export async function getEventEngagementScores(
   const out = new Map<string, number>();
   if (activityIds.length === 0) return out;
 
+  const weightCases = Object.entries(ENGAGEMENT_WEIGHTS).map(
+    ([eventType, weight]) => Prisma.sql`WHEN ${eventType} THEN ${weight}`,
+  );
+
   const rows = await prisma.$queryRaw<Array<{ entityId: string; score: bigint }>>`
     SELECT e."entityId",
       COALESCE(SUM(
         CASE e."eventType"::text
-          WHEN 'SAVE' THEN 5
-          WHEN 'PLAN_ADD' THEN 4
-          WHEN 'CTA_CLICK' THEN 3
-          WHEN 'DETAIL_OPEN' THEN 2
-          WHEN 'PAGE_VIEW' THEN 2
-          WHEN 'CARD_VIEW' THEN 1
+          ${Prisma.join(weightCases, " ")}
           ELSE 0
         END
       ), 0) AS score
