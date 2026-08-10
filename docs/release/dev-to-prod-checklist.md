@@ -20,9 +20,41 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 5 — Content Analytics & Ranking (COMPLETE)
-Last updated:       2026-08-10
-Last updated by:    Claude Code — Task 5 closed. Audit found a real,
+Active task:        Task 6 — Article Actions (COMPLETE_PENDING_BROWSER_SMOKE)
+Last updated:       2026-08-11
+Last updated by:    Claude Code — Task 6 implemented: Article gained Save
+                     (Ideas/Plan, via the existing SaveActivityFlowAdaptive
+                     chooser) and Share (via the existing ShareModal) across
+                     all 5 required surfaces (homepage journal row, /blog +
+                     /{city}/blog cards, standard Article detail, Breaking
+                     News detail, continuous reading), per the owner's
+                     canonical UX contract: cards = Heart only, detail/
+                     landing = Heart+text + Share+text. New `ArticleIdea`
+                     model + `PlanItem.articleId` (hand-written migration,
+                     applied to DEV). Bounded batch save-status endpoint
+                     built specifically to avoid Article-card N+1 (verified
+                     live: 1 batch call, 0 per-card calls). Guest pending-
+                     action resume extended with "article". New test suite
+                     `test:article-actions` green; `tsc`/targeted `eslint`/
+                     `git diff --check`/`pnpm check:push` (full build) all
+                     green. Local-DEV browser verification confirmed the
+                     full save flow end-to-end (card Heart -> chooser ->
+                     Ideas -> persisted -> state updated -> cleaned up) and
+                     Share (correct URL/title in Telegram/WhatsApp links);
+                     Breaking News detail and guest-flow verification
+                     deferred to deployed-DEV smoke (no Breaking News
+                     content in local DEV dataset; session cookie is
+                     httpOnly so guest state couldn't be simulated without
+                     disrupting the owner's persisted session) — covered
+                     instead by code inspection + targeted unit tests this
+                     session. Filed BACKLOG-050..054 for confirmed
+                     out-of-scope gaps (Place pending-action, non-Article
+                     card N+1, Share consolidation, cross-entity design-
+                     system normalization, and an unrelated DB-migration
+                     drift found incidentally). Not yet pushed — see Task 6
+                     COMMITS field once committed.
+Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
+                     found a real,
                      already-shared UserEvent-derived ranking engine
                      (kudaDiscoveryFeed / classesDiscoveryFeed /
                      planSuggestions, plus the real Boost model for paid
@@ -55,8 +87,9 @@ Last updated by:    Claude Code — Task 5 closed. Audit found a real,
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1, 2, 3, 4, or 5 — Task 5 CLOSED, Tasks
-                     6–15 remain TODO, not started
+Unresolved P0/P1:   none from Task 1–5 (all CLOSED). Task 6 implementation
+                     complete, no P0/P1 found; final COMPLETE pending
+                     deployed-DEV smoke. Tasks 7–15 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -1878,15 +1911,147 @@ useful, and cheap signals without constant manual management.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+AUDIT: Read-only code audit (models, services, APIs, UI, pending-action,
+       analytics enums) confirmed the owner-approved spec's assumptions with
+       corrections: `PlanItem` has no `offerId` field at all — the pattern to
+       mirror for Article was `placeId` (nullable FK, no defensive wrapper
+       needed, unlike `OfferIdea`'s P2021-catch pattern). No shared
+       `ArticleCard` component exists — cards are rendered inline in
+       `CityHomeContentRows.tsx` (homepage "Статьи и обзоры") and
+       `BlogIndex.tsx` (`FeaturedArticle`/`ArticleRow`, reused by both
+       `/blog` and `/{city}/blog`). `ArticleMvpView` had no `id`/href prop.
+       `BreakingNewsView` had its own bespoke `handleShare()` (native
+       share + manual clipboard), not `ShareModal`. `AnalyticsEntityType.ARTICLE`
+       already existed; `UserEventType.SHARE` does not (tracked separately,
+       BACKLOG-029). Guest pending-action resume (`PendingEntityType`) only
+       supported `"activity"`/`"route"` — confirmed the same gap already
+       existed for Place (BACKLOG-050, filed, not fixed here). Confirmed via
+       live DEV network trace that Activity/Offer/Event cards already have a
+       pre-existing per-card `/api/save/status` N+1 (BACKLOG-051, filed, not
+       fixed here — Task 6 built the batch mechanism for Article only, per
+       spec).
+GAPS: `ArticleIdea` model — missing. `PlanItem.articleId` — missing.
+      Article support in `idea.service.ts`/`plan.service.ts` — missing.
+      `articleId` support in `/api/save/idea`, `/api/save/plan`,
+      `/api/save/status` — missing. Batched save-status for Article card
+      grids — missing (had to be built new, no existing batch endpoint to
+      extend). Save/Share actions on Article cards, standard detail,
+      Breaking News detail, continuous reading — missing. `"article"` in
+      guest pending-action resume — missing.
+IMPLEMENTATION: Hand-written migration `20260811120000_add_article_actions`
+      (`ArticleIdea` model mirroring `PlaceIdea`; `PlanItem.articleId`
+      nullable FK, `ON DELETE SET NULL`) — applied to DEV via
+      `prisma migrate deploy`, schema validated. `idea.service.ts`:
+      `addArticleIdea`/`removeArticleIdea`/`hasArticleIdea`/
+      `hasArticleIdeasBatch`. `plan.service.ts`: `addArticlePlanItem`
+      (dedupes by user+article, clears competing entity fields on update,
+      mirrors `addPlacePlanItem`)/`listArticlePlanItemsBatch`. Extended
+      `/api/save/idea` (POST+DELETE), `/api/save/plan` (POST), `/api/save/status`
+      (GET) with an `articleId` branch each, emitting `SAVE`/`PLAN_ADD`
+      `UserEvent`s with `entityType: "ARTICLE"`, `section: "journal"` (matches
+      the existing Article analytics convention, not the spec's literal
+      `"articles"` — see VERIFICATION). New bounded batch endpoint
+      `POST /api/save/status/articles` (dedup, cap 40 ids, user-scoped, one
+      query pair via `hasArticleIdeasBatch` + `listArticlePlanItemsBatch`) —
+      the smallest-reasonable mechanism Task 6's own spec required to avoid
+      N+1 on Article listing cards. `PendingEntityType` extended with
+      `"article"`; `executePendingPostAuthAction` gets `save_idea`/`save_plan`
+      article branches; `SaveActivityFlowAdaptive` generalized from a
+      hardcoded `entityType: "activity"` to accept `pendingEntityType`/
+      `pendingEntityId` props (back-compat default `"activity"` +
+      `activityId`, so no existing caller changed behavior). New
+      `ArticleSaveHeart` (icon variant for cards with `skipOwnFetch`/
+      `initialStatus` batch-driven mode; labeled variant for detail),
+      `useArticleSaveStatusBatch` hook, `persistArticleSave.ts`,
+      `ArticleDetailActions` (Heart+"Сохранить" + Share2+"Поделиться",
+      reusing the existing `ShareModal`). Wired into: homepage journal row
+      (`CityHomeContentRows.tsx`), `/blog` + `/{city}/blog`
+      (`BlogIndex.tsx` — `FeaturedArticle` + `ArticleRow`, both routes share
+      this component), standard Article detail (`ArticleMvpView`, both
+      `/blog/[slug]` and `/{city}/blog/[slug]`), continuous reading (each
+      loaded article in `ContinuousArticleReader` gets its own `articleId`/
+      `href` — independent React state per article, no bleed), and Breaking
+      News detail (`BreakingNewsView`'s `NewsHero` — bespoke share handler
+      replaced with `ArticleDetailActions`, dead `copied`/`handleShare` code
+      removed). Cards use the sibling-overlay pattern (Heart positioned via
+      an absolutely-positioned sibling `div`, never nested inside the
+      article `<a>`) matching the existing `ActivityCard` convention.
+COMMITS: `d923e1f6` — feat(article): add Save (Ideas/Plan) and Share actions
+      across all article surfaces.
+VERIFICATION: `test:article-actions` (new) — `parseArticleIdsForBatch` unit
+      tests (dedup/cap/invalid-input), `executePendingPostAuthAction` article-
+      branch tests (fetch-mocked, confirms correct endpoint+payload routing,
+      confirms the pre-existing activity branch is unaffected), and a real-DB
+      integration test (`articleSaveActions.test.ts`: idea add/remove/
+      idempotent/cross-user-isolation, plan add/dedupe/clears-competing-
+      fields/cross-user-isolation, batch idea+plan checks, ownership-checked
+      remove, invalid-article-id rejection) — all green. `npx tsc --noEmit`
+      clean. Targeted `eslint` on every touched/new file clean (one genuine
+      bug caught and fixed pre-verification: `react-hooks/set-state-in-effect`
+      in `useArticleSaveStatusBatch`, fixed by gating the returned value
+      instead of resetting state synchronously in the guard branch).
+      `git diff --check` clean. `pnpm check:push` (full production build)
+      green, zero errors, full route manifest generated. Local browser
+      verification against the real local DEV DB (authenticated real user
+      session): homepage + `/minsk/blog` — confirmed via DOM inspection the
+      Heart button is a sibling of the article `<a>` (no illegal nested-
+      interactive markup), labeled "Сохранить статью" (generic save, not
+      "В идеи"), no Share icon on cards; confirmed via `read_network_requests`
+      in a **fresh tab** (to rule out soft-navigation log accumulation) that
+      exactly one `POST /api/save/status/articles` batch call fires per page
+      load and **zero** per-card `GET /api/save/status?articleId=...` calls —
+      the N+1 this task was required to avoid. Clicked the Featured Article
+      Heart → chooser opened (date picker + "Сохранить в идеи", not a direct
+      Ideas toggle) → chose "Сохранить в идеи" → `POST /api/save/idea` fired
+      → Heart label changed to "Изменить сохранение статьи" → success view
+      showed "Убрать из идей"/"Запланировать"/"Все мои идеи" — full save
+      flow confirmed end-to-end, then cleaned up (`DELETE /api/save/idea`,
+      confirmed `isSaved:false` after). Article detail
+      (`/minsk/blog/chem-zanyatsya-na-novogodnih-kanikulah`) — confirmed
+      "♡ Сохранить" + "↗ Поделиться" both render; clicked Share → `ShareModal`
+      opened with correct Telegram/WhatsApp links carrying the exact article
+      URL + title. Confirmed via `data-article-id` DOM inspection that this
+      same page renders through `ContinuousArticleReader` (continuous reading
+      is live for this article — category "podborki" is active/non-archived)
+      with exactly 1 Save + 1 Share button correctly scoped to that article's
+      id; could not live-verify the *second* loaded article's independent
+      Save/Share (IntersectionObserver-driven prefetch didn't trigger via
+      simulated scroll in this session) — verified by code inspection instead
+      (each loaded article gets its own `articleId`/`href` props, in its own
+      keyed wrapper div, so React scopes state independently by construction).
+      Breaking News detail could not be live-verified — **zero** Breaking
+      News articles exist in the local DEV dataset (confirmed via direct
+      query); verified by code inspection only (props threaded, bespoke share
+      handler removed cleanly, `eslint`/`tsc` clean). Guest pending-action
+      resume could not be live-verified in-browser — the session cookie is
+      httpOnly (can't be cleared via `document.cookie` to simulate logout
+      without a real logout, which would disrupt the owner's persisted DEV
+      session) — verified via the `executePendingPostAuthAction` unit tests
+      instead, which exercise the exact new "article" branch added.
+DEV SMOKE: pending owner-controlled Docker deploy — a short deployed-DEV
+      smoke (Breaking News detail if seeded content exists there, guest
+      pending-action resume, continuous-reading second-article scroll) will
+      close out anything this session's local-DEV verification couldn't
+      reach, before Task 6 is marked final `COMPLETE`, matching the Task 3/5
+      pattern.
+BLOCKERS: none.
+BACKLOG/NOTES: Filed BACKLOG-050 (Place/Offer guest pending-action resume
+      gap, pre-existing, confirmed not fixed here), BACKLOG-051 (pre-existing
+      per-card `/api/save/status` N+1 on Activity/Offer/Event grids, confirmed
+      live, not extended to fix here), BACKLOG-052 (global Share consolidation
+      — `ShareSheet.tsx`/Route detail untouched), BACKLOG-053 (cross-entity
+      Save/Share design-system normalization to the pattern this task
+      established, explicitly deferred per the owner's own product decision),
+      BACKLOG-054 (found incidentally: local dev DB has two migrations
+      applied — `SearchDocument.cityId`/`SearchQueryLog` fields — from commit
+      `98390674` on unmerged branch `recovery/main-wip-snapshot-2026-08-07`,
+      not present in `dev`'s `prisma/schema.prisma`; confirmed zero
+      file/table overlap with this task's migration, left untouched per
+      foreign-work-in-progress rule, needs an owner decision). Corrected
+      BACKLOG-029's now-stale Context line (claimed `BreakingNewsView` used
+      `ShareModal`, which was false at the time it was written — now true
+      after this task's `NewsHero` share swap).
 
 AUDIT FIRST existing Share / My Ideas / My Plan / CTA / saved-state
 functionality. Ensure: Share, Save to "My Ideas", Add to "My Plan" wherever

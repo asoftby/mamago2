@@ -704,6 +704,13 @@ P3 — cleanup / polish / optional
   `MarketplacePlacePage.tsx`, `PlaceSidebarCard.tsx`, `BreakingNewsView.tsx`,
   Route detail) are real, live share actions with zero analytics
   instrumentation — no `SHARE` `UserEventType` exists in the schema at all.
+  Correction (Task 6, 2026-08-11): at the time this entry was written,
+  `BreakingNewsView.tsx` did **not** actually use `ShareModal` — it had its
+  own bespoke `handleShare()` (native share + manual clipboard fallback, no
+  Telegram/WhatsApp). Task 6 replaced that bespoke handler with
+  `ArticleDetailActions` → `ShareModal` (small local substitution, no
+  behavioral regression — see `src/components/article/mvp/BreakingNewsView.tsx`
+  `NewsHero`), so the Context line above is now accurate for real.
 - Current state: not started.
 - Dependencies: a new, hand-written Prisma migration adding a `SHARE` value
   to the `UserEventType` enum (see `CLAUDE.md` Prisma-migration rules —
@@ -1326,3 +1333,163 @@ P3 — cleanup / polish / optional
   reason.
 - Source: Task 5 (Content Analytics & Ranking) deployed-DEV regression
   smoke, 2026-08-10.
+
+## [BACKLOG-050] Guest pending-action resume is inert for Place (and never existed for Offer)
+
+- Status: OPEN
+- Priority: P2
+- Area: Auth / Save-Plan
+- Added: 2026-08-11
+- Reason deferred: found during Task 6 (Article Actions) audit while
+  generalizing `SaveActivityFlowAdaptive`'s pending-action builder for
+  Article; fixing Place/Offer is a separate, independently-scoped change
+  with its own verification, not required for Task 6's exit criteria.
+- Context: `PendingEntityType` (`src/lib/post-auth/types.ts`) only ever
+  supported `"activity"` and `"route"` (Task 6 added `"article"`) — never
+  `"place"` or `"offer"`. `PlaceSaveHeart.tsx` never passes an
+  `activityId`/`pendingEntityId` prop into `SaveActivityFlowAdaptive`, so the
+  guest → auth → resume fallback (`savePostAuthContext` inside
+  `SaveActivityFlowAdaptive.handleCommit`) is silently skipped for places: a
+  guest who picks "В идеи"/"Добавить в план" on a Place, then logs in, does
+  **not** get their choice replayed — the modal still works, but the
+  persistence step is dropped. Offers have no `OfferSaveHeart`-equivalent
+  pending-action wiring at all.
+- Current state: not started.
+- Dependencies: none blocking; mechanical extension of the same pattern
+  Task 6 used for Article (`pendingEntityType`/`pendingEntityId` props +
+  `PendingEntityType` union + `executePendingPostAuthAction` branch).
+- Acceptance criteria: `"place"` (and `"offer"` if offers are meant to
+  support guest save) added to `PendingEntityType`; `PlaceSaveHeart` passes
+  `pendingEntityType="place"` + `pendingEntityId`; `executePendingPostAuthAction`
+  gets a `place` branch posting to `/api/save/idea`/`/api/save/plan` with
+  `placeId`; guest → auth → resume verified end-to-end for Place.
+- Source: Task 6 (Article Actions) audit, 2026-08-11.
+
+## [BACKLOG-051] Per-card `/api/save/status` N+1 on Activity/Offer/Event listing grids
+
+- Status: OPEN
+- Priority: P2
+- Area: Performance / Save-Plan
+- Added: 2026-08-11
+- Reason deferred: found during Task 6 (Article Actions) audit; fixing it
+  requires touching `SaveHeart`/`ActivityCard`/`OfferCard`/`EventCard` and
+  every grid that renders them (`ActivityGrid`, `DiscoveryActivitiesGrid`,
+  `CityHomeContentRows`, `PlaceEventsSection`, `/programs`), a materially
+  larger and riskier change than Task 6's scope (Article-only). Task 6's own
+  exit criteria explicitly required the Article batch mechanism NOT be
+  extended to other entity types without a separate decision.
+- Context: `SaveHeart.tsx` self-fetches `GET /api/save/status?activityId=...`
+  on mount, and it is rendered once per card inside `ActivityCard`/
+  `OfferCard`/`EventCard`. A grid of N activity/offer/event cards therefore
+  fires N independent save-status requests on page load (confirmed live via
+  `read_network_requests` during Task 6 browser verification: `/minsk`
+  fired 5 duplicate-per-id `GET /api/save/status?activityId=...` pairs for
+  a 5-card "Куда пойти" row). Task 6 built a bounded batch endpoint
+  (`POST /api/save/status/articles`) + `skipOwnFetch` pattern on
+  `ArticleSaveHeart` specifically to avoid this for Article cards — the same
+  approach is directly reusable here.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: a batched save-status mechanism for
+  Activity/Offer/Event listing grids (mirroring
+  `POST /api/save/status/articles` — bounded, deduped, user-scoped), wired
+  into the relevant grid components with no N+1 on page load; single-entity
+  detail pages (`OfferPageView`, `EventPageView`, etc.) keep their existing
+  single-item `/api/save/status` call unchanged.
+- Source: Task 6 (Article Actions) audit + live DEV network trace,
+  2026-08-11.
+
+## [BACKLOG-052] Global Share implementation consolidation (`ShareModal` / `ShareSheet` / bespoke handlers)
+
+- Status: OPEN
+- Priority: P3
+- Area: Frontend / Design system
+- Added: 2026-08-11
+- Reason deferred: Task 6 (Article Actions) only swapped `BreakingNewsView`'s
+  bespoke `handleShare()` for the shared `ShareModal` (a small, low-risk
+  local substitution scoped to Article). A full consolidation would also
+  touch `src/components/routes/ShareSheet.tsx` (used by
+  `RouteDetailClient.tsx`) and any other independent share implementation —
+  explicitly out of scope per Task 6's own instructions ("do not touch
+  unrelated ... other Share implementations. Global Share consolidation is
+  outside Task 6").
+- Context: as of 2026-08-11 there are at least two independent share UIs in
+  the codebase: `ShareModal.tsx` (Telegram/WhatsApp/native-share/copy-link,
+  used by `SidebarCardShare` on Offer/Place/Event, and now Article via
+  `ArticleDetailActions`) and `ShareSheet.tsx` (Route detail, different
+  implementation). No `SHARE` analytics either way (see `BACKLOG-029`).
+- Current state: not started.
+- Dependencies: none blocking. Should probably land together with or after
+  `BACKLOG-029` (`SHARE` analytics) so the consolidated component emits one
+  consistent event shape from day one.
+- Acceptance criteria: a single shared Share component/behavior used by
+  every entity's detail page (Place, Offer, Event, Route, Article), with
+  `ShareSheet.tsx` either retired in favor of `ShareModal` or the two
+  reconciled into one, no behavioral regression on any existing entity.
+- Source: Task 6 (Article Actions) audit, 2026-08-11.
+
+## [BACKLOG-053] Normalize Save/Share action design across entity types to Task 6's canonical pattern
+
+- Status: OPEN
+- Priority: P3
+- Area: Frontend / Design system
+- Added: 2026-08-11
+- Reason deferred: this is a cross-entity UX normalization follow-up, not a
+  Task 6 requirement — Task 6 explicitly scoped this as "the intended
+  direction for the wider mamaGo action design system" to be applied later,
+  after an audit confirms other entity types currently differ. Task 6 itself
+  must not be expanded into a full content-type refactor.
+- Context: Task 6 (Article Actions) established the owner-approved canonical
+  mamaGo pattern: **cards** → Heart save action only (no Share, no separate
+  Ideas/Plan buttons — Heart opens the existing chooser); **detail/landing
+  pages** → `♡ Сохранить` + `↗ Поделиться` as explicit text+icon actions;
+  **full-content continuous-reading surfaces** behave like detail pages (own
+  Save/Share per article). Other entity types (Place, Offer, Event, Route)
+  were not audited for consistency with this pattern as part of Task 6.
+- Current state: not started.
+- Dependencies: `BACKLOG-050` (pending-action gaps), `BACKLOG-051` (N+1 gaps),
+  `BACKLOG-052` (Share consolidation) are natural prerequisites/companions —
+  normalizing the visual/interaction pattern without fixing the underlying
+  save/share plumbing gaps would just spread the same bugs further.
+- Acceptance criteria: an owner-approved audit of Place/Offer/Event/Route
+  card and detail surfaces against the Task 6 canonical pattern, with a
+  scoped follow-up task (or tasks) for any confirmed gaps — not a blanket
+  refactor.
+- Source: Task 6 (Article Actions) product decision, 2026-08-11.
+
+## [BACKLOG-054] Local dev DB has `SearchDocument.cityId`/`SearchQueryLog` migrations applied that aren't in `dev` branch's `prisma/schema.prisma`
+
+- Status: OPEN
+- Priority: P2
+- Area: Infra / Prisma migrations
+- Added: 2026-08-11
+- Reason deferred: discovered incidentally while applying Task 6's own
+  migration (`prisma migrate status` before `migrate deploy`); confirmed no
+  file/table overlap with Task 6's change (`ArticleIdea`/`PlanItem.articleId`
+  vs. `SearchDocument`/`SearchQueryLog`), so not a blocker for Task 6. Fixing
+  a foreign branch-merge gap is out of Task 6's scope per repo rules
+  (foreign work-in-progress must not be silently fixed or absorbed).
+- Context: `npx prisma migrate status` showed the local dev Postgres
+  (`mamago2` @ `localhost:5433`) has two migrations applied —
+  `20260806120000_add_search_document_city_id` and
+  `20260806123000_add_search_query_log_click_fields` — that do **not** exist
+  under `prisma/migrations/` on the `dev` branch. `git log --all` traced
+  them to commit `98390674` ("chore(recovery): snapshot main working tree"),
+  which only exists on branch `recovery/main-wip-snapshot-2026-08-07` — i.e.
+  another session applied these migrations directly to the shared local dev
+  DB from a WIP/recovery branch that was never merged into `dev`. Current
+  `dev` `schema.prisma` is missing `SearchDocument.cityId` and
+  `SearchQueryLog.searchId`/`clickedPosition`/`clickedAt` even though the DB
+  already has the columns.
+- Current state: not started. Not yet confirmed whether this recovery
+  branch's search work is still wanted, superseded, or abandoned.
+- Dependencies: needs an explicit decision from the repo owner on the
+  `recovery/main-wip-snapshot-2026-08-07` branch's search-related changes
+  (merge the missing migration files + schema changes into `dev`, or discard
+  and let a future task redo the DB columns cleanly).
+- Acceptance criteria: `prisma migrate status` on `dev` shows a clean match
+  between local `prisma/migrations/` and the DB's `_prisma_migrations` table
+  (no DB-side migrations missing from disk), `schema.prisma` reflects the
+  real DB schema for `SearchDocument`/`SearchQueryLog`.
+- Source: Task 6 (Article Actions) implementation, 2026-08-11 (`npx prisma
+  migrate status` output during migration apply).
