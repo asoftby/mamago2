@@ -5,16 +5,25 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { listPlanItemsByDate } from "@/server/services/plan.service";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import {
   ensureDayScenario,
   getDayScenario,
   computePlanFingerprint,
+  listPlanItemsByDateForScenario,
+  listScenarioItemOverrides,
 } from "@/server/services/dayScenario.service";
-import { sortPlanItemsForDay } from "@/features/my-plan/lib/sortPlanItemsForDay";
+import {
+  resolveScenarioItemTime,
+  resolveReliableDurationMinutes,
+  sortScenarioItemsByEffectiveTime,
+  deriveFreeGapMinutes,
+  deriveEndOfDay,
+} from "@/features/my-plan/lib/scenarioProjection";
+import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
 import { detectScenarioConflictIds } from "@/features/my-plan/lib/detectScenarioConflicts";
 import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
-import { ScenarioTimeline } from "@/features/my-plan/components/ScenarioTimeline";
+import { ScenarioTimeline, type ScenarioTimelineItem } from "@/features/my-plan/components/ScenarioTimeline";
 import { refreshDayScenarioAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -40,6 +49,10 @@ function formatTime(date: Date | null): string {
   return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
+function flexibleSummary(n: number): string {
+  return n === 1 ? "1 требует времени" : `${n} требуют времени`;
+}
+
 export default async function DayScenarioPage({ params }: PageProps) {
   const { city: citySlug, date } = await params;
 
@@ -57,8 +70,7 @@ export default async function DayScenarioPage({ params }: PageProps) {
   });
   if (!city) notFound();
 
-  const items = await listPlanItemsByDate(user.id, date);
-  const sortedItems = sortPlanItemsForDay(items);
+  const items = await listPlanItemsByDateForScenario(user.id, date);
 
   // An already-created Scenario is always shown (never hidden just because
   // My Plan later dropped below the 3-item threshold) — only the initial
@@ -95,17 +107,88 @@ export default async function DayScenarioPage({ params }: PageProps) {
 
   const currentFingerprint = computePlanFingerprint(items);
   const planChanged = currentFingerprint !== existingScenario.planFingerprint;
-  const conflictIds = detectScenarioConflictIds(items);
+  const overrides = await listScenarioItemOverrides(existingScenario.id);
 
-  const metaLine = (() => {
-    if (sortedItems.length === 0) return "Пока без событий";
-    const first = sortedItems.find((item) => item.startsAt)?.startsAt ?? null;
-    const last = [...sortedItems].reverse().find((item) => item.startsAt)?.startsAt ?? null;
-    const timeRange = first && last ? `${formatTime(first)}–${formatTime(last)}` : "в течение дня";
-    const count = sortedItems.length;
-    const noun = count === 1 ? "событие" : count < 5 ? "события" : "событий";
-    return `${count} ${noun} · ${timeRange}`;
-  })();
+  const withTiming = items.map((item) => {
+    const timing = resolveScenarioItemTime(item, overrides.get(item.id) ?? null);
+    return {
+      id: item.id,
+      title: item.title || item.activity?.title || "Активность",
+      href:
+        item.activityId && item.activity
+          ? publicActivityPath(item.activityId, city.slug, item.activity.slug)
+          : null,
+      address: item.activity ? formatActivityAddressLine(item.activity) : null,
+      durationMinutes: resolveReliableDurationMinutes(item),
+      imageUrl: item.coverImageUrl || item.activity?.coverImageUrl || null,
+      effectiveStartsAt: timing.effectiveStartsAt,
+      isFlexible: timing.isFlexible,
+      overrideTime: overrides.has(item.id)
+        ? formatTime(overrides.get(item.id) ?? null)
+        : null,
+      createdAt: item.createdAt,
+    };
+  });
+
+  const sorted = sortScenarioItemsByEffectiveTime(withTiming);
+
+  const conflictIds = detectScenarioConflictIds(
+    sorted.map((item) => ({ id: item.id, startsAt: item.effectiveStartsAt })),
+  );
+
+  const timelineItems: ScenarioTimelineItem[] = sorted.map((item, index) => {
+    const previous = index > 0 ? sorted[index - 1] : null;
+    const freeGapBeforeMinutes =
+      previous && previous.effectiveStartsAt && item.effectiveStartsAt
+        ? deriveFreeGapMinutes(
+            {
+              id: previous.id,
+              effectiveStartsAt: previous.effectiveStartsAt,
+              durationMinutes: previous.durationMinutes,
+            },
+            {
+              id: item.id,
+              effectiveStartsAt: item.effectiveStartsAt,
+              durationMinutes: item.durationMinutes,
+            },
+          )
+        : null;
+
+    return {
+      id: item.id,
+      title: item.title,
+      href: item.href,
+      address: item.address,
+      durationMinutes: item.durationMinutes,
+      imageUrl: item.imageUrl,
+      effectiveStartsAt: item.effectiveStartsAt,
+      isFlexible: item.isFlexible,
+      overrideTime: item.overrideTime,
+      hasConflict: conflictIds.has(item.id),
+      // Overlap amount would require a real (not assumed) duration to state
+      // truthfully — not available yet, so never shown (see
+      // resolveReliableDurationMinutes).
+      conflictOverlapMinutes: null,
+      freeGapBeforeMinutes,
+    };
+  });
+
+  const timedSorted = sorted.filter(
+    (item): item is typeof item & { effectiveStartsAt: Date } => item.effectiveStartsAt != null,
+  );
+  const flexibleCount = sorted.length - timedSorted.length;
+  const endOfDay = deriveEndOfDay(
+    timedSorted.map((item) => ({
+      id: item.id,
+      effectiveStartsAt: item.effectiveStartsAt,
+      durationMinutes: item.durationMinutes,
+    })),
+  );
+
+  const metaLine =
+    flexibleCount === 0 && timedSorted.length > 0
+      ? `${sorted.length} ${sorted.length === 1 ? "событие" : sorted.length < 5 ? "события" : "событий"} · ${formatTime(timedSorted[0]!.effectiveStartsAt)}–${formatTime(timedSorted.at(-1)!.effectiveStartsAt)}`
+      : `${sorted.length} ${sorted.length === 1 ? "событие" : sorted.length < 5 ? "события" : "событий"} · ${flexibleSummary(flexibleCount)}`;
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-[#FFF9F5] px-5 py-8">
@@ -118,12 +201,20 @@ export default async function DayScenarioPage({ params }: PageProps) {
         </div>
       </div>
 
-      <section className="mt-5 rounded-[28px] border border-[#F8D7C7] bg-[linear-gradient(135deg,#FFF4EC_0%,#FFF9F6_48%,#FFFFFF_100%)] p-5 shadow-[0_12px_40px_-28px_rgba(239,135,89,0.6)]">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#BE4F2E]/75">
-          Сценарий дня
-        </p>
-        <p className="mt-2 text-sm leading-relaxed text-neutral-600">{metaLine}</p>
-      </section>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#BE4F2E]/75">
+            Сценарий дня
+          </p>
+          <p className="mt-1 text-sm text-neutral-600">{metaLine}</p>
+        </div>
+        <Link
+          href="/me/plan"
+          className="shrink-0 text-sm font-medium text-neutral-500 hover:text-neutral-900"
+        >
+          Изменить план
+        </Link>
+      </div>
 
       {planChanged ? (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -140,8 +231,14 @@ export default async function DayScenarioPage({ params }: PageProps) {
       ) : null}
 
       <div className="mt-6">
-        <ScenarioTimeline items={sortedItems} conflictIds={conflictIds} />
+        <ScenarioTimeline items={timelineItems} city={city.slug} date={date} />
       </div>
+
+      {endOfDay ? (
+        <p className="mt-4 text-center text-sm text-neutral-400">
+          День завершится около {formatTime(endOfDay)}
+        </p>
+      ) : null}
     </div>
   );
 }

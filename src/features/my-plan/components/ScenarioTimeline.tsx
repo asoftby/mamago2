@@ -1,74 +1,134 @@
 "use client";
 
+import Link from "next/link";
 import { MediaCover } from "@/components/ui/media-cover";
-import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import type { PlanItemWithActivity } from "../types/event";
-import { formatActivityAddressLine } from "../lib/formatActivityAddress";
+import { AssignScenarioTimeControl } from "./AssignScenarioTimeControl";
 
-type ScenarioTimelineProps = {
-  items: PlanItemWithActivity[];
-  conflictIds?: Set<string>;
+export type ScenarioTimelineItem = {
+  id: string;
+  title: string;
+  href: string | null;
+  address: string | null;
+  durationMinutes: number | null;
+  imageUrl: string | null;
+  effectiveStartsAt: Date | null;
+  isFlexible: boolean;
+  /** "HH:MM" if a Scenario override time is currently assigned. */
+  overrideTime: string | null;
+  hasConflict: boolean;
+  conflictOverlapMinutes: number | null;
+  /** Free time between the previous item and this one, in minutes. */
+  freeGapBeforeMinutes: number | null;
 };
 
-function formatTime(date: Date | string | null | undefined): string {
+type ScenarioTimelineProps = {
+  items: ScenarioTimelineItem[];
+  city: string;
+  date: string;
+};
+
+function formatTime(date: Date | null): string {
   if (!date) return "";
-  const d = date instanceof Date ? date : new Date(date);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatPrice(activity: NonNullable<PlanItemWithActivity["activity"]>): string | null {
-  const text = activity.priceText?.trim();
-  if (text) return normalizeUiCurrencyText(text);
-  if (activity.priceFrom === 0) return "Бесплатно";
-  if (activity.priceFrom != null && !Number.isNaN(activity.priceFrom)) {
-    return formatPriceFrom(activity.priceFrom, { hideZero: true });
-  }
-  return null;
+function formatDurationLabel(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0 && mins > 0) return `${hours} ч ${mins} мин`;
+  if (hours > 0) return `${hours} ч`;
+  return `${mins} мин`;
 }
 
-export function ScenarioTimeline({ items, conflictIds }: ScenarioTimelineProps) {
+function GapBlock({ minutes }: { minutes: number }) {
+  return (
+    <div className="relative flex gap-4 py-1">
+      <div className="w-10 shrink-0" />
+      <p className="text-xs font-medium text-neutral-400">
+        {formatDurationLabel(minutes)} свободно
+      </p>
+    </div>
+  );
+}
+
+export function ScenarioTimeline({ items, city, date }: ScenarioTimelineProps) {
   return (
     <div className="relative">
       <div className="absolute left-[19px] top-2 bottom-2 w-px bg-neutral-200" />
-      <div className="space-y-5">
-        {items.map((item) => {
-          const title = item.title || item.activity?.title || "Активность";
-          const age = item.activity?.ageLabel?.trim();
-          const place = item.activity ? formatActivityAddressLine(item.activity) : null;
-          const price = item.activity ? formatPrice(item.activity) : null;
-          const meta = [age, place, price].filter(Boolean).join(" · ");
-          const imageUrl = item.coverImageUrl || item.activity?.coverImageUrl;
-          const hasConflict = conflictIds?.has(item.id) ?? false;
+      <div className="space-y-1">
+        {items.map((item, index) => {
+          const previous = index > 0 ? items[index - 1] : null;
 
           return (
-            <div key={item.id} className="relative flex gap-4">
-              <div className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center">
-                <div className="h-3 w-3 rounded-full border-2 border-primary bg-white" />
-              </div>
-              <div className="min-w-0 flex-1 rounded-[22px] border border-neutral-200 bg-white p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-primary">
-                      {formatTime(item.startsAt) || "Без времени"}
-                    </p>
-                    <h3 className="mt-1 text-base font-semibold leading-snug text-neutral-900">
-                      {title}
-                    </h3>
-                    {meta ? (
-                      <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">{meta}</p>
-                    ) : null}
-                    {hasConflict ? (
-                      <p className="mt-1.5 text-sm font-medium text-amber-600">
-                        ⚠ Время пересекается
-                      </p>
-                    ) : null}
-                  </div>
-                  {imageUrl ? (
-                    <div className="w-16 shrink-0">
-                      <MediaCover imageUrl={imageUrl} alt={title} ratio="1/1" className="rounded-2xl" />
+            <div key={item.id}>
+              {previous && item.freeGapBeforeMinutes ? (
+                <GapBlock minutes={item.freeGapBeforeMinutes} />
+              ) : null}
+
+              <div className="relative flex gap-4 py-2">
+                <div className="relative z-10 flex h-10 w-10 shrink-0 items-start justify-center pt-1">
+                  <div className="h-3 w-3 rounded-full border-2 border-primary bg-white" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-semibold text-primary">
+                    {item.effectiveStartsAt ? formatTime(item.effectiveStartsAt) : "Гибкое время"}
+                  </p>
+
+                  <div className="mt-1.5 rounded-[22px] border border-neutral-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        {item.href ? (
+                          <Link
+                            href={item.href}
+                            className="text-base font-semibold leading-snug text-neutral-900 hover:underline"
+                          >
+                            {item.title}
+                          </Link>
+                        ) : (
+                          <h3 className="text-base font-semibold leading-snug text-neutral-900">
+                            {item.title}
+                          </h3>
+                        )}
+                        {item.address ? (
+                          <p className="mt-1 text-sm leading-relaxed text-neutral-500">
+                            {item.address}
+                          </p>
+                        ) : null}
+                        {item.durationMinutes != null ? (
+                          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-neutral-400">
+                            {formatDurationLabel(item.durationMinutes)}
+                          </p>
+                        ) : null}
+                        {item.hasConflict ? (
+                          <p className="mt-1.5 text-sm font-medium text-amber-600">
+                            ⚠ Время пересекается
+                            {item.conflictOverlapMinutes
+                              ? ` на ${formatDurationLabel(item.conflictOverlapMinutes)}`
+                              : ""}
+                          </p>
+                        ) : null}
+                        {item.isFlexible ? (
+                          <AssignScenarioTimeControl
+                            city={city}
+                            date={date}
+                            planItemId={item.id}
+                            currentTime={item.overrideTime}
+                          />
+                        ) : null}
+                      </div>
+                      {item.imageUrl ? (
+                        <div className="w-14 shrink-0">
+                          <MediaCover
+                            imageUrl={item.imageUrl}
+                            alt={item.title}
+                            ratio="1/1"
+                            className="rounded-2xl"
+                          />
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               </div>
             </div>

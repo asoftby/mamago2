@@ -1,6 +1,17 @@
-import type { PlanItemWithActivity } from "../types/event";
+type ActivityPlace = {
+  shortAddress: string | null;
+  formattedAddr: string | null;
+  customAddress: string | null;
+  city: { name: string } | null;
+} | null;
 
-type ActivityPlace = NonNullable<PlanItemWithActivity["activity"]>["place"];
+type ActivityForAddress = {
+  place: ActivityPlace;
+  venue: {
+    addressLine: string | null;
+    place: ActivityPlace;
+  } | null;
+} | null;
 
 function streetFromPlace(place: ActivityPlace | null | undefined): string | null {
   if (!place) return null;
@@ -17,7 +28,7 @@ function streetFromPlace(place: ActivityPlace | null | undefined): string | null
  * Одна строка: город, улица и дом (без района).
  */
 export function formatActivityAddressLine(
-  activity: PlanItemWithActivity["activity"],
+  activity: ActivityForAddress,
 ): string | null {
   if (!activity) return null;
 
