@@ -579,6 +579,14 @@ export function PlanMainContent({
     }, 0);
   }, [onRequestClose, router]);
 
+  /** «Собрать сценарий дня» — переход на отдельную страницу, а не модалка поверх модалки. */
+  const handleOpenScenarioPage = useCallback(() => {
+    onRequestClose?.();
+    window.setTimeout(() => {
+      router.push(`/${city}/my-plan/${selectedDate}/scenario`);
+    }, 0);
+  }, [city, onRequestClose, router, selectedDate]);
+
   const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
   const upcomingSelection = useMemo(
     () => selectUpcomingPlanItems({
@@ -1033,9 +1041,7 @@ export function PlanMainContent({
   const renderBottomActions = () => (
     <div className="space-y-3">
       {canOpenScenario ? (
-        <BuildScenarioButton
-          onClick={() => router.push(`/${city}/my-plan/${selectedDate}/scenario`)}
-        />
+        <BuildScenarioButton onClick={handleOpenScenarioPage} />
       ) : null}
     </div>
   );

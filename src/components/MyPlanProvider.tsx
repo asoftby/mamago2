@@ -22,6 +22,11 @@ function isMyPlanFullPageRoute(pathname: string | null): boolean {
   ) {
     return true;
   }
+  // /{city}/my-plan/{date}/scenario (Task 7 Day Scenario) — a real standalone
+  // page, not an overlay; must not render nested behind the My Plan overlay.
+  if (segments.length >= 2 && segments[1] === "my-plan") {
+    return true;
+  }
   return false;
 }
 
