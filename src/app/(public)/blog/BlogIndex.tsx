@@ -388,9 +388,6 @@ function ArticleRow({
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
-        <span className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-sm text-foreground transition-transform duration-300 group-hover:translate-x-1.5 group-hover:text-primary">
-          →
-        </span>
         {!article.coverImageUrl && (
           <span className="absolute bottom-2 left-2.5 right-2.5 flex justify-between">
             <span className="text-[10px] font-mono uppercase tracking-[.12em] text-black/35">обложка</span>
@@ -400,10 +397,12 @@ function ArticleRow({
       </div>
     </Link>
 
-    {/* Heart overlay — mirrors the Link's own grid so it lands in the meta column without nesting inside <a> */}
-    <div className="pointer-events-none absolute inset-0 grid grid-cols-1 gap-4 py-8 sm:grid-cols-[200px_1fr_180px] sm:gap-9">
+    {/* Heart overlay — mirrors the Link's own grid so it lands in the image's action slot (former arrow position) without nesting inside <a> */}
+    <div className="pointer-events-none absolute inset-0 hidden grid-cols-1 gap-4 py-8 sm:grid sm:grid-cols-[200px_1fr_180px] sm:gap-9">
+      <div />
+      <div />
       <div className="relative">
-        <div className="pointer-events-auto absolute right-0 top-0 z-10">
+        <div className="pointer-events-auto absolute right-2.5 top-2.5 z-10">
           <ArticleSaveHeart
             articleId={article.id}
             articleTitle={article.title}
