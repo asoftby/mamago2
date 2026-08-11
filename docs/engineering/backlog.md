@@ -1493,3 +1493,158 @@ P3 — cleanup / polish / optional
   real DB schema for `SearchDocument`/`SearchQueryLog`.
 - Source: Task 6 (Article Actions) implementation, 2026-08-11 (`npx prisma
   migrate status` output during migration apply).
+
+## [BACKLOG-055] Day Scenario: guest (unauthenticated) persistence not implemented
+
+- Status: OPEN
+- Priority: P2
+- Area: My Plan / Day Scenario
+- Added: 2026-08-11
+- Reason deferred: explicit owner decision for the Task 7 MVP — persistent
+  Scenario is authenticated-user only; guest Day Scenario was explicitly
+  deferred rather than building a second parallel storage system.
+- Context: `DayScenario` (Prisma model) and the standalone page at
+  `src/app/(public)/[city]/my-plan/[date]/scenario/page.tsx` require
+  `getCurrentUser()`, redirecting to login otherwise. Guests already have no
+  path to the Day Scenario CTA at all (`GuestMyPlanPanel` never renders
+  `BuildScenarioButton`), so this is a consistent, not a partial, gap.
+- Current state: not started.
+- Dependencies: none blocking; would need a product decision on whether
+  guest Scenario should be a temporary client-only (localStorage) view or
+  simply require login, before any implementation.
+- Acceptance criteria: owner decision recorded, then implemented if wanted.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  implementation, owner-approved MVP scope
+
+## [BACKLOG-056] Day Scenario: manual reorder / time / duration editing
+
+- Status: OPEN
+- Priority: P2
+- Area: My Plan / Day Scenario
+- Added: 2026-08-11
+- Reason deferred: explicitly excluded from the Task 7 MVP scope by the
+  owner ("We are NOT building a full itinerary editor" / "Do NOT
+  implement: drag-and-drop; manual reorder; manual duration editing").
+- Context: the Scenario page derives order purely from
+  `sortPlanItemsForDay()` (time, then title, then createdAt) and has no
+  `order`/`duration` fields anywhere (`PlanItem` has neither column).
+- Current state: not started.
+- Dependencies: would need a data-model decision (per-item override table
+  vs. columns on `PlanItem`) — deliberately not built speculatively per
+  Task 7's own instruction not to create `DayScenarioItem` unless proven
+  necessary.
+- Acceptance criteria: owner decision on scope + data shape, then
+  implemented.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  implementation, owner-approved MVP scope
+
+## [BACKLOG-057] Day Scenario: pauses / free-interval representation
+
+- Status: OPEN
+- Priority: P3
+- Area: My Plan / Day Scenario
+- Added: 2026-08-11
+- Reason deferred: explicitly excluded from the Task 7 MVP ("Do NOT
+  implement: pause entities").
+- Context: no `Pause`-like concept exists anywhere in the Scenario page or
+  data model; only real `PlanItem`s render on the timeline.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: owner decision on minimal representation (e.g. a
+  derived gap-detection UI vs. a persisted item) before implementation.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  implementation, owner-approved MVP scope
+
+## [BACKLOG-058] Day Scenario: public read-only share URL
+
+- Status: OPEN
+- Priority: P3
+- Area: My Plan / Day Scenario
+- Added: 2026-08-11
+- Reason deferred: explicitly excluded from the Task 7 MVP ("Do NOT
+  implement: public share URL"). The dead pre-existing `DayScenarioModal`
+  (removed this task) only ever supported `navigator.share`/clipboard text
+  export — never a real shareable URL/token.
+- Context: `DayScenario` has no token/slug field, no public route exists.
+  Sharing a Scenario today would require the recipient to already be
+  logged in as the same user (no cross-user read path — by design, see
+  Task 7 security requirements).
+- Current state: not started.
+- Dependencies: would need a new token-based public read path — a real,
+  scoped security surface, not a trivial addition.
+- Acceptance criteria: owner decision on scope before implementation.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  implementation, owner-approved MVP scope
+
+## [BACKLOG-059] Day Scenario: recommendation insertion into timeline gaps
+
+- Status: OPEN
+- Priority: P3
+- Area: My Plan / Day Scenario / Recommendations
+- Added: 2026-08-11
+- Reason deferred: explicitly excluded from the Task 7 MVP ("Do NOT
+  implement: recommendations between activities"). Architecture-only
+  extension point, not a first-release requirement per the owner's brief.
+- Context: `detectScenarioConflictIds()` and the timeline already compute
+  per-item time boundaries server-side, which is a reasonable future
+  extension point for gap-detection — not wired to any recommendation
+  source today.
+- Current state: not started.
+- Dependencies: none for extension-point compatibility; needs a real
+  recommendation source decision before implementation.
+- Acceptance criteria: owner decision before implementation.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  implementation, owner-approved MVP scope
+
+## [BACKLOG-060] Day Scenario: travel-time / Google Routes integration
+
+- Status: OPEN
+- Priority: P3
+- Area: My Plan / Day Scenario / Maps
+- Added: 2026-08-11
+- Reason deferred: explicitly excluded from the Task 7 MVP per the owner's
+  cost-boundary instruction — no Google Routes/Distance Matrix calls on
+  Scenario open/edit/save. Confirmed zero such calls exist anywhere in the
+  implemented Scenario code path.
+- Context: addresses already render via the reused
+  `formatActivityAddressLine()`; no "Открыть маршрут в Google Maps"
+  deep-link or travel-time estimate exists yet.
+- Current state: not started.
+- Dependencies: none blocking; future work should prefer a plain Maps URL
+  deep-link over any paid Routes/Distance Matrix API call, per the owner's
+  standing cost-boundary decision.
+- Acceptance criteria: owner decision before implementation.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  implementation, owner-approved MVP scope
+
+## [BACKLOG-061] Dead `src/features/me/` Day Scenario chain — finish or delete
+
+- Status: OPEN
+- Priority: P3
+- Area: My Plan / Day Scenario / Dead code
+- Added: 2026-08-11
+- Reason deferred: not in Task 7's MVP scope; owner explicitly said not to
+  bring `buildDayScenario()`/`DayScenarioBlock`/`ScenarioFinalPage`/
+  `PlanCard` back into the live architecture just because they exist.
+- Context: `src/features/me/lib/dayScenario.ts`'s `buildDayScenario()` is a
+  permanent stub (`return null`); its only consumer chain
+  (`DayScenarioBlock.tsx` → `PlanCard.tsx`) is reachable only from the
+  internal `/ui-lab` component showcase (`src/components/ui-lab/
+  registry.ts`), whose own `usedIn` metadata falsely claims usage in
+  `/me/page.tsx` and `/me/day/[date]/page.tsx` (verified false by direct
+  inspection — neither imports `PlanCard`). `ScenarioFinalPage.tsx` has
+  zero importers anywhere. `src/features/me/lib/dayScheduler.ts`
+  (`findPlacement()`) is a real, working conflict/placement algorithm but
+  has no live caller once this chain is excluded (it was only reachable via
+  the dead `useAddScenarioPlan` hook, itself only used by `DayScenarioBlock`).
+- Current state: not started; left fully untouched by Task 7 as instructed.
+- Dependencies: none blocking.
+- Acceptance criteria: either finish this as a real feature (unlikely given
+  Task 7 built a separate live implementation) or delete
+  `dayScenario.ts`/`DayScenarioBlock.tsx`/`ScenarioFinalPage.tsx` and the
+  stale `PlanCard` registry entry; also fix or remove the false `usedIn`
+  claim in `src/components/ui-lab/registry.ts` regardless of which option
+  is chosen. `dayScheduler.ts` may be worth keeping/reusing if BACKLOG-056
+  (manual time editing / conflict-aware placement) is ever picked up.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  audit + implementation

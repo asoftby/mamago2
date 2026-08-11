@@ -20,20 +20,37 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 7 (Day Scenario) — STATUS: AUDIT_COMPLETE, read-only
-                     audit done, implementation not started, awaiting owner
-                     scope decision (page-only vs. page+persistence). Task 6
-                     COMPLETE.
+Active task:        Task 7 (Day Scenario) — STATUS:
+                     COMPLETE_PENDING_BROWSER_SMOKE. Owner approved minimal
+                     Option 2 (page + minimal persistence). Implemented,
+                     locally verified (build/tests/browser), pushed. Awaiting
+                     owner-controlled DEV deploy + real-DEV smoke to close.
+                     Task 6 COMPLETE.
 Last updated:       2026-08-11
-Last updated by:    Claude Code — Task 7 (Day Scenario) audit-only pass:
-                     found the live modal-based implementation (correct 3+
-                     trigger, timeline, sort, responsive infra) plus a
-                     separate dead-code scenario chain under
-                     `src/features/me/` (stub generator always returns
-                     null, unreachable from any real route) that must not
-                     be confused with the live path. No application code
-                     changed, no deploy. Full findings in Task 7's own
-                     section below.
+Last updated by:    Claude Code — Task 7 (Day Scenario) implemented per
+                     owner-approved MVP: new minimal `DayScenario` model
+                     (hand-written migration, user+date scoped, no city in
+                     identity, no item-level duplication — My Plan stays
+                     source of truth), standalone page at
+                     `/{city}/my-plan/{date}/scenario` replacing the old
+                     nested modal (`DayScenarioModal`/`ScenarioActionBar`
+                     deleted), plan-changed detection via a cheap
+                     fingerprint + explicit "Обновить сценарий" action, a
+                     new small deterministic conflict-warning function (not
+                     a reuse of the incompatible `dayScheduler.findPlacement()`,
+                     which solves a different problem — re-audited first),
+                     full reuse of `ScenarioTimeline`/`sortPlanItemsForDay`/
+                     address+price formatting unchanged. Browser
+                     verification caught and fixed a real nested-modal
+                     regression (My Plan overlay staying open on top of the
+                     new page due to a Radix close-animation race with
+                     client-side navigation) by reusing the same
+                     route-based hard-unmount mechanism the codebase
+                     already relies on for `/me/plan`. `tsc`/`eslint`/
+                     `pnpm test:day-scenario`/`pnpm check:push` all green.
+                     Not yet deployed to actual DEV — that step is
+                     owner-controlled. Full detail in Task 7's own section
+                     below.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -2153,7 +2170,7 @@ surfaces.
 
 Priority: `P0`
 
-STATUS: `AUDIT_COMPLETE`
+STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
 AUDIT:
 EXISTING — Live path is `src/features/my-plan/components/{DayScenarioModal,
 ScenarioTimeline, ScenarioActionBar, BuildScenarioButton}.tsx`, opened from
@@ -2206,30 +2223,135 @@ read/write API exists today, so ownership/authorization is currently moot.
 No Google Routes/Distance Matrix/Maps SDK calls exist anywhere in the My
 Plan or `me/` scenario code — the owner's cost boundary is already
 respected by construction (nothing calls those APIs).
-IMPLEMENTATION: not started — owner must choose between (1) page-only,
-still-ephemeral promotion of the existing modal content to a standalone
-route (satisfies the literal Exit Criteria only), or (2) page + minimal
-persistence (new small `DayScenario`-shaped model, status draft/ready,
-reusing `dayScheduler`'s conflict algorithm) per the owner's fuller
-product-direction brief. See full audit report in this session's transcript
-for the detailed option comparison, UX gap matrix, and files-likely-to-
-change list — not duplicated here per template compactness.
-COMMITS: audit-only, this docs commit.
-VERIFICATION: full audit performed by direct code read + a scoped Explore
-sub-agent, cross-verified against the live repo (`PlanMainContent.tsx`
-trigger block, `prisma/schema.prisma` `PlanItem` model, `PlanCard`
-importers) — not from memory/history.
-DEV SMOKE: not applicable — audit only, no code changed, no deploy.
-BLOCKERS: none for continuing the audit; implementation is blocked on an
-explicit owner scope decision (Option 1 vs Option 2 above).
-BACKLOG/NOTES: candidates recorded for later — stale `PlanCard` `usedIn`
-metadata in `src/components/ui-lab/registry.ts`; decide fate of the dead
-`src/features/me/` scenario chain (finish or delete, do not leave a
-permanently-null stub behind a real-looking component); reuse
-`useAddScenarioPlan`/`dayScheduler.findPlacement` if Option 2 is chosen
-rather than writing a new conflict algorithm. Not yet added to
-`docs/engineering/backlog.md` as formal BACKLOG-XXX entries — pending owner
-scope decision so they're filed against the right implementation shape.
+IMPLEMENTATION: Owner approved Option 2, minimal ("we are not building a
+full itinerary editor"). Built:
+(1) **Data model** — new `DayScenario` model (`id, userId, date, status
+[default "READY"], planFingerprint, createdAt, updatedAt`,
+`@@unique([userId,date])`), hand-written migration
+`prisma/migrations/20260811130000_add_day_scenario/migration.sql` (no
+`prisma migrate dev`/`db push`), applied to local dev DB, Prisma client
+regenerated. No `DayScenarioItem`/content duplication — the page always
+reads current `PlanItem` rows live; the model only marks "a Scenario was
+explicitly created for this user/date" + a cheap drift signature. City is
+correctly **not** part of the DB identity (confirmed `PlanItem` has no
+`cityId` — matches audit finding).
+(2) **Service** (`src/server/services/dayScenario.service.ts`) —
+`computePlanFingerprint()` (sha256 of sorted `id:startsAt` pairs, order-
+independent, drifts on add/remove/time-change), `getDayScenario`,
+`ensureDayScenario` (idempotent get-or-create, P2002 race-safety-net
+catch), `refreshDayScenario` (recompute + persist, no-op if no row).
+(3) **Route/page** — `src/app/(public)/[city]/my-plan/[date]/scenario/
+page.tsx`, a real standalone Server Component page (not a modal). Auth via
+`redirectToLogin()` (safe `redirectTo` pattern). City validated via
+`findCityBySlug` (not used to filter data — display/nav only, matches
+audit finding that My Plan identity is user+date). Date validated by
+regex, `notFound()` otherwise. An already-created Scenario is always shown
+(never hidden if My Plan later drops below 3 items) — only *initial*
+creation is threshold-gated via the shared `canOpenDayScenario()` (see
+below), so a bookmarked/direct URL open never silently fabricates one
+below 3 items but does correctly restore an existing one.
+(4) **Conflicts** — re-audited `src/features/me/lib/dayScheduler.ts` before
+reuse: its `findPlacement()` solves single-new-item insertion, not
+"list every conflicting pair in a fixed set" — not a fit API-wise, so
+wrote a small new pure `detectScenarioConflictIds()`
+(`src/features/my-plan/lib/detectScenarioConflicts.ts`, adjacent-pair
+overlap on a shared 60-min assumed-duration convention, untimed items
+never flagged, no fabricated travel time, no optimization). `dayScheduler.ts`
+itself left fully untouched, per instruction not to revive the dead chain
+around it.
+(5) **Reuse, unchanged** — `ScenarioTimeline`/`sortPlanItemsForDay`/address
++price formatting/timed-untimed rendering, all reused as-is; only addition
+to `ScenarioTimeline` was an optional `conflictIds` prop for the warning
+line.
+(6) **Plan-changed** — page compares live `computePlanFingerprint(items)`
+vs. the stored one; on mismatch shows "План изменился" + a
+`refreshDayScenarioAction` Server Action button ("Обновить сценарий") that
+recomputes/persists the fingerprint and revalidates the page. No version
+history/stack.
+(7) **CTA wiring + a real nested-modal bug found and fixed** — the
+existing "Собрать сценарий дня" button now navigates
+(`router.push('/{city}/my-plan/{date}/scenario')`) instead of opening
+`DayScenarioModal`; that dead modal wrapper + `ScenarioActionBar.tsx` were
+deleted (0 other importers, confirmed by grep). Browser verification of
+this navigation initially found a **real regression**: the My Plan overlay
+Dialog stayed visibly open on top of the new page (exactly the nested-
+modal problem Task 7 exists to remove). Root-caused via instrumented
+logging (since removed): the pre-existing `onRequestClose()`-then-
+`router.push()` pattern (already used by the sticky-counter → `/me/plan`
+flow) only "works" today because `/me/plan` is hard-matched by
+`isMyPlanFullPageRoute()`, which **fully unmounts** `MyPlanOverlayHost`
+instead of waiting on Radix's close animation — our new route wasn't in
+that match list, so the close animation got interrupted mid-flight by the
+navigation (`getAnimations()` showed `playState:"running"`,
+`currentTime:0`, stuck) and never reached its closed visual state. Fix:
+added the `/{city}/my-plan/...` route family to `isMyPlanFullPageRoute()`
+(`src/components/MyPlanProvider.tsx`), reusing the same reliable mechanism
+instead of fighting animation timing. Re-verified clean (0 `[role="dialog"]`
+elements after CTA click) on both desktop and mobile viewports.
+(8) **Security** — every read/write is scoped server-side by the
+session-derived `userId`; the client never supplies a `DayScenario` id at
+all (lookups are always by the `(userId, date)` compound key), so
+cross-user access isn't just checked, it's structurally unreachable.
+Verified with explicit tests (see VERIFICATION).
+(9) **Cost** — one bounded `listPlanItemsByDate` query (already existed)
++ one `findUnique`/`create`/`update` on `DayScenario`, no N+1, no polling,
+no external API calls (confirmed zero Google Routes/Maps calls in the
+Scenario path, matching the audit finding and the owner's cost boundary).
+COMMITS: `7e7a2fb3` (audit docs), `a2091390` (schema/migration/service/
+route/page/CTA wiring), `c6de4186` (tests + `canOpenDayScenario` extraction
++ always-show-existing-scenario fix), `baf500b3` (nested-modal fix).
+VERIFICATION: `npx tsc --noEmit` clean; `npx eslint` on every changed file
+clean (0 errors; only pre-existing, unrelated warnings in
+`PlanMainContent.tsx`/`MyPlanProvider.tsx`, confirmed identical via
+`git stash` diff before/after). `pnpm test:day-scenario` (new bundled
+script: `canOpenDayScenario.test.ts`, `detectScenarioConflicts.test.ts`,
+`sortPlanItemsForDay.test.ts`, `dayScenario.service.test.ts`) — all green,
+covering: 2-items-no-CTA/3-items-CTA threshold, idempotent create (same
+row returned, DB unique-constraint duplicate-create rejected), cross-user
+read isolation, cross-user "refresh" isolation (wrong user's refresh call
+cannot touch another user's row — verified explicitly, not just assumed
+safe), fingerprint determinism/order-independence and drift-on-change,
+refresh persistence, timed-item chronological sort, untimed-items-sort-
+last-without-fabricated-time, conflict detection (overlap/no-overlap/
+back-to-back-boundary/mixed-timed-untimed). `pnpm check:push` (`pnpm
+build`) exits 0, zero errors, new route `/[city]/my-plan/[date]/scenario`
+correctly listed as dynamic (ƒ) in the build output.
+DEV SMOKE (local dev server, Browser pane, real seeded user + PlanItems —
+not yet deployed-DEV, see BLOCKERS): desktop 1280×720 — My Plan overlay →
+selected date with 5 items (2 overlapping, 1 clean, 1 untimed) → CTA click
+→ lands on standalone `/minsk/my-plan/2026-09-05/scenario`, correct date/
+city header, "5 событий · 12:00–21:00" summary, timeline in correct order
+(timed chronological, untimed "Прогулка в парке" last, no fabricated
+time), both real conflicting items show "⚠ Время пересекается", the
+non-overlapping 17:00 item does not. Direct reload of the URL: identical
+render, Scenario restored (not recreated — `id`/`createdAt` unchanged,
+confirmed via DB read). Leave (navigate to `/minsk/events`) and reopen via
+URL: state correctly restored. Modified My Plan (added a 6th item directly
+via DB, simulating a real add) → reopened page → "План изменился" banner
+shown with the new item already visible in the live timeline (My Plan
+stays source of truth) → clicked "Обновить сценарий" → banner disappeared,
+`planFingerprint`/`updatedAt` correctly updated in DB, same row id (no
+duplicate). "Insufficient activities" state verified for a date with 0
+items (no Scenario row created, correct empty-state copy + link back to
+`/me/plan`). Mobile 375×812: normal full page (not a Sheet), same content,
+readable timeline, no layout break, 0 `[role="dialog"]` elements. No
+relevant console errors on either viewport (only expected dev-only HMR
+websocket noise from the preview-tool's server restarts, not app errors).
+No network requests failed (except the same dev-only HMR channel).
+BLOCKERS: none for local completion. Real actual-`dev.mamago.by` smoke is
+owner-controlled deployment, not yet performed (per instruction: push only
+when clean, then stop for owner-controlled deployment — no DEV/PROD deploy
+attempted by this session).
+BACKLOG/NOTES: BACKLOG-055 (guest Scenario persistence, explicitly
+deferred), BACKLOG-056 (manual reorder/time/duration editing, explicitly
+excluded from MVP), BACKLOG-057 (pauses/free intervals, explicitly
+excluded), BACKLOG-058 (public read-only share URL, explicitly excluded),
+BACKLOG-059 (recommendation insertion into timeline gaps, explicitly
+excluded), BACKLOG-060 (travel-time/Google Routes integration, explicitly
+excluded per cost boundary), BACKLOG-061 (dead `src/features/me/` Day
+Scenario chain — finish-or-delete decision, left fully untouched by this
+task as instructed). All recorded in `docs/engineering/backlog.md`, none
+implemented.
 
 Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
 Scenario / My Plan / timeline implementation: existing modal flow,
