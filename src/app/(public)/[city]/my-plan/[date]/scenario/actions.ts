@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
+import { localWallClockToUtc } from "@/lib/date/localDateKey";
 import {
   refreshDayScenario,
   setScenarioItemOverride,
@@ -36,7 +37,12 @@ export async function setScenarioItemTimeAction(
   }
 
   try {
-    await setScenarioItemOverride(user.id, date, planItemId, new Date(`${date}T${time}:00`));
+    // Interpreted as Europe/Minsk wall-clock time (matching how every real
+    // Activity session time in the app is entered/interpreted), not the
+    // server process's own OS timezone — a bare `new Date(...)` here
+    // produced a real, multi-hour drift on the DEV container (which runs
+    // UTC), confirmed via real-DEV smoke.
+    await setScenarioItemOverride(user.id, date, planItemId, localWallClockToUtc(date, time));
   } catch (error) {
     if (error instanceof Error && (error.message === "SCENARIO_NOT_FOUND" || error.message === "PLAN_ITEM_NOT_FOUND")) {
       return { ok: false, error: error.message };
