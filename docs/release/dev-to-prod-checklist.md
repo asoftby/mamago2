@@ -20,39 +20,34 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 6 — Article Actions (COMPLETE_PENDING_BROWSER_SMOKE)
+Active task:        none — Task 6 COMPLETE; Task 7 not started
 Last updated:       2026-08-11
-Last updated by:    Claude Code — Task 6 implemented: Article gained Save
-                     (Ideas/Plan, via the existing SaveActivityFlowAdaptive
-                     chooser) and Share (via the existing ShareModal) across
-                     all 5 required surfaces (homepage journal row, /blog +
+Last updated by:    Claude Code — Task 6 (Article Actions) is CLOSED.
+                     Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
+                     via the existing SaveActivityFlowAdaptive chooser) and
+                     Share (via the existing ShareModal) across all 5
+                     required surfaces (homepage journal row, /blog +
                      /{city}/blog cards, standard Article detail, Breaking
                      News detail, continuous reading), per the owner's
                      canonical UX contract: cards = Heart only, detail/
                      landing = Heart+text + Share+text. New `ArticleIdea`
                      model + `PlanItem.articleId` (hand-written migration,
                      applied to DEV). Bounded batch save-status endpoint
-                     built specifically to avoid Article-card N+1 (verified
-                     live: 1 batch call, 0 per-card calls). Guest pending-
-                     action resume extended with "article". New test suite
-                     `test:article-actions` green; `tsc`/targeted `eslint`/
-                     `git diff --check`/`pnpm check:push` (full build) all
-                     green. Local-DEV browser verification confirmed the
-                     full save flow end-to-end (card Heart -> chooser ->
-                     Ideas -> persisted -> state updated -> cleaned up) and
-                     Share (correct URL/title in Telegram/WhatsApp links);
-                     Breaking News detail and guest-flow verification
-                     deferred to deployed-DEV smoke (no Breaking News
-                     content in local DEV dataset; session cookie is
-                     httpOnly so guest state couldn't be simulated without
-                     disrupting the owner's persisted session) — covered
-                     instead by code inspection + targeted unit tests this
-                     session. Filed BACKLOG-050..054 for confirmed
-                     out-of-scope gaps (Place pending-action, non-Article
-                     card N+1, Share consolidation, cross-entity design-
-                     system normalization, and an unrelated DB-migration
-                     drift found incidentally). Not yet pushed — see Task 6
-                     COMMITS field once committed.
+                     built specifically to avoid Article-card N+1. Guest
+                     pending-action resume extended with "article". Test
+                     suite `test:article-actions` green; full local build/
+                     lint/typecheck gate green. Deployed-DEV smoke
+                     confirmed green by the owner — Task 6 closed
+                     COMPLETE (full detail in Task 6's own DEV SMOKE field
+                     below). After closure, the owner requested a narrow,
+                     UI-only visual refinement to the homepage Article
+                     card (5-card desktop rail sized like the Events row,
+                     Heart inset into the cover, real category metadata
+                     when present, tail artifacts removed) — 3 corrective
+                     commits (`e4a1b6bb`, `d8be9416`, `9decd216`), pushed to
+                     `dev`, do not reopen Task 6 (see Task 6 BACKLOG/NOTES).
+                     Owner deploy + a targeted (not full) visual smoke of
+                     just those changes is the only remaining step.
 Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      found a real,
                      already-shared UserEvent-derived ranking engine
@@ -87,9 +82,8 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1–5 (all CLOSED). Task 6 implementation
-                     complete, no P0/P1 found; final COMPLETE pending
-                     deployed-DEV smoke. Tasks 7–15 remain TODO, not started
+Unresolved P0/P1:   none from Task 1–6 (all CLOSED, COMPLETE). Tasks 7–15
+                     remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -1911,7 +1905,7 @@ useful, and cheap signals without constant manual management.
 
 Priority: `P0`
 
-STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+STATUS: `COMPLETE`
 AUDIT: Read-only code audit (models, services, APIs, UI, pending-action,
        analytics enums) confirmed the owner-approved spec's assumptions with
        corrections: `PlanItem` has no `offerId` field at all — the pattern to
@@ -1978,7 +1972,19 @@ IMPLEMENTATION: Hand-written migration `20260811120000_add_article_actions`
       an absolutely-positioned sibling `div`, never nested inside the
       article `<a>`) matching the existing `ActivityCard` convention.
 COMMITS: `d923e1f6` — feat(article): add Save (Ideas/Plan) and Share actions
-      across all article surfaces.
+      across all article surfaces (implementation; deployed and smoked,
+      closes Exit Criteria). `3b3c13d5` — docs closure for the above.
+      Post-smoke, owner-requested UI-only visual refinements (do not
+      reopen Task 6 — see BACKLOG/NOTES): `e4a1b6bb` — revert homepage
+      journal card to its pre-Task-6 implementation, remove the `/blog`
+      row's circular arrow and move Heart into that slot. `d8be9416` —
+      resize the homepage journal rail to 5 cards matching the Events
+      rail's rhythm, restore the Heart action, fix the card-width flex
+      nesting bug that was the actual cause of the "tail" artifacts.
+      `9decd216` — anchor the homepage Heart to the cover (not the outer
+      card) and add real Article-category metadata between cover and
+      title. All 3 pushed to `dev`; not yet owner-deployed as of this
+      checklist update.
 VERIFICATION: `test:article-actions` (new) — `parseArticleIdsForBatch` unit
       tests (dedup/cap/invalid-input), `executePendingPostAuthAction` article-
       branch tests (fetch-mocked, confirms correct endpoint+payload routing,
@@ -2029,12 +2035,25 @@ VERIFICATION: `test:article-actions` (new) — `parseArticleIdsForBatch` unit
       without a real logout, which would disrupt the owner's persisted DEV
       session) — verified via the `executePendingPostAuthAction` unit tests
       instead, which exercise the exact new "article" branch added.
-DEV SMOKE: pending owner-controlled Docker deploy — a short deployed-DEV
-      smoke (Breaking News detail if seeded content exists there, guest
-      pending-action resume, continuous-reading second-article scroll) will
-      close out anything this session's local-DEV verification couldn't
-      reach, before Task 6 is marked final `COMPLETE`, matching the Task 3/5
-      pattern.
+DEV SMOKE: Deployed-DEV smoke on `d923e1f6`/`3b3c13d5` completed and
+      confirmed green by the owner — this closes the items this session's
+      own local-DEV verification could not reach (Breaking News detail, no
+      seeded content in local DEV; guest pending-action resume, could not
+      simulate logout against the owner's persisted session; continuous-
+      reading second-article scroll). The owner's deployed-DEV pass is
+      recorded here as owner-confirmed, not independently re-observed by
+      this session — the concrete, directly-observed evidence remains what's
+      documented above under VERIFICATION (local-DEV browser + code
+      inspection + unit tests). Task 6 Exit Criteria are met; status is
+      `COMPLETE`, no outstanding deployed-smoke gap remains.
+
+      Post-smoke (does not reopen Task 6): 3 UI-only visual-refinement
+      commits (`e4a1b6bb`, `d8be9416`, `9decd216` — see COMMITS) are pushed
+      to `dev` but not yet owner-deployed. Once deployed, only a **targeted**
+      visual check of the homepage Article card is required — not another
+      full Task 6 smoke: 5-card desktop layout, Heart inset into the cover,
+      real-category rendering when present, no vertical tails, Heart opens
+      the Save chooser without navigating, mobile/narrow layout.
 BLOCKERS: none.
 BACKLOG/NOTES: Filed BACKLOG-050 (Place/Offer guest pending-action resume
       gap, pre-existing, confirmed not fixed here), BACKLOG-051 (pre-existing
@@ -2052,6 +2071,25 @@ BACKLOG/NOTES: Filed BACKLOG-050 (Place/Offer guest pending-action resume
       BACKLOG-029's now-stale Context line (claimed `BreakingNewsView` used
       `ShareModal`, which was false at the time it was written — now true
       after this task's `NewsHero` share swap).
+
+      Post-smoke UI-refinement approved state (current, in effect —
+      commits `e4a1b6bb`/`d8be9416`/`9decd216`): homepage "Статьи и обзоры"
+      — 5 Article cards visible on the desktop rail, sized/spaced to match
+      the Events rail's visual weight; card's only explicit action is
+      Heart (no Share, no separate Ideas/Plan buttons); Heart anchored
+      inside the cover with a consistent ~11-12px inset (not the outer
+      card edge); decorative vertical-line/tail artifacts removed (root
+      cause was a flex-nesting width bug, not a decorative element); real
+      Article category (`CityHomeJournalArticle.category`, already
+      selected by `listCityHomeArticles.ts`, reused — no new field/
+      taxonomy) renders between cover and title only when present, no
+      fabricated category. `/blog`: Heart is the only explicit card/row
+      action, no Share; the circular navigation arrow is removed (`ArticleRow`
+      in `BlogIndex.tsx`, commit `e4a1b6bb` — confirmed via current git
+      state, no arrow markup remains). Article detail/full Article
+      (standard, Breaking News, continuous reading): unchanged canonical
+      `♡ Сохранить` + `↗ Поделиться`. Product rule stays: cards → Save/
+      Heart only; detail/full content → Save + Share.
 
 AUDIT FIRST existing Share / My Ideas / My Plan / CTA / saved-state
 functionality. Ensure: Share, Save to "My Ideas", Add to "My Plan" wherever
