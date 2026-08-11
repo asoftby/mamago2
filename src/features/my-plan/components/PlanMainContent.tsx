@@ -21,7 +21,6 @@ import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
 import { QuickAddAdultModal } from "@/components/adults/QuickAddAdultModal";
-import { DayScenarioModal } from "./DayScenarioModal";
 import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
@@ -395,7 +394,6 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
-  const [showDayScenario, setShowDayScenario] = useState(false);
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
@@ -1034,7 +1032,9 @@ export function PlanMainContent({
   const renderBottomActions = () => (
     <div className="space-y-3">
       {canOpenDayScenario ? (
-        <BuildScenarioButton onClick={() => setShowDayScenario(true)} />
+        <BuildScenarioButton
+          onClick={() => router.push(`/${city}/my-plan/${selectedDate}/scenario`)}
+        />
       ) : null}
     </div>
   );
@@ -1152,16 +1152,6 @@ export function PlanMainContent({
             toast.success("Профиль обновлён");
           }}
         />
-
-        <DayScenarioModal
-          open={showDayScenario}
-          onOpenChange={setShowDayScenario}
-          date={selectedDate}
-          city={city}
-          participantLabels={participantLabels}
-          items={dayItemsSorted}
-          layout="desktop"
-        />
       </div>
     );
   }
@@ -1258,16 +1248,6 @@ export function PlanMainContent({
         onSaved={() => {
           toast.success("Профиль обновлён");
         }}
-      />
-
-      <DayScenarioModal
-        open={showDayScenario}
-        onOpenChange={setShowDayScenario}
-        date={selectedDate}
-        city={city}
-        participantLabels={participantLabels}
-        items={dayItemsSorted}
-        layout="default"
       />
     </div>
   );

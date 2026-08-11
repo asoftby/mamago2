@@ -98,6 +98,7 @@ model User {
   reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
   planItems                         PlanItem[]
+  dayScenarios                      DayScenario[]
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
   routeRatings                      RouteRating[]
@@ -397,6 +398,26 @@ model PlanItem {
   @@index([placeId])
   @@index([userId, planPlaceSlug])
   @@index([articleId])
+}
+
+/// Сценарий дня (Task 7 MVP) — минимальная persisted-разметка поверх
+/// PlanItem на конкретную дату. Видимые элементы всегда читаются напрямую
+/// из текущих PlanItem пользователя за эту дату (My Plan остаётся source
+/// of truth); эта модель хранит только сам факт «сценарий создан» +
+/// дешёвую сигнатуру набора PlanItem на момент создания/обновления, чтобы
+/// обнаружить расхождение с текущим My Plan («План изменился»).
+model DayScenario {
+  id              String   @id @default(cuid())
+  userId          String
+  date            String
+  status          String   @default("READY")
+  planFingerprint String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
 }
 
 /// Сохранённые маршруты в «Идеи» (отдельно от Idea с activityId)

@@ -7,6 +7,7 @@ import { formatActivityAddressLine } from "../lib/formatActivityAddress";
 
 type ScenarioTimelineProps = {
   items: PlanItemWithActivity[];
+  conflictIds?: Set<string>;
 };
 
 function formatTime(date: Date | string | null | undefined): string {
@@ -26,7 +27,7 @@ function formatPrice(activity: NonNullable<PlanItemWithActivity["activity"]>): s
   return null;
 }
 
-export function ScenarioTimeline({ items }: ScenarioTimelineProps) {
+export function ScenarioTimeline({ items, conflictIds }: ScenarioTimelineProps) {
   return (
     <div className="relative">
       <div className="absolute left-[19px] top-2 bottom-2 w-px bg-neutral-200" />
@@ -38,6 +39,7 @@ export function ScenarioTimeline({ items }: ScenarioTimelineProps) {
           const price = item.activity ? formatPrice(item.activity) : null;
           const meta = [age, place, price].filter(Boolean).join(" · ");
           const imageUrl = item.coverImageUrl || item.activity?.coverImageUrl;
+          const hasConflict = conflictIds?.has(item.id) ?? false;
 
           return (
             <div key={item.id} className="relative flex gap-4">
@@ -55,6 +57,11 @@ export function ScenarioTimeline({ items }: ScenarioTimelineProps) {
                     </h3>
                     {meta ? (
                       <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">{meta}</p>
+                    ) : null}
+                    {hasConflict ? (
+                      <p className="mt-1.5 text-sm font-medium text-amber-600">
+                        ⚠ Время пересекается
+                      </p>
                     ) : null}
                   </div>
                   {imageUrl ? (
