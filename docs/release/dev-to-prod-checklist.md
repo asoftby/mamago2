@@ -20,9 +20,21 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        none — Task 6 COMPLETE; Task 7 not started
+Active task:        Task 7 (Day Scenario) — STATUS: AUDIT_COMPLETE, read-only
+                     audit done, implementation not started, awaiting owner
+                     scope decision (page-only vs. page+persistence). Task 6
+                     COMPLETE.
 Last updated:       2026-08-11
-Last updated by:    Claude Code — Task 6 (Article Actions) is CLOSED.
+Last updated by:    Claude Code — Task 7 (Day Scenario) audit-only pass:
+                     found the live modal-based implementation (correct 3+
+                     trigger, timeline, sort, responsive infra) plus a
+                     separate dead-code scenario chain under
+                     `src/features/me/` (stub generator always returns
+                     null, unreachable from any real route) that must not
+                     be confused with the live path. No application code
+                     changed, no deploy. Full findings in Task 7's own
+                     section below.
+Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
                      Share (via the existing ShareModal) across all 5
@@ -2141,15 +2153,83 @@ surfaces.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `AUDIT_COMPLETE`
+AUDIT:
+EXISTING — Live path is `src/features/my-plan/components/{DayScenarioModal,
+ScenarioTimeline, ScenarioActionBar, BuildScenarioButton}.tsx`, opened from
+`PlanMainContent.tsx`. Trigger `canOpenDayScenario = totalPlannedCount > 2`
+(`PlanMainContent.tsx:840-843`) counts only the selected date's `PlanItem`
+rows, matches the "3+ same-date activities" spec exactly. Timeline sorting
+(`sortPlanItemsForDay.ts`, timed-then-untimed, deterministic), timed/untimed
+rendering (no fabricated times, "Без времени" fallback), address/price
+formatting, and the desktop-Dialog/mobile-Sheet responsive infra
+(`MyPlanOverlay`/`ResponsiveOverlay`) are all real, correct, and reusable.
+Guests cannot reach this component tree (`MyPlanPanelContent` renders
+`GuestMyPlanPanel` instead when unauthenticated) — no leakage, but also no
+guest Scenario today.
+PARTIAL/BROKEN — `ScenarioActionBar`'s viewer/"Сохранить в мой план" path
+(`onApplyToMyPlan`) is dead: no caller passes it, both `DayScenarioModal`
+call sites default to `mode="owner"`. Share is ephemeral text via
+`navigator.share`/clipboard only, no URL, nothing persisted. A real
+conflict/placement algorithm exists (`src/features/me/lib/dayScheduler.ts`
+`findPlacement()`) but is only wired through `useAddScenarioPlan`, whose only
+consumer is dead code (see DEAD/LEGACY) — not connected to the live modal.
+MISSING — standalone route/page (today modal-only, nested inside the My
+Plan overlay itself = dialog/sheet-in-dialog/sheet on both desktop and
+mobile); explicit create/draft/ready lifecycle (today always a fresh live
+view, nothing to "create"); persistence across reload/logout/date-nav
+(nothing written anywhere — confirmed no `Scenario` Prisma model exists,
+only unrelated `NotificationScenario` enum); "план изменился" detection
+(moot only because nothing is saved yet); pauses; conflict warnings on the
+live path; manual reorder/time/duration adjustment (`PlanItem` has no
+`duration` column at all); editing UI; analytics (zero `trackUserEvent`
+calls anywhere in the Scenario components); tests (zero test files
+reference any Scenario component or the trigger logic); guest Scenario
+(structurally absent, needs an explicit owner decision if in scope).
+DEAD/LEGACY — `src/features/me/lib/dayScenario.ts`'s `buildDayScenario()` is
+a stub that always `return null`s; its only consumer
+`DayScenarioBlock.tsx` can therefore never render a populated scenario.
+`ScenarioFinalPage.tsx` has zero importers anywhere. `PlanCard.tsx` (the
+only importer of `DayScenarioBlock`) is wired solely into the internal
+`ui-lab` component showcase registry — that registry's own `usedIn`
+metadata falsely claims usage in `/me/page.tsx` and `/me/day/[date]/page.tsx`
+(neither actually imports it — stale metadata, backlog candidate).
+`GuestMyPlanPanel`'s `scenarioSlots`/morning-afternoon-evening picker is an
+unrelated feature that only shares the word "scenario" — not a guest
+version of Day Scenario, do not merge. `POST /api/plan/generate`'s response
+key literally named `scenario` is likewise just a naming collision (it's
+the suggestions array), not a persisted Scenario resource.
+GAPS: see MISSING above. Core gap vs. target: a real standalone page,
+explicit create/persist lifecycle, and wiring the already-existing
+`dayScheduler` conflict algorithm into the live path. No Scenario
+read/write API exists today, so ownership/authorization is currently moot.
+No Google Routes/Distance Matrix/Maps SDK calls exist anywhere in the My
+Plan or `me/` scenario code — the owner's cost boundary is already
+respected by construction (nothing calls those APIs).
+IMPLEMENTATION: not started — owner must choose between (1) page-only,
+still-ephemeral promotion of the existing modal content to a standalone
+route (satisfies the literal Exit Criteria only), or (2) page + minimal
+persistence (new small `DayScenario`-shaped model, status draft/ready,
+reusing `dayScheduler`'s conflict algorithm) per the owner's fuller
+product-direction brief. See full audit report in this session's transcript
+for the detailed option comparison, UX gap matrix, and files-likely-to-
+change list — not duplicated here per template compactness.
+COMMITS: audit-only, this docs commit.
+VERIFICATION: full audit performed by direct code read + a scoped Explore
+sub-agent, cross-verified against the live repo (`PlanMainContent.tsx`
+trigger block, `prisma/schema.prisma` `PlanItem` model, `PlanCard`
+importers) — not from memory/history.
+DEV SMOKE: not applicable — audit only, no code changed, no deploy.
+BLOCKERS: none for continuing the audit; implementation is blocked on an
+explicit owner scope decision (Option 1 vs Option 2 above).
+BACKLOG/NOTES: candidates recorded for later — stale `PlanCard` `usedIn`
+metadata in `src/components/ui-lab/registry.ts`; decide fate of the dead
+`src/features/me/` scenario chain (finish or delete, do not leave a
+permanently-null stub behind a real-looking component); reuse
+`useAddScenarioPlan`/`dayScheduler.findPlacement` if Option 2 is chosen
+rather than writing a new conflict algorithm. Not yet added to
+`docs/engineering/backlog.md` as formal BACKLOG-XXX entries — pending owner
+scope decision so they're filed against the right implementation shape.
 
 Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
 Scenario / My Plan / timeline implementation: existing modal flow,
