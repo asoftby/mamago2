@@ -46,8 +46,13 @@ Last updated by:    Claude Code — Task 6 (Article Actions) is CLOSED.
                      when present, tail artifacts removed) — 3 corrective
                      commits (`e4a1b6bb`, `d8be9416`, `9decd216`), pushed to
                      `dev`, do not reopen Task 6 (see Task 6 BACKLOG/NOTES).
-                     Owner deploy + a targeted (not full) visual smoke of
-                     just those changes is the only remaining step.
+                     Owner deployed `dev-272` (built from `9decd216`,
+                     confirmed via SSH + image label). Targeted post-deploy
+                     visual verification on actual `https://dev.mamago.by`:
+                     green — Heart/category/no-tails/no-Share/interaction/
+                     mobile all confirmed on live DEV, no P0/P1 introduced
+                     (full detail in Task 6's BACKLOG/NOTES). Nothing left
+                     pending for Task 6.
 Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      found a real,
                      already-shared UserEvent-derived ranking engine
@@ -2090,6 +2095,38 @@ BACKLOG/NOTES: Filed BACKLOG-050 (Place/Offer guest pending-action resume
       (standard, Breaking News, continuous reading): unchanged canonical
       `♡ Сохранить` + `↗ Поделиться`. Product rule stays: cards → Save/
       Heart only; detail/full content → Save + Share.
+
+      Post-deploy targeted visual verification (2026-08-11, actual
+      `https://dev.mamago.by`, deployed image `ghcr.io/asoftby/mamago2:dev-272`
+      — confirmed via SSH `docker ps` on the DEV host and the Docker Build &
+      Push run's `org.opencontainers.image.revision` label, both pinned to
+      `9decd2165d0f4d107a8ce7634579d8b59f489601`): **green.** This is a
+      scoped visual check of the post-smoke UI refinements only, not a
+      repeat of the full Task 6 smoke. Real DEV content for Minsk currently
+      has exactly 1 published Article, so the "5 cards" case could not be
+      observed with live content — verified instead that the deployed
+      card's class list carries the `lg:w-[calc((100%-6rem)/5)]` 5-column
+      formula (computed width 208px at 1440px, matching local verification
+      exactly) and would render 5 across once more Articles publish.
+      Directly observed on the single live card: Heart present, no Share,
+      11px inset from the cover's top/right edges (desktop and mobile,
+      375px), real category "Обзоры" rendering between cover and title, no
+      vertical-line/tail artifacts, no horizontal overflow on mobile.
+      Interaction: clicked Heart → Save chooser opened scoped to the
+      correct Article, URL stayed on `/minsk` (no navigation); closed the
+      chooser; clicked the card body → navigated to the correct Article
+      detail page, which still renders `Сохранить`/`Поделиться` unchanged.
+      `/blog` quick regression: same single Article's Featured card shows
+      Heart, no Share, no arrow — consistent with commit `e4a1b6bb`.
+      Console/network: no Article-card-related errors or 500s; the only
+      console errors present (repeated `401` on `GET /api/save/status?
+      activityId=...` for the guest session, one `400` on a Next.js image
+      optimization request for an unrelated Event cover) are pre-existing,
+      unrelated to Article cards, and not new — confirmed the new
+      `POST /api/save/status/articles` batch endpoint made zero calls for
+      this guest session (correct: no unnecessary calls for guests). No
+      P0/P1 introduced by this deploy. Task 6 stays `COMPLETE` — this
+      verification does not reopen it.
 
 AUDIT FIRST existing Share / My Ideas / My Plan / CTA / saved-state
 functionality. Ensure: Share, Save to "My Ideas", Add to "My Plan" wherever
