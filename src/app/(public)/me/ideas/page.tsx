@@ -1,27 +1,9 @@
 import { redirect } from "next/navigation";
-import { Playfair_Display, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { Container } from "@/components/ui/Container";
 import { IdeasClient } from "./IdeasClient";
 import type { IdeaItem } from "./types";
-
-const ideasSerif = Playfair_Display({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500"],
-  style: ["normal", "italic"],
-  variable: "--font-ideas-serif",
-});
-const ideasSans = Hanken_Grotesk({
-  subsets: ["latin", "cyrillic-ext"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-ideas-sans",
-});
-const ideasMono = JetBrains_Mono({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500"],
-  variable: "--font-ideas-mono",
-});
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { listOfferIdeas } from "@/server/services/idea.service";
@@ -473,8 +455,8 @@ export default async function IdeasPage() {
 
   return (
     <div
-      className={`relative min-h-screen bg-white ${ideasSerif.variable} ${ideasSans.variable} ${ideasMono.variable}`}
-      style={{ fontFamily: "var(--font-ideas-sans)" }}
+      className="relative min-h-screen bg-white"
+      style={{ fontFamily: "var(--font-sans)" }}
     >
       <div
         aria-hidden

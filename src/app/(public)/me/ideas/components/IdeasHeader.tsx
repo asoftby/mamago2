@@ -38,7 +38,7 @@ export function IdeasHeader({ totalCount, plannedCount, unplannedCount }: IdeasH
         <div className="max-w-2xl space-y-3">
           <h1
             className="text-[44px] leading-[0.94] tracking-[-0.03em] sm:text-[64px]"
-            style={{ fontFamily: "var(--font-ideas-serif)", fontWeight: 400, color: C.ink }}
+            style={{ fontFamily: "var(--font-display)", fontWeight: 400, color: C.ink }}
           >
             Мои{" "}
             <span style={{ fontStyle: "italic", color: C.accentDeep }}>идеи.</span>
@@ -61,7 +61,7 @@ export function IdeasHeader({ totalCount, plannedCount, unplannedCount }: IdeasH
           </span>
           <span
             className="text-[30px] leading-none tracking-[-0.02em]"
-            style={{ fontFamily: "var(--font-ideas-serif)", fontWeight: 400, color: C.ink }}
+            style={{ fontFamily: "var(--font-display)", fontWeight: 400, color: C.ink }}
           >
             {formatIdeasCount(totalCount)}
           </span>

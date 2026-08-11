@@ -107,7 +107,7 @@ export function IdeaPosterCard({
                 )}
                 <div
                   className="text-[18px] leading-[1.1]"
-                  style={{ fontFamily: "var(--font-ideas-serif)", color: "rgba(20,18,16,.75)" }}
+                  style={{ fontFamily: "var(--font-display)", color: "rgba(20,18,16,.75)" }}
                 >
                   {activity.title}
                 </div>
@@ -147,7 +147,7 @@ export function IdeaPosterCard({
             )}
             <h3
               className="line-clamp-2 text-[20px] leading-[1.1] tracking-[-0.015em]"
-              style={{ fontFamily: "var(--font-ideas-serif)", color: C.ink }}
+              style={{ fontFamily: "var(--font-display)", color: C.ink }}
             >
               {activity.title}
             </h3>

@@ -53,7 +53,7 @@ export function IdeasEmptyState({
         <div className="space-y-2">
           <h2
             className="text-[30px] leading-none tracking-[-0.02em] sm:text-[34px]"
-            style={{ fontFamily: "var(--font-ideas-serif)", fontWeight: 400 }}
+            style={{ fontFamily: "var(--font-display)", fontWeight: 400 }}
           >
             <span style={{ color: C.ink }}>{firstWord}</span>{" "}
             <span style={{ fontStyle: "italic", color: C.accentDeep }}>
