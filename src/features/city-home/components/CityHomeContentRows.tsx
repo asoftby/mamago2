@@ -326,6 +326,11 @@ export function CityHomeJournalSection({
                   />
                 )}
               </div>
+              {a.category && (
+                <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+                  {a.category.name}
+                </p>
+              )}
               <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
                 {a.title}
               </p>
@@ -334,17 +339,22 @@ export function CityHomeJournalSection({
               </p>
             </Link>
           </AnalyticsCardViewTracker>
-            <div className="absolute right-3 top-3 z-10">
-              <ArticleSaveHeart
-                articleId={a.id}
-                articleTitle={a.title}
-                coverImageUrl={a.coverImageUrl}
-                initialStatus={saveStatuses[a.id]}
-                skipOwnFetch
-                source="city-home-journal-card"
-                className="h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
-                iconClassName="h-4 w-4"
-              />
+            {/* Heart overlay — mirrors the Link's own padding + cover box so it anchors to the cover, not the outer card */}
+            <div className="pointer-events-none absolute inset-0 p-3">
+              <div className="relative w-full aspect-square">
+                <div className="pointer-events-auto absolute right-3 top-3 z-10">
+                  <ArticleSaveHeart
+                    articleId={a.id}
+                    articleTitle={a.title}
+                    coverImageUrl={a.coverImageUrl}
+                    initialStatus={saveStatuses[a.id]}
+                    skipOwnFetch
+                    source="city-home-journal-card"
+                    className="h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
+                    iconClassName="h-4 w-4"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         ))}
