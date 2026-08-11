@@ -6,9 +6,14 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
-import { ensureDayScenario, computePlanFingerprint } from "@/server/services/dayScenario.service";
+import {
+  ensureDayScenario,
+  getDayScenario,
+  computePlanFingerprint,
+} from "@/server/services/dayScenario.service";
 import { sortPlanItemsForDay } from "@/features/my-plan/lib/sortPlanItemsForDay";
 import { detectScenarioConflictIds } from "@/features/my-plan/lib/detectScenarioConflicts";
+import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
 import { ScenarioTimeline } from "@/features/my-plan/components/ScenarioTimeline";
 import { refreshDayScenarioAction } from "./actions";
 
@@ -17,7 +22,6 @@ export const metadata: Metadata = {
 };
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const MIN_ITEMS_FOR_SCENARIO = 3;
 
 interface PageProps {
   params: Promise<{ city: string; date: string }>;
@@ -56,9 +60,14 @@ export default async function DayScenarioPage({ params }: PageProps) {
   const items = await listPlanItemsByDate(user.id, date);
   const sortedItems = sortPlanItemsForDay(items);
 
-  const existingScenario = items.length >= MIN_ITEMS_FOR_SCENARIO
-    ? await ensureDayScenario(user.id, date, items)
-    : null;
+  // An already-created Scenario is always shown (never hidden just because
+  // My Plan later dropped below the 3-item threshold) — only the initial
+  // creation is gated on the threshold, so the CTA/URL can't silently
+  // materialize one below 3 items.
+  let existingScenario = await getDayScenario(user.id, date);
+  if (!existingScenario && canOpenDayScenario(items.length)) {
+    existingScenario = await ensureDayScenario(user.id, date, items);
+  }
 
   const formattedDate = formatDate(date);
 

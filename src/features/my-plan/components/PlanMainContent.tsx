@@ -30,6 +30,7 @@ import { PlanStickyCounter } from "./PlanStickyCounter";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
+import { canOpenDayScenario } from "../lib/canOpenDayScenario";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
@@ -835,10 +836,10 @@ export function PlanMainContent({
     return dayItems.length + pendingLocalAdds;
   }, [dayItems, addedSuggestionActivityIds]);
 
-  /** «Сценарий дня» — когда в дне больше двух событий (три и более). */
-  const canOpenDayScenario = useMemo(() => {
-    return totalPlannedCount > 2;
-  }, [totalPlannedCount]);
+  const canOpenScenario = useMemo(
+    () => canOpenDayScenario(totalPlannedCount),
+    [totalPlannedCount],
+  );
 
   const todayKey = todayIso ?? new Date().toISOString().split("T")[0];
   const slotLabel: Record<"morning" | "afternoon" | "evening", string> = {
@@ -1031,7 +1032,7 @@ export function PlanMainContent({
 
   const renderBottomActions = () => (
     <div className="space-y-3">
-      {canOpenDayScenario ? (
+      {canOpenScenario ? (
         <BuildScenarioButton
           onClick={() => router.push(`/${city}/my-plan/${selectedDate}/scenario`)}
         />
