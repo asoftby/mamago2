@@ -389,6 +389,7 @@ model PlanItem {
   place         Place?    @relation(fields: [placeId], references: [id])
   article       Article?  @relation(fields: [articleId], references: [id])
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenarioOverrides DayScenarioItemOverride[]
 
   @@index([userId, date])
   @@index([userId])
@@ -407,17 +408,37 @@ model PlanItem {
 /// дешёвую сигнатуру набора PlanItem на момент создания/обновления, чтобы
 /// обнаружить расхождение с текущим My Plan («План изменился»).
 model DayScenario {
-  id              String   @id @default(cuid())
+  id              String                     @id @default(cuid())
   userId          String
   date            String
-  status          String   @default("READY")
+  status          String                     @default("READY")
   planFingerprint String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  user            User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemOverrides   DayScenarioItemOverride[]
 
   @@unique([userId, date])
   @@index([userId])
+}
+
+/// Сценарий-специфичная организация одного PlanItem внутри Сценария дня —
+/// сейчас только назначенное вручную время для изначально «гибких»
+/// (без источника времени) пунктов. Не дублирует контент PlanItem/Activity;
+/// только ссылается на них.
+model DayScenarioItemOverride {
+  id                String      @id @default(cuid())
+  scenarioId        String
+  planItemId        String
+  startTimeOverride DateTime
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  scenario          DayScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  planItem          PlanItem    @relation(fields: [planItemId], references: [id], onDelete: Cascade)
+
+  @@unique([scenarioId, planItemId])
+  @@index([scenarioId])
+  @@index([planItemId])
 }
 
 /// Сохранённые маршруты в «Идеи» (отдельно от Idea с activityId)
