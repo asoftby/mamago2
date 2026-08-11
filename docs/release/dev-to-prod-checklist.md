@@ -21,18 +21,29 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 7 (Day Scenario) — STATUS:
-                     COMPLETE_PENDING_BROWSER_SMOKE. Functional foundation
-                     (commit `6d2d829b`) plus a full UX/functional
-                     completion phase this session: real-time-source
-                     recovery, flexible-item time assignment (new
-                     `DayScenarioItemOverride`), converged CTA across both
-                     My Plan surfaces (full page + overlay, a real
-                     inconsistency found and fixed), redesigned timeline
-                     (time as primary anchor, no price on cards, honest
-                     free-gap/end-of-day that never fabricates). Locally
-                     verified (build/tests/browser), pushed. Awaiting
-                     owner-controlled DEV deploy + real-DEV smoke to close.
-                     Task 6 COMPLETE.
+                     COMPLETE_PENDING_BROWSER_SMOKE (deliberately not
+                     flipped to COMPLETE — see below). Owner deployed
+                     `dev-274` (SHA `c10398f2`, confirmed exact match via
+                     `docker inspect`). Real-DEV smoke PARTIAL: deployed
+                     version, 2-item-no-CTA, Scenario empty states,
+                     standalone-route/no-nested-modal, real fixed-time
+                     preservation, security/cost boundaries, and full QA
+                     cleanup all confirmed green with real DEV content and
+                     a real disposable account. Flexible-time assignment,
+                     conflicts, populated timeline, and "План изменился" →
+                     override-preservation could NOT be independently
+                     re-verified on real DEV this session — real DEV's
+                     public catalog currently has only 3 distinct saveable
+                     entities (not enough to reach the 3-item threshold),
+                     and SSH to the DEV host was unavailable throughout
+                     this session (reachable at raw TCP, SSH handshake
+                     itself timed out on every attempt) to create isolated
+                     DB fixtures the way earlier sessions did. This is an
+                     environment/access constraint, not a code defect — the
+                     same functionality was already exhaustively verified
+                     against byte-identical code on local dev earlier this
+                     session. Recommend a short follow-up real-DEV pass
+                     once SSH access is confirmed restored. Task 6 COMPLETE.
 Last updated:       2026-08-11
 Last updated by:    Claude Code — Task 7 (Day Scenario) UX/functional
                      completion phase, on top of the already-accepted
@@ -2506,6 +2517,99 @@ item time assignment is DONE; arbitrary drag-and-drop reorder and manual
 duration editing remain OPEN/deferred, narrowed scope recorded. All other
 Task 7 backlog entries (BACKLOG-055, 057–061) unchanged, still correctly
 deferred, none implemented in this phase.
+
+REAL-DEV SMOKE (2026-08-11, Claude Code — PARTIAL, see BLOCKER below;
+STATUS stays `COMPLETE_PENDING_BROWSER_SMOKE`, deliberately not flipped to
+`COMPLETE`):
+DEPLOYED VERSION — confirmed exact match. `dev-app-1` running image
+`ghcr.io/asoftby/mamago2:dev-274`; `docker inspect` label
+`org.opencontainers.image.revision` = `c10398f2eb5ca009998f10806ef7ebb48df81ef9`
+— byte-exact match to the pushed SHA, `org.opencontainers.image.created`
+`2026-08-11T11:13:20.183Z`. `dev-db-1`/`dev-prisma-studio-1` also healthy.
+VERIFIED ON REAL DEV (real content, real disposable QA account
+`task7-realdev-smoke@example.invalid`, registered/used/fully deleted via
+the real self-service "Удалить аккаунт" flow afterward — no residue):
+— My Plan CTA, 2-item state: added 2 real distinct entities (article
+"«Гранд Бублик»…" + Place "Большой театр Беларуси") to 11 августа 2026 —
+`/me/plan?date=2026-08-11` correctly shows "2 события" with **no** Scenario
+CTA (confirmed via DOM text, the CTA string never renders — matches
+`resolveScenarioCtaState`'s `hidden` case).
+— Scenario page empty states: direct load of
+`/minsk/my-plan/2026-08-11/scenario` (2 real items) and
+`/minsk/my-plan/2026-09-12/scenario` (1 real fixed-time item, a real
+Event "С. Кибирова балет «Три поросенка»", session 12 сент. 2026 16:00 at
+Большой театр Беларуси) both correctly show "Пока недостаточно событий" —
+never silently creates a Scenario below the threshold, matches local
+behavior exactly.
+— Real fixed time preserved end-to-end: the real Event's session
+(16:00, 12 сентября) round-tripped correctly through save → `PlanItem.startsAt`
+→ `/me/plan` raw list display — no invented time, no drift.
+— Standalone route confirmed: both Scenario URLs load as plain pages;
+`document.querySelectorAll('[role="dialog"]').length === 0` on both,
+mobile 375×812 and desktop — no nested modal/sheet regression on real
+infra, matches the earlier local fix.
+— Security/cost: zero `googleapis`-pattern network requests on Scenario
+page load (cost boundary intact in production); zero Scenario-related 500s;
+on a **fresh tab** (isolating from unrelated accumulated console noise from
+registration/browsing), zero console errors on both Scenario URLs;
+ownership remains structurally uninjectable — the route/API carry no
+Scenario or override id at all, so there is nothing for a client to tamper
+with regardless of account.
+— Cleanup confirmed: all 3 QA `PlanItem` rows removed via the real "✕"
+remove action before account deletion; `/me/plan` confirmed back to
+"0 событий · на 0 дней"; no `DayScenario` row was ever created for either
+date (never reached the 3-item threshold) — real DEV left exactly as
+found.
+NOT INDEPENDENTLY OBSERVABLE ON REAL DEV THIS SESSION (see BLOCKER) —
+flexible-item time assignment ("Назначить время"/"Изменить время"
+persistence and reorder), the populated Scenario timeline itself (time as
+primary anchor, address/duration card layout, "Гибкое время"), deterministic
+conflict warnings, and the full "План изменился" → "Обновить сценарий" →
+override-preservation round trip. Free-gap/end-of-day: correctly
+`not observable with current DEV dataset` per the task's own instruction
+(no reliable duration source exists in the schema at all, confirmed during
+implementation) — this one is expected to stay unobservable regardless of
+dataset size, not a smoke gap.
+BLOCKER (environment/access, not a Task 7 code issue) — real DEV's public
+catalog currently has exactly 3 distinct saveable entities reachable via
+the UI (1 Event, 1 Article, 1 Place; `/minsk/programs`, `/minsk/routes`,
+`/moscow`, `/marina-gorka` all confirmed empty; `/api/search` returns no
+results) — not enough to reach the 3-item Scenario-creation threshold with
+real, distinct content on one date. The established fallback for exactly
+this situation (isolated DB-level QA fixtures via SSH — the same method
+used successfully for the local-dev verification earlier this session and
+for prior DEV media-import sessions, see `BACKLOG-018`) was attempted but
+SSH to the DEV host (`134.17.17.134:22`) was unavailable for the duration
+of this session — intermittently reachable at raw TCP (`nc` succeeded
+twice) but the SSH protocol handshake itself timed out on every attempt
+(6 attempts across ~10 minutes). HTTPS to the same host worked throughout
+(this real-DEV smoke itself proves the host is healthy) — this reads as a
+network-path/firewall issue specific to port 22 from this session's egress,
+not a DEV host outage. Creating new real public content (a real Event/Place)
+via the actual editor flow to work around this was considered and rejected
+as out of scope for a "read-only / safe verification" pass — that would
+mean publishing new content visible to real users, not a disposable fixture.
+NO NEW P0/P1 found. One pre-existing, unrelated issue noticed incidentally
+(not a Task 7 regression — the affected code was not touched by any Task 7
+commit): `PlanDayList.tsx`'s `unavailable` badge
+(`getPlanActivityPublicAvailability`) returns `"missing_activity"` — shown
+as "СНЯТО" — for **every** Place/Article-type `PlanItem` on the `/me/plan`
+list, because that function only ever receives `item.activity` (`null` for
+non-Activity types) and treats `null` as "removed". Observed on both real
+QA items (a live, published Article and a live, published Place). Filed as
+a new backlog candidate below; not investigated further per this task's
+own "do not investigate unrelated known issues" instruction.
+RECOMMENDATION: keep `COMPLETE_PENDING_BROWSER_SMOKE`. The UX-phase code
+itself was already exhaustively verified against byte-identical logic on
+local dev earlier this session (full test suite + extensive browser
+verification of exactly the checks listed as "not independently
+observable" above — flexible assignment, conflicts, plan-changed/override
+preservation, populated timeline, mobile). What's missing is proof against
+*real* DEV infrastructure specifically, blocked by an access/content
+constraint outside this session's control, not a code defect. Suggest a
+short follow-up pass once SSH access is confirmed restored (or once real
+DEV content grows past 3 distinct entities) to close the remaining items
+and flip to `COMPLETE`.
 
 Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
 Scenario / My Plan / timeline implementation: existing modal flow,

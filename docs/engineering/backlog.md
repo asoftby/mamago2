@@ -1665,3 +1665,35 @@ P3 — cleanup / polish / optional
   (manual time editing / conflict-aware placement) is ever picked up.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
   audit + implementation
+
+## [BACKLOG-062] `/me/plan` shows "СНЯТО" for every Place/Article PlanItem
+
+- Status: OPEN
+- Priority: P2
+- Area: My Plan
+- Added: 2026-08-11
+- Reason deferred: discovered incidentally during Task 7's real-DEV smoke;
+  the affected code (`PlanDayList.tsx`'s `unavailable` badge,
+  `getPlanActivityPublicAvailability`) was not touched by any Task 7
+  commit — not a Task 7 regression, out of scope to fix during that task
+  per its own "do not investigate unrelated known issues" instruction.
+- Context: `getPlanActivityPublicAvailability()`
+  (`src/lib/plan/publicVisibility.ts:6-17`) returns `"missing_activity"`
+  whenever its `activity` argument is `null` — correct for a genuinely
+  removed *Activity*-type PlanItem, but `PlanDayList.tsx`'s `PlanItemCard`
+  always calls it with `item.activity`, which is structurally `null` for
+  every Place-type and Article-type `PlanItem` (those reference
+  `placeId`/`articleId`, not `activityId`) regardless of whether the
+  underlying Place/Article is live and published. Reproduced live on real
+  DEV: a freshly-saved, live, published Article and a freshly-saved, live,
+  published Place both showed the "СНЯТО" (removed) badge on `/me/plan`.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: `PlanItemCard`'s availability check should only
+  apply (and only show "СНЯТО") for Activity-type items missing/disabled
+  for a real reason; Place/Article-type items need either their own
+  real availability check (mirroring `isPlacePubliclyVisible()`, which
+  already exists and is correct) or simply no "СНЯТО" badge when there is
+  no real Activity to check.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
+  real-DEV smoke, 2026-08-11
