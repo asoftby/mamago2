@@ -20,6 +20,8 @@ import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { ArticleSaveHeart } from "@/features/save/ArticleSaveHeart";
+import { useArticleSaveStatusBatch } from "@/features/save/useArticleSaveStatusBatch";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import {
   buildAudienceLabel,
@@ -29,6 +31,10 @@ import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
+/** Оболочка ширины карточки статьи — тот же ритм, что у ленты «Куда», но 5 карточек в ряду на desktop. */
+const ARTICLE_CARD_SHELL =
+  "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
+  "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -262,6 +268,7 @@ export function CityHomeJournalSection({
   const { appendCityQuery, citySlug } = useCity();
 
   const visibleArticles = articles.filter((a) => !a.isBreakingNews);
+  const saveStatuses = useArticleSaveStatusBatch(visibleArticles.map((a) => a.id));
 
   if (visibleArticles.length === 0) {
     return null;
@@ -286,54 +293,60 @@ export function CityHomeJournalSection({
             className="hidden lg:inline-flex"
           />
         }
-        className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory"
       >
         {visibleArticles.map((a, index) => (
+          <div key={a.slug} className={cn(ARTICLE_CARD_SHELL, "relative")}>
           <AnalyticsCardViewTracker
-            key={a.slug}
             entityType="ARTICLE"
             entityId={a.id}
             vertical="CITY"
             citySlug={citySlug}
             meta={{ section: "journal", position: index }}
           >
-          <Link
-            href={a.href}
-            className={cn(
-              cardShell,
-              index === 0
-                ? "w-full min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]"
-                : "w-[calc((100%-0.75rem)/2)] min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]",
-              "rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors group",
-            )}
-          >
-            <div
-              className={cn(
-                "w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
-                [
-                  "from-[#F2C8A7] to-[#E89460]",
-                  "from-[#CDE3D6] to-[#9CC1AC]",
-                  "from-[#F6D567] to-[#E8B935]",
-                  "from-[#E6DBC8] to-[#C9BCA0]",
-                ][index % 4],
-              )}
+            <Link
+              href={a.href}
+              className="block rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors group"
             >
-              {a.coverImageUrl && (
-                <img
-                  src={a.coverImageUrl}
-                  alt={a.title}
-                  className="w-full h-full object-cover"
-                />
-              )}
-            </div>
-            <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
-              {a.title}
-            </p>
-            <p className="mt-3 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-              {a.readTime} мин. чтения
-            </p>
-          </Link>
+              <div
+                className={cn(
+                  "w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
+                  [
+                    "from-[#F2C8A7] to-[#E89460]",
+                    "from-[#CDE3D6] to-[#9CC1AC]",
+                    "from-[#F6D567] to-[#E8B935]",
+                    "from-[#E6DBC8] to-[#C9BCA0]",
+                  ][index % 4],
+                )}
+              >
+                {a.coverImageUrl && (
+                  <img
+                    src={a.coverImageUrl}
+                    alt={a.title}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+              <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
+                {a.title}
+              </p>
+              <p className="mt-3 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
+                {a.readTime} мин. чтения
+              </p>
+            </Link>
           </AnalyticsCardViewTracker>
+            <div className="absolute right-3 top-3 z-10">
+              <ArticleSaveHeart
+                articleId={a.id}
+                articleTitle={a.title}
+                coverImageUrl={a.coverImageUrl}
+                initialStatus={saveStatuses[a.id]}
+                skipOwnFetch
+                source="city-home-journal-card"
+                className="h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
+                iconClassName="h-4 w-4"
+              />
+            </div>
+          </div>
         ))}
       </HorizontalCardRow>
     </CityHomeSection>
