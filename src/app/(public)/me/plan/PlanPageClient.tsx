@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
@@ -48,6 +49,8 @@ type Props = {
   ideaActivityIds: string[];
   childrenAges: number[];
   initialIdeas?: SerializedIdea[];
+  /** date -> Scenario status; absent entries mean no Scenario exists yet. */
+  scenarioStatusByDate?: Record<string, "ready" | "changed">;
   activeReminder?: {
     id: string;
     title: string;
@@ -220,9 +223,20 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
   );
 }
 
-export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [] }: Props) {
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function PlanPageClient({
+  initialItems,
+  ideaActivityIds,
+  initialIdeas = [],
+  scenarioStatusByDate = {},
+}: Props) {
   const todayISO = getTodayISO();
-  const [selectedDate, setSelectedDate] = useState(todayISO);
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get("date");
+  const [selectedDate, setSelectedDate] = useState(
+    dateParam && DATE_PATTERN.test(dateParam) ? dateParam : todayISO,
+  );
   const [items, setItems] = useState(initialItems);
 
   const itemsByDate = useMemo(() => {
@@ -370,6 +384,7 @@ export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [
             date={selectedDate}
             items={dayItems}
             onRemove={handleRemoveItem}
+            scenarioStatus={scenarioStatusByDate[selectedDate]}
           />
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
         </div>

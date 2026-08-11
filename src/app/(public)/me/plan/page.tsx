@@ -6,6 +6,7 @@ import { PlanGuestFlow } from "./PlanGuestFlow";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { formatPlanActivityPriceLabel } from "@/lib/plan/formatPlanActivityPriceLabel";
 import { getLatestActivePlanReminderNotification } from "@/server/services/notification.service";
+import { computePlanFingerprint } from "@/server/services/dayScenario.service";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -49,6 +50,27 @@ export default async function PlanPage() {
 
   const activeReminder = await getLatestActivePlanReminderNotification(user.id);
 
+  // Scenario status per date, so the day header can show "Собрать
+  // сценарий дня" / "Открыть сценарий дня" / "...· План изменился" without
+  // Scenario owning any item-selection UI here (that stays in Scenario's
+  // own "План изменился" reconciliation).
+  const dayScenarios = await prisma.dayScenario.findMany({
+    where: { userId: user.id },
+    select: { date: true, planFingerprint: true },
+  });
+  const itemsByDateForFingerprint = new Map<string, { id: string; startsAt: Date | null }[]>();
+  for (const item of planItems) {
+    const list = itemsByDateForFingerprint.get(item.date) ?? [];
+    list.push({ id: item.id, startsAt: item.startsAt });
+    itemsByDateForFingerprint.set(item.date, list);
+  }
+  const scenarioStatusByDate: Record<string, "ready" | "changed"> = {};
+  for (const scenario of dayScenarios) {
+    const currentItems = itemsByDateForFingerprint.get(scenario.date) ?? [];
+    scenarioStatusByDate[scenario.date] =
+      computePlanFingerprint(currentItems) === scenario.planFingerprint ? "ready" : "changed";
+  }
+
   // Serialize plan items (dates need to be strings for client)
   const serializedItems = planItems.map((item) => ({
     id: item.id,
@@ -90,6 +112,7 @@ export default async function PlanPage() {
       ideaActivityIds={ideaActivityIds}
       initialIdeas={serializedIdeas}
       childrenAges={childrenAges}
+      scenarioStatusByDate={scenarioStatusByDate}
       activeReminder={
         activeReminder
           ? {

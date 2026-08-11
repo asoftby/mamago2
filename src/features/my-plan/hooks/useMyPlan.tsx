@@ -151,6 +151,10 @@ function useMyPlanStore() {
     Record<string, PlanItemWithActivity[]>
   >({});
   const [serverConfirmedPlanDates, setServerConfirmedPlanDates] = useState<string[]>([]);
+  /** Day Scenario status by date — undefined/absent = no Scenario yet. */
+  const [scenarioStatusByDateMap, setScenarioStatusByDateMap] = useState<
+    Record<string, "ready" | "changed">
+  >({});
   const [planSummary, setPlanSummary] = useState<PlanSummary | null>(null);
   const [planSummaryLoading, setPlanSummaryLoading] = useState(false);
   /** Актуальный снимок для проверки дублей в async-колбэках без устаревшего замыкания. */
@@ -442,13 +446,26 @@ function useMyPlanStore() {
         );
         if (!res.ok) return;
         if (gen !== planDayFetchGen.current) return;
-        const data = (await res.json()) as { items?: unknown[] };
+        const data = (await res.json()) as {
+          items?: unknown[];
+          scenarioStatus?: "ready" | "changed" | null;
+        };
         const raw = Array.isArray(data.items) ? data.items : [];
         const items = sortPlanItemsForDay(normalizePlanItemsFromApi(raw));
         setPlanItemsByDateMap((prev) => ({
           ...prev,
           [date]: items,
         }));
+        if (data.scenarioStatus) {
+          setScenarioStatusByDateMap((prev) => ({ ...prev, [date]: data.scenarioStatus! }));
+        } else {
+          setScenarioStatusByDateMap((prev) => {
+            if (!(date in prev)) return prev;
+            const next = { ...prev };
+            delete next[date];
+            return next;
+          });
+        }
         setServerConfirmedPlanDates((prev) =>
           prev.includes(date) ? prev : [...prev, date],
         );
@@ -809,6 +826,7 @@ function useMyPlanStore() {
     planItems: filteredItems,
     allPlanItems: planItems,
     planItemsByDate: planItemsByDateMap,
+    scenarioStatusByDate: scenarioStatusByDateMap,
     serverConfirmedPlanDates,
     todayItems: planItemsByDateMap[today] ?? [],
     weekDates,

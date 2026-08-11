@@ -30,7 +30,7 @@ import { PlanStickyCounter } from "./PlanStickyCounter";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
-import { canOpenDayScenario } from "../lib/canOpenDayScenario";
+import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpenDayScenario";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
@@ -61,6 +61,7 @@ interface PlanMainContentProps {
   selectedDate: string;
   onChangeDate?: (date: string) => void;
   planItemsByDate?: Record<string, PlanItemWithActivity[]>;
+  scenarioStatusByDate?: Record<string, "ready" | "changed">;
   nearestPlanDate?: string | null;
   nearestPlanCount?: number;
   nearestPlanItems?: PlanItemWithActivity[];
@@ -358,6 +359,7 @@ export function PlanMainContent({
   selectedDate,
   onChangeDate,
   planItemsByDate,
+  scenarioStatusByDate,
   nearestPlanDate = null,
   nearestPlanCount = 0,
   nearestPlanItems = [],
@@ -844,10 +846,11 @@ export function PlanMainContent({
     return dayItems.length + pendingLocalAdds;
   }, [dayItems, addedSuggestionActivityIds]);
 
-  const canOpenScenario = useMemo(
-    () => canOpenDayScenario(totalPlannedCount),
-    [totalPlannedCount],
+  const scenarioCtaState = useMemo(
+    () => resolveScenarioCtaState(totalPlannedCount, scenarioStatusByDate?.[selectedDate]),
+    [totalPlannedCount, scenarioStatusByDate, selectedDate],
   );
+  const scenarioCtaLabel = resolveScenarioCtaLabel(scenarioCtaState);
 
   const todayKey = todayIso ?? new Date().toISOString().split("T")[0];
   const slotLabel: Record<"morning" | "afternoon" | "evening", string> = {
@@ -1040,8 +1043,16 @@ export function PlanMainContent({
 
   const renderBottomActions = () => (
     <div className="space-y-3">
-      {canOpenScenario ? (
-        <BuildScenarioButton onClick={handleOpenScenarioPage} />
+      {scenarioCtaLabel ? (
+        <BuildScenarioButton
+          onClick={handleOpenScenarioPage}
+          label={scenarioCtaLabel}
+          hint={
+            scenarioCtaState === "create"
+              ? "Соберем из добавленных событий красивый маршрут дня"
+              : undefined
+          }
+        />
       ) : null}
     </div>
   );

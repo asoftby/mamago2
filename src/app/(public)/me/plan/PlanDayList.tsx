@@ -9,6 +9,7 @@ import type { SerializedPlanItem } from "./PlanPageClient";
 import { formatHHMM } from "@/lib/formatters/date";
 import { BYN_SYMBOL, formatPriceAmount, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon, renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
 
 const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const DAYS_RU_FULL: Record<number, string> = {
@@ -241,49 +242,89 @@ type Props = {
   date: string;
   items: SerializedPlanItem[];
   onRemove: (id: string) => void;
+  /** undefined = no Scenario yet for this date. */
+  scenarioStatus?: "ready" | "changed";
 };
 
-export function PlanDayList({ date, items, onRemove }: Props) {
+function ScenarioCta({
+  date,
+  itemCount,
+  scenarioStatus,
+}: {
+  date: string;
+  itemCount: number;
+  scenarioStatus?: "ready" | "changed";
+}) {
+  const state = resolveScenarioCtaState(itemCount, scenarioStatus);
+  const label = resolveScenarioCtaLabel(state);
+  if (!label) return null;
+
+  const href = `/minsk/my-plan/${date}/scenario`;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <Link
+        href={href}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 13,
+          fontWeight: 600,
+          color: scenarioStatus === "changed" ? "#B45309" : "#C24E22",
+          textDecoration: "none",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label} →
+      </Link>
+    </div>
+  );
+}
+
+export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
 
   return (
     <div>
       {/* Day header */}
-      <div
-        style={{
-          marginBottom: 20,
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 14,
-        }}
-      >
-        <h2
-          className="font-sans"
+      <div style={{ marginBottom: 20 }}>
+        <div
           style={{
-            margin: 0,
-            fontSize: "clamp(32px, 4vw, 52px)",
-            lineHeight: 1,
-            letterSpacing: "-.025em",
-            color: "#141210",
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 14,
           }}
         >
-          {weekday},{" "}
-          <span className="font-display-italic" style={{ color: "var(--primary)" }}>
-            {day} {month}
-          </span>
-        </h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {items.length > 0 && (
-            <span
-              className="font-mono uppercase"
-              style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
-            >
-              {items.length} {items.length === 1 ? "событие" : items.length <= 4 ? "события" : "событий"}
+          <h2
+            className="font-sans"
+            style={{
+              margin: 0,
+              fontSize: "clamp(32px, 4vw, 52px)",
+              lineHeight: 1,
+              letterSpacing: "-.025em",
+              color: "#141210",
+            }}
+          >
+            {weekday},{" "}
+            <span className="font-display-italic" style={{ color: "var(--primary)" }}>
+              {day} {month}
             </span>
-          )}
+          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {items.length > 0 && (
+              <span
+                className="font-mono uppercase"
+                style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
+              >
+                {items.length} {items.length === 1 ? "событие" : items.length <= 4 ? "события" : "событий"}
+              </span>
+            )}
+          </div>
         </div>
+        <ScenarioCta date={date} itemCount={items.length} scenarioStatus={scenarioStatus} />
       </div>
 
       {/* Items or empty state */}

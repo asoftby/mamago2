@@ -28,6 +28,7 @@ export function MyPlanPanelContent({
     selectedPlanDate,
     setSelectedPlanDate,
     planItemsByDate,
+    scenarioStatusByDate,
     planSummary,
     planCountsByDate,
     serverConfirmedPlanDates,
@@ -103,6 +104,7 @@ export function MyPlanPanelContent({
       selectedDate={selectedPlanDate}
       onChangeDate={setSelectedPlanDate}
       planItemsByDate={planItemsByDate}
+      scenarioStatusByDate={scenarioStatusByDate}
       nearestPlanDate={planSummary?.nearestDate ?? null}
       nearestPlanCount={planSummary?.nearestCount ?? 0}
       nearestPlanItems={planSummary?.nearestItems ?? []}
