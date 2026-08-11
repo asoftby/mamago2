@@ -21,29 +21,32 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 7 (Day Scenario) — STATUS:
-                     COMPLETE_PENDING_BROWSER_SMOKE (deliberately not
-                     flipped to COMPLETE — see below). Owner deployed
-                     `dev-274` (SHA `c10398f2`, confirmed exact match via
-                     `docker inspect`). Real-DEV smoke PARTIAL: deployed
-                     version, 2-item-no-CTA, Scenario empty states,
-                     standalone-route/no-nested-modal, real fixed-time
-                     preservation, security/cost boundaries, and full QA
-                     cleanup all confirmed green with real DEV content and
-                     a real disposable account. Flexible-time assignment,
-                     conflicts, populated timeline, and "План изменился" →
-                     override-preservation could NOT be independently
-                     re-verified on real DEV this session — real DEV's
-                     public catalog currently has only 3 distinct saveable
-                     entities (not enough to reach the 3-item threshold),
-                     and SSH to the DEV host was unavailable throughout
-                     this session (reachable at raw TCP, SSH handshake
-                     itself timed out on every attempt) to create isolated
-                     DB fixtures the way earlier sessions did. This is an
-                     environment/access constraint, not a code defect — the
-                     same functionality was already exhaustively verified
-                     against byte-identical code on local dev earlier this
-                     session. Recommend a short follow-up real-DEV pass
-                     once SSH access is confirmed restored. Task 6 COMPLETE.
+                     COMPLETE_PENDING_BROWSER_SMOKE (still not flipped to
+                     COMPLETE). SSH access to DEV was restored in a
+                     follow-up round: created isolated QA fixtures (one
+                     disposable real account + 4 DB-inserted PlanItems) and
+                     ran all 12 requested interactive checks against the
+                     still-running `dev-274`/`c10398f2` (no redeploy). 11 of
+                     12 GREEN: 3-item CTA, populated Scenario creation,
+                     fixed-time display, "Гибкое время" labeling,
+                     conflict detection, "План изменился", "Обновить
+                     сценарий" preserving overrides, no duplicate
+                     DayScenario, mobile 375px. 1 RED, a real bug: assigning
+                     a flexible item's time via "Назначить время" displayed
+                     back 3 hours off (the DEV container runs UTC with no
+                     TZ set; the write path parsed the "HH:MM" input using
+                     that ambient server timezone while every display uses
+                     the browser's). Root-caused and fixed
+                     (`localWallClockToUtc()` in
+                     `src/lib/date/localDateKey.ts`, explicit
+                     Europe/Minsk conversion, no ambient-timezone
+                     dependency — caught and corrected a same-class bug in
+                     the fix's own first draft via testing under forced
+                     TZ=UTC/America/New_York). Fix is committed + tested
+                     locally but NOT deployed this session (out of scope
+                     per instruction) — cannot be re-verified live until
+                     the next deploy. All QA fixtures (both rounds)
+                     confirmed fully removed from real DEV. Task 6 COMPLETE.
 Last updated:       2026-08-11
 Last updated by:    Claude Code — Task 7 (Day Scenario) UX/functional
                      completion phase, on top of the already-accepted
@@ -2610,6 +2613,93 @@ constraint outside this session's control, not a code defect. Suggest a
 short follow-up pass once SSH access is confirmed restored (or once real
 DEV content grows past 3 distinct entities) to close the remaining items
 and flip to `COMPLETE`.
+
+FINAL INTERACTIVE REAL-DEV SMOKE (2026-08-11, Claude Code — SSH access
+restored this round; STATUS stays `COMPLETE_PENDING_BROWSER_SMOKE`, still
+not flipped to `COMPLETE` — a real regression was found, see below).
+Confirmed `dev-app-1` still running `dev-274` / `c10398f2` (unchanged, no
+redeploy — `docker inspect` re-checked). Created isolated QA fixtures via
+direct DB access (one disposable real account,
+`task7-final-smoke@example.invalid`, registered through the real DEV UI;
+4 disposable `PlanItem` rows inserted directly via SQL for that user/date
+only) to exercise the populated 3+ Scenario flow the previous partial
+smoke couldn't reach. All 12 requested checks executed:
+1. 3 PlanItems -> `/me/plan?date=...` correctly shows "Собрать сценарий
+   дня" — GREEN.
+2. Clicking it creates and navigates to a populated standalone Scenario
+   ("3 события · 1 требует времени") — GREEN.
+3. Fixed-time item ("QA Fixed A") shows its stored time prominently — GREEN.
+4. Untimed item shows "Гибкое время" + "Назначить время" — GREEN.
+5. "Назначить время" -> picked 12:30 -> "Сохранить" — **RED, real bug
+   found** (detail below).
+6. Reload: the (incorrect) assigned value persisted correctly — the
+   persistence mechanism itself is GREEN; only the stored value's
+   timezone interpretation was wrong (see below).
+7. The assigned time correctly participated in chronological ordering
+   relative to its own (incorrect) stored value — GREEN as a sorting
+   mechanism; see below for why the displayed number was wrong.
+8. Added a 4th real PlanItem via SQL 15 minutes after a fixed item ->
+   both correctly flagged "⚠ Время пересекается" — GREEN.
+9. Same DB-added 4th item correctly triggered "План изменился" on
+   reopen — GREEN.
+10. "Обновить сценарий" cleared the banner; the flexible item's override
+    was correctly preserved (same value, not reset) — GREEN.
+11. Confirmed via direct DB read: exactly one `DayScenario` row for the
+    user/date throughout (`createdAt` != `updatedAt`, bumped once by the
+    refresh, never a second row) — GREEN.
+12. 375px mobile: timeline/markers/cards/conflict badges/override control
+    all readable, no overflow, matches desktop content — GREEN.
+Free-gap/end-of-day: still `not observable with current DEV dataset` (no
+reliable duration source exists in the schema at all — expected, not a
+gap in this smoke).
+REAL BUG FOUND AND FIXED (check 5) — assigning "12:30" via "Назначить
+время" displayed back as "15:30" (a reproducible +3h drift) after save.
+Root-caused precisely: `setScenarioItemTimeAction` built the override's
+`Date` via a bare `new Date(\`${date}T${time}:00\`)`, which — per the
+ECMAScript spec — parses a date-time string with no timezone suffix using
+the *executing process's own local timezone*. The DEV container runs with
+no `TZ` set (`Intl.DateTimeFormat().resolvedOptions().timeZone` = `"UTC"`,
+confirmed via `docker exec`), so the input was silently stored as if it
+were UTC, while every displayed time on the page (both this override and
+the real `PlanItem.startsAt` values) renders via the *client's browser*
+timezone — a different, unrelated value from the container's OS setting.
+This exact asymmetry never surfaced during local-dev testing because the
+local dev process's OS timezone happened to coincide closely enough with
+the testing browser's rendering to mask it. Fixed in
+`src/lib/date/localDateKey.ts` (`localWallClockToUtc()`, exported and
+consumed by `setScenarioItemTimeAction`): explicitly interprets the
+"HH:MM" input as `DEFAULT_TZ` (Europe/Minsk, matching the same convention
+every real Activity session time already uses) via a library-free
+guess-and-correct `Intl.DateTimeFormat`/`Date.UTC` technique — never an
+ambient `new Date(string)` re-parse. Caught a subtle self-inflicted repeat
+of the same bug class while implementing this: a first version of the fix
+used `new Date(instant.toLocaleString(...))` to read back the zoned wall
+clock, which *itself* re-introduced an ambient-timezone dependency (only
+"worked" by coincidence because the local dev machine's own OS timezone
+happens to equal Europe/Minsk) — caught by explicitly re-running the new
+unit tests under `TZ=UTC` and `TZ=America/New_York`, both of which exposed
+the flaw immediately. The shipped fix passes under both of those plus the
+default environment. New tests: `src/lib/date/localDateKey.test.ts`
+(`localWallClockToUtc`: exact UTC instant for a known Europe/Minsk
+wall-clock time, a midnight-crossing case, and a `getLocalDateKey`
+round-trip), now included in `pnpm test:day-scenario`.
+NOT YET RE-VERIFIED LIVE — this fix is committed to `dev` but the running
+`dev-274` container does not include it (no redeploy performed this
+session, per this task's explicit instruction). Checks 5-7 above are
+therefore GREEN for "the save/persist/reorder/conflict-participation
+*mechanism*" but the exact displayed time value was proven wrong on the
+currently-deployed build. All QA fixtures (4 `PlanItem` rows, the
+`DayScenario` row, the `DayScenarioItemOverride` row, both this round's
+and the previous round's disposable accounts) confirmed fully removed via
+direct DB read (`select count(*) from "User" where email like
+'task7-%'` = `0`) — real DEV left exactly as found, no residue.
+RECOMMENDATION: still keep `COMPLETE_PENDING_BROWSER_SMOKE`. 11 of 12
+requested checks are fully green against the currently-deployed build;
+the one that failed has a proven, tested, committed fix, but per this
+round's own instructions no redeploy was performed to verify it live.
+Suggest the owner deploy the next build (which will include this fix)
+and a short, narrow follow-up smoke — just re-run check 5 (assign a time,
+confirm it displays back unchanged) — to finally close Task 7.
 
 Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
 Scenario / My Plan / timeline implementation: existing modal flow,
