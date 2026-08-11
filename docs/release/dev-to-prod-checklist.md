@@ -21,34 +21,56 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 7 (Day Scenario) — STATUS:
-                     COMPLETE_PENDING_BROWSER_SMOKE. Owner approved minimal
-                     Option 2 (page + minimal persistence). Implemented,
-                     locally verified (build/tests/browser), pushed. Awaiting
+                     COMPLETE_PENDING_BROWSER_SMOKE. Functional foundation
+                     (commit `6d2d829b`) plus a full UX/functional
+                     completion phase this session: real-time-source
+                     recovery, flexible-item time assignment (new
+                     `DayScenarioItemOverride`), converged CTA across both
+                     My Plan surfaces (full page + overlay, a real
+                     inconsistency found and fixed), redesigned timeline
+                     (time as primary anchor, no price on cards, honest
+                     free-gap/end-of-day that never fabricates). Locally
+                     verified (build/tests/browser), pushed. Awaiting
                      owner-controlled DEV deploy + real-DEV smoke to close.
                      Task 6 COMPLETE.
 Last updated:       2026-08-11
-Last updated by:    Claude Code — Task 7 (Day Scenario) implemented per
-                     owner-approved MVP: new minimal `DayScenario` model
-                     (hand-written migration, user+date scoped, no city in
-                     identity, no item-level duplication — My Plan stays
-                     source of truth), standalone page at
-                     `/{city}/my-plan/{date}/scenario` replacing the old
-                     nested modal (`DayScenarioModal`/`ScenarioActionBar`
-                     deleted), plan-changed detection via a cheap
-                     fingerprint + explicit "Обновить сценарий" action, a
-                     new small deterministic conflict-warning function (not
-                     a reuse of the incompatible `dayScheduler.findPlacement()`,
-                     which solves a different problem — re-audited first),
-                     full reuse of `ScenarioTimeline`/`sortPlanItemsForDay`/
-                     address+price formatting unchanged. Browser
-                     verification caught and fixed a real nested-modal
-                     regression (My Plan overlay staying open on top of the
-                     new page due to a Radix close-animation race with
-                     client-side navigation) by reusing the same
-                     route-based hard-unmount mechanism the codebase
-                     already relies on for `/me/plan`. `tsc`/`eslint`/
-                     `pnpm test:day-scenario`/`pnpm check:push` all green.
-                     Not yet deployed to actual DEV — that step is
+Last updated by:    Claude Code — Task 7 (Day Scenario) UX/functional
+                     completion phase, on top of the already-accepted
+                     backend foundation (schema, persistence, fingerprint,
+                     conflict detection, ownership isolation, no Google
+                     Routes — all preserved unchanged). This phase: (1)
+                     traced "Без времени" to a real data-projection gap —
+                     `PlanItem.startsAt` genuinely null for some add-flows
+                     even when the Activity has one unambiguous
+                     `ActivitySession` — and fixed it by recovering that
+                     time only when truly unambiguous (0 or 2+ same-date
+                     sessions still correctly fall through, never guessed);
+                     (2) added Scenario-specific flexible-time assignment
+                     (new `DayScenarioItemOverride` model, hand-written
+                     migration, structural ownership checks, no client-
+                     trusted ids) that participates in sorting and conflict
+                     detection and survives "План изменился" reconciliation
+                     (kept for retained items, FK-cascade-dropped for
+                     removed ones); (3) found and fixed a real product
+                     inconsistency — the My Plan overlay panel always said
+                     "Собрать сценарий дня" even when a Scenario already
+                     existed, unlike the full page — by threading Scenario
+                     status through the *existing* per-date
+                     `/api/save/plan/day` fetch (no new round trip, no
+                     polling); (4) redesigned the timeline (time as primary
+                     visual anchor, "Гибкое время" instead of "Без
+                     времени", removed price from Scenario cards entirely —
+                     the new Scenario-only query doesn't even select price
+                     fields anymore, closing that bug class by construction
+                     rather than hiding it in the UI). Free-gap/end-of-day
+                     summary are fully implemented but honestly never
+                     fabricate — no reliable duration field exists anywhere
+                     in the schema today, confirmed by full-schema grep.
+                     `tsc`/`eslint`/`pnpm test:day-scenario`/`pnpm
+                     check:push` all green; extensive browser verification
+                     including override persistence-across-reload and the
+                     full plan-changed→refresh→override-preservation round
+                     trip. Not yet deployed to actual DEV — that step is
                      owner-controlled. Full detail in Task 7's own section
                      below.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
@@ -2352,6 +2374,138 @@ excluded per cost boundary), BACKLOG-061 (dead `src/features/me/` Day
 Scenario chain — finish-or-delete decision, left fully untouched by this
 task as instructed). All recorded in `docs/engineering/backlog.md`, none
 implemented.
+
+UX / FUNCTIONAL COMPLETION PHASE (2026-08-11, Claude Code — supersedes
+nothing above; the accepted foundation through commit `6d2d829b` — schema,
+persistence, one-Scenario-per-user/date, fingerprint, "План изменился",
+refresh, conflict detection, ownership isolation, no Google Routes — was
+preserved unchanged. This phase makes the Scenario genuinely useful and
+converges every My Plan entry point on it):
+AUDIT (narrow, before touching code) — confirmed via direct code read:
+`PlanItem.startsAt` is populated at add-time from a client-resolved
+`ActivitySession` (`/api/save/plan/route.ts:124-145`) — genuinely
+authoritative when set, but null whenever the add-flow (e.g. quick-add
+suggestions) didn't resolve a session, even though the `Activity` itself
+may have exactly one real scheduled `ActivitySession`. This is the real
+"Без времени" data bug the owner flagged, not a display bug — confirmed by
+reading the schema (`ActivitySession{id,activityId,startsAt}`, no `endsAt`)
+and the add-flow. No reliable duration field exists anywhere in the schema
+(`ActivitySession` has no `endsAt`, `Activity` has no duration column) —
+confirmed via full-schema grep; free-gap/end-of-day display were built to
+use one but architected to never fabricate when absent (i.e., they will
+not visibly activate until a real duration source exists — this is
+correct, not a bug). `formatActivityAddressLine()` never touched price
+fields — the "long price string where address should be" issue traced to
+the old `ScenarioTimeline`'s separate `formatPrice()` meta line (now
+removed from Scenario cards entirely, not just hidden).
+IMPLEMENTATION:
+(1) Data correctness — `listPlanItemsByDateForScenario()`
+(`dayScenario.service.ts`) extends the per-date query with `scheduleMode` +
+same-date `ActivitySession`s (generous DB window, exact match via
+`getLocalDateKey`, never a cross-day guess); `resolveScenarioItemTime()`
+(`scenarioProjection.ts`) recovers an authoritative time only when exactly
+one session matches the exact planned date — genuinely ambiguous cases
+(0 or 2+ same-date sessions) correctly fall through to flexible/override,
+never guessed.
+(2) Flexible-time assignment — new `DayScenarioItemOverride` model
+(`id, scenarioId, planItemId, startTimeOverride`, `@@unique([scenarioId,
+planItemId])`, cascade-deletes with either parent), hand-written migration
+`prisma/migrations/20260811150000_add_day_scenario_item_override/
+migration.sql`. No `DayScenarioItem`, no content duplication — only an
+FK + a time. Service functions `setScenarioItemOverride`/
+`listScenarioItemOverrides`/`pruneScenarioItemOverrides`; ownership is
+structural (Scenario looked up by `(userId,date)`, PlanItem must match the
+same `userId`+`date` — never a client-supplied id trusted). New
+`setScenarioItemTimeAction` Server Action + `AssignScenarioTimeControl.tsx`
+(native `<input type="time">`, inline expand/collapse, no nested dialog).
+Fixed/recovered source time always wins over an override by construction
+(`resolveScenarioItemTime` checks source before override).
+(3) Converged CTA everywhere — extracted `resolveScenarioCtaState`/
+`resolveScenarioCtaLabel` (`canOpenDayScenario.ts`) as the one shared rule
+for "Собрать сценарий дня" / "Открыть сценарий дня" / "Сценарий дня · План
+изменился". Wired into **both** required entry points: the full `/me/plan`
+page (`PlanDayList.tsx`'s new `ScenarioCta`, server-computed
+`scenarioStatusByDate` in `me/plan/page.tsx` via one bounded
+`dayScenario.findMany` + reused-fingerprint comparison — no extra
+per-render cost) and the My Plan overlay panel (`PlanMainContent.tsx`),
+which previously always showed "Собрать сценарий дня" even when a Scenario
+already existed — a real inconsistency found and fixed during this phase.
+The overlay's status is threaded through the **existing** per-date
+`/api/save/plan/day` fetch (`scenarioStatus` field added to that response,
+consumed by `useMyPlan.tsx`) — reuses an already-happening request, adds no
+new round trip, no polling. `/me/plan?date=` now seeds the initially
+selected date (small, backward-compatible addition — falls back to today),
+making "Изменить план" from the Scenario page land on the correct date.
+(4) Timeline redesign — time is now the primary visual anchor (large,
+outside the card, next to the marker/line), not buried in card metadata.
+Flexible items show "Гибкое время" (not "Без времени") + "+ Назначить
+время". Cards dropped price entirely (title → address → duration → small
+cover only, per the owner's card-priority spec) — `listPlanItemsByDateForScenario`'s
+select doesn't even fetch price fields anymore, so the bug class is closed
+by construction, not just hidden in the UI. Conflict warning kept
+adjacent to the affected item; overlap-amount-in-minutes deliberately
+**not** shown (would require the same non-real assumed-60-min heuristic
+used only for detection — showing it as a precise number would itself be
+fabricated data, so it's omitted rather than faked). Free-gap blocks and
+"День завершится около HH:MM" are fully implemented
+(`deriveFreeGapMinutes`/`deriveEndOfDay`) but — correctly, per "never
+fabricate" — will not render until a real duration source exists.
+(5) "Изменить план" — added to the Scenario page header, links to
+`/me/plan` (now date-aware via the `?date=` support above). Scenario still
+owns no item-selection UI.
+MIGRATION: hand-written, `DayScenarioItemOverride` only (see above); no
+`prisma migrate dev`/`db push`; applied to local dev DB; Prisma client
+regenerated.
+COMMITS: implementation landed in this session's working tree; see final
+pushed SHA below (single consolidated push per owner instruction — targeted
+checks were run throughout, not after every micro-change).
+TESTS: `pnpm test:day-scenario` (bundled script) extended with
+`scenarioProjection.test.ts` (time resolution priority incl. fixed-wins-
+over-override and ambiguous-sessions-never-guessed, duration always null,
+sort with mixed fixed/override/flexible, free-gap arithmetic incl. overlap
+→ null not negative, end-of-day incl. unknown-duration → null),
+`formatActivityAddress.test.ts` (address resolution correctness, confirms
+no fabricated fallback), extended `canOpenDayScenario.test.ts` (CTA state/
+label matrix incl. "existing Scenario stays reachable below threshold"),
+extended `dayScenario.service.test.ts` (override idempotent upsert,
+cross-user override rejection, foreign/wrong-date PlanItem rejection,
+prune-on-refresh, same-date session recovery incl. the 2-sessions-never-
+guessed case) — all green. `npx tsc --noEmit` clean throughout. `npx
+eslint` clean on every changed file (0 new warnings — verified via
+`git stash` diff against pre-change baseline for the two largest/pre-
+existing-warning files). `pnpm check:push` (`pnpm build`) exits 0.
+DEV SMOKE (local dev server, Browser pane, fresh QA fixtures — one real
+`ActivitySession`-backed Activity with `PlanItem.startsAt` deliberately
+null, one fixed item, one genuinely flexible item, two overlapping fixed
+items, cleaned up after): recovered time renders correctly (session at
+08:00 UTC → correctly shown as 11:00 local); flexible item shows "Гибкое
+время" + "Назначить время"; assigning 15:45 re-sorted the timeline
+immediately into chronological position, changed the meta line from
+"N событий · 1 требует времени" to a full "HH:MM–HH:MM" span (all items
+now effectively timed), and **persisted across a full page reload**;
+conflict warnings correct on both overlapping items and unaffected
+elsewhere. Full "план изменился" round-trip re-verified with the new
+override machinery in place: added a 6th item via DB → banner appeared on
+both the Scenario page and the My Plan full-page CTA ("Сценарий дня · План
+изменился") → clicked "Обновить сценарий" → banner cleared, override for
+the still-present flexible item **preserved**; removed the overridden item
+from My Plan → its `DayScenarioItemOverride` row was confirmed gone via
+direct DB read (FK cascade, not application code) → Scenario page correctly
+showed "План изменился" again with the item absent from the timeline.
+Empty-state (0 items) and the overlay CTA → standalone-page navigation
+(desktop, confirmed 0 `[role="dialog"]` elements after navigating, mobile
+375×812) were re-verified clean — no regression from the earlier session's
+nested-modal fix. Mobile 375×812: timeline/time/markers/cards/conflict
+warnings all readable, no overflow, "Обновить сценарий" flow works
+identically. No relevant console/network errors on any of the above (only
+expected dev-only HMR websocket noise from local preview-tool restarts).
+BLOCKERS: none for local completion. Real `dev.mamago.by` smoke remains
+owner-controlled, not performed by this session.
+BACKLOG/NOTES: BACKLOG-056 updated in place (not duplicated) — flexible-
+item time assignment is DONE; arbitrary drag-and-drop reorder and manual
+duration editing remain OPEN/deferred, narrowed scope recorded. All other
+Task 7 backlog entries (BACKLOG-055, 057–061) unchanged, still correctly
+deferred, none implemented in this phase.
 
 Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
 Scenario / My Plan / timeline implementation: existing modal flow,

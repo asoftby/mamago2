@@ -1516,25 +1516,42 @@ P3 — cleanup / polish / optional
 - Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
   implementation, owner-approved MVP scope
 
-## [BACKLOG-056] Day Scenario: manual reorder / time / duration editing
+## [BACKLOG-056] Day Scenario: arbitrary reorder / manual duration editing
 
-- Status: OPEN
+- Status: OPEN (narrowed 2026-08-11 — flexible-item time assignment shipped)
 - Priority: P2
 - Area: My Plan / Day Scenario
 - Added: 2026-08-11
-- Reason deferred: explicitly excluded from the Task 7 MVP scope by the
-  owner ("We are NOT building a full itinerary editor" / "Do NOT
-  implement: drag-and-drop; manual reorder; manual duration editing").
-- Context: the Scenario page derives order purely from
-  `sortPlanItemsForDay()` (time, then title, then createdAt) and has no
-  `order`/`duration` fields anywhere (`PlanItem` has neither column).
-- Current state: not started.
-- Dependencies: would need a data-model decision (per-item override table
-  vs. columns on `PlanItem`) — deliberately not built speculatively per
-  Task 7's own instruction not to create `DayScenarioItem` unless proven
-  necessary.
-- Acceptance criteria: owner decision on scope + data shape, then
-  implemented.
+- Reason deferred: explicitly excluded from the Task 7 UX phase scope by the
+  owner ("We are NOT building a full itinerary editor" / "Do NOT implement:
+  drag-and-drop; arbitrary reorder; manual duration editing").
+- Resolution so far (2026-08-11, Task 7 UX phase): **flexible-item start-time
+  assignment is now implemented**, not deferred — a genuinely flexible
+  Scenario item ("Гибкое время") can be assigned a Scenario-specific start
+  time via "+ Назначить время" / "Изменить время"
+  (`AssignScenarioTimeControl.tsx` → `setScenarioItemTimeAction` →
+  `DayScenarioItemOverride`), participates in ordering
+  (`sortScenarioItemsByEffectiveTime`) and conflict detection, survives
+  reload, and is preserved/pruned correctly across "План изменился" →
+  "Обновить сценарий" (kept for retained PlanItems, dropped via FK cascade
+  for removed ones). This does **not** apply to items that already have an
+  authoritative source time (`PlanItem.startsAt` or a recovered single
+  same-date `ActivitySession`) — those are never overridable in this MVP,
+  by design.
+- Still deferred (unchanged): **arbitrary drag-and-drop reorder** (order is
+  always derived from effective time, never manually persisted) and
+  **manual duration editing** (no `duration` field exists on `PlanItem`;
+  `resolveReliableDurationMinutes()` always returns `null` — see
+  `src/features/my-plan/lib/scenarioProjection.ts` — free-gap and
+  end-of-day-summary display are architected to use it but will not surface
+  anything until a real duration source exists).
+- Current state: flexible-item time assignment DONE; reorder/duration
+  editing not started.
+- Dependencies: reorder/duration would need a further data-model decision
+  (a `duration` column, or extending `DayScenarioItemOverride`) — still
+  deliberately not built speculatively.
+- Acceptance criteria (remaining scope): owner decision on reorder/duration
+  scope + data shape, then implemented.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
   implementation, owner-approved MVP scope
 
