@@ -44,6 +44,7 @@ import {
 } from "@/lib/routes/routeBudget";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { makeEmptyRouteEditorStop } from "@/lib/routes/routeEditorState";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,17 +123,7 @@ const VISIBILITY_OPTIONS: {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function makeEmptyStop(): EditableRouteStop {
-  return {
-    id: `stop-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    location: null,
-    note: "",
-    photos: [],
-    priceType: "UNKNOWN",
-    priceMin: null,
-    priceMax: null,
-    priceCurrency: "BYN",
-    priceNote: "",
-  };
+  return makeEmptyRouteEditorStop();
 }
 
 const BASE_STATE: WizardState = {

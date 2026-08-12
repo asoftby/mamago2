@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getEditableRouteBySlug } from "@/server/services/route.service";
-import { RouteEditor, makeEmptyStop } from "@/components/routes/RouteEditor";
+import { RouteEditor } from "@/components/routes/RouteEditor";
 import type { EditableRouteStop, WizardState } from "@/components/routes/RouteEditor";
+import {
+  makeEmptyRouteEditorStop,
+  mapPersistedRouteAgeToEditorState,
+} from "@/lib/routes/routeEditorState";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -84,13 +88,14 @@ export default async function EditRoutePage({ params }: Props) {
 
   // Ensure at least 2 stops so the wizard doesn't render broken
   while (mappedStops.length < 2) {
-    mappedStops.push(makeEmptyStop());
+    mappedStops.push(makeEmptyRouteEditorStop());
   }
+
+  const ageState = mapPersistedRouteAgeToEditorState(route);
 
   const initialState: Partial<WizardState> = {
     title: route.title,
-    ageTags: route.ageTags,
-    agePolicy: route.agePolicy,
+    ...ageState,
     budgetLevel: route.budgetLevel as WizardState["budgetLevel"],
     visibility: route.visibility as WizardState["visibility"],
     stops: mappedStops,
