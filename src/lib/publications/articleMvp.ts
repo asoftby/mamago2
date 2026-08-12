@@ -12,6 +12,10 @@ export const ARTICLE_CONTENT_VERSION = 1 as const;
 export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
 export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema>;
 
+export const ArticleGalleryPresentationSchema = z.enum(["carousel", "mosaic", "sequential"]);
+export type ArticleGalleryPresentation = z.infer<typeof ArticleGalleryPresentationSchema>;
+export const LEGACY_ARTICLE_GALLERY_PRESENTATION: ArticleGalleryPresentation = "mosaic";
+
 const base = z.object({ id: z.string().min(1) });
 
 export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
@@ -43,6 +47,7 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({
     type: z.literal("gallery"),
     mediaIds: z.array(z.string()),
+    presentation: ArticleGalleryPresentationSchema.optional(),
     caption: z.string().optional(),
   }),
   base.extend({
@@ -147,7 +152,7 @@ export function newBlock(
     case "image":
       return { id: bid, type: "image", mediaId: "", alt: "", caption: "" };
     case "gallery":
-      return { id: bid, type: "gallery", mediaIds: [], caption: "" };
+      return { id: bid, type: "gallery", mediaIds: [], presentation: "carousel", caption: "" };
     case "activityCard":
       return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "" };
     case "embed":

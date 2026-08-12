@@ -24,7 +24,7 @@ import {
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
 import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
-import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
+import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
@@ -137,19 +137,6 @@ export function ArticleMvpView({
   const headerDekPlain =
     subtitleTrim || (!headerDekHtml ? excerptTrim || leadPlain : "") || "";
 
-  // For Breaking News: extract gallery image URLs to display above the body.
-  // The first gallery block is promoted to a hero preview; it will be skipped in the main loop.
-  const heroGalleryUrls: string[] = isBreakingNews
-    ? (() => {
-        const galleryBlock = blocks.find((b) => b.type === "gallery") as
-          | (Extract<ArticleMvpResolvedBlock, { type: "gallery" }>)
-          | undefined;
-        return galleryBlock
-          ? (galleryBlock.imageUrls.filter((u): u is string => Boolean(u)))
-          : [];
-      })()
-    : [];
-
   const isContinuation = continuousVariant === "continuation";
   const showChromeBack = continuousVariant !== "continuation";
   const showJournalFooter = continuousVariant === "standalone";
@@ -201,22 +188,12 @@ export function ArticleMvpView({
 
       <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
 
-      {/* Breaking News hero gallery — shown before body text */}
-      {heroGalleryUrls.length > 0 && (
-        <BreakingNewsGalleryPreview urls={heroGalleryUrls} />
-      )}
-
       <ArticleContent>
         {blocks.map((block, i) => {
           const tocBeforeBody =
             showToc && i === firstBodyBlockIndex ? (
               <ArticleInlineToc branches={tocBranches} />
             ) : null;
-
-          // For Breaking News, skip the gallery block — it's already rendered above.
-          if (isBreakingNews && block.type === "gallery") {
-            return null;
-          }
 
           // Лид показываем только в шапке (excerpt), в теле статьи не дублируем.
           if (block.type === "intro") {
@@ -297,36 +274,7 @@ export function ArticleMvpView({
             }
             if (block.type === "gallery") {
               return (
-                <figure className="not-prose my-8 md:my-10 space-y-3">
-                  <div
-                    className={[
-                      "flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 sm:mx-0 sm:px-0 sm:grid sm:overflow-visible",
-                      "sm:grid-cols-2 lg:grid-cols-3 sm:gap-2",
-                    ].join(" ")}
-                  >
-                    {block.imageUrls.map((url, j) =>
-                      url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={`${block.id}-${j}`}
-                          src={url}
-                          alt=""
-                          className="h-40 w-[min(78vw,280px)] shrink-0 snap-center sm:h-36 sm:w-full rounded-lg object-cover border border-border/50 sm:max-w-none"
-                        />
-                      ) : (
-                        <div
-                          key={`${block.id}-${j}`}
-                          className="h-40 w-[min(78vw,280px)] shrink-0 snap-center sm:h-36 sm:w-full rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 sm:max-w-none"
-                        />
-                      ),
-                    )}
-                  </div>
-                  {block.caption ? (
-                    <figcaption className="text-sm text-muted-foreground text-center px-1">
-                      {block.caption}
-                    </figcaption>
-                  ) : null}
-                </figure>
+                <ArticleGallery images={block.images} presentation={block.presentation} caption={block.caption} />
               );
             }
             if (block.type === "embed") {

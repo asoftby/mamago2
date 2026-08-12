@@ -136,7 +136,16 @@ export type ArticleMvpResolvedBlock =
   | (ArticleBlockMvp & { type: "quote" })
   | (ArticleBlockMvp & { type: "heading" })
   | (Extract<ArticleBlockMvp, { type: "image" }> & { imageUrl: string | null })
-  | (Extract<ArticleBlockMvp, { type: "gallery" }> & { imageUrls: (string | null)[] })
+  | (Extract<ArticleBlockMvp, { type: "gallery" }> & {
+      images: Array<{
+        id: string;
+        url: string | null;
+        alt: string | null;
+        caption: string | null;
+        width: number | null;
+        height: number | null;
+      }>;
+    })
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & { card: ResolvedActivityCard | ResolvedOfferEmbedCard | null })
   | Extract<ArticleBlockMvp, { type: "embed" }>;
 
@@ -407,10 +416,11 @@ export async function buildArticleMvpResolvedBlocks(
     mediaIds.size > 0
       ? await prisma.mediaAsset.findMany({
           where: { id: { in: [...mediaIds] } },
-          select: { id: true, publicUrl: true },
+          select: { id: true, publicUrl: true, alt: true, title: true, caption: true, width: true, height: true },
         })
       : [];
   const urlById = new Map(assets.map((a) => [a.id, a.publicUrl]));
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
 
   for (const b of blocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading") {
@@ -427,7 +437,17 @@ export async function buildArticleMvpResolvedBlocks(
     if (b.type === "gallery") {
       out.push({
         ...b,
-        imageUrls: b.mediaIds.map((id) => urlById.get(id) ?? null),
+        images: b.mediaIds.map((id) => {
+          const asset = assetById.get(id);
+          return {
+            id,
+            url: asset?.publicUrl ?? null,
+            alt: asset?.alt?.trim() || asset?.title?.trim() || null,
+            caption: asset?.caption?.trim() || null,
+            width: asset?.width ?? null,
+            height: asset?.height ?? null,
+          };
+        }),
       });
       continue;
     }

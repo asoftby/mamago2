@@ -18,6 +18,7 @@ import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/arti
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
+import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -403,6 +404,9 @@ function Lightbox({ urls, startIndex, onClose }: { urls: string[]; startIndex: n
 
 // ─── Editorial gallery ────────────────────────────────────────────────────────
 
+// Kept temporarily as the previous Breaking News gallery implementation; the
+// shared ArticleGallery now owns rendering so saved presentation modes are honored.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function HeroGallery({ urls, title }: { urls: string[]; title: string }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -990,9 +994,7 @@ export function BreakingNewsView({
 }: BreakingNewsViewProps) {
   const cityHomeHref = getCityHomeHref(citySlug);
 
-  // Extract gallery URLs from the gallery block.
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
-  const galleryUrls = galleryBlock ? galleryBlock.imageUrls.filter((u): u is string => Boolean(u)) : [];
 
   // Extract activity card block.
   const activityBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> => b.type === "activityCard");
@@ -1045,7 +1047,11 @@ export function BreakingNewsView({
           <PublicationTagChips tags={tags} citySlug={citySlug} />
         </div>
       </div>
-      <HeroGallery urls={galleryUrls} title={title} />
+      {galleryBlock ? (
+        <div className="mx-auto w-full max-w-[760px] px-4 sm:px-6">
+          <ArticleGallery images={galleryBlock.images} presentation={galleryBlock.presentation} caption={galleryBlock.caption} />
+        </div>
+      ) : null}
       <ArticleBody blocks={blocks} />
 
       {activityBlock?.card && activityBlock.card.kind === "basic" && activityBlock.card.placeExtra && (
