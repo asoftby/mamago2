@@ -261,7 +261,7 @@ export function EventCardHorizontal({
               )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Продвигать
+              Promotion выключен
             </Link>
 
             {onArchive && canArchiveEvent ? (

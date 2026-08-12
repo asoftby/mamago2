@@ -1,5 +1,9 @@
 # Business Billing UI/UX Prototype - Complete
 
+> Historical implementation report. The canonical first-PROD model is
+> `docs/business/monetization-mvp.md`; mock plans, paid leads and online top-up
+> described below are not current monetization behavior.
+
 ## Overview
 Реализован первый слой биллинга для business-кабинета mamaGo: UI/UX прототип с мок-данными для тестирования визуала и пользовательского опыта. Без реальной платежной логики и интеграций.
 

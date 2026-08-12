@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
-  creditBusinessDeposit,
+  creditBusinessDepositWithResult,
   creditBusinessDepositInTx,
   ensureBillingAccountForBusiness,
   getBillingAccountByBusinessId,
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { businessId, amount, reason, note } = validation.data;
+    const { businessId, amount, currency, idempotencyKey, reason, note } = validation.data;
 
     // Verify business exists
     const business = await prisma.business.findUnique({
@@ -51,9 +51,14 @@ export async function POST(request: NextRequest) {
     if (!account) {
       const result = await prisma.$transaction(async (tx) => {
         const newAccount = await ensureBillingAccountForBusiness(businessId, tx);
+        await tx.$queryRaw`SELECT id FROM "BillingAccount" WHERE id = ${newAccount.id} FOR UPDATE`;
+        const preExisting = await tx.billingTransaction.findFirst({
+          where: { billingAccountId: newAccount.id, idempotencyKey },
+        });
         const transaction = await creditBusinessDepositInTx(tx, {
           accountId: newAccount.id,
           amount,
+          idempotencyKey,
           description: `Ручное начисление депозита администратором: ${reason}`,
           referenceType: BillingReferenceType.MANUAL,
           metadata: {
@@ -62,14 +67,21 @@ export async function POST(request: NextRequest) {
             adminId: user.id,
             adminEmail: user.email,
             timestamp: new Date().toISOString(),
+            currency,
+            idempotencyKey,
             firstTopUp: true,
           },
         });
 
-        return { transaction };
+        const updatedAccount = await tx.billingAccount.findUniqueOrThrow({ where: { id: newAccount.id } });
+        return {
+          transaction,
+          idempotentReplay: Boolean(preExisting),
+          balance: updatedAccount.depositBalance.toNumber(),
+        };
       });
 
-      await logAdminAudit({
+      if (!result.idempotentReplay) await logAdminAudit({
         actorId: user.id,
         actorRole: user.role,
         action: "BILLING_MANUAL_CREDIT",
@@ -97,15 +109,17 @@ export async function POST(request: NextRequest) {
         transaction: {
           id: result.transaction.id,
           amount: result.transaction.amount.toNumber(),
-          newBalance: amount,
+          newBalance: result.balance,
+          idempotentReplay: result.idempotentReplay,
         },
       });
     }
 
     // Existing account - use service
-    const transaction = await creditBusinessDeposit({
+    const result = await creditBusinessDepositWithResult({
       accountId: account.id,
       amount,
+      idempotencyKey,
       description: `Ручное начисление депозита администратором: ${reason}`,
       referenceType: BillingReferenceType.MANUAL,
       metadata: {
@@ -114,21 +128,23 @@ export async function POST(request: NextRequest) {
         adminId: user.id,
         adminEmail: user.email,
         timestamp: new Date().toISOString(),
+        currency,
+        idempotencyKey,
       },
     });
 
-    await logAdminAudit({
+    if (!result.idempotentReplay) await logAdminAudit({
       actorId: user.id,
       actorRole: user.role,
       action: "BILLING_MANUAL_CREDIT",
       entityType: "BILLING_TRANSACTION",
-      entityId: transaction.id,
+      entityId: result.transaction.id,
       before: {
         balance: account.depositBalance.toNumber(),
       },
       after: {
         balance: account.depositBalance.toNumber() + amount,
-        transactionAmount: transaction.amount.toNumber(),
+        transactionAmount: result.transaction.amount.toNumber(),
       },
       reason,
       metadata: {
@@ -143,9 +159,10 @@ export async function POST(request: NextRequest) {
       success: true,
       accountCreated: false,
       transaction: {
-        id: transaction.id,
-        amount: transaction.amount.toNumber(),
-        newBalance: account.depositBalance.toNumber() + amount,
+        id: result.transaction.id,
+        amount: result.transaction.amount.toNumber(),
+        newBalance: result.balance,
+        idempotentReplay: result.idempotentReplay,
       },
     });
   } catch (error: unknown) {

@@ -217,7 +217,7 @@ function PublicationsCard({
             <span className="text-xl font-semibold text-stone-700">{activePromotions}</span>
             <span className="text-sm text-stone-500">активных продвижений</span>
           </div>
-          <p className="text-sm text-stone-500">Запустите продвижение, чтобы получать лиды</p>
+          <p className="text-sm text-stone-500">Action-based Promotion выключен; лиды бесплатны</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -240,8 +240,8 @@ function PublicationsCard({
         {noPublications
           ? "Создать публикацию"
           : noPromotion
-            ? "Запустить продвижение"
-            : "Управлять продвижением"}
+            ? "Promotion недоступен"
+            : "История Promotion"}
       </Link>
     </BusinessSurfaceCard>
   );

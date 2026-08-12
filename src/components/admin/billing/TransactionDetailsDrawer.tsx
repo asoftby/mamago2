@@ -99,10 +99,7 @@ interface TransactionDetailsDrawerProps {
 const REFUNDABLE_TYPES = new Set<BillingTransactionType>([
   BillingTransactionType.LEAD_CHARGE,
   BillingTransactionType.PROMOTION_CHARGE,
-  BillingTransactionType.MANUAL_ADJUSTMENT,
   BillingTransactionType.FEATURE_CHARGE,
-  BillingTransactionType.SUBSCRIPTION_CHARGE,
-  BillingTransactionType.SUBSCRIPTION_RENEWAL,
 ]);
 
 export function TransactionDetailsDrawer({
@@ -118,6 +115,7 @@ export function TransactionDetailsDrawer({
   const [refundNote, setRefundNote] = useState("");
   const [refundError, setRefundError] = useState<string | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
+  const [refundIdempotencyKey, setRefundIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const isRefundAllowed = useMemo(() => {
     if (!transaction) return false;
@@ -144,6 +142,8 @@ export function TransactionDetailsDrawer({
         body: JSON.stringify({
           transactionId: transaction.id,
           amount: previewAmount,
+          currency: "BYN",
+          idempotencyKey: refundIdempotencyKey,
           reason: refundReason,
           note: refundNote || undefined,
         }),
@@ -159,6 +159,7 @@ export function TransactionDetailsDrawer({
       setRefundAmount("");
       setRefundReason("");
       setRefundNote("");
+      setRefundIdempotencyKey(crypto.randomUUID());
       await onRefundSuccess(transaction.id);
     } catch (error) {
       console.error("Refund submit error:", error);

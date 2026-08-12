@@ -1,13 +1,11 @@
 import { redirect } from "next/navigation";
-import { PromotionPublicationType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
-import { PromotionOverviewClient } from "@/components/business/promotion/PromotionOverviewClient";
-import { getPromotionOverviewData, getPromotionTargetForBusiness } from "@/server/services/promotion/promotion.service";
-import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
+import { getPromotionOverviewData } from "@/server/services/promotion/promotion.service";
+import { formatPrice } from "@/lib/formatters/format-price";
 
 type PromotionPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -35,82 +33,34 @@ export default async function BusinessPromotionOverviewPage({
     );
   }
 
-  const rawSearchParams = (await searchParams) ?? {};
-  const publicationId =
-    typeof rawSearchParams.publicationId === "string"
-      ? rawSearchParams.publicationId
-      : undefined;
-  const publicationType =
-    rawSearchParams.publicationType === PromotionPublicationType.EVENT ||
-    rawSearchParams.publicationType === PromotionPublicationType.OFFER
-      ? rawSearchParams.publicationType
-      : undefined;
-
-  const [summary, selectedTarget, billingSummary] = await Promise.all([
-    getPromotionOverviewData(business.id),
-    publicationId && publicationType
-      ? getPromotionTargetForBusiness({
-          businessId: business.id,
-          publicationId,
-          publicationType,
-        })
-      : Promise.resolve(null),
-    getBusinessBillingSummary(business.id),
-  ]);
-
-  const depositBalance = billingSummary?.account.depositBalance?.toNumber() ?? 0;
-
-  const overviewHref = buildSurfaceRedirectDestination({
-    targetSurface: "business",
-    targetPath: "/promotion",
-    ...routing,
-  });
-  const eventsHref = buildSurfaceRedirectDestination({
-    targetSurface: "business",
-    targetPath: "/events",
-    ...routing,
-  });
-  const offersHref = buildSurfaceRedirectDestination({
-    targetSurface: "business",
-    targetPath: "/offers",
-    ...routing,
-  });
-  const depositHref = buildSurfaceRedirectDestination({
-    targetSurface: "business",
-    targetPath: "/billing/deposit",
-    ...routing,
-  });
-  const dashboardHref = buildSurfaceRedirectDestination({
-    targetSurface: "business",
-    targetPath: "/dashboard",
-    ...routing,
-  });
+  void searchParams;
+  const summary = await getPromotionOverviewData(business.id);
 
   return (
     <div className="space-y-6">
       <BusinessSectionHeader
         eyebrow="Promotion"
         title="Продвижение"
-        description="Здесь видно, куда уходит promotion budget, какие публикации уже получают спрос и где есть следующий безопасный шаг для роста."
+        description="Action-based paid Promotion отключён для first PROD. Существующая история доступна только для чтения."
       />
-
-      <PromotionOverviewClient
-        overviewHref={overviewHref}
-        eventsHref={eventsHref}
-        offersHref={offersHref}
-        dashboardHref={dashboardHref}
-        depositHref={depositHref}
-        depositBalance={depositBalance}
-        totalBudget={summary.totalBudget}
-        totalSpend={summary.totalSpend}
-        totalSaveToPlan={summary.totalSaveToPlan}
-        totalLeads={summary.totalLeads}
-        activeCount={summary.activeCount}
-        costPerSave={summary.costPerSave}
-        costPerLead={summary.costPerLead}
-        promotions={summary.promotions}
-        selectedTarget={selectedTarget}
-      />
+      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+        Новые кампании и автоматические списания выключены. Единственное платное действие — явная покупка Boost для опубликованного Offer.
+      </div>
+      <div className="rounded-3xl border border-stone-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-stone-950">История Promotion</h2>
+        {summary.promotions.length === 0 ? (
+          <p className="mt-3 text-sm text-stone-600">Исторических кампаний нет.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {summary.promotions.map((promotion) => (
+              <div key={promotion.id} className="rounded-2xl border border-stone-200 p-4 text-sm">
+                <p className="font-semibold text-stone-950">{promotion.publicationTitle}</p>
+                <p className="mt-1 text-stone-600">Статус: {promotion.status} · списано исторически: {formatPrice(promotion.spent)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

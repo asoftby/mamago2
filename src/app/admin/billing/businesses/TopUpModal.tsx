@@ -24,6 +24,7 @@ export function TopUpModal({ account, onClose, onSuccess }: Props) {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +38,8 @@ export function TopUpModal({ account, onClose, onSuccess }: Props) {
         body: JSON.stringify({
           businessId: account.businessId,
           amount: parseFloat(amount),
+          currency: "BYN",
+          idempotencyKey,
           reason,
           note,
         }),

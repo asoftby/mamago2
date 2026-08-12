@@ -27,13 +27,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { transactionId, amount, reason, note } = validation.data;
+    const { transactionId, amount, currency, idempotencyKey, reason, note } = validation.data;
 
     // Create refund with admin metadata (service handles all validation and atomicity)
     const refundReason = note ? `${reason} (${note})` : reason;
     const result = await createRefund({
       parentTransactionId: transactionId,
       amount,
+      currency,
+      idempotencyKey,
       reason: refundReason,
       metadata: {
         reason,
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await logAdminAudit({
+    if (!result.idempotentReplay) await logAdminAudit({
       actorId: user.id,
       actorRole: user.role,
       action: "BILLING_REFUND_CREATED",
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
         parentTransactionId: transactionId,
       },
       summary: result.refundSummaryAfter,
+      idempotentReplay: result.idempotentReplay,
     });
   } catch (error: unknown) {
     console.error("Refund error:", error);

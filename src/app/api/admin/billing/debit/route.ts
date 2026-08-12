@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
   BillingInsufficientFundsError,
-  debitBusinessDeposit,
+  debitBusinessDepositWithResult,
   getBillingAccountByBusinessId,
 } from "@/server/services/billing/billingAccount.service";
 import { BillingReferenceType, BillingTransactionType } from "@prisma/client";
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { businessId, amount, reason, note, allowNegative } = validation.data;
+    const { businessId, amount, currency, idempotencyKey, reason, note, allowNegative } = validation.data;
 
     // Get billing account
     const account = await getBillingAccountByBusinessId(businessId);
@@ -44,9 +44,10 @@ export async function POST(request: NextRequest) {
 
     // Create debit transaction (service handles balance check and atomicity)
     try {
-      const transaction = await debitBusinessDeposit({
+      const result = await debitBusinessDepositWithResult({
         accountId: account.id,
         amount,
+        idempotencyKey,
         type: BillingTransactionType.MANUAL_ADJUSTMENT,
         description: `Ручное списание депозита администратором: ${reason}`,
         referenceType: BillingReferenceType.MANUAL,
@@ -57,22 +58,24 @@ export async function POST(request: NextRequest) {
           adminEmail: user.email,
           allowNegative,
           timestamp: new Date().toISOString(),
+          currency,
+          idempotencyKey,
         },
         allowNegative,
       });
 
-      await logAdminAudit({
+      if (!result.idempotentReplay) await logAdminAudit({
         actorId: user.id,
         actorRole: user.role,
         action: "BILLING_MANUAL_DEBIT",
         entityType: "BILLING_TRANSACTION",
-        entityId: transaction.id,
+        entityId: result.transaction.id,
         before: {
           balance: currentBalance,
         },
         after: {
           balance: currentBalance - amount,
-          transactionAmount: transaction.amount.toNumber(),
+          transactionAmount: result.transaction.amount.toNumber(),
           allowNegative,
         },
         reason,
@@ -86,9 +89,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transaction: {
-          id: transaction.id,
-          amount: transaction.amount.toNumber(),
-          newBalance: currentBalance - amount,
+          id: result.transaction.id,
+          amount: result.transaction.amount.toNumber(),
+          newBalance: result.balance,
+          idempotentReplay: result.idempotentReplay,
         },
       });
     } catch (error: unknown) {

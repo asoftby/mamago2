@@ -10,7 +10,6 @@ import { OfferStatus, OfferKind } from "@prisma/client";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
-import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
@@ -158,7 +157,7 @@ export function OfferCardHorizontal({
     ? {
         text: "Продвигайте предложение, чтобы получить больше заявок и увеличить охват.",
         ctaLabel: "Узнать больше",
-        ctaHref: buildPromotionLaunchHref({ publicationType: "OFFER", publicationId: offer.id }),
+        ctaHref: `/business/offers/${offer.id}/boost`,
       }
     : null;
 
@@ -218,17 +217,14 @@ export function OfferCardHorizontal({
             </Link>
 
             <Link
-              href={buildPromotionLaunchHref({
-                publicationType: "OFFER",
-                publicationId: offer.id,
-              })}
+              href={`/business/offers/${offer.id}/boost`}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
               )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Продвигать
+              Купить Boost
             </Link>
 
             {onArchive && offer.status !== "DRAFT" ? (

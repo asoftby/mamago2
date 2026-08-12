@@ -2010,6 +2010,34 @@ P3 — cleanup / polish / optional
 - Source: `docs/release/dev-to-prod-checklist.md` Task 12 analytics audit,
   2026-08-12.
 
+## [BACKLOG-072] Post-launch financial platform hardening and billing cleanup
+
+- Status: OPEN
+- Priority: P2
+- Area: Billing / Finance
+- Added: 2026-08-13
+- Reason deferred: Task 13 first-PROD scope is deliberately limited to manual
+  verified top-up, explicit paid Boost, safe reversal and deterministic
+  reconciliation. The items below are useful but not required for that narrow
+  safe launch model.
+- Context: deferred work includes immutable-ledger DB policy and financial
+  retention; scheduled reconciliation/alerting; Decimal/minor-unit arithmetic
+  cleanup; provider refund workflow; durable financial outbox and operations
+  monitoring; legacy Plan/Subscription/Placement cleanup; mock requisites
+  cleanup; transaction-history export/advanced filters; promo credits/coupons;
+  and advanced financial analytics/invoices.
+- Current state: Task 13 supplies a signed ledger, cached balance, read-only
+  reconciliation command, idempotent manual writes and Boost purchases. Online
+  payment/provider refund, bonus currencies and advanced accounting remain
+  intentionally absent.
+- Dependencies: Task 13 completion and real post-launch operational evidence;
+  provider work additionally requires a separately approved provider.
+- Acceptance criteria: split this umbrella only when an item is scheduled;
+  fresh-audit the then-current billing model; preserve ledger traceability and
+  idempotency; do not introduce bonus wallets or automated money movement
+  without an explicit product/legal decision.
+- Source: Task 13 Phase A findings and owner-approved Phase B scope.
+
 ## [BACKLOG-071] Build acquisition cohorts for D1/D7/D30 retention
 
 - Status: OPEN

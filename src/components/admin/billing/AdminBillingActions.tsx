@@ -22,6 +22,7 @@ export function AdminBillingActions({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
   const [formData, setFormData] = useState({
     amount: "",
     reason: "",
@@ -41,6 +42,8 @@ export function AdminBillingActions({
           body = {
             ...body,
             amount: parseFloat(formData.amount),
+            currency: "BYN",
+            idempotencyKey,
             reason: formData.reason,
             note: formData.note,
           };
@@ -50,6 +53,8 @@ export function AdminBillingActions({
           body = {
             ...body,
             amount: parseFloat(formData.amount),
+            currency: "BYN",
+            idempotencyKey,
             reason: formData.reason,
             note: formData.note,
             allowNegative: formData.allowNegative,
@@ -85,6 +90,7 @@ export function AdminBillingActions({
 
       alert("Операция выполнена успешно");
       setActiveModal(null);
+      setIdempotencyKey(crypto.randomUUID());
       setFormData({ amount: "", reason: "", note: "", allowNegative: false });
       router.refresh();
     } catch (error) {

@@ -105,13 +105,13 @@ export function TopPublicationList({
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
               <Link
-                href={buildPromotionLaunchHref({
-                  publicationType: item.type === "event" ? "EVENT" : "OFFER",
+                href={item.type === "offer" ? `/business/offers/${item.id}/boost` : buildPromotionLaunchHref({
+                  publicationType: "EVENT",
                   publicationId: item.id,
                 })}
                 className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-800"
               >
-                Продвигать
+                {item.type === "offer" ? "Купить Boost" : "Promotion выключен"}
                 <Megaphone className="h-4 w-4" />
               </Link>
             </div>

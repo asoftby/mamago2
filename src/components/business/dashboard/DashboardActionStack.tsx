@@ -37,7 +37,7 @@ export function DashboardActionStack({
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]"
         >
           <Zap className="h-4 w-4 text-amber-500" />
-          Продвигать
+          История Promotion
         </Link>
       ) : (
         <div className="group relative">
@@ -47,7 +47,7 @@ export function DashboardActionStack({
             className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-stone-50 px-5 py-3 text-sm font-semibold text-stone-400"
           >
             <Zap className="h-4 w-4 text-stone-300" />
-            Продвигать
+            Boost после публикации Offer
           </button>
           <div
             className={cn(
@@ -56,7 +56,7 @@ export function DashboardActionStack({
               "opacity-0 transition-opacity group-hover:opacity-100",
             )}
           >
-            Сначала создайте объявление, затем можно включить продвижение
+            First PROD: платный Boost доступен только для опубликованных Offers
           </div>
         </div>
       )}

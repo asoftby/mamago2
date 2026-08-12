@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma";
 import { BillingTransactionType, BillingTransactionStatus, Prisma } from "@prisma/client";
+import { BILLING_CURRENCY, normalizeFinancialAmount } from "@/lib/billing/money";
+import { BillingIdempotencyConflictError } from "./billingAccount.service";
 
 type BillingTransactionFilters = {
   businessId?: string;
@@ -42,6 +44,12 @@ export class RefundNotAllowedError extends Error {
     this.name = "RefundNotAllowedError";
   }
 }
+
+export const INTERNAL_BALANCE_REFUNDABLE_TYPES = new Set<BillingTransactionType>([
+  BillingTransactionType.FEATURE_CHARGE,
+  BillingTransactionType.PROMOTION_CHARGE,
+  BillingTransactionType.LEAD_CHARGE,
+]);
 
 function toNumber(value: Prisma.Decimal | number) {
   return typeof value === "number" ? value : value.toNumber();
@@ -316,18 +324,16 @@ export async function getRefundPreview(parentTransactionId: string) {
  * Create refund transaction (atomic operation)
  * Refunds add money back to the account
  */
-export async function createRefund(params: {
+async function createRefundOnce(params: {
   parentTransactionId: string;
   amount: number;
+  currency: typeof BILLING_CURRENCY;
+  idempotencyKey: string;
   reason: string;
   metadata?: Prisma.InputJsonValue;
 }) {
-  const { parentTransactionId, amount, reason, metadata } = params;
-
-  // Validate amount
-  if (amount <= 0) {
-    throw new Error("Refund amount must be positive");
-  }
+  const { parentTransactionId, currency, idempotencyKey, reason, metadata } = params;
+  const normalizedAmount = normalizeFinancialAmount(params.amount);
 
   const result = await prisma.$transaction(async (tx) => {
     // Lock the parent transaction row to serialize concurrent refund attempts.
@@ -376,17 +382,55 @@ export async function createRefund(params: {
     if (parentTx.type === BillingTransactionType.REFUND) {
       throw new RefundNotAllowedError("Cannot refund a refund transaction");
     }
+    if (!INTERNAL_BALANCE_REFUNDABLE_TYPES.has(parentTx.type)) {
+      throw new RefundNotAllowedError("This transaction type cannot be refunded to internal balance");
+    }
+    if (parentTx.amount.gte(0)) {
+      throw new RefundNotAllowedError("Only debit transactions can be refunded to internal balance");
+    }
+    if (currency !== BILLING_CURRENCY || parentTx.currency !== BILLING_CURRENCY) {
+      throw new RefundNotAllowedError("Internal refunds support BYN only");
+    }
+
+    const existingRefund = await tx.billingTransaction.findFirst({
+      where: {
+        billingAccountId: parentTx.billingAccountId,
+        idempotencyKey,
+      },
+    });
+    if (existingRefund) {
+      if (
+        existingRefund.type !== BillingTransactionType.REFUND ||
+        existingRefund.parentTransactionId !== parentTransactionId ||
+        !existingRefund.amount.equals(normalizedAmount)
+      ) {
+        throw new BillingIdempotencyConflictError();
+      }
+
+      const existingSummary = buildRefundSummary({
+        parentAmount: parentTx.amount,
+        refunds: parentTx.childTransactions,
+      });
+      return {
+        refund: existingRefund,
+        refundSummaryBefore: existingSummary,
+        refundSummaryAfter: existingSummary,
+        business: parentTx.billingAccount.business,
+        idempotentReplay: true,
+      };
+    }
 
     const refundSummary = buildRefundSummary({
       parentAmount: parentTx.amount,
       refunds: parentTx.childTransactions,
     });
-    if (amount > refundSummary.availableAmount) {
+    const refundAmount = normalizedAmount.toNumber();
+    if (refundAmount > refundSummary.availableAmount) {
       throw new RefundAmountExceedsAvailableError({
         originalAmount: refundSummary.originalAmount,
         refundedAmount: refundSummary.refundedAmount,
         availableAmount: refundSummary.availableAmount,
-        requestedAmount: amount,
+        requestedAmount: refundAmount,
       });
     }
 
@@ -395,10 +439,11 @@ export async function createRefund(params: {
         billingAccountId: parentTx.billingAccountId,
         type: BillingTransactionType.REFUND,
         status: BillingTransactionStatus.SUCCEEDED,
-        amount,
+        amount: normalizedAmount,
         currency: parentTx.currency,
         description: `Возврат: ${reason}`,
         parentTransactionId,
+        idempotencyKey,
         referenceType: parentTx.referenceType,
         referenceId: parentTx.referenceId,
         metadata: metadata || { reason },
@@ -409,7 +454,7 @@ export async function createRefund(params: {
       where: { id: parentTx.billingAccountId },
       data: {
         depositBalance: {
-          increment: amount,
+          increment: normalizedAmount,
         },
       },
     });
@@ -419,16 +464,31 @@ export async function createRefund(params: {
       refundSummaryBefore: refundSummary,
       refundSummaryAfter: {
         originalAmount: refundSummary.originalAmount,
-        refundedAmount: Number((refundSummary.refundedAmount + amount).toFixed(2)),
-        availableAmount: Number((refundSummary.availableAmount - amount).toFixed(2)),
+        refundedAmount: Number((refundSummary.refundedAmount + refundAmount).toFixed(2)),
+        availableAmount: Number((refundSummary.availableAmount - refundAmount).toFixed(2)),
         refundCount: refundSummary.refundCount + 1,
-        canRefund: refundSummary.availableAmount - amount > 0,
+        canRefund: refundSummary.availableAmount - refundAmount > 0,
       },
       business: parentTx.billingAccount.business,
+      idempotentReplay: false,
     };
   }, {
     isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
   });
 
   return result;
+}
+
+export async function createRefund(params: Parameters<typeof createRefundOnce>[0]) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await createRefundOnce(params);
+    } catch (error) {
+      const retryable =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      if (!retryable || attempt === 3) throw error;
+    }
+  }
+
+  throw new Error("Refund retry loop exhausted");
 }

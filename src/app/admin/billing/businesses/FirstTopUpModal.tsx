@@ -30,6 +30,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [error, setError] = useState("");
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   // Load businesses on mount
   useEffect(() => {
@@ -94,6 +95,8 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
         body: JSON.stringify({
           businessId: selectedBusiness.id,
           amount: parseFloat(amount),
+          currency: "BYN",
+          idempotencyKey,
           reason,
           note,
         }),

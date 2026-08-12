@@ -26,6 +26,7 @@ export function DebitModal({ account, onClose, onSuccess }: Props) {
   const [allowNegative, setAllowNegative] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   const availableBalance = account.depositBalance + account.creditLimit;
   const requestedAmount = parseFloat(amount) || 0;
@@ -43,6 +44,8 @@ export function DebitModal({ account, onClose, onSuccess }: Props) {
         body: JSON.stringify({
           businessId: account.businessId,
           amount: parseFloat(amount),
+          currency: "BYN",
+          idempotencyKey,
           reason,
           note,
           allowNegative,
