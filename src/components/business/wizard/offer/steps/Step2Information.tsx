@@ -17,7 +17,7 @@ import {
   type SignalGroup,
 } from "../../shared/StructuredDiscoverySignalPicker";
 import { OfferClassChipPicker } from "../components/OfferClassChipPicker";
-import { SignalEntityType } from "@prisma/client";
+import { AgePolicy, SignalEntityType } from "@prisma/client";
 import { getProgramTypeLabel } from "@/lib/public/publicVerticalResolver";
 import { CAMP_OFFER_DISCOVERY_PICKER_CONFIGS } from "@/lib/offers/campOfferDiscoverySignals";
 
@@ -131,7 +131,7 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
     const newAgeGroups = currentAgeGroups.includes(ageKey)
       ? currentAgeGroups.filter(age => age !== ageKey)
       : [...currentAgeGroups, ageKey];
-    onChange({ ageGroups: newAgeGroups });
+    onChange({ ageGroups: newAgeGroups, agePolicy: newAgeGroups.length ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED });
   };
 
   const remainingChars = 120 - data.shortDescription.length;
@@ -297,13 +297,17 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         <Label>Возрастные группы</Label>
         <ChipsRow
           layout="masonry"
-          items={AGE_OPTIONS.map((ageOption): ChipItem => ({
+          items={[
+            { id: "unrestricted", label: "Любой", active: data.agePolicy === AgePolicy.UNRESTRICTED, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.UNRESTRICTED, ageGroups: [] }) },
+            ...AGE_OPTIONS.map((ageOption): ChipItem => ({
             id: ageOption.key,
             label: ageOption.shortLabel,
             active: (data.ageGroups || []).includes(ageOption.key),
             disabled: !isEditable,
             onClick: () => isEditable && handleAgeGroupsChange(ageOption.key),
-          }))}
+            })),
+            { id: "adult-only", label: "Только 18+", active: data.agePolicy === AgePolicy.ADULT_ONLY, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.ADULT_ONLY, ageGroups: [] }) },
+          ]}
         />
         <p className="text-xs text-muted-foreground">
           Для кого подходит это предложение

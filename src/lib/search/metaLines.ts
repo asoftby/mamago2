@@ -29,11 +29,13 @@ function isSameLocalDay(a: Date, b: Date): boolean {
  * ageLabel → badge из ageTags → short tags → `${ageFrom}+` из ageBoundsFromActivityFields.
  */
 export function resolveActivityAgeLabel(args: {
+  agePolicy?: import("@prisma/client").AgePolicy;
   ageLabel?: string | null;
   ageTags?: string[] | null;
   ageMinMonths?: number | null;
   ageMaxMonths?: number | null;
 }): string | null {
+  if (args.agePolicy === "ADULT_ONLY") return "18+";
   const labeled = args.ageLabel?.trim();
   if (labeled) return labeled;
 

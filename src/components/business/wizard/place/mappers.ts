@@ -39,6 +39,7 @@ export function mapPlaceToFormData(
     shortDesc: place.shortDesc,
     description: place.description,
     ageTags: place.ageTags || [],
+    agePolicy: place.agePolicy,
     visitFormats: normalizeVisitFormats(place.visitFormats || []),
     primaryCategoryId: place.primaryCategoryId ?? null,
     subcategoryIds: place.subcategories
@@ -123,6 +124,7 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     shortDesc: data.shortDesc,
     description: data.description,
     ageTags: data.ageTags,
+    agePolicy: data.agePolicy,
     visitFormats: data.visitFormats,
     
     // Step 2: Location

@@ -51,6 +51,7 @@ export type EventRuntimeFilters = {
   free: boolean;
   districtId: string | null;
   metroId: string | null;
+  adultOnly: boolean;
 };
 
 export function buildEffectivePlaceDistrictWhere(districtId: string): Prisma.PlaceWhereInput {
@@ -112,5 +113,6 @@ export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.Act
   if (filters.metroId) {
     parts.push({ place: { is: buildEffectivePlaceMetroWhere(filters.metroId) } });
   }
+  if (filters.adultOnly) parts.push({ agePolicy: "ADULT_ONLY" });
   return parts;
 }

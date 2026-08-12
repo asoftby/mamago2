@@ -26,6 +26,7 @@ import {
   buildAdminLifecycleViewModel,
 } from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 import { TableContainer } from "@/components/ui/table";
+import { agePolicyLabel } from "@/lib/age/agePolicy";
 import {
   DataCardList,
   DataCard,
@@ -291,6 +292,7 @@ function ActivitiesTable({
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Возраст</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
               </tr>
@@ -302,6 +304,7 @@ function ActivitiesTable({
                   <td className="px-4 py-3 text-gray-600">{cityLabel}</td>
                   <td className="px-4 py-3 text-gray-600">{businessLabel}</td>
                   <td className="px-4 py-3">{statusBadge}</td>
+                  <td className="px-4 py-3 text-gray-600">{activity.agePolicy === "SPECIFIC" ? (activity.ageLabel || activity.ageTags.join(", ")) : agePolicyLabel(activity.agePolicy)}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
                   </td>
@@ -320,6 +323,7 @@ function ActivitiesTable({
             <DataCardHeader title={activity.title} subtitle={cityLabel === "—" ? undefined : cityLabel} badge={statusBadge} />
             <DataCardBody>
               <DataCardRow label="Бизнес" value={businessLabel === "—" ? null : businessLabel} />
+              <DataCardRow label="Возраст" value={activity.agePolicy === "SPECIFIC" ? (activity.ageLabel || activity.ageTags.join(", ")) : agePolicyLabel(activity.agePolicy)} />
               <DataCardRow
                 label="Создано"
                 value={formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}

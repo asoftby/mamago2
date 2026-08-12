@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { AgePolicy, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
@@ -67,8 +68,9 @@ const createOfferSchema = z.object({
   kind: z.enum(["VISIT", "CLASS", "PARTY", "EVENT_TICKET"]),
   title: z.string().min(1),
   shortDescription: z.string().min(1),
-  ageMinMonths: z.number().optional(),
-  ageMaxMonths: z.number().optional(),
+  agePolicy: z.nativeEnum(AgePolicy),
+  ageMinMonths: z.number().nullable().optional(),
+  ageMaxMonths: z.number().nullable().optional(),
   coverImage: z.string().optional(),
   /** Публичные URL изображений галереи (как возвращает /api/upload). */
   gallery: z.array(z.string()).optional(),
@@ -295,8 +297,10 @@ export async function POST(request: NextRequest) {
             promotionalOffer: data.promotionalOffer,
             priceFrom,
             priceText,
-            ageMinMonths: data.ageMinMonths,
-            ageMaxMonths: data.ageMaxMonths,
+            ...(() => {
+              const age = normalizeAgePolicy({ agePolicy: data.agePolicy, ageMinMonths: data.ageMinMonths, ageMaxMonths: data.ageMaxMonths });
+              return { agePolicy: age.agePolicy, ageMinMonths: age.ageMinMonths, ageMaxMonths: age.ageMaxMonths };
+            })(),
             discoverySignalIds: data.discoverySignalIds,
             classChipSlugs: data.classChipSlugs,
             wizardCompletedSteps: data.wizardCompletedSteps ?? [],

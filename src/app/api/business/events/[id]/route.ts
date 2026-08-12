@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
+import { AgePolicy, ActivityType, ContentStatus, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   canManageActivityById,
@@ -209,6 +210,7 @@ export async function PATCH(
         ageLabel: true,
         ageMaxMonths: true,
         ageMinMonths: true,
+        agePolicy: true,
         ageTags: true,
         scheduleMode: true,
         priceFrom: true,
@@ -482,22 +484,20 @@ export async function PATCH(
       }
     }
 
-    if (
-      body.ageTags !== undefined &&
-      stableJsonStringify(body.ageTags) !== stableJsonStringify(existing.ageTags)
-    ) {
-      updateData.ageTags = body.ageTags;
+    if (body.agePolicy !== undefined || body.ageTags !== undefined || body.ageMinMonths !== undefined || body.ageMaxMonths !== undefined) {
+      const normalizedAge = normalizeAgePolicy({
+        agePolicy: Object.values(AgePolicy).includes(body.agePolicy) ? body.agePolicy : existing.agePolicy,
+        ageTags: body.ageTags ?? existing.ageTags,
+        ageMinMonths: body.ageMinMonths !== undefined ? body.ageMinMonths : existing.ageMinMonths,
+        ageMaxMonths: body.ageMaxMonths !== undefined ? body.ageMaxMonths : existing.ageMaxMonths,
+      });
+      updateData.agePolicy = normalizedAge.agePolicy;
+      updateData.ageTags = normalizedAge.ageTags;
+      updateData.ageMinMonths = normalizedAge.ageMinMonths;
+      updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
     }
     if (body.ageLabel !== undefined && body.ageLabel !== (existing.ageLabel ?? null)) {
       updateData.ageLabel = typeof body.ageLabel === "string" ? body.ageLabel || null : null;
-    }
-    if (body.ageMinMonths !== undefined && body.ageMinMonths !== existing.ageMinMonths) {
-      updateData.ageMinMonths =
-        typeof body.ageMinMonths === "number" ? body.ageMinMonths : null;
-    }
-    if (body.ageMaxMonths !== undefined && body.ageMaxMonths !== existing.ageMaxMonths) {
-      updateData.ageMaxMonths =
-        typeof body.ageMaxMonths === "number" ? body.ageMaxMonths : null;
     }
 
     if (body.scheduleMode !== undefined && body.scheduleMode !== existing.scheduleMode) {

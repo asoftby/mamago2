@@ -90,6 +90,7 @@ export default async function EditRoutePage({ params }: Props) {
   const initialState: Partial<WizardState> = {
     title: route.title,
     ageTags: route.ageTags,
+    agePolicy: route.agePolicy,
     budgetLevel: route.budgetLevel as WizardState["budgetLevel"],
     visibility: route.visibility as WizardState["visibility"],
     stops: mappedStops,

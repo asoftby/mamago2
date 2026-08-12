@@ -7,7 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { updateRoute, normalizeStops } from "@/server/services/route.service";
-import type { BudgetLevel, RouteVisibility } from "@prisma/client";
+import { AgePolicy, type BudgetLevel, type RouteVisibility } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import type { RouteStopPriceType } from "@/lib/routes/routeBudget";
 import {
   assertContentLifecycleOperationAllowed,
@@ -49,6 +50,7 @@ export async function PATCH(
     const {
       title,
       ageTags = [],
+      agePolicy = AgePolicy.UNKNOWN,
       budgetLevel,
       visibility = "PRIVATE",
       publish = false,
@@ -56,6 +58,7 @@ export async function PATCH(
     } = body as {
       title: string;
       ageTags?: string[];
+      agePolicy?: AgePolicy;
       budgetLevel?: BudgetLevel;
       visibility?: RouteVisibility;
       publish?: boolean;
@@ -93,12 +96,14 @@ export async function PATCH(
     // Admin/moderator save any route via the shared editor — including
     // authorless editorial routes (imported from WordPress).
     const isPrivilegedEditor = user.role === "ADMIN" || user.role === "MODERATOR";
+    const normalizedAge = normalizeAgePolicy({ agePolicy, ageTags });
     const result = await updateRoute(
       user.id,
       routeId,
       {
         title: title.trim(),
-        ageTags,
+        ageTags: normalizedAge.ageTags,
+        agePolicy: normalizedAge.agePolicy,
         budgetLevel,
         visibility,
         publish,

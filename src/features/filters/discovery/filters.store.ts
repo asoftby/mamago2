@@ -32,6 +32,7 @@ export type DiscoveryFilters = {
   district: string | null;
   nearby: boolean;
   free: boolean;
+  adultOnly: boolean;
 };
 
 export const defaultFilters: DiscoveryFilters = {
@@ -44,6 +45,7 @@ export const defaultFilters: DiscoveryFilters = {
   district: null,
   nearby: false,
   free: false,
+  adultOnly: false,
 };
 
 export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
@@ -57,6 +59,7 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.district &&
     !f.nearby &&
     !f.free
+    && !f.adultOnly
   );
 }
 
@@ -136,6 +139,7 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("district") ||
     searchParams.get("nearby") === "true" ||
     searchParams.get("free") === "true"
+    || searchParams.get("adultOnly") === "true"
   );
 }
 
@@ -219,6 +223,7 @@ export function parseAppliedFromUrl(
 
   const nearby = searchParams.get("nearby") === "true";
   const free = searchParams.get("free") === "true";
+  const adultOnly = searchParams.get("adultOnly") === "true";
 
   const presetParam = searchParams.get("preset");
   let whenPreset: WhenPreset = null;
@@ -240,6 +245,7 @@ export function parseAppliedFromUrl(
     district,
     nearby,
     free,
+    adultOnly,
   };
 }
 
@@ -294,6 +300,8 @@ export function serializeAppliedToSearchParams(
 
   if (next.free) params.set("free", "true");
   else params.delete("free");
+  if (next.adultOnly) params.set("adultOnly", "true");
+  else params.delete("adultOnly");
 
   return params;
 }
@@ -307,6 +315,7 @@ export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number
     (filters.district ? 1 : 0) +
     (filters.nearby ? 1 : 0) +
     (filters.free ? 1 : 0)
+    + (filters.adultOnly ? 1 : 0)
   );
 }
 
@@ -475,7 +484,8 @@ export function useDiscoveryFilters() {
       !!filters.metro ||
       !!filters.district ||
       filters.nearby ||
-      filters.free;
+      filters.free ||
+      filters.adultOnly;
 
     const activeCount = getDiscoveryFilterActiveCount(filters);
 

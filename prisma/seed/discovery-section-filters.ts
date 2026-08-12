@@ -78,6 +78,12 @@ const INTENT_FILTERS: IntentFilters[] = [
         kind: "boolean",
         trueLabel: "Только бесплатно",
       },
+      {
+        id: "adult_only",
+        label: "Только 18+",
+        kind: "boolean",
+        trueLabel: "Только 18+",
+      },
     ],
   },
   {

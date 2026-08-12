@@ -594,7 +594,9 @@ export function buildOfferCreatePayload(
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
-    ...ages,
+    ageMinMonths: data.agePolicy === "SPECIFIC" ? ages.ageMinMonths ?? null : null,
+    ageMaxMonths: data.agePolicy === "SPECIFIC" ? ages.ageMaxMonths ?? null : null,
+    agePolicy: data.agePolicy,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
     priceCaption:
@@ -791,7 +793,9 @@ export function buildOfferUpdatePayload(
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
-    ...ages,
+    ageMinMonths: data.agePolicy === "SPECIFIC" ? ages.ageMinMonths ?? null : null,
+    ageMaxMonths: data.agePolicy === "SPECIFIC" ? ages.ageMaxMonths ?? null : null,
+    agePolicy: data.agePolicy,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
     priceCaption:
@@ -885,6 +889,7 @@ export function mapOfferToFormData(offer: {
   priceText: string | null;
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
+  agePolicy: import("@prisma/client").AgePolicy;
   discoverySignalIds?: string[];
   classChipSlugs?: string[];
   // Camp fields
@@ -1028,6 +1033,7 @@ export function mapOfferToFormData(offer: {
     shortDescription: offer.description ?? "",
     description: normalizeRichTextEditorValue(offer.description),
     ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
+    agePolicy: offer.agePolicy,
     coverImage: offer.coverImage,
     gallery,
     videoUrl: offer.videoUrl ?? null,

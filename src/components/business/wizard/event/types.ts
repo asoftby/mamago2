@@ -1,6 +1,6 @@
 // Event Wizard Types
 
-import type { ActivityFormat } from "@prisma/client";
+import type { ActivityFormat, AgePolicy } from "@prisma/client";
 import type { EventFormatPreset } from "@/lib/business/eventFormatSignals";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type {
@@ -72,6 +72,7 @@ export interface EventFormData {
   primaryRootHasChildren: boolean;
   /** id опций сигнала age (Discovery / Signals) */
   ageRangeIds: string[];
+  agePolicy: AgePolicy;
   /** Значения сигнала age для поля Activity.ageTags (синхронизируется с ageRangeIds) */
   ageTags: string[];
   ageDetection?: {

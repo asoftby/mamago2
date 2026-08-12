@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
+import { AgePolicy, ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   buildActivityManageWhereForUser,
@@ -56,6 +57,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const normalizedAge = normalizeAgePolicy({
+      agePolicy: Object.values(AgePolicy).includes(body.agePolicy) ? body.agePolicy : AgePolicy.UNKNOWN,
+      ageTags: Array.isArray(body.ageTags) ? body.ageTags : [],
+      ageMinMonths: typeof body.ageMinMonths === "number" ? body.ageMinMonths : null,
+      ageMaxMonths: typeof body.ageMaxMonths === "number" ? body.ageMaxMonths : null,
+    });
     const faqItems = normalizeFaqItems(body.faqItems);
     perf.mark("parse");
 
@@ -175,11 +182,10 @@ export async function POST(request: NextRequest) {
         
         // Age
         ageLabel: typeof body.ageLabel === "string" ? body.ageLabel || null : null,
-        ageMinMonths:
-          typeof body.ageMinMonths === "number" ? body.ageMinMonths : null,
-        ageMaxMonths:
-          typeof body.ageMaxMonths === "number" ? body.ageMaxMonths : null,
-        ageTags: body.ageTags || [],
+        agePolicy: normalizedAge.agePolicy,
+        ageMinMonths: normalizedAge.ageMinMonths,
+        ageMaxMonths: normalizedAge.ageMaxMonths,
+        ageTags: normalizedAge.ageTags,
         
         // Schedule
         scheduleMode: ScheduleMode.MULTI_DATE,

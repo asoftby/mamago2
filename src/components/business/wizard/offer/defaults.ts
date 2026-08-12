@@ -2,6 +2,7 @@
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
 import type { OfferFormData, SocialLink } from "./types";
+import { AgePolicy } from "@prisma/client";
 
 export function createDefaultSocialLink(id?: string): SocialLink {
   return {
@@ -40,6 +41,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     shortDescription: "",
     description: "",
     ageGroups: [],
+    agePolicy: AgePolicy.UNRESTRICTED,
     campProgramType: null,
     
     // Step 3: Media

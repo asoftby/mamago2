@@ -97,6 +97,7 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
           free: scalar("free") === "true",
           districtId: scalar("district") ?? null,
           metroId: scalar("metro") ?? null,
+          adultOnly: scalar("adultOnly") === "true",
         }
       : undefined;
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {

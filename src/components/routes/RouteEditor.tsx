@@ -67,6 +67,7 @@ export type EditableRouteStop = {
 export type WizardState = {
   title: string;
   ageTags: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   budgetLevel: LegacyBudgetLevel | null;
   stops: EditableRouteStop[];
   visibility: Visibility;
@@ -137,6 +138,7 @@ export function makeEmptyStop(): EditableRouteStop {
 const BASE_STATE: WizardState = {
   title: "",
   ageTags: [],
+  agePolicy: "UNRESTRICTED",
   budgetLevel: null,
   stops: [makeEmptyStop(), makeEmptyStop()],
   visibility: "PUBLIC",
@@ -224,14 +226,11 @@ function Step1({
     const next = state.ageTags.includes(key)
       ? state.ageTags.filter((k) => k !== key)
       : [...state.ageTags, key];
-    onChange({ ageTags: next });
+    onChange({ ageTags: next, agePolicy: next.length ? "SPECIFIC" : "UNRESTRICTED" });
   };
 
-  const allAgesSelected = state.ageTags.length === AGE_OPTIONS.length;
   const toggleAllAges = () => {
-    onChange({
-      ageTags: allAgesSelected ? [] : AGE_OPTIONS.map((opt) => opt.key),
-    });
+    onChange({ ageTags: [], agePolicy: "UNRESTRICTED" });
   };
 
   return (
@@ -268,7 +267,7 @@ function Step1({
             onClick={toggleAllAges}
             className={cn(
               "px-3.5 py-2 rounded-xl text-sm font-medium transition-all border",
-              allAgesSelected
+              state.agePolicy === "UNRESTRICTED"
                 ? "bg-neutral-900 text-white border-neutral-900"
                 : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
             )}
@@ -289,6 +288,18 @@ function Step1({
               {opt.shortLabel}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => onChange({ ageTags: [], agePolicy: "ADULT_ONLY" })}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-sm font-medium transition-all border",
+              state.agePolicy === "ADULT_ONLY"
+                ? "bg-neutral-900 text-white border-neutral-900"
+                : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
+            )}
+          >
+            Только 18+
+          </button>
         </div>
       </div>
 
@@ -944,6 +955,7 @@ export function RouteEditor({
       const body = {
         title: state.title,
         ageTags: state.ageTags,
+        agePolicy: state.agePolicy,
         budgetLevel: state.budgetLevel,
         visibility: state.visibility,
         publish,

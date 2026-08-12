@@ -5,6 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { AgePolicy } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { MediaEntityType } from "@prisma/client";
@@ -178,6 +180,8 @@ export async function PATCH(
         phone3: true,
         phone3Label: true,
         primaryCategoryId: true,
+        ageTags: true,
+        agePolicy: true,
         subcategories: {
           orderBy: { position: "asc" },
           select: { categoryId: true },
@@ -349,7 +353,14 @@ export async function PATCH(
     if (body.instagramHandle !== undefined) updateData.instagramHandle = body.instagramHandle ? String(body.instagramHandle) : null;
     if (body.instagramUrl !== undefined) updateData.instagramUrl = body.instagramUrl ? String(body.instagramUrl) : null;
     if (body.reelsUrl !== undefined) updateData.reelsUrl = body.reelsUrl ? String(body.reelsUrl) : null;
-    if (body.ageTags !== undefined) updateData.ageTags = Array.isArray(body.ageTags) ? body.ageTags : [];
+    if (body.ageTags !== undefined || body.agePolicy !== undefined) {
+      const normalizedAge = normalizeAgePolicy({
+        agePolicy: Object.values(AgePolicy).includes(body.agePolicy) ? body.agePolicy : existing.agePolicy,
+        ageTags: body.ageTags !== undefined ? body.ageTags : existing.ageTags,
+      });
+      updateData.ageTags = normalizedAge.ageTags;
+      updateData.agePolicy = normalizedAge.agePolicy;
+    }
     if (body.visitFormats !== undefined) updateData.visitFormats = Array.isArray(body.visitFormats) ? body.visitFormats : [];
     if (body.placeKind !== undefined) updateData.placeKind = body.placeKind;
     if (body.parentPlaceId !== undefined) updateData.parentPlaceId = body.parentPlaceId;

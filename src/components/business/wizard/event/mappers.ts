@@ -180,6 +180,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
 
   formData.ageRangeIds = resolvedAgeBuckets;
   formData.ageTags = resolvedAgeBuckets;
+  formData.agePolicy = event.agePolicy;
 
   formData.eventFormats = resolveEventFormatsFromScheduleJson(scheduleJson);
   // Optional multi-select «Интересы» (за пределами eventFormats).
@@ -640,6 +641,7 @@ type EventPayload = {
   ageMaxMonths: number | null;
   ageMinMonths: number | null;
   ageTags: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   scheduleMode: "MULTI_DATE";
   eventCategoryId?: string;
   programCategoryIds: string[];
@@ -746,6 +748,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     ageMinMonths: ageRange?.minMonths ?? null,
     ageMaxMonths: ageRange?.maxMonths ?? null,
     ageTags: normalizedAgeBuckets,
+    agePolicy: data.agePolicy,
 
     scheduleMode: "MULTI_DATE",
 
@@ -908,6 +911,7 @@ type EventChanges = {
   description?: string;
   format?: ActivityFormat;
   ageTags?: string[];
+  agePolicy?: import("@prisma/client").AgePolicy;
   coverImageId?: string | null;
   galleryMediaIds?: string[];
   scheduleJson?: Record<string, unknown>;
@@ -941,6 +945,7 @@ export function extractChanges(current: EventFormData, original: EventFormData):
   if (JSON.stringify(current.ageTags) !== JSON.stringify(original.ageTags)) {
     changes.ageTags = current.ageTags;
   }
+  if (current.agePolicy !== original.agePolicy) changes.agePolicy = current.agePolicy;
 
   if (current.coverImage !== original.coverImage) {
     changes.coverImageId = current.coverImage;

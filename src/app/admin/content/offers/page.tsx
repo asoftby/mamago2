@@ -23,6 +23,8 @@ import {
   buildAdminOfferLifecycleInput,
 } from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
 import { TableContainer } from "@/components/ui/table";
+import { agePolicyLabel } from "@/lib/age/agePolicy";
+import { formatAgeRange } from "@/lib/config/ages";
 import {
   DataCardList,
   DataCard,
@@ -230,6 +232,7 @@ function OffersTable({
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Возраст</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
               </tr>
@@ -248,6 +251,7 @@ function OffersTable({
                   <td className="px-4 py-3">
                     <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
                   </td>
+                  <td className="px-4 py-3 text-gray-600">{offer.agePolicy === "SPECIFIC" ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths) : agePolicyLabel(offer.agePolicy)}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
                   </td>
@@ -269,6 +273,7 @@ function OffersTable({
             />
             <DataCardBody>
               <DataCardRow label="Место" value={offer.place.title} />
+              <DataCardRow label="Возраст" value={offer.agePolicy === "SPECIFIC" ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths) : agePolicyLabel(offer.agePolicy)} />
               <DataCardRow label="Город" value={offer.place.city?.name} />
               <DataCardRow
                 label="Бизнес"

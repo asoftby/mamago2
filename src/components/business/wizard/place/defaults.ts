@@ -1,4 +1,4 @@
-import { PlaceKind } from "@prisma/client";
+import { AgePolicy, PlaceKind } from "@prisma/client";
 import type { PlaceFormData } from "./types";
 
 /**
@@ -12,6 +12,7 @@ export function getDefaultFormData(): PlaceFormData {
     shortDesc: "",
     description: null,
     ageTags: [],
+    agePolicy: AgePolicy.UNRESTRICTED,
     visitFormats: [],
     primaryCategoryId: null,
     subcategoryIds: [],

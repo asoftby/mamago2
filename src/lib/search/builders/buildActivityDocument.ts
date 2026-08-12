@@ -112,6 +112,7 @@ export async function buildActivityDocument(
   const metaLine = activityMetaLine({
     nextOccurrenceAt: activity.nextOccurrenceAt,
     ageLabel: resolveActivityAgeLabel({
+      agePolicy: activity.agePolicy,
       ageLabel: activity.ageLabel,
       ageTags: activity.ageTags,
       ageMinMonths: activity.ageMinMonths,

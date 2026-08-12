@@ -28,6 +28,28 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </div>
       </fieldset>
 
+      <button
+        type="button"
+        role="switch"
+        aria-checked={applied.adultOnly}
+        onClick={() => actions.setDraft({ adultOnly: !applied.adultOnly })}
+        className="flex w-full items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-900"
+      >
+        <span>Только 18+</span>
+        <span
+          aria-hidden="true"
+          className={`relative h-6 w-11 rounded-full transition-colors ${
+            applied.adultOnly ? "bg-neutral-900" : "bg-neutral-200"
+          }`}
+        >
+          <span
+            className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+              applied.adultOnly ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </span>
+      </button>
+
       <FilterSelect label="Формат" value={applied.format ?? ""} onChange={(value) => actions.setDraft({ format: (value || null) as typeof applied.format })} options={[{ value: "OFFLINE", label: "Офлайн" }, { value: "ONLINE", label: "Онлайн" }, { value: "HYBRID", label: "Гибрид" }]} />
       <FilterSelect label="Район" value={applied.district ?? ""} onChange={(value) => actions.setDraft({ district: value || null })} options={options.districts} disabled={loading} />
       <FilterSelect label="Метро" value={applied.metro ?? ""} onChange={(value) => actions.setDraft({ metro: value || null })} options={options.metros} disabled={loading} />

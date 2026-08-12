@@ -397,6 +397,10 @@ async function createActivityFromImport(
   if (fields.priceFrom != null){ createData.priceFrom        = fields.priceFrom;        appliedFields.push("priceFrom"); }
   if (fields.priceTo != null)  { createData.priceTo          = fields.priceTo;          appliedFields.push("priceTo"); }
   if (fields.ageTags?.length)  { createData.ageTags          = fields.ageTags;          appliedFields.push("ageTags"); }          else emptyFields.push("ageTags");
+  createData.agePolicy = fields.ageTags?.length || fields.ageMinMonths != null || fields.ageMaxMonths != null
+    ? "SPECIFIC"
+    : "UNKNOWN";
+  appliedFields.push("agePolicy");
   if (fields.ageMinMonths != null){ createData.ageMinMonths  = fields.ageMinMonths;     appliedFields.push("ageMinMonths"); }     else emptyFields.push("ageMinMonths");
   if (fields.ageMaxMonths != null){ createData.ageMaxMonths  = fields.ageMaxMonths;     appliedFields.push("ageMaxMonths"); }     else emptyFields.push("ageMaxMonths");
   if (fields.scheduleJson)     { createData.scheduleJson     = fields.scheduleJson;     appliedFields.push("scheduleJson"); }     else emptyFields.push("scheduleJson");

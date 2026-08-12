@@ -1,4 +1,4 @@
-import type { ContentStatus, PlaceKind, Prisma } from "@prisma/client";
+import type { AgePolicy, ContentStatus, PlaceKind, Prisma } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
 import type { PriceData } from "@/lib/priceItems";
 import type { FaqItem } from "@/lib/faq/faqItems";
@@ -20,6 +20,7 @@ export interface PlaceFormData {
   shortDesc: string;
   description: string | null;
   ageTags: string[];
+  agePolicy: AgePolicy;
   visitFormats: string[];
   /// Новая структура категорий: ID корневой категории (EventCategory, publicationType=PLACE)
   primaryCategoryId: string | null;

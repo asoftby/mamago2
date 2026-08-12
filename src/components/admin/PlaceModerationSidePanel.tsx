@@ -29,6 +29,7 @@ type PlaceDetail = {
   website: string | null;
   instagramHandle: string | null;
   ageTags: string[];
+  agePolicy?: import("@prisma/client").AgePolicy;
   visitFormats: string[];
   activityTypes: string[];
   createdAt: string;
@@ -386,12 +387,13 @@ export function PlaceModerationSidePanel({
               </div>
 
               {/* Tags */}
-              {(place.ageTags.length > 0 ||
+              {(place.agePolicy || place.ageTags.length > 0 ||
                 place.visitFormats.length > 0 ||
                 place.activityTypes.length > 0) && (
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="text-lg font-semibold mb-3">Теги</h4>
-                  <div className="space-y-2">
+                <div className="space-y-2">
+                    {place.agePolicy && place.agePolicy !== "SPECIFIC" && <div><span className="text-sm font-medium text-gray-600">Возраст: </span><span className="text-sm text-gray-700">{place.agePolicy === "ADULT_ONLY" ? "Только 18+" : place.agePolicy === "UNRESTRICTED" ? "Любой возраст" : "Возраст не указан"}</span></div>}
                     {place.ageTags.length > 0 && (
                       <div>
                         <span className="text-sm font-medium text-gray-700">

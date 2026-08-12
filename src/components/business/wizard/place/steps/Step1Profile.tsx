@@ -13,6 +13,7 @@ import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
 import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import { generateSummary } from "@/lib/openingHours/openingHoursMapper";
 import type { PlaceFormData } from "../types";
+import { AgePolicy } from "@prisma/client";
 
 const MAX_SUBCATEGORIES = 3;
 
@@ -157,7 +158,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
     // of the same "no restriction" meaning.
     const newTags = canonicalizeAgeTags(rawTags);
     setAgeTags(newTags);
-    onChange({ ageTags: newTags });
+    onChange({ ageTags: newTags, agePolicy: newTags.length ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED });
   };
 
   const toggleVisitFormat = (format: string) => {
@@ -342,12 +343,12 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
                 // Selecting a specific age naturally clears this (ageTags becomes
                 // non-empty); selecting this chip clears ageTags, which naturally
                 // deactivates every specific-age chip. No dual-selection is possible.
-                active: ageTags.length === 0,
+                active: data.agePolicy === AgePolicy.UNRESTRICTED,
                 disabled: !isEditable,
                 onClick: () => {
                   if (!isEditable || ageTags.length === 0) return;
                   setAgeTags([]);
-                  onChange({ ageTags: [] });
+                  onChange({ ageTags: [], agePolicy: AgePolicy.UNRESTRICTED });
                 },
               },
               ...AGE_OPTIONS.map((ageOption): ChipItem => ({
@@ -357,6 +358,16 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
                 disabled: !isEditable,
                 onClick: () => isEditable && toggleAgeTag(ageOption.key),
               })),
+              {
+                id: "adult-only",
+                label: "Только 18+",
+                active: data.agePolicy === AgePolicy.ADULT_ONLY,
+                disabled: !isEditable,
+                onClick: () => {
+                  setAgeTags([]);
+                  onChange({ ageTags: [], agePolicy: AgePolicy.ADULT_ONLY });
+                },
+              },
             ]}
           />
         </div>

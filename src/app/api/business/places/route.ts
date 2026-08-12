@@ -12,7 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
+import { AgePolicy, ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
@@ -174,6 +175,10 @@ export async function POST(request: NextRequest) {
       }
     }
     timer.mark("validate");
+    const normalizedAge = normalizeAgePolicy({
+      agePolicy: Object.values(AgePolicy).includes(d.agePolicy) ? d.agePolicy : AgePolicy.UNKNOWN,
+      ageTags: Array.isArray(d.ageTags) ? d.ageTags : [],
+    });
 
     // Get user's business (if exists)
     const businessId = await getUserBusinessId(user.id);
@@ -230,7 +235,8 @@ export async function POST(request: NextRequest) {
         category: d.category,
         shortDesc: d.shortDesc,
         description: d.description || null,
-        ageTags: d.ageTags || [],
+        ageTags: normalizedAge.ageTags,
+        agePolicy: normalizedAge.agePolicy,
         visitFormats: d.visitFormats || [],
         primaryCategoryId: d.primaryCategoryId || null,
         discoverySignalIds: Array.isArray(d.discoverySignalIds) ? d.discoverySignalIds : [],

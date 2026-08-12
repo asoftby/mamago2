@@ -1,5 +1,5 @@
 import type { Intent } from "@/lib/intent";
-import type { ActivityFormat } from "@prisma/client";
+import type { ActivityFormat, AgePolicy } from "@prisma/client";
 
 export type ActivityType =
   | "EVENT_FIXED"
@@ -23,6 +23,7 @@ export interface ActivityMock {
   coverMediaId?: string | null;
   ageFrom: number;
   ageTo: number;
+  agePolicy?: AgePolicy;
   priceMin?: number;
   priceMax?: number;
   priceListUsesOt?: boolean;

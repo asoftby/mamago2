@@ -107,10 +107,6 @@ export async function POST(
       errors.push("Загрузите главное изображение");
     }
 
-    if (!existing.ageTags || existing.ageTags.length === 0) {
-      errors.push("Выберите возраст");
-    }
-
     perf.mark("validate-fields");
 
     if (errors.length > 0) {

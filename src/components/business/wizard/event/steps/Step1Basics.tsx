@@ -15,6 +15,8 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { straightQuotesToGuillemets } from "@/lib/text/straightQuotesToGuillemets";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { AGE_OPTIONS, sortAgeKeys } from "@/lib/config/ages";
+import { AgePolicy } from "@prisma/client";
+import { selectAdultOnlyAge, selectSpecificAge, selectUnrestrictedAge } from "@/lib/age/agePolicy";
 import type {
   DiscoveryEventCategory,
   EventStep1Taxonomies,
@@ -509,6 +511,7 @@ export function Step1Basics({
     if (current.join("|") === next.join("|") && data.ageDetectionAutoApplied) return;
 
     onChange({
+      agePolicy: AgePolicy.SPECIFIC,
       ageRangeIds: next,
       ageTags: next,
       ageDetectionAutoApplied: true,
@@ -537,6 +540,7 @@ export function Step1Basics({
     const next = sortAgeKeys([...buckets]);
     // Keep `ageTags` synchronized for existing Activity.ai/recommendations pipeline
     onChange({
+      agePolicy: next.length > 0 ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED,
       ageRangeIds: next,
       ageTags: next,
       ageDetectionUserOverride: userOverride,
@@ -548,13 +552,15 @@ export function Step1Basics({
     const next = data.ageRangeIds.includes(ageValue)
       ? data.ageRangeIds.filter((v) => v !== ageValue)
       : [...data.ageRangeIds, ageValue];
-    applyAgeBuckets(next, { userOverride: true, autoApplied: false });
+    const selected = next.length > 0 ? selectSpecificAge(next) : selectUnrestrictedAge();
+    onChange({ ...selected, ageRangeIds: selected.ageTags, ageDetectionUserOverride: true, ageDetectionAutoApplied: false });
   };
 
   const clearAgeSelection = () => {
+    const selected = selectUnrestrictedAge();
     onChange({
+      ...selected,
       ageRangeIds: [],
-      ageTags: [],
       ageDetectionUserOverride: true,
       ageDetectionAutoApplied: false,
     });
@@ -616,6 +622,23 @@ export function Step1Basics({
         ? "!border-amber-300 !bg-transparent !text-amber-900"
         : undefined,
     };
+  });
+  ageItems.unshift({
+    id: "unrestricted",
+    label: "Любой",
+    active: data.agePolicy === AgePolicy.UNRESTRICTED,
+    disabled: !isEditable || loading,
+    onClick: clearAgeSelection,
+  });
+  ageItems.push({
+    id: "adult-only",
+    label: "Только 18+",
+    active: data.agePolicy === AgePolicy.ADULT_ONLY,
+    disabled: !isEditable || loading,
+    onClick: () => {
+      const selected = selectAdultOnlyAge();
+      onChange({ ...selected, ageRangeIds: [], ageDetectionUserOverride: true, ageDetectionAutoApplied: false });
+    },
   });
 
   const interestItems: ChipItem[] = interestOptions.map((o) => {

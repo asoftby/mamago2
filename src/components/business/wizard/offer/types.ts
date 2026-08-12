@@ -109,6 +109,7 @@ export interface OfferFormData {
   shortDescription: string; // max 120 chars
   description: string; // Rich text HTML for full description
   ageGroups: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   
   // Camp-specific details (Step 2 for CAMP type)
   campProgramType: "городской" | "выездной" | "смешанный" | null; // Only for CAMP

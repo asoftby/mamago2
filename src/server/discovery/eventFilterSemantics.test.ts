@@ -43,7 +43,7 @@ test("free requires explicit structured free state", () => {
 
 test("resolved date range becomes an ActivitySession inclusion predicate", () => {
   const dateRange = resolveEventDateRange({ from: "2026-09-12" });
-  const where = buildEventRuntimeWhere({ dateRange, free: false, districtId: null, metroId: null });
+  const where = buildEventRuntimeWhere({ dateRange, free: false, districtId: null, metroId: null, adultOnly: false });
   assert.deepEqual(where, [{ sessions: { some: { startsAt: { gte: dateRange?.start, lt: dateRange?.end } } } }]);
 });
 
@@ -60,4 +60,11 @@ test("manual geo assignment wins and auto is used only when manual is absent", (
       { metroManualId: null, metroAutoId: "metro-1" },
     ],
   });
+});
+
+test("adult-only uses the typed executable predicate", () => {
+  assert.deepEqual(
+    buildEventRuntimeWhere({ dateRange: null, free: false, districtId: null, metroId: null, adultOnly: true }),
+    [{ agePolicy: "ADULT_ONLY" }],
+  );
 });

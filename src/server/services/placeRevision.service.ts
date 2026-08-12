@@ -11,6 +11,7 @@ import {
 import { mapToCreatePayload } from "@/lib/openingHours";
 import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 
 /**
  * Data structure for revision snapshot fields
@@ -52,6 +53,7 @@ export interface PlaceRevisionData {
   instagramUrl?: string | null;
   reelsUrl?: string | null;
   ageTags?: string[];
+  agePolicy?: import("@prisma/client").AgePolicy;
   visitFormats?: string[];
   activityTypes?: string[];
   placeGroupId?: string | null;
@@ -237,6 +239,7 @@ export async function getOrCreatePlaceRevision(
       instagramUrl: place.instagramUrl,
       reelsUrl: place.reelsUrl,
       ageTags: place.ageTags,
+      agePolicy: place.agePolicy,
       visitFormats: place.visitFormats,
       activityTypes: place.activityTypes,
       faqItems: place.faqItems as Prisma.InputJsonValue,
@@ -328,6 +331,12 @@ export async function savePlaceRevisionDraft(
     : null;
   const normalizedFaqItems =
     revisionData.faqItems !== undefined ? normalizeFaqItems(revisionData.faqItems) : undefined;
+  const normalizedAge = revisionData.agePolicy !== undefined || revisionData.ageTags !== undefined
+    ? normalizeAgePolicy({
+        agePolicy: revisionData.agePolicy ?? revision.agePolicy,
+        ageTags: revisionData.ageTags ?? revision.ageTags,
+      })
+    : null;
 
   // Filter out fields that don't exist in PlaceRevision model
   // PlaceRevision uses logoImageId, not logoMediaId
@@ -388,6 +397,9 @@ export async function savePlaceRevisionDraft(
   const validDataFiltered = Object.fromEntries(
     Object.entries({
       ...validData,
+      ...(normalizedAge
+        ? { agePolicy: normalizedAge.agePolicy, ageTags: normalizedAge.ageTags }
+        : {}),
       ...(normalizedPhoneFields ?? {}),
       ...(normalizedFaqItems !== undefined
         ? { faqItems: normalizedFaqItems as unknown as Prisma.InputJsonValue }
@@ -900,6 +912,7 @@ export async function approvePlaceRevision(
         instagramUrl: revision.instagramUrl ?? revision.place.instagramUrl,
         reelsUrl: revision.reelsUrl ?? revision.place.reelsUrl,
         ageTags: revision.ageTags,
+        agePolicy: revision.agePolicy,
         visitFormats: revision.visitFormats,
         activityTypes: revision.activityTypes,
         placeGroupId: revision.placeGroupId ?? revision.place.placeGroupId,

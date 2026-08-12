@@ -35,6 +35,7 @@ export type ActivityForEventPageInput = {
   description: string | null;
   format: ActivityFormat;
   ageTags: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   priceText: string | null;
   priceFrom: number | null;
   currency: string | null;
@@ -286,7 +287,9 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   }
 
   // 02 Возраст
-  const ageBadge = ageFromPlusBadgeFromAgeTags(activity.ageTags);
+  const ageBadge = activity.agePolicy === "ADULT_ONLY"
+    ? "Только 18+"
+    : ageFromPlusBadgeFromAgeTags(activity.ageTags);
   if (ageBadge) {
     rows.push({
       id: "age",
@@ -487,7 +490,7 @@ export function buildEventPageDataFromPrismaActivity(
     citySlug,
     isPastEvent,
     discoveryIntent: discoveryIntentForActivity(),
-    ageFromBadge: ageFromPlusBadgeFromAgeTags(activity.ageTags),
+    ageFromBadge: activity.agePolicy === "ADULT_ONLY" ? "18+" : ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
     title: activity.title,
     subtitle: activity.shortDesc,

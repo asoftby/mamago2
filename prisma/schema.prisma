@@ -813,6 +813,7 @@ model Activity {
   ageMaxMonths         Int?
   ageMinMonths         Int?
   ageLabel             String?
+  agePolicy            AgePolicy                 @default(UNKNOWN)
   businessId           String?
   coverImageUrl        String?
   createdBy            String?
@@ -1177,6 +1178,7 @@ model Place {
   activityTypes                String[]
   addressJson                  Json?
   ageTags                      String[]
+  agePolicy                    AgePolicy          @default(UNKNOWN)
   category                     String?
   countryCode                  String?
   customAddress                String?
@@ -1413,6 +1415,7 @@ model PlaceRevision {
   instagramUrl          String?
   reelsUrl              String?
   ageTags               String[]
+  agePolicy             AgePolicy           @default(UNKNOWN)
   visitFormats          String[]
   activityTypes         String[]
   faqItems              Json?
@@ -1958,6 +1961,7 @@ model Offer {
   promotionalOffer         String?
   ageMinMonths             Int?
   ageMaxMonths             Int?
+  agePolicy                AgePolicy          @default(UNKNOWN)
   dateFrom                 DateTime?
   dateTo                   DateTime?
   promoTitle               String?
@@ -2604,6 +2608,7 @@ model Route {
   slug               String             @unique
   title              String
   ageTags            String[]
+  agePolicy          AgePolicy       @default(UNKNOWN)
   budgetLevel        BudgetLevel        @default(LOW)
   cityId             String?
   coverImageUrl      String?
@@ -3278,6 +3283,13 @@ enum ContentStatus {
   SCHEDULED
   /// Снято с публикации, URL обычно не отдаём
   ARCHIVED
+}
+
+enum AgePolicy {
+  UNKNOWN
+  UNRESTRICTED
+  SPECIFIC
+  ADULT_ONLY
 }
 
 enum ActivityType {

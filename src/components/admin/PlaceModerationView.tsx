@@ -63,6 +63,7 @@ interface PlaceModerationViewProps {
     instagramHandle?: string | null;
     instagramUrl?: string | null;
     ageTags: string[];
+    agePolicy?: import("@prisma/client").AgePolicy;
     visitFormats: string[];
     activityTypes: string[];
     googlePlaceId?: string | null;
@@ -420,10 +421,11 @@ export function PlaceModerationView({
           )}
 
           {/* Tags */}
-          {(place.ageTags.length > 0 || place.visitFormats.length > 0 || place.activityTypes.length > 0) && (
+          {(place.agePolicy || place.ageTags.length > 0 || place.visitFormats.length > 0 || place.activityTypes.length > 0) && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Теги</h3>
               <div className="space-y-2">
+                {place.agePolicy && place.agePolicy !== "SPECIFIC" && <div><span className="text-sm font-medium text-gray-600">Возраст: </span><span className="text-sm text-gray-700">{place.agePolicy === "ADULT_ONLY" ? "Только 18+" : place.agePolicy === "UNRESTRICTED" ? "Любой возраст" : "Возраст не указан"}</span></div>}
                 {place.ageTags.length > 0 && (
                   <div>
                     <span className="text-sm font-medium text-gray-600">Возраст: </span>

@@ -8,6 +8,7 @@ import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSeco
 import { BudgetSliderFilter } from "@/components/discovery/BudgetSliderFilter";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 
 type SecondaryFiltersFormProps = {
   intent: Intent;
@@ -36,6 +37,7 @@ export function SecondaryFiltersForm({
   }, [intent]);
 
   const { values, patch, reset } = useSecondaryFiltersFromUrl(intent);
+  const primaryFilters = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const budgetConfig = budgetCtx?.budgetConfig ?? null;
   const { clearBudget } = useBudgetFilter();
@@ -51,6 +53,7 @@ export function SecondaryFiltersForm({
   const gap = compact ? "space-y-5" : "space-y-8";
   const handleReset = () => {
     reset();
+    primaryFilters.actions.setDraft({ adultOnly: false });
     if (budgetConfig) clearBudget();
   };
 
@@ -62,8 +65,10 @@ export function SecondaryFiltersForm({
         <FilterGroupRenderer
           key={group.id}
           group={group}
-          values={values}
-          patch={patch}
+          values={group.id === "adult_only" ? { ...values, adult_only: primaryFilters.applied.adultOnly } : values}
+          patch={group.id === "adult_only"
+            ? (partial) => primaryFilters.actions.setDraft({ adultOnly: partial.adult_only === true })
+            : patch}
         />
       ))}
 

@@ -11,6 +11,7 @@ import { getDefaultFormData } from "./defaults";
     ageMinMonths: 36,
     ageMaxMonths: 60,
     ageTags: [],
+    agePolicy: "SPECIFIC",
     scheduleJson: {
       ageDetection: {
         raw: "от 0 лет",
@@ -47,6 +48,7 @@ import { getDefaultFormData } from "./defaults";
   form.title = "Event";
   form.ageRangeIds = ["3-5"];
   form.ageTags = ["3-5"];
+  form.agePolicy = "SPECIFIC";
 
   const payload = buildEventPayload(form);
 
@@ -54,6 +56,27 @@ import { getDefaultFormData } from "./defaults";
   assert.equal(payload.ageMaxMonths, 60);
   assert.equal(payload.ageLabel, "3–5 лет");
   assert.deepEqual(payload.ageTags, ["3-5"]);
+  assert.equal(payload.agePolicy, "SPECIFIC");
+}
+
+{
+  const form = getDefaultFormData();
+  form.title = "Any age event";
+  form.agePolicy = "UNRESTRICTED";
+  const payload = buildEventPayload(form);
+  assert.equal(payload.agePolicy, "UNRESTRICTED");
+  assert.deepEqual(payload.ageTags, []);
+  assert.equal(payload.ageMinMonths, null);
+  assert.equal(payload.ageMaxMonths, null);
+}
+
+{
+  const form = getDefaultFormData();
+  form.title = "Strict adult event";
+  form.agePolicy = "ADULT_ONLY";
+  const payload = buildEventPayload(form);
+  assert.equal(payload.agePolicy, "ADULT_ONLY");
+  assert.deepEqual(payload.ageTags, []);
 }
 
 console.log("event mappers tests: OK");

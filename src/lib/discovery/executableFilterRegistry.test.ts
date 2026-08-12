@@ -10,6 +10,7 @@ test("only code-owned event keys are executable", () => {
 
 test("unknown Admin definitions fail closed", () => {
   assert.equal(isExecutableAdminFilterKey("kuda", "free_only"), true);
+  assert.equal(isExecutableAdminFilterKey("kuda", "adult_only"), true);
   assert.equal(isExecutableAdminFilterKey("kuda", "activity_type"), false);
   assert.equal(isExecutableAdminFilterKey("classes", "free_only"), false);
 });

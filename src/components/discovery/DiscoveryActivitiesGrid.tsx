@@ -43,6 +43,7 @@ function filtersSignature(f: DiscoveryFilters): string {
     district: f.district,
     nearby: f.nearby,
     free: f.free,
+    adultOnly: f.adultOnly,
   });
 }
 

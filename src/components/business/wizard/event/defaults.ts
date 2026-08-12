@@ -4,6 +4,7 @@ import type { EventFormData, SocialLink } from "./types";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
 import { DEFAULT_ACTIVITY_FORMAT } from "@/domain/activities/activity-format";
+import { AgePolicy } from "@prisma/client";
 
 /** Одна стартовая строка соцсетей (Instagram, URL пустой). */
 export function createDefaultSocialLink(id?: string): SocialLink {
@@ -43,6 +44,7 @@ export function getDefaultFormData(): EventFormData {
     subcategoryId: null,
     primaryRootHasChildren: false,
     ageRangeIds: [],
+    agePolicy: AgePolicy.UNRESTRICTED,
     ageTags: [],
     ageDetection: {
       raw: null,

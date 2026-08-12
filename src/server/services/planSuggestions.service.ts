@@ -143,6 +143,9 @@ export async function listPlanSuggestionsForCity(input: {
     ...pubParts,
     ...dayFilterAnd,
     ...(exclude.length > 0 ? [{ id: { notIn: exclude } }] : []),
+    ...(ageRangeValues.some((value) => value !== "18+")
+      ? [{ agePolicy: { not: "ADULT_ONLY" as const } }]
+      : []),
   ];
 
   const ageFilterAnd: Prisma.ActivityWhereInput[] =

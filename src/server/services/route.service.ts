@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
+import type { AgePolicy, RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import {
   generateRouteSlugFromTitle,
@@ -36,6 +36,7 @@ export type RouteWithStops = {
   slug: string;
   title: string;
   ageTags: string[];
+  agePolicy: AgePolicy;
   budgetLevel: BudgetLevel;
   cityId: string | null;
   coverImageUrl: string | null;
@@ -93,6 +94,7 @@ export type RouteStopInput = {
 export type RouteWriteInput = {
   title: string;
   ageTags: string[];
+  agePolicy: AgePolicy;
   budgetLevel?: BudgetLevel;
   visibility: RouteVisibility;
   publish?: boolean;
@@ -403,6 +405,7 @@ export async function createRoute(
   data: {
     title: string;
     ageTags: string[];
+    agePolicy: AgePolicy;
     budgetLevel?: BudgetLevel;
     visibility: RouteVisibility;
     publish?: boolean;
@@ -439,6 +442,7 @@ export async function createRoute(
       slugUpdatedAt: new Date(),
       title: data.title,
       ageTags: data.ageTags,
+      agePolicy: data.agePolicy,
       budgetLevel,
       coverImageUrl,
       cityId,
@@ -537,6 +541,7 @@ export async function updateRoute(
     const routeScalarUpdate = {
       title: data.title,
       ageTags: data.ageTags,
+      agePolicy: data.agePolicy,
       budgetLevel,
       visibility: data.visibility,
       status,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { AgePolicy, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
@@ -70,8 +71,9 @@ const updateOfferSchema = z.object({
   }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
-  ageMinMonths: z.number().optional(),
-  ageMaxMonths: z.number().optional(),
+  agePolicy: z.nativeEnum(AgePolicy).optional(),
+  ageMinMonths: z.number().nullable().optional(),
+  ageMaxMonths: z.number().nullable().optional(),
   coverImage: z.string().optional(),
   gallery: z.array(z.string()).optional(),
   /** Видео URL (YouTube, YouTube Shorts, Instagram Reels) */
@@ -254,6 +256,9 @@ export async function PATCH(
         productType: true,
         priceFrom: true,
         priceText: true,
+        agePolicy: true,
+        ageMinMonths: true,
+        ageMaxMonths: true,
         campProgramType: true,
         campSessions: true,
         placeId: true,
@@ -346,8 +351,16 @@ export async function PATCH(
     
     if (data.title !== undefined) updateData.title = data.title;
     if (data.shortDescription !== undefined) updateData.description = data.shortDescription;
-    if (data.ageMinMonths !== undefined) updateData.ageMinMonths = data.ageMinMonths;
-    if (data.ageMaxMonths !== undefined) updateData.ageMaxMonths = data.ageMaxMonths;
+    if (data.agePolicy !== undefined || data.ageMinMonths !== undefined || data.ageMaxMonths !== undefined) {
+      const normalizedAge = normalizeAgePolicy({
+        agePolicy: data.agePolicy ?? existingOffer.agePolicy,
+        ageMinMonths: data.ageMinMonths !== undefined ? data.ageMinMonths : existingOffer.ageMinMonths,
+        ageMaxMonths: data.ageMaxMonths !== undefined ? data.ageMaxMonths : existingOffer.ageMaxMonths,
+      });
+      updateData.agePolicy = normalizedAge.agePolicy;
+      updateData.ageMinMonths = normalizedAge.ageMinMonths;
+      updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
+    }
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
     if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;

@@ -56,6 +56,7 @@ export async function getKudaDiscoveryFeed(
         free: false,
         districtId: null,
         metroId: null,
+        adultOnly: false,
       }),
       ...pubParts,
     ],

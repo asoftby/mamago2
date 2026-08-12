@@ -29,3 +29,11 @@ test("reset serialization from an empty base clears primary, secondary, and budg
   assert.notEqual(stale.toString(), params.toString());
   assert.equal(getDiscoveryFilterActiveCount(defaultFilters), 0);
 });
+
+test("adultOnly round-trips and contributes to unified active count", () => {
+  const filters = { ...defaultFilters, adultOnly: true };
+  const params = serializeAppliedToSearchParams(new URLSearchParams(), filters);
+  assert.deepEqual(parseAppliedFromUrl(params as never), filters);
+  assert.equal(params.get("adultOnly"), "true");
+  assert.equal(getDiscoveryFilterActiveCount(filters), 1);
+});

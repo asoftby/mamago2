@@ -11,6 +11,7 @@ export const EVENT_EXECUTABLE_FILTER_KEYS = [
   "format",
   "district",
   "metro",
+  "adultOnly",
 ] as const;
 
 export type EventExecutableFilterKey = (typeof EVENT_EXECUTABLE_FILTER_KEYS)[number];
@@ -23,7 +24,7 @@ export function isExecutableEventFilterKey(key: string): key is EventExecutableF
 
 const EXECUTABLE_ADMIN_KEYS: Readonly<Partial<Record<Intent, ReadonlySet<string>>>> = {
   // This legacy DB definition maps to the code-owned `free` query semantics.
-  kuda: new Set(["free_only"]),
+  kuda: new Set(["free_only", "adult_only"]),
 };
 
 export function isExecutableAdminFilterKey(intent: Intent, key: string): boolean {

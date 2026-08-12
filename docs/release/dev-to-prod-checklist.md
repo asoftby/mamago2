@@ -21,9 +21,9 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 10 (`nokids` / strict 18+ / unrestricted age) —
-                     STATUS: AUDIT_COMPLETE. Recommended typed four-state age
-                     policy and minimal implementation scope await owner
-                     approval; no application implementation or deployment.
+                     STATUS: COMPLETE_PENDING_DEV_SMOKE. Owner-approved typed
+                     four-state implementation is complete locally; DEV/PROD
+                     were not deployed. Owner controls DEV deployment/smoke.
 Prior — Task 9 (Filters & Quick Access) — STATUS:
                      COMPLETE. Owner-approved Events-first implementation is
                      finished: fixed quick filters, code-owned typed semantics,
@@ -34,7 +34,7 @@ Prior — Task 9 (Filters & Quick Access) — STATUS:
                      real proximity. No migration/new Admin architecture. Tests,
                      tsc, eslint, production build, and desktop/375px browser
                      verification are green. Full evidence in Task 9 below.
-                     Task 10 audit is now complete and awaiting owner approval.
+                     Task 10 implementation is complete pending owner DEV smoke.
 Prior — Task 8 (Schema.org / Structured Data) — STATUS:
                      COMPLETE. Audit found no P0/P1 (see prior entry).
                      Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
@@ -75,8 +75,8 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-12
-Last updated by:    Codex — Task 10 audit complete; no application implementation
-                     or deployment. Task 11 remains TODO and untouched.
+Last updated by:    Codex — Task 10 implementation complete pending owner DEV
+                     smoke; no DEV/PROD deployment. Task 11 remains TODO.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -3284,7 +3284,8 @@ at runtime.
 
 Priority: `P0`
 
-STATUS: `AUDIT_COMPLETE` — owner approval required before implementation.
+STATUS: `COMPLETE_PENDING_DEV_SMOKE` — owner-approved implementation completed
+locally 2026-08-12; owner controls DEV deployment and smoke.
 AUDIT: **Completed 2026-08-12 at `0d92ea85`. Audit only; no application,
 schema, data, deployment, or PROD changes.**
 
@@ -3482,16 +3483,43 @@ non-strict formatting do not justify release-scope refactoring.
    unrestricted inclusion; Search refresh; ranking unchanged among eligible
    rows. Browser verify desktop + 375px editors, cards/detail and filter.
 
-GAPS: Owner decision on the typed four-state model and whether all four
-publication fields land atomically. Rerun actual-DEV census before approving any
-data correction/backfill.
-IMPLEMENTATION: — (intentionally not started)
-COMMITS: pending audit docs commit.
-VERIFICATION: Read-only source/Prisma/migration/runtime tracing and actual DEV
-DB identity check. Census blocked by SSH timeouts; no counts claimed.
-DEV SMOKE: — (not deployed; prohibited in this phase)
-BLOCKERS: Implementation intentionally blocked on owner approval; no audit
-blocker to the recommendation.
+GAPS: BACKLOG-069 remains open for reviewed legacy classification. The bounded
+read-only DEV census found 8 published Activities: 1 structured SPECIFIC
+candidate, 7 null-range/unknown candidates, 1 ordinary structured `18+`, 1
+contradictory structured row, and 0 text-only `18+` candidates. No rows were
+mutated and no strict/unrestricted state was inferred.
+IMPLEMENTATION: Added shared Prisma `AgePolicy` (`UNKNOWN`, `UNRESTRICTED`,
+`SPECIFIC`, `ADULT_ONLY`) to Activity/Offer/Place/PlaceRevision/Route with the
+hand-written `20260812190000_add_age_policy` migration and conservative
+SPECIFIC-only backfill. Shared write-boundary normalization rejects invalid
+tags, inverted bounds, missing SPECIFIC data, and policy/data contradictions.
+Event, Offer, Place and Route create/edit state now exposes mutually exclusive
+`Любой`, ordinary age chips (including SPECIFIC `18+`) and `Только 18+`;
+Event unrestricted publication is allowed; Route `Любой` stores no enumerated
+buckets; PlaceRevision moderation preserves the policy. Admin lists/moderation,
+Event detail/cards and Search render strict policy truthfully without labelling
+UNKNOWN as unrestricted. Imports write SPECIFIC only from valid structured
+evidence, otherwise UNKNOWN. No SEO change was required.
+FILTER/ELIGIBILITY: Added typed `adultOnly=true` through executable allowlist,
+URL/store/runtime predicate/count/reset and Admin presentation configuration.
+Child discovery removes ADULT_ONLY before partition/fallback/ranking, and Plan
+suggestions apply the same hard eligibility boundary; UNRESTRICTED stays
+eligible and existing ranking among eligible rows is unchanged.
+COMMITS: implementation commit pending final gates.
+VERIFICATION: 20 focused Task 10 tests pass; Prisma schema valid; whole-repo
+TypeScript clean; targeted ESLint 0 errors (19 pre-existing warnings); migration
+SQL applied successfully to local PostgreSQL for smoke and reviewed; diff check
+clean. Browser verified Events filter on desktop and 375px (control, count,
+URL toggle/reload, Reset, no request loop or console error) and Route selector
+on 375px (`Любой` does not enumerate buckets; specific/strict transitions are
+exclusive). Protected Event/Offer/Place screens had no authenticated local
+browser session; their persistence/hydration paths are covered by typed tests
+and full compile gates rather than a fabricated browser login. `pnpm
+check:push` completed with exit 0 (production build compiled and generated all
+388 pages); the sandboxed build workers emitted the repository's tolerated
+local-DB-unreachable fallback logs during prerender, without failing the gate.
+DEV SMOKE: pending owner deployment; Codex did not deploy DEV or touch PROD.
+BLOCKERS: none for implementation; owner-controlled DEV deploy/smoke remains.
 BACKLOG/NOTES: BACKLOG-069 added; BACKLOG-004 already covers Plan null-array.
 Task 11 remains TODO and untouched.
 
