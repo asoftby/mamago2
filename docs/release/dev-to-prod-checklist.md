@@ -20,7 +20,11 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 9 (Filters & Quick Access) — STATUS:
+Active task:        Task 10 (`nokids` / strict 18+ / unrestricted age) —
+                     STATUS: AUDIT_COMPLETE. Recommended typed four-state age
+                     policy and minimal implementation scope await owner
+                     approval; no application implementation or deployment.
+Prior — Task 9 (Filters & Quick Access) — STATUS:
                      COMPLETE. Owner-approved Events-first implementation is
                      finished: fixed quick filters, code-owned typed semantics,
                      ActivitySession/Minsk-time date execution, structured Free,
@@ -30,7 +34,7 @@ Active task:        Task 9 (Filters & Quick Access) — STATUS:
                      real proximity. No migration/new Admin architecture. Tests,
                      tsc, eslint, production build, and desktop/375px browser
                      verification are green. Full evidence in Task 9 below.
-                     Task 10 remains TODO and untouched.
+                     Task 10 audit is now complete and awaiting owner approval.
 Prior — Task 8 (Schema.org / Structured Data) — STATUS:
                      COMPLETE. Audit found no P0/P1 (see prior entry).
                      Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
@@ -71,8 +75,8 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-12
-Last updated by:    Codex — Task 9 audit complete; no application implementation
-                     or deployment. Task 8 remains complete; Task 10 remains TODO.
+Last updated by:    Codex — Task 10 audit complete; no application implementation
+                     or deployment. Task 11 remains TODO and untouched.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -3280,15 +3284,216 @@ at runtime.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `AUDIT_COMPLETE` — owner approval required before implementation.
+AUDIT: **Completed 2026-08-12 at `0d92ea85`. Audit only; no application,
+schema, data, deployment, or PROD changes.**
+
+### A/B. Current model and semantic truth
+
+| Entity/runtime | Stored age data | Writers | Principal readers | Present meaning |
+|---|---|---|---|---|
+| `Activity` (Event/Program/Class legacy Activity types) | nullable `ageMinMonths`, `ageMaxMonths`, `ageLabel`; non-null Postgres `ageTags[]`; optional age detection inside `scheduleJson` | Event Wizard/API, legacy activities-v2 API, generic import publisher | Event cards/detail, discovery, SearchDocument, My Plan, recommendations | suitability/recommended range; empty/null is ambiguously treated as unrestricted or missing |
+| `ActivitySession` | none | — | scheduling only | irrelevant |
+| `Offer` (services, regular activities/classes, camps, party/birthday offers) | nullable `ageMinMonths`/`ageMaxMonths`; no `ageTags` | Offer Wizard/API and Phoenix offer writer | classes/program discovery, cards/detail, Ideas | suitability range; null/null means absent/unrestricted but provenance is lost |
+| `Place` + `PlaceRevision` | non-null `ageTags[]` | Place Wizard/API, revision/moderation/import | Place cards/detail/search/moderation | suitability; live Wizard deliberately defines `[]` as “Любой возраст” |
+| `Route` | non-null `ageTags[]` | Route editor/API/import | route cards/detail/search | suitability; current “Любой” incorrectly stores every bucket on first click |
+| User/family audience | Child DOB/persona → URL age buckets, including adult persona → `18+` | family/profile stores | discovery/My Plan | viewer age, not admission restriction |
+| Signal/taxonomy/filter rows | canonical age signal includes ordinary `18+`; generic `FilterDefinition`/`FilterOption` presentation records | seed/Admin | Wizard taxonomy loading/filter presentation | metadata/presentation, not strong adult-only truth |
+
+Allowed canonical buckets are `0-1`, `1-3`, `3-5`, `5-7`, `7-9`, `9-12`,
+`12-14`, `14-16`, `16-18`, `18+`. Validators generally check shape/presence,
+not cross-field consistency. There is no `nokids`, `adultOnly`, admission-age,
+or age-provenance field anywhere in Prisma/runtime.
+
+The existing representation does **not** distinguish all required states:
+specific suitability is representable; `18+` is adult suitability rather than
+proven strict admission; deliberately unrestricted and unknown/missing both
+collapse to empty tags/null bounds; malformed legacy values take inconsistent
+fallback paths; strict adult-only is not representable unambiguously.
+
+**Critical conclusion: PARTIAL/NO — `ageMinMonths >= 216` or `ageTags=["18+"]`
+must not derive `nokids`.** Evidence: `AGE_OPTIONS` defines `18+` as the last
+ordinary suitability bucket; `audienceSyncMapper` and `FamilyDerivedAgeSync`
+emit it for a selected adult persona; discovery treats it as an overlapping
+age range; age text detection maps both numeric `18+` and “взросл…” to it; all
+age-aware editors permit it beside child buckets. Mixed adult/child buckets are
+legal today. No path asserts admission restriction.
+
+### C/D. Live editor matrix and Event end-to-end
+
+| Live surface | Content | UI / storage | Multi-select / shared? | Unrestricted now | Strict 18+ now | Change |
+|---|---|---|---|---|---|---|
+| Event create/edit (`EventWizard`) | `Activity(EVENT)` | Step1 chips → `ageRangeIds` + `ageTags` → derived bounds/label → events API → DB; edit prefers `scheduleJson.ageRangeIds`, then tags/range/label | yes; Event-specific | UI can clear, but publish rejects empty tags | no; `18+` is ordinary | required |
+| Offer create/edit (`OfferWizard`) | service/regular activity/class/program/camp/birthday offer | chips `ageGroups` → combined bounds → Offer API; hydration expands bounds | yes; duplicated | empty maps to null/null; warning only | no | required |
+| Place create/edit (`PlaceWizard`) | Place/revision | canonical chips → `ageTags` | yes; Place-specific | already correct UI: “Любой возраст” ⇄ `[]` | no | adult state if approved |
+| Route create/edit (`RouteEditor`) | Route | chips → `ageTags` | yes; Route-specific | **incorrect:** “Любой” first enumerates all ten buckets | no | required |
+| Admin Event/Offer lists + moderation | Event/Offer | status/list actions, no age editor | n/a | not visible/editable | no | required for truthful review |
+| Admin Place moderation | Place/revision | generic age-tag diff/review | separate | sees tags/empty, not provenance | no | adapter if approved |
+| Birthday builder | user planning input, not a content editor | child persona/signals; explicitly excludes 18+ | child-only | n/a | n/a | none |
+
+There are no separate live Class/Program/Birthday content Wizards: those are
+Offer Wizard product variants. Business and content-editor routes reuse the
+same Event/Offer/Place Wizards. Dead/UI-lab forms were not counted.
+
+Event specific buckets round-trip through tags, combined bounds, label and
+`scheduleJson.ageRangeIds`. Unrestricted becomes empty/null but fails both Event
+submit endpoints (“Выберите возраст” / “At least one age tag is required”).
+`18+` round-trips only as recommended age 18+. APIs accept arrays and nullable
+bounds independently and do not reject contradictions.
+
+### E. Admin audit
+
+Admin Event/Offer pages do not expose the age source of truth, so moderators
+cannot see or correct strict intent. Place moderation displays revision tags but
+has no explicit policy. No Admin-only adult representation exists and no DB/API
+invariant prevents adult + child/unrestricted contradictions. Minimal work must
+use the same typed source; generic tags must not define strictness.
+
+### F/G. Actual DEV and legacy/import findings
+
+Read-only access confirmed actual DEV DB identity `devmamago/public` in
+`dev-db-1`. The subsequent bounded census (published totals, empty/structured/
+18+/contradictory and text-only candidates) could not complete because SSH to
+the DEV host repeatedly timed out. Local `localhost:5433/mamago2` was also
+unavailable. Counts are explicitly **UNKNOWN, not guessed**; rerun before any
+backfill approval.
+
+The generic importer detects text and writes buckets/bounds; “взросл…” and
+`18+` become the ordinary suitability bucket, so strict meaning is not
+preserved. The WordPress/Phoenix normalizer extracts `ageEvidence` from
+meta/terms/text, but Phoenix `EventCommitWriter` persists neither tags nor
+bounds, losing structured age meaning at Activity commit. Do not parse public
+copy into truth automatically. Text-only/empty rows remain `UNKNOWN`; reviewed
+classification is BACKLOG-069.
+
+### H. Public rendering map
+
+| Surface | Current renderer | Current behavior / gap |
+|---|---|---|
+| `/[city]/events`, main discovery, homepage rail, recommendations | `ActivityCard`, discovery mapper, `activityAgeBounds` | renders `${ageFrom}+`; cannot distinguish strictness; empty/malformed may fall back to `0–12`/`0+` |
+| Search | `resolveActivityAgeLabel` → `SearchDocument.metaLine` | prefers arbitrary label, then tags/bounds; update indexer rebuilds, but strict state is absent |
+| My Ideas / My Plan | several helpers or raw `ageLabel` | inconsistent fallbacks; strict eligibility absent |
+| Event detail | `buildEventPageDataFromPrisma` age badge/fact | minimum `N+`; strict intent is not explicit; unrestricted usually has no fact |
+
+Smallest truthful rendering: strict policy gets `18+` on cards/Search and
+“Только 18+” on detail; unrestricted gets no card badge; unknown must never be
+labelled “Любой возраст”.
+
+### I/J. Task 9 integration and public age filter
+
+Reuse the live URL/store/partition architecture and extend
+`EVENT_EXECUTABLE_FILTER_KEYS`; do not revive the dead parallel stack. Proposed
+code-owned URL key is `adultOnly=true`; Admin may enable/order/place and label it
+but cannot define meaning. It must participate in URL reload/back, unified count,
+Reset All, mobile/desktop and `buildEventRuntimeWhere`; unknown keys remain
+fail-closed and `sec` carries no executable meaning.
+
+Current age filtering partitions a bounded candidate list by overlap. If no
+primary matches it deliberately recovers the whole feed, and engaged mismatches
+may enter a secondary block. A strict Event can therefore appear for child age
+5 today. When any child bucket is active, typed adult-only rows must be removed
+from both primary and fallback/secondary candidates **before ranking**.
+Unrestricted remains eligible; specific ages retain current behavior; unknown
+keeps existing conservative/default behavior but is never called unrestricted.
+“Любой” is editor state, not a public filter/query parameter.
+
+### K/L/M. Family, recommendations, Search, ranking
+
+My Plan suggestions treat `ageTags=[]` as unrestricted and `hasSome(selected)`
+as specific; SQL null compatibility is already BACKLOG-004. Family persona
+selection emits adult/child buckets, while discovery can surface mismatches.
+Apply hard child-context exclusion at existing discovery and Plan suggestion/
+generation eligibility boundaries; build no new personalization system.
+
+Search indexes age text and normal mutation side effects rebuild documents.
+MVP adds the typed strict label to Activity SearchDocument construction and
+verifies refresh; Search has no child context, so no contextual filtering
+redesign. Task 5 ranking remains unchanged: eligibility first, then current
+engagement/weather/business ranking—no adult penalty/boost. **NO SEO CHANGE
+REQUIRED:** no proven supported Event JSON-LD property warrants reopening Task 8.
+
+### N/O/P/Q. Decisions
+
+**Strict model: OPTION C — NEW EXPLICIT TYPED FIELD.** Recommend an enum such
+as `AgePolicy = UNKNOWN | UNRESTRICTED | SPECIFIC | ADULT_ONLY` on each live
+age-aware publication (`Activity`, `Offer`, `Place`/revision, `Route`), rather
+than a Boolean that still conflates unknown and unrestricted. Tags/bounds remain
+suitability only. Invariants:
+
+- `UNKNOWN`: no asserted policy and no specific data;
+- `UNRESTRICTED`: deliberate “Любой”, no specific data;
+- `SPECIFIC`: valid buckets/bounds, including ordinary adult suitability `18+`;
+- `ADULT_ONLY`: strict restriction; all specific child/hidden ages cleared.
+
+Migration: yes, hand-written; no index. Mechanically backfill `SPECIFIC` only
+where valid structured data exists; all other existing rows `UNKNOWN`. No
+automatic adult-only/unrestricted backfill. Imports set `SPECIFIC` only from
+trusted structured evidence; strict source evidence needs an explicit trusted
+mapping or reviewed manifest.
+
+**“Любой” storage:** `agePolicy=UNRESTRICTED`, `ageTags=[]`, bounds null; API
+and form carry the discriminated policy. Hydration reads it explicitly. It
+**does not enumerate all ages**. Selecting a bucket sets `SPECIFIC`; selecting
+strict sets `ADULT_ONLY`; every transition clears incompatible state.
+
+**Shared selector: PARTIAL.** Options/normalization are shared, but four live
+editors render separately and Offer stores bounds. Add one small canonical
+age-state helper/controller plus Event/Place/Route tag adapters and an Offer
+bounds adapter; no global forms refactor.
+
+Wording: internal key/URL `adultOnly`; editor choices “Любой”, normal specific
+chips (including “18+” as suitability) and separate “Только 18+”. Public compact
+badge/filter “18+”; detail/Admin explanation “Только 18+”. Avoid “Без детей”
+because it may describe positioning rather than a strict boundary.
+
+### R/S. Severity and deferred work
+
+P0/P1 first-PROD gaps: strict truth cannot be stored; Event unrestricted cannot
+publish; child discovery/recommendation fallbacks lack a hard strict-adult
+exclusion; APIs can persist contradictory age fields. These do not prove any
+current `18+` row is strict.
+
+P2/P3: legacy empty/text-only classification is BACKLOG-069. BACKLOG-004 covers
+the separate Plan `ageTags NULL`/`[]` defect. UI duplication and nicer
+non-strict formatting do not justify release-scope refactoring.
+
+### T. Minimal implementation proposal for owner approval
+
+1. Add `AgePolicy` fields to Activity, Offer, Place, PlaceRevision and Route;
+   hand-written migration; backfill only provable `SPECIFIC`, otherwise
+   `UNKNOWN`; no index or adult/text backfill.
+2. Add one invariant helper/schema shared by APIs/imports: canonical tags,
+   min<=max, and no specific data with `UNRESTRICTED`/`ADULT_ONLY`.
+3. Add shared policy-selector behavior with narrow adapters to Event, Offer,
+   Place and Route. Remove Event empty-age rejection; fix Route enumeration;
+   hydrate explicit policy.
+4. Expose the same policy in Admin moderation/edit review.
+5. Add shared strict label to Event cards/detail/Search; no unrestricted card
+   noise and no unknown-as-unrestricted fallback.
+6. Extend Task 9 with executable `adultOnly=true`, Admin-controlled
+   presentation, server predicate, URL/count/reset/mobile/desktop behavior.
+7. Exclude adult-only before discovery fallback/ranking and in Plan suggestion/
+   generation child contexts; keep ranking scores unchanged.
+8. Search: policy-aware builder and update reindex proof. No SEO, external API,
+   cache, job, N+1 or deployment work.
+9. Focused tests: four-state/contradiction validation; Wizard transitions,
+   persistence and hydration; Offer adapter; Route non-enumeration; Admin;
+   filter result/URL/count/reset; child exclusion including fallback and
+   unrestricted inclusion; Search refresh; ranking unchanged among eligible
+   rows. Browser verify desktop + 375px editors, cards/detail and filter.
+
+GAPS: Owner decision on the typed four-state model and whether all four
+publication fields land atomically. Rerun actual-DEV census before approving any
+data correction/backfill.
+IMPLEMENTATION: — (intentionally not started)
+COMMITS: pending audit docs commit.
+VERIFICATION: Read-only source/Prisma/migration/runtime tracing and actual DEV
+DB identity check. Census blocked by SSH timeouts; no counts claimed.
+DEV SMOKE: — (not deployed; prohibited in this phase)
+BLOCKERS: Implementation intentionally blocked on owner approval; no audit
+blocker to the recommendation.
+BACKLOG/NOTES: BACKLOG-069 added; BACKLOG-004 already covers Plan null-array.
+Task 11 remains TODO and untouched.
 
 AUDIT FIRST existing age restrictions / 18+ / audience models / tags /
 filters. Do not automatically create a new DB field — first determine

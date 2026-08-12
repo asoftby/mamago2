@@ -1953,3 +1953,33 @@ P3 — cleanup / polish / optional
   control with accurate copy.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 9 implementation (Filters
   & Quick Access), 2026-08-12.
+
+## [BACKLOG-069] Classify legacy records with missing age provenance
+
+- Status: OPEN
+- Priority: P2
+- Area: Content data / Age semantics
+- Added: 2026-08-12
+- Reason deferred: Task 10 must establish truthful typed semantics for new
+  edits, but legacy rows with no age tags/range cannot be automatically
+  classified as deliberately unrestricted versus simply unknown. Text matching
+  is not authoritative enough for an automatic release-blocking backfill.
+- Context: `Activity.ageTags=[]` plus null month bounds is currently both a
+  runtime unrestricted fallback and the default/absence state. The WordPress
+  normalizer preserves `ageEvidence`, including textual `18+`, in normalized
+  migration evidence, but the Phoenix `EventCommitWriter` does not persist that
+  evidence into Activity age fields. A bounded actual-DEV census was attempted
+  during Task 10 audit; after the DEV DB identity was confirmed, the SSH
+  endpoint became unavailable, so row counts remain unproven rather than
+  guessed.
+- Current state: rows with valid structured age values can be classified
+  mechanically as age-specific during Task 10; empty legacy rows must remain
+  `UNKNOWN`. Text-only `18+` rows need a reviewed correction manifest, not
+  regex writes.
+- Dependencies: owner approval and implementation of Task 10's canonical
+  age-policy model.
+- Acceptance criteria: capture a read-only DEV census; export text-only,
+  malformed, and contradictory candidates to a bounded review manifest;
+  correct approved rows idempotently; never silently promote unknown rows to
+  unrestricted or adult-only.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 10 audit, 2026-08-12.
