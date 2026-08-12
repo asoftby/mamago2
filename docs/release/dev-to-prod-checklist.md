@@ -20,11 +20,12 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 10 (`nokids` / strict 18+ / unrestricted age) —
-                     STATUS: COMPLETE. Owner-approved typed four-state
-                     implementation shipped; DEV `dev-282` / OCI
-                     `a40db0ac…` smoke + persisted DB proof closed Task 10.
-                     Task 11 remains TODO and untouched.
+Active task:        Task 11 (Article Gallery Visual Types) — STATUS:
+                     COMPLETE. Carousel, Mosaic, and full-width Sequential
+                     shipped in `390fefeb`; DEV `dev-283` OCI revision matches
+                     exactly. Focused tests, canonical build, local editor/
+                     public/legacy desktop+375px smoke, and owner-approved DEV
+                     verification are green. No DB migration was required.
 Prior — Task 9 (Filters & Quick Access) — STATUS:
                      COMPLETE. Owner-approved Events-first implementation is
                      finished: fixed quick filters, code-owned typed semantics,
@@ -75,10 +76,8 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-12
-Last updated by:    Cursor — Task 10 CLOSED COMPLETE after DEV `dev-282`
-                     375px smoke + read-only DEV DB proof
-                     (`agePolicy=ADULT_ONLY`, empty `ageTags`, `status=DRAFT`).
-                     Task 11 remains TODO and untouched.
+Last updated by:    Codex — Task 11 CLOSED COMPLETE after DEV `dev-283`
+                     revision proof and owner approval of sufficient DEV smoke.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -144,7 +143,7 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–9 are CLOSED, COMPLETE. Tasks 10–17 remain TODO,
+Unresolved P0/P1:   Tasks 1–11 are CLOSED, COMPLETE. Tasks 12–17 remain TODO,
                      not started.
 ```
 
@@ -3553,15 +3552,45 @@ from family/kids content without unnecessary model duplication.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE`
+AUDIT: Existing `Article.contentJson` v1 already had typed image/gallery blocks,
+the shared Admin editor, MediaAsset-backed upload/library/reorder, preview/public
+resolution, and the same `ArticleMvpView` path for continuous reading. Gallery
+stored `mediaIds` plus an optional block caption; the renderer used a mobile
+scroll rail/desktop grid but dropped per-asset alt/caption/dimensions and had no
+saved presentation choice. Breaking News had a separate gallery layout.
+GAPS: Add exactly three persisted presentation modes; preserve deterministic
+legacy behavior; resolve MediaAsset alt/caption/dimensions; use one stable,
+responsive renderer across preview, public, Breaking News, and continuous
+reading; retain optimized responsive image delivery without a schema migration.
+IMPLEMENTATION: Added optional gallery `presentation` (`carousel`, `mosaic`,
+`sequential`) inside the existing JSON block, with `mosaic` as the no-mode legacy
+fallback and Carousel as the new-block default. The editor uses existing Select
+conventions and save/hydration path. Shared `ArticleGallery` renders Carousel
+(scroll-snap, controls, touch/horizontal gesture), Mosaic (bounded responsive
+grid), and full-width Sequential (asset aspect ratio, contain, stable spacing).
+Resolved gallery media now carry URL, alt/title fallback, caption, width, and
+height. Standard, preview, Breaking News, and continuous reading all consume the
+same resolved component. No Prisma/data migration and no destructive rewrite.
+COMMITS: `390fefeb9bcf3761494ff8f4495ca67c6723ba7f` (implementation);
+checklist closure commit follows this entry.
+VERIFICATION: `pnpm test:article-gallery`, `tsc --noEmit`, changed-file ESLint,
+`git diff --check`, and canonical `pnpm check:push`/pre-push production build are
+green. Focused regression covers save/parse hydration for all modes, legacy
+no-mode fallback, one/multiple images, optional captions, alt preservation, and
+renderer selection. Local browser smoke used a disposable Article with all three
+modes: desktop 1280 (`clientWidth=scrollWidth=1280`) and mobile 375
+(`clientWidth=scrollWidth=375`) were green; Carousel controls and horizontal
+gesture moved the rail; captions/alts survived; no console errors. Imported
+Article `grand-bublik-prosto-ozhivshaja-usadba-gjetsbi-i-otel-grand-budapesht`
+rendered its no-mode gallery as Mosaic with MediaAsset alt values.
+DEV SMOKE: Owner deployed and approved the DEV verification as sufficient.
+Read-only infrastructure proof: `dev-app-1` running image
+`ghcr.io/asoftby/mamago2:dev-283`; OCI revision exactly
+`390fefeb9bcf3761494ff8f4495ca67c6723ba7f`; `dev-db-1` healthy. Owner explicitly
+approved closure after testing. No P0/P1 was reported.
+BLOCKERS: none.
+BACKLOG/NOTES: No new Task 11 P2/P3 item. PROD untouched; Task 12 not started.
 
 AUDIT FIRST Article block/editor/gallery infrastructure: image blocks,
 gallery blocks, editor, frontend rendering, imported galleries, continuous
