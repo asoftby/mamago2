@@ -20,75 +20,31 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 7 (Day Scenario) — STATUS:
-                     COMPLETE_PENDING_BROWSER_SMOKE (still not flipped to
-                     COMPLETE). SSH access to DEV was restored in a
-                     follow-up round: created isolated QA fixtures (one
-                     disposable real account + 4 DB-inserted PlanItems) and
-                     ran all 12 requested interactive checks against the
-                     still-running `dev-274`/`c10398f2` (no redeploy). 11 of
-                     12 GREEN: 3-item CTA, populated Scenario creation,
-                     fixed-time display, "Гибкое время" labeling,
-                     conflict detection, "План изменился", "Обновить
-                     сценарий" preserving overrides, no duplicate
-                     DayScenario, mobile 375px. 1 RED, a real bug: assigning
-                     a flexible item's time via "Назначить время" displayed
-                     back 3 hours off (the DEV container runs UTC with no
-                     TZ set; the write path parsed the "HH:MM" input using
-                     that ambient server timezone while every display uses
-                     the browser's). Root-caused and fixed
-                     (`localWallClockToUtc()` in
-                     `src/lib/date/localDateKey.ts`, explicit
-                     Europe/Minsk conversion, no ambient-timezone
-                     dependency — caught and corrected a same-class bug in
-                     the fix's own first draft via testing under forced
-                     TZ=UTC/America/New_York). Fix is committed + tested
-                     locally but NOT deployed this session (out of scope
-                     per instruction) — cannot be re-verified live until
-                     the next deploy. All QA fixtures (both rounds)
-                     confirmed fully removed from real DEV. Task 6 COMPLETE.
+Active task:        Task 8 (Schema.org / Structured Data) — STATUS:
+                     AUDIT_IN_PROGRESS. Audit-only pass per owner
+                     instruction: build the page-type audit matrix, no
+                     implementation, no Task 9 start.
+Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
+                     2026-08-12; not reopened for P2/P3 UX/cleanup
+                     findings). Accepted final state: standalone Scenario
+                     page, 3+ My Plan CTA, persistence/reopen, flexible
+                     time assignment, timezone-safe time handling
+                     (`localWallClockToUtc()`), effective-time consistency
+                     between My Plan and Scenario, category/meta cleanup,
+                     structured Scenario address, conflict detection,
+                     plan-changed reconciliation, ownership isolation, no
+                     Google Routes dependency. Full detail, including the
+                     owner-authored post-smoke fix commits (`49e7ef49`,
+                     `98eed7d3`, `56d2d8a4`), in Task 7's own OWNER CLOSURE
+                     entry below.
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
-Last updated:       2026-08-11
-Last updated by:    Claude Code — Task 7 (Day Scenario) UX/functional
-                     completion phase, on top of the already-accepted
-                     backend foundation (schema, persistence, fingerprint,
-                     conflict detection, ownership isolation, no Google
-                     Routes — all preserved unchanged). This phase: (1)
-                     traced "Без времени" to a real data-projection gap —
-                     `PlanItem.startsAt` genuinely null for some add-flows
-                     even when the Activity has one unambiguous
-                     `ActivitySession` — and fixed it by recovering that
-                     time only when truly unambiguous (0 or 2+ same-date
-                     sessions still correctly fall through, never guessed);
-                     (2) added Scenario-specific flexible-time assignment
-                     (new `DayScenarioItemOverride` model, hand-written
-                     migration, structural ownership checks, no client-
-                     trusted ids) that participates in sorting and conflict
-                     detection and survives "План изменился" reconciliation
-                     (kept for retained items, FK-cascade-dropped for
-                     removed ones); (3) found and fixed a real product
-                     inconsistency — the My Plan overlay panel always said
-                     "Собрать сценарий дня" even when a Scenario already
-                     existed, unlike the full page — by threading Scenario
-                     status through the *existing* per-date
-                     `/api/save/plan/day` fetch (no new round trip, no
-                     polling); (4) redesigned the timeline (time as primary
-                     visual anchor, "Гибкое время" instead of "Без
-                     времени", removed price from Scenario cards entirely —
-                     the new Scenario-only query doesn't even select price
-                     fields anymore, closing that bug class by construction
-                     rather than hiding it in the UI). Free-gap/end-of-day
-                     summary are fully implemented but honestly never
-                     fabricate — no reliable duration field exists anywhere
-                     in the schema today, confirmed by full-schema grep.
-                     `tsc`/`eslint`/`pnpm test:day-scenario`/`pnpm
-                     check:push` all green; extensive browser verification
-                     including override persistence-across-reload and the
-                     full plan-changed→refresh→override-preservation round
-                     trip. Not yet deployed to actual DEV — that step is
-                     owner-controlled. Full detail in Task 7's own section
-                     below.
+Last updated:       2026-08-12
+Last updated by:    Claude Code — Task 7 closure (owner decision) + Task 8
+                     audit kickoff. Did not re-verify Task 7 code; recorded
+                     the owner's explicit closure decision and the
+                     already-committed post-smoke fixes into the checklist.
+                     Full detail in Task 7's own section below.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -154,9 +110,8 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1–6 (all CLOSED, COMPLETE). Task 7 remains
-                     COMPLETE_PENDING_BROWSER_SMOKE. Tasks 8–17 remain TODO,
-                     not started
+Unresolved P0/P1:   none from Task 1–7 (all CLOSED, COMPLETE). Task 8 is
+                     AUDIT_IN_PROGRESS. Tasks 9–17 remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -2209,7 +2164,7 @@ surfaces.
 
 Priority: `P0`
 
-STATUS: `COMPLETE_PENDING_BROWSER_SMOKE`
+STATUS: `COMPLETE`
 AUDIT:
 EXISTING — Live path is `src/features/my-plan/components/{DayScenarioModal,
 ScenarioTimeline, ScenarioActionBar, BuildScenarioButton}.tsx`, opened from
@@ -2704,6 +2659,54 @@ Suggest the owner deploy the next build (which will include this fix)
 and a short, narrow follow-up smoke — just re-run check 5 (assign a time,
 confirm it displays back unchanged) — to finally close Task 7.
 
+OWNER CLOSURE (2026-08-12) — Task 7 accepted and closed by the project
+owner. Per §8, not reopened for P2/P3 UX or cleanup findings. Accepted
+final state, including implementation landed after the last recorded
+smoke above (owner-authored commits `49e7ef49`, `56a5fccc`, `98eed7d3`,
+`56d2d8a4` — correctness/consistency fixes only, none touch the
+release-frozen Exit Criteria):
+- Standalone Scenario page (`/{city}/my-plan/{date}/scenario`) — no
+  modal-in-modal, confirmed on real DEV.
+- 3+ My Plan CTA (`resolveScenarioCtaState`/`resolveScenarioCtaLabel`),
+  converged across both `/me/plan` and the My Plan overlay panel.
+- Persistence/reopen — `DayScenario` row survives reload/logout/date-nav,
+  never silently recreated below the 3-item threshold.
+- Flexible time assignment ("Назначить время") via
+  `DayScenarioItemOverride`, persists across reload.
+- Timezone-safe time handling — `localWallClockToUtc()` (`49e7ef49`)
+  fixes the real +3h drift found in the prior real-DEV smoke (check 5);
+  assignment is now always interpreted as Europe/Minsk, never the
+  ambient server process timezone.
+- Effective-time consistency between My Plan and Scenario (`56d2d8a4`) —
+  both surfaces now share the same `resolveScenarioItemTime`/
+  `resolveMyPlanItemEffectiveTime` priority chain (`startsAt` -> recovered
+  unambiguous same-date session -> Scenario override -> untimed),
+  closing the "real time on Scenario, БЕЗ ВРЕМЕНИ on My Plan" gap.
+- Category/meta cleanup (`98eed7d3`) — My Plan's category slot is now
+  sourced only from `resolvePlanItemCategoryLabel`; raw price text no
+  longer leaks into that slot; `formatPlanActivityPriceLabel` removed.
+- Structured Scenario address (`98eed7d3`) — `resolveActivityAddress`
+  returns structured city/street/metro labels sourced from
+  `Place.metroAuto`/`metroManual`, replacing free-text metro baked into
+  address parentheses.
+- Conflict detection — `detectScenarioConflictIds()`, adjacent-pair
+  overlap on a shared assumed-duration convention, no fabricated travel
+  time.
+- Plan-changed reconciliation — fingerprint compare + "Обновить
+  сценарий"; overrides preserved for retained items, FK-cascade-dropped
+  for removed ones.
+- Ownership isolation — every read/write scoped server-side by the
+  session-derived `userId`; no client-supplied Scenario/override id
+  exists to tamper with.
+- No Google Routes dependency — confirmed zero `googleapis`-pattern
+  network calls anywhere in the Scenario/My Plan path.
+No new P0/P1 at closure. One pre-existing, unrelated, already-filed
+non-blocking item remains open and untouched: BACKLOG-062 (`/me/plan`
+"СНЯТО" badge incorrectly shown for every Place/Article-type
+`PlanItem`) — not a Task 7 regression, does not affect this task's Exit
+Criteria. Task 7 is now CLOSED and will not be reopened for further
+P2/P3 UX/cleanup findings.
+
 Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
 Scenario / My Plan / timeline implementation: existing modal flow,
 modal-in-modal, models, APIs, persistence, timeline, time, duration,
@@ -2721,7 +2724,7 @@ family day from one screen.
 
 Priority: `P0 — SEO BLOCKER`
 
-STATUS: `TODO`
+STATUS: `AUDIT_IN_PROGRESS`
 AUDIT: —
 GAPS: —
 IMPLEMENTATION: —
