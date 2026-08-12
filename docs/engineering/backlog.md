@@ -1700,71 +1700,119 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-063] `/[city]/classes`, `/[city]/birthday`, `/[city]/routes` have zero page-specific metadata
 
-- Status: OPEN
+- Status: **DONE** (2026-08-12)
 - Priority: P2
 - Area: SEO / Structured Data (Task 8)
 - Added: 2026-08-12
-- Reason deferred: Task 8 is audit-only this phase; real, confirmed, but
-  not a broken/unsafe production flow — pages render correctly, they just
-  inherit the generic root-layout title/description instead of their own.
+- Owner decision (2026-08-12): pulled back into Task 8's own implementation
+  scope (directly relevant to Task 8's existing Exit Criteria), approved
+  as minimal scope alongside BACKLOG-064. BACKLOG-065 stays deferred.
 - Context: `src/app/(public)/[city]/classes/page.tsx`,
   `src/app/(public)/[city]/birthday/page.tsx`, and
-  `src/app/(public)/[city]/routes/page.tsx` are thin `<CityShell
+  `src/app/(public)/[city]/routes/page.tsx` were thin `<CityShell
   intent="...">` wrappers with no `generateMetadata`/`metadata` export at
-  all — confirmed by direct file read, all three contain only the
-  `CityShell` render, nothing else. They inherit the root layout's static
-  `metadata` (`src/app/layout.tsx`: title `"mamaGo 2.0"`, description
-  `"Next Generation City Guide"`), which is identical across every active
-  city × these 3 intents — i.e. duplicate title/description at scale
-  across the sitemap-adjacent surface (their sibling `/[city]/events` and
-  `/[city]/programs` both correctly have per-page `generateMetadata()`).
-  No `alternates.canonical` either, unlike every other city-level listing.
-- Current state: not started.
-- Dependencies: none blocking. Can reuse the existing
-  `buildCityEventsListingMetadata`/`buildCityHubMetadata` pattern in
-  `src/lib/seo/cityKudaListingMetadata.ts` as a template for a
-  `classes`/`birthday`/`routes` variant.
-- Acceptance criteria: each of the 3 pages gets its own
-  `generateMetadata()` (title, description, `alternates.canonical`),
-  wrapped through `applyGlobalRobotsOverride`/`buildOgMeta`, matching the
-  pattern already used by `/[city]/events` and `/[city]/programs`. No
-  JSON-LD required for these (no meaningful rich-result type — they are
-  discovery/listing shells, not entities).
+  all — confirmed by direct file read, all three contained only the
+  `CityShell` render, nothing else. They inherited the root layout's
+  static `metadata` (`src/app/layout.tsx`: title `"mamaGo 2.0"`,
+  description `"Next Generation City Guide"`), identical across every
+  active city × these 3 intents — duplicate title/description at scale.
+- Resolution: added `buildCityClassesListingMetadata()`,
+  `buildCityBirthdayListingMetadata()`, `buildCityRoutesListingMetadata()`
+  to `src/lib/seo/cityKudaListingMetadata.ts`, following the exact
+  `buildCityEventsListingMetadata`/`buildCityHubMetadata` pattern already
+  in that file. Title reuses the same `DISCOVERY_INTENT_CONFIG[intent]
+  .titleTemplate` + `formatCityTitle()` that already backs each page's own
+  on-page `<H1>` (`CityDiscoveryShell.tsx`), so `<title>` can never drift
+  from the visible heading. Description uses `getCityDisplayName()`
+  (prepositional case, e.g. "в Минске") — an earlier draft used the DB
+  `city.name` field (nominative, "Минск"), producing an ungrammatical "в
+  Минск"; caught and fixed during browser verification before commit.
+  Canonical via 2 new `CityPathType` entries (`"classes"`, `"birthday"`,
+  plus `"programs"` for BACKLOG-064) added to the existing single-source-
+  of-truth `buildCityPublicPath()`/`buildCityPublicUrl()`
+  (`src/lib/routing/cityPaths.ts`) rather than hand-built strings. All 3
+  pages' `generateMetadata()` wrap the result in
+  `applyGlobalRobotsOverride()` explicitly (matching the safer
+  `/[city]/events` pattern, not the fragile inheritance-only
+  `/[city]/programs` pattern the audit flagged). No JSON-LD added (none
+  needed for listing shells, per the approved scope).
+- Tests: `src/lib/seo/cityKudaListingMetadata.test.ts` (new) — title
+  matches the H1 template, canonical is absolute and correct, description
+  non-empty, unknown city returns `{}` (no fabricated metadata), routes
+  and classes titles don't collide, and — via the same subprocess
+  env-isolation technique as `globalNoindex.test.ts` — all 3 pages'
+  `generateMetadata()` resolve to noindex robots under the prelaunch
+  default (no `SITE_INDEXING_ENABLED` set).
+- Verification: `npx tsc --noEmit` clean; targeted `eslint` clean (0
+  errors); `pnpm check:push` (`pnpm build`) exit 0, all 3 routes compiled.
+  Browser-verified locally (`/minsk/classes`, `/minsk/birthday`,
+  `/minsk/routes`): correct `<title>`, meta description, absolute
+  canonical, and `noindex, nofollow` robots (prelaunch default, matching
+  every other page — confirms the global override still wins).
 - Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
-  Structured Data) audit, 2026-08-12
+  Structured Data), audited 2026-08-12, implemented 2026-08-12
 
 ## [BACKLOG-064] `sitemap.xml` omits several real listing page types; doesn't check per-entity `seoRobots`
 
-- Status: OPEN
+- Status: **DONE** (2026-08-12)
 - Priority: P2
 - Area: SEO / Structured Data (Task 8)
 - Added: 2026-08-12
-- Reason deferred: audit-only phase; not a broken flow, existing sitemap
-  is functional and correct for the entity types it does cover.
-- Context: `src/app/sitemap.ts` includes city hub, `/[city]/events`,
+- Owner decision (2026-08-12): pulled back into Task 8's own implementation
+  scope alongside BACKLOG-063, with an explicitly bounded gap list (see
+  below) — no `/[city]/birthday` entry, per owner instruction (its
+  discovery feed currently reuses kuda/event content, a separate
+  pre-existing product issue, not addressed by this change).
+- Context: `src/app/sitemap.ts` included city hub, `/[city]/events`,
   per-city discovery tags, and detail pages for Place/Offer/Route/Article/
-  Event. It does **not** include `/[city]/programs`, `/[city]/classes`,
-  `/[city]/routes` (city listing), `/routes` (global listing), `/blog`,
-  or `/[city]/blog` — confirmed by direct read of the file, no query or
-  push for any of these. Separately: Event/Place/Offer/Route sitemap
-  entries are filtered only by publish status/visibility, never by the
-  per-entity `seoRobots` string field (`prisma/schema.prisma`: `Activity`,
-  `Place`, `Offer`, `Route` all have `seoRobots String?`, checked at the
-  page-metadata level via each detail page's own `parseRobots()`/
-  `buildOgMeta()` call but not re-checked in `sitemap.ts`) — an entity
-  with an admin-set `seoRobots="noindex,nofollow"` override still gets a
-  sitemap.xml entry even though its own page renders `noindex`. Article is
-  the only model sitemap correctly excludes via its `noindex` boolean.
-- Current state: not started.
-- Dependencies: none blocking.
-- Acceptance criteria: decide (owner call) whether `/[city]/programs`,
-  `/[city]/classes`, `/[city]/routes` should be added to the sitemap
-  (recommended, once BACKLOG-063's metadata gap is fixed) or left as
-  internal-link-only discovery; add a `seoRobots`-noindex filter to the
-  Event/Place/Offer/Route sitemap queries so admin-noindexed entities are
-  never listed.
+  Event, but not `/[city]/programs`, `/[city]/classes`, `/[city]/routes`
+  (city listing), `/routes` (global), `/blog`, or `/[city]/blog`.
+  Separately, Event/Place/Offer/Route sitemap entries were filtered only
+  by publish status/visibility, never by the per-entity `seoRobots`
+  string field — an admin-set `seoRobots="noindex,nofollow"` override
+  still got a sitemap entry even though the entity's own page rendered
+  `noindex`. Article was already correctly excluded via its `noindex`
+  boolean (unchanged, not touched).
+- Resolution: added the approved 6 listing URLs (global `/routes`,
+  `/blog`, once each; per active city `/{city}/programs`,
+  `/{city}/classes`, `/{city}/routes`, `/{city}/blog`) to
+  `src/app/sitemap.ts`, all built via the existing
+  `buildCityPublicPath()`/`buildCityPublicUrl()` single source of truth
+  (extended with 2 new `CityPathType` entries, `"classes"`/`"birthday"`,
+  plus `"programs"` — no hand-built alternate URL format). Added a new
+  `hasNoindexRobots()` predicate (same comma-separated
+  `parts.includes("noindex")` semantics as the existing per-page
+  `parseRobots()` helpers in the Event/Offer detail pages) and applied it
+  as an in-memory post-fetch filter (not a raw SQL `NOT: {contains}`
+  clause, which would silently exclude every row with `seoRobots IS NULL`
+  under three-valued SQL logic — deliberately avoided) to the
+  Place/Offer/Route/Event sitemap queries, each now also selecting
+  `seoRobots`. Dataset is small (~276 published entities per the Task 8
+  audit), so this stays a single bounded query per entity type, no N+1.
+  Article intentionally left untouched (out of the owner-approved gap
+  list; already correctly filtered via its `noindex` boolean).
+- Tests: `src/app/sitemap.test.ts` (new) — unit-tests `hasNoindexRobots()`
+  directly (case-insensitivity, comma-separated parsing, null/empty
+  handling), then an end-to-end integration test with 2 disposable real
+  `Place` fixtures (one plain, one `seoRobots: "noindex,nofollow"`,
+  cleaned up in a `finally` block): confirms the global + all 4 per-city
+  new listing URLs are present, `/{city}/birthday` is correctly absent,
+  the plain fixture's URL is present, the noindexed fixture's URL is
+  absent, no duplicate URLs, every URL absolute/well-formed. Exercises
+  `sitemap()` with `SITE_INDEXING_ENABLED=true` set in-process (its
+  default-noindex short-circuit behavior is already covered by
+  `globalNoindex.test.ts`, not re-tested here).
+- Verification: `npx tsc --noEmit` clean; targeted `eslint` clean (0
+  errors); `pnpm check:push` (`pnpm build`) exit 0, `/sitemap.xml`
+  compiled. Browser-verified locally: `/sitemap.xml` resolves cleanly
+  (empty `<urlset>` under the local prelaunch-default noindex flag —
+  correct, same safety behavior as `/robots.txt`); full content
+  correctness proven by the automated integration test above (indexing
+  can't safely be toggled on for a live local browser check without
+  restarting the dev server under a different env, which the test
+  already covers end-to-end).
 - Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
-  Structured Data) audit, 2026-08-12
+  Structured Data), audited 2026-08-12, implemented 2026-08-12
 
 ## [BACKLOG-065] Minor Schema.org / SEO enrichment opportunities (grab-bag)
 
@@ -1828,3 +1876,36 @@ P3 — cleanup / polish / optional
   block PROD.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
   Structured Data) audit, 2026-08-12
+
+## [BACKLOG-066] `/[city]/birthday` renders kuda/event content, not birthday-specific content
+
+- Status: OPEN
+- Priority: P3
+- Area: Discovery / Birthday section
+- Added: 2026-08-12
+- Reason deferred: incidentally noticed while implementing BACKLOG-063
+  (birthday page metadata); already self-documented in code as a known
+  defect, not caused by and out of scope for Task 8 (metadata-only task).
+  Not fixed here per this task's own "do not expand beyond the approved
+  scope" instruction.
+- Context: `src/components/city/CityShell.tsx` (~line 65) has an inline
+  comment marked `DEFECT (not a TODO)`: `intent === "birthday"` currently
+  reuses `getKudaDiscoveryFeed()` and renders Event/kuda discovery content
+  — not birthday-specific content. The comment states the correct
+  architecture needs a separate feed built on `PartyCategory`/
+  `PartyOccasion`/`PartyLocationType` and `PARTY_SERVICE`/
+  `PARTY_PACKAGE` Offer rows, none of which have a read-side consumer
+  today. Also relevant: `DISCOVERY_INTENT_CONFIG.birthday` has
+  `navigationEnabled: false, comingSoon: true` — this section is not yet
+  promoted in primary navigation, consistent with it being unfinished.
+  Task 8's BACKLOG-063 gave this page real, topic-appropriate metadata
+  (title/description about children's birthday party organization)
+  matching its intended purpose and URL — but the actual on-page content
+  still doesn't match that topic yet, a pre-existing product gap.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: either build the real birthday-specific discovery
+  feed described in the `CityShell.tsx` comment, or keep the page
+  `comingSoon`/unpromoted until that feed exists.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
+  Structured Data) implementation, 2026-08-12

@@ -21,27 +21,29 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 8 (Schema.org / Structured Data) — STATUS:
-                     AUDIT_COMPLETE. Full read-only audit of every
-                     indexable page type + shared SEO/JSON-LD
-                     infrastructure. Result: infrastructure is real,
-                     single-path, reused correctly (buildOgMeta, global
-                     noindex kill-switch, per-entity canonical resolvers,
-                     one JSON-LD builder per Schema.org type) — no
-                     duplicate/conflicting @id, no fabricated data
-                     (Place AggregateRating confirmed real), no P0/P1
-                     found. 3 real P2/P3 gaps filed to backlog
-                     (BACKLOG-063..065): `/[city]/classes`,
-                     `/[city]/birthday`, `/[city]/routes` have zero
-                     page-specific metadata; sitemap.xml omits several
-                     listing types and doesn't filter by per-entity
-                     `seoRobots`; a grab-bag of minor enrichment items
-                     (unused SearchAction, a misleading `.env.example`
-                     comment — real launch runbooks already use the
-                     correct flag, plain-string vs PostalAddress, etc.).
-                     No implementation performed — stopped for owner
-                     scope approval per instruction, Task 9 not started.
-                     Full detail, matrix, and minimal implementation plan
-                     in Task 8's own section below.
+                     COMPLETE. Audit found no P0/P1 (see prior entry).
+                     Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
+                     minimal implementation scope (directly relevant to
+                     its Exit Criteria); BACKLOG-065 stayed explicitly
+                     deferred. Implemented: page-specific metadata
+                     (title/description/absolute canonical, reusing the
+                     existing city-listing pattern and the same
+                     `DISCOVERY_INTENT_CONFIG` template that already
+                     drives each page's own H1) for `/[city]/classes`,
+                     `/[city]/birthday`, `/[city]/routes`; added the
+                     approved 6 listing URLs to `sitemap.xml` (global
+                     `/routes`,`/blog`; per-city `/programs`,`/classes`,
+                     `/routes`,`/blog` — birthday excluded, not approved)
+                     and a `seoRobots`-noindex filter on the Place/Offer/
+                     Route/Event sitemap queries. A real bug (DB
+                     nominative city name producing ungrammatical "в
+                     Минск") was caught during browser verification and
+                     fixed before commit. 2 new test files, all green;
+                     `tsc`/`eslint`/`pnpm check:push` all clean; browser-
+                     verified locally. One new incidental P3 finding filed
+                     (BACKLOG-066, birthday page content — pre-existing,
+                     unrelated, not fixed). Full detail in Task 8's own
+                     section below. Task 9 not started.
 Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
                      2026-08-12; not reopened for P2/P3 UX/cleanup
                      findings). Accepted final state: standalone Scenario
@@ -128,9 +130,8 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1–7 (all CLOSED, COMPLETE). Task 8 audit
-                     complete, zero P0/P1 found. Tasks 9–17 remain TODO,
-                     not started
+Unresolved P0/P1:   none from Task 1–8 (all CLOSED, COMPLETE). Tasks 9–17
+                     remain TODO, not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -2743,7 +2744,7 @@ family day from one screen.
 
 Priority: `P0 — SEO BLOCKER`
 
-STATUS: `AUDIT_COMPLETE`
+STATUS: `COMPLETE`
 
 ### A. Current implementation map
 
@@ -2898,30 +2899,80 @@ comment* is wrong, and the real runbooks already use the correct flag).
   Event JSON-LD, Organization/WebSite JSON-LD inherited onto noindex/
   auth-gated pages (harmless).
 
-### J. Minimal implementation plan for Task 8 (for owner scope approval — NOT executed this phase)
+### J. Minimal implementation plan for Task 8 — APPROVED and EXECUTED (2026-08-12)
 
-If approved, in priority order: (1) BACKLOG-063 — add
-`generateMetadata()` to the 3 gap pages, reusing the
-`buildCityEventsListingMetadata` pattern (small, additive, no schema/DB
-change); (2) BACKLOG-064 — add the 3 missing listing types to
-`sitemap.ts` + a `seoRobots`-noindex filter on the 4 entity queries that
-lack it (small, additive); (3) BACKLOG-065 items are independently
-pickable, none urgent. No item requires a new abstraction, new JSON-LD
-type, or schema/DB migration.
+Owner reviewed the audit and approved BACKLOG-063 + BACKLOG-064 as Task 8's
+minimal implementation scope (both directly relevant to the existing Exit
+Criteria). BACKLOG-065 stays explicitly deferred, not implemented.
 
-### K. Files likely affected (if J is approved)
+**BACKLOG-063 — city listing metadata.** Added
+`buildCityClassesListingMetadata()`, `buildCityBirthdayListingMetadata()`,
+`buildCityRoutesListingMetadata()` to `src/lib/seo/
+cityKudaListingMetadata.ts`, following the exact pattern of the file's own
+`buildCityEventsListingMetadata`/`buildCityHubMetadata`. Title reuses
+`DISCOVERY_INTENT_CONFIG[intent].titleTemplate` + `formatCityTitle()` —
+the same source that already drives each page's on-page `<H1>`
+(`CityDiscoveryShell.tsx`), so `<title>` can never drift from the visible
+heading. Description uses `getCityDisplayName()` (prepositional case). All
+3 pages' `generateMetadata()` wrap the result in
+`applyGlobalRobotsOverride()` explicitly. No JSON-LD added (listing
+shells, no entity to describe).
 
+**BACKLOG-064 — sitemap gaps.** Added the owner-approved 6 listing URLs
+(global `/routes`, `/blog` once each; per active city `/{city}/programs`,
+`/{city}/classes`, `/{city}/routes`, `/{city}/blog`) to `src/app/
+sitemap.ts` — `/{city}/birthday` deliberately excluded, not part of the
+approved gap list. Added `hasNoindexRobots()` (same comma-separated
+semantics as the existing per-page `parseRobots()` helpers) as an
+in-memory post-fetch filter on the Place/Offer/Route/Event sitemap
+queries (each now also selects `seoRobots`) — deliberately not a raw SQL
+`NOT: {contains}` clause, which would silently drop every row with
+`seoRobots IS NULL` under three-valued SQL logic. Article left untouched
+(already correctly filtered via its own `noindex` boolean, not part of
+the approved gap list).
+
+**Shared infrastructure change**: extended `CityPathType`
+(`src/lib/routing/cityPaths.ts`) with `"classes"`, `"birthday"`,
+`"programs"` and their `buildCityPublicPath()` cases — both features
+build every URL through this existing single source of truth, no
+hand-built alternate URL format introduced anywhere.
+
+**Real bug found and fixed during implementation, before commit**: an
+early draft used the DB `city.name` field (nominative case, e.g.
+"Минск") in the 3 new descriptions, producing an ungrammatical "в Минск"
+instead of "в Минске" — caught during the required browser verification
+step (§ DEV SMOKE below), fixed to use `getCityDisplayName()`
+(prepositional case, the same source the title already used).
+
+**BACKLOG-065 — confirmed NOT implemented**: SearchAction, OG type
+enrichment, PostalAddress enrichment, Event offers enrichment,
+Organization/WebSite-on-noindex-pages, `/search` server redirect, and the
+`.env.example` comment all remain untouched, exactly as instructed.
+
+**New, incidentally-discovered finding, filed not fixed**: while writing
+BACKLOG-063's birthday-page description, found `CityShell.tsx` already
+self-documents (inline `DEFECT (not a TODO)` comment) that
+`intent==="birthday"` currently renders kuda/event content, not
+birthday-specific content — pre-existing, unrelated to Task 8, out of
+scope for a metadata-only change. Filed as BACKLOG-066 (P3), not
+investigated or fixed further.
+
+### K. Files changed
+
+`src/lib/routing/cityPaths.ts` (2 new `CityPathType` entries + cases),
+`src/lib/seo/cityKudaListingMetadata.ts` (3 new builders),
 `src/app/(public)/[city]/classes/page.tsx`,
 `src/app/(public)/[city]/birthday/page.tsx`,
-`src/app/(public)/[city]/routes/page.tsx`, `src/lib/seo/
-cityKudaListingMetadata.ts` (extend with 3 new builders or generalize the
-existing one), `src/app/sitemap.ts`, `.env.example` (comment-only fix).
+`src/app/(public)/[city]/routes/page.tsx` (each: `generateMetadata()`
+added), `src/app/sitemap.ts` (6 new listing entries + `seoRobots` filter),
+`src/lib/seo/cityKudaListingMetadata.test.ts` (new),
+`src/app/sitemap.test.ts` (new). `.env.example` left untouched
+(BACKLOG-065, not this task's approved scope).
 
 ### L. Migration/DB schema change required
 
-**None.** Every finding is either a missing `generateMetadata()` call, a
-sitemap query addition, or a documentation-comment fix — no new Prisma
-model, field, or migration needed for any P0/P1/P2/P3 item found.
+**None.** No new Prisma model, field, or migration — confirmed, matches
+the audit's own finding.
 
 AUDIT FIRST existing SEO utilities and JSON-LD. Build an audit matrix: `page
 type → current schema → problem → missing → required action`. Check:
@@ -2932,31 +2983,45 @@ description, OpenGraph, robots, indexability, JSON-LD validity, duplicate
 entities, conflicting entities, Rich Results compatibility where applicable.
 Reuse shared SEO utilities.
 
-GAPS: see §D/E/F/G above.
-IMPLEMENTATION: not started this phase — audit only, per owner instruction.
-COMMITS: audit findings recorded in this doc + BACKLOG-063..065 filed in
-`docs/engineering/backlog.md` (see commit history for this file).
-VERIFICATION: full-repo code read (not grep-only) of every route file
-listed in §B, all JSON-LD builder files, `sitemap.ts`, `robots.ts`,
-`middleware.ts`'s robots-header logic, `prisma/schema.prisma` for
-`seoRobots`/`noindex` field presence per model, and a direct spot-check of
-Place's `AggregateRating` data source (confirmed real, not fabricated) and
-H1 presence across all 5 main detail-page hero components.
-DEV SMOKE: not applicable — audit-only phase, no code changed.
+GAPS: BACKLOG-063 and BACKLOG-064 resolved (see §J). BACKLOG-065 remains
+OPEN/P3, explicitly deferred. BACKLOG-066 newly filed (P3, incidental
+finding, not fixed).
+IMPLEMENTATION: see §J. Minimal, additive, reused existing patterns
+throughout — no new SEO framework, no new DB fields, no JSON-LD added to
+listing shells.
+COMMITS: see git log (one atomic commit: implementation + backlog/
+checklist closure for Task 8).
+VERIFICATION: `npx tsc --noEmit` clean; targeted `eslint` on all 8 changed/
+new files clean (0 errors, 1 pre-existing unrelated warning unchanged);
+`git diff --check` clean; `pnpm check:push` (`pnpm build`) exit 0, all
+routes compiled including the 3 previously-metadata-less pages and
+`/sitemap.xml`. New tests: `cityKudaListingMetadata.test.ts` (title/
+canonical/description correctness, unknown-city returns `{}`, no title
+collision, global-noindex-still-wins for all 3 pages via subprocess
+env-isolation) and `sitemap.test.ts` (`hasNoindexRobots()` unit tests +
+an end-to-end integration test with 2 disposable real `Place` fixtures
+proving the noindex filter and all 6 new listing URLs, cleaned up after).
+Both new suites green. Pre-existing `cityPaths.test.ts`,
+`discoveryIntentConfig.test.ts`, `globalNoindex.test.ts` re-run, all
+still green (no regression from the shared `CityPathType`/sitemap
+changes).
+DEV SMOKE: Local dev server, Browser pane. `/minsk/classes`,
+`/minsk/birthday`, `/minsk/routes`: each inspected via
+`document.title`/`link[rel=canonical]`/`meta[name=description]`/
+`meta[name=robots]` — correct page-specific title (matching the on-page
+H1 template exactly), correct absolute canonical
+(`http://mamago.local:3000/minsk/{page}`), correct grammatical
+description (after the fix above), and `robots: noindex, nofollow`
+(local dev's prelaunch default — confirms the global override still
+wins, exactly as required). `/sitemap.xml`: resolves cleanly, empty
+`<urlset>` under the same local prelaunch-default noindex flag (correct,
+same safety behavior as `/robots.txt`) — full populated-content
+correctness proven by the automated integration test instead of toggling
+the live dev server's indexing flag for this narrow check.
 BLOCKERS: none.
-BACKLOG/NOTES: BACKLOG-063, BACKLOG-064, BACKLOG-065 (see §I).
-
-**Exit Criteria:** No main indexable page type reaches PROD without correct
-SEO/structured-data implementation.
-
-AUDIT FIRST existing SEO utilities and JSON-LD. Build an audit matrix: `page
-type → current schema → problem → missing → required action`. Check:
-Events, Places, Articles, Routes, Offers, Services, Programs (if indexed),
-listing/category pages, BreadcrumbList, Organization, WebSite, other actually
-used Schema.org types. Also: H1/H2/H3, canonical, city URLs, title,
-description, OpenGraph, robots, indexability, JSON-LD validity, duplicate
-entities, conflicting entities, Rich Results compatibility where applicable.
-Reuse shared SEO utilities.
+BACKLOG/NOTES: BACKLOG-063 DONE, BACKLOG-064 DONE, BACKLOG-065 OPEN/P3
+(deferred, untouched as instructed), BACKLOG-066 OPEN/P3 (new, filed not
+fixed).
 
 **Exit Criteria:** No main indexable page type reaches PROD without correct
 SEO/structured-data implementation.

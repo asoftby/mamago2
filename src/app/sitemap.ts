@@ -18,6 +18,23 @@ import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Matches the `parts.includes("noindex")` semantics already used by the
+ * per-entity `parseRobots()` helpers in the Event/Offer detail pages'
+ * `generateMetadata()` — an entity explicitly marked noindex via its
+ * `seoRobots` field must never get a sitemap entry, even though its own
+ * detail page correctly renders `robots: noindex` regardless of sitemap
+ * presence.
+ */
+export function hasNoindexRobots(seoRobots: string | null | undefined): boolean {
+  if (!seoRobots) return false;
+  return seoRobots
+    .toLowerCase()
+    .split(",")
+    .map((part) => part.trim())
+    .includes("noindex");
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (isGlobalNoindexEnabled()) {
     return [];
@@ -34,6 +51,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // effectively the sitemap's "homepage" entry (sitemap entries should
   // resolve directly to 200, not redirect).
   const entries: MetadataRoute.Sitemap = [];
+
+  // Global (non-city-scoped) listing pages — real, indexable, each with its
+  // own metadata (see BACKLOG-064).
+  entries.push({
+    url: `${baseUrl}/routes`,
+    changeFrequency: "weekly",
+    priority: 0.5,
+  });
+  entries.push({
+    url: `${baseUrl}/blog`,
+    changeFrequency: "daily",
+    priority: 0.6,
+  });
 
   try {
     const cities = await prisma.city.findMany({
@@ -65,6 +95,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       });
 
+      // City-scoped listing pages confirmed real/indexable by the Task 8
+      // audit but previously missing from the sitemap (BACKLOG-064).
+      // Birthday is intentionally excluded — not part of the approved gap
+      // list (its discovery feed currently reuses kuda/event content, a
+      // separate pre-existing product issue, not a sitemap decision here).
+      entries.push({
+        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
+        lastModified: city.updatedAt,
+        changeFrequency: "weekly",
+        priority: 0.6,
+      });
+      entries.push({
+        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "classes" })}`,
+        lastModified: city.updatedAt,
+        changeFrequency: "weekly",
+        priority: 0.5,
+      });
+      entries.push({
+        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "routes" })}`,
+        lastModified: city.updatedAt,
+        changeFrequency: "weekly",
+        priority: 0.5,
+      });
+      entries.push({
+        url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "journal" })}`,
+        lastModified: city.updatedAt,
+        changeFrequency: "daily",
+        priority: 0.6,
+      });
+
       // Discovery tag pages per city
       for (const tag of tags) {
         entries.push({
@@ -84,9 +144,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       where: {
         AND: [getPublicPublishedPlaceWhere(), { OR: [{ cityId: null }, { city: { isActive: true } }] }],
       },
-      select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true },
+      select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true, seoRobots: true },
     });
     for (const place of places) {
+      if (hasNoindexRobots(place.seoRobots)) continue;
       entries.push({
         url: resolvePlaceCanonicalUrl({
           seoCanonicalUrl: place.seoCanonicalUrl,
@@ -118,10 +179,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         campProgramType: true,
         seoCanonicalUrl: true,
         updatedAt: true,
+        seoRobots: true,
         place: { select: { city: { select: { slug: true } } } },
       },
     });
     for (const offer of offers) {
+      if (hasNoindexRobots(offer.seoRobots)) continue;
       const citySlug = offer.place?.city?.slug || "minsk";
       entries.push({
         url: resolveOfferCanonicalUrl({
@@ -142,9 +205,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const routes = await prisma.route.findMany({
       where: { status: "PUBLISHED", visibility: "PUBLIC" },
-      select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true },
+      select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true, seoRobots: true },
     });
     for (const route of routes) {
+      if (hasNoindexRobots(route.seoRobots)) continue;
       entries.push({
         url: resolveRouteCanonicalUrl({
           seoCanonicalUrl: route.seoCanonicalUrl,
@@ -205,6 +269,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         seoCanonicalUrl: true,
         cityId: true,
         updatedAt: true,
+        seoRobots: true,
         place: { select: { city: { select: { slug: true } } } },
         venue: { select: { cityId: true } },
       },
@@ -227,6 +292,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const inactiveCitySlugs = new Set(cityRows.filter((row) => !row.isActive).map((row) => row.slug));
 
     for (const event of events) {
+      if (hasNoindexRobots(event.seoRobots)) continue;
       const citySlug = resolveCanonicalCitySlugForEvent({
         activityCitySlug: event.cityId ? citySlugById.get(event.cityId) ?? null : null,
         placeCitySlug: event.place?.city?.slug ?? null,
