@@ -3225,14 +3225,44 @@ round-trip/reset/count). `tsc --noEmit`, `eslint src --quiet`, and `pnpm build`
 green. Read-only DEV inspection found 9 published Events and no structured-free
 row; the visually “бесплатно” null-price import therefore correctly yields no
 Free result instead of treating unknown as free.
-DEV SMOKE: desktop and 375x812 on `/minsk/events`: unfiltered 5 cards; Today 4;
-Tomorrow 4; Weekend 4; exact 2026-09-12 only “Три поросенка”; exact-date H1 is
-“— 12 сент.”; Free produces the recovery state for the current dataset; reset
-restores the clean URL; district selection produces a badge/count and survives
-reload; geo options load; detail -> Back restores the copied exact-date URL;
-Nearby is absent; zero browser console errors. `/admin/discovery/filters` route
-was targeted but correctly redirected the unauthenticated browser to login;
-allowlist behavior is instead covered by code/API inspection and focused tests.
+DEV SMOKE: **Complete — post-deploy read-only smoke on actual
+`https://dev.mamago.by` (2026-08-12).** Exact deployment verified independently
+of workflow status: running container `dev-app-1`, image
+`ghcr.io/asoftby/mamago2:dev-280`, OCI revision
+`245d7c28de7f03d5e8d3b551b22ea9c0539cfc79`, created
+`2026-08-12T11:49:42.548Z`, state `running`.
+
+Desktop `/minsk/events`, actual DEV data: default = 1 visible card (“С.
+Кибирова балет «Три поросенка»”); Today (`?preset=TODAY`) = 0 with H1
+“сегодня” and recovery; Tomorrow (`?preset=TOMORROW`) = 0 with H1 “завтра”
+and recovery; Weekend (`?preset=WEEKEND`) = 0 with H1 “на выходных” and
+recovery; exact `?from=2026-09-12` = the one “Три поросенка” card with H1
+“— 12 сент.”. Read-only DEV DB proof confirms its real ActivitySession is
+2026-09-12 10:00 Europe/Minsk, inside that selected boundary. Free
+(`?free=true`) = 0 plus the real recovery/reset UI; DB count of published
+structured-free Events (`priceFrom=0` or `scheduleJson.pricingMode=free`) is
+also 0, proving the null/unknown imported prices were not misclassified.
+
+Advanced sheet exposes only Age, Format, District, Metro. Offline preserves
+the one real card; real Заводской district and Автозаводская metro options
+each produce a valid zero-result recovery because the current published card
+has no effective Place geo; age remains the approved soft partition. Selection
+is reflected in URL/state and the unified badge (`1`). A six-filter URL
+(preset/free/age/format/district/metro plus legacy `sec`) showed count `6`;
+Reset cleared every param including `sec`, removed the badge, and restored the
+clean URL/default card. Stale `?nearby=true` was automatically cleaned to the
+default URL without changing results; Nearby/Рядом/Поблизости was absent from
+desktop header, advanced/old-secondary UI, and mobile.
+
+Copied exact-date URL and reload preserved identical URL/H1/card; opening the
+event detail and Browser Back returned to the same filtered state. At 375x812,
+Today, exact date, Free recovery, district empty result/count, advanced
+open/close, and Reset all re-verified; controls were readable, appeared once,
+sheet was intact, and document `scrollWidth=clientWidth=375` before and after
+reset. No browser console errors, filter-related 500s, request/refetch loop,
+Google Maps/Routes/geolocation request, or per-card filter API N+1 was observed;
+`dev-app-1` logs were clean during the smoke. No PROD access or write, no data
+fabrication, and no redeploy.
 BLOCKERS: none.
 BACKLOG/NOTES: BACKLOG-004, BACKLOG-045, BACKLOG-066, BACKLOG-067 unchanged;
 BACKLOG-068 added for real proximity. Task 10 remains TODO.
