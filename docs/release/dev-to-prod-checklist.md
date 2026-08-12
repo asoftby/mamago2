@@ -3608,15 +3608,33 @@ frontend renders it reliably on mobile and desktop.
 
 Priority: `P0 — PRE-LAUNCH VISIBILITY`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE`
+AUDIT: Existing analytics signals and bounded aggregates support a factual
+owner dashboard; registration conversion, cohort retention and monetization
+cannot yet be calculated truthfully and are explicitly shown as unavailable.
+GAPS: No remaining Task 12 P0/P1 gap.
+IMPLEMENTATION: Added the ADMIN-only `/admin/performance` dashboard and Admin
+navigation entry with FACT-only audience, engagement, discovery, content and
+marketplace metrics for Today / 7d / 30d, using `Europe/Minsk` boundaries.
+COMMITS: `da8e242f77aad0c8cf27f68afa0ed0952640c7f0` (implementation); checklist
+closure commit follows this entry.
+VERIFICATION: Focused metric tests, TypeScript, changed-file ESLint and
+canonical `pnpm check:push` were green before deployment. Independent read-only
+DEV DB verification for 7d matched the dashboard: new accounts 1, DAU 0, WAU
+1, MAU 1, searches 37, zero-result searches 13, saves 0, plan additions 3,
+CTA clicks 22 and created routes 2. Desktop 1280px smoke was green; mobile
+375px smoke was owner-approved green. Period changes updated URL and KPI;
+unavailable metrics remained honestly labelled.
+DEV SMOKE: Reconfirmed 2026-08-13 on running image
+`ghcr.io/asoftby/mamago2:dev-284`, OCI revision exactly
+`da8e242f77aad0c8cf27f68afa0ed0952640c7f0`; `dev-app-1` running and
+`dev-db-1` healthy. Minimal live `/admin/performance` sanity passed: page and
+Admin `Performance` navigation opened, KPI loaded, Today / 7d / 30d selector
+was available, and browser console plus fresh server logs contained no errors.
+BLOCKERS: none.
+BACKLOG/NOTES: `BACKLOG-070` and `BACKLOG-071` track the deliberately deferred
+registration-source attribution and acquisition-cohort retention work. Task 13
+not started. PROD untouched.
 
 ### Goal
 
