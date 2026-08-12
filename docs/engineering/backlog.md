@@ -1935,3 +1935,21 @@ P3 — cleanup / polish / optional
   live filter stack green.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 9 audit (Filters & Quick
   Access), 2026-08-12.
+
+## [BACKLOG-068] Add real coordinate/radius Nearby filtering
+
+- Status: OPEN
+- Priority: P3
+- Area: Discovery / Geography
+- Added: 2026-08-12
+- Reason deferred: Task 9 explicitly chooses the smallest safe MVP and must not
+  add proximity infrastructure. The former “Nearby” control only constrained
+  format to offline/hybrid, so Task 9 hides it and ignores stale `nearby` URLs.
+- Current state: no executable proximity semantics in public discovery.
+- Dependencies: a product-defined origin (device or selected point), radius,
+  consent/fallback behavior, and a bounded coordinate query design.
+- Acceptance criteria: filter by real coordinates and radius, document boundary
+  and missing-coordinate behavior, add query/performance tests, then restore the
+  control with accurate copy.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 9 implementation (Filters
+  & Quick Access), 2026-08-12.

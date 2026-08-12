@@ -923,7 +923,7 @@ export function MobileSearchSheet({
                 getLocationText(),
                 <div className="p-0">
                   <MobileLocationPanel
-                    variant="default"
+                    variant={selectedIntent === "kuda" ? "cityHub" : "default"}
                     citySlug={pendingCitySlug}
                     selectedCitySlug={pendingCitySlug}
                     onCityPick={(slug) => setPendingCitySlug(slug)}

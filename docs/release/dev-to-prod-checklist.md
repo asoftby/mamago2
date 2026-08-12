@@ -21,17 +21,16 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 9 (Filters & Quick Access) — STATUS:
-                     AUDIT_COMPLETE, awaiting owner scope approval. Audit
-                     confirmed a P1 correctness gap: visible date/geo and all
-                     secondary/Admin-managed controls can change UI/URL without
-                     changing results; Nearby is format-only, not proximity.
-                     Existing section placement Admin is therefore FALSE ADMIN
-                     for query behavior. Minimal proposal: make Events quick
-                     Today/Tomorrow/Weekend/date/Free execute through code-owned
-                     typed semantics, move geo to advanced, hide unsupported
-                     keys, unify active/reset/empty handling — no new DB/Admin
-                     architecture. Full evidence in Task 9 below. Task 10 remains
-                     TODO and untouched.
+                     COMPLETE. Owner-approved Events-first implementation is
+                     finished: fixed quick filters, code-owned typed semantics,
+                     ActivitySession/Minsk-time date execution, structured Free,
+                     effective Place geo, advanced age/format/district/metro,
+                     fail-closed Admin keys, unified count/reset, and recovery
+                     empty state. Nearby is hidden/ignored and BACKLOG-068 tracks
+                     real proximity. No migration/new Admin architecture. Tests,
+                     tsc, eslint, production build, and desktop/375px browser
+                     verification are green. Full evidence in Task 9 below.
+                     Task 10 remains TODO and untouched.
 Prior — Task 8 (Schema.org / Structured Data) — STATUS:
                      COMPLETE. Audit found no P0/P1 (see prior entry).
                      Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
@@ -139,8 +138,8 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1–8 (all CLOSED, COMPLETE). Tasks 9–17
-                     remain TODO, not started
+Unresolved P0/P1:   Tasks 1–9 are CLOSED, COMPLETE. Tasks 10–17 remain TODO,
+                     not started.
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -3039,7 +3038,7 @@ SEO/structured-data implementation.
 
 Priority: `P0`
 
-STATUS: `AUDIT_COMPLETE` — awaiting owner approval of the minimal scope below.
+STATUS: `COMPLETE` — owner-approved minimal implementation completed 2026-08-12.
 AUDIT: Completed 2026-08-12 against `dev`/`origin/dev` at
 `311dc9fe61e511147122b1000bdead1a2814d3a1` (equal; no pre-existing working-tree
 changes). This was audit-only: no application code, migration, DEV deploy, PROD
@@ -3188,7 +3187,7 @@ approved visible filter keys execute (or hide unsupported controls), with a
 code-owned, allowlisted semantic registry and safe defaults. Arbitrary Admin
 keys must never become executable logic.
 
-IMPLEMENTATION: Proposed minimum, pending owner approval:
+IMPLEMENTATION: Completed owner-approved minimum:
 
 1. Events only: expose QUICK Today/Tomorrow/Weekend/Choose date/Free in the
    existing responsive header/search architecture; move district/metro to the
@@ -3208,25 +3207,35 @@ IMPLEMENTATION: Proposed minimum, pending owner approval:
    do not implement Birthday/Routes placeholder filtering, My Plan age cleanup,
    or `nokids`; do not touch Task 10.
 
-Likely files: primary URL/store + header/mobile search components,
-`CityShell`, `kudaDiscoveryFeed`, a shared date-range helper,
-`partitionDiscoveryFeed`, secondary modal allowlist/registry, and focused tests.
-Required tests: URL parse/serialize/reset; city-timezone Today/Tomorrow/Weekend
-boundaries; ActivitySession overlap; free/null/paid; effective manual/auto geo;
-unsupported Admin key fail-safe; combined count/reset; filtered-empty. Browser
-smoke at 375px and desktop: each quick control changes cards, copied URL/reload,
-Back/Forward/detail-back, zero results/reset, advanced sheet, and no duplicate
-fetch/refetch loop.
-COMMITS: —
-VERIFICATION: code/Prisma/runtime-consumer trace; repository-wide symbol and
-route search; local responsive browser smoke at 375x812 on `/minsk/kuda`
-confirmed the nested Today/Tomorrow/Weekend UI and live cards while the filter
-state changed. Local DB completeness query was unavailable (`localhost:5433`),
-so no unsupported dataset percentage is claimed.
-DEV SMOKE: —
-BLOCKERS: owner approval of the minimal implementation scope.
-BACKLOG/NOTES: BACKLOG-004, BACKLOG-045, BACKLOG-066 unchanged; BACKLOG-067
-added. Task 10 remains TODO.
+Implemented one typed semantic registry; the public Admin-config endpoint now
+fails closed for unknown keys. Events expose Quick Today/Tomorrow/Weekend/exact
+date/Free and an Advanced age/format/district/metro sheet. Date predicates use
+real `ActivitySession.startsAt` and explicit `Europe/Minsk` boundaries. Free is
+only numeric zero or Event Wizard `scheduleJson.pricingMode="free"`; null and
+marketing text are not promoted to Free. District/metro use Place manual values
+first and auto values only when manual is absent. Nearby is removed from Events
+UI and stale URLs are ignored/cleaned. Reset-all starts from an empty query, so
+primary, `sec`, budget, and scoped persisted state clear together. Empty state
+now checks the effective visible partition.
+
+COMMITS: pending final Task 9 commit.
+VERIFICATION: focused Node tests: 10/10 green (date/timezone/custom range,
+free/paid/null, manual/auto geo precedence, allowlist fail-closed, URL
+round-trip/reset/count). `tsc --noEmit`, `eslint src --quiet`, and `pnpm build`
+green. Read-only DEV inspection found 9 published Events and no structured-free
+row; the visually “бесплатно” null-price import therefore correctly yields no
+Free result instead of treating unknown as free.
+DEV SMOKE: desktop and 375x812 on `/minsk/events`: unfiltered 5 cards; Today 4;
+Tomorrow 4; Weekend 4; exact 2026-09-12 only “Три поросенка”; exact-date H1 is
+“— 12 сент.”; Free produces the recovery state for the current dataset; reset
+restores the clean URL; district selection produces a badge/count and survives
+reload; geo options load; detail -> Back restores the copied exact-date URL;
+Nearby is absent; zero browser console errors. `/admin/discovery/filters` route
+was targeted but correctly redirected the unauthenticated browser to login;
+allowlist behavior is instead covered by code/API inspection and focused tests.
+BLOCKERS: none.
+BACKLOG/NOTES: BACKLOG-004, BACKLOG-045, BACKLOG-066, BACKLOG-067 unchanged;
+BACKLOG-068 added for real proximity. Task 10 remains TODO.
 
 AUDIT FIRST existing filtering infrastructure: date/when, age, district,
 metro, free, budget, additional filters, quick access, active state, reset,

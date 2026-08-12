@@ -338,6 +338,7 @@ export function DiscoveryFilters({
              dateTo: applied.dateTo,
              whenPreset: applied.whenPreset,
              format: applied.format,
+             free: applied.free,
           }}
           draft={applied}
           setDraft={setDraft}

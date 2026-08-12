@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useRefinementFilters } from "@/contexts/RefinementFiltersContext";
 import type { Intent } from "@/lib/intent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 
 interface MobileFilterButtonProps {
   intent?: Intent | string;
@@ -14,7 +15,9 @@ interface MobileFilterButtonProps {
 export function MobileFilterButton({ intent, className }: MobileFilterButtonProps) {
   const { setIsOpen, setCurrentIntent } = useRefinementFilters();
   const safeIntent = intent as Intent | null;
-  const { activeCount } = useSecondaryFiltersFromUrl(safeIntent);
+  const { activeCount: secondaryActiveCount } = useSecondaryFiltersFromUrl(safeIntent);
+  const { derived } = useDiscoveryFilters();
+  const activeCount = safeIntent === "kuda" ? derived.activeCount : secondaryActiveCount;
 
   const handleClick = () => {
     if (intent) {

@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Intent } from "@/lib/intent";
-import {
-  filterConfigByIntent,
-  type SecondaryFilterGroup,
-} from "@/lib/discovery/filterConfigByIntent";
+import type { SecondaryFilterGroup } from "@/lib/discovery/filterConfigByIntent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
 import { BudgetSliderFilter } from "@/components/discovery/BudgetSliderFilter";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
@@ -23,22 +20,18 @@ export function SecondaryFiltersForm({
   compact = false,
   onApply,
 }: SecondaryFiltersFormProps) {
-  // Start with static fallback so the form is interactive immediately.
-  // Once the API responds, swap in the DB-managed groups.
-  const [groups, setGroups] = useState<SecondaryFilterGroup[]>(
-    () => filterConfigByIntent[intent] ?? [],
-  );
+  const [groups, setGroups] = useState<SecondaryFilterGroup[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/public/discovery-filters?intent=${intent}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: SecondaryFilterGroup[] | null) => {
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
+        if (!cancelled && Array.isArray(data)) {
           setGroups(data);
         }
       })
-      .catch(() => {/* keep static fallback */});
+      .catch(() => {/* fail closed: unsupported controls must not look functional */});
     return () => { cancelled = true; };
   }, [intent]);
 

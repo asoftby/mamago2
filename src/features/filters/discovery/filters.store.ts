@@ -31,6 +31,7 @@ export type DiscoveryFilters = {
   metro: string | null;
   district: string | null;
   nearby: boolean;
+  free: boolean;
 };
 
 export const defaultFilters: DiscoveryFilters = {
@@ -42,6 +43,7 @@ export const defaultFilters: DiscoveryFilters = {
   metro: null,
   district: null,
   nearby: false,
+  free: false,
 };
 
 export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
@@ -53,7 +55,8 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.format &&
     !f.metro &&
     !f.district &&
-    !f.nearby
+    !f.nearby &&
+    !f.free
   );
 }
 
@@ -131,7 +134,8 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("format") ||
     searchParams.get("metro") ||
     searchParams.get("district") ||
-    searchParams.get("nearby") === "true"
+    searchParams.get("nearby") === "true" ||
+    searchParams.get("free") === "true"
   );
 }
 
@@ -214,6 +218,7 @@ export function parseAppliedFromUrl(
   const format = parseActivityFormatQuery(searchParams.get("format"));
 
   const nearby = searchParams.get("nearby") === "true";
+  const free = searchParams.get("free") === "true";
 
   const presetParam = searchParams.get("preset");
   let whenPreset: WhenPreset = null;
@@ -234,6 +239,7 @@ export function parseAppliedFromUrl(
     metro,
     district,
     nearby,
+    free,
   };
 }
 
@@ -244,6 +250,19 @@ function writeAppliedToUrl(
   next: DiscoveryFilters,
   mode: "replace" | "push" = "replace",
 ) {
+  const params = serializeAppliedToSearchParams(searchParams, next);
+
+  const queryString = params.toString();
+  const url = queryString ? `${pathname}?${queryString}` : pathname;
+
+  if (mode === "push") router.push(url, { scroll: false });
+  else router.replace(url, { scroll: false });
+}
+
+export function serializeAppliedToSearchParams(
+  searchParams: Pick<URLSearchParams, "toString">,
+  next: DiscoveryFilters,
+): URLSearchParams {
   const params = new URLSearchParams(searchParams.toString());
 
   if (next.dateFrom) params.set("from", next.dateFrom);
@@ -273,11 +292,22 @@ function writeAppliedToUrl(
   if (next.nearby) params.set("nearby", "true");
   else params.delete("nearby");
 
-  const queryString = params.toString();
-  const url = queryString ? `${pathname}?${queryString}` : pathname;
+  if (next.free) params.set("free", "true");
+  else params.delete("free");
 
-  if (mode === "push") router.push(url, { scroll: false });
-  else router.replace(url, { scroll: false });
+  return params;
+}
+
+export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number {
+  return (
+    (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
+    (filters.age.length > 0 ? 1 : 0) +
+    (filters.format ? 1 : 0) +
+    (filters.metro ? 1 : 0) +
+    (filters.district ? 1 : 0) +
+    (filters.nearby ? 1 : 0) +
+    (filters.free ? 1 : 0)
+  );
 }
 
 export function useDiscoveryFilters() {
@@ -388,7 +418,7 @@ export function useDiscoveryFilters() {
         writeAppliedToUrl(
           router,
           pathname,
-          searchParams,
+          new URLSearchParams() as unknown as ReadonlyURLSearchParams,
           defaultFilters,
           "replace",
         );
@@ -444,15 +474,10 @@ export function useDiscoveryFilters() {
       !!filters.format ||
       !!filters.metro ||
       !!filters.district ||
-      filters.nearby;
+      filters.nearby ||
+      filters.free;
 
-    const activeCount =
-      (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
-      (filters.age.length > 0 ? 1 : 0) +
-      (filters.format ? 1 : 0) +
-      (filters.metro ? 1 : 0) +
-      (filters.district ? 1 : 0) +
-      (filters.nearby ? 1 : 0);
+    const activeCount = getDiscoveryFilterActiveCount(filters);
 
     const dateLabel = whenLabel(filters);
 

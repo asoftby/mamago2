@@ -16,6 +16,7 @@ import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { computeMaxBudget, getBudgetStep } from "@/lib/discovery/budgetUtils";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
 
 export type BudgetConfig = { max: number; step: number } | null;
 
@@ -77,9 +78,31 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
     const nearbyParam = Array.isArray(searchParams.nearby)
       ? searchParams.nearby[0]
       : searchParams.nearby;
+    const scalar = (key: string) => {
+      const value = searchParams[key];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const eventFilters = intent === "kuda"
+      ? {
+          dateRange: resolveEventDateRange({
+            preset:
+              scalar("preset") === "TODAY" ||
+              scalar("preset") === "TOMORROW" ||
+              scalar("preset") === "WEEKEND"
+                ? (scalar("preset") as "TODAY" | "TOMORROW" | "WEEKEND")
+                : null,
+            from: scalar("from") ?? scalar("dateFrom") ?? null,
+            to: scalar("to") ?? scalar("dateTo") ?? null,
+          }),
+          free: scalar("free") === "true",
+          districtId: scalar("district") ?? null,
+          metroId: scalar("metro") ?? null,
+        }
+      : undefined;
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
       format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
-      nearby: nearbyParam === "true",
+      nearby: intent === "kuda" ? false : nearbyParam === "true",
+      eventFilters,
     });
     if (budgetEnabled && discoveryActivities) {
       const max = computeMaxBudget(discoveryActivities);

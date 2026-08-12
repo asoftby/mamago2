@@ -8,6 +8,9 @@ import { useRefinementFilters } from "@/contexts/RefinementFiltersContext";
 import { SecondaryFiltersForm } from "@/components/discovery/SecondaryFiltersForm";
 import type { Intent } from "@/lib/intent";
 import type { SecondaryValues } from "@/lib/discovery/secondaryFiltersUrl";
+import { EventAdvancedFilters } from "@/components/discovery/EventAdvancedFilters";
+import { useOptionalCity } from "@/contexts/CityContext";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 
 /** @deprecated Используйте SecondaryValues из secondaryFiltersUrl */
 export type FilterState = SecondaryValues;
@@ -19,6 +22,7 @@ export type FilterState = SecondaryValues;
 export function RefinementFiltersModal() {
   const { isOpen, setIsOpen, currentIntent } = useRefinementFilters();
   const [isVisible, setIsVisible] = useState(() => isOpen);
+  const citySlug = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
   const prevIsOpenRef = useRef(isOpen);
 
   // Sync visibility with animation delay
@@ -90,11 +94,11 @@ export function RefinementFiltersModal() {
           <div className="flex-shrink-0 p-6 pb-0">{stickyHeader}</div>
 
           <div className="flex-1 overflow-y-auto px-6 pt-4">
-            <SecondaryFiltersForm
-              intent={intent}
-              compact
-              onApply={() => setIsOpen(false)}
-            />
+            {intent === "kuda" ? (
+              <EventAdvancedFilters citySlug={citySlug} onApply={() => setIsOpen(false)} />
+            ) : (
+              <SecondaryFiltersForm intent={intent} compact onApply={() => setIsOpen(false)} />
+            )}
           </div>
         </div>
       </div>
