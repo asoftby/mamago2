@@ -47,6 +47,8 @@ Active task:        Task 7 (Day Scenario) — STATUS:
                      per instruction) — cannot be re-verified live until
                      the next deploy. All QA fixtures (both rounds)
                      confirmed fully removed from real DEV. Task 6 COMPLETE.
+Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
+                     and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-11
 Last updated by:    Claude Code — Task 7 (Day Scenario) UX/functional
                      completion phase, on top of the already-accepted
@@ -152,12 +154,13 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1–6 (all CLOSED, COMPLETE). Tasks 7–15
-                     remain TODO, not started
+Unresolved P0/P1:   none from Task 1–6 (all CLOSED, COMPLETE). Task 7 remains
+                     COMPLETE_PENDING_BROWSER_SMOKE. Tasks 8–17 remain TODO,
+                     not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
-Tasks 1–15 below, not aspiration or memory of a prior session.
+Tasks 1–17 below, not aspiration or memory of a prior session.
 
 ---
 
@@ -201,7 +204,7 @@ existing architecture can be safely extended instead.
 ## 3. Release Readiness Is Not Code Perfection
 
 Release is not blocked on eliminating all technical debt. Once the mandatory
-release scope (Tasks 1–15) is satisfied, only problems that genuinely affect
+release scope (Tasks 1–17) is satisfied, only problems that genuinely affect
 PROD safety or readiness get fixed. The following do **not** block PROD on
 their own: refactoring opportunities, architecture cleanup, cosmetic cleanup,
 legacy cleanup, code style, optional test improvements, future optimizations,
@@ -229,7 +232,7 @@ classify a new finding.
 
 ## 5. Checklist Freeze
 
-After creation, the main release scope (Tasks 1–15, their Exit Criteria, and
+After creation, the main release scope (Tasks 1–17, their Exit Criteria, and
 the rules in this document) is **FROZEN**. A newly found task does not
 automatically become a new mandatory checklist item. First ask: *is it truly
 unsafe or wrong to go to first PROD without this?* If no → backlog. See §17
@@ -259,7 +262,7 @@ missing optional test, a theoretical risk without realistic impact, a chance
 to make something prettier, or the mere existence of legacy code are never
 by themselves grounds for P0/P1.
 
-A new finding may be added as a sub-item of an existing Task 1–15 only if the
+A new finding may be added as a sub-item of an existing Task 1–17 only if the
 task's existing Exit Criteria cannot be met without it, or it is a confirmed
 P0/P1. Otherwise → backlog. Exit Criteria are never expanded after the fact
 for nice-to-haves.
@@ -342,7 +345,7 @@ Do not turn development into endless identical checks.
 - **Completed task** — run a sufficient task-level gate. Use `pnpm
   check:push` when it's actually needed to confirm task completion. Do not
   rerun a full heavy build after every small edit.
-- **Before PROD readiness** — a full final gate (Task 15) is mandatory.
+- **Before PROD readiness** — a full final gate (Task 17) is mandatory.
 
 ## 14. New Finding Decision Flow
 
@@ -398,7 +401,7 @@ release, not something to keep redesigning.
 
 ## 18. Per-Task Progress Fields
 
-Every Task 1–15 below uses this compact template. Do not turn it into an
+Every Task 1–17 below uses this compact template. Do not turn it into an
 agent diary.
 
 ```
@@ -565,7 +568,7 @@ a DB `@unique` constraint); no duplicate `PlaceImage` rows found (checked
 directly); no orphan files/rows found in the pre-write-phase DB-vs-disk
 filename diff.
 DEV SMOKE: Targeted, via the Browser pane against the running DEV server
-(not the full Task 15 site-wide smoke). Place detail
+(not the full Task 17 site-wide smoke). Place detail
 (`/places/kofta-na-pr-t-mira-1`, then `/places/malberri-klab-mulberry-club`):
 gallery of real photos renders correctly on desktop and mobile (375×812),
 breadcrumb/address/CTA all correct, 0 relevant console errors. Article
@@ -1494,7 +1497,7 @@ analytics-specific).
 Separately, during this smoke session the owner discovered and fixed an
 unrelated DEV environment defect (`OTP_SECRET` not configured, blocking
 business-signup phone verification) — resolved for DEV, tracked as
-BACKLOG-037 with the PROD-side requirement flagged for Task 12
+BACKLOG-037 with the PROD-side requirement flagged for Task 14
 (Environment Parity); did not block or require any Task 3 code change.
 BLOCKERS: none. All required Admin + Business Publication Analytics
 checks passed on deployed DEV.
@@ -2812,11 +2815,292 @@ possible.
 **Exit Criteria:** The editor can pick one of the three visual types and the
 frontend renders it reliably on mobile and desktop.
 
+## TASK 12 — CEO Performance Dashboard
+
+Priority: `P0 — PRE-LAUNCH VISIBILITY`
+
+STATUS: `TODO`
+AUDIT: —
+GAPS: —
+IMPLEMENTATION: —
+COMMITS: —
+VERIFICATION: —
+DEV SMOKE: —
+BLOCKERS: —
+BACKLOG/NOTES: —
+
+### Goal
+
+Before PROD, the owner must have one simple factual page answering:
+
+**“Как проект работает прямо сейчас?”**
+
+Canonical route: `/admin/performance`
+
+### AUDIT FIRST
+
+Audit the existing:
+
+- `/admin/analytics`;
+- Publication Analytics;
+- `UserEvent`;
+- authentication/user models;
+- existing business metrics;
+- existing search analytics;
+- existing content-performance aggregation;
+- existing dashboard services/components;
+- any already-existing DAU/WAU/MAU logic;
+- any existing registrations/activity/retention queries.
+
+Reuse the current analytics infrastructure.
+
+Do **not** create another analytics platform.
+
+Do **not** build a data warehouse.
+
+Do **not** duplicate metrics already calculated elsewhere.
+
+### MVP scope
+
+The page should expose **FACT metrics**, not forecasts or decorative fake
+KPIs.
+
+At minimum audit feasibility and provide the useful available subset of:
+
+#### Audience / usage
+
+- DAU;
+- WAU;
+- MAU;
+- WAU / MAU;
+- new users;
+- returning users;
+- registrations.
+
+#### Engagement
+
+Use existing trusted signals where available, e.g.:
+
+- My Ideas additions;
+- My Plan additions;
+- meaningful content opens;
+- relevant CTA activity.
+
+Do not invent events that are not actually tracked.
+
+#### Content / marketplace health
+
+Use existing real data where useful, e.g.:
+
+- published Events;
+- published Places;
+- published Offers;
+- active businesses;
+- content with engagement.
+
+#### Business / monetization metrics
+
+Only include monetary metrics here if the underlying system can calculate
+them truthfully.
+
+Do not fabricate revenue, GMV, ARPU, lead revenue, or balance values.
+
+Task 13 owns the deeper balance/monetization architecture decision.
+
+### Time ranges
+
+The dashboard should make daily / weekly / monthly state understandable.
+
+Reuse existing date-range infrastructure where possible.
+
+Do not build arbitrary BI filtering.
+
+### UX
+
+This is an owner/CEO operational page.
+
+It should be:
+
+- simple;
+- fast;
+- factual;
+- understandable in seconds;
+- mobile-safe but primarily desktop/admin oriented.
+
+No decorative analytics for their own sake.
+
+### Security / cost
+
+- ADMIN only unless existing admin policy clearly dictates otherwise;
+- bounded aggregate queries;
+- no user-level PII output;
+- no raw event dumps;
+- no expensive unbounded analytics scans;
+- no polling unless already justified.
+
+### Exit Criteria
+
+**The owner can open `/admin/performance` and quickly understand the factual
+daily/weekly/monthly health of mamaGo using real existing data, without a
+parallel analytics architecture or fabricated metrics.**
+
+## TASK 13 — Audit Business Balance & Monetization
+
+Priority: `P0 — MONEY / PROD BLOCKER`
+
+STATUS: `TODO`
+AUDIT: —
+GAPS: —
+IMPLEMENTATION: —
+COMMITS: —
+VERIFICATION: —
+DEV SMOKE: —
+BLOCKERS: —
+BACKLOG/NOTES: —
+
+### Why this is mandatory
+
+This task concerns **real money**.
+
+The owner explicitly decided that the existing balance/monetization mechanics
+must be understood and made safe **before first PROD**.
+
+Do not defer the core audit until after release.
+
+### AUDIT FIRST — mandatory
+
+Before proposing or implementing anything, audit the actual current
+architecture for:
+
+- Business balance;
+- top-ups;
+- payment provider/payment records;
+- credits;
+- debits/write-offs;
+- leads;
+- paid lead mechanics;
+- Boost;
+- promotion;
+- ledger/history;
+- refunds;
+- failed payments;
+- reversals;
+- admin adjustments;
+- manual balance changes;
+- idempotency;
+- ownership/isolation;
+- concurrency;
+- money precision/currency representation;
+- audit logging;
+- relevant Business UI;
+- relevant Admin UI;
+- existing Prisma models;
+- existing APIs/services;
+- existing tests.
+
+Classify:
+
+- EXISTING;
+- PARTIAL / BROKEN;
+- MISSING;
+- DO NOT TOUCH;
+- minimum required pre-PROD scope.
+
+### Product comparison
+
+Review the previously-approved reference concept:
+
+**Kufar-style wallet/internal-balance mechanics**
+
+Use it as a product comparison, not as an instruction to copy Kufar
+architecture literally.
+
+Answer:
+
+- what money the user actually pays;
+- what the internal balance represents;
+- whether balance is real money / prepaid credit / internal units;
+- when balance is credited;
+- when it is written off;
+- whether unused balance expires;
+- what happens when a business topped up but bought nothing;
+- what happens on failed/cancelled paid actions;
+- what happens on refund;
+- whether Boost spends from balance;
+- whether leads spend from balance;
+- what admin can adjust manually;
+- what history/audit trail the business sees.
+
+### Decision principle
+
+After the audit, make **one simple MVP monetization decision**.
+
+Do not build:
+
+- complex billing;
+- subscriptions;
+- multi-wallet accounting;
+- bonus currencies;
+- promotional currencies;
+- accounting software;
+- an unnecessarily complex financial ledger
+
+unless the current architecture genuinely requires it for safe first PROD.
+
+Prefer the smallest understandable mechanics.
+
+### Safety requirements
+
+Before PROD, monetary writes must have clear protection against:
+
+- double charge;
+- duplicate webhook;
+- duplicate Boost write-off;
+- race conditions;
+- negative balance when not allowed;
+- unauthorized balance mutation;
+- foreign-business access;
+- silent admin adjustment;
+- amount precision errors;
+- partial transaction state.
+
+Use DB transactions/constraints/idempotency where the existing architecture
+requires them.
+
+### Admin
+
+Audit whether admin can safely:
+
+- see balance/history;
+- understand why money changed;
+- make an adjustment if the product requires it;
+- see who made that adjustment.
+
+Do not add broad financial-admin capabilities without need.
+
+### Business
+
+The business must be able to understand at minimum:
+
+- current balance;
+- what credited it;
+- what spent it;
+- what paid action caused the debit.
+
+Do not expose internal implementation noise.
+
+### Exit Criteria
+
+**Before first PROD, mamaGo has one documented and technically-safe MVP rule
+for business balance/top-up/write-off/refund/Boost/paid actions, and the
+existing implementation has been audited and minimally corrected so real
+money cannot be charged or mutated ambiguously or unsafely.**
+
 ---
 
 # PART II — INFRASTRUCTURE READINESS
 
-## TASK 12 — Environment Parity / PROD Configuration
+## TASK 14 — Environment Parity / PROD Configuration
 
 Priority: `P0 — PROD BLOCKER`
 
@@ -2845,7 +3129,7 @@ existence/configuration shape.
 **Exit Criteria:** No unknown mandatory PROD configuration is discovered
 only during deployment.
 
-## TASK 13 — Deployment & Rollback Readiness
+## TASK 15 — Deployment & Rollback Readiness
 
 Priority: `P0 — PROD BLOCKER`
 
@@ -2879,7 +3163,7 @@ to deploy, (3) in what order, (4) how to verify, (5) what to do on failure,
 
 # PART III — FINAL RELEASE SAFETY AUDIT
 
-## TASK 14 — Final Release Safety Audit
+## TASK 16 — Final Release Safety Audit
 
 Priority: `P0 — FINAL RELEASE BLOCKER`
 
@@ -2893,9 +3177,9 @@ DEV SMOKE: —
 BLOCKERS: —
 BACKLOG/NOTES: —
 
-Start only after Product + Infrastructure readiness tasks (1–13) are
-complete. Goal is NOT to find everything that could be improved in the
-repository — it is to determine whether anything makes the first PROD
+Start only after Tasks 1–15 are complete. Goal is NOT to find everything
+that could be improved in the repository — it is to determine whether
+anything makes the first PROD
 deployment unsafe. P2/P3 → backlog. Only fix P0/P1 here.
 
 **A. Security** — risk-focused: authentication, authorization, RBAC, USER
@@ -2949,7 +3233,7 @@ each fix.
 
 # PART IV — FINAL GATE
 
-## TASK 15 — Final DEV → PROD Gate
+## TASK 17 — Final DEV → PROD Gate
 
 Priority: `P0`
 
@@ -2963,7 +3247,7 @@ DEV SMOKE: —
 BLOCKERS: —
 BACKLOG/NOTES: —
 
-Start only after Tasks 1–14 are complete and no unresolved P0/P1 remain.
+Start only after Tasks 1–16 are complete and no unresolved P0/P1 remain.
 This is the single full final release gate.
 
 **Git / Repository:** expected branch; expected HEAD; exact release SHA
@@ -3001,7 +3285,7 @@ overall status is:
 PROD: NOT READY
 ```
 
-Only when Tasks 1–14 are `COMPLETE`, no P0/P1 remain, Task 15 is green, and
+Only when Tasks 1–16 are `COMPLETE`, no P0/P1 remain, Task 17 is green, and
 DEV browser smoke is green, may the status become:
 
 ```
@@ -3063,8 +3347,8 @@ Roughly five phases:
 
 ## 23. Stop Condition
 
-Critical rule. When Tasks 1–14 are `COMPLETE`, there are no unresolved
-P0/P1, P2/P3 are in the backlog, Task 15 is green, and DEV browser smoke is
+Critical rule. When Tasks 1–16 are `COMPLETE`, there are no unresolved
+P0/P1, P2/P3 are in the backlog, Task 17 is green, and DEV browser smoke is
 green, DEV → PROD development under this checklist is **finished**. Set:
 
 ```
