@@ -21,9 +21,10 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 10 (`nokids` / strict 18+ / unrestricted age) —
-                     STATUS: COMPLETE_PENDING_DEV_SMOKE. Owner-approved typed
-                     four-state implementation is complete locally; DEV/PROD
-                     were not deployed. Owner controls DEV deployment/smoke.
+                     STATUS: COMPLETE. Owner-approved typed four-state
+                     implementation shipped; DEV `dev-282` / OCI
+                     `a40db0ac…` smoke + persisted DB proof closed Task 10.
+                     Task 11 remains TODO and untouched.
 Prior — Task 9 (Filters & Quick Access) — STATUS:
                      COMPLETE. Owner-approved Events-first implementation is
                      finished: fixed quick filters, code-owned typed semantics,
@@ -34,7 +35,6 @@ Prior — Task 9 (Filters & Quick Access) — STATUS:
                      real proximity. No migration/new Admin architecture. Tests,
                      tsc, eslint, production build, and desktop/375px browser
                      verification are green. Full evidence in Task 9 below.
-                     Task 10 implementation is complete pending owner DEV smoke.
 Prior — Task 8 (Schema.org / Structured Data) — STATUS:
                      COMPLETE. Audit found no P0/P1 (see prior entry).
                      Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
@@ -75,8 +75,10 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-12
-Last updated by:    Codex — Task 10 implementation complete pending owner DEV
-                     smoke; no DEV/PROD deployment. Task 11 remains TODO.
+Last updated by:    Cursor — Task 10 CLOSED COMPLETE after DEV `dev-282`
+                     375px smoke + read-only DEV DB proof
+                     (`agePolicy=ADULT_ONLY`, empty `ageTags`, `status=DRAFT`).
+                     Task 11 remains TODO and untouched.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -3284,8 +3286,9 @@ at runtime.
 
 Priority: `P0`
 
-STATUS: `COMPLETE_PENDING_DEV_SMOKE` — owner-approved implementation completed
-locally 2026-08-12; owner controls DEV deployment and smoke.
+STATUS: `COMPLETE` — owner-approved implementation completed locally
+2026-08-12; DEV deploy + 375px smoke + read-only persisted DB proof closed
+Task 10 on 2026-08-12.
 AUDIT: **Completed 2026-08-12 at `0d92ea85`. Audit only; no application,
 schema, data, deployment, or PROD changes.**
 
@@ -3518,8 +3521,22 @@ and full compile gates rather than a fabricated browser login. `pnpm
 check:push` completed with exit 0 (production build compiled and generated all
 388 pages); the sandboxed build workers emitted the repository's tolerated
 local-DB-unreachable fallback logs during prerender, without failing the gate.
-DEV SMOKE: pending owner deployment; Codex did not deploy DEV or touch PROD.
-BLOCKERS: none for implementation; owner-controlled DEV deploy/smoke remains.
+DEV SMOKE: **Complete — verified on actual `https://dev.mamago.by`
+(2026-08-12).** Deployed image `ghcr.io/asoftby/mamago2:dev-282`, OCI
+revision `a40db0ac624855a0b7b781c2418f8e150460491a`. Full mandatory UI smoke
+on 375px successful. P1 Server Components regression root cause: Route edit
+server page called `makeEmptyStop()` from client module `RouteEditor`; fix
+moved empty-stop creation and age hydration into a server/client-safe pure
+helper (fix commit `a40db0ac624855a0b7b781c2418f8e150460491a`).
+`/me/routes → Редактировать` reopen successful; digest `1173656967` absent;
+post-reopen selector shows only strict `Только 18+`; no horizontal overflow.
+Read-only DEV DB proof for disposable draft title
+`QA Task 10 strict route disposable final 2` (exact title match, 1 row):
+`id=cmsq78fa10001ny016vkipu5i`,
+`slug=qa-task-10-strict-route-disposable-final-2`,
+`agePolicy=ADULT_ONLY`, `ageTags={}` (empty Postgres text[]),
+`status=DRAFT`, `createdAt=2026-08-12 14:43:06.458`. PROD untouched.
+BLOCKERS: none.
 BACKLOG/NOTES: BACKLOG-069 added; BACKLOG-004 already covers Plan null-array.
 Task 11 remains TODO and untouched.
 
