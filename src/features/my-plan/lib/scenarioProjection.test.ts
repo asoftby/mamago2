@@ -68,23 +68,52 @@ function item(overrides: Partial<Pick<ScenarioPlanItem, "startsAt" | "activity">
 }
 
 // ── resolveMyPlanItemEffectiveTime (My Plan's reuse of the canonical helper) ──
+// Must match Scenario's priority exactly: startsAt -> recovered session ->
+// override -> untimed, so My Plan and Scenario never disagree.
 
-// Authoritative PlanItem.startsAt wins over any Scenario override.
+// 1. startsAt -> same time shown in My Plan (wins over any override too).
 {
   const result = resolveMyPlanItemEffectiveTime({ startsAt: at(11) }, at(15));
   assert.equal(result?.getTime(), at(11).getTime(), "source time wins over override");
 }
 
-// No source time -> falls back to the Scenario override.
+// 2. No startsAt, exactly one same-date session -> recovered time shown.
 {
-  const result = resolveMyPlanItemEffectiveTime({ startsAt: null }, at(9, 30));
+  const result = resolveMyPlanItemEffectiveTime(
+    { startsAt: null, sessions: [{ startsAt: at(8) }] },
+    null,
+  );
+  assert.equal(result?.getTime(), at(8).getTime(), "unambiguous session recovered in My Plan");
+}
+
+// 3. Multiple same-date sessions -> ambiguous, never guessed.
+{
+  const result = resolveMyPlanItemEffectiveTime(
+    { startsAt: null, sessions: [{ startsAt: at(8) }, { startsAt: at(18) }] },
+    null,
+  );
+  assert.equal(result, null, "multiple sessions -> no guessed recovery");
+}
+
+// 4. No session, has override -> override shown.
+{
+  const result = resolveMyPlanItemEffectiveTime({ startsAt: null, sessions: [] }, at(9, 30));
   assert.equal(result?.getTime(), at(9, 30).getTime(), "falls back to Scenario override");
 }
 
-// Neither source nor override -> remains untimed (never fabricated).
+// 5. Recovered session wins over an assigned override.
+{
+  const result = resolveMyPlanItemEffectiveTime(
+    { startsAt: null, sessions: [{ startsAt: at(8) }] },
+    at(20),
+  );
+  assert.equal(result?.getTime(), at(8).getTime(), "recovered session wins over override");
+}
+
+// 6. Neither source, session, nor override -> untimed.
 {
   const result = resolveMyPlanItemEffectiveTime({ startsAt: null }, null);
-  assert.equal(result, null, "no source and no override -> untimed");
+  assert.equal(result, null, "no source, session, or override -> untimed");
 }
 
 // ── resolveReliableDurationMinutes: never fabricates ──

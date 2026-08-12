@@ -8,6 +8,7 @@ import { getLatestActivePlanReminderNotification } from "@/server/services/notif
 import {
   computePlanFingerprint,
   listScenarioItemOverridesForScenarios,
+  listActivitySessionsForPlanItems,
 } from "@/server/services/dayScenario.service";
 import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
 
@@ -81,10 +82,22 @@ export default async function PlanPage() {
     dayScenarios.map((s) => s.id),
   );
 
+  // Only items without an authoritative startsAt can possibly need session
+  // recovery (priority 1 already resolves the rest) — batch-loaded in one
+  // query, grouped by activityId + local date, same tier Scenario uses.
+  const sessionsByActivityDate = await listActivitySessionsForPlanItems(
+    planItems
+      .filter((item) => item.startsAt == null)
+      .map((item) => ({ activityId: item.activityId, date: item.date })),
+  );
+
   // Serialize plan items (dates need to be strings for client)
   const serializedItems = planItems.map((item) => {
+    const sessions = item.activityId
+      ? (sessionsByActivityDate.get(`${item.activityId}|${item.date}`) ?? [])
+      : [];
     const effectiveStartsAt = resolveMyPlanItemEffectiveTime(
-      { startsAt: item.startsAt },
+      { startsAt: item.startsAt, sessions: sessions.map((startsAt) => ({ startsAt })) },
       scenarioOverridesByPlanItemId.get(item.id) ?? null,
     );
     return {

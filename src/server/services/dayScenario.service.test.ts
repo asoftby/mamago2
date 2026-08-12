@@ -19,6 +19,7 @@ import {
   listScenarioItemOverrides,
   pruneScenarioItemOverrides,
   listPlanItemsByDateForScenario,
+  listActivitySessionsForPlanItems,
 } from "@/server/services/dayScenario.service";
 
 async function main() {
@@ -244,6 +245,34 @@ async function main() {
       ambiguousCandidate?.activity?.sessions.length,
       2,
       "two same-date sessions -> both returned, never guessed down to one",
+    );
+
+    // ── listActivitySessionsForPlanItems: batch session lookup for My Plan ──
+    // Reuses the same activities/sessions as the listPlanItemsByDateForScenario
+    // block above, proving My Plan's batch loader agrees with Scenario's.
+    const batchSessions = await listActivitySessionsForPlanItems([
+      { activityId: oneSessionActivityId, date },
+      { activityId: twoSessionActivityId, date },
+      { activityId: null, date }, // no activity -> skipped, never queried
+    ]);
+    assert.equal(
+      batchSessions.get(`${oneSessionActivityId}|${date}`)?.length,
+      1,
+      "batch loader groups exactly one same-date session per activityId+date",
+    );
+    assert.equal(
+      batchSessions.get(`${oneSessionActivityId}|${date}`)?.[0]?.toISOString(),
+      new Date("2026-09-01T09:00:00Z").toISOString(),
+    );
+    assert.equal(
+      batchSessions.get(`${twoSessionActivityId}|${date}`)?.length,
+      2,
+      "batch loader keeps multiple same-date sessions grouped, never collapsed to one",
+    );
+    assert.equal(
+      (await listActivitySessionsForPlanItems([])).size,
+      0,
+      "empty input -> no query, empty map",
     );
 
     console.log("dayScenario service tests: OK");

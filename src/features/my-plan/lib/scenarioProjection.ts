@@ -47,22 +47,25 @@ export function resolveScenarioItemTime(
 }
 
 /**
- * My Plan's effective time for one PlanItem: the authoritative source time
- * (`PlanItem.startsAt`) if set, otherwise a Scenario-assigned override time
- * for that item, otherwise untimed. My Plan never loads per-item
- * `ActivitySession` data (that recovery is Scenario-only — see
- * `resolveScenarioItemTime`), so this always passes an empty session list;
- * `PlanItem.startsAt` presence alone already short-circuits before sessions
- * are ever consulted. Reuses `resolveScenarioItemTime` rather than
- * duplicating its priority logic — this function only adapts the shape.
- * Never mutates `PlanItem.startsAt` — purely a read-side projection.
+ * My Plan's effective time for one PlanItem — same priority order Scenario
+ * uses: (1) authoritative `PlanItem.startsAt`; (2) an unambiguous same-date
+ * `ActivitySession` recovery, when the caller supplies exactly the sessions
+ * for this item's activity+date (batch-loaded via
+ * `listActivitySessionsForPlanItems`, never fetched per-item); (3) a
+ * Scenario-assigned override; (4) untimed. Reuses `resolveScenarioItemTime`
+ * rather than duplicating its priority logic — this function only adapts
+ * the shape, so My Plan and Scenario can never disagree on whether a time
+ * is recoverable. Never mutates `PlanItem.startsAt` — purely a read-side
+ * projection.
  */
 export function resolveMyPlanItemEffectiveTime(
-  item: { startsAt: Date | null },
+  item: { startsAt: Date | null; sessions?: { startsAt: Date }[] },
   overrideStartsAt: Date | null,
 ): Date | null {
-  return resolveScenarioItemTime({ startsAt: item.startsAt, activity: null }, overrideStartsAt)
-    .effectiveStartsAt;
+  return resolveScenarioItemTime(
+    { startsAt: item.startsAt, activity: { sessions: item.sessions ?? [] } },
+    overrideStartsAt,
+  ).effectiveStartsAt;
 }
 
 /**

@@ -108,6 +108,50 @@ export async function listPlanItemsByDateForScenario(
 }
 
 /**
+ * Batch-loads ActivitySession rows needed to recover an effective time for
+ * PlanItems whose PlanItem.startsAt is null — one bounded query across
+ * every (activityId, date) pair that actually needs it (callers should
+ * already have filtered to startsAt == null items), grouped deterministically
+ * by `${activityId}|${local date}` — the same recovery tier Scenario uses
+ * (see `resolveScenarioItemTime`), so My Plan and Scenario never disagree
+ * on whether a time is unambiguously recoverable. Items without an
+ * activityId are skipped (nothing to recover from).
+ */
+export async function listActivitySessionsForPlanItems(
+  items: { activityId: string | null; date: string }[],
+): Promise<Map<string, Date[]>> {
+  const pending = items.filter(
+    (item): item is { activityId: string; date: string } => item.activityId != null,
+  );
+  if (pending.length === 0) return new Map();
+
+  const dates = pending.map((item) => item.date);
+  const minDate = dates.reduce((a, b) => (a < b ? a : b));
+  const maxDate = dates.reduce((a, b) => (a > b ? a : b));
+  // Generous UTC-agnostic bound around the target local dates; exact
+  // per-date matching is done in-memory via getLocalDateKey below (never
+  // guesses across dates) — same technique as listPlanItemsByDateForScenario.
+  const windowStart = new Date(`${addDaysLocal(minDate, -1)}T00:00:00.000Z`);
+  const windowEnd = new Date(`${addDaysLocal(maxDate, 2)}T00:00:00.000Z`);
+
+  const activityIds = [...new Set(pending.map((item) => item.activityId))];
+
+  const sessions = await prisma.activitySession.findMany({
+    where: { activityId: { in: activityIds }, startsAt: { gte: windowStart, lt: windowEnd } },
+    select: { activityId: true, startsAt: true },
+  });
+
+  const grouped = new Map<string, Date[]>();
+  for (const session of sessions) {
+    const key = `${session.activityId}|${getLocalDateKey(session.startsAt)}`;
+    const list = grouped.get(key) ?? [];
+    list.push(session.startsAt);
+    grouped.set(key, list);
+  }
+  return grouped;
+}
+
+/**
  * Cheap deterministic signature of a PlanItem set: detects added/removed
  * items and startsAt changes, order-independent. Not a general version
  * hash — just enough to answer "does My Plan still match what the
