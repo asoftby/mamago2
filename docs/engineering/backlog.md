@@ -1983,3 +1983,53 @@ P3 — cleanup / polish / optional
   correct approved rows idempotently; never silently promote unknown rows to
   unrestricted or adult-only.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 10 audit, 2026-08-12.
+
+## [BACKLOG-070] Add explicit acquisition and visit attribution telemetry
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / Acquisition
+- Added: 2026-08-12
+- Reason deferred: Task 12 must remain a factual CEO overview over existing
+  telemetry; changing the event/session model and registration flow is a
+  separate analytics architecture task.
+- Context: `UserEvent.sessionId` is a stable browser identity stored in
+  localStorage, not a bounded visit/session. `User.createdAt` also does not
+  distinguish a public registration from imports, test/service accounts, or
+  admin-created users, and no registration event carries source attribution.
+  Therefore visits and registration conversion cannot be stated honestly.
+- Current state: Task 12 labels stable browser identities as tracked visitors,
+  labels `User.createdAt` counts as new accounts, and renders registration
+  conversion unavailable.
+- Dependencies: product definitions for visit timeout, acquisition source, and
+  which account-creation paths count as registrations.
+- Acceptance criteria: emit an explicit registration event with durable source
+  attribution; model bounded visits separately from stable visitor identity;
+  document bot/internal traffic handling; back metrics with focused tests and
+  reconcile them against direct DB queries.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 12 analytics audit,
+  2026-08-12.
+
+## [BACKLOG-071] Build acquisition cohorts for D1/D7/D30 retention
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / Retention
+- Added: 2026-08-12
+- Reason deferred: the available event history is short and there is no
+  trustworthy acquisition cohort marker, so a retention percentage in Task 12
+  would create false precision.
+- Context: current telemetry can identify authenticated users active before a
+  selected period (returning users), but cannot assign every user or anonymous
+  visitor to a reliable first-acquisition cohort. Stable browser IDs are also
+  not visits and can be cleared or replaced by clients.
+- Current state: Task 12 shows returning authenticated users and an explicit
+  `Retention: недостаточно данных` state instead of D1/D7/D30.
+- Dependencies: BACKLOG-070 and enough post-launch telemetry history to mature
+  the requested cohorts.
+- Acceptance criteria: define cohort entry and active-return semantics;
+  implement D1/D7/D30 on mature cohorts only; separate authenticated and
+  anonymous populations; add timezone-boundary, empty-cohort, and denominator
+  tests plus direct DB reconciliation.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 12 analytics audit,
+  2026-08-12.

@@ -91,6 +91,20 @@ export const NAV_ANALYTICS: AdminSidebarNavItem = {
   label: "Analytics",
   href: adminPath("/analytics"),
   icon: ChartColumn,
+  children: [
+    {
+      id: "performance",
+      label: "Performance",
+      href: adminPath("/performance"),
+      matchers: [{ type: "exact", value: adminPath("/performance") }],
+    },
+    {
+      id: "analytics-detail",
+      label: "Детальная аналитика",
+      href: adminPath("/analytics"),
+      matchers: [{ type: "prefix", value: adminPath("/analytics") }],
+    },
+  ],
 };
 
 // === IMPORT SECTION (STANDALONE TOP-LEVEL) ===
