@@ -1697,3 +1697,134 @@ P3 — cleanup / polish / optional
   no real Activity to check.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 7 (Day Scenario)
   real-DEV smoke, 2026-08-11
+
+## [BACKLOG-063] `/[city]/classes`, `/[city]/birthday`, `/[city]/routes` have zero page-specific metadata
+
+- Status: OPEN
+- Priority: P2
+- Area: SEO / Structured Data (Task 8)
+- Added: 2026-08-12
+- Reason deferred: Task 8 is audit-only this phase; real, confirmed, but
+  not a broken/unsafe production flow — pages render correctly, they just
+  inherit the generic root-layout title/description instead of their own.
+- Context: `src/app/(public)/[city]/classes/page.tsx`,
+  `src/app/(public)/[city]/birthday/page.tsx`, and
+  `src/app/(public)/[city]/routes/page.tsx` are thin `<CityShell
+  intent="...">` wrappers with no `generateMetadata`/`metadata` export at
+  all — confirmed by direct file read, all three contain only the
+  `CityShell` render, nothing else. They inherit the root layout's static
+  `metadata` (`src/app/layout.tsx`: title `"mamaGo 2.0"`, description
+  `"Next Generation City Guide"`), which is identical across every active
+  city × these 3 intents — i.e. duplicate title/description at scale
+  across the sitemap-adjacent surface (their sibling `/[city]/events` and
+  `/[city]/programs` both correctly have per-page `generateMetadata()`).
+  No `alternates.canonical` either, unlike every other city-level listing.
+- Current state: not started.
+- Dependencies: none blocking. Can reuse the existing
+  `buildCityEventsListingMetadata`/`buildCityHubMetadata` pattern in
+  `src/lib/seo/cityKudaListingMetadata.ts` as a template for a
+  `classes`/`birthday`/`routes` variant.
+- Acceptance criteria: each of the 3 pages gets its own
+  `generateMetadata()` (title, description, `alternates.canonical`),
+  wrapped through `applyGlobalRobotsOverride`/`buildOgMeta`, matching the
+  pattern already used by `/[city]/events` and `/[city]/programs`. No
+  JSON-LD required for these (no meaningful rich-result type — they are
+  discovery/listing shells, not entities).
+- Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
+  Structured Data) audit, 2026-08-12
+
+## [BACKLOG-064] `sitemap.xml` omits several real listing page types; doesn't check per-entity `seoRobots`
+
+- Status: OPEN
+- Priority: P2
+- Area: SEO / Structured Data (Task 8)
+- Added: 2026-08-12
+- Reason deferred: audit-only phase; not a broken flow, existing sitemap
+  is functional and correct for the entity types it does cover.
+- Context: `src/app/sitemap.ts` includes city hub, `/[city]/events`,
+  per-city discovery tags, and detail pages for Place/Offer/Route/Article/
+  Event. It does **not** include `/[city]/programs`, `/[city]/classes`,
+  `/[city]/routes` (city listing), `/routes` (global listing), `/blog`,
+  or `/[city]/blog` — confirmed by direct read of the file, no query or
+  push for any of these. Separately: Event/Place/Offer/Route sitemap
+  entries are filtered only by publish status/visibility, never by the
+  per-entity `seoRobots` string field (`prisma/schema.prisma`: `Activity`,
+  `Place`, `Offer`, `Route` all have `seoRobots String?`, checked at the
+  page-metadata level via each detail page's own `parseRobots()`/
+  `buildOgMeta()` call but not re-checked in `sitemap.ts`) — an entity
+  with an admin-set `seoRobots="noindex,nofollow"` override still gets a
+  sitemap.xml entry even though its own page renders `noindex`. Article is
+  the only model sitemap correctly excludes via its `noindex` boolean.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: decide (owner call) whether `/[city]/programs`,
+  `/[city]/classes`, `/[city]/routes` should be added to the sitemap
+  (recommended, once BACKLOG-063's metadata gap is fixed) or left as
+  internal-link-only discovery; add a `seoRobots`-noindex filter to the
+  Event/Place/Offer/Route sitemap queries so admin-noindexed entities are
+  never listed.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
+  Structured Data) audit, 2026-08-12
+
+## [BACKLOG-065] Minor Schema.org / SEO enrichment opportunities (grab-bag)
+
+- Status: OPEN
+- Priority: P3
+- Area: SEO / Structured Data (Task 8)
+- Added: 2026-08-12
+- Reason deferred: all confirmed real but cosmetic/enrichment-only, none
+  affect current Rich Results validity or indexability.
+- Context (each independently actionable, grouped only for backlog
+  hygiene):
+  1. `WebSite` JSON-LD's `potentialAction.SearchAction` is never
+     populated — `buildWebSiteJsonLd()` supports a `searchPath` input but
+     `src/app/(public)/layout.tsx`'s call site never passes one. Passing
+     `/search` (or the real search route once it's server-renderable,
+     see item 3) would enable Google Sitelinks Search Box.
+  2. `.env.example` lines 47-49 tell operators "Production launch: set
+     `SITE_NOINDEX_DEFAULT=false` so search engines can index the site" —
+     this is misleading: `isGlobalNoindexEnabled()`
+     (`src/lib/seo/globalNoindex.ts:25-30`) only turns indexing on via
+     `SITE_INDEXING_ENABLED=true`; `SITE_NOINDEX_DEFAULT=false` alone does
+     nothing (falls through to the default-noindex `return true`). The
+     real, correct flag is already used consistently in
+     `docs/migration/production-cutover-runbook.md` and
+     `docs/migration/dns-cutover-plan-2026-07-29.md` — this is a stale/
+     wrong comment in the example env file only, not a live-config risk,
+     but worth a one-line fix so a future operator following only
+     `.env.example` doesn't launch permanently noindexed.
+  3. `src/app/(public)/search/page.tsx` is a `"use client"` component that
+     JS-redirects (`router.replace`) to `/{citySlug}` on mount — no
+     server-side metadata or redirect, so a crawler fetching it
+     server-side gets an empty shell, not a 30x. Low risk unless
+     something links to `/search` publicly (not confirmed either way);
+     converting to a server redirect would be a trivial, safe fix if ever
+     prioritized.
+  4. `buildOgMeta()` always sets `openGraph.type: "website"`, even for
+     Article/Event/Offer detail pages (Facebook/LinkedIn recommend
+     `"article"` for articles, with `article:published_time` etc.) — a
+     social-share preview quality gap, not a Google Rich Results
+     requirement.
+  5. `Event`/`Place` JSON-LD emit `location.address`/`address` as a plain
+     string rather than a structured `PostalAddress` (`streetAddress`,
+     `addressLocality`, etc.) — valid per schema.org (address accepts a
+     string), but Google's Event/Place Rich Results guidance recommends
+     structured `PostalAddress` for the richest eligible presentation.
+  6. `buildEventJsonLd()` never emits an `offers` node (price), even when
+     the underlying session/Activity has a real price — Google's Event
+     Rich Results recommend (not require) `offers` when ticketing/pricing
+     exists.
+  7. Global `Organization`/`WebSite` JSON-LD (`(public)/layout.tsx`) is
+     emitted on every page in the `(public)` route group, including
+     auth-gated `/me/*` pages and explicitly-noindex pages (e.g. the Day
+     Scenario page) — confirmed harmless (generic, non-personal data,
+     doesn't affect indexability since those pages are noindex/auth-gated
+     regardless), but flagged per Task 8's own "structured data inherited
+     accidentally from layouts" check. No action needed unless the owner
+     wants layout-level suppression on noindex routes for cleanliness.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: each sub-item can be picked up independently; none
+  block PROD.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
+  Structured Data) audit, 2026-08-12

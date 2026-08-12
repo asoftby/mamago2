@@ -21,9 +21,27 @@ DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
 Active task:        Task 8 (Schema.org / Structured Data) — STATUS:
-                     AUDIT_IN_PROGRESS. Audit-only pass per owner
-                     instruction: build the page-type audit matrix, no
-                     implementation, no Task 9 start.
+                     AUDIT_COMPLETE. Full read-only audit of every
+                     indexable page type + shared SEO/JSON-LD
+                     infrastructure. Result: infrastructure is real,
+                     single-path, reused correctly (buildOgMeta, global
+                     noindex kill-switch, per-entity canonical resolvers,
+                     one JSON-LD builder per Schema.org type) — no
+                     duplicate/conflicting @id, no fabricated data
+                     (Place AggregateRating confirmed real), no P0/P1
+                     found. 3 real P2/P3 gaps filed to backlog
+                     (BACKLOG-063..065): `/[city]/classes`,
+                     `/[city]/birthday`, `/[city]/routes` have zero
+                     page-specific metadata; sitemap.xml omits several
+                     listing types and doesn't filter by per-entity
+                     `seoRobots`; a grab-bag of minor enrichment items
+                     (unused SearchAction, a misleading `.env.example`
+                     comment — real launch runbooks already use the
+                     correct flag, plain-string vs PostalAddress, etc.).
+                     No implementation performed — stopped for owner
+                     scope approval per instruction, Task 9 not started.
+                     Full detail, matrix, and minimal implementation plan
+                     in Task 8's own section below.
 Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
                      2026-08-12; not reopened for P2/P3 UX/cleanup
                      findings). Accepted final state: standalone Scenario
@@ -110,8 +128,9 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   none from Task 1–7 (all CLOSED, COMPLETE). Task 8 is
-                     AUDIT_IN_PROGRESS. Tasks 9–17 remain TODO, not started
+Unresolved P0/P1:   none from Task 1–7 (all CLOSED, COMPLETE). Task 8 audit
+                     complete, zero P0/P1 found. Tasks 9–17 remain TODO,
+                     not started
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -2724,15 +2743,211 @@ family day from one screen.
 
 Priority: `P0 — SEO BLOCKER`
 
-STATUS: `AUDIT_IN_PROGRESS`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `AUDIT_COMPLETE`
+
+### A. Current implementation map
+
+Real, live, single-path SEO infrastructure — not a second framework, no
+dead abstraction competing with it:
+- **Metadata**: `src/lib/seo/buildOgMeta.ts` is the de facto shared
+  builder (title/description/OG/Twitter, always routes through
+  `applyGlobalRobotsOverride`) — used by every entity detail page (Event,
+  Place, Offer×2, Route, Article×2).
+- **Global noindex kill-switch**: `src/lib/seo/globalNoindex.ts` —
+  `isGlobalNoindexEnabled()` defaults to `noindex` until
+  `SITE_INDEXING_ENABLED=true` is explicitly set; enforced twice
+  (metadata layer via `applyGlobalRobotsOverride`, and an HTTP
+  `X-Robots-Tag: noindex, nofollow` header in `src/middleware.ts:56-68`
+  as a safety net). `sitemap.ts`/`robots.ts` both short-circuit to
+  empty/disallow-all under the same flag.
+- **Canonical URLs**: one resolver per entity
+  (`resolve{Event,Place,Offer,Route,Article}CanonicalUrl.ts`), all
+  sharing `validateStoredCanonical.ts` — a stored `seoCanonicalUrl` is
+  only trusted if same-origin + exact expected path, else falls back to
+  a deterministic path from current city/slug/id. Correctly rejects
+  stale/wrong-origin values.
+- **JSON-LD builders**: `src/lib/seo/schema/` — one file per Schema.org
+  type (see §C), rendered via `src/components/seo/JsonLd.tsx`
+  (`cleanJsonLd()` strips empty values, single `<script
+  type="application/ld+json">`).
+- **Per-entity override escape hatch**: Event/Place/Offer/Article/Route
+  all check a stored `seoJsonLdOverride` JSON column first and use it
+  verbatim instead of the builder output when present (admin-settable).
+- **Admin SEO tooling**: `src/app/admin/seo/*` — per-entity SEO editors,
+  schema preview/override editor, redirect manifest, sitemap/robots
+  admin view, SEO templates, `llms.txt` management. Internal-only, not
+  itself a public/indexable surface, not deep-audited here.
+
+### B. Audit matrix by page type
+
+| Page type | Indexable? | Canonical | Metadata impl | JSON-LD emitted | Correct? | Missing |
+|---|---|---|---|---|---|---|
+| Homepage `/` | Yes (flag-gated; middleware 307s to flagship city in prod so `/` itself never resolves 200 in PROD) | `alternates.canonical=BASE_URL` | static `metadata` export | none page-level; Organization+WebSite from `(public)/layout.tsx` | Yes | — |
+| City home `/[city]` | Yes | `buildCityHubMetadata()` | `generateMetadata()` | Organization+WebSite (layout-inherited) only | Yes | No page-type JSON-LD needed (listing shell, not an entity) |
+| Events listing `/[city]/events` | Yes | `buildCityEventsListingMetadata()` | `generateMetadata()` | none | Yes | Could add `ItemList` of upcoming events — P3, not required |
+| Event detail `/[city]/events/[slug]` | Yes (per-entity `seoRobots` override respected) | `resolveEventCanonicalUrl()` | `generateMetadata()` via `buildOgMeta()` | `Event` + `BreadcrumbList` + conditional `FAQPage` (`buildEventJsonLd`) | Yes | `offers`/price node (BACKLOG-065.6); `location.address` is a plain string not `PostalAddress` (BACKLOG-065.5) |
+| Places listing | **No dedicated route exists** — Place discovery folds into the `kuda`/events feed | n/a | n/a | n/a | Correctly absent | Not a gap — no listing route to have metadata for |
+| Place detail `/places/[slug]` | Yes | `resolvePlaceCanonicalUrl()` | `generateMetadata()` via `buildOgMeta()` | `Place` (+`GeoCoordinates`, real `AggregateRating` blended from `PlaceReview` rows + Google import, never fabricated) + `BreadcrumbList` + conditional `FAQPage` | Yes | Same `PostalAddress` note as Event; no per-entity `seoRobots` parsing (binary index/noindex only via global flag — P3, no confirmed real-world need for per-Place granular robots today) |
+| Articles/Blog listing `/blog`, `/[city]/blog` | Yes | none set explicitly (relies on inherited/base) | static/`generateMetadata()` via `applyGlobalRobotsOverride` | none | Acceptable (listing shell) | Could add explicit `alternates.canonical` — P3 |
+| Article detail `/blog/[slug]`, `/[city]/blog/[slug]` | Yes (per-article `noindex` bool + `seoRobots` string both respected) | `resolveArticleCanonicalUrl()` | `generateMetadata()` via `buildOgMeta()`/`applyGlobalRobotsOverride` | `NewsArticle`/`BlogPosting` (via `isNews` flag) + `BreadcrumbList` (`buildArticleJsonLd`) | Yes | OG `type` always `"website"` not `"article"` (BACKLOG-065.4) |
+| Continuous-reading article variant (same URL) | Yes, same as above | same | same `generateMetadata()` (shared route) | Same JSON-LD as the normal article — confirmed mutually-exclusive `return` branches (Breaking News / Continuous / normal / legacy), not duplicate emission | Yes | — |
+| Breaking News article variant (same URL, `subtitle===BREAKING_NEWS_SUBTITLE`) | Yes | same | same | `NewsArticle` (isNews=true) + `BreadcrumbList` | Yes | — |
+| Discovery tag pages `/[city]/tags/[tagSlug]` | Yes | none explicit | `generateMetadata()` via `buildOgMeta()` | none | Acceptable (listing shell) | — |
+| Routes listing `/routes` (global) | Yes | none | static `metadata` | none | Acceptable | — |
+| Routes listing `/[city]/routes` (city) | Yes | **none — no metadata export at all** | inherits root layout only | none | **Gap** (BACKLOG-063) | Title/description/canonical |
+| Route detail `/routes/[slug]` | Conditional (`robots:{index:false}` when not publicly visible) | `resolvePublicRouteCanonicalUrl()`, never emitted for DRAFT | `generateMetadata()` | `ItemList` (stops as `ListItem`) + `BreadcrumbList` (`buildRouteJsonLd`, deliberately MVP-grade per source comment, not a bug) | Yes | — |
+| Offer/Service detail `/[city]/offers/[section]/[slug]` | Yes (per-entity `seoRobots`) | `resolveOfferCanonicalUrl()`, always resolved against the offer's own city | `generateMetadata()` via `buildOgMeta()` | `Service`(+nested `Offer`) for CAMP/SERVICE, else bare `Offer`, real `price`/`priceCurrency` when numeric price exists + `BreadcrumbList` + conditional `VideoObject`/`FAQPage` | Yes | — |
+| Legacy `/offers/[slug]` | n/a (301 shim) | redirects to canonical | metadata exists but page always redirects | none | Correct (redirect-only) | — |
+| Programs listing `/[city]/programs` | Yes | **no explicit `alternates.canonical`** | `generateMetadata()` (title+OG) but doesn't call `applyGlobalRobotsOverride` directly — relies on Next.js metadata-merge inheriting root `robots` | none | Works today; fragile pattern (P3 — make it call `applyGlobalRobotsOverride` explicitly for defense-in-depth, don't rely on merge semantics) | Explicit canonical |
+| Program detail `/[city]/programs/[slug]` | Yes | from `seo?.canonicalUrl` or deterministic fallback | `generateMetadata()` via `applyGlobalRobotsOverride` | Same Offer/Service builders (Program is Offer-backed) | Yes | — |
+| Classes `/[city]/classes` | Yes | **none — no metadata export at all** | inherits root layout only | none | **Gap** (BACKLOG-063) | Title/description/canonical |
+| Birthday `/[city]/birthday` | Yes | **none — no metadata export at all** | inherits root layout only | none | **Gap** (BACKLOG-063) | Title/description/canonical |
+| `/[city]/kuda`, `/[city]/where-to-go` | n/a (301 shims to `/{city}/events`) | n/a | n/a | n/a | Correct (real 301, not soft canonical-only redirect) | — |
+| Search `/search` | Practically no — client-only `"use client"` JS redirect (`router.replace`) to `/{city}` on mount, no server metadata/redirect | none | none | none | Not crawlable as a real page (BACKLOG-065.3) — confirm no public link targets it | Server-side redirect if ever linked |
+| `/me/*` (should NOT be indexable) | Correctly excluded — `MeLayout` requires auth, redirects unauthenticated (incl. crawlers) to `/login`; global `X-Robots-Tag` header also covers it | n/a | mostly static title-only | Organization+WebSite still render (layout-inherited, harmless — BACKLOG-065.7) | Correct exclusion | — |
+| `/[city]/my-plan/[date]/scenario` | Explicitly noindex (`robots:{index:false,follow:false}`) | n/a | static | Organization+WebSite still render (same as above) | Correct | — |
+| `/preview/articles/[id]` | Explicitly noindex | n/a | static | none | Correct | — |
+| `/p/[id]` (shareable plan) | Indexable-by-default (only global flag applies, no per-instance noindex) | none | `applyGlobalRobotsOverride({title:"План праздника"})` only | none | Thin/generic if ever crawled — low real risk (link-shared, not discoverable/linked publicly) | P3, no action needed without evidence of real crawl exposure |
+
+### C. Shared SEO/schema utilities already reusable (all confirmed via direct code read)
+
+`buildOgMeta.ts`, `globalNoindex.ts` (+ its own test file), `cityKudaListingMetadata.ts`,
+5× `resolve*CanonicalUrl.ts` + `validateStoredCanonical.ts`,
+`src/lib/config/publicAppUrl.ts` / `src/lib/routing/cityPaths.ts` (base URL +
+city path builders), `src/lib/seo/schema/{buildOrganizationJsonLd,
+buildWebSiteJsonLd,buildEventJsonLd,buildPlaceJsonLd,buildArticleJsonLd,
+buildOfferJsonLd,buildOfferStructuredData,buildRouteJsonLd,
+buildBreadcrumbJsonLd,buildFaqJsonLd,cleanJsonLd,url}.ts`,
+`src/components/seo/JsonLd.tsx`. All absolute-URL handling goes through
+one shared `absolutePublicUrl`/`absolutePublicImageUrl` pair
+(`schema/url.ts`) — verified no page builds a relative JSON-LD URL by
+hand. No second SEO framework exists or is needed.
+
+### D/E/F. Confirmed defects, missing structured data, duplicate/conflicting schema
+
+- **No duplicate/conflicting `@id` values found.** Every per-entity
+  JSON-LD sets a canonical-URL-scoped `@id`
+  (`{canonicalUrl}#event|#place|#article|#offer|#service`); Organization/
+  WebSite use stable global `{base}/#organization|#website` ids,
+  correctly cross-referenced (`WebSite.publisher` → `Organization`
+  `@id`) — this is the *intended* shared-entity pattern, not a bug.
+- **No JSON-LD double-emission found.** The 3–4 `<JsonLd>` call sites
+  inside `blog/[slug]/page.tsx` and `[city]/blog/[slug]/page.tsx`
+  (Breaking News / Continuous-reading / normal / legacy variants) are
+  confirmed mutually-exclusive `return` branches, not duplicate renders
+  on the same page load.
+- **Missing metadata (confirmed gap, no code speculation)**:
+  `/[city]/classes`, `/[city]/birthday`, `/[city]/routes` have **zero**
+  page-specific `title`/`description`/`canonical` — direct file read of
+  all 3 confirms no `generateMetadata`/`metadata` export exists. Routed
+  to BACKLOG-063.
+- **Sitemap gaps**: omits `/[city]/programs`, `/[city]/classes`,
+  `/[city]/routes`, `/routes`, `/blog`, `/[city]/blog`; does not filter
+  Event/Place/Offer/Route by per-entity `seoRobots`. Routed to
+  BACKLOG-064.
+- **No fabricated data found**: Place `AggregateRating` is real
+  (blended `PlaceReview` DB aggregate + Google-imported rating, never
+  invented); no duration/price fields are fabricated anywhere (matches
+  Task 7's own "never fabricate" finding — Event JSON-LD's `startDate`
+  is a real session date or omitted, never guessed).
+- **H1 sanity**: spot-checked all 5 main detail-page hero components
+  (`EventHero`, `PlaceHero`×2 variants, `ArticleHeader`, `OfferHero`,
+  `RouteDetailClient`) — each renders exactly one `<h1>`. No missing/
+  duplicate H1 found on the pages that matter for Rich Results.
+
+### G. Indexability / canonical / robots findings
+
+- Global noindex mechanism (`isGlobalNoindexEnabled`) is correctly
+  fail-safe (defaults to noindex, needs an explicit flag to go live) and
+  enforced at two independent layers (metadata + HTTP header) — this is
+  the right pattern for a pre-launch site, not a defect.
+- **`.env.example`'s own comment is factually wrong** about which flag
+  enables indexing (`SITE_NOINDEX_DEFAULT=false` does nothing by itself;
+  the real switch is `SITE_INDEXING_ENABLED=true`) — confirmed by
+  reading `globalNoindex.ts` line-by-line. **Not a live risk**: every
+  actual production runbook (`docs/migration/production-cutover-runbook.md`,
+  `docs/migration/dns-cutover-plan-2026-07-29.md`) already references the
+  correct `SITE_INDEXING_ENABLED=true` flag. Routed to BACKLOG-065.2 as a
+  trivial doc-comment fix, not a P0/P1 — the authoritative launch
+  procedure is already correct.
+- Canonical resolution is robust against stale/wrong-origin stored
+  values (`validateStoredCanonical.ts`) — verified this rejects a stored
+  canonical that doesn't match the current origin/path exactly.
+- `robots.txt`/`sitemap.xml` both correctly go empty/disallow-all under
+  the same global noindex flag — no risk of submitting a live sitemap
+  while the site is still meant to be hidden.
+
+### H. P0/P1 required before PROD
+
+**None.** No finding in this audit makes any main indexable page type
+unsafe, broken, or wrong in a way that blocks first PROD per this
+checklist's own severity model (§4/§7): no security issue, no data
+loss/leak, no broken authentication/authorization, no critical flow
+failure, no fabricated data, no duplicate/conflicting JSON-LD, and the
+global noindex kill-switch itself works correctly (only its *documentation
+comment* is wrong, and the real runbooks already use the correct flag).
+
+### I. P2/P3 backlog candidates (all filed)
+
+- BACKLOG-063 (P2) — `/[city]/classes`, `/[city]/birthday`,
+  `/[city]/routes` missing page-specific metadata.
+- BACKLOG-064 (P2) — sitemap coverage gaps + missing `seoRobots` filter.
+- BACKLOG-065 (P3) — grab-bag: `SearchAction` unused, `.env.example`
+  misleading comment, `/search` not server-crawlable, OG `type` always
+  `"website"`, plain-string addresses vs `PostalAddress`, no `offers` on
+  Event JSON-LD, Organization/WebSite JSON-LD inherited onto noindex/
+  auth-gated pages (harmless).
+
+### J. Minimal implementation plan for Task 8 (for owner scope approval — NOT executed this phase)
+
+If approved, in priority order: (1) BACKLOG-063 — add
+`generateMetadata()` to the 3 gap pages, reusing the
+`buildCityEventsListingMetadata` pattern (small, additive, no schema/DB
+change); (2) BACKLOG-064 — add the 3 missing listing types to
+`sitemap.ts` + a `seoRobots`-noindex filter on the 4 entity queries that
+lack it (small, additive); (3) BACKLOG-065 items are independently
+pickable, none urgent. No item requires a new abstraction, new JSON-LD
+type, or schema/DB migration.
+
+### K. Files likely affected (if J is approved)
+
+`src/app/(public)/[city]/classes/page.tsx`,
+`src/app/(public)/[city]/birthday/page.tsx`,
+`src/app/(public)/[city]/routes/page.tsx`, `src/lib/seo/
+cityKudaListingMetadata.ts` (extend with 3 new builders or generalize the
+existing one), `src/app/sitemap.ts`, `.env.example` (comment-only fix).
+
+### L. Migration/DB schema change required
+
+**None.** Every finding is either a missing `generateMetadata()` call, a
+sitemap query addition, or a documentation-comment fix — no new Prisma
+model, field, or migration needed for any P0/P1/P2/P3 item found.
+
+AUDIT FIRST existing SEO utilities and JSON-LD. Build an audit matrix: `page
+type → current schema → problem → missing → required action`. Check:
+Events, Places, Articles, Routes, Offers, Services, Programs (if indexed),
+listing/category pages, BreadcrumbList, Organization, WebSite, other actually
+used Schema.org types. Also: H1/H2/H3, canonical, city URLs, title,
+description, OpenGraph, robots, indexability, JSON-LD validity, duplicate
+entities, conflicting entities, Rich Results compatibility where applicable.
+Reuse shared SEO utilities.
+
+GAPS: see §D/E/F/G above.
+IMPLEMENTATION: not started this phase — audit only, per owner instruction.
+COMMITS: audit findings recorded in this doc + BACKLOG-063..065 filed in
+`docs/engineering/backlog.md` (see commit history for this file).
+VERIFICATION: full-repo code read (not grep-only) of every route file
+listed in §B, all JSON-LD builder files, `sitemap.ts`, `robots.ts`,
+`middleware.ts`'s robots-header logic, `prisma/schema.prisma` for
+`seoRobots`/`noindex` field presence per model, and a direct spot-check of
+Place's `AggregateRating` data source (confirmed real, not fabricated) and
+H1 presence across all 5 main detail-page hero components.
+DEV SMOKE: not applicable — audit-only phase, no code changed.
+BLOCKERS: none.
+BACKLOG/NOTES: BACKLOG-063, BACKLOG-064, BACKLOG-065 (see §I).
+
+**Exit Criteria:** No main indexable page type reaches PROD without correct
+SEO/structured-data implementation.
 
 AUDIT FIRST existing SEO utilities and JSON-LD. Build an audit matrix: `page
 type → current schema → problem → missing → required action`. Check:
