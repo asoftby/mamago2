@@ -4,9 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
 import { PlanGuestFlow } from "./PlanGuestFlow";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
-import { formatPlanActivityPriceLabel } from "@/lib/plan/formatPlanActivityPriceLabel";
 import { getLatestActivePlanReminderNotification } from "@/server/services/notification.service";
-import { computePlanFingerprint } from "@/server/services/dayScenario.service";
+import {
+  computePlanFingerprint,
+  listScenarioItemOverridesForScenarios,
+} from "@/server/services/dayScenario.service";
+import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -56,7 +59,7 @@ export default async function PlanPage() {
   // own "План изменился" reconciliation).
   const dayScenarios = await prisma.dayScenario.findMany({
     where: { userId: user.id },
-    select: { date: true, planFingerprint: true },
+    select: { id: true, date: true, planFingerprint: true },
   });
   const itemsByDateForFingerprint = new Map<string, { id: string; startsAt: Date | null }[]>();
   for (const item of planItems) {
@@ -71,28 +74,41 @@ export default async function PlanPage() {
       computePlanFingerprint(currentItems) === scenario.planFingerprint ? "ready" : "changed";
   }
 
+  // Bounded, single-query lookup of Scenario-assigned times across every
+  // date this user has a Scenario for — lets My Plan show the same
+  // effective time as the Scenario without mutating PlanItem.startsAt.
+  const scenarioOverridesByPlanItemId = await listScenarioItemOverridesForScenarios(
+    dayScenarios.map((s) => s.id),
+  );
+
   // Serialize plan items (dates need to be strings for client)
-  const serializedItems = planItems.map((item) => ({
-    id: item.id,
-    date: item.date,
-    startsAt: item.startsAt ? item.startsAt.toISOString() : null,
-    activityId: item.activityId,
-    title: item.title,
-    coverImageUrl: item.coverImageUrl,
-    planAvailability: getPlanActivityPublicAvailability(item.activity),
-    activity: item.activity
-      ? {
-          id: item.activity.id,
-          slug: item.activity.slug,
-          title: item.activity.title,
-          type: item.activity.type,
-          coverImageUrl: item.activity.coverImageUrl,
-          ageLabel: item.activity.ageLabel,
-          categoryLabel: item.activity.eventCategory?.nameRu ?? null,
-          priceLabel: formatPlanActivityPriceLabel(item.activity),
-        }
-      : null,
-  }));
+  const serializedItems = planItems.map((item) => {
+    const effectiveStartsAt = resolveMyPlanItemEffectiveTime(
+      { startsAt: item.startsAt },
+      scenarioOverridesByPlanItemId.get(item.id) ?? null,
+    );
+    return {
+      id: item.id,
+      date: item.date,
+      startsAt: item.startsAt ? item.startsAt.toISOString() : null,
+      effectiveStartsAt: effectiveStartsAt ? effectiveStartsAt.toISOString() : null,
+      activityId: item.activityId,
+      title: item.title,
+      coverImageUrl: item.coverImageUrl,
+      planAvailability: getPlanActivityPublicAvailability(item.activity),
+      activity: item.activity
+        ? {
+            id: item.activity.id,
+            slug: item.activity.slug,
+            title: item.activity.title,
+            type: item.activity.type,
+            coverImageUrl: item.activity.coverImageUrl,
+            ageLabel: item.activity.ageLabel,
+            categoryLabel: item.activity.eventCategory?.nameRu ?? null,
+          }
+        : null,
+    };
+  });
 
   const serializedIdeas = ideas.map((idea) => {
     const act = ideaActivityMap.get(idea.activityId) ?? null;

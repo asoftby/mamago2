@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   resolveScenarioItemTime,
+  resolveMyPlanItemEffectiveTime,
   resolveReliableDurationMinutes,
   sortScenarioItemsByEffectiveTime,
   deriveFreeGapMinutes,
@@ -64,6 +65,26 @@ function item(overrides: Partial<Pick<ScenarioPlanItem, "startsAt" | "activity">
   assert.equal(result.timeSource, "override");
   assert.equal(result.isFlexible, true, "override doesn't change flexible classification");
   assert.equal(result.effectiveStartsAt?.getTime(), at(9, 30).getTime());
+}
+
+// ── resolveMyPlanItemEffectiveTime (My Plan's reuse of the canonical helper) ──
+
+// Authoritative PlanItem.startsAt wins over any Scenario override.
+{
+  const result = resolveMyPlanItemEffectiveTime({ startsAt: at(11) }, at(15));
+  assert.equal(result?.getTime(), at(11).getTime(), "source time wins over override");
+}
+
+// No source time -> falls back to the Scenario override.
+{
+  const result = resolveMyPlanItemEffectiveTime({ startsAt: null }, at(9, 30));
+  assert.equal(result?.getTime(), at(9, 30).getTime(), "falls back to Scenario override");
+}
+
+// Neither source nor override -> remains untimed (never fabricated).
+{
+  const result = resolveMyPlanItemEffectiveTime({ startsAt: null }, null);
+  assert.equal(result, null, "no source and no override -> untimed");
 }
 
 // ── resolveReliableDurationMinutes: never fabricates ──

@@ -19,6 +19,8 @@ const scenarioActivitySelect = {
       formattedAddr: true,
       customAddress: true,
       city: { select: { name: true } },
+      metroAuto: { select: { name: true } },
+      metroManual: { select: { name: true } },
     },
   },
   venue: {
@@ -31,6 +33,8 @@ const scenarioActivitySelect = {
           formattedAddr: true,
           customAddress: true,
           city: { select: { name: true } },
+          metroAuto: { select: { name: true } },
+          metroManual: { select: { name: true } },
         },
       },
     },
@@ -173,6 +177,23 @@ export async function listScenarioItemOverrides(
 ): Promise<Map<string, Date>> {
   const rows = await prisma.dayScenarioItemOverride.findMany({
     where: { scenarioId },
+    select: { planItemId: true, startTimeOverride: true },
+  });
+  return new Map(rows.map((row) => [row.planItemId, row.startTimeOverride]));
+}
+
+/**
+ * Same as `listScenarioItemOverrides` but bounded across multiple Scenarios
+ * at once (one query) — used by My Plan, which shows items across every
+ * date a user has a Scenario for, not just one. `planItemId` is globally
+ * unique, so a flat map is safe even across scenarios/dates.
+ */
+export async function listScenarioItemOverridesForScenarios(
+  scenarioIds: string[],
+): Promise<Map<string, Date>> {
+  if (scenarioIds.length === 0) return new Map();
+  const rows = await prisma.dayScenarioItemOverride.findMany({
+    where: { scenarioId: { in: scenarioIds } },
     select: { planItemId: true, startTimeOverride: true },
   });
   return new Map(rows.map((row) => [row.planItemId, row.startTimeOverride]));

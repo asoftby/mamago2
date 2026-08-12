@@ -7,9 +7,8 @@ import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import { formatHHMM } from "@/lib/formatters/date";
-import { BYN_SYMBOL, formatPriceAmount, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { BelarusianRubleIcon, renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
+import { resolvePlanItemCategoryLabel } from "@/features/my-plan/lib/planItemMeta";
 
 const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const DAYS_RU_FULL: Record<number, string> = {
@@ -31,33 +30,9 @@ function formatTime(iso: string | null): string | null {
   return formatHHMM(iso) || null;
 }
 
-function PlanItemPriceDisplay({ priceLabel }: { priceLabel: string }) {
-  if (priceLabel.toLowerCase() === "бесплатно") {
-    return <span className="uppercase">{priceLabel}</span>;
-  }
-
-  const stripped = priceLabel
-    .replace(/^от\s+/i, "")
-    .split(BYN_SYMBOL)
-    .join("")
-    .trim();
-  const amount = formatPriceAmount(stripped);
-  if (amount) {
-    return (
-      <span style={{ display: "inline-flex", alignItems: "baseline", gap: "0.18em" }}>
-        <span>{amount}</span>
-        <BelarusianRubleIcon size="sm" />
-      </span>
-    );
-  }
-
-  return <span>{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}</span>;
-}
-
 function PlanItemMeta({ item }: { item: SerializedPlanItem }) {
-  const category = item.activity?.categoryLabel?.trim();
-  const priceLabel = item.activity?.priceLabel?.trim();
-  if (!category && !priceLabel) return null;
+  const category = resolvePlanItemCategoryLabel(item.activity);
+  if (!category) return null;
 
   const metaStyle = {
     fontSize: 10,
@@ -66,10 +41,8 @@ function PlanItemMeta({ item }: { item: SerializedPlanItem }) {
   } as const;
 
   return (
-    <span className="font-mono inline-flex items-center gap-[0.35em] flex-wrap" style={metaStyle}>
-      {category && <span className="uppercase">{category}</span>}
-      {category && priceLabel && <span aria-hidden>·</span>}
-      {priceLabel && <PlanItemPriceDisplay priceLabel={priceLabel} />}
+    <span className="font-mono uppercase" style={metaStyle}>
+      {category}
     </span>
   );
 }
@@ -83,7 +56,7 @@ function PlanItemCard({
 }) {
   const [removing, setRemoving] = useState(false);
   const title = item.activity?.title ?? item.title ?? "Активность";
-  const time = formatTime(item.startsAt);
+  const time = formatTime(item.effectiveStartsAt);
   const unavailable =
     item.planAvailability === "business_disabled" ||
     item.planAvailability === "missing_activity";

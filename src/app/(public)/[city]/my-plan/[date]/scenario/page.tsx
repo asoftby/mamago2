@@ -20,7 +20,7 @@ import {
   deriveFreeGapMinutes,
   deriveEndOfDay,
 } from "@/features/my-plan/lib/scenarioProjection";
-import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
+import { resolveActivityAddress } from "@/features/my-plan/lib/formatActivityAddress";
 import { detectScenarioConflictIds } from "@/features/my-plan/lib/detectScenarioConflicts";
 import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
 import { ScenarioTimeline, type ScenarioTimelineItem } from "@/features/my-plan/components/ScenarioTimeline";
@@ -118,7 +118,7 @@ export default async function DayScenarioPage({ params }: PageProps) {
         item.activityId && item.activity
           ? publicActivityPath(item.activityId, city.slug, item.activity.slug)
           : null,
-      address: item.activity ? formatActivityAddressLine(item.activity) : null,
+      address: item.activity ? resolveActivityAddress(item.activity) : null,
       durationMinutes: resolveReliableDurationMinutes(item),
       imageUrl: item.coverImageUrl || item.activity?.coverImageUrl || null,
       effectiveStartsAt: timing.effectiveStartsAt,

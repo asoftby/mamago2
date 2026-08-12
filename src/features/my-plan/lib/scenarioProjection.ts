@@ -11,6 +11,13 @@ export interface ScenarioItemTiming {
   timeSource: ScenarioTimeSource;
 }
 
+/** Minimal shape this resolver needs — structural, not coupled to any one
+ * query's exact projection, so both Scenario and My Plan can reuse it. */
+export type ScenarioItemTimeInput = {
+  startsAt: Date | null;
+  activity: { sessions: { startsAt: Date }[] } | null;
+};
+
 /**
  * Resolves the time a Scenario item should render/sort by, in priority
  * order: (1) `PlanItem.startsAt` — set at add-time when the user picked a
@@ -20,7 +27,7 @@ export interface ScenarioItemTiming {
  * override; (4) flexible (no time).
  */
 export function resolveScenarioItemTime(
-  item: Pick<ScenarioPlanItem, "startsAt" | "activity">,
+  item: ScenarioItemTimeInput,
   overrideStartsAt: Date | null,
 ): ScenarioItemTiming {
   if (item.startsAt) {
@@ -37,6 +44,25 @@ export function resolveScenarioItemTime(
   }
 
   return { effectiveStartsAt: null, isFlexible: true, timeSource: "flexible" };
+}
+
+/**
+ * My Plan's effective time for one PlanItem: the authoritative source time
+ * (`PlanItem.startsAt`) if set, otherwise a Scenario-assigned override time
+ * for that item, otherwise untimed. My Plan never loads per-item
+ * `ActivitySession` data (that recovery is Scenario-only — see
+ * `resolveScenarioItemTime`), so this always passes an empty session list;
+ * `PlanItem.startsAt` presence alone already short-circuits before sessions
+ * are ever consulted. Reuses `resolveScenarioItemTime` rather than
+ * duplicating its priority logic — this function only adapts the shape.
+ * Never mutates `PlanItem.startsAt` — purely a read-side projection.
+ */
+export function resolveMyPlanItemEffectiveTime(
+  item: { startsAt: Date | null },
+  overrideStartsAt: Date | null,
+): Date | null {
+  return resolveScenarioItemTime({ startsAt: item.startsAt, activity: null }, overrideStartsAt)
+    .effectiveStartsAt;
 }
 
 /**

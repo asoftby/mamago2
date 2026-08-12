@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { MediaCover } from "@/components/ui/media-cover";
 import { AssignScenarioTimeControl } from "./AssignScenarioTimeControl";
+import type { ActivityAddressLabel } from "@/features/my-plan/lib/formatActivityAddress";
 
 export type ScenarioTimelineItem = {
   id: string;
   title: string;
   href: string | null;
-  address: string | null;
+  address: ActivityAddressLabel | null;
   durationMinutes: number | null;
   imageUrl: string | null;
   effectiveStartsAt: Date | null;
@@ -90,10 +91,15 @@ export function ScenarioTimeline({ items, city, date }: ScenarioTimelineProps) {
                             {item.title}
                           </h3>
                         )}
-                        {item.address ? (
+                        {item.address?.cityLabel || item.address?.streetAddressLabel ? (
                           <p className="mt-1 text-sm leading-relaxed text-neutral-500">
-                            {item.address}
+                            {[item.address.cityLabel, item.address.streetAddressLabel]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </p>
+                        ) : null}
+                        {item.address?.metroLabel ? (
+                          <p className="mt-0.5 text-xs text-neutral-400">{item.address.metroLabel}</p>
                         ) : null}
                         {item.durationMinutes != null ? (
                           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-neutral-400">

@@ -13,7 +13,12 @@ import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility
 export type SerializedPlanItem = {
   id: string;
   date: string;
+  /** Raw, authoritative source time — never mutated to reflect a Scenario
+   * override. Presentation should read `effectiveStartsAt` instead. */
   startsAt: string | null;
+  /** Time to display: `startsAt` if set, else a Scenario-assigned override
+   * for this item, else null (untimed). See `resolveMyPlanItemEffectiveTime`. */
+  effectiveStartsAt: string | null;
   activityId: string | null;
   title: string | null;
   coverImageUrl: string | null;
@@ -26,7 +31,6 @@ export type SerializedPlanItem = {
     coverImageUrl: string | null;
     ageLabel: string | null;
     categoryLabel: string | null;
-    priceLabel: string | null;
   } | null;
 };
 
