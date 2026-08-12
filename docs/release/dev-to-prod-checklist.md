@@ -20,7 +20,19 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 8 (Schema.org / Structured Data) — STATUS:
+Active task:        Task 9 (Filters & Quick Access) — STATUS:
+                     AUDIT_COMPLETE, awaiting owner scope approval. Audit
+                     confirmed a P1 correctness gap: visible date/geo and all
+                     secondary/Admin-managed controls can change UI/URL without
+                     changing results; Nearby is format-only, not proximity.
+                     Existing section placement Admin is therefore FALSE ADMIN
+                     for query behavior. Minimal proposal: make Events quick
+                     Today/Tomorrow/Weekend/date/Free execute through code-owned
+                     typed semantics, move geo to advanced, hide unsupported
+                     keys, unify active/reset/empty handling — no new DB/Admin
+                     architecture. Full evidence in Task 9 below. Task 10 remains
+                     TODO and untouched.
+Prior — Task 8 (Schema.org / Structured Data) — STATUS:
                      COMPLETE. Audit found no P0/P1 (see prior entry).
                      Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
                      minimal implementation scope (directly relevant to
@@ -43,7 +55,7 @@ Active task:        Task 8 (Schema.org / Structured Data) — STATUS:
                      verified locally. One new incidental P3 finding filed
                      (BACKLOG-066, birthday page content — pre-existing,
                      unrelated, not fixed). Full detail in Task 8's own
-                     section below. Task 9 not started.
+                     section below.
 Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
                      2026-08-12; not reopened for P2/P3 UX/cleanup
                      findings). Accepted final state: standalone Scenario
@@ -60,11 +72,8 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-12
-Last updated by:    Claude Code — Task 7 closure (owner decision) + Task 8
-                     audit kickoff. Did not re-verify Task 7 code; recorded
-                     the owner's explicit closure decision and the
-                     already-committed post-smoke fixes into the checklist.
-                     Full detail in Task 7's own section below.
+Last updated by:    Codex — Task 9 audit complete; no application implementation
+                     or deployment. Task 8 remains complete; Task 10 remains TODO.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -3030,15 +3039,194 @@ SEO/structured-data implementation.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
+STATUS: `AUDIT_COMPLETE` — awaiting owner approval of the minimal scope below.
+AUDIT: Completed 2026-08-12 against `dev`/`origin/dev` at
+`311dc9fe61e511147122b1000bdead1a2814d3a1` (equal; no pre-existing working-tree
+changes). This was audit-only: no application code, migration, DEV deploy, PROD
+access, or Task 10 work.
+
+**Current architecture / source of truth.** There are two separate live UI
+layers plus older dead implementations:
+
+1. Primary filters (`when/date`, age, format, metro, district, nearby) are
+   hardcoded and type-safe in `features/filters/discovery/filters.store.ts` and
+   rendered by the desktop header / mobile search sheet. URL params are the
+   canonical selection state (`preset`, `from`, `to`, `age`, `format`, `metro`,
+   `district`, `nearby`); a city+intent-scoped `localStorage` snapshot restores
+   the last listing state and supports list -> detail -> back. Writes use
+   `router.replace`, so filter changes intentionally do not create individual
+   Back/Forward history entries. Primary composition/order/labels cannot be
+   changed in Admin.
+2. Secondary filters use one JSON `sec` URL param, scoped by intent. Their
+   definitions/options/order/enablement are persisted in `FilterDefinition`,
+   `FilterOption`, and `DiscoveryFilterPlacement`; `/admin/discovery/filters`
+   has authenticated section/category CRUD and the public modal reads them via
+   `/api/public/discovery-filters`. A static `filterConfigByIntent` is a safe UI
+   fallback. However, no live feed or client partition reads `sec`, so these
+   controls change chips/count/URL only and never results. This is a confirmed
+   **FALSE ADMIN** chain, not a missing-Admin problem.
+3. `SectionSystemFilter` is a separate partial setting. Only `BUDGET` is read
+   by `CityShell` (it enables a client-side max-price slider); `FREE_ONLY` is
+   accepted by the API but is not read by public runtime and was nominally
+   replaced by the secondary `free_only` definition. No live Admin component
+   calls the system-filter API. Classification: PARTIAL / DISCONNECTED.
+4. `features/discovery/filters/*` (old Zustand+global localStorage),
+   `FilterMasonryMenu`, `lib/discovery/urlState.ts`, and
+   `server/discovery/getActivityFeed.ts` form an older incompatible chain with
+   no public runtime consumer. Classification: DEAD BUT HARMLESS; BACKLOG-067.
+
+**A. Surface matrix.**
+
+| Surface | UI / filters exposed | State -> query reality | Responsive finding |
+|---|---|---|---|
+| Events / `kuda` / legacy `/events` | header/mobile: date, age, format, city/nearby; secondary modal: venue, price, open-now, free, activity type | URL is stable, but only format/nearby reach the server; client partition applies format, budget and soft age partition. Date, metro/district, and all `sec` values do not filter results | One shared responsive header, but at 375px Today/Tomorrow/Weekend require opening search then the date subpanel; Free is in a second, separate filter sheet |
+| Classes | same primary UI; class chips; secondary duration/format/trial | class chip is server-live; primary age/format/budget are client-live; date/geo and every secondary value are inert | mobile nav labels Classes as “Скоро” even though the URL/page/feed exist |
+| Birthday | same primary UI; birthday secondary service/budget/includes | currently reuses kuda Events feed (BACKLOG-066); only the same kuda primary subset works; secondary inert | navigation is intentionally coming-soon/unpromoted |
+| Routes | global primary + route secondary can be opened | route list ignores every primary, secondary, and budget value | navigation is intentionally coming-soon; no filtered empty state |
+| Programs | detail route only, no public programs listing/filter surface | n/a | n/a |
+| Offers / Services | no independent listing; Classes is the live Offer discovery surface | see Classes | see Classes |
+| Homepage | global header state and kuda title are shared; home cards are persona-ranked | selected date changes title only; the already-loaded home row is not date-filtered | same mobile search sheet |
+| Search | query + city only; Admin quick tags are a separate search feature | no overlap with discovery filter execution | search sheet co-locates search and discovery controls but search API does not consume them |
+| My Plan recommendations | reuses discovery location state only for UI plumbing; recommendation API has its own family/age/date constraints | separate recommendation query architecture; known `NULL` vs `[]` age issue already BACKLOG-004 | no reason to merge it into discovery filters |
+
+**B. Filter storage matrix.**
+
+| Filter | Definition / label / options | Persisted? | Runtime consumer | Admin manageable? |
+|---|---|---|---|---|
+| Today / Tomorrow / Weekend / exact date | hardcoded `WhenSelect` + date helpers; calendar-generated dates | selection only in URL/localStorage | H1/labels only; results not filtered | No |
+| Age (multi) | code `AGE_GROUPS`; DB age options are fetched by one legacy API path but live controls canonicalize back to code | selection only | client soft partition: if zero matches, all content returns; NULL/no-bounds behave as 0–99 | No |
+| Format | code enum/options | selection only | server query + client partition (live) | No |
+| Metro / district | DB city taxonomies via bounded cached header fetch; Place has manual+automatic relations | selection only | UI only in discovery results | taxonomy values yes; filter presence/placement no |
+| Nearby | hardcoded | selection only | server constrains format to offline/hybrid, not radius/coordinates; it is therefore mislabeled as proximity | No |
+| Budget slider | `SectionSystemFilter.BUDGET` + runtime max from loaded candidate pool | DB enable flag + URL budget state | client price ceiling; unknown price deliberately passes | API exists, but no connected Admin UI |
+| Free / price / venue / open-now / activity type | DB definitions/options/placements with static fallback | yes | public modal only; no result consumer | UI says yes, effective behavior no (FALSE ADMIN) |
+| Classes duration/format/trial | same DB system | yes | public modal only | FALSE ADMIN |
+| Birthday service/budget/includes | same DB system | yes | public modal only | FALSE ADMIN |
+| Routes duration/format/stroller | same DB system | yes | public modal only | FALSE ADMIN |
+| Class category chips | `DiscoveryClassChip` DB model and Admin API/UI | yes | Classes server query (`classChipSlugs`) | Yes, REAL AND LIVE |
+
+**C. Per-section configuration matrix.** Primary filters are globally
+hardcoded in header/search rather than configured per section. Secondary
+order and availability are DB-managed independently for kuda/classes/
+birthday/routes, but there is no QUICK vs ADVANCED field; every placement is
+advanced and execution is absent. Category-level placements can be edited in
+Admin but no public category-filter runtime read was found. Programs and
+standalone Offers have no section configuration.
+
+Recommended product split after semantics work: Events QUICK = Today,
+Tomorrow, Weekend, Choose date, Free; ADVANCED = age, format, district, metro,
+venue/activity type (only keys with proven semantics). Classes QUICK = class
+category chips; ADVANCED = age, format, schedule/duration only when backed by
+real Offer fields. Birthday and Routes should remain unpromoted until their
+real feeds are ready; do not build filter behavior on placeholder content.
+
+**D. Admin chain matrix.**
+
+| Admin control | Write / persistence | Runtime read | Public effect | Class |
+|---|---|---|---|---|
+| section placement/order/active | authenticated Admin API -> `DiscoveryFilterPlacement` | public filters API -> modal | UI/order only, never query | FALSE ADMIN |
+| filter labels/options/UI type | authenticated `/api/admin/filters` -> `FilterDefinition`/`FilterOption` | public filters API -> modal | UI only | PARTIAL |
+| category placements | authenticated placement API -> DB | no public category placement consumer | none | DISCONNECTED |
+| class chips | authenticated class-chip API -> `DiscoveryClassChip` | Classes feed | filters Offers | REAL AND LIVE |
+| system BUDGET/FREE_ONLY | authenticated API -> `SectionSystemFilter` | `CityShell` reads BUDGET only | budget slider only | PARTIAL / DISCONNECTED |
+
+**Date / age / price / geography correctness.** Date values survive refresh
+and copied URLs, but they never constrain Events/Classes/Birthday/Routes; the
+H1 can therefore say “сегодня” while showing future cards. Date helpers use
+browser-local `Date`/`toISOString()` rather than one city-timezone model, and
+weekend logic is duplicated (existing BACKLOG-045). Age is deliberately a
+soft relevance partition, not a strict filter: no selection means no age
+constraint; empty selection is normalized; absent bounds behave as all ages;
+zero matching rows silently falls back to all candidates. The known My Plan
+`ageTags NULL` vs `[]` defect is already BACKLOG-004. Task 10's `nokids` could
+plug into the code-owned age semantics/Activity age bounds, but was not
+implemented or otherwise audited as Task 10. “Free” has one sensible canonical
+card meaning (`priceFrom === 0`), while unknown/null is not free; the secondary
+Free/price controls currently do nothing. Budget passes null/unknown prices by
+design. Metro/district option data is DB-backed with manual/automatic Place
+relations, but neither relation is queried by discovery filters. A requested
+read-only completeness count could not be taken because the repository's
+documented local DB target (`localhost:5433`) was unavailable; this does not
+change the code-proven no-op result.
+
+**URL, reset, empty state, mobile.** Primary and secondary selections survive
+reload/copied URL. Primary reset clears URL and scoped saved state; secondary
+reset clears only `sec`; the two separate reset controls cannot clear each
+other, so hidden active filters are possible. `router.replace` means browser
+Back does not undo each selection (detail -> back is restored through the URL/
+scoped snapshot). At 375x812 the mobile controls fit and sheets scroll with
+sticky actions, but the common Events path is unnecessarily nested, there are
+two visually separate “filters” entry points, no combined active count/reset,
+and Free is not quick access. The empty-result component checks the unfiltered
+server input length rather than the filtered partition, so a client filter that
+produces zero primary cards can show a blank grid without recovery copy.
+
+**Performance / analytics.** Kuda is bounded (candidate cap 200, response 80)
+and Classes is bounded (120); filtering is local over these pools, with no new
+external/Google calls. Public secondary definitions add one DB-backed API
+request whenever the modal mounts, with a static fallback; no cache is required
+at current scale. Budget max is computed from the already-loaded pool. The
+`FILTER_APPLY` enum exists but no discovery producer or decision consumer was
+found; no new analytics is recommended without a named consumer.
+
+GAPS: **P1 (first-PROD):** visible primary date/metro/district controls and all
+secondary/Admin-managed filters claim to filter but do not affect results;
+Nearby claims proximity but only constrains format. This can produce silently
+incorrect result sets and contradictory H1/filter state. No P0 found. P2/P3:
+two uncoordinated reset/count surfaces; filtered-empty handling; duplicated/dead
+filter architecture (BACKLOG-067); duplicate date helpers already BACKLOG-045;
+My Plan age-null issue already BACKLOG-004; Birthday feed already BACKLOG-066.
+
+**Explicit Admin answers.** “Can the owner manage each section's filters in
+Admin without code?” **FALSE ADMIN** for discovery filtering: section-specific
+definitions/order/visibility can change what the modal displays, but not what
+the query returns. Class chips are the sole real exception. “Must section filter
+management be built before first PROD?” **NO new Admin/DB implementation is
+required**: the existing schema/Admin presentation layer is already sufficient
+for advanced placement. Before PROD, the minimal requirement is to make the
+approved visible filter keys execute (or hide unsupported controls), with a
+code-owned, allowlisted semantic registry and safe defaults. Arbitrary Admin
+keys must never become executable logic.
+
+IMPLEMENTATION: Proposed minimum, pending owner approval:
+
+1. Events only: expose QUICK Today/Tomorrow/Weekend/Choose date/Free in the
+   existing responsive header/search architecture; move district/metro to the
+   existing advanced sheet. No redesign and no new state store.
+2. Add one code-owned, typed execution mapping for approved keys. Apply date
+   against Activity sessions/schedule using a single city-timezone date range;
+   Free means `priceFrom === 0`; geo resolves the effective manual-then-auto
+   Place district/metro relation. Keep Admin responsible only for enabled/
+   order/placement presentation.
+3. Until semantics exist, do not render unsupported secondary groups for live
+   sections (or explicitly allowlist only implemented groups). Correct Nearby's
+   behavior/label or hide it; do not pretend format-only is proximity.
+4. Make one combined active count/reset and a real filtered-empty recovery
+   state. Preserve URL/copy/reload/detail-back behavior; retain `replace` unless
+   product explicitly wants Back to step through every chip change.
+5. Do **not** add a model/migration/Admin page/cache/search engine/analytics;
+   do not implement Birthday/Routes placeholder filtering, My Plan age cleanup,
+   or `nokids`; do not touch Task 10.
+
+Likely files: primary URL/store + header/mobile search components,
+`CityShell`, `kudaDiscoveryFeed`, a shared date-range helper,
+`partitionDiscoveryFeed`, secondary modal allowlist/registry, and focused tests.
+Required tests: URL parse/serialize/reset; city-timezone Today/Tomorrow/Weekend
+boundaries; ActivitySession overlap; free/null/paid; effective manual/auto geo;
+unsupported Admin key fail-safe; combined count/reset; filtered-empty. Browser
+smoke at 375px and desktop: each quick control changes cards, copied URL/reload,
+Back/Forward/detail-back, zero results/reset, advanced sheet, and no duplicate
+fetch/refetch loop.
 COMMITS: —
-VERIFICATION: —
+VERIFICATION: code/Prisma/runtime-consumer trace; repository-wide symbol and
+route search; local responsive browser smoke at 375x812 on `/minsk/kuda`
+confirmed the nested Today/Tomorrow/Weekend UI and live cards while the filter
+state changed. Local DB completeness query was unavailable (`localhost:5433`),
+so no unsupported dataset percentage is claimed.
 DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+BLOCKERS: owner approval of the minimal implementation scope.
+BACKLOG/NOTES: BACKLOG-004, BACKLOG-045, BACKLOG-066 unchanged; BACKLOG-067
+added. Task 10 remains TODO.
 
 AUDIT FIRST existing filtering infrastructure: date/when, age, district,
 metro, free, budget, additional filters, quick access, active state, reset,

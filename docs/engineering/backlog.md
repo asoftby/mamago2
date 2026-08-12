@@ -1909,3 +1909,29 @@ P3 — cleanup / polish / optional
   `comingSoon`/unpromoted until that feed exists.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 8 (Schema.org /
   Structured Data) implementation, 2026-08-12
+
+## [BACKLOG-067] Remove the dead parallel discovery-filter stack after Task 9
+
+- Status: OPEN
+- Priority: P3
+- Area: Discovery / Cleanup
+- Added: 2026-08-12
+- Reason deferred: harmless dead-code cleanup; Task 9 is audit-only and the
+  release-relevant work is correcting the currently visible live controls, not
+  deleting inactive experiments.
+- Context: `src/features/discovery/filters/*` implements a second Zustand +
+  global-localStorage filter store; `src/components/discovery/FilterMasonryMenu.tsx`,
+  `src/lib/discovery/urlState.ts`, and
+  `src/server/discovery/getActivityFeed.ts` form a differently-shaped
+  FilterDefinition/ActivityFilterOption query path. Repository-wide consumer
+  tracing found no public runtime call site; `FilterMasonryMenu` is listed only
+  in UI Lab. The live stack is `src/features/filters/discovery/*` plus
+  `CityShell`/`DiscoveryActivitiesGrid`.
+- Current state: not started; leave untouched until the approved Task 9 live
+  path is stable, then re-run consumer tracing before deletion.
+- Dependencies: Task 9 implementation/verification.
+- Acceptance criteria: prove no runtime/import consumer on current HEAD, remove
+  the dead store/menu/parser/feed together, and keep the canonical URL-based
+  live filter stack green.
+- Source: `docs/release/dev-to-prod-checklist.md` Task 9 audit (Filters & Quick
+  Access), 2026-08-12.
