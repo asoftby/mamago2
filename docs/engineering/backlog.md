@@ -2315,32 +2315,57 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-085] `scripts/deploy/backup-remote-db.sh` needs a live end-to-end test
 
-- Status: OPEN
-- Priority: P1
+- Status: **DONE** (2026-08-13)
+- Priority: P1 (was — resolved, no longer a release blocker)
 - Area: Deployment / Backup
 - Added: 2026-08-13
-- Reason deferred: not a code gap — the script is written, `bash -n`-clean,
-  and manually reviewed — but SSH to `134.17.17.134` was intermittent
-  throughout Task 15's session (worked briefly, then repeatedly timed out)
-  and no live run against a real container completed. An unverified backup
-  script should not be trusted as the safety net for a real PROD migration.
+- Reason deferred (historical): not a code gap — the script was written,
+  `bash -n`-clean, and manually reviewed — but SSH to `134.17.17.134` was
+  intermittent throughout Task 15's session (worked briefly, then
+  repeatedly timed out) and no live run against a real container
+  completed. An unverified backup script should not be trusted as the
+  safety net for a real PROD migration.
 - Context: `scripts/deploy/backup-remote-db.sh` (new, Task 15) streams
   `pg_dump` over SSH straight into a local file so the dump never touches
-  the host's disk. Logic reviewed line-by-line, but never executed against
-  `dev-db-1`/`prod-db-1`.
-- Current state: not started. **Unresolved P1 — must fix before PROD**
-  (per checklist §4 Severity Model: P1 = substantial confirmed production
-  risk, must fix before PROD). Blocks Task 17 (Final DEV → PROD Gate) and
-  any destructive PROD migration / the first real deploy's migration step.
-- Dependencies: stable SSH access to `mamago-prod`.
-- Acceptance criteria: run `scripts/deploy/backup-remote-db.sh mamago-prod
-  dev-db-1` once SSH is stable, confirm a non-empty, checksummed
-  `.sql.gz` lands locally, and (separately, deliberately) confirm the
-  documented restore command works against a disposable/local DB. This
-  must be done **before** `pnpm prisma migrate deploy` is ever run against
-  PROD (the migration gap includes confirmed destructive migrations — see
-  Task 15's runbook §2) and before the first real deploy's migration step.
-- Source: Task 15 audit (Deployment & Rollback Readiness)
+  the host's disk.
+- **Resolution evidence (2026-08-13, this session):**
+  - SSH to `mamago-prod` was stable this session
+    (`ssh -o ConnectTimeout=10 mamago-prod "echo SSH_OK"` succeeded
+    immediately).
+  - Live backup run: `scripts/deploy/backup-remote-db.sh mamago-prod
+    dev-db-1 /tmp/mamago-backup-test` — exit 0. Produced
+    `dev-db-1-20260813-204438.sql.gz` (810K/829766 bytes), non-empty,
+    `gzip -t` integrity valid, `.sha256` checksum file present and
+    `shasum -a 256 -c` verified OK.
+  - Dump content confirmed to be a genuine, complete PostgreSQL dump (not
+    error output): starts with `-- PostgreSQL database dump --`, ends
+    with `-- PostgreSQL database dump complete --`, 155 `CREATE TABLE`
+    statements matching 155 `COPY` statements, 22166 total lines.
+  - Confirmed nothing was written to the remote host's disk: no `.sql*`
+    files newer than 10 minutes anywhere under `/tmp`, `/root`, `/home`
+    on the host or inside the `dev-db-1` container; `df -h /` unchanged
+    (18G used / 8.8G free — identical to Task 15's recorded baseline).
+  - **Restore path tested against a disposable, throwaway local
+    container** (`postgres:16-alpine`, name
+    `mamago-backup-restore-test-<pid>`, port 5544 — never the real local
+    `mamago2-db` dev container, never DEV/PROD): restore via
+    `gunzip -c <dump> | docker exec -i <disposable> sh -c 'psql -U
+    "$POSTGRES_USER" -d "$POSTGRES_DB"'` completed with exit 0, zero
+    `ERROR` lines in the restore log. Post-restore verification: 155
+    tables in `information_schema.tables`, all expected core tables
+    present (`User`, `Place`, `Event`/`Activity`, `City`), sanity row
+    counts read back correctly (567 `User`, 5 `City`, 81 `Place` —
+    consistent with the dataset counts observed during Task 16's audit).
+    Disposable container removed immediately after (`docker rm -f`),
+    confirmed gone from `docker ps -a`.
+  - No code fix was needed — the script worked exactly as documented on
+    the first live run. No PROD migration, PROD deploy, PROD DB change,
+    or restore against DEV/PROD was performed.
+- Dependencies: none remaining.
+- Acceptance criteria: met in full — live non-empty checksummed backup
+  confirmed, restore confirmed working against a disposable DB.
+- Source: Task 15 audit (Deployment & Rollback Readiness); closed by a
+  dedicated live-verification session (2026-08-13, post-Task 16).
 
 ## [BACKLOG-086] Disk headroom on shared DEV+PROD host — extend before full media/content migration or cutover
 

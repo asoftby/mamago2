@@ -20,7 +20,30 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 16 (Final Release Safety Audit) — STATUS:
+Active task:        BACKLOG-085 closure (pre-deploy backup live
+                     verification) — STATUS: DONE (2026-08-13). SSH to
+                     `mamago-prod` was stable this session. Ran
+                     `scripts/deploy/backup-remote-db.sh mamago-prod
+                     dev-db-1` live: exit 0, non-empty 810K `.sql.gz`,
+                     `gzip -t` valid, `.sha256` present and verified,
+                     content confirmed to be a genuine complete
+                     PostgreSQL dump (155 `CREATE TABLE` / 155 `COPY`,
+                     proper header/footer), confirmed nothing written to
+                     the remote host's disk. Restore path tested against
+                     a disposable, throwaway local `postgres:16-alpine`
+                     container (never the real local dev DB, never
+                     DEV/PROD) — restore exit 0, zero errors, 155 tables
+                     present, sanity row counts read back correctly;
+                     disposable container removed immediately after. No
+                     code fix was needed — the script worked exactly as
+                     documented on the first live run. No PROD migration,
+                     PROD deploy, PROD DB change, or destructive restore
+                     against DEV/PROD was performed. BACKLOG-085 closed
+                     DONE with full evidence recorded there. **P0 = 0, P1
+                     = 0.** Task 16 remains COMPLETE (unchanged). Task 17
+                     remains TODO, not started this session. PROD remains
+                     NOT READY (Task 17 itself has not run).
+Prior — Task 16 (Final Release Safety Audit) — STATUS:
                      COMPLETE. Read-only audit across all 7 areas
                      (Security, Data Integrity, Core Business Logic,
                      Performance/Cost, Failure Handling, SEO/Public
@@ -38,13 +61,7 @@ Active task:        Task 16 (Final Release Safety Audit) — STATUS:
                      `tsc`/`eslint`/`git diff --check` clean), committed
                      (`ed9546aa`). 12 real P2/P3 findings filed as
                      BACKLOG-087 through BACKLOG-098 (no duplicates of
-                     existing entries). P0 = 0. **1 unresolved P1 remains,
-                     carried from Task 15: BACKLOG-085** (live end-to-end
-                     verification of `scripts/deploy/backup-remote-db.sh`
-                     — operational, needs stable SSH, not code-fixable
-                     this session). Task 16 COMPLETE does not mean PROD
-                     READY. Task 17 must not start until BACKLOG-085 is
-                     resolved.
+                     existing entries).
 Prior — Task 15 (Deployment & Rollback Readiness) — STATUS:
                      COMPLETE. Full deploy/rollback runbook written
                      (`docs/release/task15-deployment-rollback-runbook.md`).
@@ -132,13 +149,19 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-13
-Last updated by:    Claude Code — Task 16 CLOSED COMPLETE. Final release
+Last updated by:    Claude Code — BACKLOG-085 CLOSED DONE. Live end-to-end
+                     test of `scripts/deploy/backup-remote-db.sh` against
+                     `dev-db-1` (real backup, checksummed, content
+                     verified) plus a restore test against a disposable
+                     throwaway local Postgres container (never DEV/PROD,
+                     never the local dev DB) — both green, no code fix
+                     needed. Zero unresolved P0/P1 remain. Task 17 is
+                     next, not started.
+Prior — Claude Code — Task 16 CLOSED COMPLETE. Final release
                      safety audit across all 7 areas; 4 confirmed new P1s
                      found and fixed (Next.js CVEs, sharp CVEs, register
                      rate limit, stack-trace leak), committed `ed9546aa`;
-                     12 P2/P3 findings filed (BACKLOG-087..098). Task 17
-                     is next, not started; must not start until
-                     BACKLOG-085 is resolved.
+                     12 P2/P3 findings filed (BACKLOG-087..098).
 Prior — Claude Code — Task 15 CLOSED COMPLETE. Deployment/
                      rollback architecture audited, owner decided deploy
                      source (`dev`, zero CI change), safe remote-DB backup
@@ -213,15 +236,14 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–16 CLOSED COMPLETE, zero unresolved P0. **1
-                     unresolved P1: BACKLOG-085** (live end-to-end
-                     verification of `scripts/deploy/backup-remote-db.sh`
-                     — must fix before PROD; see Task 15 entry). All 4
-                     P1s newly found during Task 16 were fixed within that
-                     same session (`ed9546aa`) — see Task 16 entry. PROD
-                     remains NOT READY until BACKLOG-085 is resolved.
-                     Task 17 TODO (not started). Task 17 must not start
-                     until BACKLOG-085 is resolved.
+Unresolved P0/P1:   Tasks 1–16 CLOSED COMPLETE. **P0 = 0, P1 = 0.**
+                     BACKLOG-085 (the last unresolved P1, live end-to-end
+                     verification of `scripts/deploy/backup-remote-db.sh`)
+                     is CLOSED DONE — live backup + disposable-DB restore
+                     both verified green this session, no code fix
+                     needed. PROD remains NOT READY only because Task 17
+                     (the final gate itself) has not run yet — not because
+                     of any open P0/P1. Task 17 TODO, not started.
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -4179,12 +4201,15 @@ Priority: `P0 — PROD BLOCKER`
 
 STATUS: `COMPLETE` — deployment/rollback architecture fully audited, one real
 owner decision resolved, one real gap (safe remote DB backup) closed. P0 = 0.
-**1 unresolved P1: BACKLOG-085** (live end-to-end verification of
-`scripts/deploy/backup-remote-db.sh` — must fix before PROD, before any
-destructive PROD migration / the first real deploy's migration step). Disk
-headroom is **not** a P1 for this task — reclassified P2, see GAPS/BACKLOG
-below. PROD remains NOT READY until BACKLOG-085 is resolved; Task 17 must
-not start until then. Full detail:
+**Update (2026-08-13, follow-up session): BACKLOG-085 is now CLOSED DONE** —
+live end-to-end test of `scripts/deploy/backup-remote-db.sh` against
+`dev-db-1` plus a disposable-DB restore test both passed, no code fix
+needed; see BACKLOG-085 in `docs/engineering/backlog.md` for full evidence.
+This entry's original text below (VERIFICATION/BLOCKERS/BACKLOG-NOTES) is
+left as the historical record of this task's own session and is superseded
+by that closure. Disk headroom is **not** a P1 for this task — reclassified
+P2, see GAPS/BACKLOG below (BACKLOG-086, still open, not touched by the
+BACKLOG-085 closure). Full detail:
 `docs/release/task15-deployment-rollback-runbook.md`.
 AUDIT: DEV+PROD share one host (`134.17.17.134`, `/opt/mamago/dev` +
 `/opt/mamago/prod` compose projects) and one disk (28G LV, 8.8G free —
@@ -4261,8 +4286,10 @@ Severity note (correction, 2026-08-13): an earlier version of this entry
 listed disk headroom as "P1, non-blocking" — that is a contradiction under
 this checklist's own §4 Severity Model (P1 = must fix before PROD; a truly
 non-blocking finding is P2 by definition). Corrected: disk headroom is
-BACKLOG-086 (P2). The one real unresolved P1 for PROD readiness is
-BACKLOG-085.
+BACKLOG-086 (P2). BACKLOG-085 was the one real unresolved P1 for PROD
+readiness; it was live-verified and CLOSED DONE in a follow-up session
+(2026-08-13) — see the STATUS field above and BACKLOG-085 in
+`docs/engineering/backlog.md`.
 
 This is NOT a deployment. Goal: know the safe path forward and back ahead of
 time. AUDIT FIRST the actual deployment architecture/process. Determine:
@@ -4290,13 +4317,14 @@ Priority: `P0 — FINAL RELEASE BLOCKER`
 
 STATUS: `COMPLETE` — read-only audit across all 7 areas (parallel agents for
 A/B/C/D, direct cross-check for F/G) found 4 confirmed new P1s, all fixed,
-verified, and committed this session (`ed9546aa`). P0 = 0. **1 unresolved
-P1 remains, carried from Task 15: BACKLOG-085** (live end-to-end
-verification of `scripts/deploy/backup-remote-db.sh` — operational, not
-code-fixable in this session; needs stable SSH). 12 real P2/P3 findings
-filed as BACKLOG-087 through BACKLOG-098 (search backlog for dupes
-performed first — none found). Task 16 COMPLETE does **not** mean PROD
-READY: BACKLOG-085 must still be resolved before Task 17.
+verified, and committed this session (`ed9546aa`). P0 = 0. At the time this
+task closed, 1 P1 remained carried from Task 15 (BACKLOG-085). **Update
+(2026-08-13, follow-up session): BACKLOG-085 is now CLOSED DONE** — live
+end-to-end backup test against `dev-db-1` plus a disposable-DB restore
+test both passed; see BACKLOG-085 in `docs/engineering/backlog.md`. 12
+real P2/P3 findings filed as BACKLOG-087 through BACKLOG-098 (search
+backlog for dupes performed first — none found) remain open, non-blocking.
+As of now: **P0 = 0, P1 = 0** across Tasks 1–16.
 AUDIT: **A. Security** — auth (custom session, bcrypt, httpOnly/sameSite
 cookies), RBAC (all 193 `admin/**` routes gated), object-ownership
 (IDOR-safe everywhere sampled), input validation (zod), uploads
@@ -4326,8 +4354,9 @@ Safety** — `isGlobalNoindexEnabled()` defaults `true` (fail-closed), only
 flips with explicit `SITE_INDEXING_ENABLED=true`; middleware adds
 `X-Robots-Tag: noindex` as defense-in-depth. No P0/P1. **G. Deployment
 Safety** — cross-checked against Task 15's runbook, no new gap found.
-GAPS: None remaining beyond the carried BACKLOG-085 (operational
-prerequisite, not a code gap — see Task 15).
+GAPS: None remaining. (At close, the carried BACKLOG-085 was still open;
+it was live-verified and CLOSED DONE in a follow-up session, 2026-08-13
+— see the STATUS field above.)
 IMPLEMENTATION: 4 minimal fixes, each mirroring an existing correct
 pattern already in the repo: (1) `next` 16.2.9 → 16.2.11 in
 `package.json` + the `@react-email/preview-server>next` override; (2)
@@ -4370,10 +4399,10 @@ UI surface; correctness is proven by `pnpm build` succeeding and the
 targeted integration/unit tests above, per this checklist's §13
 risk-based verification (a full DEV browser smoke is Task 17's job, not
 required per-fix here).
-BLOCKERS: None for Task 16 itself. **PROD readiness remains blocked**
-separately by the carried BACKLOG-085 (P1, operational — live-test
-`backup-remote-db.sh` once SSH is stable), exactly as Task 15 already
-stated. Task 17 must not start until BACKLOG-085 is resolved.
+BLOCKERS: None for Task 16 itself, and none remaining for PROD readiness
+from this task's own findings. (At close, PROD readiness was separately
+blocked by the carried BACKLOG-085 — that P1 is now CLOSED DONE, see the
+STATUS field above and BACKLOG-085 in `docs/engineering/backlog.md`.)
 BACKLOG/NOTES: BACKLOG-087 (P2, no rate limit on password-reset
 request), BACKLOG-088 (P2, no timeout/AbortController on Google
 Places/Telegram/SMS.BY fetches), BACKLOG-089 (P2, `sitemap.xml`
