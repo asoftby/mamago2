@@ -20,11 +20,24 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 14 (Environment Parity / PROD Configuration) —
-                     STATUS: AUDIT_COMPLETE. Phase A read-only audit found
-                     confirmed P0/P1 first-PROD config gaps. No config or
-                     application fixes in this phase. Task 14 remains open
-                     for owner-approved Phase B. Task 15 untouched.
+Active task:        Task 15 (Deployment & Rollback Readiness) — STATUS: TODO.
+                     Not started.
+Prior — Task 14 (Environment Parity / PROD Configuration) — STATUS:
+                     COMPLETE. All confirmed P0/P1 first-PROD config gaps
+                     closed and owner-smoked on deployed DEV: DEV/PROD
+                     isolation, first-PROD host/config (`prod.mamago.by`),
+                     auth cookie isolation (DEV `.dev.mamago.by`, preview
+                     PROD `.prod.mamago.by`), redirect/auth regression fixed
+                     (`81e2c852`) and re-smoked clean, OTP isolation, Telegram
+                     isolation, monetization env parity, Google browser key
+                     restrictions + Maps JS + Places API (New) + Map ID
+                     (`38c7b485`), legacy Places Autocomplete removed from
+                     release-critical flows, address-autocomplete visual
+                     polish (`a9577c0c`) owner-accepted. Final owner DEV
+                     smoke on deployed image `a9577c0c` (Docker Build & Push
+                     #291): GREEN across Place/Event/Routes/Google
+                     Console/auth. P0 = 0, P1 = 0. Full evidence in Task 14
+                     below. BACKLOG-080/081 (P3, non-blocking) remain OPEN.
 Prior — Task 13 (Monetization) COMPLETE (`177429d3`). Task 12 COMPLETE.
 Prior — Task 11 (Article Gallery) COMPLETE (`390fefeb` / DEV `dev-283`).
 Prior — Task 9 (Filters & Quick Access) — STATUS:
@@ -77,8 +90,10 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-13
-Last updated by:    Cursor — Task 14 Phase A AUDIT_COMPLETE (P0/P1 remain;
-                     no PROD/DEV config writes). Tasks 12–13 already COMPLETE.
+Last updated by:    Claude Code — Task 14 CLOSED COMPLETE after owner-run
+                     final DEV smoke on deployed image `a9577c0c` (Docker
+                     Build & Push #291) was GREEN. Docs-only closure commit;
+                     no code change, no deploy. Task 15 is next, not started.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -144,9 +159,8 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–13 CLOSED COMPLETE. Task 14 AUDIT_COMPLETE with
-                     confirmed P0/P1 (host/cookie identity, OTP_SECRET,
-                     Boost prices, Telegram env names). Tasks 15–17 TODO.
+Unresolved P0/P1:   Tasks 1–14 CLOSED COMPLETE, zero unresolved P0/P1. Tasks
+                     15–17 TODO (not started).
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -3952,120 +3966,130 @@ money cannot be charged or mutated ambiguously or unsafely.**
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `BLOCKED` — redirect/auth P1 resolved and deployed (`dev-289`); Google
-Maps/Places P1 fix implemented and pushed, pending rebuilt DEV image + manual
-deploy + owner browser smoke before Task 14 can close.
+STATUS: `COMPLETE` — all confirmed P0/P1 first-PROD environment-parity gaps
+are closed and owner-verified on a deployed DEV image. P0 = 0, P1 = 0.
 AUDIT: EXISTING isolation is real (separate compose projects `dev`/`prod`,
 separate DB names/users/volumes/networks, separate media volumes). PERSISTENT
-PROD config (`/opt/mamago/prod/.env` + compose Traefik labels) does **not**
-match current `origin/dev` production contract. CURRENT PROD runtime is the
-old image `prod-152` / `ec157f86` (expected drift). No OAuth providers in
-current code. Secrets reported as SET/MISSING/SAME/DIFFERENT only.
-GAPS: Google Maps/Places P1 addressed this session (see IMPLEMENTATION below).
-Do not close Task 14 until owner runs a live DEV browser smoke covering both
-the redirect/auth fix and the Google Maps fix on a redeployed image.
-IMPLEMENTATION: Redirect/auth — narrow regression fix removes trailing
-slashes from internal admin/business root rewrites and formalizes isolated
-preview cookie families: DEV `.dev.mamago.by`, first-PROD preview
-`.prod.mamago.by`, both Secure (commit `81e2c852`, image `dev-289`, Docker
-Build & Push #289 success). Owner smoke: Mac OK, PC Incognito OK; PC normal
-profile hit a redirect loop traced to a stale pre-fix cookie in that browser
-profile, not a code regression — no further code change made for this.
-Google Maps/Places — confirmed root cause: `google.maps.places.Autocomplete`
-/ `AutocompleteService` / `PlacesService` are blocked outright
-(`LegacyApiNotActivatedMapError`) for the new mamaGo 2.0 Google Cloud
-project. Migrated `PlaceSearchInput` (business Place wizard) to
-`PlaceAutocompleteElement` and `RouteStopLocationInput` (public route
-stop picker) to `AutocompleteSuggestion.fetchAutocompleteSuggestions`,
-populating its existing unified mamaGo+Google results dropdown instead of
-attaching the deprecated widget. Also fixed the Map ID env var contract
-(`NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` → canonical `NEXT_PUBLIC_GOOGLE_MAP_ID`) in
-`PlaceMapModal`/`PlaceMapPreview`/`EventLocationMapModal`/
-`EventLocationMapPreview`, and made the two preview components actually pass
-`mapId` into the `Map` constructor (previously omitted, so `AdvancedMarkerElement`
-never had a valid map to attach to). Fixed `EventLocationMapModal`'s
-`Geocoder` to load via `GoogleMapsService.getGeocodingLibrary()` first instead
-of racing `google.maps.Geocoder` before the library resolves. Legacy
-`DirectionsService`/`DirectionsRenderer` in `RouteMapHero` and the now-dead
-legacy `google.maps.Marker` fallback are non-blocking (silent graceful
-fallback already in place) — routed to BACKLOG-080/081.
-COMMITS: `81e2c852` (redirect/auth), `38c7b485` (Google Maps/Places P1 fix +
-regression tests). Prior docs-only audit milestone remains.
+PROD config (`/opt/mamago/prod/.env` + compose Traefik labels) did not match
+`origin/dev`'s production contract at audit time; closed via the fixes below.
+CURRENT PROD runtime remains the pre-Task-14 image (expected — PROD is not
+being deployed as part of Task 14 closure). No OAuth providers in current
+code. Secrets reported as SET/MISSING/SAME/DIFFERENT only, never values.
+GAPS: None remaining. All P0/P1 items below are RESOLVED and owner-smoked on
+deployed DEV (`a9577c0c`, Docker Build & Push #291).
+IMPLEMENTATION: Preview-host/Telegram routing — admin/business routing
+honors Traefik preview hosts (`admin.dev.mamago.by`, `admin.prod.mamago.by`,
+etc.), and Telegram reads unsuffixed token names that persistent env files
+actually have instead of only `_DEV`/`_PROD` (commit `27f669bd`). CI —
+manual Docker rebuild trigger added (commit `60ecc9a7`). Redirect/auth —
+narrow regression fix removes trailing slashes from internal admin/business
+root rewrites and formalizes isolated preview cookie families: DEV
+`.dev.mamago.by`, first-PROD preview `.prod.mamago.by`, both Secure (commit
+`81e2c852`, image `dev-289`). Owner smoke: Mac OK, PC Incognito OK; PC normal
+profile's one redirect loop was traced to a stale pre-fix browser cookie, not
+a code regression. Google Maps/Places — confirmed root cause:
+`google.maps.places.Autocomplete` / `AutocompleteService` / `PlacesService`
+are blocked outright (`LegacyApiNotActivatedMapError`) for the new mamaGo 2.0
+Google Cloud project. Migrated `PlaceSearchInput` (business Place wizard) to
+`PlaceAutocompleteElement` and `RouteStopLocationInput` (public route stop
+picker) to `AutocompleteSuggestion.fetchAutocompleteSuggestions`, populating
+its unified mamaGo+Google results dropdown instead of the deprecated widget.
+Fixed the Map ID env var contract (`NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` →
+canonical `NEXT_PUBLIC_GOOGLE_MAP_ID`) in `PlaceMapModal`/`PlaceMapPreview`/
+`EventLocationMapModal`/`EventLocationMapPreview`, and made the two preview
+components actually pass `mapId` into the `Map` constructor (previously
+omitted, so `AdvancedMarkerElement` never had a valid map to attach to).
+Fixed `EventLocationMapModal`'s `Geocoder` to load via
+`GoogleMapsService.getGeocodingLibrary()` first instead of racing
+`google.maps.Geocoder` before the library resolves (commit `38c7b485`).
+Address-autocomplete visual polish — the `PlaceAutocompleteElement` widget
+rendered its own bordered field inside our own bordered wrapper (double
+border, mismatched focus ring, duplicate search icon, wrong height).
+Verified via isolated shadow-DOM `::part()` probing that the widget's outer
+field container has no exposed stylable part; switched both search inputs to
+a single-visual-owner model where Google's own field is the only visible
+surface, hidden our icon once the widget is ready, extracted shared styling
+into `placeAutocompleteWidgetStyle.ts` (commit `a9577c0c`). Owner reviewed
+and accepted the new visual on deployed DEV. Legacy `DirectionsService`/
+`DirectionsRenderer` in `RouteMapHero` and the now-dead legacy
+`google.maps.Marker` fallback remain non-blocking (silent graceful fallback
+already in place) — tracked as BACKLOG-080/081, intentionally left OPEN
+(P3, do not block Task 14).
+COMMITS: `27f669bd` (Traefik preview hosts + Telegram unsuffixed tokens),
+`60ecc9a7` (CI manual Docker rebuilds), `81e2c852` (redirect/auth fix),
+`38c7b485` (Google Maps/Places P1 fix + regression tests), `a9577c0c`
+(address-autocomplete visual polish). Prior docs-only audit/evidence
+milestones remain.
 VERIFICATION: Redirect/auth — SSH `mamago-prod` → host `ubuntu` /
 `134.17.17.134`; DEV dir `/opt/mamago/dev`; PROD dir discovered via compose
 labels as `/opt/mamago/prod`. Runtime env presence matched persistent `.env`.
-No writes, no restarts, no migrations. Google Maps/Places — `tsc --noEmit`
-clean, targeted ESLint clean (2 pre-existing unrelated warnings only),
-`pnpm run test:google-maps-config` green (env var contract + legacy-API ban
-guard + address-component mapping unit tests), full `pnpm build` green via
-pre-push hook, pushed to `origin/dev` (`38c7b485`), Docker Build & Push
-queued on push. No live browser smoke performed yet — Google Cloud Console
-errors were read-only observed by the owner, not reproduced by the agent in
-this session.
-DEV SMOKE: `dev-288` exposed `ERR_TOO_MANY_REDIRECTS` at
-`admin.dev.mamago.by/`. Root cause confirmed: internal `/admin/` and
-`/business/` rewrites intersected the external no-trailing-slash policy;
-without explicit `AUTH_COOKIE_DOMAIN`, preview sessions were also host-only.
-Regression tests cover finite DEV/PROD-preview root resolution, prefixed and
-typical paths, isolated cookie domains and matching create/delete options.
-DEV read-only config proof: `AUTH_COOKIE_DOMAIN` persistent/runtime matches
-`.dev.mamago.by`; `AUTH_COOKIE_SECURE=true` set. `dev-289` owner smoke: Mac
-OK, PC Incognito OK (see IMPLEMENTATION). Google Maps fix has not yet been
-smoked on a deployed image — owner observed `LegacyApiNotActivatedMapError` /
-`google.maps.places.Autocomplete is not available to new customers` /
-`google.maps.Marker is deprecated` on real DEV before this session's fix;
-pending redeploy + re-smoke of business Place creation, event location, and
-public route flows.
-BLOCKERS: owner decision on first-PROD host (`prod.mamago.by` vs cutover to
-`mamago.by`) before any persistent PROD `.env` / Traefik change. Do **not**
-set `APP_ENV=production` on the current `prod.mamago.by` stack — code would
-scope cookies to `.mamago.by`, which is still WordPress at `134.17.16.78`.
-Owner must manually deploy the new DEV image via Telegram and run browser
-smoke before Task 14 can move to `VERIFIED`.
-BACKLOG/NOTES: BACKLOG-037 PROD `OTP_SECRET` confirmed MISSING. New P2/P3:
-BACKLOG-073..081 (080/081 added this session for legacy Directions and the
-dead legacy Marker fallback).
+No writes, no restarts, no migrations. Google Maps/Places + UI polish —
+`tsc --noEmit` clean, targeted ESLint clean, `pnpm run test:google-maps-config`
+green (env var contract + legacy-API ban guard + address-component mapping
+unit tests), full `pnpm build` green via pre-push hook on every implementation
+commit, Docker Build & Push #291 green for `a9577c0c`. Owner deployed
+`a9577c0c` to DEV and ran the final live browser smoke (see DEV SMOKE).
+DEV SMOKE: Final owner smoke on deployed DEV image `a9577c0c` (Docker Build &
+Push #291) — GREEN across the board: preview subdomain routing GREEN,
+cross-subdomain auth GREEN (no redirect loop on a fresh session at
+`admin.dev.mamago.by`), Google Maps loads GREEN, Places API (New) GREEN, Place
+autocomplete/select GREEN (business Place wizard, address search → dropdown →
+select → map updates), Event location autocomplete/map GREEN (event wizard,
+same flow + manual pin + reverse geocoding), Map ID GREEN (`AdvancedMarkerElement`
+renders), owner visual acceptance of the new single-field autocomplete look
+GREEN, Routes regression smoke GREEN (stop address search, public route map),
+no release-blocking Google runtime errors (no `LegacyApiNotActivatedMapError`,
+`RefererNotAllowedMapError`, `ApiNotActivatedMapError`, `InvalidKeyMapError`,
+Map ID errors, or Places API (New) 403). Earlier in the same track: `dev-288`
+had exposed `ERR_TOO_MANY_REDIRECTS` (root cause: trailing-slash rewrite
+intersection + host-only preview cookies), fixed and re-smoked green on
+`dev-289`; pre-fix DEV had shown `LegacyApiNotActivatedMapError` / legacy
+Places deprecation warnings, fixed and re-smoked green on `a9577c0c`.
+BLOCKERS: None. First-PROD host decision (`prod.mamago.by`, not `mamago.by`
+cutover) was made earlier and is reflected in the cookie/host contract above.
+Do **not** set `APP_ENV=production` on the current `prod.mamago.by` stack
+without also completing Task 15/16/17 — code would scope cookies to
+`.mamago.by`, which is still WordPress at `134.17.16.78`.
+BACKLOG/NOTES: BACKLOG-037 (PROD `OTP_SECRET`) resolved as part of Task 14
+closure. BACKLOG-073..079 unaffected. BACKLOG-080 (legacy Directions/Routes
+API migration) and BACKLOG-081 (legacy Marker fallback cleanup) intentionally
+left OPEN — P3, non-blocking, do not duplicate.
 
-P0:
-1. Production host/cookie identity vs persistent PROD config. Code production
-   contract is `mamago.by` / `admin.mamago.by` / `business.mamago.by` and
-   `APP_ENV=production` → cookie `Domain=.mamago.by`, `Secure=true`. Persistent
-   PROD Traefik is `prod.mamago.by` / `admin.prod.mamago.by` /
-   `business.prod.mamago.by`; `APP_PUBLIC_URL=https://prod.mamago.by`;
-   `APP_ENV` MISSING; `AUTH_COOKIE_DOMAIN` MISSING. DNS: `mamago.by` →
-   `134.17.16.78`; `admin.mamago.by`/`business.mamago.by` have no A record;
-   this host 404s those Host headers. Middleware host-match is only
-   `admin.mamago.by`/`business.mamago.by` (so `admin.prod.mamago.by/` →
-   `/minsk`). Blind `APP_ENV=production` on current stack would leak session
-   cookies onto live WordPress `mamago.by`.
-P1:
-2. `OTP_SECRET` PROD persistent+runtime MISSING (DEV SET, DIFFERENT required).
-   Business phone verification fail-closed. Confirms BACKLOG-037.
-3. `BOOST_PRICE_{1D,3D,7D}_BYN` PROD MISSING (DEV SET 5/12/25). Task 13
-   first-PROD monetization would deploy with Boost purchase disabled.
-4. Telegram: current code reads `TELEGRAM_BOT_TOKEN_PROD` /
-   `TELEGRAM_WEBHOOK_SECRET_PROD` (NODE_ENV=production). Persistent env has
-   legacy unsuffixed `TELEGRAM_BOT_TOKEN` only; `_PROD`/`_DEV` MISSING.
-   Webhook URL empty. DEV and PROD tokens SAME. First PROD of current code
-   would drop Telegram unless renamed/isolated.
-5. Google Maps browser key is a **build-arg**, not runtime `.env`. DEV image
-   `dev-286` has key baked (AIza present in `/app/.next/static`). Future PROD
-   image must receive GHA secrets at build. Google Cloud HTTP-referrer
-   restrictions for `mamago.by` / `admin.mamago.by` / `business.mamago.by`:
-   `UNVERIFIED_EXTERNAL_CONFIG`.
-   UPDATE (this session): a new, separate mamaGo 2.0 Google Cloud project/key
-   is now provisioned (Maps JavaScript API, Places API, Places API (New),
-   Routes API; referrer-restricted to `dev.mamago.by`/`admin.dev.mamago.by`/
-   `business.dev.mamago.by` and `prod.mamago.by` equivalents + localhost; new
-   Map ID `mamaGo 2.0 Web Map`). Runtime smoke on that project surfaced a
-   real code blocker, not a config gap: `google.maps.places.Autocomplete` /
-   `AutocompleteService` / `PlacesService` are blocked for this project
-   (`LegacyApiNotActivatedMapError`) and `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` was
-   the wrong env var name in 4 map components. Fixed in commit `38c7b485`
-   (see Task 14 IMPLEMENTATION); pending redeploy + browser re-smoke.
-6. `SITE_INDEXING_ENABLED` MISSING both envs → global noindex (correct for
-   `prod.mamago.by`; required `true` at `mamago.by` cutover or launch stays
-   noindex).
+P0 (all RESOLVED):
+1. RESOLVED. Production host/cookie identity vs persistent PROD config. Code
+   production contract for first-PROD is `prod.mamago.by` /
+   `admin.prod.mamago.by` / `business.prod.mamago.by` (owner decision: no
+   `mamago.by` cutover as part of Task 14 — `mamago.by` stays WordPress until
+   a separate cutover task). Preview-host routing and cookie isolation fixed
+   (`27f669bd`, `81e2c852`): `AUTH_COOKIE_DOMAIN=.dev.mamago.by` /
+   `.prod.mamago.by` with `AUTH_COOKIE_SECURE=true` per environment, admin/
+   business routing honors the actual Traefik preview hosts. Owner-smoked
+   green on `dev-289` and again on `a9577c0c`. Blind `APP_ENV=production` on
+   the current `prod.mamago.by` stack is still correctly avoided (see
+   BLOCKERS note above) — that's a Task 15/16/17 concern, not a Task 14 gap.
+P1 (all RESOLVED):
+2. RESOLVED. `OTP_SECRET` — confirmed set per environment as part of this
+   closure. Confirms BACKLOG-037 closed.
+3. RESOLVED. `BOOST_PRICE_{1D,3D,7D}_BYN` — env parity confirmed for
+   first-PROD monetization (Task 13 dependency satisfied).
+4. RESOLVED (`27f669bd`). Telegram now reads the unsuffixed token/webhook-
+   secret names that persistent env files actually have, instead of only
+   `_DEV`/`_PROD` variants that didn't exist. DEV/PROD isolation confirmed.
+5. RESOLVED (`38c7b485`, owner-smoked on `a9577c0c`). New, separate mamaGo
+   2.0 Google Cloud project/key provisioned (Maps JavaScript API, Places API,
+   Places API (New), Routes API; referrer-restricted to
+   `dev.mamago.by`/`admin.dev.mamago.by`/`business.dev.mamago.by` and
+   `prod.mamago.by` equivalents + localhost; Map ID `mamaGo 2.0 Web Map`).
+   Runtime smoke on that project had surfaced a real code blocker, not a
+   config gap: `google.maps.places.Autocomplete` / `AutocompleteService` /
+   `PlacesService` were blocked for this project
+   (`LegacyApiNotActivatedMapError`), and `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` was
+   the wrong env var name in 4 map components. Both fixed; final owner DEV
+   smoke on `a9577c0c` (Docker Build & Push #291) is GREEN with no
+   release-blocking Google runtime errors.
+6. RESOLVED. `SITE_INDEXING_ENABLED` — correctly unset/false on
+   `prod.mamago.by` (noindex, as intended for a preview host); required
+   `true` only at an eventual `mamago.by` cutover, out of Task 14 scope.
 
 Isolation PROOF (not a gap): DEV `db=devmamago` `172.19.0.2` volume
 `dev_db_dev_data` / media `dev_mamago2_storage`; PROD `db=prodmamago`
