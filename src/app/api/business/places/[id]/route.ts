@@ -538,7 +538,10 @@ export async function PATCH(
       {
         error: "INTERNAL_SERVER_ERROR",
         message: error instanceof Error ? error.message : "Internal server error",
-        detail: error instanceof Error ? error.stack?.split("\n").slice(0, 3).join(" | ") : undefined,
+        detail:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.stack?.split("\n").slice(0, 3).join(" | ")
+            : undefined,
       },
       { status: 500 }
     );

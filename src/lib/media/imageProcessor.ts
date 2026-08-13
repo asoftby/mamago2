@@ -6,7 +6,7 @@
  * Handles format conversion, resizing, optimization, and HEIC/HEIF support.
  */
 
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
   ALLOWED_UPLOAD_MIME_TYPE_SET,
@@ -100,7 +100,7 @@ export function validateImageFile(
  * Process single image to specific size
  */
 async function processImageToSize(
-  sharpInstance: sharp.Sharp,
+  sharpInstance: Sharp,
   targetWidth: number,
   quality: number
 ): Promise<ProcessedImage> {
@@ -158,7 +158,7 @@ export async function processImage(
     console.log("✅ [PROCESSOR] Validation passed");
 
     // Load image with sharp
-    let sharpInstance: sharp.Sharp;
+    let sharpInstance: Sharp;
     
     try {
       console.log("📸 [PROCESSOR] Loading image with sharp...");
