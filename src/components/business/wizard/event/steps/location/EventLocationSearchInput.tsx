@@ -10,6 +10,7 @@ import {
 } from "react";
 import { MapPin } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
+import { placeAutocompleteWidgetStyles } from "@/services/googleMaps/placeAutocompleteWidgetStyle";
 import { cn } from "@/lib/utils";
 
 interface EventLocationSearchInputProps {
@@ -185,11 +186,6 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         syncWidgetValue(widget, inputValueRef.current);
 
         widget.classList.add(EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS);
-        widget.style.display = "block";
-        widget.style.width = "100%";
-        widget.style.colorScheme = "light";
-        widget.style.backgroundColor = "#FFFFFF";
-        widget.style.color = "#1F1F1F";
 
         const handleInput = (event: Event) => {
           const target = event.target as HTMLInputElement | null;
@@ -315,59 +311,14 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
 
     return (
       <div className="relative">
-        <style>{`
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS} {
-            color-scheme: light;
-            background-color: #ffffff;
-            color: #1f1f1f;
-          }
+        <style>{placeAutocompleteWidgetStyles(EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS)}</style>
 
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(input-field) {
-            background-color: #ffffff;
-            color: #1f1f1f;
-          }
+        {/* Google's widget renders its own search icon — our MapPin is only shown for the fallback input */}
+        {!isWidgetReady && (
+          <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        )}
 
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(predictions) {
-            background-color: #ffffff;
-            border: 1px solid #eceae6;
-            border-radius: 12px;
-            box-shadow: 0 16px 40px rgba(31, 31, 31, 0.12);
-          }
-
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item) {
-            background-color: #ffffff;
-            color: #1f1f1f;
-          }
-
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item-match) {
-            color: #1f1f1f;
-          }
-
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item-selected) {
-            background-color: #f7f4ef;
-            color: #1f1f1f;
-          }
-
-          .${EVENT_LOCATION_AUTOCOMPLETE_WIDGET_CLASS}::part(prediction-item-icon) {
-            color: #6b6b6b;
-          }
-        `}</style>
-
-        <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
-
-        <div
-          className={cn(
-            "border-input focus-within:border-ring focus-within:ring-ring/50 min-h-10 w-full rounded-md border bg-white pl-10 pr-3 py-2 shadow-xs focus-within:ring-[3px]",
-            "text-[13px]",
-            disabled && "pointer-events-none cursor-not-allowed opacity-50",
-            !isWidgetReady && "hidden",
-          )}
-        >
-          <div
-            ref={hostRef}
-            className="min-h-[24px] w-full"
-          />
-        </div>
+        <div ref={hostRef} className={cn("w-full", !isWidgetReady && "hidden")} />
 
         {!isWidgetReady ? (
           <input
@@ -384,7 +335,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
               "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full min-w-0 rounded-md border bg-white px-3 py-2 text-base leading-none shadow-xs outline-none md:text-sm dark:bg-input/30",
               "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-              "pl-10 text-[13px]",
+              "pl-10",
             )}
           />
         ) : null}

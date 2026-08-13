@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
 import { toLegacyAddressComponents, type NewAddressComponent } from "@/services/googleMaps/toLegacyAddressComponents";
+import { placeAutocompleteWidgetStyles } from "@/services/googleMaps/placeAutocompleteWidgetStyle";
 import { cn } from "@/lib/utils";
 
 interface PlaceSearchInputProps {
@@ -113,11 +114,6 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
       }
 
       widget.classList.add(PLACE_SEARCH_WIDGET_CLASS);
-      widget.style.display = "block";
-      widget.style.width = "100%";
-      widget.style.colorScheme = "light";
-      widget.style.backgroundColor = "#FFFFFF";
-      widget.style.color = "#1F1F1F";
 
       const handlePlaceSelect = async (event: Event) => {
         const selectEvent = event as PlaceAutocompleteSelectionEvent;
@@ -200,55 +196,14 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
 
   return (
     <div id="place-location-search" className="relative">
-      <style>{`
-        .${PLACE_SEARCH_WIDGET_CLASS} {
-          color-scheme: light;
-          background-color: #ffffff;
-          color: #1f1f1f;
-        }
+      <style>{placeAutocompleteWidgetStyles(PLACE_SEARCH_WIDGET_CLASS)}</style>
 
-        .${PLACE_SEARCH_WIDGET_CLASS}::part(input-field) {
-          background-color: #ffffff;
-          color: #1f1f1f;
-        }
+      {/* Google's widget renders its own search icon — our MapPin is only shown for the fallback input */}
+      {!isWidgetReady && (
+        <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+      )}
 
-        .${PLACE_SEARCH_WIDGET_CLASS}::part(predictions) {
-          background-color: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          box-shadow: 0 16px 40px rgba(31, 31, 31, 0.12);
-        }
-
-        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item) {
-          background-color: #ffffff;
-          color: #1f1f1f;
-        }
-
-        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item-match) {
-          color: #1f1f1f;
-        }
-
-        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item-selected) {
-          background-color: #f3f4f6;
-          color: #1f1f1f;
-        }
-
-        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item-icon) {
-          color: #6b6b6b;
-        }
-      `}</style>
-
-      <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
-
-      <div
-        className={cn(
-          "border-input focus-within:border-ring focus-within:ring-ring/50 h-10 w-full rounded-md border bg-white pl-10 pr-3 shadow-xs focus-within:ring-[3px]",
-          "flex items-center text-sm",
-          !isWidgetReady && "hidden",
-        )}
-      >
-        <div ref={hostRef} className="w-full" />
-      </div>
+      <div ref={hostRef} className={cn("w-full", !isWidgetReady && "hidden")} />
 
       {!isWidgetReady ? (
         <input
