@@ -20,8 +20,24 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 15 (Deployment & Rollback Readiness) — STATUS: TODO.
-                     Not started.
+Active task:        Task 15 (Deployment & Rollback Readiness) — STATUS:
+                     COMPLETE. Full deploy/rollback runbook written
+                     (`docs/release/task15-deployment-rollback-runbook.md`).
+                     Owner-resolved deploy source: first PROD ships from
+                     `dev` (re-tagged `prod-N` in GHCR, no rebuild, no
+                     `dev`→`main` merge needed — `main` is 539 commits
+                     behind). Added `scripts/deploy/backup-remote-db.sh`
+                     (safe off-host DB backup; live end-to-end test still
+                     pending stable SSH, tracked BACKLOG-085). Rollback
+                     decision tree documents the confirmed limitation that
+                     redeploying the old app image is unsafe once pending
+                     destructive migrations are applied. Disk capacity
+                     re-confirmed (8.8G free/28G) with a cheaper fix than
+                     previously assumed: the physical disk already has
+                     ~70G unpartitioned — local LVM extension, not a cloud
+                     resize; not executed, owner `sudo` action. P0 = 0,
+                     P1 = 1 (disk headroom, non-blocking for this task's
+                     own scope). Task 16 not started.
 Prior — Task 14 (Environment Parity / PROD Configuration) — STATUS:
                      COMPLETE. All confirmed P0/P1 first-PROD config gaps
                      closed and owner-smoked on deployed DEV: DEV/PROD
@@ -90,10 +106,16 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-13
-Last updated by:    Claude Code — Task 14 CLOSED COMPLETE after owner-run
+Last updated by:    Claude Code — Task 15 CLOSED COMPLETE. Deployment/
+                     rollback architecture audited, owner decided deploy
+                     source (`dev`, zero CI change), safe remote-DB backup
+                     script added, rollback limitations documented. No app
+                     code changed, no deployment performed. Task 16 is
+                     next, not started.
+Prior — Claude Code — Task 14 CLOSED COMPLETE after owner-run
                      final DEV smoke on deployed image `a9577c0c` (Docker
                      Build & Push #291) was GREEN. Docs-only closure commit;
-                     no code change, no deploy. Task 15 is next, not started.
+                     no code change, no deploy.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -159,8 +181,9 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–14 CLOSED COMPLETE, zero unresolved P0/P1. Tasks
-                     15–17 TODO (not started).
+Unresolved P0/P1:   Tasks 1–15 CLOSED COMPLETE, zero unresolved P0
+                     (Task 15 carries 1 non-blocking P1, disk headroom —
+                     see Task 15 entry). Tasks 16–17 TODO (not started).
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -4116,15 +4139,84 @@ only during deployment.
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE` — deployment/rollback architecture fully audited, one real
+owner decision resolved, one real gap (safe remote DB backup) closed. P0 = 0,
+P1 = 1 (disk headroom — pre-existing, tracked, non-blocking for this scope).
+Full detail: `docs/release/task15-deployment-rollback-runbook.md`.
+AUDIT: DEV+PROD share one host (`134.17.17.134`, `/opt/mamago/dev` +
+`/opt/mamago/prod` compose projects) and one disk (28G LV, 8.8G free —
+confirmed the underlying virtual disk is already 100G, only 28.2G is
+partitioned/in the LVM VG, so the previously-planned 30→80G "resize" is a
+**local LVM extension**, not a cloud-provider operation). Image provenance
+already works with zero code change (OCI `org.opencontainers.image.revision`
+label = exact source SHA on every build). Migrations already correctly
+gated to a one-shot `*-migrate-1` compose service, `db:preflight` already
+refuses non-local `DATABASE_URL` hosts. No existing backup script can
+safely back up a *remote* container without writing the dump to that same
+disk-constrained host. No rollback documentation existed anywhere in the
+repo prior to this task.
+GAPS: (1) `main` is 539 commits/1430 files behind `dev` (last `main` push:
+2026-06-20, before Tasks 1–14) — the existing CI (`docker.yml`) only tags
+`prod-*` images from `main`, so producing one the "normal" way would force
+an effectively-unreviewable merge just to satisfy a branch-name convention
+for a noindex preview. (2) No script could safely back up PROD's DB to
+somewhere other than PROD's own nearly-full disk. (3) No rollback plan
+existed, including the specific risk that "redeploy the old image" is
+**not** a full rollback once a destructive migration (confirmed: at least
+`DROP TABLE "OfferBirthdayDetails"`, `DROP COLUMN
+"DirectMessage"."hiddenReason"` are pending somewhere in PROD's migration
+gap) has been applied.
+IMPLEMENTATION: Owner decision (asked directly, resolved this session):
+deploy first-PROD from **`dev`**, not `main`. Resolved with **zero CI/code
+change** — the `dev-<N>` image `docker.yml` already builds on every `dev`
+push is byte-identical to what a `main` build of the same commit would
+produce (same build-args/secrets for both branches); before deploying,
+re-tag that exact image as `prod-<N>` in GHCR with `docker buildx imagetools
+create` (no rebuild) so it lands in the conservative `prod-*` GHCR
+retention pool instead of aging out of the fast-churning `dev-*` pool. Real
+`dev`→`main` merge deferred to the actual future `mamago.by` cutover, where
+it can be reviewed properly. Added `scripts/deploy/backup-remote-db.sh` —
+streams `pg_dump` over SSH straight into a file on the operator's own
+machine (reads `POSTGRES_USER`/`POSTGRES_DB` from the target container's
+own env, no dump ever touches the host's disk). Wrote the full runbook
+(`docs/release/task15-deployment-rollback-runbook.md`): pre-flight
+checklist, backup, migration sequencing (incl. the destructive-migration
+finding), deploy order, a rollback decision tree that explicitly separates
+"safe to redeploy old image" from "must restore from backup" failure
+modes, and an owner-reviewed (not executed) disk-extension command plan.
+COMMITS: (pending — see below)
+VERIFICATION: `bash -n scripts/deploy/backup-remote-db.sh` clean (no
+`shellcheck` available in this environment). Live end-to-end test against
+`dev-db-1` attempted but not completed — SSH to `134.17.17.134` was
+intermittent throughout this session (worked briefly for the host audit,
+then repeatedly timed out); tracked as BACKLOG-085 (P1), required before
+the script is trusted for the first real PROD backup. `git diff --check`
+clean.
+DEV SMOKE: N/A — docs/runbook/script only, no application code changed, no
+deployment performed (per task scope: audit and plan only).
+BLOCKERS: None for Task 15 itself. Real pre-first-deploy blocker carried
+forward: `scripts/deploy/backup-remote-db.sh` must be live-verified once
+SSH access is stable (BACKLOG-085) before it is relied on as the pre-deploy
+backup step; PROD's exact live `_prisma_migrations` state must be
+re-confirmed at actual pre-flight time (never assumed from this audit —
+the runbook's own §3 already requires this regardless).
+BACKLOG/NOTES: BACKLOG-082 (compose files not version-controlled, P2),
+BACKLOG-083 (stale Phoenix/migration containers+images on the shared host,
+P2), BACKLOG-084 (no Docker `HEALTHCHECK` on app containers, P3),
+BACKLOG-085 (live-test `backup-remote-db.sh`, P1, see BLOCKERS). Disk
+headroom itself is not a new backlog entry — it's the same pre-existing
+capacity finding from before this task, now with a cheaper confirmed fix
+(local LVM extension, not a cloud resize); exact commands in the runbook
+§7, execution is an owner `sudo` action, not performed this session.
+
+P1 (carried, non-blocking for this task's own exit criteria):
+1. Disk: root filesystem 8.8G free of 28G on the shared DEV+PROD host.
+   Sufficient for this task's narrow scope (docs/script only) and, per the
+   runbook, for a pre-flight-pruned app+schema-only deploy — but must be
+   resized (or at minimum re-pruned) before any full media/content
+   migration to PROD, per the prior capacity audit's own finding. Fix
+   identified as low-risk/local (see runbook §7); not executed — needs the
+   owner's own `sudo` session.
 
 This is NOT a deployment. Goal: know the safe path forward and back ahead of
 time. AUDIT FIRST the actual deployment architecture/process. Determine:

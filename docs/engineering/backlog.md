@@ -2236,3 +2236,103 @@ P3 — cleanup / polish / optional
   fallback permanently or remove it now that the env contract is fixed; if
   removed, delete the fallback branch in all four components together.
 - Source: Task 14 Google Maps/Places P1 audit
+
+## [BACKLOG-082] Deploy-critical compose files not version-controlled
+
+- Status: OPEN
+- Priority: P2
+- Area: Deployment / Git
+- Added: 2026-08-13
+- Reason deferred: not a blocker for the first PROD preview itself — the
+  runbook documents the read-only commands to inspect the host's actual
+  compose/env state at pre-flight time — but it is a real, standing gap for
+  safe long-term operation.
+- Context: `/opt/mamago/dev/docker-compose.yml` and
+  `/opt/mamago/prod/docker-compose.yml` (confirmed to exist via `docker
+  inspect` compose-project labels during Task 15's audit) live only on the
+  deploy host, not in this git repo. `docker-compose.yml` at the repo root
+  is a local-dev-only file (`mamago2-db`/`mamago2-app` container names,
+  ports `5433`/`3000`) and does not reflect the real DEV/PROD stacks, which
+  additionally run a one-shot `*-migrate-1` service and `prisma-studio`
+  that the repo-root file doesn't define at all. No diff-reviewable record
+  exists of compose changes on the host, and dev/prod compose drift can
+  only be detected via SSH, not via git.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: a redacted compose template (or the real files with
+  secrets externalized to `.env`, never committed) checked into the repo
+  under version control, kept in sync with the host on every intentional
+  change, so compose changes go through the same review path as code.
+- Source: Task 15 audit (Deployment & Rollback Readiness)
+
+## [BACKLOG-083] Stale Phoenix/migration containers and images on the shared DEV+PROD host
+
+- Status: OPEN
+- Priority: P2
+- Area: Ops / Disk
+- Added: 2026-08-13
+- Reason deferred: safe-looking prune candidates, but Task 15 is a
+  read-only audit — deleting containers/images on the live shared host is
+  out of scope without owner confirmation these aren't intentionally kept.
+- Context: on `134.17.17.134` (confirmed via `docker ps -a`/`docker
+  images`): `phoenix-dev-rerun-c53d380cc4a2`, `phoenix-dev-rerun-0e35d863ebdf`,
+  `phoenix-dev-continue-apply-0e35d863ebdf` (all `Exited`, 9 days old,
+  outside the `dev`/`prod` compose projects) plus their images
+  `mamago2-migrate:phoenix-c53d380cc4a2` / `mamago2-migrate:phoenix-0e35d863ebdf`
+  (~2.14GB each); `prod-migrate-1` (`Exited`, 5 weeks old, superseded by
+  the next PROD migration run); `docker system df` also reports 1.386GB
+  already dangling. Meaningful reclaim on a filesystem with only 8.8GB
+  free out of 28GB.
+- Current state: not started, nothing removed.
+- Dependencies: owner confirmation these aren't intentionally retained for
+  reference/debugging (the Phoenix ones correspond to
+  `recovery/phoenix-pr102-rerun-skip` — see BACKLOG-002).
+- Acceptance criteria: owner-approved `docker rm`/`docker rmi` of the
+  confirmed-safe candidates, or a documented reason to keep each one.
+- Source: Task 15 audit (Deployment & Rollback Readiness)
+
+## [BACKLOG-084] No Docker HEALTHCHECK on app containers
+
+- Status: OPEN
+- Priority: P3
+- Area: Deployment / Reliability
+- Added: 2026-08-13
+- Reason deferred: `/api/health` (checks DB connectivity) already exists
+  and is usable for manual/external smoke checks; the gap is only that
+  Docker itself has no automatic health signal to act on (e.g. for
+  restart-on-unhealthy policies).
+- Context: neither `Dockerfile` nor the repo-root `docker-compose.yml`
+  define a `HEALTHCHECK`; confirmed on the live host that `prod-app-1`/
+  `dev-app-1` report `Health=n/a` in `docker inspect`, unlike `prod-db-1`/
+  `dev-db-1` (postgres image ships its own healthcheck, reports
+  `healthy`).
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add a `HEALTHCHECK` to `Dockerfile` (e.g. `curl -f
+  http://localhost:3000/api/health`) so `docker ps`/orchestration tooling
+  can see app health directly, not just container-alive status.
+- Source: Task 15 audit (Deployment & Rollback Readiness)
+
+## [BACKLOG-085] `scripts/deploy/backup-remote-db.sh` needs a live end-to-end test
+
+- Status: OPEN
+- Priority: P1
+- Area: Deployment / Backup
+- Added: 2026-08-13
+- Reason deferred: not a code gap — the script is written, `bash -n`-clean,
+  and manually reviewed — but SSH to `134.17.17.134` was intermittent
+  throughout Task 15's session (worked briefly, then repeatedly timed out)
+  and no live run against a real container completed. An unverified backup
+  script should not be trusted as the safety net for a real PROD migration.
+- Context: `scripts/deploy/backup-remote-db.sh` (new, Task 15) streams
+  `pg_dump` over SSH straight into a local file so the dump never touches
+  the host's disk. Logic reviewed line-by-line, but never executed against
+  `dev-db-1`/`prod-db-1`.
+- Current state: not started.
+- Dependencies: stable SSH access to `mamago-prod`.
+- Acceptance criteria: run `scripts/deploy/backup-remote-db.sh mamago-prod
+  dev-db-1` once SSH is stable, confirm a non-empty, checksummed
+  `.sql.gz` lands locally, and (separately, deliberately) confirm the
+  documented restore command works against a disposable/local DB before
+  this script is relied on for the first real PROD backup.
+- Source: Task 15 audit (Deployment & Rollback Readiness)
