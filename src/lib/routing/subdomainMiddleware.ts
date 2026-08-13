@@ -224,7 +224,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
 
     return {
       kind: "rewrite",
-      pathname: pathname.startsWith("/business") ? pathname : `/business${pathname}`,
+      pathname: pathname === "/" ? "/business" : `/business${pathname}`,
     };
   }
 
@@ -244,7 +244,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
 
     return {
       kind: "rewrite",
-      pathname: pathname.startsWith("/admin") ? pathname : `/admin${pathname}`,
+      pathname: pathname === "/" ? "/admin" : `/admin${pathname}`,
     };
   }
 

@@ -101,7 +101,31 @@ function main() {
     assert.strictEqual(isSecureCookie(), false, "Explicit AUTH_COOKIE_SECURE=false must override APP_ENV=production");
   });
 
-  // 4c. Staging on real *.mamago.by HTTPS subdomains: cross-subdomain sharing
+  // 4c. HTTPS preview families explicitly share only within their own family.
+  for (const [host, domain] of [
+    ["dev.mamago.by", ".dev.mamago.by"],
+    ["admin.dev.mamago.by", ".dev.mamago.by"],
+    ["business.dev.mamago.by", ".dev.mamago.by"],
+    ["prod.mamago.by", ".prod.mamago.by"],
+    ["admin.prod.mamago.by", ".prod.mamago.by"],
+    ["business.prod.mamago.by", ".prod.mamago.by"],
+  ] as const) {
+    withEnv({
+      NODE_ENV: "production",
+      APP_ENV: "preview",
+      AUTH_COOKIE_DOMAIN: domain,
+      AUTH_COOKIE_SECURE: "true",
+    }, () => {
+      const createOptions = getAuthCookieOptions(host);
+      const deleteOptions = getAuthCookieOptions(host);
+      assert.strictEqual(createOptions.domain, domain);
+      assert.strictEqual(createOptions.secure, true);
+      assert.deepStrictEqual(deleteOptions, createOptions);
+      assert.notStrictEqual(createOptions.domain, ".mamago.by");
+    });
+  }
+
+  // 4d. Staging on real *.mamago.by HTTPS subdomains: cross-subdomain sharing
   // is opt-in via explicit overrides, not a hardcoded APP_ENV=staging branch —
   // subdomainMiddleware.ts redirects auth routes on business./admin.mamago.by
   // back to the public mamago.by host, so the session must be readable across
@@ -117,7 +141,7 @@ function main() {
     assert.strictEqual(isSecureCookie(), true, "Staging with explicit AUTH_COOKIE_SECURE=true must be Secure over HTTPS");
   });
 
-  // 4d. Staging on a separate domain / preview URL / plain host: without the
+  // 4e. Staging on a separate domain / preview URL / plain host: without the
   // explicit overrides, staging must NOT get .mamago.by scoping (host-only).
   withEnv({ NODE_ENV: "production", APP_ENV: "staging" }, () => {
     const domain = getAuthCookieDomain("my-app-preview.vercel.app");
@@ -131,6 +155,21 @@ function main() {
     assert.notStrictEqual(domain, ".mamago.by", "Bare NODE_ENV=production alone must not scope Domain to .mamago.by");
     assert.strictEqual(domain, undefined, "Bare NODE_ENV=production alone must yield host-only cookie on localhost");
     assert.strictEqual(isSecureCookie(), false, "Bare NODE_ENV=production alone must not force Secure");
+  });
+
+  withEnv({ NODE_ENV: "production", APP_ENV: "dev" }, () => {
+    assert.strictEqual(
+      getAuthCookieDomain("dev.mamago.by"),
+      undefined,
+      "DEV preview must never fall back to the broader .mamago.by domain",
+    );
+  });
+
+  withEnv({ NODE_ENV: "development", APP_ENV: "local" }, () => {
+    assert.strictEqual(getAuthCookieDomain("mamago.local"), ".mamago.local");
+    assert.strictEqual(getAuthCookieDomain("admin.mamago.local"), ".mamago.local");
+    assert.strictEqual(getAuthCookieDomain("127.0.0.1:3000"), undefined);
+    assert.strictEqual(getAuthCookieDomain("192.168.1.20:3000"), undefined);
   });
 
   // 6. Logout options must match login options for the same request host

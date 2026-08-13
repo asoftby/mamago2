@@ -4,6 +4,68 @@ import {
   getPublicBaseFromHost,
   resolveSubdomainMiddlewareDecision,
 } from "./subdomainMiddleware";
+import {
+  removeTrailingSlash,
+  shouldSkipTrailingSlashRedirect,
+} from "./trailingSlashPolicy";
+
+function resolvePreviewLifecycle(host: string, pathname: string) {
+  const visitedExternalPaths = new Set<string>();
+  let externalPathname = pathname;
+
+  for (let step = 0; step < 5; step += 1) {
+    assert.equal(
+      visitedExternalPaths.has(externalPathname),
+      false,
+      `redirect cycle detected for ${host}${pathname} at ${externalPathname}`,
+    );
+    visitedExternalPaths.add(externalPathname);
+
+    if (
+      externalPathname.endsWith("/") &&
+      !shouldSkipTrailingSlashRedirect(externalPathname)
+    ) {
+      externalPathname = removeTrailingSlash(externalPathname);
+      continue;
+    }
+
+    const decision = resolveSubdomainMiddlewareDecision({
+      host,
+      protocol: "https:",
+      pathname: externalPathname,
+      search: "",
+    });
+
+    if (decision.kind === "redirect") {
+      externalPathname = new URL(decision.location).pathname;
+      continue;
+    }
+
+    return { decision, externalPathname, steps: step + 1 };
+  }
+
+  assert.fail(`preview lifecycle did not resolve for ${host}${pathname}`);
+}
+
+for (const [host, expectedInternalPath] of [
+  ["admin.dev.mamago.by", "/admin"],
+  ["admin.prod.mamago.by", "/admin"],
+  ["business.dev.mamago.by", "/business"],
+  ["business.prod.mamago.by", "/business"],
+] as const) {
+  const result = resolvePreviewLifecycle(host, "/");
+  assert.deepEqual(result.decision, { kind: "rewrite", pathname: expectedInternalPath });
+  assert.equal(result.externalPathname, "/");
+}
+
+const prefixedAdminRoot = resolvePreviewLifecycle("admin.dev.mamago.by", "/admin");
+assert.deepEqual(prefixedAdminRoot.decision, { kind: "rewrite", pathname: "/admin" });
+assert.equal(prefixedAdminRoot.externalPathname, "/");
+
+assert.deepEqual(
+  resolvePreviewLifecycle("admin.dev.mamago.by", "/ranking").decision,
+  { kind: "rewrite", pathname: "/admin/ranking" },
+);
 
 assert.equal(
   getPublicBaseFromHost("business.mamago.local:3002", "http:"),
@@ -373,7 +435,7 @@ assert.deepEqual(
     pathname: "/",
     search: "",
   }),
-  { kind: "rewrite", pathname: "/admin/" },
+  { kind: "rewrite", pathname: "/admin" },
 );
 
 assert.deepEqual(

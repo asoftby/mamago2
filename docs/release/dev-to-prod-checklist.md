@@ -3952,7 +3952,8 @@ money cannot be charged or mutated ambiguously or unsafely.**
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `AUDIT_COMPLETE`
+STATUS: `BLOCKED` — redirect/auth regression found on deployed DEV `dev-288`;
+pending fix image deployment and cross-subdomain session smoke.
 AUDIT: EXISTING isolation is real (separate compose projects `dev`/`prod`,
 separate DB names/users/volumes/networks, separate media volumes). PERSISTENT
 PROD config (`/opt/mamago/prod/.env` + compose Traefik labels) does **not**
@@ -3962,13 +3963,24 @@ current code. Secrets reported as SET/MISSING/SAME/DIFFERENT only.
 GAPS: Confirmed P0/P1 below. Do not close Task 14 until Phase B lands and is
 re-verified. Proposed Phase B is config-only unless owner chooses a
 `prod.mamago.by` first target that also needs host-matching code.
-IMPLEMENTATION: none this phase (read-only audit).
-COMMITS: docs-only audit milestone (this Task 14 field update + backlog).
+IMPLEMENTATION: Narrow regression fix removes trailing slashes from internal
+admin/business root rewrites and formalizes isolated preview cookie families:
+DEV `.dev.mamago.by`, first-PROD preview `.prod.mamago.by`, both Secure.
+COMMITS: implementation commit pending; prior docs-only audit milestone remains.
 VERIFICATION: SSH `mamago-prod` → host `ubuntu` / `134.17.17.134`; DEV dir
 `/opt/mamago/dev`; PROD dir discovered via compose labels as
 `/opt/mamago/prod`. Runtime env presence matched persistent `.env`. No
 writes, no restarts, no migrations.
-DEV SMOKE: not applicable (audit-only; no deploy).
+DEV SMOKE: `dev-288` exposed `ERR_TOO_MANY_REDIRECTS` at
+`admin.dev.mamago.by/`. Root cause confirmed: internal `/admin/` and
+`/business/` rewrites intersected the external no-trailing-slash policy;
+without explicit `AUTH_COOKIE_DOMAIN`, preview sessions were also host-only.
+Regression tests cover finite DEV/PROD-preview root resolution, prefixed and
+typical paths, isolated cookie domains and matching create/delete options.
+DEV read-only config proof: `AUTH_COOKIE_DOMAIN` persistent/runtime matches
+`.dev.mamago.by`; `AUTH_COOKIE_SECURE=true` is still missing persistent/runtime
+and must be set before the new image is redeployed. Pending new DEV image
+deployment and live smoke; Task 14 remains blocked.
 BLOCKERS: owner decision on first-PROD host (`prod.mamago.by` vs cutover to
 `mamago.by`) before any persistent PROD `.env` / Traefik change. Do **not**
 set `APP_ENV=production` on the current `prod.mamago.by` stack — code would
