@@ -119,8 +119,18 @@ export function resolveSubdomainMiddlewareDecision(params: {
     return { kind: "next" };
   }
 
-  const isBusinessHost = isHost(host, ["business.mamago.local", "business.mamago.by"]);
-  const isAdminHost = isHost(host, ["admin.mamago.local", "admin.mamago.by"]);
+  const isBusinessHost = isHost(host, [
+    "business.mamago.local",
+    "business.mamago.by",
+    "business.dev.mamago.by",
+    "business.prod.mamago.by",
+  ]);
+  const isAdminHost = isHost(host, [
+    "admin.mamago.local",
+    "admin.mamago.by",
+    "admin.dev.mamago.by",
+    "admin.prod.mamago.by",
+  ]);
   const adminSafeSearch = isAdminHost ? stripPublicDiscoverySearchParams(search) : search;
 
   if (isBusinessHost || isAdminHost) {

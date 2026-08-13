@@ -364,6 +364,71 @@ assert.deepEqual(
   { kind: "rewrite", pathname: "/business/places" },
 );
 
+// Current Traefik hosts (dev.mamago.by / prod.mamago.by) must not fall through
+// to the public `/` → `/minsk` rewrite. Apex mamago.by stays unchanged.
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.dev.mamago.by",
+    protocol: "https:",
+    pathname: "/",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/admin/" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.prod.mamago.by",
+    protocol: "https:",
+    pathname: "/ranking",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/admin/ranking" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.dev.mamago.by",
+    protocol: "https:",
+    pathname: "/dashboard",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/business/dashboard" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "business.prod.mamago.by",
+    protocol: "https:",
+    pathname: "/places",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/business/places" },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "prod.mamago.by",
+    protocol: "https:",
+    pathname: "/",
+    search: "",
+  }),
+  {
+    kind: "redirect",
+    location: "https://prod.mamago.by/minsk",
+  },
+);
+
+assert.deepEqual(
+  resolveSubdomainMiddlewareDecision({
+    host: "admin.mamago.by",
+    protocol: "https:",
+    pathname: "/ranking",
+    search: "",
+  }),
+  { kind: "rewrite", pathname: "/admin/ranking" },
+);
+
 assert.deepEqual(
   resolveSubdomainMiddlewareDecision({
     host: "admin.mamago.local",

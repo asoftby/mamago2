@@ -17,7 +17,12 @@ export const ADMIN_PATH_PREFIX = "/admin";
 /** Canonical path prefix for the business UI (App Router). */
 export const BUSINESS_PATH_PREFIX = "/business";
 
-const SUPPORTED_SURFACE_BASE_HOSTS = ["mamago.by", "mamago.local"] as const;
+const SUPPORTED_SURFACE_BASE_HOSTS = [
+  "dev.mamago.by",
+  "prod.mamago.by",
+  "mamago.by",
+  "mamago.local",
+] as const;
 
 /**
  * Builds an absolute admin destination path under {@link ADMIN_PATH_PREFIX}.

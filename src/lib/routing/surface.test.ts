@@ -32,6 +32,18 @@ assert.equal(
   "business",
 );
 assert.equal(
+  resolveSurfaceFromHostAndPathname("admin.dev.mamago.by", "/"),
+  "admin",
+);
+assert.equal(
+  resolveSurfaceFromHostAndPathname("business.prod.mamago.by", "/dashboard"),
+  "business",
+);
+assert.equal(
+  resolveSurfaceFromHostAndPathname("prod.mamago.by", "/"),
+  "public",
+);
+assert.equal(
   resolveSurfaceFromHostAndPathname("mamago.local:3000", "/"),
   "public",
 );
@@ -69,6 +81,26 @@ assert.equal(
     currentProtocol: "https",
   }),
   "https://admin.mamago.by/",
+);
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "public",
+    targetPath: "/minsk",
+    currentHost: "admin.dev.mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://dev.mamago.by/minsk",
+);
+
+assert.equal(
+  buildSurfaceRedirectDestination({
+    targetSurface: "admin",
+    targetPath: "/",
+    currentHost: "business.prod.mamago.by",
+    currentProtocol: "https",
+  }),
+  "https://admin.prod.mamago.by/",
 );
 
 assert.equal(
