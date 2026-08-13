@@ -15,10 +15,12 @@ Business monetization. Older billing reports describe historical scaffolding.
 The only paid action is an explicit Boost purchase for an eligible published
 Offer owned by the Business. Action-based Promotion is disabled.
 
-Boost durations are `1`, `3` and `7` days. Prices are authoritative only on the
-server and are configured by `BOOST_PRICE_1_DAY_BYN`,
-`BOOST_PRICE_3_DAYS_BYN` and `BOOST_PRICE_7_DAYS_BYN`. An option without a
-valid configured price is not offered. The client submits an option ID, never
+Boost durations and owner-approved beta prices are `1 day = 5 BYN`,
+`3 days = 12 BYN` and `7 days = 25 BYN`. Prices are authoritative only on the
+server and are configured by `BOOST_PRICE_1D_BYN`, `BOOST_PRICE_3D_BYN` and
+`BOOST_PRICE_7D_BYN`. All three values must be set in the deployment
+environment. An option without a valid configured price is not offered; an
+invalid configured price fails closed. The client submits an option ID, never
 an authoritative price.
 
 An already-active Boost is denied rather than extended or replaced. Boost

@@ -14,6 +14,8 @@ import {
 import { createRefund, RefundNotAllowedError } from "./billingTransaction.service";
 import {
   BoostAlreadyActiveError,
+  BoostPricingUnavailableError,
+  getConfiguredBoostOptions,
   purchaseOfferBoost,
 } from "./boostPurchase.service";
 import { reconcileBillingAccounts } from "./billingReconciliation.service";
@@ -48,9 +50,9 @@ async function resetFinancialState(balance: string) {
 }
 
 test.before(async () => {
-  process.env.BOOST_PRICE_1_DAY_BYN = "10.00";
-  process.env.BOOST_PRICE_3_DAYS_BYN = "25.00";
-  process.env.BOOST_PRICE_7_DAYS_BYN = "50.00";
+  process.env.BOOST_PRICE_1D_BYN = "5";
+  process.env.BOOST_PRICE_3D_BYN = "12";
+  process.env.BOOST_PRICE_7D_BYN = "25";
 
   const user = await prisma.user.create({ data: { email: `${prefix}@example.invalid`, role: "BUSINESS_OWNER" } });
   userId = user.id;
@@ -176,20 +178,56 @@ test("financial writes reject non-finite, over-precision and excessive amounts",
 
 test("Boost uses server price and atomically links one debit", async () => {
   await resetFinancialState("100.00");
+  assert.deepEqual(getConfiguredBoostOptions(), [
+    { id: "BOOST_1_DAY", durationDays: 1, price: 5, currency: "BYN" },
+    { id: "BOOST_3_DAYS", durationDays: 3, price: 12, currency: "BYN" },
+    { id: "BOOST_7_DAYS", durationDays: 7, price: 25, currency: "BYN" },
+  ]);
   const key = `${prefix}:boost-success`;
   const purchase = await purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
   const replay = await purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_3_DAYS", requestKey: key });
   assert.equal(purchase.boost.id, replay.boost.id);
-  assert.equal(purchase.boost.price?.toFixed(2), "25.00");
+  assert.equal(purchase.boost.price?.toFixed(2), "12.00");
   assert.equal(purchase.boost.durationDays, 3);
   assert.equal(purchase.boost.billingTransactionId, purchase.transaction?.id);
-  assert.equal(purchase.transaction?.amount.toFixed(2), "-25.00");
-  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "75.00");
+  assert.equal(purchase.transaction?.amount.toFixed(2), "-12.00");
+  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "88.00");
   assert.equal(await prisma.boost.count({ where: { offerId } }), 1);
 });
 
+test("Boost pricing rejects unsupported options and fails closed on missing or invalid config", async () => {
+  await resetFinancialState("100.00");
+  await assert.rejects(
+    purchaseOfferBoost({
+      businessId,
+      offerId,
+      optionId: "BOOST_14_DAYS" as never,
+      requestKey: `${prefix}:unsupported-duration`,
+    }),
+    BoostPricingUnavailableError,
+  );
+
+  const originalOneDayPrice = process.env.BOOST_PRICE_1D_BYN;
+  delete process.env.BOOST_PRICE_1D_BYN;
+  assert.equal(getConfiguredBoostOptions().some((option) => option.id === "BOOST_1_DAY"), false);
+  await assert.rejects(
+    purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:missing-price` }),
+    BoostPricingUnavailableError,
+  );
+
+  process.env.BOOST_PRICE_1D_BYN = "0";
+  assert.throws(() => getConfiguredBoostOptions(), BoostPricingUnavailableError);
+  process.env.BOOST_PRICE_1D_BYN = originalOneDayPrice;
+
+  assert.equal(await prisma.boost.count({ where: { offerId } }), 0);
+  assert.equal(await prisma.billingTransaction.count({
+    where: { billingAccountId: accountId, type: "FEATURE_CHARGE" },
+  }), 0);
+  assert.equal((await prisma.billingAccount.findUniqueOrThrow({ where: { id: accountId } })).depositBalance.toFixed(2), "100.00");
+});
+
 test("Boost rejects insufficient funds, foreign ownership and concurrent active duplicates", async () => {
-  await resetFinancialState("5.00");
+  await resetFinancialState("4.00");
   await assert.rejects(
     purchaseOfferBoost({ businessId, offerId, optionId: "BOOST_1_DAY", requestKey: `${prefix}:insufficient` }),
     BillingInsufficientFundsError,
