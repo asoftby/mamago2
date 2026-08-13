@@ -20,7 +20,32 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 15 (Deployment & Rollback Readiness) — STATUS:
+Active task:        Task 16 (Final Release Safety Audit) — STATUS:
+                     COMPLETE. Read-only audit across all 7 areas
+                     (Security, Data Integrity, Core Business Logic,
+                     Performance/Cost, Failure Handling, SEO/Public
+                     Safety, Deployment Safety) found 4 confirmed new P1s:
+                     Next.js 16.2.9 (unpatched HIGH CVEs) → 16.2.11; sharp
+                     0.33.5 (HIGH libvips CVEs, processes user-uploaded
+                     images) → 0.35.3 (+ pnpm override so Next's own
+                     bundled sharp also patches); `/api/auth/register`
+                     missing rate limiting (unlike login/OTP) → added,
+                     matching the existing pattern; stack-trace leak in
+                     `business/places/[id]` PATCH error response → gated
+                     behind `NODE_ENV=development`, matching the sibling
+                     POST handler. All 4 fixed, tested (new integration
+                     test for the rate limit, full `pnpm build` green,
+                     `tsc`/`eslint`/`git diff --check` clean), committed
+                     (`ed9546aa`). 12 real P2/P3 findings filed as
+                     BACKLOG-087 through BACKLOG-098 (no duplicates of
+                     existing entries). P0 = 0. **1 unresolved P1 remains,
+                     carried from Task 15: BACKLOG-085** (live end-to-end
+                     verification of `scripts/deploy/backup-remote-db.sh`
+                     — operational, needs stable SSH, not code-fixable
+                     this session). Task 16 COMPLETE does not mean PROD
+                     READY. Task 17 must not start until BACKLOG-085 is
+                     resolved.
+Prior — Task 15 (Deployment & Rollback Readiness) — STATUS:
                      COMPLETE. Full deploy/rollback runbook written
                      (`docs/release/task15-deployment-rollback-runbook.md`).
                      Owner-resolved deploy source: first PROD ships from
@@ -38,14 +63,7 @@ Active task:        Task 15 (Deployment & Rollback Readiness) — STATUS:
                      resize; reclassified P2 — mandatory prerequisite
                      before full media/content migration or cutover, not a
                      first-PROD-preview blocker (Task 15's own scope has no
-                     media/content migration step). P0 = 0. **1 unresolved
-                     P1 remains: BACKLOG-085** (live end-to-end
-                     verification of `scripts/deploy/backup-remote-db.sh`
-                     — must fix before PROD; required before any
-                     destructive PROD migration / the first real deploy's
-                     migration step). PROD remains NOT READY. Task 16 not
-                     started; Task 17 must not start until BACKLOG-085 is
-                     resolved.
+                     media/content migration step).
 Prior — Task 14 (Environment Parity / PROD Configuration) — STATUS:
                      COMPLETE. All confirmed P0/P1 first-PROD config gaps
                      closed and owner-smoked on deployed DEV: DEV/PROD
@@ -114,12 +132,18 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-13
-Last updated by:    Claude Code — Task 15 CLOSED COMPLETE. Deployment/
+Last updated by:    Claude Code — Task 16 CLOSED COMPLETE. Final release
+                     safety audit across all 7 areas; 4 confirmed new P1s
+                     found and fixed (Next.js CVEs, sharp CVEs, register
+                     rate limit, stack-trace leak), committed `ed9546aa`;
+                     12 P2/P3 findings filed (BACKLOG-087..098). Task 17
+                     is next, not started; must not start until
+                     BACKLOG-085 is resolved.
+Prior — Claude Code — Task 15 CLOSED COMPLETE. Deployment/
                      rollback architecture audited, owner decided deploy
                      source (`dev`, zero CI change), safe remote-DB backup
                      script added, rollback limitations documented. No app
-                     code changed, no deployment performed. Task 16 is
-                     next, not started.
+                     code changed, no deployment performed.
 Prior — Claude Code — Task 14 CLOSED COMPLETE after owner-run
                      final DEV smoke on deployed image `a9577c0c` (Docker
                      Build & Push #291) was GREEN. Docs-only closure commit;
@@ -189,13 +213,15 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–15 CLOSED COMPLETE, zero unresolved P0. **1
+Unresolved P0/P1:   Tasks 1–16 CLOSED COMPLETE, zero unresolved P0. **1
                      unresolved P1: BACKLOG-085** (live end-to-end
                      verification of `scripts/deploy/backup-remote-db.sh`
-                     — must fix before PROD; see Task 15 entry). PROD
-                     remains NOT READY until it is resolved. Task 16 TODO
-                     (not started). Task 17 must not start until
-                     BACKLOG-085 is resolved.
+                     — must fix before PROD; see Task 15 entry). All 4
+                     P1s newly found during Task 16 were fixed within that
+                     same session (`ed9546aa`) — see Task 16 entry. PROD
+                     remains NOT READY until BACKLOG-085 is resolved.
+                     Task 17 TODO (not started). Task 17 must not start
+                     until BACKLOG-085 is resolved.
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -4262,15 +4288,105 @@ to deploy, (3) in what order, (4) how to verify, (5) what to do on failure,
 
 Priority: `P0 — FINAL RELEASE BLOCKER`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE` — read-only audit across all 7 areas (parallel agents for
+A/B/C/D, direct cross-check for F/G) found 4 confirmed new P1s, all fixed,
+verified, and committed this session (`ed9546aa`). P0 = 0. **1 unresolved
+P1 remains, carried from Task 15: BACKLOG-085** (live end-to-end
+verification of `scripts/deploy/backup-remote-db.sh` — operational, not
+code-fixable in this session; needs stable SSH). 12 real P2/P3 findings
+filed as BACKLOG-087 through BACKLOG-098 (search backlog for dupes
+performed first — none found). Task 16 COMPLETE does **not** mean PROD
+READY: BACKLOG-085 must still be resolved before Task 17.
+AUDIT: **A. Security** — auth (custom session, bcrypt, httpOnly/sameSite
+cookies), RBAC (all 193 `admin/**` routes gated), object-ownership
+(IDOR-safe everywhere sampled), input validation (zod), uploads
+(magic-byte MIME check, WebP re-encode, path-traversal guarded), secrets
+(no hardcoded keys), cron/webhook secret-gated — OK. Found: Next.js
+16.2.9 (multiple unpatched HIGH CVEs, Server-Actions-heavy app), sharp
+0.33.5 (HIGH libvips CVEs, runs on user-uploaded images at request time),
+`/api/auth/register` had no rate limiting unlike its siblings login/OTP —
+all P1, all fixed. **B. Data Integrity** — `prisma validate` clean, all
+money-adjacent FKs have explicit `onDelete`, all critical multi-write
+paths (Boost purchase, balance credit/debit, OTP consumption, claim
+approval) correctly use `$transaction` with row locks. Full 231-migration
+destructive-op scan confirms the pending-on-PROD destructive gap is
+exactly the 2 migrations BACKLOG-085 already tracks — nothing additional.
+No new P0/P1. **C. Core Business Logic** — auth, discovery, Search,
+Places, Offers, claims, admin moderation, My Plan/Day Scenario all wired
+to real Prisma-backed handlers, no stubs/mocks/disabled happy paths. No
+P0/P1. **D. Performance/Cost** — discovery/ranking queries batched (no
+N+1), Google APIs on-demand/client-side only, polling bounded/gated. No
+P0/P1. **E. Failure Handling** — images, empty results, unauthorized
+access, invalid input, external-API-down all degrade safely. Found: one
+route (`business/places/[id]` PATCH) unconditionally leaked
+`error.stack` in its JSON 500 response — P1, fixed (gated behind
+`NODE_ENV === "development"`, matching the sibling POST handler in the
+same directory which already did this correctly). **F. SEO/Public
+Safety** — `isGlobalNoindexEnabled()` defaults `true` (fail-closed), only
+flips with explicit `SITE_INDEXING_ENABLED=true`; middleware adds
+`X-Robots-Tag: noindex` as defense-in-depth. No P0/P1. **G. Deployment
+Safety** — cross-checked against Task 15's runbook, no new gap found.
+GAPS: None remaining beyond the carried BACKLOG-085 (operational
+prerequisite, not a code gap — see Task 15).
+IMPLEMENTATION: 4 minimal fixes, each mirroring an existing correct
+pattern already in the repo: (1) `next` 16.2.9 → 16.2.11 in
+`package.json` + the `@react-email/preview-server>next` override; (2)
+`sharp` ^0.33.5 → ^0.35.3 in `package.json`, plus a new `sharp` entry in
+`pnpm.overrides` (Next.js itself pulls its own optional `sharp` for
+built-in Image Optimization — without the override it resolved to a
+still-vulnerable 0.34.5 independent of the direct dependency); (3) added
+`checkRateLimit` (5/15min per IP+email) to
+`src/app/api/auth/register/route.ts`, copying the exact pattern already
+used by `/api/auth/login` and `/api/auth/phone/verify-otp`; (4) gated the
+`detail` stack-trace field in
+`src/app/api/business/places/[id]/route.ts` PATCH behind
+`NODE_ENV === "development"`, copying the sibling POST handler in the
+same file. Mechanical fallout from the sharp 0.35 bump: its ESM type
+declarations moved `Sharp` from a `sharp.Sharp` namespace member to a
+named export — updated the 2 call sites in
+`src/lib/media/imageProcessor.ts` (`import sharp, { type Sharp } from
+"sharp"`).
+COMMITS: `ed9546aa` — "fix(security): close 4 confirmed P1s from Task 16
+final release audit".
+VERIFICATION: `pnpm audit --prod` before/after confirms `next` and
+`sharp` no longer appear (verified via `pnpm why sharp` that all 3
+resolution paths — direct dep, `next`'s optional peer, `@react-email`'s
+preview-server peer — converge on 0.35.3). New targeted integration test
+`src/app/api/auth/register/rateLimit.integration.test.ts` (real DB, same
+pattern as `login/pendingActivation.integration.test.ts`) green: happy
+path unaffected, 6th rapid attempt from the same IP+email gets 429, a
+different IP+email is unaffected (key is correctly scoped). Existing
+`pnpm test:rate-limit` and
+`login/pendingActivation.integration.test.ts` re-run green (no
+regression). `npx tsc --noEmit` clean (after clearing a stale
+`tsconfig.tsbuildinfo`). `npx eslint` clean on all changed files (one
+pre-existing unrelated warning in an untouched sibling file, ignored per
+scope rules). Full `pnpm build` green (real proof point for a runtime
+dependency bump touching Next.js itself and the image pipeline). `git
+diff --check` clean throughout.
+DEV SMOKE: Not performed this session — these are backend/dependency
+fixes (rate limiting, error-response shape, dependency versions) with no
+UI surface; correctness is proven by `pnpm build` succeeding and the
+targeted integration/unit tests above, per this checklist's §13
+risk-based verification (a full DEV browser smoke is Task 17's job, not
+required per-fix here).
+BLOCKERS: None for Task 16 itself. **PROD readiness remains blocked**
+separately by the carried BACKLOG-085 (P1, operational — live-test
+`backup-remote-db.sh` once SSH is stable), exactly as Task 15 already
+stated. Task 17 must not start until BACKLOG-085 is resolved.
+BACKLOG/NOTES: BACKLOG-087 (P2, no rate limit on password-reset
+request), BACKLOG-088 (P2, no timeout/AbortController on Google
+Places/Telegram/SMS.BY fetches), BACKLOG-089 (P2, `sitemap.xml`
+force-dynamic with no cache), BACKLOG-090 (P2, missing `React.cache()`
+on `getCurrentUser()`/entity loaders causing duplicate per-request
+queries), BACKLOG-091 (P3, leftover admin-gated debug endpoints),
+BACKLOG-092 (P3, `/ui-lab-admin` reachable without auth guard, no
+sensitive data), BACKLOG-093 (P3, child PII in debug `console.log`),
+BACKLOG-094 (P3, `PlanItem` no `@@unique` on dedup keys), BACKLOG-095
+(P3, `seed-demo-data.ts` not code-guarded against PROD),
+BACKLOG-096 (P3, admin list views lack pagination), BACKLOG-097 (P3,
+`UserEvent` `CARD_VIEW` writes not debounced), BACKLOG-098 (P3, no
+custom `not-found.tsx`/`error.tsx` anywhere in `src/app`).
 
 Start only after Tasks 1–15 are complete. Goal is NOT to find everything
 that could be improved in the repository — it is to determine whether

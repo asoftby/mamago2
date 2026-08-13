@@ -2379,3 +2379,260 @@ P3 — cleanup / polish / optional
   full Phoenix media/content migration is run against PROD or the real
   `mamago.by` DNS cutover proceeds.
 - Source: Task 15 audit (Deployment & Rollback Readiness)
+
+## [BACKLOG-087] No rate limiting on password-reset request
+
+- Status: OPEN
+- Priority: P2
+- Area: Security / Auth
+- Added: 2026-08-13
+- Reason deferred: does not block first PROD — unlike the missing register
+  rate limit (fixed directly, see Task 16), this endpoint doesn't leak
+  account existence (always returns the same success message) and the
+  reset token is single-use with a short expiry, so the residual risk is
+  email-bombing/abuse cost, not enumeration or auth bypass.
+- Context: `src/server/auth/password-reset.ts` (`requestPasswordReset`) /
+  `src/app/(auth)/forgot-password/actions.ts` (`forgotPasswordAction`) have
+  no `checkRateLimit` call, unlike `/api/auth/login`,
+  `/api/auth/register` (Task 16 fix), and `/api/auth/phone/verify-otp`.
+- Current state: not started.
+- Dependencies: none — same `checkRateLimit` pattern as the other three
+  endpoints (`src/lib/security/rateLimit.ts`).
+- Acceptance criteria: add a per-IP+email rate limit to the reset-request
+  path, consistent with the existing pattern.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-088] No timeout/AbortController on Google Places, Telegram, SMS.BY fetches
+
+- Status: OPEN
+- Priority: P2
+- Area: Reliability / External APIs
+- Added: 2026-08-13
+- Reason deferred: real robustness gap, but bounded impact — Google Places
+  calls are on-demand, admin/business-only, and fail safe (return `null`
+  → 404); Telegram sends are fire-and-forget on every critical path
+  (booking, direct messages) so they can't block those responses. The one
+  path with a synchronous await on an un-timed external call in a
+  public-reachable flow is SMS OTP send/verify (business phone
+  verification, not primary login) — worst case is a single hung
+  request/spinner for the calling user, not a systemic outage.
+- Context: `src/lib/google-places/client.ts:43,140`,dispatch in
+  `src/server/services/telegram/TelegramChannel.ts:61`,
+  `src/lib/sms/smsBy.ts:53` all call `fetch` with no `AbortSignal`/timeout.
+  `src/server/egr/lookupByUnp.ts:26-33` already does this correctly (8s
+  `AbortController`) — same pattern should be applied to the three above.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add `AbortSignal.timeout(8000–10000)` (or
+  equivalent) to the three fetches above, following the existing EGR
+  pattern.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-089] `sitemap.xml` is force-dynamic with no cache — unbounded per-request scan across 5 tables
+
+- Status: OPEN
+- Priority: P2
+- Area: Performance / SEO
+- Added: 2026-08-13
+- Reason deferred: harmless at current dataset size (small row counts
+  across Place/Offer/Route/Article/Activity) and the first-PROD preview is
+  noindex, so it won't actually be crawled at volume. Becomes a real cost
+  concern once real content volume and real crawler traffic exist.
+- Context: `src/app/sitemap.ts:39-300` sets `export const dynamic =
+  "force-dynamic"`, so `/sitemap.xml` re-runs full `findMany` queries
+  across `Place`, `Offer`, `Route`, `Article`, `Activity` (events) plus a
+  batched `City` lookup on every single request — no
+  caching/revalidation, no pagination/sitemap-splitting.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add `revalidate` (ISR) or move to
+  `generateSitemaps` for pagination before real content volume/crawl
+  traffic exists.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-090] Missing request-level memoization on `getCurrentUser()` / entity loaders — duplicate DB queries per request
+
+- Status: OPEN
+- Priority: P2
+- Area: Performance
+- Added: 2026-08-13
+- Reason deferred: each individual query is a trivial indexed lookup
+  (`Session.tokenHash`, `Place.id`/`Activity.id` unique/indexed), so this
+  doesn't spike cost or risk the shared host at low initial traffic — but
+  it's a real, well-understood Next.js anti-pattern hitting the two
+  highest-traffic public page types plus every business dashboard page,
+  and the fix is cheap and high-leverage.
+- Context: `getCurrentUser()` (`src/lib/auth/server.ts:11` →
+  `validateSession()` `src/lib/auth/session.ts:139`) is not wrapped in
+  React's `cache()`, so it's not deduped within one request.
+  `src/app/(public)/places/[slug]/page.tsx` runs the full `Place`
+  `findUnique` twice per request (`generateMetadata` + page body);
+  `src/app/(public)/[city]/events/[slugOrId]/page.tsx` runs
+  `loadPublicActivityForCityPage` twice the same way, plus
+  `getCurrentUser()` is called independently by the page body and by
+  `AnalyticsDetailBeacon.tsx:26`. Same layout+page double-`getCurrentUser()`
+  pattern repeats across `src/app/business/(protected)/*`.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: wrap `getCurrentUser()` and the per-entity page
+  loaders (place/event detail) in React's `cache()` so repeated calls
+  within one request are deduped.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-091] Leftover debug endpoints: `/api/debug/media-usage`, `/api/admin/debug-db`
+
+- Status: OPEN
+- Priority: P3
+- Area: Cleanup
+- Added: 2026-08-13
+- Reason deferred: both correctly require `role === "ADMIN"` server-side
+  (`debug-db` also 404s outside `NODE_ENV !== "production"`), so neither
+  is exploitable by an unauthenticated or non-admin actor — cleanup, not
+  a vulnerability.
+- Context: `src/app/api/debug/media-usage/route.ts` (comment: "DEBUG
+  ENDPOINT - Remove after debugging"), `src/app/api/admin/debug-db/route.ts`.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: remove both once no longer needed for debugging, or
+  document why they should stay.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-092] `/ui-lab-admin` reachable on public surface with no auth guard
+
+- Status: OPEN
+- Priority: P3
+- Area: Cleanup / Security hygiene
+- Added: 2026-08-13
+- Reason deferred: no real business/user data is rendered (static
+  component/pattern demos only), and the site-wide noindex header already
+  in place for the first-PROD preview covers it. Cosmetic
+  info-exposure-of-internal-UI-patterns concern only.
+- Context: `src/app/(ui)/ui-lab-admin/page.tsx` has no auth check and no
+  `layout.tsx` guard; it lives outside the `/admin` path prefix so the
+  admin-surface routing doesn't gate it either.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: gate behind an admin/dev check, or remove from the
+  build for production, before broader public traffic.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-093] Debug `console.log` leftovers logging child PII in `children/[id]/route.ts`
+
+- Status: OPEN
+- Priority: P3
+- Area: Privacy hygiene
+- Added: 2026-08-13
+- Reason deferred: ownership/auth checks in this same file are correct
+  (`parentId: user.id` filter present on every operation) — this is a
+  logging-hygiene issue, not an access-control bug, and not
+  attacker-reachable.
+- Context: `src/app/api/children/[id]/route.ts` — e.g. line 342
+  `console.log("Child details:", { id, name })`, line 92
+  `console.log("Request body:", body)` (includes child name/birthDate/
+  interests), throughout PUT/GET/DELETE handlers.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: remove or redact these debug logs so child
+  name/birthdate don't land in server stdout.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-094] `PlanItem` has no `@@unique` on its dedup keys — narrow TOCTOU duplicate-row race
+
+- Status: OPEN
+- Priority: P3
+- Area: Data integrity
+- Added: 2026-08-13
+- Reason deferred: dedup is enforced only in application code (`findFirst`
+  then `create`, e.g. `src/server/services/plan.service.ts:110-137`); a
+  rapid double-submit has a narrow race window that could produce a
+  duplicate `PlanItem` row. No data loss, no money involved, cosmetic at
+  worst.
+- Context: `PlanItem` has indexes on `[userId, activityId]` /
+  `[userId, planRouteSlug]` / `[userId, planPlaceSlug]` but no `@@unique`.
+- Current state: not started.
+- Dependencies: needs a hand-written migration per this repo's Prisma
+  rules (`prisma migrate dev`/`db push` forbidden — see `CLAUDE.md`).
+- Acceptance criteria: add the appropriate `@@unique` constraint(s) via a
+  hand-written migration, with dedup of any existing duplicate rows first.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-095] `scripts/dev/seed-demo-data.ts` not code-guarded against accidental PROD invocation
+
+- Status: OPEN
+- Priority: P3
+- Area: Data integrity / Safety net
+- Added: 2026-08-13
+- Reason deferred: not wired into any auto-run path (`db:seed:demo` is a
+  manual `pnpm` script, not in `docker-entrypoint.sh`), so it can only run
+  against PROD via deliberate operator misuse — same class of risk as any
+  admin script. Low priority, informational.
+- Context: marked "DEV/STAGING ONLY" in a comment but not code-enforced,
+  unlike its sibling `scripts/modules/import/dev/clear-import-data.ts`
+  (`clearImportDataDevOnly()`), which throws if `NODE_ENV !==
+  "development"`.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add the same `NODE_ENV !== "development"` guard
+  used by `clearImportDataDevOnly()`.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-096] Admin list views (`admin/content/places`, `admin/content/events`) lack pagination
+
+- Status: OPEN
+- Priority: P3
+- Area: Performance
+- Added: 2026-08-13
+- Reason deferred: admin-only, internal traffic, and current row counts
+  (83 places, 10 activities in DEV) make this a non-issue today.
+- Context: `src/app/admin/content/places/page.tsx:81`
+  (`prisma.place.findMany` with `include` of city/business/revisions, no
+  `take`), `src/app/admin/content/events/page.tsx:81` similarly for
+  `Activity`.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add `take`/pagination before content volume grows
+  into the hundreds/thousands.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-097] `UserEvent` `CARD_VIEW` writes not debounced/batched for logged-in users
+
+- Status: OPEN
+- Priority: P3
+- Area: Performance / Analytics cost
+- Added: 2026-08-13
+- Reason deferred: each query is trivial (indexed lookup + upsert), not
+  dangerous at current/expected first-PROD traffic — worth a fix only if
+  traffic grows.
+- Context: every `CARD_VIEW` analytics event (fired once per card via
+  `IntersectionObserver` in `AnalyticsCardViewTracker.tsx`) triggers
+  `applyUserBehaviorEvent`
+  (`UserBehaviorAggregationService.ts:128`), which does a `findUnique` +
+  upsert against `UserBehaviorProfile` per event — i.e. 1 insert + 1 read
+  + 1 upsert per interaction, not debounced/batched. Scrolling a 20–40
+  card feed as a logged-in user can generate that many individual
+  `/api/analytics/events` POSTs.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: debounce/batch `CARD_VIEW` writes client-side if
+  traffic growth makes this worth the complexity.
+- Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-098] No custom `not-found.tsx`/`error.tsx` anywhere in `src/app`
+
+- Status: OPEN
+- Priority: P3
+- Area: SEO / UX polish
+- Added: 2026-08-13
+- Reason deferred: safe as-is — Next.js's default fallback pages don't
+  leak stack traces or internal details in production — just unbranded.
+  45 call sites already use `notFound()` across the app, so this is a
+  pure presentation gap, not a functional or safety one.
+- Context: no `not-found.tsx`, `error.tsx`, or `global-error.tsx` exists
+  anywhere under `src/app`; every 404/500 falls back to Next's generic
+  default page.
+- Current state: not started.
+- Dependencies: none.
+- Acceptance criteria: add a branded `not-found.tsx` (and optionally
+  `error.tsx`) at the root of `src/app`, consistent with the site's
+  design system.
+- Source: Task 16 audit (Final Release Safety Audit)
