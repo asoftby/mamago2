@@ -3755,15 +3755,54 @@ parallel analytics architecture or fabricated metrics.**
 
 Priority: `P0 — MONEY / PROD BLOCKER`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `COMPLETE`
+AUDIT: First-PROD monetization is a prepaid BYN wallet with one paid product
+(Boost 1/3/7 days). Leads and ordinary publication are free. Action-based
+Promotion and online top-up/provider flows are disabled. Admin/manual credit
+is the only top-up path. Ledger (`BillingTransaction`) is source of truth;
+`depositBalance` is the cached operational balance. Canonical rule:
+`docs/business/monetization-mvp.md`.
+GAPS: No remaining Task 13 P0/P1 gap for first PROD.
+IMPLEMENTATION: Secure first-PROD monetization + locked beta Boost prices in
+runtime ENV (`BOOST_PRICE_1D_BYN=5`, `BOOST_PRICE_3D_BYN=12`,
+`BOOST_PRICE_7D_BYN=25`). Server-authoritative pricing; client submits option
+ID + request key only.
+COMMITS: `7b2c52fa` (feat(billing): secure first-prod monetization);
+`d184f4de` (fix(billing): lock first-prod boost prices); checklist closure
+commit follows this entry.
+VERIFICATION:
+- Canonical pricing 1d=5 / 3d=12 / 7d=25 BYN on DEV runtime ENV PASS
+- Server-authoritative pricing PASS (unsupported option rejected; no client amount)
+- Durations only 1/3/7 PASS
+- Admin/manual top-up PASS (`+50 BYN` credit with actor/reason/reference metadata)
+- Online top-up disabled PASS (`depositBalanceAction` hard-fails to manager path)
+- Leads FREE PASS (public booking created; balance unchanged; `LEAD_CHARGE`=0)
+- Ordinary publication FREE PASS (offer edit; no extra FEATURE_CHARGE)
+- Promotion disabled PASS (`paid_promotion_disabled`; no promotion debit)
+- Balance does not expire PASS (no `BillingAccount` expiry field; unused 8 BYN retained)
+- Credit idempotency PASS (same key → one SUCCEEDED credit)
+- Boost idempotency PASS (same requestKey → one Boost + one debit)
+- Insufficient balance PASS (7d rejected at balance 8; no Boost/debit)
+- Concurrency PASS (`100` then concurrent `80+80` → exactly one debit, balance `20`)
+- Disposable reconciliation PASS: `0 + 50 - 5 - 12 - 25 = 8`;
+  depositBalance=`8.00`; SUCCEEDED ledger sum=`8.00`; divergence=`0.00`
+- DEV-wide reconciliation PASS: accountsChecked=2, mismatched=0
+- Financial suite PASS: `pnpm test:billing-financial` → **12/12** on DEV DB
+  (local DB lacks `Boost.durationDays` — schema lag only; not a Task 13 defect)
+- `pnpm check:push` PASS (production build)
+DEV SMOKE: **Complete — verified 2026-08-13 on actual DEV host**
+`134.17.17.134` via SSH alias `mamago-prod` (no VPN). Running image
+`ghcr.io/asoftby/mamago2:dev-286`; OCI revision exactly
+`d184f4de4a8b3fa07f902749354ad868aec029e9`; `dev-app-1` running
+(RestartCount=0); `dev-db-1` healthy; internal health
+`{"status":"ok","db":"ok"}`. Disposable smoke prefix retained for audit trail
+(ledger rows not deleted): Business
+`cmsqyg77z0002s20nvlm240q6`, BillingAccount
+`cmsqyg7830004s20nqct0t3t5`, closing balance `8.00` BYN.
+BLOCKERS: none.
+BACKLOG/NOTES: Known separate historical DEV migrate noise
+`20260812190000_add_age_policy` / `P3018` enum-already-exists remains out of
+Task 13 scope (not fixed here). Task 14 not started. PROD untouched.
 
 ### Why this is mandatory
 
