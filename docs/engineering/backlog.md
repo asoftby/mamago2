@@ -2189,3 +2189,50 @@ P3 — cleanup / polish / optional
   sites are switched to a runtime-safe helper. Never bake `dev.mamago.by`
   into a PROD image.
 - Source: Task 14 Phase A environment audit
+
+## [BACKLOG-080] `RouteMapHero` still uses legacy `DirectionsService`/`DirectionsRenderer`
+
+- Status: OPEN
+- Priority: P3
+- Area: Google Maps / Routes
+- Added: 2026-08-13
+- Reason deferred: not release-blocking — `renderDirections()` already wraps
+  the legacy Directions call in try/catch and silently falls back to a plain
+  `Polyline` between stops on any failure (including a Directions API not
+  enabled/blocked error), so there is no unhandled runtime error and no
+  console spam on the public route detail page. The fallback just draws a
+  straight line instead of the actual walking/driving path.
+- Context: `src/components/routes/RouteMapHero.tsx` (`renderDirections`).
+  Routes API (New) is already enabled on the mamaGo 2.0 Google Cloud project;
+  a proper migration would call the Routes API's `computeRoutes` endpoint
+  instead of `google.maps.DirectionsService`.
+- Current state: legacy Directions path live in production code, silent
+  polyline fallback in place.
+- Dependencies: none.
+- Acceptance criteria: `RouteMapHero` renders an actual routed polyline via
+  Routes API (New) instead of the straight-line fallback, with the same
+  graceful degradation on failure.
+- Source: Task 14 Google Maps/Places P1 audit
+
+## [BACKLOG-081] Legacy `google.maps.Marker` fallback still present in map components
+
+- Status: OPEN
+- Priority: P3
+- Area: Google Maps / Places
+- Added: 2026-08-13
+- Reason deferred: harmless now that BACKLOG-079-adjacent Map ID env fix
+  (Task 14 Google P1) landed — `NEXT_PUBLIC_GOOGLE_MAP_ID` resolves correctly
+  everywhere, so `AdvancedMarkerElement` is the live path in all four map
+  components and the legacy `google.maps.Marker` branch is dead-but-harmless
+  defensive code for the case `mapId` is ever unset again in some future
+  environment.
+- Context: `PlaceMapModal.tsx`, `PlaceMapPreview.tsx`,
+  `EventLocationMapModal.tsx`, `EventLocationMapPreview.tsx` all branch on
+  `mapId ? AdvancedMarkerElement : google.maps.Marker`.
+- Current state: fallback branch present, not currently reachable in a
+  correctly configured environment.
+- Dependencies: none.
+- Acceptance criteria: product/eng decision on whether to keep the defensive
+  fallback permanently or remove it now that the env contract is fixed; if
+  removed, delete the fallback branch in all four components together.
+- Source: Task 14 Google Maps/Places P1 audit

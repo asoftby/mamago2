@@ -129,6 +129,7 @@
     "search:reindex": "tsx scripts/search-reindex.ts",
     "media:backfill-migrated-metadata": "tsx scripts/backfill-migrated-media-metadata.ts",
     "test:media-metadata-backfill": "tsx src/lib/media/isTechnicalMediaTitle.test.ts && tsx src/lib/media/decideMigratedMediaMetadataPatch.test.ts",
+    "test:google-maps-config": "tsx src/services/googleMaps/googleMapsConfigContract.test.ts && tsx src/services/googleMaps/toLegacyAddressComponents.test.ts",
     "prepare": "husky",
     "check:push": "pnpm build",
     "check:no-old-social-links": "sh -c 'OLD_URL=$(printf \"%s%s\" \"https://www.tiktok.com/\" \"@mamago.by\"); if git grep -n \"$OLD_URL\" -- src prisma public .env.example; then echo \"Old TikTok URL found in tracked source/example files\"; exit 1; fi'"

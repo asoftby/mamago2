@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
-import { Input } from "@/components/ui/input";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import { GoogleMapsService } from "@/services/googleMaps";
+import { toLegacyAddressComponents, type NewAddressComponent } from "@/services/googleMaps/toLegacyAddressComponents";
+import { cn } from "@/lib/utils";
 
 interface PlaceSearchInputProps {
   onPlaceSelect: (data: {
@@ -18,76 +19,253 @@ interface PlaceSearchInputProps {
   initialValue?: string; // Initial address to display
 }
 
-export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: PlaceSearchInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+type PlaceAutocompleteElementCtor = new () => HTMLElement & {
+  value?: string;
+  focus?: () => void;
+};
 
-  // Set initial value when component mounts or initialValue changes
+type PlaceAutocompleteSelectionEvent = Event & {
+  placePrediction?: {
+    toPlace?: () => {
+      id?: string;
+      displayName?: string;
+      formattedAddress?: string;
+      location?: {
+        lat?: number | (() => number);
+        lng?: number | (() => number);
+      };
+      addressComponents?: NewAddressComponent[];
+      fetchFields?: (input: { fields: string[] }) => Promise<void>;
+    };
+  };
+  detail?: {
+    placePrediction?: {
+      toPlace?: () => {
+        id?: string;
+        displayName?: string;
+        formattedAddress?: string;
+        location?: {
+          lat?: number | (() => number);
+          lng?: number | (() => number);
+        };
+        addressComponents?: NewAddressComponent[];
+        fetchFields?: (input: { fields: string[] }) => Promise<void>;
+      };
+    };
+  };
+};
+
+const PLACE_SEARCH_WIDGET_CLASS = "mg-place-search-autocomplete-widget";
+
+function readCoordinate(value: number | (() => number) | undefined): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "function") {
+    const resolved = value();
+    return Number.isFinite(resolved) ? resolved : null;
+  }
+  return null;
+}
+
+export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: PlaceSearchInputProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const fallbackInputRef = useRef<HTMLInputElement>(null);
+  const widgetRef = useRef<(HTMLElement & { value?: string; focus?: () => void }) | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const onPlaceSelectRef = useRef(onPlaceSelect);
+  const [isWidgetReady, setIsWidgetReady] = useState(false);
+
   useEffect(() => {
-    if (inputRef.current && initialValue) {
-      inputRef.current.value = initialValue;
-    }
-  }, [initialValue]);
+    onPlaceSelectRef.current = onPlaceSelect;
+  }, [onPlaceSelect]);
 
   const initAutocomplete = useCallback(async () => {
-    if (!inputRef.current || !(inputRef.current instanceof HTMLInputElement)) return;
+    if (widgetRef.current) return;
+
+    const host = hostRef.current;
+    if (!host) return;
 
     try {
-      const placesLib = await GoogleMapsService.getPlacesLibrary();
+      const placesLib = (await GoogleMapsService.getPlacesLibrary()) as google.maps.PlacesLibrary & {
+        PlaceAutocompleteElement?: PlaceAutocompleteElementCtor;
+      };
 
-      const input = inputRef.current;
-      if (!input || !(input instanceof HTMLInputElement)) return;
+      const PlaceAutocompleteElement = placesLib.PlaceAutocompleteElement;
+      if (!PlaceAutocompleteElement) return;
 
-      // TODO(google-maps-tech-debt): migrate from deprecated Autocomplete to PlaceAutocompleteElement
-      // after we finish stabilizing the geo options + enrichment flow in Place Wizard step 2.
-      const autocomplete = new placesLib.Autocomplete(input, {
-        types: ["geocode", "establishment"],
-        fields: ["place_id", "name", "geometry", "formatted_address", "address_components"],
-        componentRestrictions: { country: "by" },
-      });
+      const widget = new PlaceAutocompleteElement();
+      widgetRef.current = widget;
 
-      autocompleteRef.current = autocomplete;
+      widget.setAttribute("placeholder", "Адрес или название места");
+      widget.setAttribute("aria-label", "Адрес или название места");
+      widget.setAttribute("included-region-codes", "by");
+      widget.setAttribute("requested-language", "ru");
+      widget.setAttribute("requested-region", "by");
 
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        
-        if (!place.place_id || !place.geometry?.location) {
+      if (disabled) {
+        widget.setAttribute("disabled", "");
+      }
+
+      if (initialValue) {
+        widget.value = initialValue;
+        widget.setAttribute("value", initialValue);
+      }
+
+      widget.classList.add(PLACE_SEARCH_WIDGET_CLASS);
+      widget.style.display = "block";
+      widget.style.width = "100%";
+      widget.style.colorScheme = "light";
+      widget.style.backgroundColor = "#FFFFFF";
+      widget.style.color = "#1F1F1F";
+
+      const handlePlaceSelect = async (event: Event) => {
+        const selectEvent = event as PlaceAutocompleteSelectionEvent;
+        const prediction = selectEvent.placePrediction ?? selectEvent.detail?.placePrediction;
+
+        const place = prediction?.toPlace?.();
+        if (!place) return;
+
+        try {
+          await place.fetchFields?.({
+            fields: ["id", "displayName", "formattedAddress", "location", "addressComponents"],
+          });
+        } catch (error) {
+          console.error("[PlaceSearchInput] Place fetch error:", error);
           return;
         }
 
-        onPlaceSelect({
-          googlePlaceId: place.place_id,
-          placeName: place.name || "",
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-          formattedAddr: place.formatted_address || "",
-          addressJson: place.address_components || [],
+        const lat = readCoordinate(place.location?.lat);
+        const lng = readCoordinate(place.location?.lng);
+        if (!place.id || lat === null || lng === null) return;
+
+        onPlaceSelectRef.current({
+          googlePlaceId: place.id,
+          placeName: place.displayName || place.formattedAddress || "",
+          lat,
+          lng,
+          formattedAddr: place.formattedAddress || "",
+          addressJson: toLegacyAddressComponents(place.addressComponents),
         });
-      });
+      };
+
+      widget.addEventListener("gmp-select", handlePlaceSelect);
+      widget.addEventListener("gmp-placeselect", handlePlaceSelect);
+
+      host.innerHTML = "";
+      host.appendChild(widget);
+      setIsWidgetReady(true);
+
+      cleanupRef.current = () => {
+        widget.removeEventListener("gmp-select", handlePlaceSelect);
+        widget.removeEventListener("gmp-placeselect", handlePlaceSelect);
+        if (host.contains(widget)) {
+          host.removeChild(widget);
+        }
+        widgetRef.current = null;
+        cleanupRef.current = null;
+        setIsWidgetReady(false);
+      };
     } catch (err) {
       console.error("[PlaceSearchInput] Init error:", err);
     }
-  }, [onPlaceSelect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     initAutocomplete();
     return () => {
-      if (autocompleteRef.current && typeof google !== "undefined") {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
+      cleanupRef.current?.();
     };
   }, [initAutocomplete]);
 
+  // Keep the widget's disabled attribute and value in sync with props after it mounts
+  useEffect(() => {
+    const widget = widgetRef.current;
+    if (!widget) return;
+    if (disabled) {
+      widget.setAttribute("disabled", "");
+    } else {
+      widget.removeAttribute("disabled");
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    const widget = widgetRef.current;
+    if (!widget || initialValue === undefined) return;
+    if (widget.value !== initialValue) {
+      widget.value = initialValue;
+    }
+  }, [initialValue]);
+
   return (
-    <div className="relative">
-      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-      <Input
-        id="place-location-search"
-        ref={inputRef}
-        placeholder="Адрес или название места"
-        className="pl-10"
-        disabled={disabled}
-      />
+    <div id="place-location-search" className="relative">
+      <style>{`
+        .${PLACE_SEARCH_WIDGET_CLASS} {
+          color-scheme: light;
+          background-color: #ffffff;
+          color: #1f1f1f;
+        }
+
+        .${PLACE_SEARCH_WIDGET_CLASS}::part(input-field) {
+          background-color: #ffffff;
+          color: #1f1f1f;
+        }
+
+        .${PLACE_SEARCH_WIDGET_CLASS}::part(predictions) {
+          background-color: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          box-shadow: 0 16px 40px rgba(31, 31, 31, 0.12);
+        }
+
+        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item) {
+          background-color: #ffffff;
+          color: #1f1f1f;
+        }
+
+        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item-match) {
+          color: #1f1f1f;
+        }
+
+        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item-selected) {
+          background-color: #f3f4f6;
+          color: #1f1f1f;
+        }
+
+        .${PLACE_SEARCH_WIDGET_CLASS}::part(prediction-item-icon) {
+          color: #6b6b6b;
+        }
+      `}</style>
+
+      <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+      <div
+        className={cn(
+          "border-input focus-within:border-ring focus-within:ring-ring/50 h-10 w-full rounded-md border bg-white pl-10 pr-3 shadow-xs focus-within:ring-[3px]",
+          "flex items-center text-sm",
+          !isWidgetReady && "hidden",
+        )}
+      >
+        <div ref={hostRef} className="w-full" />
+      </div>
+
+      {!isWidgetReady ? (
+        <input
+          ref={fallbackInputRef}
+          type="text"
+          placeholder="Адрес или название места"
+          disabled={disabled}
+          defaultValue={initialValue}
+          autoComplete="off"
+          className={cn(
+            "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full min-w-0 rounded-md border bg-white px-3 py-2 text-base leading-none shadow-xs outline-none md:text-sm dark:bg-input/30",
+            "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+            "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+            "pl-10",
+          )}
+        />
+      ) : null}
     </div>
   );
 }

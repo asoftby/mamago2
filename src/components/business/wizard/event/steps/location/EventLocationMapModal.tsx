@@ -68,7 +68,7 @@ export function EventLocationMapModal({
     }
 
     try {
-      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
 
       if (mapId) {
         const markerLib = await GoogleMapsService.getMarkerLibrary();
@@ -116,7 +116,7 @@ export function EventLocationMapModal({
 
       const center = initialPin ?? { lat: 53.9045, lng: 27.5615 };
 
-      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
 
       const map = new mapsLib.Map(mapRef.current, {
         center,
@@ -128,7 +128,8 @@ export function EventLocationMapModal({
       });
 
       mapInstanceRef.current = map;
-      geocoderRef.current = new google.maps.Geocoder();
+      const geocodingLib = await GoogleMapsService.getGeocodingLibrary();
+      geocoderRef.current = new geocodingLib.Geocoder();
 
       await new Promise<void>((resolve) => {
         google.maps.event.addListenerOnce(map, "idle", () => resolve());

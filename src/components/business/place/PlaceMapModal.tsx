@@ -65,7 +65,7 @@ export function PlaceMapModal({
     }
 
     try {
-      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
 
       if (mapId) {
         const markerLib = await GoogleMapsService.getMarkerLibrary();
@@ -115,7 +115,7 @@ export function PlaceMapModal({
 
       const center = initialPin ?? { lat: 53.9045, lng: 27.5615 };
 
-      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
 
       const map = new mapsLib.Map(mapRef.current, {
         center,
