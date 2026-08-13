@@ -17,30 +17,34 @@ two documents or their processes.
 ## RELEASE STATUS (update this block as work proceeds)
 
 ```
-DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
-PROD:  NOT READY
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
 
-Active task:        Task 17 (Final DEV → PROD Gate) — STATUS: `BLOCKED`
-                     (2026-08-13). Phase 1 (release candidate identity):
-                     `origin/dev` HEAD `567d4cf5`, CI green, most recent
-                     actual Docker image build is `ghcr.io/asoftby/
-                     mamago2:dev-293` (digest
-                     `sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`),
-                     OCI revision `86154ddc` — `567d4cf5` is docs-only on
-                     top of it (`docker.yml`'s `paths-ignore` correctly
-                     skipped it), so `dev-293`'s app state already equals
-                     what `567d4cf5` would produce, including Task 16's
-                     security fixes (`ed9546aa`). Phase 2 (critical DEV
-                     deployment check, read-only SSH): actual `dev-app-1`
-                     is running `dev-291` / revision `a9577c0c` — the
-                     pre-Task-15 image, predating the Task 16 security
-                     fixes entirely; `dev-293` isn't even pulled on the
-                     host yet. Per this task's own mandatory rule: STOPPED
-                     before Final Browser Smoke. **Owner action required:
-                     pull + deploy `ghcr.io/asoftby/mamago2:dev-293` to
-                     DEV via Telegram**, then Task 17 can resume at Phase
-                     3. No code changed, no P0/P1 found, Tasks 1–16 not
-                     reopened. Full evidence in Task 17's own entry below.
+Active task:        Task 17 (Final DEV → PROD Gate) — STATUS: `COMPLETE`
+                     (2026-08-13). All 7 phases green. VERIFIED_APP_SHA =
+                     `86154ddc`, DEV_IMAGE = `ghcr.io/asoftby/
+                     mamago2:dev-293`, digest
+                     `sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`.
+                     Task was initially BLOCKED (running DEV was on stale
+                     `dev-291`/`a9577c0c`, predating Task 16's security
+                     fixes) — owner manually deployed `dev-293` via
+                     Telegram; re-check confirmed
+                     RUNNING_DEV_REVISION == RELEASE_SHA, then Phases 3–7
+                     ran clean: Git gate clean, `prisma validate` clean
+                     (231 migrations, unchanged), `pnpm check:push` green
+                     (389/389 static pages), targeted Task 16 regression
+                     tests green, full DEV browser smoke green on the
+                     actual verified image (public/user flows fully
+                     exercised incl. a real end-to-end registration
+                     proving the register-rate-limit fix shipped; business/
+                     admin RBAC isolation confirmed live; mobile clean; zero
+                     hydration/500/redirect-loop/Google-Maps errors),
+                     deployment readiness cross-checked against the Task 15
+                     runbook (disk 7.1G free, not a collapse). **P0 = 0, P1
+                     = 0.** PROD deployment has **not** been performed —
+                     next step is owner-controlled, via Telegram, per the
+                     Task 15 runbook. Full evidence in Task 17's own entry
+                     below.
 Prior — Task 15.5 (BACKLOG-085 closure — pre-deploy backup live
                      verification) — STATUS: DONE (2026-08-13). Live
                      backup + disposable-DB restore both verified green;
@@ -152,14 +156,23 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
 Last updated:       2026-08-13
-Last updated by:    Claude Code — BACKLOG-085 CLOSED DONE. Live end-to-end
+Last updated by:    Claude Code — Task 17 CLOSED COMPLETE. Final DEV → PROD
+                     gate: owner deployed `dev-293` to DEV via Telegram
+                     (resolving the initial BLOCKED state where DEV ran
+                     stale `dev-291`); re-verified match, then ran Git/
+                     Prisma/application/browser-smoke/deployment-readiness
+                     gates, all green, on the actual verified release
+                     candidate. DEV: VERIFIED, PROD:
+                     READY_FOR_MANUAL_DEPLOY. PROD has NOT been deployed —
+                     next step is owner-controlled via Telegram, per the
+                     Task 15 runbook.
+Prior — Claude Code — BACKLOG-085 CLOSED DONE. Live end-to-end
                      test of `scripts/deploy/backup-remote-db.sh` against
                      `dev-db-1` (real backup, checksummed, content
                      verified) plus a restore test against a disposable
                      throwaway local Postgres container (never DEV/PROD,
                      never the local dev DB) — both green, no code fix
-                     needed. Zero unresolved P0/P1 remain. Task 17 is
-                     next, not started.
+                     needed.
 Prior — Claude Code — Task 16 CLOSED COMPLETE. Final release
                      safety audit across all 7 areas; 4 confirmed new P1s
                      found and fixed (Next.js CVEs, sharp CVEs, register
@@ -239,14 +252,20 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–16 CLOSED COMPLETE. **P0 = 0, P1 = 0.**
-                     BACKLOG-085 (the last unresolved P1, live end-to-end
-                     verification of `scripts/deploy/backup-remote-db.sh`)
-                     is CLOSED DONE — live backup + disposable-DB restore
-                     both verified green this session, no code fix
-                     needed. PROD remains NOT READY only because Task 17
-                     (the final gate itself) has not run yet — not because
-                     of any open P0/P1. Task 17 TODO, not started.
+Unresolved P0/P1:   Tasks 1–17 CLOSED COMPLETE. **P0 = 0, P1 = 0.**
+                     BACKLOG-085 (the last P1) is CLOSED DONE. Task 17
+                     (final gate) is COMPLETE — Git, Prisma, application,
+                     DEV browser smoke, and deployment-readiness gates all
+                     green on VERIFIED_APP_SHA `86154ddc` /
+                     `ghcr.io/asoftby/mamago2:dev-293`.
+
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+
+PROD deployment has NOT been performed. Per this checklist's own §23 Stop
+Condition: do not start a new general audit, do not look for additional
+improvements, do not start on the backlog, do not expand this checklist.
+Hand readiness for manual PROD deployment to the project owner.
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -4480,11 +4499,16 @@ each fix.
 
 Priority: `P0`
 
-STATUS: `BLOCKED` (2026-08-13) — Phase 1/2 (release candidate identity +
-critical DEV deployment check) complete; STOPPED per this task's own
-mandatory rule before Final Browser Smoke because actual running DEV does
-not match the release candidate. Not an app defect — an un-deployed image,
-owner action required.
+STATUS: `COMPLETE` (2026-08-13) — all 7 phases green. Owner manually
+deployed `dev-293` to DEV via Telegram; resumed at Phase 2 re-check,
+confirmed match, proceeded through Phase 7. P0 = 0, P1 = 0.
+
+```
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+```
+
+This is **not** a PROD launch. First PROD deploy has not been performed.
 AUDIT: **Phase 1 — Release candidate identity.** `origin/dev` HEAD =
 `567d4cf5` (docs-only closure of BACKLOG-085 — touches only
 `docs/engineering/backlog.md` + `docs/release/dev-to-prod-checklist.md`,
@@ -4517,32 +4541,124 @@ pre-Task-15 commit (Task 14's own closure image) — it **predates**
 `ed9546aa` (Task 16's security fixes) entirely. `docker images` on the
 host shows only `dev-287` through `dev-291` pulled — `dev-293` has not
 even been pulled yet, let alone deployed.
-GAPS: **RUNNING_DEV_REVISION (`a9577c0c`, `dev-291`) ≠ RELEASE_SHA
-(`86154ddc`, `dev-293`)**. Per this task's own mandatory rule, this is a
-hard stop: Final Browser Smoke must not proceed against a DEV deployment
-that predates the Task 16 security fixes — a smoke pass there would not
-prove anything about the actual release candidate. This is an
-**operational gap (un-deployed image), not a new application defect** —
-no new P0/P1 finding, Tasks 1–16 are not reopened.
-IMPLEMENTATION: None — Claude Code does not perform DEV deployment (owner
-rule, Task 15 runbook §1/§5: deploy is manual, via Telegram).
-COMMITS: None this session (blocked before any code change was needed).
-VERIFICATION: Phase 1/2 evidence above, gathered read-only (`gh run list`/
-`gh run view --log` for CI/image evidence; `ssh mamago-prod docker
-inspect`/`docker images` for the live DEV state). No PROD action, no DEV
-deploy, no destructive operation performed.
-DEV SMOKE: NOT STARTED — blocked, see GAPS. Must not run until
-`RUNNING_DEV_REVISION == RELEASE_SHA`.
-BLOCKERS: **Owner action required**: pull and deploy
-`ghcr.io/asoftby/mamago2:dev-293` (digest
-`sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`)
-to the DEV compose project (`/opt/mamago/dev` on `mamago-prod`), via
-Telegram per the existing deploy mechanism. Once
-`dev-app-1`'s `org.opencontainers.image.revision` label reads
-`86154ddc5ff17f2381103b6e18f5f049e1fb6a87`, Task 17 can resume at Phase 3
-(Git final gate) through Phase 6 (Final DEV Browser Smoke).
-BACKLOG/NOTES: None new. BACKLOG-086 (P2, disk/LVM) remains open,
-untouched, not in scope.
+GAPS: (historical, resolved) At the point above, RUNNING_DEV_REVISION
+(`a9577c0c`, `dev-291`) ≠ RELEASE_SHA (`86154ddc`, `dev-293`) — hard stop
+per this task's own mandatory rule. **Owner deployed `dev-293` to DEV
+manually via Telegram.** Re-check (read-only SSH, same method as above):
+`dev-app-1` now reports `Image: ghcr.io/asoftby/mamago2:dev-293`,
+`Revision: 86154ddc5ff17f2381103b6e18f5f049e1fb6a87`, `Version: dev-293`,
+`Status: running`, `RestartCount: 0`, `StartedAt:
+2026-08-13T19:41:45Z`; `dev-db-1`: `Status: running Health: healthy
+RestartCount: 0`. **RUNNING_DEV_REVISION == RELEASE_SHA confirmed** — Task
+17 resumed at Phase 3. No new P0/P1 at any point; Tasks 1–16 not reopened.
+
+**Phase 3 — Git/Repository final gate.** Branch `dev`; HEAD == origin/dev
+== `d58f7ac0` (the intermediate BLOCKED-status closure commit written
+before the owner's redeploy); working tree clean; no untracked files;
+`git diff --check` clean.
+
+**Phase 4 — Database/Prisma final gate.** `npx prisma validate` →
+"The schema at prisma/schema.prisma is valid". 231 migrations under
+`prisma/migrations/` — unchanged count from Task 16's full-inventory scan
+(confirmed via `git log -- prisma/`: no migration files touched since
+before Task 15). Migration mechanism, backup/restore path
+(BACKLOG-085 DONE, live-verified this release cycle), and destructive-
+migration handling (2 confirmed pending on PROD, documented in Task 15's
+runbook) all already established — not re-audited from scratch. Old-image
+rollback after a destructive migration remains explicitly NOT assumed
+safe (Task 15 runbook §6a) — no change to that finding.
+
+**Phase 5 — Application final automated gate.** `pnpm check:push`
+(= `pnpm build`) green: `✓ Compiled successfully`, `Finished TypeScript`,
+all 389 static pages generated, zero errors. Targeted regression tests
+green: `pnpm test:rate-limit`,
+`src/app/api/auth/register/rateLimit.integration.test.ts`,
+`src/app/api/auth/login/pendingActivation.integration.test.ts` (all real-DB
+integration tests from Task 16, re-run against current code — no
+regression). CI evidence already recorded in Phase 1 (`ci.yml` green for
+`567d4cf5`).
+
+**Phase 6 — Final actual DEV browser smoke** (real `https://dev.mamago.by`,
+confirmed running `dev-293`/`86154ddc` per the Phase 2 re-check above — not
+a local mock, not an older image). PUBLIC: homepage (real weather/events/
+articles), Events listing, Event detail (full pricing/venue/countdown/
+schedule), Place detail (via search — no dedicated `/[city]/places`
+listing route by design, confirmed in Task 16's SEO audit), Blog listing,
+Article detail (full content incl. pricing/contact sections), Routes
+listing, Search (live results across events + places, highlighted match),
+Filters (category chips visible/functional on events + classes listings)
+— all GREEN. USER: real registration + session
+(`task17-smoke-test@example.invalid`, disposable test account) on the
+live `dev-293` image itself proves the Task 16 register-rate-limit fix
+shipped without breaking the happy path; My Ideas, My Plan, Day Scenario —
+all GREEN, correct empty states, all API calls 200. BUSINESS/ADMIN: no
+real business/admin credentials available this session — verified instead
+that RBAC isolation holds on the **live deployed image**: `/business` and
+the `business.` subdomain cleanly redirect a plain USER account back to
+their own account (no leak, no crash); `/admin` does the same. This
+matches Task 16's exhaustive code-level audit (all 193 `admin/**` routes
+gated) — this smoke additionally confirms it holds at runtime on the
+actual release candidate. The Place inquiry/claim modal ("Отправить
+заявку") renders and accepts input correctly (business-onboarding entry
+point). MOBILE (375px): homepage, Events/discovery listing, My Plan — all
+GREEN, no layout breakage, sticky bottom nav intact. CONSOLE/NETWORK
+(entire session): zero hydration errors, zero uncaught
+exceptions/TypeErrors, zero 500s, zero auth redirect loops, zero Google
+Maps errors (`RefererNotAllowedMapError`/`InvalidKeyMapError`/
+`LegacyApiNotActivatedMapError` — none found). The only 4xx traffic seen:
+expected 401s from `/api/save/status` for guest (pre-login) visitors
+checking their own save-state (correct, not a bug), and one expected 404
+for `/minsk/places` (not a real route by design — falls back to Next's
+safe default 404 page, no leak; matches known BACKLOG-098). SEO/PREVIEW
+SAFETY: `X-Robots-Tag: noindex, nofollow` confirmed on the live homepage
+response; `https://dev.mamago.by/robots.txt` returns `Disallow: /`; no
+`mamago.by` domain was touched at any point this session; WordPress
+untouched.
+
+**Phase 7 — Deployment readiness cross-check.** All Task 15 runbook
+items re-confirmed still valid: release SHA/image/digest known (above),
+deploy-source rule (`dev` re-tagged `prod-N`, no rebuild) unchanged,
+backup path verified (BACKLOG-085 DONE), migration diagnostics/
+destructive-migration handling documented, rollback decision tree
+unchanged, owner-only Telegram deploy boundary preserved (the owner
+performed the DEV redeploy manually, exactly per that rule — Claude Code
+did not deploy). Disk: `df -h /` on `mamago-prod` = 28G total, 20G used,
+**7.1G free (74%)** — down from 8.8G at Task 15/16 time, consistent with
+pulling one new ~2GB image; not a collapse, not a new finding. BACKLOG-086
+(P2, LVM expansion before full media/content migration) remains open and
+untouched — out of Task 17's scope, no LVM operation performed.
+IMPLEMENTATION: None — no code change was needed anywhere in this task;
+Claude Code did not perform DEV or PROD deployment at any point (the
+DEV redeploy to `dev-293` was owner-performed via Telegram, per rule).
+COMMITS: `d58f7ac0` (intermediate BLOCKED-status checklist update, written
+before the owner's redeploy) — this closure entry will be a further
+docs-only commit; see COMMIT DISCIPLINE below for why the checklist's
+final HEAD legitimately differs from VERIFIED_APP_SHA.
+VERIFICATION: All phases above, full evidence inline. `git status --short`
+/ `git diff --check` clean throughout. No PROD action, no destructive
+operation, no unrelated work performed.
+DEV SMOKE: GREEN — see Phase 6 above. Confirmed against the actual
+verified release candidate (`dev-293` / `86154ddc`), not a stale or mock
+deployment.
+BLOCKERS: None. Task 17 exit criteria fully met.
+BACKLOG/NOTES: None new — no P2/P3 findings surfaced during this task
+(cosmetic/tooling glitches encountered during smoke, e.g. one transient
+blank Browser-pane screenshot and one untraceable favicon-like 404, were
+confirmed non-reproducible/non-functional and are not filed). BACKLOG-086
+(P2, disk/LVM) remains open, untouched, not in scope.
+
+**IMPORTANT — VERIFIED_APP_SHA vs. checklist closure HEAD (read before
+relying on this entry):** The actually-deployed-and-smoked release
+candidate is **VERIFIED_APP_SHA = `86154ddc`, DEV_IMAGE =
+`ghcr.io/asoftby/mamago2:dev-293`** (digest
+`sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`).
+This task's own closure commit (docs-only, see COMMITS) moves
+`origin/dev`'s HEAD forward past that SHA. That is expected and does
+**not** invalidate this verification and does **not** require the owner
+to redeploy DEV again before a PROD deploy — `docker.yml`'s
+`paths-ignore` guarantees a docs-only commit produces no new image, so
+`dev-293` remains the correct, current, fully-verified image to promote
+to `prod-N` per the Task 15 runbook whenever the owner is ready.
 
 Start only after Tasks 1–16 are complete and no unresolved P0/P1 remain.
 This is the single full final release gate.
