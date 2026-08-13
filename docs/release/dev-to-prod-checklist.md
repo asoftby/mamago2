@@ -20,29 +20,32 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        BACKLOG-085 closure (pre-deploy backup live
-                     verification) — STATUS: DONE (2026-08-13). SSH to
-                     `mamago-prod` was stable this session. Ran
-                     `scripts/deploy/backup-remote-db.sh mamago-prod
-                     dev-db-1` live: exit 0, non-empty 810K `.sql.gz`,
-                     `gzip -t` valid, `.sha256` present and verified,
-                     content confirmed to be a genuine complete
-                     PostgreSQL dump (155 `CREATE TABLE` / 155 `COPY`,
-                     proper header/footer), confirmed nothing written to
-                     the remote host's disk. Restore path tested against
-                     a disposable, throwaway local `postgres:16-alpine`
-                     container (never the real local dev DB, never
-                     DEV/PROD) — restore exit 0, zero errors, 155 tables
-                     present, sanity row counts read back correctly;
-                     disposable container removed immediately after. No
-                     code fix was needed — the script worked exactly as
-                     documented on the first live run. No PROD migration,
-                     PROD deploy, PROD DB change, or destructive restore
-                     against DEV/PROD was performed. BACKLOG-085 closed
-                     DONE with full evidence recorded there. **P0 = 0, P1
-                     = 0.** Task 16 remains COMPLETE (unchanged). Task 17
-                     remains TODO, not started this session. PROD remains
-                     NOT READY (Task 17 itself has not run).
+Active task:        Task 17 (Final DEV → PROD Gate) — STATUS: `BLOCKED`
+                     (2026-08-13). Phase 1 (release candidate identity):
+                     `origin/dev` HEAD `567d4cf5`, CI green, most recent
+                     actual Docker image build is `ghcr.io/asoftby/
+                     mamago2:dev-293` (digest
+                     `sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`),
+                     OCI revision `86154ddc` — `567d4cf5` is docs-only on
+                     top of it (`docker.yml`'s `paths-ignore` correctly
+                     skipped it), so `dev-293`'s app state already equals
+                     what `567d4cf5` would produce, including Task 16's
+                     security fixes (`ed9546aa`). Phase 2 (critical DEV
+                     deployment check, read-only SSH): actual `dev-app-1`
+                     is running `dev-291` / revision `a9577c0c` — the
+                     pre-Task-15 image, predating the Task 16 security
+                     fixes entirely; `dev-293` isn't even pulled on the
+                     host yet. Per this task's own mandatory rule: STOPPED
+                     before Final Browser Smoke. **Owner action required:
+                     pull + deploy `ghcr.io/asoftby/mamago2:dev-293` to
+                     DEV via Telegram**, then Task 17 can resume at Phase
+                     3. No code changed, no P0/P1 found, Tasks 1–16 not
+                     reopened. Full evidence in Task 17's own entry below.
+Prior — Task 15.5 (BACKLOG-085 closure — pre-deploy backup live
+                     verification) — STATUS: DONE (2026-08-13). Live
+                     backup + disposable-DB restore both verified green;
+                     no code fix needed. Full detail in BACKLOG-085
+                     (`docs/engineering/backlog.md`).
 Prior — Task 16 (Final Release Safety Audit) — STATUS:
                      COMPLETE. Read-only audit across all 7 areas
                      (Security, Data Integrity, Core Business Logic,
@@ -4477,15 +4480,69 @@ each fix.
 
 Priority: `P0`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `BLOCKED` (2026-08-13) — Phase 1/2 (release candidate identity +
+critical DEV deployment check) complete; STOPPED per this task's own
+mandatory rule before Final Browser Smoke because actual running DEV does
+not match the release candidate. Not an app defect — an un-deployed image,
+owner action required.
+AUDIT: **Phase 1 — Release candidate identity.** `origin/dev` HEAD =
+`567d4cf5` (docs-only closure of BACKLOG-085 — touches only
+`docs/engineering/backlog.md` + `docs/release/dev-to-prod-checklist.md`,
+confirmed via `git show --stat`). CI (`ci.yml`) green for `567d4cf5`
+(run `31727920764`, `conclusion=success`). `docker.yml` did **not** run
+for `567d4cf5` — expected: its `paths-ignore: docs/**, **/*.md` correctly
+skips a docs-only push. The most recent actual image build is for
+`86154ddc` (Task 16 closure commit, itself docs-only but pushed in the
+same `git push` as `ed9546aa` — the real Task 16 code fix — so
+`paths-ignore` correctly did not skip that push): `docker.yml` run
+`31726878923`, `conclusion=success`, produced
+`ghcr.io/asoftby/mamago2:dev-293` /
+`ghcr.io/asoftby/mamago2:dev`, digest
+`sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`,
+OCI `org.opencontainers.image.revision=86154ddc5ff17f2381103b6e18f5f049e1fb6a87`
+(verified from the workflow's own `docker buildx build` invocation log,
+not assumed). Since `567d4cf5` is docs-only relative to `86154ddc`,
+`dev-293`'s application state is identical to what a build from
+`567d4cf5` would produce — includes Task 16's security fixes (`next`
+16.2.11, `sharp` 0.35.3, `/api/auth/register` rate limit, Place PATCH
+stack-trace fix). **VERIFIED_APP_SHA = `86154ddc`, DEV_IMAGE =
+`ghcr.io/asoftby/mamago2:dev-293`** (checklist-closure HEAD `567d4cf5`
+remains the repo SHA; these are intentionally different, see COMMIT
+DISCIPLINE below). **Phase 2 — Critical DEV deployment check (read-only
+SSH).** `dev-app-1` is actually running `ghcr.io/asoftby/mamago2:dev-291`,
+OCI revision `a9577c0c211fd040915e53d727db388d37c23df2`, version
+`dev-291`, `Status=running`, `RestartCount=0`, healthy `dev-db-1`
+(`Status=running Health=healthy RestartCount=0`). `a9577c0c` is the
+pre-Task-15 commit (Task 14's own closure image) — it **predates**
+`ed9546aa` (Task 16's security fixes) entirely. `docker images` on the
+host shows only `dev-287` through `dev-291` pulled — `dev-293` has not
+even been pulled yet, let alone deployed.
+GAPS: **RUNNING_DEV_REVISION (`a9577c0c`, `dev-291`) ≠ RELEASE_SHA
+(`86154ddc`, `dev-293`)**. Per this task's own mandatory rule, this is a
+hard stop: Final Browser Smoke must not proceed against a DEV deployment
+that predates the Task 16 security fixes — a smoke pass there would not
+prove anything about the actual release candidate. This is an
+**operational gap (un-deployed image), not a new application defect** —
+no new P0/P1 finding, Tasks 1–16 are not reopened.
+IMPLEMENTATION: None — Claude Code does not perform DEV deployment (owner
+rule, Task 15 runbook §1/§5: deploy is manual, via Telegram).
+COMMITS: None this session (blocked before any code change was needed).
+VERIFICATION: Phase 1/2 evidence above, gathered read-only (`gh run list`/
+`gh run view --log` for CI/image evidence; `ssh mamago-prod docker
+inspect`/`docker images` for the live DEV state). No PROD action, no DEV
+deploy, no destructive operation performed.
+DEV SMOKE: NOT STARTED — blocked, see GAPS. Must not run until
+`RUNNING_DEV_REVISION == RELEASE_SHA`.
+BLOCKERS: **Owner action required**: pull and deploy
+`ghcr.io/asoftby/mamago2:dev-293` (digest
+`sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`)
+to the DEV compose project (`/opt/mamago/dev` on `mamago-prod`), via
+Telegram per the existing deploy mechanism. Once
+`dev-app-1`'s `org.opencontainers.image.revision` label reads
+`86154ddc5ff17f2381103b6e18f5f049e1fb6a87`, Task 17 can resume at Phase 3
+(Git final gate) through Phase 6 (Final DEV Browser Smoke).
+BACKLOG/NOTES: None new. BACKLOG-086 (P2, disk/LVM) remains open,
+untouched, not in scope.
 
 Start only after Tasks 1–16 are complete and no unresolved P0/P1 remain.
 This is the single full final release gate.
