@@ -20,12 +20,13 @@ two documents or their processes.
 DEV:   MEDIA DATASET VERIFIED (actual dev.mamago.by)
 PROD:  NOT READY
 
-Active task:        Task 11 (Article Gallery Visual Types) — STATUS:
-                     COMPLETE. Carousel, Mosaic, and full-width Sequential
-                     shipped in `390fefeb`; DEV `dev-283` OCI revision matches
-                     exactly. Focused tests, canonical build, local editor/
-                     public/legacy desktop+375px smoke, and owner-approved DEV
-                     verification are green. No DB migration was required.
+Active task:        Task 14 (Environment Parity / PROD Configuration) —
+                     STATUS: AUDIT_COMPLETE. Phase A read-only audit found
+                     confirmed P0/P1 first-PROD config gaps. No config or
+                     application fixes in this phase. Task 14 remains open
+                     for owner-approved Phase B. Task 15 untouched.
+Prior — Task 13 (Monetization) COMPLETE (`177429d3`). Task 12 COMPLETE.
+Prior — Task 11 (Article Gallery) COMPLETE (`390fefeb` / DEV `dev-283`).
 Prior — Task 9 (Filters & Quick Access) — STATUS:
                      COMPLETE. Owner-approved Events-first implementation is
                      finished: fixed quick filters, code-owned typed semantics,
@@ -75,9 +76,9 @@ Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
                      entry below.
 Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
                      and 13; renumbered the former Tasks 12–15 to 14–17.
-Last updated:       2026-08-12
-Last updated by:    Codex — Task 11 CLOSED COMPLETE after DEV `dev-283`
-                     revision proof and owner approval of sufficient DEV smoke.
+Last updated:       2026-08-13
+Last updated by:    Cursor — Task 14 Phase A AUDIT_COMPLETE (P0/P1 remain;
+                     no PROD/DEV config writes). Tasks 12–13 already COMPLETE.
 Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
                      Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
                      via the existing SaveActivityFlowAdaptive chooser) and
@@ -143,8 +144,9 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–11 are CLOSED, COMPLETE. Tasks 12–17 remain TODO,
-                     not started.
+Unresolved P0/P1:   Tasks 1–13 CLOSED COMPLETE. Task 14 AUDIT_COMPLETE with
+                     confirmed P0/P1 (host/cookie identity, OTP_SECRET,
+                     Boost prices, Telegram env names). Tasks 15–17 TODO.
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -3950,15 +3952,66 @@ money cannot be charged or mutated ambiguously or unsafely.**
 
 Priority: `P0 — PROD BLOCKER`
 
-STATUS: `TODO`
-AUDIT: —
-GAPS: —
-IMPLEMENTATION: —
-COMMITS: —
-VERIFICATION: —
-DEV SMOKE: —
-BLOCKERS: —
-BACKLOG/NOTES: —
+STATUS: `AUDIT_COMPLETE`
+AUDIT: EXISTING isolation is real (separate compose projects `dev`/`prod`,
+separate DB names/users/volumes/networks, separate media volumes). PERSISTENT
+PROD config (`/opt/mamago/prod/.env` + compose Traefik labels) does **not**
+match current `origin/dev` production contract. CURRENT PROD runtime is the
+old image `prod-152` / `ec157f86` (expected drift). No OAuth providers in
+current code. Secrets reported as SET/MISSING/SAME/DIFFERENT only.
+GAPS: Confirmed P0/P1 below. Do not close Task 14 until Phase B lands and is
+re-verified. Proposed Phase B is config-only unless owner chooses a
+`prod.mamago.by` first target that also needs host-matching code.
+IMPLEMENTATION: none this phase (read-only audit).
+COMMITS: docs-only audit milestone (this Task 14 field update + backlog).
+VERIFICATION: SSH `mamago-prod` → host `ubuntu` / `134.17.17.134`; DEV dir
+`/opt/mamago/dev`; PROD dir discovered via compose labels as
+`/opt/mamago/prod`. Runtime env presence matched persistent `.env`. No
+writes, no restarts, no migrations.
+DEV SMOKE: not applicable (audit-only; no deploy).
+BLOCKERS: owner decision on first-PROD host (`prod.mamago.by` vs cutover to
+`mamago.by`) before any persistent PROD `.env` / Traefik change. Do **not**
+set `APP_ENV=production` on the current `prod.mamago.by` stack — code would
+scope cookies to `.mamago.by`, which is still WordPress at `134.17.16.78`.
+BACKLOG/NOTES: BACKLOG-037 PROD `OTP_SECRET` confirmed MISSING. New P2/P3:
+BACKLOG-073..079.
+
+P0:
+1. Production host/cookie identity vs persistent PROD config. Code production
+   contract is `mamago.by` / `admin.mamago.by` / `business.mamago.by` and
+   `APP_ENV=production` → cookie `Domain=.mamago.by`, `Secure=true`. Persistent
+   PROD Traefik is `prod.mamago.by` / `admin.prod.mamago.by` /
+   `business.prod.mamago.by`; `APP_PUBLIC_URL=https://prod.mamago.by`;
+   `APP_ENV` MISSING; `AUTH_COOKIE_DOMAIN` MISSING. DNS: `mamago.by` →
+   `134.17.16.78`; `admin.mamago.by`/`business.mamago.by` have no A record;
+   this host 404s those Host headers. Middleware host-match is only
+   `admin.mamago.by`/`business.mamago.by` (so `admin.prod.mamago.by/` →
+   `/minsk`). Blind `APP_ENV=production` on current stack would leak session
+   cookies onto live WordPress `mamago.by`.
+P1:
+2. `OTP_SECRET` PROD persistent+runtime MISSING (DEV SET, DIFFERENT required).
+   Business phone verification fail-closed. Confirms BACKLOG-037.
+3. `BOOST_PRICE_{1D,3D,7D}_BYN` PROD MISSING (DEV SET 5/12/25). Task 13
+   first-PROD monetization would deploy with Boost purchase disabled.
+4. Telegram: current code reads `TELEGRAM_BOT_TOKEN_PROD` /
+   `TELEGRAM_WEBHOOK_SECRET_PROD` (NODE_ENV=production). Persistent env has
+   legacy unsuffixed `TELEGRAM_BOT_TOKEN` only; `_PROD`/`_DEV` MISSING.
+   Webhook URL empty. DEV and PROD tokens SAME. First PROD of current code
+   would drop Telegram unless renamed/isolated.
+5. Google Maps browser key is a **build-arg**, not runtime `.env`. DEV image
+   `dev-286` has key baked (AIza present in `/app/.next/static`). Future PROD
+   image must receive GHA secrets at build. Google Cloud HTTP-referrer
+   restrictions for `mamago.by` / `admin.mamago.by` / `business.mamago.by`:
+   `UNVERIFIED_EXTERNAL_CONFIG`.
+6. `SITE_INDEXING_ENABLED` MISSING both envs → global noindex (correct for
+   `prod.mamago.by`; required `true` at `mamago.by` cutover or launch stays
+   noindex).
+
+Isolation PROOF (not a gap): DEV `db=devmamago` `172.19.0.2` volume
+`dev_db_dev_data` / media `dev_mamago2_storage`; PROD `db=prodmamago`
+`172.20.0.2` volume `prod_db_prod_data` / media `prod_mamago2_storage`;
+cross-name DNS fails; DB passwords DIFFERENT. Postgres `0.0.0.0:5432` is
+internet-filtered from laptop (P2 BACKLOG-075).
 
 Goal: never let DEV work while PROD breaks due to environment differences.
 AUDIT FIRST environment-specific dependencies. Build a matrix:

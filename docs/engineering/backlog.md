@@ -934,7 +934,8 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-037] `OTP_SECRET` environment variable — DEV resolved, PROD still needs its own independent value
 
-- Status: PARTIALLY RESOLVED (DEV done 2026-08-09; PROD portion OPEN, P1)
+- Status: PARTIALLY RESOLVED (DEV done 2026-08-09; PROD portion OPEN, P1 —
+  confirmed MISSING by Task 14 Phase A 2026-08-13)
 - Priority: P1 (PROD readiness — must be verified before first PROD deploy)
 - Area: Environment Parity / Business Onboarding / Secrets
 - Added: 2026-08-09
@@ -956,18 +957,15 @@ P3 — cleanup / polish / optional
   Business Analytics ownership-isolation smoke.
 - **Remaining requirement (P1, blocks first PROD deploy):** PROD must
   receive its **own independent** `OTP_SECRET` value — never the same
-  secret as DEV's, never copied between environments. Not yet verified
-  whether PROD already has one set (this session did not check PROD's
-  environment — DEV-only per owner instruction). This must be explicitly
-  covered by **Task 12 — Environment Parity / PROD Configuration**'s own
-  audit (`docs/release/dev-to-prod-checklist.md`) when that task starts —
-  add `OTP_SECRET` to Task 12's env-variable parity matrix
-  (LOCAL/DEV/PROD requirement/verified) rather than assuming DEV's fix
-  extends to PROD.
+  secret as DEV's, never copied between environments. Task 14 Phase A
+  (2026-08-13) confirmed PROD persistent `/opt/mamago/prod/.env` and
+  `prod-app-1` runtime: `OTP_SECRET=MISSING`. DEV remains SET. No value
+  was printed or copied. Phase B must generate a new PROD secret in the
+  existing PROD env mechanism.
 - Acceptance criteria (remaining): PROD confirmed to have its own
   independently-generated `OTP_SECRET` (existence checked the same
   read-only way — never comparing/printing values), verified as part of
-  Task 12, before first PROD deployment.
+  Task 14 Phase B, before first PROD deployment.
 - Source: owner-reported and owner-directed fix, during Task 3 (Publication
   Analytics) deployed-DEV smoke.
   smoke session.
@@ -2061,3 +2059,133 @@ P3 — cleanup / polish / optional
   tests plus direct DB reconciliation.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 12 analytics audit,
   2026-08-12.
+
+## [BACKLOG-073] Public Prisma Studio on Traefik (`studio.dev` / `studio.prod`)
+
+- Status: OPEN
+- Priority: P2
+- Area: Environment / Security
+- Added: 2026-08-13
+- Reason deferred: does not block first PROD of the application itself; Studio
+  is basic-auth gated. Still an internet-facing DB GUI on the same host.
+- Context: compose labels publish `studio.dev.mamago.by` and
+  `studio.prod.mamago.by` via Traefik `websecure`. Live probe: HTTP 401 +
+  `WWW-Authenticate: Basic`. DEV and PROD use the same basic-auth users hash.
+- Current state: both `dev-prisma-studio-1` and `prod-prisma-studio-1` are Up.
+- Dependencies: none.
+- Acceptance criteria: Studio is not publicly routed on PROD (or is IP-restricted
+  with unique credentials); DEV/PROD basic-auth secrets are independent.
+- Source: Task 14 Phase A environment audit
+
+## [BACKLOG-074] Host env-file hygiene on `/opt/mamago/dev` and leftover NEXTAUTH keys
+
+- Status: OPEN
+- Priority: P2
+- Area: Environment / Secrets
+- Added: 2026-08-13
+- Reason deferred: not a first-PROD application-config blocker; current code
+  does not read `NEXTAUTH_*`.
+- Context: DEV `.env` is mode `0777`; several `.env.bak-*` copies exist in
+  `/opt/mamago/dev`. Persistent env still contains unused `NEXTAUTH_SECRET` /
+  `NEXTAUTH_URL` (DEV vs PROD secret SAME).
+- Current state: observed 2026-08-13; files not modified this audit.
+- Dependencies: none.
+- Acceptance criteria: DEV `.env` is not world-writable; stale backups removed
+  or locked down; unused NextAuth keys removed from both env files after
+  confirming no remaining runtime reader.
+- Source: Task 14 Phase A environment audit
+
+## [BACKLOG-075] PROD Postgres published on `0.0.0.0:5432`
+
+- Status: OPEN
+- Priority: P2
+- Area: Environment / Database
+- Added: 2026-08-13
+- Reason deferred: laptop TCP probe to `134.17.17.134:5432` was
+  FILTERED/CLOSED, so this is not a proven internet-open P0. Compose still
+  publishes the port; DEV does not.
+- Context: `/opt/mamago/prod/docker-compose.yml` `ports: ["5432:5432"]` on
+  `prod-db-1`. Host `ss` shows listen on `0.0.0.0:5432` and `[::]:5432`.
+  UFW/iptables were not readable without sudo.
+- Current state: internet-filtered from auditor laptop; still an unnecessary
+  publish surface.
+- Dependencies: none. Do not change live PROD compose without a dedicated
+  maintenance window (would recreate the DB container if done carelessly).
+- Acceptance criteria: PROD DB is not published on the public interface;
+  access remains on `prod_prod_net` only.
+- Source: Task 14 Phase A environment audit
+
+## [BACKLOG-076] Dual Google Map ID env names (`NEXT_PUBLIC_GOOGLE_MAP_ID` vs `..._MAPS_MAP_ID`)
+
+- Status: OPEN
+- Priority: P2
+- Area: Google Maps / Build-time config
+- Added: 2026-08-13
+- Reason deferred: Maps JavaScript API still loads via
+  `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`; AdvancedMarker in some wizards reads a
+  different Map ID name than Dockerfile/GHA bake.
+- Context: Docker/GHA bake `NEXT_PUBLIC_GOOGLE_MAP_ID`. Place/Event map
+  components read `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID`. `RouteMapHero` reads
+  `NEXT_PUBLIC_GOOGLE_MAP_ID`.
+- Current state: first-PROD maps depend on the baked API key (P1/build), not
+  on unifying Map ID names.
+- Dependencies: none.
+- Acceptance criteria: one Map ID env name used by Dockerfile, GHA, and all
+  map components.
+- Source: Task 14 Phase A environment audit
+
+## [BACKLOG-077] Leftover `/api/debug/media-usage` is reachable in production for ADMIN
+
+- Status: OPEN
+- Priority: P2
+- Area: Security / Debug
+- Added: 2026-08-13
+- Reason deferred: ADMIN-gated, does not expose env secrets; still a debug
+  endpoint that should not ship.
+- Context: `src/app/api/debug/media-usage/route.ts` has no `NODE_ENV`
+  production 404. `/api/debug/cookies` correctly 404s when
+  `NODE_ENV=production`.
+- Current state: present on `origin/dev`.
+- Dependencies: none.
+- Acceptance criteria: endpoint removed or hard-404 outside local development.
+- Source: Task 14 Phase A environment audit
+
+## [BACKLOG-078] No scheduler invokes `/api/cron/*`; `CRON_SECRET` MISSING
+
+- Status: OPEN
+- Priority: P2
+- Area: Cron / Jobs
+- Added: 2026-08-13
+- Reason deferred: first PROD can run without plan-digest / reminders /
+  broadcast auto-publish / temp-media cleanup. Current code fail-closes cron
+  routes in `NODE_ENV=production` without `CRON_SECRET` (503).
+- Context: four routes under `src/app/api/cron/`. Host has no user crontab,
+  no ofelia/watchtower, no app timers. Distinct from BACKLOG-035 (behavior
+  segment recompute has no caller).
+- Current state: DEV and PROD persistent `CRON_SECRET=MISSING`.
+- Dependencies: product decision which jobs are required post-launch.
+- Acceptance criteria: each first-needed job has exactly one scheduler, a
+  per-environment `CRON_SECRET`, and no dual DEV+PROD firing at the same
+  target.
+- Source: Task 14 Phase A environment audit
+
+## [BACKLOG-079] `NEXT_PUBLIC_APP_URL` is not a Docker build-arg
+
+- Status: OPEN
+- Priority: P2
+- Area: Docker / Canonical URLs
+- Added: 2026-08-13
+- Reason deferred: many helpers fall back to `https://mamago.by` when the
+  public var is unset at build, which is the desired PROD origin. Runtime
+  `APP_PUBLIC_URL` covers emails/`getCanonicalPublicAppUrl`. Not a silent
+  DEV-URL bake into PROD today because GHA does not pass this ARG.
+- Context: Dockerfile bakes only Google Maps `NEXT_PUBLIC_*`. Canonical sync
+  (`syncEntityCanonical.ts`) reads `NEXT_PUBLIC_APP_URL` directly.
+- Current state: DEV/PROD persistent env set `APP_PUBLIC_URL` but not
+  `NEXT_PUBLIC_APP_URL`.
+- Dependencies: owner-chosen first-PROD public origin (Task 14 Phase B).
+- Acceptance criteria: PROD image build receives the intended public origin
+  for any client/middleware inlined `NEXT_PUBLIC_APP_URL`, or those call
+  sites are switched to a runtime-safe helper. Never bake `dev.mamago.by`
+  into a PROD image.
+- Source: Task 14 Phase A environment audit
