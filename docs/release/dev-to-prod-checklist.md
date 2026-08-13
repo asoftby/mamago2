@@ -35,9 +35,17 @@ Active task:        Task 15 (Deployment & Rollback Readiness) — STATUS:
                      re-confirmed (8.8G free/28G) with a cheaper fix than
                      previously assumed: the physical disk already has
                      ~70G unpartitioned — local LVM extension, not a cloud
-                     resize; not executed, owner `sudo` action. P0 = 0,
-                     P1 = 1 (disk headroom, non-blocking for this task's
-                     own scope). Task 16 not started.
+                     resize; reclassified P2 — mandatory prerequisite
+                     before full media/content migration or cutover, not a
+                     first-PROD-preview blocker (Task 15's own scope has no
+                     media/content migration step). P0 = 0. **1 unresolved
+                     P1 remains: BACKLOG-085** (live end-to-end
+                     verification of `scripts/deploy/backup-remote-db.sh`
+                     — must fix before PROD; required before any
+                     destructive PROD migration / the first real deploy's
+                     migration step). PROD remains NOT READY. Task 16 not
+                     started; Task 17 must not start until BACKLOG-085 is
+                     resolved.
 Prior — Task 14 (Environment Parity / PROD Configuration) — STATUS:
                      COMPLETE. All confirmed P0/P1 first-PROD config gaps
                      closed and owner-smoked on deployed DEV: DEV/PROD
@@ -181,9 +189,13 @@ Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
                      pre-existing Docker build-arg gap affecting all Google
                      Maps features (`5bd4371b`, `dev-269`) — full detail in
                      Task 4's own section below.
-Unresolved P0/P1:   Tasks 1–15 CLOSED COMPLETE, zero unresolved P0
-                     (Task 15 carries 1 non-blocking P1, disk headroom —
-                     see Task 15 entry). Tasks 16–17 TODO (not started).
+Unresolved P0/P1:   Tasks 1–15 CLOSED COMPLETE, zero unresolved P0. **1
+                     unresolved P1: BACKLOG-085** (live end-to-end
+                     verification of `scripts/deploy/backup-remote-db.sh`
+                     — must fix before PROD; see Task 15 entry). PROD
+                     remains NOT READY until it is resolved. Task 16 TODO
+                     (not started). Task 17 must not start until
+                     BACKLOG-085 is resolved.
 ```
 
 Do not hand-wave this block. It must reflect the actual current state of
@@ -4140,9 +4152,14 @@ only during deployment.
 Priority: `P0 — PROD BLOCKER`
 
 STATUS: `COMPLETE` — deployment/rollback architecture fully audited, one real
-owner decision resolved, one real gap (safe remote DB backup) closed. P0 = 0,
-P1 = 1 (disk headroom — pre-existing, tracked, non-blocking for this scope).
-Full detail: `docs/release/task15-deployment-rollback-runbook.md`.
+owner decision resolved, one real gap (safe remote DB backup) closed. P0 = 0.
+**1 unresolved P1: BACKLOG-085** (live end-to-end verification of
+`scripts/deploy/backup-remote-db.sh` — must fix before PROD, before any
+destructive PROD migration / the first real deploy's migration step). Disk
+headroom is **not** a P1 for this task — reclassified P2, see GAPS/BACKLOG
+below. PROD remains NOT READY until BACKLOG-085 is resolved; Task 17 must
+not start until then. Full detail:
+`docs/release/task15-deployment-rollback-runbook.md`.
 AUDIT: DEV+PROD share one host (`134.17.17.134`, `/opt/mamago/dev` +
 `/opt/mamago/prod` compose projects) and one disk (28G LV, 8.8G free —
 confirmed the underlying virtual disk is already 100G, only 28.2G is
@@ -4194,29 +4211,32 @@ the script is trusted for the first real PROD backup. `git diff --check`
 clean.
 DEV SMOKE: N/A — docs/runbook/script only, no application code changed, no
 deployment performed (per task scope: audit and plan only).
-BLOCKERS: None for Task 15 itself. Real pre-first-deploy blocker carried
-forward: `scripts/deploy/backup-remote-db.sh` must be live-verified once
-SSH access is stable (BACKLOG-085) before it is relied on as the pre-deploy
-backup step; PROD's exact live `_prisma_migrations` state must be
-re-confirmed at actual pre-flight time (never assumed from this audit —
-the runbook's own §3 already requires this regardless).
+BLOCKERS: Task 15's own exit criteria (a clear, documented plan) are met —
+nothing blocks this task's `COMPLETE` status. **PROD readiness is still
+blocked**, separately: `scripts/deploy/backup-remote-db.sh` must be
+live-verified once SSH access is stable (BACKLOG-085, P1 — must fix before
+PROD) before it is relied on as the pre-deploy backup step, and before any
+destructive PROD migration / the first real deploy's migration step runs.
+PROD's exact live `_prisma_migrations` state must also be re-confirmed at
+actual pre-flight time regardless (runbook §3).
 BACKLOG/NOTES: BACKLOG-082 (compose files not version-controlled, P2),
 BACKLOG-083 (stale Phoenix/migration containers+images on the shared host,
 P2), BACKLOG-084 (no Docker `HEALTHCHECK` on app containers, P3),
-BACKLOG-085 (live-test `backup-remote-db.sh`, P1, see BLOCKERS). Disk
-headroom itself is not a new backlog entry — it's the same pre-existing
-capacity finding from before this task, now with a cheaper confirmed fix
-(local LVM extension, not a cloud resize); exact commands in the runbook
-§7, execution is an owner `sudo` action, not performed this session.
+BACKLOG-085 (live-test `backup-remote-db.sh` — **P1, unresolved, must fix
+before PROD**, see BLOCKERS), BACKLOG-086 (disk headroom — reclassified
+**P2**: not a first-PROD-preview blocker since Task 15's scope has no
+media/content migration step, but a mandatory prerequisite before any full
+media/content migration to PROD or the real `mamago.by` cutover; cheaper
+confirmed fix — local LVM extension, not a cloud resize — exact commands
+in runbook §7, execution is an owner `sudo` action, not performed this
+session).
 
-P1 (carried, non-blocking for this task's own exit criteria):
-1. Disk: root filesystem 8.8G free of 28G on the shared DEV+PROD host.
-   Sufficient for this task's narrow scope (docs/script only) and, per the
-   runbook, for a pre-flight-pruned app+schema-only deploy — but must be
-   resized (or at minimum re-pruned) before any full media/content
-   migration to PROD, per the prior capacity audit's own finding. Fix
-   identified as low-risk/local (see runbook §7); not executed — needs the
-   owner's own `sudo` session.
+Severity note (correction, 2026-08-13): an earlier version of this entry
+listed disk headroom as "P1, non-blocking" — that is a contradiction under
+this checklist's own §4 Severity Model (P1 = must fix before PROD; a truly
+non-blocking finding is P2 by definition). Corrected: disk headroom is
+BACKLOG-086 (P2). The one real unresolved P1 for PROD readiness is
+BACKLOG-085.
 
 This is NOT a deployment. Goal: know the safe path forward and back ahead of
 time. AUDIT FIRST the actual deployment architecture/process. Determine:

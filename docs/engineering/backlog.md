@@ -2328,11 +2328,54 @@ P3 — cleanup / polish / optional
   `pg_dump` over SSH straight into a local file so the dump never touches
   the host's disk. Logic reviewed line-by-line, but never executed against
   `dev-db-1`/`prod-db-1`.
-- Current state: not started.
+- Current state: not started. **Unresolved P1 — must fix before PROD**
+  (per checklist §4 Severity Model: P1 = substantial confirmed production
+  risk, must fix before PROD). Blocks Task 17 (Final DEV → PROD Gate) and
+  any destructive PROD migration / the first real deploy's migration step.
 - Dependencies: stable SSH access to `mamago-prod`.
 - Acceptance criteria: run `scripts/deploy/backup-remote-db.sh mamago-prod
   dev-db-1` once SSH is stable, confirm a non-empty, checksummed
   `.sql.gz` lands locally, and (separately, deliberately) confirm the
-  documented restore command works against a disposable/local DB before
-  this script is relied on for the first real PROD backup.
+  documented restore command works against a disposable/local DB. This
+  must be done **before** `pnpm prisma migrate deploy` is ever run against
+  PROD (the migration gap includes confirmed destructive migrations — see
+  Task 15's runbook §2) and before the first real deploy's migration step.
+- Source: Task 15 audit (Deployment & Rollback Readiness)
+
+## [BACKLOG-086] Disk headroom on shared DEV+PROD host — extend before full media/content migration or cutover
+
+- Status: OPEN
+- Priority: P2 — not a first-PROD-preview blocker (Task 15's own scope has
+  no media/content migration step), but a **mandatory prerequisite before
+  any full media/content migration to PROD or the real `mamago.by`
+  cutover**.
+- Area: Infrastructure / Disk
+- Added: 2026-08-13
+- Reason deferred: confirmed real by this session's read-only host audit,
+  but out of Task 15's own scope (deployment/rollback mechanics, not
+  media/content population — see Task 15's runbook §5, "media/content
+  import is explicitly out of scope for this first PROD preview").
+  Reclassified from an earlier "P1, non-blocking" mischaracterization —
+  per the checklist's own Severity Model (§4), P1 means "must fix before
+  PROD"; a genuinely non-blocking finding cannot also be P1. This is P2:
+  does not block the first-PROD preview, blocks a later phase.
+- Context: `134.17.17.134` (DEV+PROD shared host) root filesystem is a
+  28.2G LVM logical volume with 8.8G free, on top of a **100G physical
+  disk** — only `vda3` (28.2G) is partitioned/in the LVM volume group,
+  the remaining ~70G is already present but unpartitioned. This is a
+  **local LVM extension** (`growpart` + `pvresize` + `lvextend` +
+  `resize2fs`), not a cloud-provider resize — confirmed via `lsblk`/`df`
+  this session; exact commands (read-only topology confirmation first,
+  then the proposed extension to the previously-approved 80G target) are
+  in `docs/release/task15-deployment-rollback-runbook.md` §7. Not
+  `sudo`-executed this session (no non-interactive sudo available, and
+  it's a write operation on shared live infrastructure that needs the
+  owner's own session regardless).
+- Current state: not started.
+- Dependencies: owner's own `sudo` session on `mamago-prod`.
+- Acceptance criteria: root filesystem extended to the owner-approved 80G
+  target (or a deliberately re-confirmed different target), verified
+  read-only (`df -h`, `lsblk`, `vgs`/`lvs`) post-extension, **before** any
+  full Phoenix media/content migration is run against PROD or the real
+  `mamago.by` DNS cutover proceeds.
 - Source: Task 15 audit (Deployment & Rollback Readiness)
