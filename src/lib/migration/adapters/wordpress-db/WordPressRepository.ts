@@ -52,6 +52,21 @@ export type WordPressQueryExecutor = <T>(
   params?: readonly unknown[],
 ) => Promise<T[]>;
 
+/**
+ * Coerces a value that the tabular SSH-mysql executor may have left as a
+ * numeric-looking string (any column outside `connectExecutor.ts`'s
+ * `NUMERIC_COLUMNS` allowlist, e.g. `wp_usermeta.user_id`/`umeta_id`) into a
+ * real `number`. Accepts both an already-numeric value (a fake/test
+ * executor, or a future column that does get added to the allowlist) and a
+ * numeric string; returns `null` for anything else (empty string, `NaN`,
+ * non-integer, or a non-numeric value) so callers can skip a malformed row
+ * deterministically instead of keying a Map with `NaN`.
+ */
+function coerceMysqlNumericId(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
 function groupByPostId<T extends { post_id: number }>(rows: readonly T[]): Map<number, T[]> {
   const map = new Map<number, T[]>();
   for (const row of rows) {
@@ -301,6 +316,25 @@ export class WordPressRepository {
    * unique constraint on `(user_id, meta_key)` — if a user somehow has more
    * than one row for this key, the first one in `ORDER BY user_id, umeta_id`
    * (the earliest recorded value) wins; see `buildUserMetaQuery()`.
+   *
+   * `row.user_id`/`row.umeta_id` are normalized to real numbers here before
+   * being used as a Map key or returned — confirmed PROD bug (2026-08-15,
+   * avatar preview): the SSH `mysql --defaults-extra-file` tabular executor
+   * (`connectExecutor.ts`'s `NUMERIC_COLUMNS`) only coerces a fixed column
+   * allowlist that includes `post_id`/`meta_id` but not `user_id`/
+   * `umeta_id`, so every row actually arrives with `user_id` as the
+   * *string* `"14"` despite `WordPressUserMetaRow`'s `number` type. Building
+   * the Map straight off `row.user_id` therefore produced string keys, and
+   * every `avatarMetaByUser.get(row.ID)` lookup with a real `number` ID
+   * missed — 0/575 eligible, though the live source had 49 valid + 18
+   * broken-ref avatars. Fixed locally here (not by widening
+   * `NUMERIC_COLUMNS`) because that allowlist is also relied on by
+   * `WordPressVoxelReviewRow.user_id` (`buildVoxelPostReviewsQuery`), which
+   * currently only works because it never does numeric comparison/Map-
+   * keying on that field, just string interpolation
+   * (`normalizeReview.ts`) — changing the shared parser's behavior for an
+   * unrelated, already-working path to fix a bug only this new usermeta
+   * path has would be a wider, riskier change than necessary.
    */
   async getUserMetaByKey(userIds: readonly number[], metaKey: string): Promise<Map<number, WordPressUserMetaRow>> {
     const map = new Map<number, WordPressUserMetaRow>();
@@ -308,7 +342,18 @@ export class WordPressRepository {
     const { sql, params } = buildUserMetaQuery(userIds, metaKey);
     const rows = await this.executor<WordPressUserMetaRow>(sql, params);
     for (const row of rows) {
-      if (!map.has(row.user_id)) map.set(row.user_id, row);
+      const userId = coerceMysqlNumericId(row.user_id);
+      // Malformed/unparseable user_id: skip deterministically rather than
+      // create a NaN (or otherwise garbage) Map key.
+      if (userId === null) continue;
+      if (!map.has(userId)) {
+        // umeta_id is never used as a lookup key (only carried through on
+        // the returned row), so unlike user_id it doesn't need to gate
+        // inclusion — coerceMysqlNumericId(...) ?? NaN keeps it a `number`
+        // (satisfying WordPressUserMetaRow's type) even in the
+        // never-expected-in-practice malformed case.
+        map.set(userId, { ...row, user_id: userId, umeta_id: coerceMysqlNumericId(row.umeta_id) ?? NaN });
+      }
     }
     return map;
   }

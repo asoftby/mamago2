@@ -632,6 +632,92 @@ async function testUserMetaByKeyEmptyIdsSkipsExecutor() {
   assert.equal(calls.length, 0);
 }
 
+// ---------------------------------------------------------------------------
+// Regression: PROD avatar preview bug (2026-08-15).
+//
+// The real SSH `mysql --defaults-extra-file` tabular executor only coerces
+// a fixed column-name allowlist (`NUMERIC_COLUMNS` in connectExecutor.ts)
+// to `number` — `user_id`/`umeta_id` are not in it, so every row actually
+// arrives with `user_id` as the *string* "14", not the number 14, despite
+// `WordPressUserMetaRow`'s `number`-typed interface. This executor
+// reproduces that exact runtime shape (bypassing `createFakeExecutor()`'s
+// already-numeric fixtures, which cannot catch this) to prove
+// `getUserMetaByKey()` still keys its Map by the real numeric user id.
+// ---------------------------------------------------------------------------
+
+function createStringTypedUserMetaExecutor(
+  rawRows: ReadonlyArray<{ umeta_id: string; user_id: string; meta_key: string; meta_value: string | null }>,
+): WordPressQueryExecutor {
+  return (async (sql: string, params?: readonly unknown[]) => {
+    if (!sql.includes("FROM wp_usermeta")) throw new Error(`Unexpected query in test fake: ${sql}`);
+    const paramList = params ?? [];
+    const metaKey = paramList[paramList.length - 1] as string;
+    const userIds = new Set((paramList.slice(0, -1) as readonly string[]).map(String));
+    return rawRows.filter((row) => userIds.has(String(row.user_id)) && row.meta_key === metaKey);
+  }) as unknown as WordPressQueryExecutor;
+}
+
+async function testUserMetaByKeyCoercesMysqlTabularStringUserId() {
+  const executor = createStringTypedUserMetaExecutor([
+    { umeta_id: "123", user_id: "14", meta_key: "voxel:avatar", meta_value: "4445" },
+  ]);
+  const repo = new WordPressRepository(executor);
+
+  const map = await repo.getUserMetaByKey([14], "voxel:avatar");
+  const entry = map.get(14);
+  assert.notEqual(entry, undefined);
+  assert.equal(entry?.meta_value, "4445");
+  // Normalized to real numbers, not left as the strings the executor returned.
+  assert.equal(entry?.user_id, 14);
+  assert.equal(typeof entry?.user_id, "number");
+  assert.equal(entry?.umeta_id, 123);
+  assert.equal(typeof entry?.umeta_id, "number");
+}
+
+async function testUserMetaByKeyNumericUserIdAlsoWorks() {
+  // A fake/test executor (or a future NUMERIC_COLUMNS addition) may hand
+  // back already-numeric values — coercion must be a no-op there too.
+  const executor: WordPressQueryExecutor = (async (sql: string) => {
+    if (!sql.includes("FROM wp_usermeta")) throw new Error(`Unexpected query in test fake: ${sql}`);
+    return [{ umeta_id: 123, user_id: 14, meta_key: "voxel:avatar", meta_value: "4445" }];
+  }) as unknown as WordPressQueryExecutor;
+  const repo = new WordPressRepository(executor);
+
+  const map = await repo.getUserMetaByKey([14], "voxel:avatar");
+  assert.deepEqual(map.get(14), { umeta_id: 123, user_id: 14, meta_key: "voxel:avatar", meta_value: "4445" });
+}
+
+async function testUserMetaByKeyMultipleUsersDoNotConflict() {
+  const executor = createStringTypedUserMetaExecutor([
+    { umeta_id: "1", user_id: "14", meta_key: "voxel:avatar", meta_value: "100" },
+    { umeta_id: "2", user_id: "27", meta_key: "voxel:avatar", meta_value: "200" },
+    { umeta_id: "3", user_id: "138", meta_key: "voxel:avatar", meta_value: "300" },
+  ]);
+  const repo = new WordPressRepository(executor);
+
+  const map = await repo.getUserMetaByKey([14, 27, 138], "voxel:avatar");
+  assert.equal(map.size, 3);
+  assert.equal(map.get(14)?.meta_value, "100");
+  assert.equal(map.get(27)?.meta_value, "200");
+  assert.equal(map.get(138)?.meta_value, "300");
+}
+
+async function testUserMetaByKeyInvalidUserIdDoesNotCreateFalseMapKey() {
+  const executor = createStringTypedUserMetaExecutor([
+    // Malformed/garbage user_id — must never become a NaN (or otherwise
+    // bogus) Map key; the row is dropped deterministically instead.
+    { umeta_id: "1", user_id: "not-a-number", meta_key: "voxel:avatar", meta_value: "100" },
+    { umeta_id: "2", user_id: "", meta_key: "voxel:avatar", meta_value: "200" },
+    { umeta_id: "3", user_id: "14", meta_key: "voxel:avatar", meta_value: "300" },
+  ]);
+  const repo = new WordPressRepository(executor);
+
+  const map = await repo.getUserMetaByKey([14], "voxel:avatar");
+  assert.equal(map.size, 1);
+  assert.equal(map.get(14)?.meta_value, "300");
+  assert.equal([...map.keys()].some((key) => Number.isNaN(key)), false);
+}
+
 async function testLimitClamping() {
   assert.equal(clampLimit(undefined), DEFAULT_LIMIT);
   assert.equal(clampLimit(0), DEFAULT_LIMIT);
@@ -879,6 +965,10 @@ async function main() {
   await testRedirectsAndUsers();
   await testUserMetaByKeyPicksEarliestRowPerUser();
   await testUserMetaByKeyEmptyIdsSkipsExecutor();
+  await testUserMetaByKeyCoercesMysqlTabularStringUserId();
+  await testUserMetaByKeyNumericUserIdAlsoWorks();
+  await testUserMetaByKeyMultipleUsersDoNotConflict();
+  await testUserMetaByKeyInvalidUserIdDoesNotCreateFalseMapKey();
   await testLimitClamping();
 
   await testOfferBundleRegularHbProgram();
