@@ -123,6 +123,31 @@ const indexingSkippedResult = evaluateProductionMigrationGuard({
 assert.equal(indexingSkippedResult.passed, true);
 assert.deepEqual(indexingSkippedResult.issues, []);
 
+const prodImportProfile = resolveMigrationProfile({ profileName: "PROD_IMPORT" });
+const prodImportMissingConfirm = evaluateProductionMigrationGuard({
+  profile: prodImportProfile,
+  confirmProduction: false,
+  manifestPath: missingManifestPath,
+  appDir,
+  isIndexingBlocked: () => true,
+});
+assert.equal(prodImportMissingConfirm.passed, false);
+assert.deepEqual(
+  prodImportMissingConfirm.issues.map((issue) => issue.code),
+  ["PRODUCTION_CONFIRMATION_MISSING"],
+);
+
+const prodImportOk = evaluateProductionMigrationGuard({
+  profile: prodImportProfile,
+  confirmProduction: true,
+  manifestPath: missingManifestPath,
+  minRedirectRows: 900,
+  appDir,
+  isIndexingBlocked: () => true,
+});
+assert.equal(prodImportOk.passed, true);
+assert.deepEqual(prodImportOk.issues, []);
+
 rmSync(rootDir, { recursive: true, force: true });
 
 console.log("production migration guard tests: OK");

@@ -43,6 +43,7 @@ assert.equal(defaultProfileNameForEnvironment("PROD"), "PRODUCTION");
 
 assert.equal(parseMigrationProfileName("full_import"), "FULL_IMPORT");
 assert.equal(parseMigrationProfileName("dev-validation"), "DEV_VALIDATION");
+assert.equal(parseMigrationProfileName("prod-import"), "PROD_IMPORT");
 assert.equal(parseMigrationProfileName("bogus"), null);
 assert.equal(parseMigrationProfileName(undefined), null);
 
@@ -100,5 +101,16 @@ assert.match(formatted, /Media: FULL/);
 assert.match(formatted, /SEO: DRY_RUN/);
 assert.match(formatted, /Redirects: VALIDATE/);
 assert.match(formatted, /Validate only: NO/);
+
+const prodImport = resolveMigrationProfile({
+  env: fakeEnv({ APP_ENV: "production" }),
+  profileName: "PROD_IMPORT",
+});
+assert.equal(prodImport.name, "PROD_IMPORT");
+assert.equal(prodImport.environment, "PROD");
+assert.deepEqual(prodImport.mediaPolicy, MEDIA_POLICIES.FULL);
+assert.deepEqual(prodImport.seoPolicy, SEO_POLICIES.VALIDATE);
+assert.equal(prodImport.seoPolicy.requireIndexingEnabled, false);
+assert.deepEqual(prodImport.redirectPolicy, REDIRECT_POLICIES.VALIDATE);
 
 console.log("migration profile tests: OK");

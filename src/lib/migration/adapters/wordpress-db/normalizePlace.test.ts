@@ -251,7 +251,7 @@ function testRepeatedGalleryValuesPreserved() {
   assert.deepEqual(payload.media.galleryAttachmentIds, [111, 222, 333]);
 }
 
-function testLogoExcludedFromMediaOnlyWarned() {
+function testLogoIncludedInMediaRefs() {
   const record = normalizePlace(
     buildBundle({
       postMeta: {
@@ -264,11 +264,12 @@ function testLogoExcludedFromMediaOnlyWarned() {
   const payload = payloadOf(record);
   assert.equal(payload.media.thumbnailAttachmentId, 555);
   assert.deepEqual(payload.media.galleryAttachmentIds, [111, 222, 333]);
-  assert.ok(!record.mediaRefs?.includes("999"));
+  assert.equal(payload.media.logoAttachmentId, 999);
+  assert.ok(record.mediaRefs?.includes("999"));
 
-  const logoWarning = record.warnings?.find((warning) => warning.code === "PLACE_LOGO_EXCLUDED");
+  const logoWarning = record.warnings?.find((warning) => warning.code === "PLACE_LOGO_PRESENT");
   assert.ok(logoWarning);
-  assert.deepEqual(logoWarning?.details?.logoAttachmentIds, ["999"]);
+  assert.equal(logoWarning?.details?.logoAttachmentId, 999);
 }
 
 function testCategoryTermsNotMappedKeptAsSourceReferences() {
@@ -530,7 +531,8 @@ function testGoldenPlace5389HasExpectedSourceMediaIds() {
   const payload = payloadOf(record);
   assert.equal(payload.media.thumbnailAttachmentId, 5406);
   assert.equal(payload.media.galleryAttachmentIds.length, 14);
-  assert.ok(record.warnings?.some((w) => w.code === "PLACE_LOGO_EXCLUDED"));
+  assert.ok(record.warnings?.some((w) => w.code === "PLACE_LOGO_PRESENT"));
+  assert.equal(payload.media.logoAttachmentId, 5390);
 }
 
 function testGoldenPlace895HasGalleryButNoCover() {
@@ -567,7 +569,7 @@ function main() {
   testFullPlace();
   testMissingCoordinatesWarnsNotErrors();
   testRepeatedGalleryValuesPreserved();
-  testLogoExcludedFromMediaOnlyWarned();
+  testLogoIncludedInMediaRefs();
   testCategoryTermsNotMappedKeptAsSourceReferences();
   testLegacyFormattedPhoneNormalizedWithoutWarning();
   testInvalidPhoneWarnsAndKeepsRawEvidenceWithNullE164();

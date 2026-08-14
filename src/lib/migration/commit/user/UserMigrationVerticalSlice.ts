@@ -231,14 +231,20 @@ function safeNormalizedPayload(plan: UserMigrationPlan): Prisma.InputJsonValue {
   };
 }
 
-export async function writeUserMigration(prisma: PrismaClient, plan: UserMigrationPlan, sourceNamespace = "users-immutable-snapshot"): Promise<{ action: UserMigrationAction; targetId: string | null; recordId: string }> {
+export async function writeUserMigration(
+  prisma: PrismaClient,
+  plan: UserMigrationPlan,
+  sourceNamespace = "users-immutable-snapshot",
+  options?: { snapshotHash?: string },
+): Promise<{ action: UserMigrationAction; targetId: string | null; recordId: string }> {
+  const snapshotHash = options?.snapshotHash ?? USER_SNAPSHOT_SHA256;
   return prisma.$transaction(async tx => {
     const source = await tx.migrationSource.upsert({
       where: { adapterKey_sourceNamespace: { adapterKey: "wordpress-db", sourceNamespace } },
-      create: { adapterKey: "wordpress-db", sourceNamespace, name: "Immutable WordPress User snapshot", scope: { goldenOnly: true } },
+      create: { adapterKey: "wordpress-db", sourceNamespace, name: sourceNamespace === "users-immutable-snapshot" ? "Immutable WordPress User snapshot" : "Live WordPress users", scope: { goldenOnly: sourceNamespace === "users-immutable-snapshot" } },
       update: {},
     });
-    const run = await tx.migrationRun.create({ data: { sourceId: source.id, mode: "COMMIT", status: "RUNNING", adapterVersion: "users-v1", snapshotHash: USER_SNAPSHOT_SHA256, startedAt: new Date() } });
+    const run = await tx.migrationRun.create({ data: { sourceId: source.id, mode: "COMMIT", status: "RUNNING", adapterVersion: "users-v1", snapshotHash, startedAt: new Date() } });
     const record = await tx.migrationRecord.create({ data: {
       sourceId: source.id, runId: run.id, status: plan.action === "BLOCKED" ? "QUARANTINED" : plan.action === "SKIP_UNCHANGED" ? "COMPLETED" : "PLANNED",
       sourceEntityType: USER_SOURCE_ENTITY_TYPE, sourceExternalId: String(plan.candidate.legacyUserId), sourceStableKey: plan.sourceRecordKey, sourceRecordKey: plan.sourceRecordKey,

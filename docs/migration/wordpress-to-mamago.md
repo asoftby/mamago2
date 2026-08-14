@@ -2,6 +2,13 @@
 
 Phase 1: Discovery and GAP Analysis
 
+> **Current FULL PROD behavior (2026-08-14), not Phase 1 policy:** Event
+> images ARE imported under `--media-policy FULL`. Users, Offers, Routes,
+> and Reviews have commit runners. Articles FULL scope is all valid
+> published posts, not the old 2-article golden. This document remains
+> historical Phase 1 discovery; do not treat “Event images are not
+> migrated” below as current importer policy.
+
 This document is read-only analysis only. It does not define an importer implementation, database migration, Prisma schema change, or data mutation plan for the current phase.
 
 ## Project Goals

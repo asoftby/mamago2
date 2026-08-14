@@ -47,7 +47,7 @@ function candidateFixture(overrides: Partial<NormalizedPlaceCandidate> = {}): No
     addressText: null,
     cityRaw: "Minsk",
     coordinates: { lat: 53.9, lng: 27.5667 },
-    media: { thumbnailAttachmentId: 10, galleryAttachmentIds: [11, 12] },
+    media: { thumbnailAttachmentId: 10, galleryAttachmentIds: [11, 12], logoAttachmentId: null },
     seo: { title: "SEO Title", focusKeyword: "kids playground" },
     sourceTerms: [],
     rawMeta: {},
@@ -83,7 +83,7 @@ function createHarness(
       findMany: (async (args: { where: { placeId: string } }) => {
         return placeImages
           .filter((row) => row.placeId === args.where.placeId)
-          .map((r) => ({ id: r.id, url: r.url, sortOrder: r.sortOrder }));
+          .map((r) => ({ id: r.id, url: r.url, sortOrder: r.sortOrder, kind: r.kind }));
       }) as unknown as PlaceMediaSyncerPrismaClient["placeImage"]["findMany"],
       create: (async (args: { data: Omit<PlaceImageRow, "id"> }) => {
         const row: PlaceImageRow = { id: `image-${nextRowId++}`, ...args.data };
@@ -108,6 +108,11 @@ function createHarness(
         const mediaId = lineages.get(args.where.sourceRecordKey);
         return mediaId ? { targetId: mediaId } : null;
       }) as unknown as PlaceMediaSyncerPrismaClient["migrationLineage"]["findFirst"],
+    },
+    place: {
+      update: (async (args: { where: { id: string }; data: { logoImageId: string } }) => {
+        return { id: args.where.id, logoImageId: args.data.logoImageId };
+      }) as unknown as PlaceMediaSyncerPrismaClient["place"]["update"],
     },
   };
 
@@ -531,6 +536,22 @@ async function testPartialGallerySuccessProducesPartialWarning() {
   assert.deepEqual(partial?.details, { imported: 2, reused: 0, skipped: 0, failed: 1 });
 }
 
+async function testLogoImportedAndLinked() {
+  const { syncer, placeImages } = createHarness({
+    attachmentOverrides: new Map([[999, attachment(999)]]),
+  });
+  const result = await syncer.sync(
+    syncInput({
+      candidate: candidateFixture({
+        media: { thumbnailAttachmentId: 10, galleryAttachmentIds: [], logoAttachmentId: 999 },
+      }),
+    }),
+  );
+  assert.equal(result.imported, 2);
+  assert.ok(placeImages.some((row) => row.kind === "LOGO" && row.url === "/uploads/999.webp"));
+  assert.ok(result.warnings.some((warning) => warning.code === "PLACE_LOGO_IMPORTED"));
+}
+
 async function main() {
   await testCoverOnly();
   await testGalleryOnly();
@@ -555,6 +576,7 @@ async function main() {
   await testDownloadFailureWarnsAndKeepsOtherAttachments();
   await testProcessorFailureClassifiedSeparatelyFromDownloadFailure();
   await testPartialGallerySuccessProducesPartialWarning();
+  await testLogoImportedAndLinked();
 }
 
 main()

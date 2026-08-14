@@ -4,6 +4,7 @@ import {
   ARTICLE_ENTITY_TYPE,
   EVENT_ENTITY_TYPE,
   PLACE_ENTITY_TYPE,
+  REVIEW_ENTITY_TYPE,
   ROUTE_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
@@ -98,6 +99,12 @@ function createFakeExecutor(): WordPressQueryExecutor {
     if (sql.includes("FROM wp_voxel_index_places")) {
       const ids = params as readonly number[];
       return placeIndexRows.filter((row) => ids.includes(row.post_id)) as never;
+    }
+    if (sql.includes("post_type IN (")) {
+      return [] as never;
+    }
+    if (sql.includes("FROM wp_voxel_timeline")) {
+      return [] as never;
     }
     throw new Error(`Unexpected query in test fake: ${sql}`);
   };
@@ -342,10 +349,11 @@ async function testMetadata() {
   assert.equal(wordpressDbAdapter.metadata.key, WORDPRESS_DB_ADAPTER_KEY);
   assert.deepEqual(
     [...wordpressDbAdapter.metadata.supportedSourceEntityTypes],
-    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE, "wordpress-db:hb-programs", "wordpress-db:services"],
+    [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE, "wordpress-db:hb-programs", "wordpress-db:services", REVIEW_ENTITY_TYPE],
   );
   assert.ok(wordpressDbAdapter.metadata.supportedTargetTypes.includes("ROUTE"));
   assert.ok(wordpressDbAdapter.metadata.supportedTargetTypes.includes("OFFER"));
+  assert.ok(wordpressDbAdapter.metadata.supportedTargetTypes.includes("PLACE_REVIEW"));
 }
 
 async function main() {

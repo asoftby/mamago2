@@ -20,6 +20,11 @@ import type { ExecuteRouteCommitRunInput, ExecuteRouteCommitRunResult } from "..
 import type { NormalizedOfferCandidate } from "../../adapters/wordpress-db/normalizeOffer";
 import type { OfferCommitContext } from "../offer/types";
 import type { ExecuteOfferCommitRunInput, ExecuteOfferCommitRunResult } from "../offer/OfferCommitRunner";
+import type {
+  ExecuteReviewCommitRunInput,
+  ExecuteReviewCommitRunResult,
+} from "../review/ReviewCommitRunner";
+import type { NormalizedReviewCandidate } from "../../adapters/wordpress-db/normalizeReview";
 
 /** Narrow enough that the real `PlaceCommitRunner` (PR12) satisfies this unchanged. */
 export interface PlaceCommitRunnerLike {
@@ -41,8 +46,9 @@ export interface RouteCommitRunnerLike {
   execute(input: ExecuteRouteCommitRunInput): Promise<ExecuteRouteCommitRunResult>;
 }
 export interface OfferCommitRunnerLike { execute(input: ExecuteOfferCommitRunInput): Promise<ExecuteOfferCommitRunResult> }
+export interface ReviewCommitRunnerLike { execute(input: ExecuteReviewCommitRunInput): Promise<ExecuteReviewCommitRunResult> }
 
-export type CommitDispatchTargetType = "PLACE" | "ACTIVITY" | "ARTICLE" | "ROUTE" | "OFFER";
+export type CommitDispatchTargetType = "PLACE" | "ACTIVITY" | "ARTICLE" | "ROUTE" | "OFFER" | "PLACE_REVIEW";
 
 export interface DispatchCommitRunnerInput {
   executionCandidate: MigrationExecutionCandidate;
@@ -55,7 +61,7 @@ export interface DispatchCommitRunnerInput {
    * not two values that could disagree; this dispatcher never calls the
    * PR26 resolver itself.
    */
-  resolvedContext: PlaceCommitContext | EventCommitContext | ArticleCommitContext | RouteCommitContext | OfferCommitContext;
+  resolvedContext: PlaceCommitContext | EventCommitContext | ArticleCommitContext | RouteCommitContext | OfferCommitContext | Record<string, never>;
   migrationRecord: MigrationRecord;
   runners: {
     place?: PlaceCommitRunnerLike;
@@ -63,6 +69,7 @@ export interface DispatchCommitRunnerInput {
     article?: ArticleCommitRunnerLike;
     route?: RouteCommitRunnerLike;
     offer?: OfferCommitRunnerLike;
+    review?: ReviewCommitRunnerLike;
   };
 }
 
@@ -261,6 +268,17 @@ export async function dispatchCommitRunner(input: DispatchCommitRunnerInput): Pr
     const result = await runners.offer.execute({ operation: buildCommitOperation(executionCandidate.planItem, migrationRecord), candidate: executionCandidate.candidate as NormalizedOfferCandidate, context: resolvedContext as OfferCommitContext, migrationRecord });
     if (result.ok) return { ok: true, targetType: "OFFER", targetId: result.offerId, lineageId: result.lineageId, status: "LINKED" };
     return { ok: false, targetType: "OFFER", status: "FAILED", errorCode: result.errorCode, errorMessage: result.errorMessage };
+  }
+
+  if (targetType === "PLACE_REVIEW") {
+    if (!runners.review) return missingRunnerResult("PLACE_REVIEW");
+    const result = await runners.review.execute({
+      operation: buildCommitOperation(executionCandidate.planItem, migrationRecord),
+      candidate: executionCandidate.candidate as NormalizedReviewCandidate,
+      migrationRecord,
+    });
+    if (result.ok) return { ok: true, targetType: "PLACE_REVIEW", targetId: result.reviewId, lineageId: result.lineageId, status: "LINKED" };
+    return { ok: false, targetType: "PLACE_REVIEW", status: "FAILED", errorCode: result.errorCode, errorMessage: result.errorMessage };
   }
 
   return {

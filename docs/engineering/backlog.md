@@ -252,7 +252,7 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-015] Offer media (cover/gallery) — implement real importer
 
-- Status: OPEN
+- Status: DONE (2026-08-14)
 - Priority: P1
 - Area: Media / Offers
 - Added: 2026-08-07
@@ -271,7 +271,10 @@ P3 — cleanup / polish / optional
   `PlaceMediaSyncer`) — a genuinely new, scoped piece of architecture, not a
   Task 1 (DEV media import) minimal-scope fix. Confirmed via DEV DB
   read-only audit 2026-08-07: 0/63 Offers (all PUBLISHED) have any image.
-- Current state: not started.
+- Current state: DONE. `FullOfferMediaDelegate` reuses MediaImportWriter +
+  attachment lineage. CLI no longer hard-blocks `--entity offer
+  --media-policy FULL`. One broken attachment does not abort the Offer
+  commit. Media attaches on CREATE.
 - Dependencies: none blocking.
 - Acceptance criteria: founder chooses Option A (minimal source-backed
   cover-image importer reusing `PlaceMediaSyncer`'s dedup/storage pattern)
@@ -355,10 +358,10 @@ P3 — cleanup / polish / optional
   same hash-equality gate, proven safe this session), Route has no dedicated
   narrow media-only replay CLI path — `RouteStopMediaSyncer`/
   `MediaPolicyGatedRouteStopMediaSyncer` are only reachable through the
-  generic `RouteCommitRunner` UPDATE path, and `RouteCommitRunner.ts` has
-  **no** `TARGET_MODIFIED_AFTER_IMPORT`-equivalent (or hash-equality)
-  conflict guard at all (confirmed by reading the file — no
-  `classifyRouteUpdateSafety` module exists, unlike Place). A plain
+  generic `RouteCommitRunner` UPDATE path. A `TARGET_MODIFIED_AFTER_IMPORT`
+  timestamp gate now exists (`classifyImportedTargetUpdateSafety`). FULL
+  first-run RouteStop media remains wired via `MediaPolicyGatedRouteStopMediaSyncer`.
+  Narrow media-only replay (`--force-route-media-replay`) is still absent.
   `--entity route --media-policy FULL` run would therefore UPDATE every
   matched Route's content fields unconditionally, with no protection
   against clobbering a manual edit made since import. Separately, the
@@ -370,11 +373,9 @@ P3 — cleanup / polish / optional
   behavior (the commit script wires `MigrationLedgerRepository`
   unconditionally for every entity) — worth fixing for future migration
   sessions so preview output isn't misleading, but not itself a blocker.
-- Current state: not attempted. 0 Routes/RouteStops touched this session.
-  All 14 Routes/90 RouteStops render cleanly with no images today (no
-  broken `<img>`, confirmed via code read of `RouteCard`/`RouteDetailClient`
-  — see Task 1 audit), so this is not a P0/P1 visual-breakage risk, just an
-  incomplete production-like dataset for this one entity type.
+- Current state: FULL first-run RouteStop media is wired. Timestamp
+  update-safety exists. Narrow `--force-route-media-replay` is still
+  absent (recovery tool, not first-run).
 - Dependencies: needs either (a) a `classifyRouteUpdateSafety`-equivalent
   guard added to `RouteCommitRunner` (mirroring Place), or (b) a dedicated
   `--force-route-media-replay` narrow path (mirroring Event/Article) before
@@ -2369,41 +2370,33 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-086] Disk headroom on shared DEV+PROD host — extend before full media/content migration or cutover
 
-- Status: OPEN
-- Priority: P2 — not a first-PROD-preview blocker (Task 15's own scope has
-  no media/content migration step), but a **mandatory prerequisite before
-  any full media/content migration to PROD or the real `mamago.by`
-  cutover**.
+- Status: DONE (2026-08-14) — owner-executed LVM extension verified
+  read-only this session; no further disk work required before Phoenix
+  PROD import from a capacity standpoint.
+- Priority: P2 — was a mandatory prerequisite before full media/content
+  migration; prerequisite is now met.
 - Area: Infrastructure / Disk
 - Added: 2026-08-13
-- Reason deferred: confirmed real by this session's read-only host audit,
-  but out of Task 15's own scope (deployment/rollback mechanics, not
-  media/content population — see Task 15's runbook §5, "media/content
-  import is explicitly out of scope for this first PROD preview").
-  Reclassified from an earlier "P1, non-blocking" mischaracterization —
-  per the checklist's own Severity Model (§4), P1 means "must fix before
-  PROD"; a genuinely non-blocking finding cannot also be P1. This is P2:
-  does not block the first-PROD preview, blocks a later phase.
-- Context: `134.17.17.134` (DEV+PROD shared host) root filesystem is a
-  28.2G LVM logical volume with 8.8G free, on top of a **100G physical
-  disk** — only `vda3` (28.2G) is partitioned/in the LVM volume group,
-  the remaining ~70G is already present but unpartitioned. This is a
-  **local LVM extension** (`growpart` + `pvresize` + `lvextend` +
-  `resize2fs`), not a cloud-provider resize — confirmed via `lsblk`/`df`
-  this session; exact commands (read-only topology confirmation first,
-  then the proposed extension to the previously-approved 80G target) are
-  in `docs/release/task15-deployment-rollback-runbook.md` §7. Not
-  `sudo`-executed this session (no non-interactive sudo available, and
-  it's a write operation on shared live infrastructure that needs the
-  owner's own session regardless).
-- Current state: not started.
-- Dependencies: owner's own `sudo` session on `mamago-prod`.
-- Acceptance criteria: root filesystem extended to the owner-approved 80G
-  target (or a deliberately re-confirmed different target), verified
-  read-only (`df -h`, `lsblk`, `vgs`/`lvs`) post-extension, **before** any
-  full Phoenix media/content migration is run against PROD or the real
-  `mamago.by` DNS cutover proceeds.
-- Source: Task 15 audit (Deployment & Rollback Readiness)
+- Closed: 2026-08-14
+- Reason deferred: originally confirmed real by Task 15's read-only host
+  audit, out of Task 15's own scope (first-PROD preview had no
+  media/content import). Owner later performed the local LVM extension.
+- Context: `134.17.17.134` (DEV+PROD shared host) was a 28.2G LV with
+  8.8G free on a 100G disk (`vda3` only 28.2G partitioned). Extension
+  target was owner-approved 80G.
+- Current state: verified 2026-08-14 via SSH `mamago-prod` (read-only):
+  `/dev/vda` 100G; `/dev/vda3` 98.2G; `ubuntu--vg-ubuntu--lv` **80G**
+  (`lsblk`); root `/` **79G** total, **16G used / 61G free** (`df -h`);
+  `prod-app-1`/`prod-db-1`/`dev-app-1`/`dev-db-1` healthy,
+  `RestartCount=0`. `vgs`/`lvs` were not re-read (no non-interactive
+  sudo); `lsblk` already shows the 80G LV. Remaining ~18G VG free space
+  is unused reserve, not a gap.
+- Dependencies: none remaining.
+- Acceptance criteria: met — root filesystem is the owner-approved 80G
+  target, verified read-only (`df -h`, `lsblk`) before any full Phoenix
+  media/content migration.
+- Source: Task 15 audit; closed by Phoenix FULL PROD preflight
+  (2026-08-14) against the already-extended live host.
 
 ## [BACKLOG-087] No rate limiting on password-reset request
 
@@ -2661,3 +2654,273 @@ P3 — cleanup / polish / optional
   `error.tsx`) at the root of `src/app`, consistent with the site's
   design system.
 - Source: Task 16 audit (Final Release Safety Audit)
+
+## [BACKLOG-099] User/business Phoenix CLIs cannot target PROD
+
+- Status: DONE (2026-08-14)
+- Priority: P1 — blocks FULL PROD content migration because Places/Events/
+  Offers/ownership require migrated User ids in `--context-config`.
+- Area: Migration / Users
+- Added: 2026-08-14
+- Reason deferred: found during Phoenix FULL PROD preflight; no code fix
+  until owner-approved targeted change. Existing localhost gate is
+  intentional safety from the LOCAL golden slices.
+- Context: `assertLocalDatabaseUrl()` in
+  `scripts/migration-user-vertical-slice.ts` (imported by user batch,
+  business-ownership, role-elevation, authorship, activation-manifest)
+  refuses anything except `localhost:5433/mamago2`. PROD DB is
+  `prodmamago` inside `prod-db-1`. `migration:phoenix-release` adapters
+  for users/businesses exist in lib but the CLI never registers them
+  (`RELEASE_ADAPTER_REGISTRY_EMPTY`).
+- Current state: live path `pnpm migration:user:live` exists. Frozen
+  golden CLIs stay localhost-only. PROD still has 2 users until the
+  owner-controlled import runs.
+- Dependencies: owner decision on a PROD-safe user CLI gate (explicit
+  `--confirm-production` + `PHOENIX_DATABASE_ENV=PROD` fingerprint,
+  never silently widening the localhost gate).
+- Acceptance criteria: a documented, guarded path can CREATE
+  `PENDING_ACTIVATION` users on PROD with lineage/idempotency, without
+  passwords, without activation emails, and without opening the local
+  golden CLIs to arbitrary remotes.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+- Resolution: `assertMigrationDatabaseTarget` fail-closed gate. LOCAL golden
+  remains `localhost:5433/mamago2`. PROD is identified by database name
+  `prodmamago`. Writes require `--confirm-production`, `--confirm-writes`,
+  and `--acknowledge-prod-user-import`. Activation email must stay disabled.
+  Live path: `pnpm migration:user:live --preview` (default) or commit with
+  the three flags. Frozen 564-user golden CLIs stay localhost-only.
+
+## [BACKLOG-100] PRODUCTION migration profile requires indexing; prod.mamago.by must stay noindex
+
+- Status: DONE (2026-08-14)
+- Priority: P1 — operational footgun. `--profile PRODUCTION` and Phoenix
+  `loadPhoenixEnvironment(PROD)` both fail closed unless
+  `SITE_INDEXING_ENABLED=true`. Owner requirement is that
+  `prod.mamago.by` remains noindex until the real `mamago.by` cutover.
+- Area: Migration / SEO
+- Added: 2026-08-14
+- Reason deferred: needs an explicit pre-cutover profile (FULL media,
+  validate redirects, do **not** require indexing) rather than weakening
+  the eventual cutover gate.
+- Context: `ProductionMigrationGuard` /
+  `SEO_POLICIES.PRODUCTION.requireIndexingEnabled`;
+  `src/lib/migration/release/environment.ts`
+  `PRODUCTION_INDEXING_GATE_MISMATCH`. Current committed `manifest.csv`
+  has 893 redirect rows vs default `REDIRECT_MANIFEST_MIN_ROWS=900`, so
+  PRODUCTION profile would also fail the redirect-count guard.
+- Current state: use `--profile FULL_IMPORT --media-policy FULL` or
+  `--profile PROD_IMPORT`. Do not enable indexing on prod.mamago.by.
+- Dependencies: none.
+- Acceptance criteria: a named pre-cutover profile or flag that allows
+  FULL media + redirect validation on a noindex PROD, without enabling
+  indexing and without silently sampling media.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+- Resolution: named profile `PROD_IMPORT` (FULL media, SEO VALIDATE, redirects
+  VALIDATE, no indexing requirement, still requires `--confirm-production`).
+  Canonical pre-cutover command remains `--profile FULL_IMPORT --media-policy
+  FULL` or `--profile PROD_IMPORT`. `loadPhoenixEnvironment(PROD)` no longer
+  requires `SITE_INDEXING_ENABLED`. PRODUCTION profile still requires indexing
+  for the eventual mamago.by cutover. Do not set `SITE_INDEXING_ENABLED=true`
+  on prod.mamago.by.
+
+## [BACKLOG-101] Phoenix release APPLY/RERUN is a stub; frozen 2026-07-30 manifest is stale
+
+- Status: DONE (2026-08-14) — option (b): coordinator is not the FULL PROD path
+- Priority: P2
+- Area: Migration
+- Added: 2026-08-14
+- Reason deferred: `scripts/migration-phoenix-release.ts` still throws
+  `RELEASE_ADAPTER_REGISTRY_EMPTY` after the BLOCKED-phase check.
+  Content writes actually go through `migration:commit:wordpress-db`.
+  The committed manifest
+  `docs/migration/releases/phoenix-approved-2026-07-30.json` marks
+  offers/routes/events/articles BLOCKED and encodes July-30 counts that
+  no longer match live WordPress.
+- Current state: `--plan` works (fingerprint + phase listing). `--apply`
+  / `--rerun` cannot write. Live WP 2026-08-14 drifted vs the freeze
+  (users 579→580, articles 115→117, published events 28→9, attachments
+  9635→9703).
+- Dependencies: BACKLOG-002/012 if the coordinator path is chosen;
+  otherwise a new frozen executable scope for the commit-CLI path.
+- Acceptance criteria: either (a) coordinator is wired and the manifest
+  is regenerated from live approved scope, or (b) coordinator is
+  explicitly retired in docs and the commit-CLI + fresh per-entity
+  freeze is the only approved PROD path.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+- Resolution: option (b). FULL PROD uses `pnpm migration:commit:wordpress-db`
+  plus `pnpm migration:user:live` and `pnpm migration:scope:wordpress-db`.
+  Do not use `migration:phoenix-release --apply`. July freeze manifests are
+  not current source truth. The APPLY stub remains in the repo unused.
+
+## [BACKLOG-102] Voxel reviews have no Phoenix commit runner
+
+- Status: DONE (2026-08-14)
+- Priority: P1 — owner FULL PROD scope lists Reviews; code/docs still
+  say NOT STARTED.
+- Area: Migration / Reviews
+- Added: 2026-08-14
+- Reason deferred: no Review commit runner exists. Live source
+  `wp_voxel_timeline` feed `post_reviews` = **25** rows (read-only,
+  2026-08-14). Score scale is Voxel decimal −2..+2, not mamaGo 1–5.
+- Context: `docs/migration/prelaunch-checklist.md` §5.6 still allows
+  explicit founder P1 defer. Until that defer is re-confirmed for FULL
+  PROD, this is a blocker.
+- Current state: PROD `PlaceReview` count = 0. WP `wp_comments` is not
+  the review source (only 1 spam row).
+- Dependencies: owner decision — implement mapping or explicitly defer
+  Reviews out of FULL PROD.
+- Acceptance criteria: either a lineage-backed PlaceReview importer with
+  a frozen rating formula, or a written owner exclusion.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+- Resolution: `ReviewCommitRunner` imports Voxel `post_reviews` into
+  `PlaceReview` with `source=MAMAGO`, `sourceReviewId=wp-voxel-timeline:{id}`.
+  Rating = clamp(round(score + 3), 1, 5). Missing user/place →
+  SKIP_WITH_REASON. No guessed ownership. No notification side effects.
+  Rerun is lineage-idempotent.
+
+## [BACKLOG-103] FULL PROD media completeness gaps vs owner CONTENT+MEDIA rule
+
+- Status: DONE (2026-08-14) — remaining profile/business media is BACKLOG-108
+- Priority: P1 — owner requirement for this preflight: FULL PROD =
+  content + all required images; no silent DEV-sample suppression.
+- Area: Migration / Media
+- Added: 2026-08-14
+- Reason deferred: several media paths are still DEV-era policy, not
+  missing-by-accident. Do not treat sampled METADATA as PROD policy.
+- Context / remaining gaps (do not duplicate work already filed):
+  - Offer cover/gallery: no FULL delegate; CLI hard-rejects
+    `--entity offer --media-policy FULL` — BACKLOG-015.
+  - Route stop photos: no narrow replay / no update-safety classifier —
+    BACKLOG-017 (was P2 for first-PROD preview; now in the FULL MEDIA
+    critical path).
+  - Article cover/inline: normal `ArticleCommitRunner` writes
+    `coverImageId: null`; import only via `--force-article-media-replay`.
+  - Place logos: permanently excluded (`PLACE_LOGO_EXCLUDED`, 47
+    published Places have `logo` meta).
+  - User/business profile media: prelaunch checklist NOT STARTED.
+  - LOCAL/DEV sampling allowlist of 9 keys still applies whenever
+    `--media-policy` is omitted.
+- Current state: Offer FULL delegate, Place logos, Article FULL first-run,
+  Route FULL first-run, Event FULL (unchanged) are implemented. Remaining
+  P2: BACKLOG-017 narrow Route replay; BACKLOG-108 Business/User profile
+  images (no target field). Always pass `--media-policy FULL` on PROD so
+  LOCAL/DEV sampling cannot suppress images.
+- Dependencies: owner exceptions per entity, or targeted importers.
+- Acceptance criteria: every in-scope entity either imports required
+  images under `--media-policy FULL` or has an explicit owner-approved
+  exclusion recorded here.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+
+## [BACKLOG-104] Phoenix cannot run on the shared DEV+PROD host — WP is unreachable from it
+
+- Status: DONE (2026-08-14) — topology documented; runner stays on operator Mac
+- Priority: P1 — chooses execution topology. Running a one-shot
+  migration container on `134.17.17.134` cannot read WordPress or fetch
+  media.
+- Area: Migration / Ops
+- Added: 2026-08-14
+- Reason deferred: confirmed live this session; needs a written PROD
+  runbook using the proven operator-Mac path, not a host-side container.
+- Context: from `mamago-prod`, TCP to `134.17.16.78:22`, `mamago.by:443`
+  and `:80` all timed out. Operator Mac can SSH to WP (inspect succeeded)
+  and HTTP-fetch `mamago.by`. Same finding as BACKLOG-018's DEV note,
+  now confirmed for PROD as well.
+- Current state: recommended path = operator Mac + SSH tunnel to
+  `prod-db-1` + WP SSH from the Mac + HTTP media fetch + stage into
+  `MEDIA_STORAGE_ROOT` then copy **only** into `prod_mamago2_storage`.
+- Dependencies: none for the topology itself; BACKLOG-099 for users.
+- Acceptance criteria: PROD Phoenix runbook documents this topology and
+  forbids running the importer on the shared host until WP/HTTP
+  reachability is proven from that host.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+
+## [BACKLOG-105] Migration commits bypass SearchIndexer
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Search
+- Added: 2026-08-14
+- Reason deferred: not unsafe; public search/discovery will be empty or
+  stale until a separate reindex after import. Commit CLIs correctly use
+  bare `PrismaClient` (no notification/search side effects).
+- Context: `@/lib/prisma` wraps `SearchIndexerService`;
+  `scripts/migration-commit-wordpress-db.ts` documents that it must not
+  use that singleton.
+- Current state: no post-import reindex step in the current runbook.
+- Dependencies: a successful PROD content import.
+- Acceptance criteria: documented, idempotent reindex (or indexer
+  backfill) runs after Phoenix commit and is part of reconciliation.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+
+## [BACKLOG-106] No deleted-legacy sync; Event/Article/Route UPDATE lacks Place-style safety
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Idempotency
+- Added: 2026-08-14
+- Reason deferred: first PROD import is onto an empty content DB, so
+  overwrite/delete-sync is not a first-write P0. It becomes a cutover
+  risk on the freeze→final-rerun window and on any later rerun after
+  editorial edits.
+- Context: lineage is hash-based CREATE/UPDATE/SKIP_UNCHANGED. Missing
+  WP rows are not deleted in target. Only Places have
+  `classifyPlaceUpdateSafety` / `TARGET_MODIFIED_AFTER_IMPORT`. Event
+  sessions and RouteStops `deleteMany`+recreate on UPDATE. Users block
+  on source-hash change instead of updating.
+- Current state: Event/Article/Route/Review UPDATE now uses
+  `classifyImportedTargetUpdateSafety` (timestamp gate, QUARANTINE on
+  conflict). Route UPDATE no longer overwrites `status`/`visibility`/
+  `authorId`. Delete-sync of WP-deleted rows is still absent and remains
+  a freeze→final-rerun cutover issue.
+- Dependencies: owner policy for the freeze window (new/changed/deleted
+  WP rows).
+- Acceptance criteria: documented final-sync behavior for new / changed /
+  deleted legacy rows; safety classifier or media-only replay for
+  Event/Article/Route before any hash-driven UPDATE against a
+  possibly-edited PROD.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+
+## [BACKLOG-107] Stale Phoenix production runbooks vs current commit CLI
+
+- Status: DONE (2026-08-14)
+- Priority: P3
+- Area: Docs / Migration
+- Added: 2026-08-14
+- Reason deferred: docs drift, not a runtime defect. `docs/migration/
+  production-cutover-runbook.md` still says users/offers/routes/reviews
+  have no runners; `migration-engine.md` still says Event images are
+  excluded. Both are false in current `dev`.
+- Current state: authoritative live path is
+  `pnpm migration:commit:wordpress-db` + user/business CLIs;
+  `docs/migration/production-migration-runbook-2026-07-29.md` is closer
+  but still assumes founder hosting inputs that now exist
+  (`prod.mamago.by` / `prod-db-1` / `prod_mamago2_storage`).
+- Dependencies: none.
+- Acceptance criteria: one current PROD Phoenix runbook; stale “Event
+  images excluded” / “no user runner” statements removed or clearly
+  marked historical.
+- Source: Phoenix FULL PROD preflight (2026-08-14)
+- Resolution: current-state banners added to cutover/runbook docs. LIVE
+  path is commit-CLI + `migration:user:live` + `migration:scope:wordpress-db`.
+  Event images ARE imported under `--media-policy FULL`. Reviews and live
+  users have runners. Historical Phase 1/2D text is marked historical.
+
+## [BACKLOG-108] Business/User profile images have no mamaGo 2.0 target field
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Media / Schema
+- Added: 2026-08-14
+- Reason deferred: FULL PROD media audit found no `Business` image column
+  and no proven WordPress field feeding `User.avatarUrl` in the live
+  importer. Inventing storage would violate schema.
+- Context: `Business` has name/phone/UNP/status only. `User.avatarUrl`
+  exists but live WP user SELECT does not include an avatar column, and
+  Voxel profile media is not mapped.
+- Current state: documented schema gap. Place logos, Offer/Event/Article/
+  Route media are on the FULL path.
+- Dependencies: product decision whether Business/User images are in
+  mamaGo 2.0 before cutover.
+- Acceptance criteria: either a target field + importer, or an explicit
+  owner exclusion that Business/User profile images are out of FULL PROD.
+- Source: Phoenix FULL PROD readiness (2026-08-14)

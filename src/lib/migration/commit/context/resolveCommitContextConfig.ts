@@ -48,6 +48,7 @@ export type ResolveCommitContextResult =
   | { ok: true; targetType: "ARTICLE"; context: ArticleCommitContext }
   | { ok: true; targetType: "ROUTE"; context: RouteCommitContext }
   | { ok: true; targetType: "OFFER"; context: OfferCommitContext }
+  | { ok: true; targetType: "PLACE_REVIEW"; context: Record<string, never> }
   | { ok: false; errorCode: ResolveCommitContextErrorCode; errorMessage: string };
 
 function shallowMerge<T extends object>(
@@ -127,6 +128,10 @@ export function resolveCommitContextForExecutionCandidate(
       return { ok: false, errorCode: "MISSING_REQUIRED_CONTEXT_FIELD", errorMessage: `OfferCommitContext placeId/legacyPlaceId/ownerUserId/cityId/mediaPolicy is incomplete for "${sourceRecordKey}".` };
     }
     return { ok: true, targetType: "OFFER", context };
+  }
+
+  if (targetType === "PLACE_REVIEW") {
+    return { ok: true, targetType: "PLACE_REVIEW", context: {} };
   }
 
   return {

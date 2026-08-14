@@ -30,6 +30,7 @@ export interface PlaceMediaSyncerPrismaClient {
   placeImage: Pick<PrismaClient["placeImage"], "create" | "findMany" | "update">;
   mediaAsset: Pick<PrismaClient["mediaAsset"], "findFirst">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst">;
+  place: Pick<PrismaClient["place"], "update">;
 }
 
 export interface PlaceMediaSyncInput {
@@ -152,10 +153,9 @@ function classifyImportError(message: string): "PLACE_MEDIA_DOWNLOAD_FAILED" | "
  *    silently move that recovered item to the back instead of restoring
  *    correct order.
  *
- * Never touches `Place.logoImageId` or creates a `PlaceImageKind.LOGO`
- * row — Place logo import is a permanent, separate policy exclusion (see
- * `PLACE_LOGO_EXCLUDED` in `normalizePlace.ts`), not something this PR
- * revisits.
+ * Logo attachments (`candidate.media.logoAttachmentId`) are imported
+ * separately as `PlaceImageKind.LOGO` and written to `Place.logoImageId`
+ * (which stores the PlaceImage.id, not a MediaAsset.id).
  */
 export class PlaceMediaSyncer {
   constructor(
@@ -172,7 +172,9 @@ export class PlaceMediaSyncer {
     const counts = { imported: 0, reused: 0, skipped: 0, failed: 0 };
 
     const ids = orderedUniqueAttachmentIds(input.candidate);
-    if (ids.length === 0) {
+    const logoId = input.candidate.media.logoAttachmentId ?? null;
+    const fetchIds = [...new Set([...ids, ...(logoId !== null ? [logoId] : [])])];
+    if (fetchIds.length === 0) {
       return { warnings, ...counts };
     }
 
@@ -183,18 +185,18 @@ export class PlaceMediaSyncer {
           input.sourceRecordKey,
           "PLACE_MEDIA_OWNER_MISSING",
           "Place media was skipped because no uploadedByUserId was available for migrated MediaAsset ownership.",
-          { attachmentIds: ids },
+          { attachmentIds: fetchIds },
         ),
       );
-      counts.skipped = ids.length;
+      counts.skipped = fetchIds.length;
       return { warnings, ...counts };
     }
 
     const [attachments, existingImages] = await Promise.all([
-      this.deps.attachmentResolver.getAttachmentsByIds(ids),
+      this.deps.attachmentResolver.getAttachmentsByIds(fetchIds),
       this.deps.prisma.placeImage.findMany({
         where: { placeId: input.placeId },
-        select: { id: true, url: true, sortOrder: true },
+        select: { id: true, url: true, sortOrder: true, kind: true },
       }),
     ]);
 
@@ -310,7 +312,86 @@ export class PlaceMediaSyncer {
           sortOrder: targetSortOrder,
         },
       });
-      existingByUrl.set(url, { id: createdRow.id, url, sortOrder: targetSortOrder });
+      existingByUrl.set(url, { id: createdRow.id, url, sortOrder: targetSortOrder, kind: "GALLERY" });
+    }
+
+    if (logoId !== null) {
+      const logoAttachment = attachments.get(logoId);
+      if (!logoAttachment) {
+        warnings.push(
+          warning(input.sourceRecordKey, "PLACE_MEDIA_SOURCE_MISSING", "WordPress logo attachment row was not found.", {
+            attachmentId: logoId,
+          }),
+        );
+        counts.skipped++;
+      } else if (isHeicMime(logoAttachment.post_mime_type)) {
+        warnings.push(
+          warning(input.sourceRecordKey, "PLACE_MEDIA_HEIC_UNSUPPORTED", "HEIC/HEIF logo cannot be processed; skipped.", {
+            attachmentId: logoId,
+            mimeType: logoAttachment.post_mime_type,
+          }),
+        );
+        counts.skipped++;
+      } else if (!logoAttachment.post_mime_type?.toLowerCase().startsWith("image/")) {
+        warnings.push(
+          warning(input.sourceRecordKey, "PLACE_MEDIA_FORMAT_UNSUPPORTED", "Logo mime type is not a supported image format.", {
+            attachmentId: logoId,
+            mimeType: logoAttachment.post_mime_type,
+          }),
+        );
+        counts.skipped++;
+      } else if (!isUsableHttpUrl(logoAttachment.guid)) {
+        warnings.push(
+          warning(input.sourceRecordKey, "PLACE_MEDIA_SOURCE_MISSING", "Logo attachment guid is not a valid http(s) URL.", {
+            attachmentId: logoId,
+          }),
+        );
+        counts.skipped++;
+      } else {
+        const resolvedLogo = await this.importOrReuseAttachment({
+          attachmentId: logoId,
+          attachment: logoAttachment,
+          importer,
+          sourceId: input.sourceId,
+          sourceHash: input.sourceHash ?? input.sourceRecordKey,
+          runId: input.runId ?? null,
+          recordId: input.recordId ?? null,
+          sourceRecordKey: input.sourceRecordKey,
+          warnings,
+          counts,
+        });
+        if (resolvedLogo) {
+          const logoUrl = resolvedLogo.publicUrl.trim();
+          const existingLogo = existingImages.find((row) => row.kind === "LOGO" && row.url.trim() === logoUrl);
+          const logoRow =
+            existingLogo ??
+            (await this.deps.prisma.placeImage.create({
+              data: {
+                placeId: input.placeId,
+                kind: "LOGO",
+                url: logoUrl,
+                width: resolvedLogo.width,
+                height: resolvedLogo.height,
+                sortOrder: 0,
+              },
+            }));
+          await this.deps.prisma.place.update({
+            where: { id: input.placeId },
+            data: { logoImageId: logoRow.id },
+          });
+          warnings.push(
+            warning(
+              input.sourceRecordKey,
+              existingLogo ? "PLACE_LOGO_REUSED" : "PLACE_LOGO_IMPORTED",
+              existingLogo
+                ? "Existing PlaceImage LOGO row was reused and Place.logoImageId was set."
+                : "Place logo was imported as PlaceImage(kind: LOGO) and Place.logoImageId was set.",
+              { attachmentId: logoId, placeImageId: logoRow.id, mediaAssetId: resolvedLogo.mediaId },
+              "INFO",
+            ),
+          );
+        }
+      }
     }
 
     if (counts.failed > 0) {

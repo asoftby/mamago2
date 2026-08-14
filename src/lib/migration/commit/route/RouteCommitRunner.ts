@@ -2,6 +2,7 @@ import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/cl
 
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
+import { classifyImportedTargetUpdateSafety } from "../shared/classifyImportedTargetUpdateSafety";
 import type { ExecuteRouteCommitResult } from "./RouteCommitOrchestrator";
 import type { MigrationWarning } from "../../types";
 import type { NormalizedRouteCandidate, RouteCommitContext } from "./buildRouteCreateDraft";
@@ -33,6 +34,7 @@ export interface MigrationLineageWriterLike {
 export interface RouteCommitRunnerPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
+  route: Pick<PrismaClient["route"], "findUnique">;
 }
 
 export interface RouteStopMediaSyncerLike {
@@ -104,8 +106,13 @@ export class RouteCommitRunner {
       lineageWriter: MigrationLineageWriterLike;
       prisma: RouteCommitRunnerPrismaClient;
       mediaSyncer?: RouteStopMediaSyncerLike;
+      now?: () => Date;
     },
   ) {}
+
+  private now(): Date {
+    return (this.deps.now ?? (() => new Date()))();
+  }
 
   async execute(input: ExecuteRouteCommitRunInput): Promise<ExecuteRouteCommitRunResult> {
     const isUpdate = isUpdateAction(input.operation.action);
@@ -131,6 +138,36 @@ export class RouteCommitRunner {
         },
       });
       return missingTargetResult;
+    }
+
+    if (isUpdate && existingLineage?.targetId) {
+      const route = await this.deps.prisma.route.findUnique({
+        where: { id: existingLineage.targetId },
+        select: { id: true, updatedAt: true },
+      });
+      const safety = classifyImportedTargetUpdateSafety({
+        targetType: "ROUTE",
+        sourceRecordKey: input.record.sourceRecordKey,
+        lineage: existingLineage,
+        target: route,
+      });
+      if (safety.classification === "UPDATE_CONFLICT") {
+        await this.deps.prisma.migrationRecord.update({
+          where: { id: input.record.id },
+          data: {
+            status: "QUARANTINED",
+            lastErrorCode: "ROUTE_UPDATE_CONFLICT",
+            lastErrorMessage: safety.reason,
+          },
+        });
+        return {
+          ok: false,
+          recordId: input.record.id,
+          status: "BLOCKED",
+          reasonCode: "ROUTE_UPDATE_CONFLICT",
+          error: new Error(`Route UPDATE refused: ${safety.reason}.`),
+        };
+      }
     }
 
     const commitResult = await this.deps.orchestrator.execute({
@@ -197,6 +234,7 @@ export class RouteCommitRunner {
             runId: input.record.runId,
             recordId: input.record.id,
             isActive: true,
+            lastImportedAt: this.now(),
           },
         });
         lineageResult = {

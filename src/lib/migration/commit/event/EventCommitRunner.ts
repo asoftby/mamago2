@@ -4,6 +4,7 @@ import type { MigrationWarning } from "../../types";
 import type { CommitOperation } from "../types";
 import type { EventCreateTransactionClient, RunAtomicEventCreateResult } from "./runAtomicEventCreate";
 import type { ExecuteEventCommitResult } from "./EventCommitOrchestrator";
+import { classifyImportedTargetUpdateSafety } from "../shared/classifyImportedTargetUpdateSafety";
 import type { EventCommitContext, NormalizedEventCandidate } from "./types";
 
 /**
@@ -74,6 +75,7 @@ export interface EventMediaSyncerLike {
 export interface EventCommitRunnerPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
+  activity: Pick<PrismaClient["activity"], "findUnique">;
   $transaction<T>(fn: (tx: EventCreateTransactionClient) => Promise<T>): Promise<T>;
 }
 
@@ -165,8 +167,13 @@ export class EventCommitRunner {
       runAtomicCreate: RunAtomicEventCreateLike;
       prisma: EventCommitRunnerPrismaClient;
       mediaSyncer?: EventMediaSyncerLike;
+      now?: () => Date;
     },
   ) {}
+
+  private now(): Date {
+    return (this.deps.now ?? (() => new Date()))();
+  }
 
   async execute(input: ExecuteEventCommitRunInput): Promise<ExecuteEventCommitRunResult> {
     if (isUpdateAction(input.operation.action)) {
@@ -196,6 +203,34 @@ export class EventCommitRunner {
         },
       });
       return missingTargetResult;
+    }
+
+    const activity = await this.deps.prisma.activity.findUnique({
+      where: { id: existingLineage.targetId },
+      select: { id: true, updatedAt: true },
+    });
+    const safety = classifyImportedTargetUpdateSafety({
+      targetType: "ACTIVITY",
+      sourceRecordKey: input.record.sourceRecordKey,
+      lineage: existingLineage,
+      target: activity,
+    });
+    if (safety.classification === "UPDATE_CONFLICT") {
+      await this.deps.prisma.migrationRecord.update({
+        where: { id: input.record.id },
+        data: {
+          status: "QUARANTINED",
+          lastErrorCode: "EVENT_UPDATE_CONFLICT",
+          lastErrorMessage: safety.reason,
+        },
+      });
+      return {
+        ok: false,
+        recordId: input.record.id,
+        status: "BLOCKED",
+        reasonCode: "EVENT_UPDATE_CONFLICT",
+        error: new Error(`Event UPDATE refused: ${safety.reason}.`),
+      };
     }
 
     const commitResult = await this.deps.orchestrator.execute({
@@ -232,6 +267,7 @@ export class EventCommitRunner {
           runId: input.record.runId,
           recordId: input.record.id,
           isActive: true,
+          lastImportedAt: this.now(),
         },
       });
       lineageId = updatedLineage.id;

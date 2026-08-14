@@ -13,6 +13,8 @@ export type {
 export { normalizeRoute } from "./normalizeRoute";
 export { normalizeOffer } from "./normalizeOffer";
 export type { NormalizedOfferCandidate } from "./normalizeOffer";
+export { normalizeReview } from "./normalizeReview";
+export type { NormalizedReviewCandidate } from "./normalizeReview";
 export { loadOfferSnapshotEnvelope } from "./loadOfferSnapshotEnvelope";
 export type {
   NormalizedRouteCandidate,
@@ -29,10 +31,12 @@ export {
   ROUTE_ENTITY_TYPE,
   OFFER_PROGRAMS_ENTITY_TYPE,
   OFFER_SERVICES_ENTITY_TYPE,
+  REVIEW_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedEventEnvelopeBySourceRecordKey,
   fetchPublishedRouteEnvelopeBySourceRecordKey,
   fetchPublishedOfferEnvelopeBySourceRecordKey,
+  fetchPublishedReviewEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
   wordpressDbAdapter,
 } from "./wordpressDbAdapter";

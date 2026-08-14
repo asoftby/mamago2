@@ -41,6 +41,7 @@ function testParsesValidFlags() {
     forceReprocess: false,
     forceMediaReprocess: false,
     forceArticleMediaReplay: false,
+    forcePlaceMediaReplay: false,
     mediaOwnerUserId: undefined,
     allowRemoteReadonly: true,
     out: "report.json",
@@ -102,7 +103,7 @@ function testInvalidLimitFails() {
 }
 
 function testValidEntityValuesAllParse() {
-  for (const entity of ["article", "place", "event", "route", "all"]) {
+  for (const entity of ["article", "place", "event", "route", "offer", "review", "all"]) {
     const args = parseArgs(["--entity", entity, ...REQUIRED_FLAGS]);
     assert.equal(args.entity, entity);
   }
@@ -429,7 +430,7 @@ function testForceArticleMediaReplayRejectsCombinationWithForceMediaReprocess() 
 }
 
 function testProfileFlagParsesValidValues() {
-  for (const profile of ["FULL_IMPORT", "DEV_VALIDATION", "PRODUCTION"]) {
+  for (const profile of ["FULL_IMPORT", "DEV_VALIDATION", "PRODUCTION", "PROD_IMPORT"]) {
     const args = parseArgs(["--profile", profile, ...REQUIRED_FLAGS]);
     assert.equal(args.profileName, profile);
   }

@@ -112,7 +112,7 @@ const WARNING_LABELS: Record<string, string> = {
   ARTICLE_WEB_STORY: "Web Stories",
   ARTICLE_MISSING_FEATURED_IMAGE: "articles without a featured image",
   PLACE_MISSING_COORDINATES: "places without coordinates",
-  PLACE_LOGO_EXCLUDED: "places with a logo excluded from import",
+  PLACE_LOGO_PRESENT: "places with a logo included in FULL import",
 };
 
 function warningLabel(code: string): string {

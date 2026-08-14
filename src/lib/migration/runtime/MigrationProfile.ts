@@ -1,5 +1,5 @@
 export type MigrationEnvironment = "LOCAL" | "DEV" | "PROD";
-export type MigrationProfileName = "FULL_IMPORT" | "DEV_VALIDATION" | "PRODUCTION";
+export type MigrationProfileName = "FULL_IMPORT" | "DEV_VALIDATION" | "PRODUCTION" | "PROD_IMPORT";
 
 export type MediaPolicyName = "FULL" | "METADATA" | "NONE";
 export type SeoPolicyName = "DRY_RUN" | "VALIDATE" | "PRODUCTION";
@@ -124,6 +124,19 @@ const PROFILE_DEFAULTS: Record<
     redirectPolicy: "APPLY",
     validateOnly: false,
   },
+  /**
+   * Pre-cutover PROD content+media import. FULL media, no search-engine
+   * indexing requirement, redirects stay VALIDATE (not APPLY). Use this
+   * (or `--profile FULL_IMPORT --media-policy FULL`) while prod.mamago.by
+   * must remain noindex. PRODUCTION remains the cutover profile.
+   */
+  PROD_IMPORT: {
+    environment: "PROD",
+    mediaPolicy: "FULL",
+    seoPolicy: "VALIDATE",
+    redirectPolicy: "VALIDATE",
+    validateOnly: false,
+  },
 };
 
 export interface ResolveMigrationProfileInput {
@@ -141,7 +154,9 @@ function normalizeToken(value: string | undefined): string | null {
 
 export function parseMigrationProfileName(value: string | undefined): MigrationProfileName | null {
   const token = normalizeToken(value);
-  if (token === "FULL_IMPORT" || token === "DEV_VALIDATION" || token === "PRODUCTION") return token;
+  if (token === "FULL_IMPORT" || token === "DEV_VALIDATION" || token === "PRODUCTION" || token === "PROD_IMPORT") {
+    return token;
+  }
   return null;
 }
 

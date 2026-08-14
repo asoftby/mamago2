@@ -70,6 +70,7 @@ export interface NormalizedPlaceCandidate {
   media: {
     thumbnailAttachmentId: number | null;
     galleryAttachmentIds: readonly number[];
+    logoAttachmentId?: number | null;
   };
   seo: {
     title: string | null;
@@ -194,14 +195,23 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   }
 
   const logoValues = postMeta["logo"];
-  if (logoValues && logoValues.length > 0) {
+  const logoParsed = parsePlaceMediaAttachmentIds(logoValues);
+  const logoAttachmentId = logoParsed.ids[0] ?? null;
+  if (logoValues && logoValues.length > 0 && logoAttachmentId === null) {
     warnings.push({
-      code: "PLACE_LOGO_EXCLUDED",
-      message:
-        "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+      code: "PLACE_LOGO_UNPARSEABLE",
+      message: "Source has a logo reference that could not be parsed as an attachment id; not imported.",
+      severity: "WARNING",
+      sourceRecordKey,
+      details: { logoValues, invalidTokens: logoParsed.invalidTokens },
+    });
+  } else if (logoAttachmentId !== null) {
+    warnings.push({
+      code: "PLACE_LOGO_PRESENT",
+      message: "Source has a logo attachment; FULL import will create PlaceImage(kind: LOGO) and set Place.logoImageId.",
       severity: "INFO",
       sourceRecordKey,
-      details: { logoAttachmentIds: logoValues },
+      details: { logoAttachmentId },
     });
   }
 
@@ -259,6 +269,7 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     ...coverParsed.invalidTokens.map((token) => ({ field: "cover", token })),
     ...thumbnailFallbackParsed.invalidTokens.map((token) => ({ field: "_thumbnail_id", token })),
     ...galleryParsed.invalidTokens.map((token) => ({ field: "gallery", token })),
+    ...logoParsed.invalidTokens.map((token) => ({ field: "logo", token })),
   ];
   if (invalidMediaTokens.length > 0) {
     warnings.push({
@@ -292,7 +303,7 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   if (legacyLogoPlaceValues && legacyLogoPlaceValues.length > 0) {
     warnings.push({
       code: "PLACE_MEDIA_LEGACY_KEY_USED",
-      message: "Source has a legacy logo-place value; kept as raw evidence, logos are never auto-imported.",
+      message: "Source has a legacy logo-place value; kept as raw evidence, not merged into Place.logoImageId.",
       severity: "INFO",
       sourceRecordKey,
       details: { legacyKey: "logo-place", rawValues: legacyLogoPlaceValues, merged: false },
@@ -302,6 +313,7 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
   const mediaRefs = [
     ...(thumbnailAttachmentId !== null ? [String(thumbnailAttachmentId)] : []),
     ...galleryAttachmentIds.map((id) => String(id)),
+    ...(logoAttachmentId !== null ? [String(logoAttachmentId)] : []),
   ];
   const relationRefs = terms.map((term) => `term:${term.taxonomy}:${term.slug}`);
 
@@ -326,6 +338,7 @@ export function normalizePlace(bundle: WordPressPlaceBundle): NormalizedRecord {
     media: {
       thumbnailAttachmentId,
       galleryAttachmentIds,
+      logoAttachmentId,
     },
     seo: {
       title: firstMetaValue(postMeta, "rank_math_title"),

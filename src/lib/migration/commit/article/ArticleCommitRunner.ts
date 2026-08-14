@@ -2,8 +2,10 @@ import type { MigrationLineage, MigrationRecord, PrismaClient } from "@prisma/cl
 
 import type { CommitOperation } from "../types";
 import type { CreateLineageResult } from "../../lineage/types";
+import { classifyImportedTargetUpdateSafety } from "../shared/classifyImportedTargetUpdateSafety";
 import type { ExecuteArticleCommitResult } from "./ArticleCommitOrchestrator";
 import type { ArticleCommitContext, NormalizedArticleCandidate } from "./buildArticleCreateDraft";
+import type { MigrationWarning } from "../../types";
 
 /**
  * The narrowest slice of `ArticleCommitOrchestrator` this runner needs —
@@ -52,6 +54,7 @@ export interface MigrationLineageWriterLike {
 export interface ArticleCommitRunnerPrismaClient {
   migrationRecord: Pick<PrismaClient["migrationRecord"], "update">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst" | "update">;
+  article: Pick<PrismaClient["article"], "findUnique">;
 }
 
 export interface ExecuteArticleCommitRunInput {
@@ -134,14 +137,33 @@ function buildUpdateTargetMissingResult(recordId: string): ExecuteArticleCommitR
  * speculative. They remain available on `ArticleCommitOrchestrator`'s own
  * result for whoever wires that up next.
  */
+export interface ArticleFullMediaSyncerLike {
+  sync(input: {
+    articleId: string;
+    candidate: NormalizedArticleCandidate;
+    ownerUserId: string | null | undefined;
+    sourceId: string;
+    sourceHash: string | null;
+    runId?: string | null;
+    recordId?: string | null;
+    sourceRecordKey: string;
+  }): Promise<{ warnings: MigrationWarning[] }>;
+}
+
 export class ArticleCommitRunner {
   constructor(
     private readonly deps: {
       orchestrator: ArticleCommitOrchestratorLike;
       lineageWriter: MigrationLineageWriterLike;
       prisma: ArticleCommitRunnerPrismaClient;
+      mediaSyncer?: ArticleFullMediaSyncerLike;
+      now?: () => Date;
     },
   ) {}
+
+  private now(): Date {
+    return (this.deps.now ?? (() => new Date()))();
+  }
 
   async execute(input: ExecuteArticleCommitRunInput): Promise<ExecuteArticleCommitRunResult> {
     const { migrationRecord, operation } = input;
@@ -168,6 +190,36 @@ export class ArticleCommitRunner {
         },
       });
       return missingTargetResult;
+    }
+
+    if (isUpdate && existingLineage?.targetId) {
+      const article = await this.deps.prisma.article.findUnique({
+        where: { id: existingLineage.targetId },
+        select: { id: true, updatedAt: true },
+      });
+      const safety = classifyImportedTargetUpdateSafety({
+        targetType: "ARTICLE",
+        sourceRecordKey: migrationRecord.sourceRecordKey,
+        lineage: existingLineage,
+        target: article,
+      });
+      if (safety.classification === "UPDATE_CONFLICT") {
+        await this.deps.prisma.migrationRecord.update({
+          where: { id: migrationRecord.id },
+          data: {
+            status: "QUARANTINED",
+            lastErrorCode: "ARTICLE_UPDATE_CONFLICT",
+            lastErrorMessage: safety.reason,
+          },
+        });
+        return {
+          ok: false,
+          recordId: migrationRecord.id,
+          status: "FAILED",
+          errorCode: "ARTICLE_UPDATE_CONFLICT",
+          errorMessage: `Article UPDATE refused: ${safety.reason}.`,
+        };
+      }
     }
 
     const commitResult = await this.deps.orchestrator.execute({
@@ -212,6 +264,7 @@ export class ArticleCommitRunner {
             runId: migrationRecord.runId,
             recordId: migrationRecord.id,
             isActive: true,
+            lastImportedAt: this.now(),
           },
         });
         lineageResult = {
@@ -256,6 +309,23 @@ export class ArticleCommitRunner {
         errorCode,
         errorMessage: lineageError.message,
       };
+    }
+
+    if (this.deps.mediaSyncer && commitResult.articleId) {
+      try {
+        await this.deps.mediaSyncer.sync({
+          articleId: commitResult.articleId,
+          candidate: input.candidate,
+          ownerUserId: input.context.authorUserId,
+          sourceId: migrationRecord.sourceId,
+          sourceHash: migrationRecord.sourceHash,
+          runId: migrationRecord.runId,
+          recordId: migrationRecord.id,
+          sourceRecordKey: migrationRecord.sourceRecordKey,
+        });
+      } catch {
+        // Best-effort: one broken image must not abort the Article commit.
+      }
     }
 
     await this.deps.prisma.migrationRecord.update({

@@ -61,6 +61,8 @@
     "import:preview": "tsx scripts/import-preview.ts",
     "migration:commit:wordpress-db": "tsx scripts/migration-commit-wordpress-db.ts",
     "migration:user": "tsx scripts/migration-user-vertical-slice.ts",
+    "migration:user:live": "tsx scripts/migration-user-live.ts",
+    "migration:scope:wordpress-db": "tsx scripts/migration-scope-wordpress-db.ts",
     "migration:user:batch": "tsx scripts/migration-user-clean-batch.ts",
     "migration:users:plan-ownership": "tsx scripts/migration-user-plan-ownership.ts",
     "migration:users:business-ownership-golden": "tsx scripts/migration-business-ownership-golden.ts",

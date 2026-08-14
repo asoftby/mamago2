@@ -84,8 +84,24 @@ export class OfferCommitRunner {
       return this.fail(input.migrationRecord.id, errorCode, errorMessage, state?.offer.id);
     }
     if (!isUpdate && this.deps.mediaSyncer) {
-      try { await this.deps.mediaSyncer.sync({ offerId: committed.offerId, ownerUserId: input.context.ownerUserId, attachmentIds: [...(input.candidate.media.coverAttachmentId === null ? [] : [input.candidate.media.coverAttachmentId]), ...input.candidate.media.galleryAttachmentIds], mediaPolicy: input.context.mediaPolicy, sourceRecordKey: input.migrationRecord.sourceRecordKey }); }
-      catch (error) { return this.fail(input.migrationRecord.id, "OFFER_MEDIA_SYNC_FAILED", error instanceof Error ? error.message : String(error), committed.offerId); }
+      try {
+        await this.deps.mediaSyncer.sync({
+          offerId: committed.offerId,
+          ownerUserId: input.context.ownerUserId,
+          attachmentIds: [
+            ...(input.candidate.media.coverAttachmentId === null ? [] : [input.candidate.media.coverAttachmentId]),
+            ...input.candidate.media.galleryAttachmentIds,
+          ],
+          mediaPolicy: input.context.mediaPolicy,
+          sourceRecordKey: input.migrationRecord.sourceRecordKey,
+          sourceId: input.migrationRecord.sourceId,
+          sourceHash: input.migrationRecord.sourceHash,
+          runId: input.migrationRecord.runId,
+          recordId: input.migrationRecord.id,
+        });
+      } catch (error) {
+        return this.fail(input.migrationRecord.id, "OFFER_MEDIA_SYNC_FAILED", error instanceof Error ? error.message : String(error), committed.offerId);
+      }
     }
     let lineageId: string;
     try {

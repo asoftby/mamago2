@@ -151,6 +151,7 @@ function unusedRunAtomicCreate(): RunAtomicEventCreateLike {
 function createFakePrisma(options: { throwError?: Error; existingLineage?: MigrationLineage | null } = {}) {
   const calls: unknown[] = [];
   let transactionCallCount = 0;
+  const importedAt = options.existingLineage?.lastImportedAt ?? new Date("2026-08-01T00:00:00.000Z");
   const prisma: EventCommitRunnerPrismaClient = {
     migrationRecord: {
       update: (async (args: unknown) => {
@@ -174,10 +175,14 @@ function createFakePrisma(options: { throwError?: Error; existingLineage?: Migra
         return existing as unknown as MigrationLineage;
       }) as unknown as EventCommitRunnerPrismaClient["migrationLineage"]["update"],
     },
+    activity: {
+      findUnique: (async (args: { where: { id: string } }) => {
+        if (!options.existingLineage?.targetId) return null;
+        return { id: args.where.id, updatedAt: importedAt };
+      }) as unknown as EventCommitRunnerPrismaClient["activity"]["findUnique"],
+    },
     $transaction: async <T>(fn: (tx: EventCreateTransactionClient) => Promise<T>): Promise<T> => {
       transactionCallCount += 1;
-      // The fake `tx` is never actually used by these tests — `runAtomicCreate`
-      // is itself faked and ignores it — but the real signature must be honored.
       return fn({} as EventCreateTransactionClient);
     },
   };
@@ -253,6 +258,7 @@ async function testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator()
     sourceRecordKey: "wordpress-db:events:401",
     targetType: "ACTIVITY",
     targetId: "activity-99",
+    lastImportedAt: new Date("2026-08-01T00:00:00.000Z"),
   } as unknown as MigrationLineage;
   const { prisma } = createFakePrisma({ existingLineage });
   const runner = new EventCommitRunner({ orchestrator, runAtomicCreate: unusedRunAtomicCreate(), prisma });
@@ -267,7 +273,7 @@ async function testUpdateWithActiveLineagePassesTargetActivityIdToOrchestrator()
 
 async function testUpdateNeverOpensATransaction() {
   const { orchestrator } = createFakeOrchestrator({ ok: true, activityId: "activity-1" });
-  const existingLineage = { id: "lineage-9", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-99" } as unknown as MigrationLineage;
+  const existingLineage = { id: "lineage-9", sourceRecordKey: "wordpress-db:events:401", targetType: "ACTIVITY", targetId: "activity-99", lastImportedAt: new Date("2026-08-01T00:00:00.000Z") } as unknown as MigrationLineage;
   const { prisma, transactionCallCount } = createFakePrisma({ existingLineage });
   const runner = new EventCommitRunner({ orchestrator, runAtomicCreate: unusedRunAtomicCreate(), prisma });
 

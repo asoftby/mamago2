@@ -1708,3 +1708,50 @@ Next single action: approve explicit lifecycle/SEO/slug/media/schedule update
 contracts or exclusions for the 63 conflict records; do not perform a lineage
 hash transition until every target-domain mismatch has a disposition.
 ```
+
+```text
+Phase: PHOENIX FULL PROD MIGRATION PREFLIGHT — BLOCKED (no writes)
+2026-08-14, branch dev@8211d836 (= origin/dev, clean tree).
+
+Read-only preflight of legacy mamaGo.by → mamaGo 2.0 PROD. Phoenix was not
+started. WordPress was not modified. PROD DB/media/DNS/indexing were not
+changed. Disk headroom BACKLOG-086 closed DONE (80G LV, 61G free).
+
+Live WP (2026-08-14): Places publish 82; Events publish 9 (7–8
+future/active); Articles publish 117; Routes 14; hb-programs 90 +
+services 1; Users 580; attachments 9703; RankMath redirects 156;
+Voxel post_reviews 25; uploads 23G / 136929 files.
+
+PROD before: City 3, User 2 (ADMIN+USER ACTIVE), all content/ledger/
+media tables 0. Image prod-158 / OCI 86154ddc. 231 Prisma migrations
+applied (+1 historical rolled-back row).
+
+Verdict: BLOCKED. P0=0. P1s filed BACKLOG-099..104 (user CLI local-only,
+PRODUCTION profile vs noindex, phoenix-release stub + stale freeze,
+Reviews missing, FULL MEDIA gaps, operator-Mac topology because the
+shared host cannot reach WP). P2/P3: BACKLOG-105..107.
+
+Next single action: owner decisions on P1s (especially Users-on-PROD
+gate, Reviews in/out of scope, Article 2-vs-117 scope, Offer/Route/
+logo/profile media exceptions) — then a separate owner-controlled
+execution prompt. Do not run Phoenix until that approval.
+```
+
+```text
+Phase: PHOENIX FULL PROD MIGRATION READINESS — code+tests (no writes)
+2026-08-14, continuation of the preflight above.
+
+Closed P1s in code: BACKLOG-015 Offer FULL media, BACKLOG-099 PROD-safe
+user gate (`migration:user:live`), BACKLOG-100 PROD_IMPORT / noindex
+decoupling, BACKLOG-101 commit-CLI is the path, BACKLOG-102 Reviews
+runner, BACKLOG-103 FULL media gaps except Business/User profile
+(BACKLOG-108 P2), BACKLOG-104 Mac-side topology documented.
+
+Do not run FULL PROD migration from this handoff. Owner-controlled
+execution is a separate prompt.
+
+PHASE L note: after the code change, live WP SSH to 134.17.16.78:22
+timed out from the operator Mac (HTTP https://mamago.by still 200).
+Fresh `migration:scope:wordpress-db` inventory was therefore not
+written. Re-run the scope CLI before the owner-controlled import.
+```

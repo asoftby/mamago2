@@ -31,15 +31,21 @@
  *   singleton is wrapped with `SearchIndexerService` and `globalThis`
  *   dev-hot-reload caching, both Next.js-app concerns a disposable,
  *   one-shot CLI process doesn't need.
- * - `--profile FULL_IMPORT|DEV_VALIDATION|PRODUCTION` (default: derived from
- *   APP_ENV/VERCEL_ENV, see `resolveMigrationProfile()`) selects a bundle of
- *   `--media-policy FULL|METADATA|NONE`, `--seo-policy DRY_RUN|VALIDATE|PRODUCTION`
- *   and `--redirect-policy VALIDATE|APPLY`, each individually overridable.
- *   The resolved profile is printed before anything runs.
+ * - `--profile FULL_IMPORT|DEV_VALIDATION|PRODUCTION|PROD_IMPORT` (default:
+ *   derived from APP_ENV/VERCEL_ENV, see `resolveMigrationProfile()`).
+ *   Pre-cutover PROD content+media import must use `--profile FULL_IMPORT`
+ *   or `--profile PROD_IMPORT` with `--media-policy FULL`. Do not use
+ *   `--profile PRODUCTION` until mamago.by cutover — that profile requires
+ *   search-engine indexing. `prod.mamago.by` stays noindex.
  * - When the resolved profile is `PRODUCTION`, `ProductionMigrationGuard`
  *   requires `--confirm-production` and validates the redirect manifest and
  *   global-noindex flag *before* the WordPress SSH connection or
  *   `PrismaClient` is ever opened — see `assertProductionMigrationGuard()`.
+ * - After opening Prisma, `assertMigrationDatabaseTarget` fail-closes on
+ *   anything except localhost:5433/mamago2 or `prodmamago`. Targeting
+ *   `prodmamago` (including via a loopback tunnel) requires
+ *   `--confirm-production`. User-import acknowledgement is not required
+ *   here — that flag is only for `migration:user:live`.
  *
  * Run:
  *   pnpm migration:commit:wordpress-db --entity place \
@@ -74,12 +80,14 @@ import {
   ROUTE_ENTITY_TYPE,
   OFFER_PROGRAMS_ENTITY_TYPE,
   OFFER_SERVICES_ENTITY_TYPE,
+  REVIEW_ENTITY_TYPE,
   WORDPRESS_DB_ADAPTER_KEY,
   fetchPublishedArticleEnvelopeBySourceRecordKey,
   fetchPublishedEventEnvelopeBySourceRecordKey,
   fetchPublishedPlaceEnvelopeBySourceRecordKey,
   fetchPublishedRouteEnvelopeBySourceRecordKey,
   fetchPublishedOfferEnvelopeBySourceRecordKey,
+  fetchPublishedReviewEnvelopeBySourceRecordKey,
   registerWordPressDbAdapter,
 } from "../src/lib/migration/adapters/wordpress-db/wordpressDbAdapter";
 import { WordPressRepository, type WordPressQueryExecutor } from "../src/lib/migration/adapters/wordpress-db/WordPressRepository";
@@ -110,7 +118,7 @@ import { RouteCommitOrchestrator } from "../src/lib/migration/commit/route/Route
 import { RouteCommitRunner } from "../src/lib/migration/commit/route/RouteCommitRunner";
 import { RouteCommitWriter } from "../src/lib/migration/commit/route/RouteCommitWriter";
 import { RouteStopMediaSyncer } from "../src/lib/migration/commit/route/RouteStopMediaSyncer";
-import { OfferCommitWriter, OfferCommitOrchestrator, OfferCommitRunner, OfferMediaSyncer, buildOfferCreateDraft, type OfferCommitContext } from "../src/lib/migration/commit/offer";
+import { OfferCommitWriter, OfferCommitOrchestrator, OfferCommitRunner, OfferMediaSyncer, FullOfferMediaDelegate, buildOfferCreateDraft, hydrateOfferContextsFromPlaceLineage, type OfferCommitContext } from "../src/lib/migration/commit/offer";
 import { createMigrationRunExecutionPlan } from "../src/lib/migration/core/orchestrator";
 import type { MigrationLineageLookup, MigrationRunPlanInput } from "../src/lib/migration/core/orchestrator";
 import { MigrationLedgerRepository } from "../src/lib/migration/ledger/MigrationLedgerRepository";
@@ -132,6 +140,8 @@ import {
   ArticleMediaReplaySyncer,
   PrismaArticleMediaAttachmentImportCoordinator,
 } from "../src/lib/migration/commit/article/ArticleMediaReplaySyncer";
+import { ArticleFullMediaSyncer } from "../src/lib/migration/commit/article/ArticleFullMediaSyncer";
+import { ReviewCommitRunner, PrismaReviewLineageLookup } from "../src/lib/migration/commit/review";
 import {
   parsePlacePostIdFromSourceRecordKey,
   runPlaceMediaOnlyReplay,
@@ -158,9 +168,10 @@ import type {
   RedirectPolicyName,
   SeoPolicyName,
 } from "../src/lib/migration/runtime/MigrationProfile";
+import { assertMigrationDatabaseTarget } from "../src/lib/migration/runtime/migrationDatabaseTarget";
 import { assertProductionMigrationGuard } from "../src/lib/migration/runtime/ProductionMigrationGuard";
 
-export type CommitEntity = "article" | "place" | "event" | "route" | "offer" | "all";
+export type CommitEntity = "article" | "place" | "event" | "route" | "offer" | "review" | "all";
 
 export interface CommitCliArgs {
   entity: CommitEntity;
@@ -183,13 +194,13 @@ export interface CommitCliArgs {
   snapshotRoot?: string;
 }
 
-const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "route", "offer", "all"];
+const VALID_ENTITIES: readonly CommitEntity[] = ["article", "place", "event", "route", "offer", "review", "all"];
 
 export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const entityIndex = argv.indexOf("--entity");
   const rawEntity = entityIndex !== -1 ? argv[entityIndex + 1] : undefined;
   if (rawEntity !== undefined && !VALID_ENTITIES.includes(rawEntity as CommitEntity)) {
-    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|route|offer|all.`);
+    throw new Error(`Invalid --entity value "${rawEntity}". Expected article|place|event|route|offer|review|all.`);
   }
   const entity: CommitEntity = (rawEntity as CommitEntity | undefined) ?? "all";
 
@@ -234,7 +245,6 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
     throw new Error("Missing value for --source-record-key.");
   }
   const sourceRecordKeyCount = argv.filter((token) => token === "--source-record-key").length;
-  if (entity === "offer" && (!sourceRecordKey || sourceRecordKeyCount !== 1 || limit !== undefined)) throw new Error("--entity offer requires exactly one --source-record-key and forbids --limit; Batch 1 is not enabled.");
 
   if (forceReprocess) {
     if (entity !== "article" && entity !== "place") {
@@ -256,7 +266,7 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   const profileName = rawProfile !== undefined ? parseMigrationProfileName(rawProfile) : undefined;
   if (rawProfile !== undefined && profileName === null) {
     throw new Error(
-      `Invalid --profile value "${rawProfile}". Expected FULL_IMPORT|DEV_VALIDATION|PRODUCTION.`,
+      `Invalid --profile value "${rawProfile}". Expected FULL_IMPORT|DEV_VALIDATION|PRODUCTION|PROD_IMPORT.`,
     );
   }
 
@@ -266,7 +276,6 @@ export function parseArgs(argv: readonly string[]): CommitCliArgs {
   if (rawMediaPolicy !== undefined && mediaPolicyName === null) {
     throw new Error(`Invalid --media-policy value "${rawMediaPolicy}". Expected FULL|METADATA|NONE.`);
   }
-  if (entity === "offer" && mediaPolicyName === "FULL") throw new Error("Offer FULL media commit requires a separate media execution gate; use METADATA or NONE for the initial golden.");
 
   if (forceMediaReprocess) {
     const guard = validateEventMediaOnlyReprocessArgs({
@@ -400,6 +409,7 @@ function entityTypesFor(entity: CommitEntity): readonly string[] | undefined {
   if (entity === "event") return [EVENT_ENTITY_TYPE];
   if (entity === "route") return [ROUTE_ENTITY_TYPE];
   if (entity === "offer") return [OFFER_PROGRAMS_ENTITY_TYPE, OFFER_SERVICES_ENTITY_TYPE];
+  if (entity === "review") return [REVIEW_ENTITY_TYPE];
   return undefined;
 }
 
@@ -567,7 +577,6 @@ async function main(): Promise<void> {
     seoPolicyName: args.seoPolicyName,
     redirectPolicyName: args.redirectPolicyName,
   });
-  if (args.entity === "offer" && profile.mediaPolicy.name === "FULL") throw new Error("Initial targeted Offer commit requires --media-policy METADATA or NONE; FULL media needs a separate execution gate.");
   console.log(formatMigrationProfileForCli(profile));
   console.log();
 
@@ -586,6 +595,15 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient();
   try {
+    const databaseRows = await prisma.$queryRaw<Array<{ current_database: string }>>`SELECT current_database()`;
+    assertMigrationDatabaseTarget({
+      databaseUrl: process.env.DATABASE_URL,
+      confirmProduction: args.confirmProduction,
+      confirmWrites: args.confirmWrites,
+      currentDatabase: databaseRows[0]?.current_database ?? "",
+      requireProdUserAcknowledgement: false,
+    });
+
     const ledger = new MigrationLedgerRepository(prisma);
 
     let records: readonly SourceRecordEnvelope[] | undefined;
@@ -602,9 +620,11 @@ async function main(): Promise<void> {
         records = [await fetchPublishedRouteEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else if (args.entity === "offer") {
         records = [await fetchPublishedOfferEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
+      } else if (args.entity === "review") {
+        records = [await fetchPublishedReviewEnvelopeBySourceRecordKey(executor, args.sourceRecordKey)];
       } else {
         throw new Error(
-          "--source-record-key is only supported with --entity article|place|event|route|offer for golden-sample runs.",
+          "--source-record-key is only supported with --entity article|place|event|route|offer|review.",
         );
       }
     }
@@ -621,6 +641,20 @@ async function main(): Promise<void> {
       }),
     );
     applyForcedReprocess(executionPlan, args);
+
+    let resolvedContextConfig = contextConfig;
+    const offerCandidates = executionPlan.executionCandidates.filter((candidate) => candidate.planItem.targetType === "OFFER");
+    if (offerCandidates.length > 0) {
+      resolvedContextConfig = await hydrateOfferContextsFromPlaceLineage({
+        records: offerCandidates.map((candidate) => ({
+          sourceRecordKey: candidate.planItem.sourceRecordKey,
+          candidate: candidate.candidate as import("../src/lib/migration/adapters/wordpress-db/normalizeOffer").NormalizedOfferCandidate,
+        })),
+        contextConfig,
+        prisma,
+        mediaPolicyName: profile.mediaPolicy.name,
+      });
+    }
 
     const runWriter = new MigrationRunWriter(prisma);
     const lineageWriter = new MigrationLineageWriter(prisma);
@@ -1020,6 +1054,16 @@ async function main(): Promise<void> {
         orchestrator: new ArticleCommitOrchestrator(new ArticleCommitWriter(prisma)),
         lineageWriter,
         prisma,
+        mediaSyncer:
+          profile.mediaPolicy.name === "FULL" || samplingActive
+            ? new ArticleFullMediaSyncer({
+                prisma,
+                attachmentResolver: wordpressRepository,
+                mediaImporterFactory,
+                lineageWriter,
+                attachmentImportCoordinator: new PrismaArticleMediaAttachmentImportCoordinator(prisma),
+              })
+            : undefined,
       }),
       route: new RouteCommitRunner({
         orchestrator: new RouteCommitOrchestrator(new RouteCommitWriter(prisma)),
@@ -1031,13 +1075,25 @@ async function main(): Promise<void> {
         orchestrator: new OfferCommitOrchestrator(new OfferCommitWriter(prisma)),
         lineageWriter,
         prisma,
-        mediaSyncer: new OfferMediaSyncer(),
+        mediaSyncer: new OfferMediaSyncer(
+          new FullOfferMediaDelegate({
+            prisma,
+            attachmentResolver: wordpressRepository,
+            mediaImporterFactory,
+            lineageWriter,
+          }),
+        ),
+      }),
+      review: new ReviewCommitRunner({
+        prisma,
+        lineageLookup: new PrismaReviewLineageLookup(prisma),
+        lineageWriter,
       }),
     };
 
     const summary = await runCommitExecutionPlan({
       executionPlan,
-      contextConfig,
+      contextConfig: resolvedContextConfig,
       runWriter,
       prisma,
       runners,

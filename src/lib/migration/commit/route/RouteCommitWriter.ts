@@ -81,9 +81,6 @@ function buildRouteUpdateData(draft: RouteCreateDraft): Prisma.RouteUncheckedUpd
   return {
     title: draft.title,
     cityId: draft.cityId,
-    status: draft.status,
-    visibility: draft.visibility,
-    authorId: draft.authorId,
     seoTitle: draft.seoTitle,
   };
 }

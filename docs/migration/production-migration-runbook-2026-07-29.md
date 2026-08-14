@@ -78,6 +78,12 @@ has actually executed in local/dev, made explicit for production:
 7. **Articles** — no dependency on Events; safe to run in parallel with
    step 6, but keep sequential per checklist §1 rule 6 (first full write
    per entity is sequential, stop-on-first-error).
+8. **Reviews** — depends on Users + Places. Missing mapping → SKIP_WITH_REASON.
+
+Canonical pre-cutover flags (2026-08-14): `--profile FULL_IMPORT --media-policy FULL`
+(or `--profile PROD_IMPORT`). Keep noindex. Users: `pnpm migration:user:live`.
+Fresh inventory: `pnpm migration:scope:wordpress-db`. Topology: operator Mac,
+not the PROD host.
 8. **Redirects** — build-time/runtime manifest, not a DB write; validate
    after all content entities exist so canonical destinations resolve.
 9. **Media reconciliation** — storage manifest + `MediaAsset` rows,

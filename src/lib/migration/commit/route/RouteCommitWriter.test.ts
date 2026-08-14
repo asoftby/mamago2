@@ -189,6 +189,9 @@ async function testUpdateReplacesStopsAndKeepsSlugOutOfUpdateData() {
   const updateCall = calls.routeUpdate[0] as { where: { id: string }; data: Record<string, unknown> };
   assert.equal(updateCall.where.id, "route-99");
   assert.ok(!("slug" in updateCall.data));
+  assert.ok(!("status" in updateCall.data), "Phoenix must not overwrite mamaGo Route.status on UPDATE");
+  assert.ok(!("visibility" in updateCall.data), "Phoenix must not overwrite mamaGo Route.visibility on UPDATE");
+  assert.ok(!("authorId" in updateCall.data), "Phoenix must not overwrite mamaGo Route.authorId on UPDATE");
   assert.deepEqual(calls.stopDeleteMany[0], { where: { routeId: "route-99" } });
   assert.deepEqual(calls.stopCreateMany[0], {
     data: [

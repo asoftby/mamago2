@@ -117,6 +117,7 @@ function createFakePrisma(options: { existingLineage?: MigrationLineage | null }
   const recordUpdateCalls: unknown[] = [];
   const lineageFindCalls: unknown[] = [];
   const lineageUpdateCalls: unknown[] = [];
+  const importedAt = options.existingLineage?.lastImportedAt ?? new Date("2026-08-01T00:00:00.000Z");
   const prisma: RouteCommitRunnerPrismaClient = {
     migrationRecord: {
       update: (async (args: unknown) => {
@@ -138,6 +139,12 @@ function createFakePrisma(options: { existingLineage?: MigrationLineage | null }
           targetId: "route-1",
         } as unknown as MigrationLineage;
       }) as unknown as RouteCommitRunnerPrismaClient["migrationLineage"]["update"],
+    },
+    route: {
+      findUnique: (async () =>
+        options.existingLineage?.targetId
+          ? { id: options.existingLineage.targetId, updatedAt: importedAt }
+          : null) as unknown as RouteCommitRunnerPrismaClient["route"]["findUnique"],
     },
   };
   return { prisma, recordUpdateCalls, lineageFindCalls, lineageUpdateCalls };
@@ -246,6 +253,7 @@ async function testUpdateWithActiveLineageIsIdempotentPath() {
     sourceRecordKey: "wordpress-db:routes:701",
     targetType: "ROUTE",
     targetId: "route-1",
+    lastImportedAt: new Date("2026-08-01T00:00:00.000Z"),
   } as unknown as MigrationLineage;
   const { prisma, lineageFindCalls, lineageUpdateCalls } = createFakePrisma({ existingLineage });
   const runner = new RouteCommitRunner({ orchestrator, lineageWriter, prisma });

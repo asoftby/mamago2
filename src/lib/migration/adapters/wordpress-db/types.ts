@@ -90,6 +90,21 @@ export interface WordPressUserRow {
   display_name: string;
 }
 
+/** One Voxel `wp_voxel_timeline` row with feed=`post_reviews`, plus the related Place post_status. */
+export interface WordPressVoxelReviewRow {
+  id: number;
+  user_id: number;
+  post_id: number;
+  feed: string;
+  content: string | null;
+  details: string | null;
+  review_score: string | number | null;
+  created_at: string;
+  moderation: string | null;
+  published_as: string | null;
+  place_status: string | null;
+}
+
 /**
  * One row of `wp_voxel_index_places`, with the native `_location POINT`
  * column already decomposed via `ST_X()`/`ST_Y()` in the query itself —

@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
+import { assertMigrationDatabaseTarget } from "../src/lib/migration/runtime/migrationDatabaseTarget";
+
 import {
   USER_GOLDEN_KEYS,
   loadUserSourceCandidate,
@@ -24,11 +26,12 @@ export function parseUserMigrationArgs(argv: readonly string[]): Args {
 }
 
 export function assertLocalDatabaseUrl(raw: string | undefined): void {
-  if (!raw) throw new Error("DATABASE_URL is required.");
-  const url = new URL(raw);
-  if (!(["localhost", "127.0.0.1"].includes(url.hostname) && url.port === "5433" && url.pathname === "/mamago2")) {
-    throw new Error("LOCAL_DB_GATE_FAILED: only localhost:5433/mamago2 is allowed.");
-  }
+  assertMigrationDatabaseTarget({
+    databaseUrl: raw,
+    confirmProduction: false,
+    confirmWrites: false,
+    requireProdUserAcknowledgement: false,
+  });
 }
 
 async function main(): Promise<void> {

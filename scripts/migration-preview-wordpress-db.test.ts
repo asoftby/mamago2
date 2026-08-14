@@ -105,6 +105,12 @@ function createFakeExecutor(): WordPressQueryExecutor {
       const ids = params as readonly number[];
       return placeIndexRows.filter((row) => ids.includes(row.post_id)) as never;
     }
+    if (sql.includes("post_type IN (")) {
+      return [] as never;
+    }
+    if (sql.includes("FROM wp_voxel_timeline")) {
+      return [] as never;
+    }
     throw new Error(`Unexpected query in test fake: ${sql}`);
   };
 }

@@ -5,6 +5,25 @@ database writes, and no deploys happen as part of writing this runbook. It
 defines the sequence a human operator follows to execute a real cutover,
 using the CLI and guard rails already built through Phase 2D.
 
+## Current implementation (2026-08-14) — use this, not the Phase 2D table below
+
+Historical Phase 2D scope below is preserved as evidence. Current `dev`:
+
+| Entity | Path |
+| --- | --- |
+| Users | `pnpm migration:user:live` (PROD writes: `--confirm-production --confirm-writes --acknowledge-prod-user-import`). Passwords are not migrated. Golden 564-user CLI stays localhost-only. |
+| Places | `pnpm migration:commit:wordpress-db --entity place --profile FULL_IMPORT --media-policy FULL` — cover, gallery, logo |
+| Events | `--entity event --media-policy FULL` — current/future published only; Event images ARE imported |
+| Articles | `--entity article --media-policy FULL` — all valid published; cover + inline on the normal FULL path |
+| Routes | `--entity route --media-policy FULL` — RouteStop media on first FULL run |
+| Offers | `--entity offer --media-policy FULL` — valid Place mapping required; otherwise SKIP with reason |
+| Reviews | `--entity review` — Voxel `post_reviews` → `PlaceReview` |
+| Fresh inventory | `pnpm migration:scope:wordpress-db --allow-remote-readonly` (read-only, no freeze) |
+
+Pre-cutover profile: `--profile FULL_IMPORT` or `--profile PROD_IMPORT`. Keep `prod.mamago.by` noindex. Do not use `--profile PRODUCTION` until mamago.by cutover.
+
+Topology: Owner Mac → live WordPress (SSH/HTTP read-only) → Phoenix process → PROD DB/media. Do not run the importer on the shared PROD host (`134.17.17.134` cannot reach WordPress). Do not use `migration:phoenix-release --apply`.
+
 Related: [`migration-engine.md`](./migration-engine.md) (Phase 2 architecture),
 [`wordpress-to-mamago.md`](./wordpress-to-mamago.md) (Phase 1 discovery/GAP
 analysis), [`migration-ledger-schema-proposal.md`](./migration-ledger-schema-proposal.md)

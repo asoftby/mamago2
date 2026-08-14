@@ -6,14 +6,14 @@ import { MediaImportWriter } from "../../media/MediaImportWriter";
 import type { MediaImporterLike, MediaLineageWriterLike } from "../../media/types";
 
 /**
- * Article media replay's own attachment-level resolve/import/reuse — not a
- * general-purpose `ArticleMediaSyncer` wired into the normal Article
- * CREATE/UPDATE commit path (that path never touches media at all today,
- * by design; see `buildArticleCreateDraft.ts`). Deliberately narrow, built
- * for `strictArticleMediaReplay.ts` only, mirroring `EventMediaSyncer`'s
- * attachment-level methods (`checkAttachmentLineageStates`/
- * `resolveAndImportAttachments`) so the resolve/import/dedup logic isn't
- * reinvented — just the entity-specific plumbing around it.
+ * Article media replay's own attachment-level resolve/import/reuse.
+ * `ArticleFullMediaSyncer` reuses this on the normal FULL CREATE/UPDATE
+ * path as a best-effort first run; `--force-article-media-replay` remains
+ * the strict recovery tool. Deliberately narrow, built for
+ * `strictArticleMediaReplay.ts` and the FULL first-run path, mirroring
+ * `EventMediaSyncer`'s attachment-level methods
+ * (`checkAttachmentLineageStates` / `resolveAndImportAttachments`) so the
+ * resolve/import/dedup logic isn't reinvented.
  *
  * A single constant `targetRole` (like `PlaceMediaSyncer`'s `"place-media"`)
  * is used for every Article attachment, regardless of whether it ends up as

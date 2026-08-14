@@ -41,16 +41,23 @@ export function evaluateProductionMigrationGuard(
 ): ProductionMigrationGuardResult {
   const issues: ProductionMigrationGuardIssue[] = [];
 
-  if (input.profile.name !== "PRODUCTION") {
+  const requiresProductionConfirmation =
+    input.profile.name === "PRODUCTION" || input.profile.name === "PROD_IMPORT";
+  if (!requiresProductionConfirmation) {
     return { passed: true, issues };
   }
 
   if (!input.confirmProduction) {
     issues.push({
       code: "PRODUCTION_CONFIRMATION_MISSING",
-      message:
-        "Migration profile is PRODUCTION but --confirm-production was not passed. Refusing to run.",
+      message: `Migration profile is ${input.profile.name} but --confirm-production was not passed. Refusing to run.`,
     });
+  }
+
+  // PROD_IMPORT is pre-cutover: confirm the target, keep noindex, do not
+  // require the 900-row redirect manifest or SITE_INDEXING_ENABLED.
+  if (input.profile.name === "PROD_IMPORT") {
+    return { passed: issues.length === 0, issues };
   }
 
   if (input.profile.redirectPolicy.validateManifest) {

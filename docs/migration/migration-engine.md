@@ -525,7 +525,7 @@ RankMath rules should not be blindly copied. They need normalization, loop detec
 | Overloading current import models | Use separate Phoenix ledger proposal and keep existing import workflow intact. |
 | Duplicate target entities after crash | Require lineage and idempotency checks before every target write. |
 | Dry-run and commit divergence | Use the same normalization, validation, and planning logic for both modes. |
-| Event images accidentally migrate | Enforce event media exclusion in the media planner before fetch/copy. |
+| Event images accidentally migrate | **Historical Phase 2 note.** Current importer (`EventMediaSyncer`) imports Event images under `--media-policy FULL`. Past-only events are excluded in `normalizeEvent`. |
 | Past events leak into v1 | Validate event eligibility before planning. |
 | User password expectations | Do not migrate passwords; report reactivation-required users and align product flow. |
 | Profile ambiguity | Quarantine ambiguous personal/business profiles for manual review. |

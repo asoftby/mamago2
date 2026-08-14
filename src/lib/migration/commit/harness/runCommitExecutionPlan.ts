@@ -10,7 +10,9 @@ import type {
   ArticleCommitRunnerLike,
   DispatchCommitRunnerInput,
   EventCommitRunnerLike,
+  OfferCommitRunnerLike,
   PlaceCommitRunnerLike,
+  ReviewCommitRunnerLike,
   RouteCommitRunnerLike,
 } from "../dispatch/dispatchCommitRunner";
 import type { MigrationWarning } from "../../types";
@@ -56,6 +58,8 @@ export interface RunCommitExecutionPlanInput {
     event?: EventCommitRunnerLike;
     article?: ArticleCommitRunnerLike;
     route?: RouteCommitRunnerLike;
+    offer?: OfferCommitRunnerLike;
+    review?: ReviewCommitRunnerLike;
   };
 }
 

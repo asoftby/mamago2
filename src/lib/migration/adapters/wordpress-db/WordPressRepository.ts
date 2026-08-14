@@ -16,6 +16,8 @@ import {
   buildRankMathRedirectsQuery,
   buildTermsQuery,
   buildUsersQuery,
+  buildVoxelPostReviewByIdQuery,
+  buildVoxelPostReviewsQuery,
   clampLimit,
 } from "./sql";
 import type {
@@ -33,6 +35,7 @@ import type {
   WordPressRouteBundle,
   WordPressTermRow,
   WordPressUserRow,
+  WordPressVoxelReviewRow,
 } from "./types";
 
 /**
@@ -289,5 +292,16 @@ export class WordPressRepository {
   async getUsers(limit?: number): Promise<WordPressUserRow[]> {
     const { sql, params } = buildUsersQuery(clampLimit(limit));
     return this.executor<WordPressUserRow>(sql, params);
+  }
+
+  async getVoxelPostReviews(limit?: number): Promise<WordPressVoxelReviewRow[]> {
+    const { sql, params } = buildVoxelPostReviewsQuery(clampLimit(limit));
+    return this.executor<WordPressVoxelReviewRow>(sql, params);
+  }
+
+  async getVoxelPostReviewById(id: number): Promise<WordPressVoxelReviewRow | null> {
+    const { sql, params } = buildVoxelPostReviewByIdQuery(id);
+    const rows = await this.executor<WordPressVoxelReviewRow>(sql, params);
+    return rows[0] ?? null;
   }
 }

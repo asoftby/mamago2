@@ -55,12 +55,11 @@ export async function loadPhoenixEnvironment(
   if (input.environment !== "PROD" && env.SITE_INDEXING_ENABLED === "true") {
     throw new Error("INDEXING_GATE_OPEN: non-production Phoenix target must not be indexable.");
   }
-  if (
-    input.environment === "PROD" &&
-    (env.SITE_INDEXING_ENABLED !== "true" || env.SITE_NOINDEX_FORCE === "true")
-  ) {
-    throw new Error("PRODUCTION_INDEXING_GATE_MISMATCH");
-  }
+  // Pre-cutover PROD import must stay noindex. Indexing is a PRODUCTION
+  // *profile* concern (`ProductionMigrationGuard` + seoPolicy.requireIndexingEnabled),
+  // not an environment fingerprint requirement. Forcing SITE_INDEXING_ENABLED
+  // here made FULL media import to prodmamago impossible while the preview
+  // host correctly remained noindex.
 
   const rawDatabaseUrl = env.DATABASE_URL;
   if (!rawDatabaseUrl) throw new Error("DATABASE_URL is required.");

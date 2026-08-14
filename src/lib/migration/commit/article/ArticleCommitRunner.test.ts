@@ -134,12 +134,13 @@ function createFakeLineageWriter(options: { result?: CreateLineageResult; throwE
 function createFakePrisma(
   options: {
     throwError?: Error;
-    existingLineage?: { id: string; targetId: string } | null;
+    existingLineage?: { id: string; targetId: string; lastImportedAt?: Date } | null;
   } = {},
 ) {
   const recordUpdateCalls: unknown[] = [];
   const lineageFindCalls: unknown[] = [];
   const lineageUpdateCalls: unknown[] = [];
+  const importedAt = options.existingLineage?.lastImportedAt ?? new Date("2026-08-01T00:00:00.000Z");
   const prisma: ArticleCommitRunnerPrismaClient = {
     migrationRecord: {
       update: (async (args: unknown) => {
@@ -159,6 +160,7 @@ function createFakePrisma(
               sourceRecordKey: "wordpress-db:post:201",
               targetType: "ARTICLE",
               targetId: options.existingLineage.targetId,
+              lastImportedAt: importedAt,
             } as unknown)
           : null;
       }) as unknown as ArticleCommitRunnerPrismaClient["migrationLineage"]["findFirst"],
@@ -174,6 +176,12 @@ function createFakePrisma(
           targetId: "article-1",
         } as unknown;
       }) as unknown as ArticleCommitRunnerPrismaClient["migrationLineage"]["update"],
+    },
+    article: {
+      findUnique: (async () =>
+        options.existingLineage
+          ? { id: options.existingLineage.targetId, updatedAt: importedAt }
+          : null) as unknown as ArticleCommitRunnerPrismaClient["article"]["findUnique"],
     },
   };
   return { prisma, recordUpdateCalls, lineageFindCalls, lineageUpdateCalls };
@@ -311,9 +319,10 @@ async function testPlanSummaryNormalizedAndRawPayloadNeverTouched() {
 }
 
 async function testNoMediaSlugHistoryCategoryTagsGeoDelegatesExistOrTouched() {
-  // `ArticleCommitRunnerPrismaClient` only exposes migration status/lineage delegates.
+  // Prisma surface is ledger + Article timestamp gate. Media still goes through
+  // the injected ArticleFullMediaSyncer, not extra article writer delegates.
   const { prisma } = createFakePrisma();
-  assert.deepEqual(Object.keys(prisma), ["migrationRecord", "migrationLineage"]);
+  assert.deepEqual(Object.keys(prisma), ["migrationRecord", "migrationLineage", "article"]);
 }
 
 async function testWarningsAreDeliberatelyNotExposedOnRunnerResult() {

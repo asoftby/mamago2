@@ -19,6 +19,7 @@ import { normalizeEvent } from "./normalizeEvent";
 import { normalizePlace } from "./normalizePlace";
 import { normalizeRoute } from "./normalizeRoute";
 import { normalizeOffer } from "./normalizeOffer";
+import { hashReviewCandidate, normalizeReview } from "./normalizeReview";
 import { WordPressRepository } from "./WordPressRepository";
 import type { WordPressQueryExecutor } from "./WordPressRepository";
 import type {
@@ -28,6 +29,7 @@ import type {
   WordPressRouteBundle,
   WordPressOfferBundle,
 } from "./types";
+import type { WordPressVoxelReviewRow } from "./types";
 import type {
   MigrationAdapterContext,
   NormalizedRecord,
@@ -41,8 +43,9 @@ export const EVENT_ENTITY_TYPE = "wordpress-db:events";
 export const ROUTE_ENTITY_TYPE = "wordpress-db:routes";
 export const OFFER_PROGRAMS_ENTITY_TYPE = "wordpress-db:hb-programs";
 export const OFFER_SERVICES_ENTITY_TYPE = "wordpress-db:services";
+export const REVIEW_ENTITY_TYPE = "wordpress-db:voxel-timeline-review";
 
-type WordPressEntityFilter = "article" | "place" | "event" | "route" | "offer" | "all";
+type WordPressEntityFilter = "article" | "place" | "event" | "route" | "offer" | "review" | "all";
 
 function getExecutorFromContext(context: MigrationAdapterContext): WordPressQueryExecutor {
   const executor = context.config?.executor;
@@ -65,6 +68,7 @@ function resolveEntityFilter(context: MigrationAdapterContext): WordPressEntityF
     event: entityTypes.includes(EVENT_ENTITY_TYPE),
     route: entityTypes.includes(ROUTE_ENTITY_TYPE),
     offer: entityTypes.includes(OFFER_PROGRAMS_ENTITY_TYPE) || entityTypes.includes(OFFER_SERVICES_ENTITY_TYPE),
+    review: entityTypes.includes(REVIEW_ENTITY_TYPE),
   };
   const wantedKeys = (Object.keys(wanted) as (keyof typeof wanted)[]).filter((key) => wanted[key]);
   return wantedKeys.length === 1 ? wantedKeys[0] : "all";
@@ -117,6 +121,19 @@ function toRouteEnvelope(bundle: WordPressRouteBundle): SourceRecordEnvelope {
     rawPayload: bundle,
   };
 }
+function toReviewEnvelope(row: WordPressVoxelReviewRow): SourceRecordEnvelope {
+  const sourceRecordKey = `${REVIEW_ENTITY_TYPE}:${row.id}`;
+  const normalized = normalizeReview(row);
+  const candidate = normalized.normalizedPayload as import("./normalizeReview").NormalizedReviewCandidate;
+  return {
+    sourceEntityType: REVIEW_ENTITY_TYPE,
+    sourceStableKey: sourceRecordKey,
+    sourceRecordKey,
+    sourceUpdatedAt: row.created_at,
+    sourceHash: hashReviewCandidate(candidate),
+    rawPayload: row,
+  };
+}
 function toOfferEnvelope(bundle: WordPressOfferBundle): SourceRecordEnvelope {
   const sourceRecordKey = `wordpress-db:${bundle.post.post_type}:${bundle.post.ID}`;
   return { sourceEntityType: `wordpress-db:${bundle.post.post_type}`, sourceStableKey: sourceRecordKey, sourceRecordKey, sourceUpdatedAt: bundle.post.post_modified, sourceHash: hashOfferBundle(bundle), rawPayload: bundle };
@@ -151,9 +168,13 @@ async function discoverRecords(
     const routes = await repository.getPublishedRoutes(limit);
     envelopes.push(...routes.map(toRouteEnvelope));
   }
-  if (entityFilter === "offer") {
+  if (entityFilter === "offer" || entityFilter === "all") {
     const offers = await repository.getPublishedOffers(limit);
     envelopes.push(...offers.map(toOfferEnvelope));
+  }
+  if (entityFilter === "review" || entityFilter === "all") {
+    const reviews = await repository.getVoxelPostReviews(limit);
+    envelopes.push(...reviews.map(toReviewEnvelope));
   }
 
   return envelopes;
@@ -179,6 +200,7 @@ async function normalizeRecord(record: SourceRecordEnvelope, context?: Migration
     return normalizeRoute(record.rawPayload as WordPressRouteBundle);
   }
   if (record.sourceEntityType === OFFER_PROGRAMS_ENTITY_TYPE || record.sourceEntityType === OFFER_SERVICES_ENTITY_TYPE) return normalizeOffer(record.rawPayload as WordPressOfferBundle);
+  if (record.sourceEntityType === REVIEW_ENTITY_TYPE) return normalizeReview(record.rawPayload as WordPressVoxelReviewRow);
   throw new Error(`wordpress-db adapter cannot normalize sourceEntityType "${record.sourceEntityType}"`);
 }
 
@@ -187,8 +209,8 @@ export const wordpressDbAdapter = {
     key: WORDPRESS_DB_ADAPTER_KEY,
     version: "1.0.0",
     displayName: "WordPress DB (read-only)",
-    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE, OFFER_PROGRAMS_ENTITY_TYPE, OFFER_SERVICES_ENTITY_TYPE],
-    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY", "ROUTE", "OFFER"] as const,
+    supportedSourceEntityTypes: [ARTICLE_ENTITY_TYPE, PLACE_ENTITY_TYPE, EVENT_ENTITY_TYPE, ROUTE_ENTITY_TYPE, OFFER_PROGRAMS_ENTITY_TYPE, OFFER_SERVICES_ENTITY_TYPE, REVIEW_ENTITY_TYPE],
+    supportedTargetTypes: ["ARTICLE", "PLACE", "ACTIVITY", "ROUTE", "OFFER", "PLACE_REVIEW"] as const,
     capabilities: ["DISCOVERY", "NORMALIZATION"] as const,
     stableIdPolicy: "WordPress post ID, namespaced by post_type (post/places/events)",
     hashPolicy:
@@ -212,6 +234,14 @@ export async function fetchPublishedOfferEnvelopeBySourceRecordKey(executor: Wor
   const bundle = await new WordPressRepository(executor).getPublishedOfferById(match[1], Number(match[2]));
   if (!bundle) throw new Error(`No published canonical WordPress Offer found for "${sourceRecordKey}".`);
   return toOfferEnvelope(bundle);
+}
+
+export async function fetchPublishedReviewEnvelopeBySourceRecordKey(executor: WordPressQueryExecutor, sourceRecordKey: string): Promise<SourceRecordEnvelope> {
+  const match = /^wordpress-db:voxel-timeline-review:([1-9]\d*)$/.exec(sourceRecordKey.trim());
+  if (!match) throw new Error(`Invalid Review sourceRecordKey "${sourceRecordKey}".`);
+  const row = await new WordPressRepository(executor).getVoxelPostReviewById(Number(match[1]));
+  if (!row) throw new Error(`No Voxel post_reviews row found for "${sourceRecordKey}".`);
+  return toReviewEnvelope(row);
 }
 
 /**

@@ -16,7 +16,8 @@ export interface SqlQuery {
 }
 
 export const DEFAULT_LIMIT = 100;
-export const MAX_LIMIT = 1000;
+/** Raised for FULL PROD inventory: live WP has thousands of published historical events. Past-only rows are still excluded in normalizeEvent, but the SELECT must not silently drop newer IDs. */
+export const MAX_LIMIT = 20000;
 
 /** Clamp an optional caller-supplied limit into a safe, bounded range. */
 export function clampLimit(limit: number | undefined, fallback: number = DEFAULT_LIMIT): number {
@@ -259,6 +260,29 @@ export function buildUsersQuery(limit: number): SqlQuery {
       ORDER BY ID
       LIMIT ?`,
     params: [limit],
+  };
+}
+
+export function buildVoxelPostReviewsQuery(limit: number): SqlQuery {
+  return {
+    sql: `SELECT t.id, t.user_id, t.post_id, t.feed, t.content, t.details, t.review_score, t.created_at, t.moderation, t.published_as, p.post_status AS place_status
+      FROM wp_voxel_timeline t
+      LEFT JOIN wp_posts p ON p.ID = t.post_id
+      WHERE t.feed = ?
+      ORDER BY t.id
+      LIMIT ?`,
+    params: ["post_reviews", limit],
+  };
+}
+
+export function buildVoxelPostReviewByIdQuery(id: number): SqlQuery {
+  return {
+    sql: `SELECT t.id, t.user_id, t.post_id, t.feed, t.content, t.details, t.review_score, t.created_at, t.moderation, t.published_as, p.post_status AS place_status
+      FROM wp_voxel_timeline t
+      LEFT JOIN wp_posts p ON p.ID = t.post_id
+      WHERE t.feed = ? AND t.id = ?
+      LIMIT 1`,
+    params: ["post_reviews", id],
   };
 }
 
