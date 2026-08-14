@@ -134,28 +134,72 @@ function testInlineImageIds() {
   assert.deepEqual(record.mediaRefs, ["555", "701", "702"]);
 }
 
-function testElementorContentFlaggedNotParsed() {
+function testEmptyElementorMetaIsNotFlagged() {
   const record = normalizeArticle(
     buildBundle({
       postMeta: {
         _thumbnail_id: ["555"],
-        _elementor_data: ['[{"id":"abc123","elType":"section"}]'],
+        _elementor_data: [""],
         _elementor_template_type: ["wp-post"],
       },
     }),
   );
   const payload = payloadOf(record);
+  assert.equal(payload.hasElementorContent, false);
+  assert.equal(record.warnings?.some((w) => w.code === "ARTICLE_ELEMENTOR_CONTENT"), false);
+  assert.equal(payload.content, "<p>Hello world</p>");
+}
 
+function testSectionOnlyElementorShellIsNotFlagged() {
+  const record = normalizeArticle(
+    buildBundle({
+      postMeta: {
+        _thumbnail_id: ["555"],
+        _elementor_data: ['[{"id":"abc123","elType":"section"}]'],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.hasElementorContent, false);
+  assert.equal(record.warnings?.some((w) => w.code === "ARTICLE_ELEMENTOR_CONTENT"), false);
+}
+
+function testRealElementorWidgetIsFlaggedButPostContentKept() {
+  const widgetPayload = JSON.stringify([
+    {
+      id: "w1",
+      elType: "widget",
+      widgetType: "text-editor",
+      settings: { editor: "<p>Купалье в Минске</p>" },
+    },
+  ]);
+  const record = normalizeArticle(
+    buildBundle({
+      postMeta: {
+        _thumbnail_id: ["555"],
+        _elementor_data: [widgetPayload],
+        _elementor_template_type: ["wp-post"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
   assert.equal(payload.hasElementorContent, true);
   const warning = record.warnings?.find((w) => w.code === "ARTICLE_ELEMENTOR_CONTENT");
   assert.ok(warning);
-  // Raw Elementor JSON is passed through untouched, never parsed into structured fields.
-  assert.deepEqual(payload.rawMeta._elementor_data, ['[{"id":"abc123","elType":"section"}]']);
+  assert.equal(payload.content, "<p>Hello world</p>");
+  assert.deepEqual(payload.rawMeta._elementor_data, [widgetPayload]);
 }
 
-function testWebStoryFlaggedNotParsed() {
+function testWebStoryLinearizedAndInlineImagesLifted() {
   const record = normalizeArticle(
     buildBundle({
+      post: {
+        ...basePost,
+        post_content:
+          "<amp-story><amp-story-page><h1>Page one</h1>" +
+          '<amp-img src="https://example.com/a.jpg" class="wp-image-801"></amp-img>' +
+          "<p>Story text</p></amp-story-page></amp-story>",
+      },
       postMeta: {
         _thumbnail_id: ["555"],
         "wp-story-image": ["801"],
@@ -168,9 +212,13 @@ function testWebStoryFlaggedNotParsed() {
   assert.equal(payload.hasWebStoryContent, true);
   const warning = record.warnings?.find((w) => w.code === "ARTICLE_WEB_STORY");
   assert.ok(warning);
-  // Web Story attachment ids are not lifted into featured/inline image fields.
+  assert.equal(/amp-story/i.test(payload.content), false);
+  assert.equal(/amp-img/i.test(payload.content), false);
+  assert.match(payload.content, /Page one/);
+  assert.match(payload.content, /Story text/);
   assert.equal(payload.featuredImageAttachmentId, 555);
-  assert.deepEqual(payload.inlineImageAttachmentIds, []);
+  assert.deepEqual(payload.inlineImageAttachmentIds, [801, 802, 803]);
+  assert.deepEqual(record.mediaRefs, ["555", "801", "802", "803"]);
 }
 
 function testArticleWithoutFeaturedImageWarns() {
@@ -229,8 +277,10 @@ function main() {
   testMultipleOldSlugsPreserved();
   testFeaturedImage();
   testInlineImageIds();
-  testElementorContentFlaggedNotParsed();
-  testWebStoryFlaggedNotParsed();
+  testEmptyElementorMetaIsNotFlagged();
+  testSectionOnlyElementorShellIsNotFlagged();
+  testRealElementorWidgetIsFlaggedButPostContentKept();
+  testWebStoryLinearizedAndInlineImagesLifted();
   testArticleWithoutFeaturedImageWarns();
   testRepeatedPostmetaPreservedAsArrays();
   testEmptyFieldsDoNotThrow();

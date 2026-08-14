@@ -137,7 +137,7 @@ async function testContentNormalizationWarningPropagated() {
   assert.ok(result.warnings?.some((w) => w.code === "CONTENT_NORMALIZED_WITH_LIMITATIONS"));
 }
 
-async function testElementorBlockedPathThroughOrchestrator() {
+async function testElementorWithUsableContentCreates() {
   const { writer, createCalls } = createFakeWriter();
   const orchestrator = new ArticleCommitOrchestrator(writer);
 
@@ -145,12 +145,11 @@ async function testElementorBlockedPathThroughOrchestrator() {
     inputFixture({ candidate: candidateFixture({ hasElementorContent: true }) }),
   );
 
-  assert.equal(result.status, "BLOCKED");
-  assert.ok(result.blockReasons?.some((r) => r.code === "ELEMENTOR_CONTENT_UNSUPPORTED"));
-  assert.equal(createCalls.length, 0);
+  assert.equal(result.status, "CREATED");
+  assert.equal(createCalls.length, 1);
 }
 
-async function testWebStoryBlockedPathThroughOrchestrator() {
+async function testWebStoryWithUsableContentCreates() {
   const { writer, createCalls } = createFakeWriter();
   const orchestrator = new ArticleCommitOrchestrator(writer);
 
@@ -158,8 +157,20 @@ async function testWebStoryBlockedPathThroughOrchestrator() {
     inputFixture({ candidate: candidateFixture({ hasWebStoryContent: true }) }),
   );
 
+  assert.equal(result.status, "CREATED");
+  assert.equal(createCalls.length, 1);
+}
+
+async function testRealElementorWithoutContentBlockedPathThroughOrchestrator() {
+  const { writer, createCalls } = createFakeWriter();
+  const orchestrator = new ArticleCommitOrchestrator(writer);
+
+  const result = await orchestrator.execute(
+    inputFixture({ candidate: candidateFixture({ hasElementorContent: true, content: "<p></p>" }) }),
+  );
+
   assert.equal(result.status, "BLOCKED");
-  assert.ok(result.blockReasons?.some((r) => r.code === "WEB_STORY_CONTENT_UNSUPPORTED"));
+  assert.ok(result.blockReasons?.some((r) => r.code === "ELEMENTOR_CONTENT_NOT_REPRESENTABLE"));
   assert.equal(createCalls.length, 0);
 }
 
@@ -207,8 +218,9 @@ async function main() {
   await testWriterFailureReturnsFailedResult();
   await testWarningsPropagated();
   await testContentNormalizationWarningPropagated();
-  await testElementorBlockedPathThroughOrchestrator();
-  await testWebStoryBlockedPathThroughOrchestrator();
+  await testElementorWithUsableContentCreates();
+  await testWebStoryWithUsableContentCreates();
+  await testRealElementorWithoutContentBlockedPathThroughOrchestrator();
   await testNoMigrationOrMediaDelegatesExistOrTouched();
   await testUpdateActionUsesUpdateWriterMethod();
   await testExactResultShapeForEachOutcome();

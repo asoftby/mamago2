@@ -69,24 +69,35 @@ function testBlankTitleBlocked() {
   assert.ok(result.reasons.some((r) => r.code === "MISSING_TITLE"));
 }
 
-function testElementorBlocked() {
+function testElementorWithUsablePostContentSucceeds() {
   const result = buildArticleCreateDraft({
     candidate: candidateFixture({ hasElementorContent: true }),
     context: contextFixture(),
   });
-  assert.equal(result.ok, false);
-  if (result.ok) return;
-  assert.ok(result.reasons.some((r) => r.code === "ELEMENTOR_CONTENT_UNSUPPORTED"));
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.title, "Hello Article");
 }
 
-function testWebStoryBlocked() {
+function testWebStoryWithUsableContentSucceeds() {
   const result = buildArticleCreateDraft({
     candidate: candidateFixture({ hasWebStoryContent: true }),
     context: contextFixture(),
   });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.draft.title, "Hello Article");
+}
+
+function testRealElementorWithoutUsableContentBlocked() {
+  const result = buildArticleCreateDraft({
+    candidate: candidateFixture({ hasElementorContent: true, content: "<p></p>" }),
+    context: contextFixture(),
+  });
   assert.equal(result.ok, false);
   if (result.ok) return;
-  assert.ok(result.reasons.some((r) => r.code === "WEB_STORY_CONTENT_UNSUPPORTED"));
+  assert.ok(result.reasons.some((r) => r.code === "ELEMENTOR_CONTENT_NOT_REPRESENTABLE"));
+  assert.equal(result.reasons.some((r) => r.code === "MISSING_CONTENT"), false);
 }
 
 function testSeoFieldsCopied() {
@@ -230,8 +241,9 @@ function main() {
   testSuccessfulMinimalDraft();
   testMissingTitleBlocked();
   testBlankTitleBlocked();
-  testElementorBlocked();
-  testWebStoryBlocked();
+  testElementorWithUsablePostContentSucceeds();
+  testWebStoryWithUsableContentSucceeds();
+  testRealElementorWithoutUsableContentBlocked();
   testSeoFieldsCopied();
   testSlugCopiedRawNoGeneration();
   testContentJsonIsVersionOneTextBlock();

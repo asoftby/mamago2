@@ -349,29 +349,44 @@ function testArticleDomainFieldsChangeHash() {
 }
 
 // ---------------------------------------------------------------------------
-// Article content flags — normalizeArticle() only checks *presence* of
-// _elementor_data/_elementor_template_type/wp-story-image/
-// wp-story-cycle-image (hasMeta()), never their content, to compute
-// hasElementorContent/hasWebStoryContent (ARTICLE_ELEMENTOR_CONTENT/
-// ARTICLE_WEB_STORY warnings). The hash must track that exact boolean.
+// Article content flags — same semantic booleans as normalizeArticle():
+// empty leftover Elementor keys and template-type-only do NOT flip the
+// hash; a real widget tree does. Payload bytes are still not hashed.
 // ---------------------------------------------------------------------------
+
+const REAL_ELEMENTOR_WIDGET = JSON.stringify([
+  { id: "w1", elType: "widget", widgetType: "text-editor", settings: { editor: "<p>A</p>" } },
+]);
+const OTHER_ELEMENTOR_WIDGET = JSON.stringify([
+  { id: "w2", elType: "widget", widgetType: "heading", settings: { title: "B" } },
+]);
+
+function testArticleEmptyElementorDataDoesNotChangeHash() {
+  const absent = hashArticleBundle(articleBundle());
+  const empty = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: [""] } }));
+  const emptyJson = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ["[]"] } }));
+  const whitespace = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ["   "] } }));
+  assert.equal(absent, empty, "empty-string _elementor_data must hash like absence");
+  assert.equal(absent, emptyJson, "empty JSON _elementor_data must hash like absence");
+  assert.equal(absent, whitespace, "whitespace _elementor_data must hash like absence");
+}
 
 function testArticleElementorDataPresenceChangesHash() {
   const absent = hashArticleBundle(articleBundle());
-  const present = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ['{"a":1}'] } }));
-  assert.notEqual(absent, present, "absent -> _elementor_data present must change the hash");
+  const present = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: [REAL_ELEMENTOR_WIDGET] } }));
+  assert.notEqual(absent, present, "absent -> real Elementor widget tree must change the hash");
 }
 
-function testArticleElementorTemplateTypePresenceChangesHash() {
+function testArticleElementorTemplateTypePresenceDoesNotChangeHash() {
   const absent = hashArticleBundle(articleBundle());
   const present = hashArticleBundle(articleBundle({ postMeta: { _elementor_template_type: ["wp-post"] } }));
-  assert.notEqual(absent, present, "absent -> _elementor_template_type present must change the hash");
+  assert.equal(absent, present, "_elementor_template_type alone is not domain-significant");
 }
 
 function testArticleElementorPayloadChurnDoesNotChangeHash() {
-  const first = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ['{"a":1,"b":[1,2,3]}'] } }));
-  const second = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: ['{"totally":"different","nested":{"x":99}}'] } }));
-  assert.equal(first, second, "two different non-empty Elementor payloads must hash the same — only presence is domain-significant");
+  const first = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: [REAL_ELEMENTOR_WIDGET] } }));
+  const second = hashArticleBundle(articleBundle({ postMeta: { _elementor_data: [OTHER_ELEMENTOR_WIDGET] } }));
+  assert.equal(first, second, "two different real Elementor payloads must hash the same — only semantic presence is domain-significant");
 }
 
 function testArticleWebStoryImagePresenceChangesHash() {
@@ -390,6 +405,12 @@ function testArticleWebStoryValueChurnDoesNotChangeHash() {
   const first = hashArticleBundle(articleBundle({ postMeta: { "wp-story-image": ["111"] } }));
   const second = hashArticleBundle(articleBundle({ postMeta: { "wp-story-image": ["222"] } }));
   assert.equal(first, second, "two different non-empty Web Story values must hash the same — only presence is domain-significant");
+}
+
+function testArticleBlankWebStoryMetaDoesNotChangeHash() {
+  const absent = hashArticleBundle(articleBundle());
+  const blank = hashArticleBundle(articleBundle({ postMeta: { "wp-story-image": [""] } }));
+  assert.equal(absent, blank, "blank wp-story-image must hash like absence");
 }
 
 function testRouteDomainFieldsChangeHash() {
@@ -510,12 +531,14 @@ function main() {
   testEventStatusChangesHash();
   testPlaceDomainFieldsChangeHash();
   testArticleDomainFieldsChangeHash();
+  testArticleEmptyElementorDataDoesNotChangeHash();
   testArticleElementorDataPresenceChangesHash();
-  testArticleElementorTemplateTypePresenceChangesHash();
+  testArticleElementorTemplateTypePresenceDoesNotChangeHash();
   testArticleElementorPayloadChurnDoesNotChangeHash();
   testArticleWebStoryImagePresenceChangesHash();
   testArticleWebStoryCycleImagePresenceChangesHash();
   testArticleWebStoryValueChurnDoesNotChangeHash();
+  testArticleBlankWebStoryMetaDoesNotChangeHash();
   testRouteDomainFieldsChangeHash();
   testRouteStopOrderChangesHash();
   testRouteIgnoredPostFieldsDoNotChangeHash();

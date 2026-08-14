@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 
+import {
+  hasMeaningfulElementorMeta,
+  hasWebStoryMeta,
+} from "./articleSourceRepresentation";
 import type {
   WordPressArticleBundle,
   WordPressEventBundle,
@@ -10,11 +14,6 @@ import type {
   WordPressOfferBundle,
   WordPressTermRow,
 } from "./types";
-
-/** `postMeta[key]` is present with at least one value — same semantics as `normalizeArticle.ts`'s own `hasMeta()`. */
-function hasMeta(postMeta: WordPressPostMetaByKey, key: string): boolean {
-  return (postMeta[key]?.length ?? 0) > 0;
-}
 
 /**
  * Bumped whenever the canonical hash *input* changes shape (a new
@@ -149,21 +148,21 @@ const ARTICLE_POSTMETA_ALLOWLIST: readonly string[] = [
 ];
 
 /**
- * `normalizeArticle()` never parses `_elementor_data`/`wp-story-image` and
- * friends — it only checks *presence* (`hasMeta()`) to derive
- * `hasElementorContent`/`hasWebStoryContent`, which drive the
- * `ARTICLE_ELEMENTOR_CONTENT`/`ARTICLE_WEB_STORY` warnings. Hashing the
- * raw (often huge) Elementor JSON would make the hash sensitive to
- * Elementor's own internal churn (which changes on every builder
- * re-save with zero visible content change) while missing the actual
- * domain-significant transition: absent ↔ present. Projecting to the
- * exact boolean the normalizer computes keeps the hash exactly as
- * sensitive as the target model actually is — no more, no less.
+ * `normalizeArticle()` never hashes raw `_elementor_data` / Web Story
+ * payloads. It only projects the same semantic booleans the normalizer
+ * computes (`hasMeaningfulElementorMeta` / `hasWebStoryMeta`). Empty
+ * leftover keys and `_elementor_template_type` alone must hash like
+ * absence — presence-only detection was a false-positive source of
+ * ARTICLE_BLOCKED. Hashing the raw (often huge) Elementor JSON would
+ * still make the hash sensitive to builder-internal churn with zero
+ * visible `post_content` change. Payload bytes are therefore excluded;
+ * only empty ↔ real-builder and absent ↔ non-blank story meta flip the
+ * flag.
  */
 function articleContentFlags(postMeta: WordPressPostMetaByKey): { hasElementorContent: boolean; hasWebStoryContent: boolean } {
   return {
-    hasElementorContent: hasMeta(postMeta, "_elementor_data") || hasMeta(postMeta, "_elementor_template_type"),
-    hasWebStoryContent: hasMeta(postMeta, "wp-story-image") || hasMeta(postMeta, "wp-story-cycle-image"),
+    hasElementorContent: hasMeaningfulElementorMeta(postMeta),
+    hasWebStoryContent: hasWebStoryMeta(postMeta),
   };
 }
 

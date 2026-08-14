@@ -24,8 +24,7 @@ export interface ArticleCommitContext {
 
 export type ArticleCommitBlockReasonCode =
   | "MISSING_TITLE"
-  | "ELEMENTOR_CONTENT_UNSUPPORTED"
-  | "WEB_STORY_CONTENT_UNSUPPORTED"
+  | "ELEMENTOR_CONTENT_NOT_REPRESENTABLE"
   | "MISSING_CONTENT";
 
 export interface ArticleCommitBlockReason {
@@ -89,14 +88,16 @@ export interface BuildArticleCreateDraftInput {
  * universal Phoenix `ContentNormalizationPipeline`, not to WordPress-specific
  * string cleanup in this builder.
  *
- * Elementor and Web Story posts are blocked outright, not lossily
- * converted — `normalizeArticle()` already flags these
- * (`hasElementorContent`/`hasWebStoryContent`) precisely because their
- * content isn't linear HTML a plain-text strip could represent honestly.
+ * Empty/fake Elementor leftover keys are not a block — the normalizer
+ * already treats those as `hasElementorContent: false`. Real Elementor
+ * still uses this same HTML → contentJson pipeline when `post_content`
+ * yields usable plain text. Web Stories are linearized upstream into
+ * ordinary HTML; AMP UI is not reproduced. A real Elementor tree with
+ * no usable linear HTML is blocked as ELEMENTOR_CONTENT_NOT_REPRESENTABLE
+ * rather than inventing a builder parser.
  *
  * No media, category, tags, related place, city/geo, or slug history are
- * ever produced here — all deferred to later PRs, exactly like Place/Event
- * before it.
+ * ever produced here — media is applied later by ArticleFullMediaSyncer.
  */
 export function buildArticleCreateDraft(input: BuildArticleCreateDraftInput): ArticleCreateDraftResult {
   const { candidate, context } = input;
@@ -106,25 +107,18 @@ export function buildArticleCreateDraft(input: BuildArticleCreateDraftInput): Ar
     reasons.push({ code: "MISSING_TITLE", message: "NormalizedArticleCandidate.title is empty." });
   }
 
-  if (candidate.hasElementorContent) {
-    reasons.push({
-      code: "ELEMENTOR_CONTENT_UNSUPPORTED",
-      message: "Post has Elementor content (_elementor_data/_elementor_template_type) — not representable as plain text without real loss.",
-    });
-  }
-
-  if (candidate.hasWebStoryContent) {
-    reasons.push({
-      code: "WEB_STORY_CONTENT_UNSUPPORTED",
-      message: "Post has Web Story content (wp-story-image/wp-story-cycle-image) — not representable as plain text without real loss.",
-    });
-  }
-
   const normalizedContent = normalizeMigrationContent({
     sourceKind: "wordpress",
     raw: candidate.content ?? "",
   });
-  if (!normalizedContent.plainText) {
+  const hasUsablePostContent = Boolean(normalizedContent.plainText);
+  if (candidate.hasElementorContent && !hasUsablePostContent) {
+    reasons.push({
+      code: "ELEMENTOR_CONTENT_NOT_REPRESENTABLE",
+      message:
+        "Post has a real Elementor builder payload and candidate.content does not normalize to usable plain text — refusing to invent an Elementor layout parser.",
+    });
+  } else if (!hasUsablePostContent) {
     reasons.push({
       code: "MISSING_CONTENT",
       message: "candidate.content normalizes to empty plain text — refusing to write an Article with no content at all.",

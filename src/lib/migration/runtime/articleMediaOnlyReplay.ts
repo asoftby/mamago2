@@ -16,15 +16,15 @@
  *   lineage/target lookup; the hash-equality check is load-bearing (same
  *   reasoning as Event's): this replay is only ever allowed when the
  *   freshly computed canonical hash is byte-identical to the stored
- *   lineage hash. Also refuses Elementor/Web Story source content outright
- *   — neither is representable by the position-preserving content
- *   pipeline in a way that's safe to trust unattended.
+ *   lineage hash. Also refuses a source that `buildArticleCreateDraft`
+ *   cannot represent (empty body, or real Elementor without usable HTML).
  * - `strictArticleMediaReplay.ts`'s own preflight (allowlist, content
  *   divergence, attachment resolvability) — the actual media-level safety
  *   gate.
  */
 import { CANONICAL_SOURCE_HASH_VERSION, hashArticleBundle } from "../adapters/wordpress-db/canonicalSourceHash";
 import { normalizeArticle } from "../adapters/wordpress-db/normalizeArticle";
+import { buildArticleCreateDraft } from "../commit/article/buildArticleCreateDraft";
 import type { NormalizedArticleCandidate } from "../commit/article/buildArticleCreateDraft";
 import type { WordPressArticleBundle } from "../adapters/wordpress-db/types";
 import type { MediaPolicyName } from "./MigrationProfile";
@@ -162,11 +162,12 @@ export function validateArticleMediaReplayRuntime(input: ArticleMediaReplayRunti
   }
   const normalized = normalizeArticle(input.bundle);
   const candidate = normalized.normalizedPayload as NormalizedArticleCandidate;
-  if (candidate.hasElementorContent) {
-    return { ok: false, reason: "Source Article has Elementor content — not representable by the position-preserving content pipeline; media replay refused." };
-  }
-  if (candidate.hasWebStoryContent) {
-    return { ok: false, reason: "Source Article has Web Story content — not representable by the position-preserving content pipeline; media replay refused." };
+  const draft = buildArticleCreateDraft({ candidate, context: {} });
+  if (!draft.ok) {
+    return {
+      ok: false,
+      reason: `Source Article is not representable (${draft.reasons.map((reason) => reason.code).join(", ")}) — media replay refused.`,
+    };
   }
   return { ok: true, freshHash, candidate, targetContentJson: targetContentResult.data };
 }

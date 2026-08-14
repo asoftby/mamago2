@@ -27,7 +27,7 @@ import type { WordPressQueryExecutor } from "../src/lib/migration/adapters/wordp
 import type { MigrationPlan, MigrationPlanItem } from "../src/lib/migration/types";
 
 // ---------------------------------------------------------------------------
-// Fixtures: 2 articles (one plain, one with Elementor + no featured image)
+// Fixtures: 2 articles (one plain, one with empty leftover Elementor JSON + no featured image)
 // and 2 places (one with coordinates, one without) — no live DB involved.
 // Same shape as WordPressRepository.test.ts / wordpressDbAdapter.test.ts.
 // ---------------------------------------------------------------------------
@@ -249,7 +249,6 @@ async function testStatsPresentAndUsedByReport() {
   assert.equal(plan.stats!.normalizedCount, 5);
   assert.equal(plan.stats!.failedCount, 0);
   assert.deepEqual(plan.stats!.warningCounts, {
-    ARTICLE_ELEMENTOR_CONTENT: 1,
     ARTICLE_MISSING_FEATURED_IMAGE: 1,
     PLACE_MISSING_COORDINATES: 1,
   });
@@ -279,7 +278,6 @@ async function testHumanReportContent() {
   assert.match(report, /PLACE: 2/);
   assert.match(report, /ROUTE: 1/);
   assert.match(report, /Source entity type counts/);
-  assert.match(report, /• 1 Elementor articles/);
   assert.match(report, /• 1 articles without a featured image/);
   assert.match(report, /• 1 places without coordinates/);
   assert.match(report, /Durations \(ms\)/);
@@ -434,7 +432,6 @@ async function testJsonReportExcludesRawContent() {
   assert.ok(jsonReport.stats);
   assert.equal(jsonReport.stats!.discoveredCount, 5);
   assert.deepEqual(jsonReport.stats!.warningCounts, {
-    ARTICLE_ELEMENTOR_CONTENT: 1,
     ARTICLE_MISSING_FEATURED_IMAGE: 1,
     PLACE_MISSING_COORDINATES: 1,
   });

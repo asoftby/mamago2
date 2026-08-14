@@ -190,7 +190,7 @@ function testRuntimeRefusesOnHashMismatch() {
   }
 }
 
-function testRuntimeRefusesElementorContent() {
+function testRuntimeAllowsEmptyElementorMetaWithUsableContent() {
   const b = bundle({ postMeta: { _elementor_data: ["{}"] } });
   const hash = hashArticleBundle(b);
   const result = validateArticleMediaReplayRuntime({
@@ -201,14 +201,32 @@ function testRuntimeRefusesElementorContent() {
     targetContentJson: VALID_TARGET_CONTENT,
     ownerUserExists: true,
   });
-  assert.equal(result.ok, false);
-  if (!result.ok) {
-    assert.match(result.reason, /Elementor/);
-  }
+  assert.equal(result.ok, true);
 }
 
-function testRuntimeRefusesWebStoryContent() {
+function testRuntimeAllowsWebStoryWithUsableContent() {
   const b = bundle({ postMeta: { "wp-story-image": ["123"] } });
+  const hash = hashArticleBundle(b);
+  const result = validateArticleMediaReplayRuntime({
+    bundle: b,
+    lineage: { sourceId: "s", isActive: true, targetId: "article-1", lastSourceHash: hash },
+    activeLineageCount: 1,
+    targetExists: true,
+    targetContentJson: VALID_TARGET_CONTENT,
+    ownerUserExists: true,
+  });
+  assert.equal(result.ok, true);
+}
+
+const REAL_ELEMENTOR_WIDGET = JSON.stringify([
+  { id: "w1", elType: "widget", widgetType: "text-editor", settings: { editor: "<p>Hi</p>" } },
+]);
+
+function testRuntimeRefusesRealElementorWithoutUsableContent() {
+  const b = bundle(
+    { postMeta: { _elementor_data: [REAL_ELEMENTOR_WIDGET] } },
+    { post_content: "" },
+  );
   const hash = hashArticleBundle(b);
   const result = validateArticleMediaReplayRuntime({
     bundle: b,
@@ -220,7 +238,7 @@ function testRuntimeRefusesWebStoryContent() {
   });
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.match(result.reason, /Web Story/);
+    assert.match(result.reason, /ELEMENTOR_CONTENT_NOT_REPRESENTABLE/);
   }
 }
 
@@ -313,8 +331,9 @@ function main() {
   testRuntimeRequiresTargetExists();
   testRuntimeRequiresCanonicalHashFormat();
   testRuntimeRefusesOnHashMismatch();
-  testRuntimeRefusesElementorContent();
-  testRuntimeRefusesWebStoryContent();
+  testRuntimeAllowsEmptyElementorMetaWithUsableContent();
+  testRuntimeAllowsWebStoryWithUsableContent();
+  testRuntimeRefusesRealElementorWithoutUsableContent();
   testRuntimeSucceedsOnExactHashMatch();
   testRuntimeRefusesNullTargetContentJson();
   testRuntimeRefusesMalformedTargetContentJson();
