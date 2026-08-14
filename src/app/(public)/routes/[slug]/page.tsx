@@ -11,6 +11,7 @@ import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBea
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolvePublicRouteCanonicalUrl } from "@/lib/seo/resolveRouteCanonicalUrl";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { mapRouteStopPublicPhotos } from "@/lib/routes/mapRouteStopPublicPhotos";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canViewRoute } from "@/lib/routes/routeAccess";
 
@@ -169,6 +170,10 @@ export default async function RouteDetailPage({ params }: Props) {
             customTitle: true,
             note: true,
             photoUrl: true,
+            images: {
+              orderBy: { sortOrder: "asc" as const },
+              select: { url: true, sortOrder: true },
+            },
             detectedCityName: true,
             priceType: true,
             priceMin: true,
@@ -224,6 +229,7 @@ export default async function RouteDetailPage({ params }: Props) {
           address: buildStopAddress(s.place, s.address, s.detectedCityName),
           note: s.note,
           photoUrl: s.photoUrl ?? "",
+          photos: mapRouteStopPublicPhotos({ photoUrl: s.photoUrl, images: s.images }),
           lat: s.lat ?? undefined,
           lng: s.lng ?? undefined,
         })),

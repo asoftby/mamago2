@@ -60,6 +60,7 @@ export type RouteWithStops = {
     customTitle: string | null;
     note: string;
     photoUrl: string | null;
+    images: { id: string; url: string; sortOrder: number; mediaAssetId: string | null }[];
     priceType: RouteStopPriceType;
     priceMin: number | null;
     priceMax: number | null;
@@ -242,6 +243,11 @@ export async function deriveCityIdFromStops(
 
 // ─── Shared include fragment ───────────────────────────────────────────────────
 
+const routeStopImagesInclude = {
+  orderBy: { sortOrder: "asc" as const },
+  select: { id: true, url: true, sortOrder: true, mediaAssetId: true },
+} as const;
+
 const routeWithStopsInclude = {
   city: { select: { id: true, name: true } },
   author: { select: { id: true, email: true } },
@@ -257,6 +263,7 @@ const routeWithStopsInclude = {
           city: { select: { name: true } },
         },
       },
+      images: routeStopImagesInclude,
     },
   },
 } as const;
@@ -321,6 +328,7 @@ export async function getRouteBySlug(
               city: { select: { name: true } },
             },
           },
+          images: routeStopImagesInclude,
         },
       },
     },

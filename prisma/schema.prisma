@@ -2579,6 +2579,7 @@ model MediaAsset {
   usages           MediaUsage[]
   activityCovers   Activity[]       @relation("ActivityCover")
   activityImages   ActivityImage[]  @relation("ActivityGalleryImageAsset")
+  routeStopImages  RouteStopImage[] @relation("RouteStopGalleryImageAsset")
   articleCovers    Article[]        @relation("ArticleCover")
   articleSeoImages Article[]        @relation("ArticleSeoImage")
   brandingLogo     BrandingConfig[] @relation("BrandingLogo")
@@ -2827,10 +2828,31 @@ model RouteStop {
   updatedAt           DateTime           @updatedAt
   place               Place?             @relation(fields: [placeId], references: [id])
   route               Route              @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  images              RouteStopImage[]
 
   @@index([routeId, order])
   @@index([placeId])
   @@index([googlePlaceId])
+}
+
+/// Ordered gallery for one RouteStop. `RouteStop.photoUrl` remains the
+/// denormalized first image for backward-compatible readers.
+model RouteStopImage {
+  id           String      @id @default(cuid())
+  routeStopId  String
+  mediaAssetId String?
+  url          String
+  width        Int?
+  height       Int?
+  blurhash     String?
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  routeStop    RouteStop   @relation(fields: [routeStopId], references: [id], onDelete: Cascade)
+  mediaAsset   MediaAsset? @relation("RouteStopGalleryImageAsset", fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@unique([routeStopId, sortOrder])
+  @@unique([routeStopId, mediaAssetId])
+  @@index([mediaAssetId])
 }
 
 /// SEO llms.txt configuration (per city or global)

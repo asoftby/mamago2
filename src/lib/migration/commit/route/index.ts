@@ -27,7 +27,7 @@ export type {
   RouteCommitResult,
   RouteCommitWriterPrismaClient,
 } from "./RouteCommitWriter";
-export { RouteStopMediaSyncer, uniqueAttachmentIds } from "./RouteStopMediaSyncer";
+export { RouteStopMediaSyncer, uniqueAttachmentIds, uniquePreserveOrder } from "./RouteStopMediaSyncer";
 export type {
   RouteStopMediaAttachmentResolver,
   RouteStopMediaSyncerPrismaClient,

@@ -48,6 +48,8 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
   const lineages = new Map<string, string>();
   const stopUpdates: unknown[] = [];
   const routeUpdates: unknown[] = [];
+  const galleryDeletes: unknown[] = [];
+  const galleryCreates: unknown[] = [];
   const importCalls: unknown[] = [];
   const lineageCalls: unknown[] = [];
 
@@ -69,6 +71,20 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
         stopUpdates.push(args);
         return { count: 1 };
       }) as unknown as RouteStopMediaSyncerPrismaClient["routeStop"]["updateMany"],
+      findMany: (async () => [
+        { id: "stop-1", order: 1 },
+        { id: "stop-2", order: 2 },
+      ]) as unknown as RouteStopMediaSyncerPrismaClient["routeStop"]["findMany"],
+    },
+    routeStopImage: {
+      deleteMany: (async (args: unknown) => {
+        galleryDeletes.push(args);
+        return { count: 0 };
+      }) as unknown as RouteStopMediaSyncerPrismaClient["routeStopImage"]["deleteMany"],
+      create: (async (args: unknown) => {
+        galleryCreates.push(args);
+        return { id: `img-${galleryCreates.length}` };
+      }) as unknown as RouteStopMediaSyncerPrismaClient["routeStopImage"]["create"],
     },
     mediaAsset: {
       findFirst: (async (args: { where: { id?: string } }) => {
@@ -130,7 +146,16 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
     },
   });
 
-  return { syncer, stopUpdates, routeUpdates, importCalls, lineageCalls, attachments };
+  return {
+    syncer,
+    stopUpdates,
+    routeUpdates,
+    galleryDeletes,
+    galleryCreates,
+    importCalls,
+    lineageCalls,
+    attachments,
+  };
 }
 
 function syncInput(overrides: Partial<Parameters<RouteStopMediaSyncer["sync"]>[0]> = {}) {
@@ -152,8 +177,15 @@ function coverUpdate(routeUpdates: unknown[]): { coverImageUrl: string | null } 
   return last.data;
 }
 
+function galleryForStop(galleryCreates: unknown[], routeStopId: string): { url: string; sortOrder: number }[] {
+  return galleryCreates
+    .map((row) => (row as { data: { url: string; sortOrder: number; routeStopId: string } }).data)
+    .filter((row) => row.routeStopId === routeStopId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 async function testNoStopMediaClearsCoverAndDoesNotImport() {
-  const { syncer, stopUpdates, importCalls, routeUpdates } = createHarness();
+  const { syncer, importCalls, routeUpdates, galleryCreates } = createHarness();
 
   const result = await syncer.sync(
     syncInput({
@@ -164,9 +196,9 @@ async function testNoStopMediaClearsCoverAndDoesNotImport() {
   );
 
   assert.deepEqual(result.warnings, []);
-  assert.deepEqual(stopUpdates, []);
   assert.deepEqual(importCalls, []);
   assert.equal(coverUpdate(routeUpdates).coverImageUrl, null);
+  assert.deepEqual(galleryCreates, []);
 }
 
 async function testCoverImportedFromThumbnailId() {
@@ -199,7 +231,7 @@ async function testSingleAttachmentLinkedToCorrectStopOrder() {
 
   const result = await syncer.sync(syncInput());
 
-  assert.equal(lineageCalls.length, 2);
+  assert.equal(lineageCalls.length, 3);
   assert.equal((stopUpdates[0] as { where: { routeId: string; order: number }; data: { photoUrl: string | null } }).where.order, 1);
   assert.equal((stopUpdates[0] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/10.webp");
   assert.equal((stopUpdates[1] as { where: { routeId: string; order: number }; data: { photoUrl: string | null } }).where.order, 2);
@@ -207,25 +239,56 @@ async function testSingleAttachmentLinkedToCorrectStopOrder() {
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_IMPORTED"));
 }
 
-async function testMultipleAttachmentsUseFirstImportedAndWarnAboutExtras() {
-  const { syncer, stopUpdates, importCalls } = createHarness();
+async function testMultipleImagesStoredInSourceOrderIncludingFirst() {
+  const { syncer, stopUpdates, galleryCreates, importCalls } = createHarness();
 
   const result = await syncer.sync(syncInput());
 
   assert.equal((stopUpdates[1] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/11.webp");
-  assert.ok(!importCalls.some((call) => String((call as { sourceRecordKey: string }).sourceRecordKey).endsWith(":12")));
-  const extraWarning = result.warnings.find((w) => w.code === "ROUTE_STOP_MEDIA_EXTRA_ATTACHMENTS_SKIPPED");
-  assert.ok(extraWarning);
-  assert.deepEqual(extraWarning.details?.skippedAttachmentIds, [12]);
+  assert.ok(importCalls.some((call) => String((call as { sourceRecordKey: string }).sourceRecordKey).endsWith(":12")));
+  assert.deepEqual(
+    galleryForStop(galleryCreates, "stop-2").map((row) => row.url),
+    ["/uploads/11.webp", "/uploads/12.webp"],
+  );
+  assert.deepEqual(
+    galleryForStop(galleryCreates, "stop-1").map((row) => row.url),
+    ["/uploads/10.webp"],
+  );
+  assert.ok(!result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_EXTRA_ATTACHMENTS_SKIPPED"));
+}
+
+async function testDuplicateSourceAttachmentStoredOnce() {
+  const { syncer, galleryCreates, importCalls } = createHarness();
+
+  await syncer.sync(
+    syncInput({
+      candidate: candidateFixture({
+        stops: [{ index: 1, title: "First", description: null, imageAttachmentIds: [10, 10, 11], placeId: null }],
+      }),
+    }),
+  );
+
+  assert.equal(
+    importCalls.filter((call) => String((call as { sourceRecordKey: string }).sourceRecordKey).endsWith(":10")).length,
+    1,
+  );
+  assert.deepEqual(
+    galleryForStop(galleryCreates, "stop-1").map((row) => ({ url: row.url, sortOrder: row.sortOrder })),
+    [
+      { url: "/uploads/10.webp", sortOrder: 0 },
+      { url: "/uploads/11.webp", sortOrder: 1 },
+    ],
+  );
 }
 
 async function testMissingAttachmentWarnsAndUsesNextValidForSameStop() {
-  const { syncer, attachments, stopUpdates } = createHarness();
+  const { syncer, attachments, stopUpdates, galleryCreates } = createHarness();
   attachments.delete(11);
 
   const result = await syncer.sync(syncInput());
 
   assert.equal((stopUpdates[1] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/12.webp");
+  assert.deepEqual(galleryForStop(galleryCreates, "stop-2").map((row) => row.url), ["/uploads/12.webp"]);
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_ATTACHMENT_MISSING"));
 }
 
@@ -239,24 +302,27 @@ async function testInvalidAttachmentUrlWarnsAndSkips() {
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_URL_INVALID"));
 }
 
-async function testRepeatedSyncReusesLineageAndDoesNotReimport() {
-  const { syncer, importCalls, lineageCalls, routeUpdates } = createHarness();
+async function testRepeatedSyncReusesLineageAndDoesNotDuplicateGallery() {
+  const { syncer, importCalls, lineageCalls, routeUpdates, galleryCreates, galleryDeletes } = createHarness();
   const input = syncInput({ candidate: candidateFixture({ media: { featuredAttachmentId: 9 } }) });
 
   await syncer.sync(input);
   const firstImports = importCalls.length;
   const firstLineages = lineageCalls.length;
+  const firstGalleryCreates = galleryCreates.length;
   const second = await syncer.sync(input);
 
-  assert.equal(firstLineages, 3, "cover + two first-stop images");
+  assert.equal(firstLineages, 4, "cover + three stop images");
   assert.equal(importCalls.length, firstImports, "second run must reuse existing MEDIA_ASSET lineage");
   assert.equal(lineageCalls.length, firstLineages);
+  assert.equal(galleryDeletes.length, 4, "each run replaces both stop galleries");
+  assert.equal(galleryCreates.length, firstGalleryCreates * 2);
   assert.ok(second.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_DEDUP_REUSED"));
   assert.equal(coverUpdate(routeUpdates).coverImageUrl, "/uploads/9.webp");
 }
 
 async function testCoverAndStopSharingAttachmentDoNotDuplicateLineage() {
-  const { syncer, importCalls, lineageCalls, routeUpdates, stopUpdates } = createHarness();
+  const { syncer, importCalls, lineageCalls, routeUpdates, stopUpdates, galleryCreates } = createHarness();
 
   const result = await syncer.sync(
     syncInput({ candidate: candidateFixture({ media: { featuredAttachmentId: 10 } }) }),
@@ -265,7 +331,7 @@ async function testCoverAndStopSharingAttachmentDoNotDuplicateLineage() {
   const attachmentKeys = lineageCalls.map((call) => (call as { sourceRecordKey: string }).sourceRecordKey);
   assert.deepEqual(
     attachmentKeys.filter((key, index, all) => all.indexOf(key) === index),
-    ["wordpress-db:attachment:10", "wordpress-db:attachment:11"],
+    ["wordpress-db:attachment:10", "wordpress-db:attachment:11", "wordpress-db:attachment:12"],
   );
   assert.equal(
     importCalls.filter((call) => String((call as { sourceRecordKey: string }).sourceRecordKey).endsWith(":10")).length,
@@ -273,27 +339,30 @@ async function testCoverAndStopSharingAttachmentDoNotDuplicateLineage() {
   );
   assert.equal(coverUpdate(routeUpdates).coverImageUrl, "/uploads/10.webp");
   assert.equal((stopUpdates[0] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/10.webp");
+  assert.deepEqual(galleryForStop(galleryCreates, "stop-1").map((row) => row.url), ["/uploads/10.webp"]);
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_DEDUP_REUSED"));
 }
 
 async function testMissingOwnerSkipsMediaWithWarning() {
-  const { syncer, stopUpdates, importCalls, routeUpdates } = createHarness();
+  const { syncer, stopUpdates, importCalls, routeUpdates, galleryCreates } = createHarness();
 
   const result = await syncer.sync(syncInput({ mediaOwnerUserId: null }));
 
   assert.deepEqual(stopUpdates, []);
   assert.deepEqual(importCalls, []);
   assert.deepEqual(routeUpdates, []);
+  assert.deepEqual(galleryCreates, []);
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_OWNER_MISSING"));
 }
 
 async function testFailedDownloadDoesNotBlockOtherStopMedia() {
-  const { syncer, stopUpdates } = createHarness({ failImportIds: [10] });
+  const { syncer, stopUpdates, galleryCreates } = createHarness({ failImportIds: [10] });
 
   const result = await syncer.sync(syncInput());
 
   assert.equal((stopUpdates[0] as { data: { photoUrl: string | null } }).data.photoUrl, null);
   assert.equal((stopUpdates[1] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/11.webp");
+  assert.deepEqual(galleryForStop(galleryCreates, "stop-1"), []);
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_DOWNLOAD_FAILED"));
 }
 
@@ -320,10 +389,11 @@ async function main() {
   await testCoverImportedFromThumbnailId();
   await testMissingCoverLeavesCoverImageUrlNull();
   await testSingleAttachmentLinkedToCorrectStopOrder();
-  await testMultipleAttachmentsUseFirstImportedAndWarnAboutExtras();
+  await testMultipleImagesStoredInSourceOrderIncludingFirst();
+  await testDuplicateSourceAttachmentStoredOnce();
   await testMissingAttachmentWarnsAndUsesNextValidForSameStop();
   await testInvalidAttachmentUrlWarnsAndSkips();
-  await testRepeatedSyncReusesLineageAndDoesNotReimport();
+  await testRepeatedSyncReusesLineageAndDoesNotDuplicateGallery();
   await testCoverAndStopSharingAttachmentDoNotDuplicateLineage();
   await testMissingOwnerSkipsMediaWithWarning();
   await testFailedDownloadDoesNotBlockOtherStopMedia();

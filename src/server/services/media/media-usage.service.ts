@@ -774,11 +774,9 @@ export async function syncArticleMediaUsage(articleId: string) {
  * would treat UGC as deletable.
  *
  * Phase C — reference vs owned: we only traverse the route's OWN reference
- * columns (coverImageUrl, seoOgImage) and its stops' own photos (photoUrl).
- * Place gallery images shown *inside* a route stay attached to their Place
- * (reference, not route-owned); they are deliberately NOT traversed here, so a
- * route's usage rows never claim ownership of a place's media. Routes have no
- * Tiptap/contentJson body, so there is nothing to recurse into.
+ * columns (coverImageUrl, seoOgImage), its stops' own photos (photoUrl),
+ * and RouteStopImage gallery rows. Place gallery images shown *inside* a
+ * route stay attached to their Place (reference, not route-owned).
  */
 export async function syncRouteMediaUsage(routeId: string) {
   const route = await prisma.route.findUnique({
@@ -786,7 +784,7 @@ export async function syncRouteMediaUsage(routeId: string) {
     select: {
       coverImageUrl: true,
       seoOgImage: true,
-      stops: { select: { photoUrl: true } },
+      stops: { select: { photoUrl: true, images: { select: { url: true, mediaAssetId: true, sortOrder: true } } } },
     },
   });
 
@@ -814,6 +812,16 @@ export async function syncRouteMediaUsage(routeId: string) {
     if (stopAsset) {
       mediaIds.add(stopAsset.id);
       usageRecords.push({ mediaId: stopAsset.id, field: "stopPhotoUrl" });
+    }
+    for (const image of stop.images) {
+      const galleryAsset =
+        (image.mediaAssetId
+          ? await findMediaAssetByReference(image.mediaAssetId)
+          : null) ?? (await findMediaAssetByReference(image.url));
+      if (galleryAsset) {
+        mediaIds.add(galleryAsset.id);
+        usageRecords.push({ mediaId: galleryAsset.id, field: "stopGalleryUrl" });
+      }
     }
   }
 

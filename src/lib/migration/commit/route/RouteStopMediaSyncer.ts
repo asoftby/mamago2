@@ -13,7 +13,8 @@ export interface RouteStopMediaAttachmentResolver {
 
 export interface RouteStopMediaSyncerPrismaClient {
   route: Pick<PrismaClient["route"], "update">;
-  routeStop: Pick<PrismaClient["routeStop"], "updateMany">;
+  routeStop: Pick<PrismaClient["routeStop"], "updateMany" | "findMany">;
+  routeStopImage: Pick<PrismaClient["routeStopImage"], "deleteMany" | "create">;
   mediaAsset: Pick<PrismaClient["mediaAsset"], "findFirst">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst">;
 }
@@ -36,6 +37,7 @@ export interface RouteStopMediaSyncResult {
 type ImportedRouteMedia = {
   mediaId: string;
   publicUrl: string;
+  attachmentId?: number;
 };
 
 function warning(
@@ -48,13 +50,16 @@ function warning(
   return { code, message, severity, sourceRecordKey, ...(details ? { details } : {}) };
 }
 
+export function uniquePreserveOrder(ids: readonly number[]): number[] {
+  return ids.filter((id, index, all) => all.indexOf(id) === index);
+}
+
 export function uniqueAttachmentIds(candidate: NormalizedRouteCandidate): number[] {
   const featuredId = candidate.media.featuredAttachmentId;
-  const ids = [
+  return uniquePreserveOrder([
     ...(featuredId !== null ? [featuredId] : []),
     ...candidate.stops.flatMap((stop) => stop.imageAttachmentIds),
-  ];
-  return ids.filter((id, index, all) => all.indexOf(id) === index);
+  ]);
 }
 
 function isUsableHttpUrl(value: string | null | undefined): boolean {
@@ -70,10 +75,8 @@ function isUsableHttpUrl(value: string | null | undefined): boolean {
 /**
  * Imports WordPress route media through the shared Phoenix pipeline:
  * - `_thumbnail_id` → existing `Route.coverImageUrl` (URL column, MediaAsset lineage reused)
- * - first usable `images-location-N` id → `RouteStop.photoUrl`
- *
- * The current Prisma model has no stop gallery relation; extra valid
- * attachment ids are reported as warnings instead of inventing storage.
+ * - first usable `images-location-N` id → `RouteStop.photoUrl` (backward compatible)
+ * - every usable stop attachment, including the first → `RouteStopImage` in source order
  */
 export class RouteStopMediaSyncer {
   constructor(
@@ -94,6 +97,13 @@ export class RouteStopMediaSyncer {
       await this.deps.prisma.route.update({
         where: { id: input.routeId },
         data: { coverImageUrl: null },
+      });
+      await this.replaceStopGalleries({
+        routeId: input.routeId,
+        stops: input.candidate.stops,
+        importedByStopIndex: new Map(),
+        warnings,
+        sourceRecordKey: input.sourceRecordKey,
       });
       return { warnings };
     }
@@ -145,29 +155,86 @@ export class RouteStopMediaSyncer {
     }
 
     const stopsInCommitOrder = [...input.candidate.stops].sort((a, b) => a.index - b.index);
-    for (const [position, stop] of stopsInCommitOrder.entries()) {
-      const order = position + 1;
-      let primary: { attachmentId: number; media: ImportedRouteMedia } | null = null;
-      for (const id of stop.imageAttachmentIds) {
-        if (primary) break;
+    const importedByStopIndex = new Map<number, ImportedRouteMedia[]>();
+    for (const stop of stopsInCommitOrder) {
+      const imported: ImportedRouteMedia[] = [];
+      const seenMediaIds = new Set<string>();
+      for (const id of uniquePreserveOrder(stop.imageAttachmentIds)) {
         const importedMedia = await this.importStopAttachment({
           attachmentId: id,
           sourceStopIndex: stop.index,
           attachments,
           ...importContext,
         });
-        if (importedMedia) {
-          primary = { attachmentId: id, media: importedMedia };
-        }
+        if (!importedMedia || seenMediaIds.has(importedMedia.mediaId)) continue;
+        seenMediaIds.add(importedMedia.mediaId);
+        imported.push({ ...importedMedia, attachmentId: id });
       }
+      importedByStopIndex.set(stop.index, imported);
+    }
+
+    await this.replaceStopGalleries({
+      routeId: input.routeId,
+      stops: stopsInCommitOrder,
+      importedByStopIndex,
+      warnings,
+      sourceRecordKey: input.sourceRecordKey,
+    });
+
+    return { warnings };
+  }
+
+  private async replaceStopGalleries(input: {
+    routeId: string;
+    stops: NormalizedRouteCandidate["stops"];
+    importedByStopIndex: Map<number, ImportedRouteMedia[]>;
+    warnings: MigrationWarning[];
+    sourceRecordKey: string;
+  }): Promise<void> {
+    const stopRows = await this.deps.prisma.routeStop.findMany({
+      where: { routeId: input.routeId },
+      select: { id: true, order: true },
+    });
+    const idByOrder = new Map(stopRows.map((row) => [row.order, row.id]));
+    const stopsInCommitOrder = [...input.stops].sort((a, b) => a.index - b.index);
+
+    for (const [position, stop] of stopsInCommitOrder.entries()) {
+      const order = position + 1;
+      const imported = input.importedByStopIndex.get(stop.index) ?? [];
+      const primary = imported[0] ?? null;
 
       await this.deps.prisma.routeStop.updateMany({
         where: { routeId: input.routeId, order },
-        data: { photoUrl: primary?.media.publicUrl ?? null },
+        data: { photoUrl: primary?.publicUrl ?? null },
       });
 
+      const routeStopId = idByOrder.get(order);
+      if (!routeStopId) {
+        input.warnings.push(
+          warning(
+            input.sourceRecordKey,
+            "ROUTE_STOP_MEDIA_TARGET_MISSING",
+            "RouteStop row was not found for gallery replace; stop media was not linked.",
+            { sourceStopIndex: stop.index, routeStopOrder: order },
+          ),
+        );
+        continue;
+      }
+
+      await this.deps.prisma.routeStopImage.deleteMany({ where: { routeStopId } });
+      for (const [sortOrder, media] of imported.entries()) {
+        await this.deps.prisma.routeStopImage.create({
+          data: {
+            routeStopId,
+            mediaAssetId: media.mediaId,
+            url: media.publicUrl,
+            sortOrder,
+          },
+        });
+      }
+
       if (primary) {
-        warnings.push(
+        input.warnings.push(
           warning(
             input.sourceRecordKey,
             "ROUTE_STOP_MEDIA_IMPORTED",
@@ -175,36 +242,15 @@ export class RouteStopMediaSyncer {
             {
               sourceStopIndex: stop.index,
               routeStopOrder: order,
-              attachmentId: primary.attachmentId,
-              mediaAssetId: primary.media.mediaId,
+              attachmentId: primary.attachmentId ?? null,
+              mediaAssetId: primary.mediaId,
+              galleryCount: imported.length,
             },
             "INFO",
           ),
         );
       }
-
-      const skippedAfterPrimary =
-        primary === null
-          ? []
-          : stop.imageAttachmentIds.slice(stop.imageAttachmentIds.indexOf(primary.attachmentId) + 1);
-      if (skippedAfterPrimary.length > 0) {
-        warnings.push(
-          warning(
-            input.sourceRecordKey,
-            "ROUTE_STOP_MEDIA_EXTRA_ATTACHMENTS_SKIPPED",
-            "RouteStop has multiple attachments, but current schema stores only one photoUrl; extra attachments were not imported or linked.",
-            {
-              sourceStopIndex: stop.index,
-              routeStopOrder: order,
-              linkedAttachmentId: primary?.attachmentId ?? null,
-              skippedAttachmentIds: skippedAfterPrimary,
-            },
-          ),
-        );
-      }
     }
-
-    return { warnings };
   }
 
   private async importCover(input: {
