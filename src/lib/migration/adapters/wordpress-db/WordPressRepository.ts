@@ -15,6 +15,7 @@ import {
   buildPublishedRoutesQuery,
   buildRankMathRedirectsQuery,
   buildTermsQuery,
+  buildUserMetaQuery,
   buildUsersQuery,
   buildVoxelPostReviewByIdQuery,
   buildVoxelPostReviewsQuery,
@@ -34,6 +35,7 @@ import type {
   WordPressRedirectRow,
   WordPressRouteBundle,
   WordPressTermRow,
+  WordPressUserMetaRow,
   WordPressUserRow,
   WordPressVoxelReviewRow,
 } from "./types";
@@ -292,6 +294,23 @@ export class WordPressRepository {
   async getUsers(limit?: number): Promise<WordPressUserRow[]> {
     const { sql, params } = buildUsersQuery(clampLimit(limit));
     return this.executor<WordPressUserRow>(sql, params);
+  }
+
+  /**
+   * One `meta_key` value per user, keyed by `user_id`. `wp_usermeta` has no
+   * unique constraint on `(user_id, meta_key)` — if a user somehow has more
+   * than one row for this key, the first one in `ORDER BY user_id, umeta_id`
+   * (the earliest recorded value) wins; see `buildUserMetaQuery()`.
+   */
+  async getUserMetaByKey(userIds: readonly number[], metaKey: string): Promise<Map<number, WordPressUserMetaRow>> {
+    const map = new Map<number, WordPressUserMetaRow>();
+    if (userIds.length === 0) return map;
+    const { sql, params } = buildUserMetaQuery(userIds, metaKey);
+    const rows = await this.executor<WordPressUserMetaRow>(sql, params);
+    for (const row of rows) {
+      if (!map.has(row.user_id)) map.set(row.user_id, row);
+    }
+    return map;
   }
 
   async getVoxelPostReviews(limit?: number): Promise<WordPressVoxelReviewRow[]> {

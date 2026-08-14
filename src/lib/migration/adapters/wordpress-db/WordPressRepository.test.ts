@@ -11,6 +11,7 @@ import {
   type WordPressPostRow,
   type WordPressRedirectRow,
   type WordPressTermRow,
+  type WordPressUserMetaRow,
   type WordPressUserRow,
 } from "./types";
 
@@ -267,6 +268,15 @@ const userRows: WordPressUserRow[] = [
   { ID: 9, user_login: "admin", user_email: "admin@example.com", user_registered: "2020-01-01", display_name: "Admin" },
 ];
 
+const userMetaRows: WordPressUserMetaRow[] = [
+  { umeta_id: 1, user_id: 9, meta_key: "voxel:avatar", meta_value: "555" },
+  // Duplicate (user_id, meta_key) row with a higher umeta_id — the earlier
+  // one (umeta_id: 1) must win, mirroring buildAttachmentsQuery()'s
+  // earliest-value-wins determinism.
+  { umeta_id: 2, user_id: 9, meta_key: "voxel:avatar", meta_value: "999" },
+  { umeta_id: 3, user_id: 10, meta_key: "some_other_key", meta_value: "irrelevant" },
+];
+
 // ---------------------------------------------------------------------------
 // Fake executor
 // ---------------------------------------------------------------------------
@@ -367,6 +377,10 @@ function createFakeExecutor() {
     }
     if (sql.includes("FROM wp_users")) {
       return userRows as never;
+    }
+    if (sql.includes("FROM wp_usermeta")) {
+      const [userIds, metaKey] = [params.slice(0, -1) as readonly number[], params[params.length - 1] as string];
+      return userMetaRows.filter((row) => userIds.includes(row.user_id) && row.meta_key === metaKey) as never;
     }
 
     throw new Error(`Unexpected query in test fake: ${sql}`);
@@ -596,6 +610,26 @@ async function testRedirectsAndUsers() {
 
   assert.deepEqual(await repo.getRankMathRedirects(), redirectRows);
   assert.deepEqual(await repo.getUsers(), userRows);
+}
+
+async function testUserMetaByKeyPicksEarliestRowPerUser() {
+  const { executor } = createFakeExecutor();
+  const repo = new WordPressRepository(executor);
+
+  const map = await repo.getUserMetaByKey([9, 10], "voxel:avatar");
+  assert.equal(map.size, 1);
+  // umeta_id: 1 (meta_value "555") wins over the later duplicate (umeta_id: 2, "999").
+  assert.deepEqual(map.get(9), { umeta_id: 1, user_id: 9, meta_key: "voxel:avatar", meta_value: "555" });
+  assert.equal(map.get(10), undefined);
+}
+
+async function testUserMetaByKeyEmptyIdsSkipsExecutor() {
+  const { executor, calls } = createFakeExecutor();
+  const repo = new WordPressRepository(executor);
+
+  const map = await repo.getUserMetaByKey([], "voxel:avatar");
+  assert.equal(map.size, 0);
+  assert.equal(calls.length, 0);
 }
 
 async function testLimitClamping() {
@@ -843,6 +877,8 @@ async function main() {
   await testEmptyIdListsSkipExecutor();
   await testAttachmentsById();
   await testRedirectsAndUsers();
+  await testUserMetaByKeyPicksEarliestRowPerUser();
+  await testUserMetaByKeyEmptyIdsSkipsExecutor();
   await testLimitClamping();
 
   await testOfferBundleRegularHbProgram();

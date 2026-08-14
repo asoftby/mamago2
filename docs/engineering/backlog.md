@@ -2916,26 +2916,55 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-108] Business/User profile images have no mamaGo 2.0 target field
 
-- Status: OPEN
+- Status: OPEN — User avatars: implementation ready, PROD replay pending.
+  Business logos: owner-excluded, out of scope for current cutover (not a
+  blocker).
 - Priority: P2
 - Area: Migration / Media / Schema
 - Added: 2026-08-14
-- Reason deferred: FULL PROD media audit found no `Business` image column
-  and no proven WordPress field feeding `User.avatarUrl` in the live
-  importer. Inventing storage would violate schema.
-- Context: `Business` has name/phone/UNP/status only. `User.avatarUrl`
-  exists but live WP user SELECT does not include an avatar column, and
-  Voxel profile media is not mapped.
-- Current state: documented schema gap. Place logos, Offer/Event/Article/
-  Route media are on the FULL path. PROD initial import (2026-08-14) created
-  no Business/User profile images. If owner keeps these in final approved
-  scope, treat as **cutover completeness P1** until imported or explicitly
-  excluded.
-- Dependencies: product decision whether Business/User images are in
-  mamaGo 2.0 before cutover. Explicit exclusion required to remain P2.
-- Acceptance criteria: either a target field + importer, or an explicit
-  owner exclusion that Business/User profile images are out of FULL PROD.
-- Source: Phoenix FULL PROD readiness (2026-08-14)
+- Reason deferred (original): FULL PROD media audit found no `Business`
+  image column and no proven WordPress field feeding `User.avatarUrl` in
+  the live importer. Inventing storage would violate schema.
+- Context: `Business` still has name/phone/UNP/status only — no schema
+  change is planned; owner decision (2026-08-15) is that Business logos are
+  explicit post-release scope, not required before cutover.
+  `User.avatarUrl` already exists on schema and is actively rendered
+  (header/account menu, mobile nav, article byline, place review author,
+  direct messages). Live WP user SELECT previously omitted any avatar
+  column; Voxel profile media was unmapped.
+- Current state (2026-08-15): User-avatar import support implemented —
+  `wp_usermeta.meta_key = 'voxel:avatar'` is now read
+  (`WordPressRepository.getUserMetaByKey`), classified
+  (`voxelAvatarSource.ts`: valid attachment / broken ref / non-attachment
+  value — Telegram `wptg_login_avatar`/Gravatar/default avatars are never
+  read, by construction), and imported via a narrow, idempotent
+  avatar-only backfill (`UserAvatarSyncer.ts` +
+  `scripts/migration-user-avatar-backfill.ts`,
+  `pnpm migration:user:avatar-backfill`). This is a **replay against
+  already-migrated Users only**: it never creates or recreates a User,
+  never touches any other User column, and only ever writes
+  `avatarUrl` when it is currently `null` (never overwrites a
+  user-provided avatar). Media import/dedup reuses the same
+  `MigrationLineage`-backed attachment lineage as Place/Event/Article/
+  Route media, so a re-run is a no-op and no duplicate `MediaAsset`/file
+  is ever created. Verified inventory (2026-08-14, live WP):
+  575 Phoenix-eligible users, 49 importable Voxel avatar attachments, 18
+  broken references (attachment id present in usermeta, `wp_posts` row
+  missing — reported as an explained skip, not a failure).
+  **Not yet executed against PROD** — this session did not run the
+  importer (no SSH/live WP/PROD access used); PROD replay is a separate,
+  explicitly authorized follow-up step.
+- Dependencies: none remaining for Business logos (owner-excluded). User
+  avatars depend only on running `migration:user:avatar-backfill
+  --confirm-writes` against PROD once authorized, then verifying the
+  49/18 counts land as expected.
+- Acceptance criteria: User avatars — PROD replay executed and verified
+  (imported count matches the 49-attachment inventory, 18 broken refs
+  reported as skips, zero unrelated User fields changed). Business
+  logos — closed as owner-excluded, no further action required for
+  current cutover.
+- Source: Phoenix FULL PROD readiness (2026-08-14); User avatar migration
+  support (2026-08-15).
 
 ## [BACKLOG-109] Phoenix commit does not write MediaUsage rows
 

@@ -90,6 +90,14 @@ export interface WordPressUserRow {
   display_name: string;
 }
 
+/** One row of `wp_usermeta`. `meta_value` can be null in WordPress. */
+export interface WordPressUserMetaRow {
+  umeta_id: number;
+  user_id: number;
+  meta_key: string;
+  meta_value: string | null;
+}
+
 /** One Voxel `wp_voxel_timeline` row with feed=`post_reviews`, plus the related Place post_status. */
 export interface WordPressVoxelReviewRow {
   id: number;

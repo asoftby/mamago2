@@ -263,6 +263,26 @@ export function buildUsersQuery(limit: number): SqlQuery {
   };
 }
 
+/**
+ * Single-`meta_key` lookup across many users, e.g. `voxel:avatar`
+ * (Voxel's custom-avatar attachment-id reference — see
+ * `docs/migration/manifests/` avatar audit). `wp_usermeta` has no unique
+ * constraint on `(user_id, meta_key)`, so this can return more than one row
+ * per user; callers (`WordPressRepository.getUserMetaByKey()`) keep the
+ * first row per user in `ORDER BY user_id, umeta_id` order — the earliest
+ * recorded value — mirroring `buildAttachmentsQuery()`'s
+ * earliest-value-wins determinism for `_wp_attached_file`.
+ */
+export function buildUserMetaQuery(userIds: readonly number[], metaKey: string): SqlQuery {
+  return {
+    sql: `SELECT umeta_id, user_id, meta_key, meta_value
+      FROM wp_usermeta
+      WHERE user_id IN (${placeholders(userIds.length)}) AND meta_key = ?
+      ORDER BY user_id, umeta_id`,
+    params: [...userIds, metaKey],
+  };
+}
+
 export function buildVoxelPostReviewsQuery(limit: number): SqlQuery {
   return {
     sql: `SELECT t.id, t.user_id, t.post_id, t.feed, t.content, t.details, t.review_score, t.created_at, t.moderation, t.published_as, p.post_status AS place_status
