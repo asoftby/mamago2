@@ -375,21 +375,22 @@ P3 — cleanup / polish / optional
   sessions so preview output isn't misleading, but not itself a blocker.
 - Current state: FULL first-run RouteStop media is wired. Timestamp
   update-safety exists. Narrow `--force-route-media-replay` is still
-  absent (recovery tool, not first-run).
+  absent (recovery tool, not first-run). Cover mapping landed 2026-08-14:
+  WP `_thumbnail_id` → existing `Route.coverImageUrl` via MediaAsset
+  lineage (no schema change). PROD still has 0/14 covers until a Route
+  rerun. Extra stop gallery images cannot be stored on singular
+  `RouteStop.photoUrl` — that is BACKLOG-112 (P1, owner decision), not
+  this replay-tool item. Replay CLI remains the recovery tool.
 - Dependencies: needs either (a) a `classifyRouteUpdateSafety`-equivalent
   guard added to `RouteCommitRunner` (mirroring Place), or (b) a dedicated
   `--force-route-media-replay` narrow path (mirroring Event/Article) before
   any Route media backfill is safe to run.
 - Acceptance criteria: safety net built and verified; then Route/RouteStop
   media backfill can run safely.
-- Severity review (2026-08-07, Task 1 closure): confirmed **not** P0/P1.
-  Routes are a small, secondary entity (14 total, vs. 83 Places/26
-  Articles), already render cleanly with no broken images or layout
-  regression, and are not one of Task 1's core "main sections" (Places,
-  Articles, Events). Lack of Route/RouteStop imported media does not
-  materially prevent production-like DEV testing of the core discovery
-  flows and does not make first PROD unsafe. Stays P2, does not block
-  Task 1 `COMPLETE`.
+- Severity review (2026-08-07, Task 1 closure): replay tool confirmed
+  **not** P0/P1 for first PROD. 2026-08-14: extra stop images are a
+  separate P1 cutover item (BACKLOG-112); this entry stays P2 for the
+  missing `--force-route-media-replay` recovery path only.
 - Source: `docs/release/dev-to-prod-checklist.md` Task 1 audit (Import
   Images Into DEV)
 
@@ -2790,9 +2791,11 @@ P3 — cleanup / polish / optional
 - Context / remaining gaps (do not duplicate work already filed):
   - Offer cover/gallery: no FULL delegate; CLI hard-rejects
     `--entity offer --media-policy FULL` — BACKLOG-015.
-  - Route stop photos: no narrow replay / no update-safety classifier —
-    BACKLOG-017 (was P2 for first-PROD preview; now in the FULL MEDIA
-    critical path).
+  - Route extra stop images: current schema stores one `photoUrl` per
+    stop; 510 additional WP images are skipped with a warning —
+    BACKLOG-112 (P1, blocks full Route media). Cover mapping now exists
+    (`_thumbnail_id` → `Route.coverImageUrl`). Narrow replay remains
+    BACKLOG-017 (P2 recovery tool).
   - Article cover/inline: normal `ArticleCommitRunner` writes
     `coverImageId: null`; import only via `--force-article-media-replay`.
   - Place logos: permanently excluded (`PLACE_LOGO_EXCLUDED`, 47
@@ -2801,8 +2804,9 @@ P3 — cleanup / polish / optional
   - LOCAL/DEV sampling allowlist of 9 keys still applies whenever
     `--media-policy` is omitted.
 - Current state: Offer FULL delegate, Place logos, Article FULL first-run,
-  Route FULL first-run, Event FULL (unchanged) are implemented. Remaining
-  P2: BACKLOG-017 narrow Route replay; BACKLOG-108 Business/User profile
+  Route cover + first stop photo, Event FULL (unchanged) are implemented.
+  Remaining P1 media: BACKLOG-112 Route extra stop images. Remaining P2:
+  BACKLOG-017 narrow Route replay; BACKLOG-108 Business/User profile
   images (no target field). Always pass `--media-policy FULL` on PROD so
   LOCAL/DEV sampling cannot suppress images.
 - Dependencies: owner exceptions per entity, or targeted importers.
@@ -2847,6 +2851,9 @@ P3 — cleanup / polish / optional
   `scripts/migration-commit-wordpress-db.ts` documents that it must not
   use that singleton.
 - Current state: no post-import reindex step in the current runbook.
+  PROD after initial import (2026-08-14): `SearchDocument` = 0. Content is
+  PENDING/DRAFT so public search should stay empty until publication.
+  Reindex is mandatory after publish, not before.
 - Dependencies: a successful PROD content import.
 - Acceptance criteria: documented, idempotent reindex (or indexer
   backfill) runs after Phoenix commit and is part of reconciliation.
@@ -2871,7 +2878,11 @@ P3 — cleanup / polish / optional
   `classifyImportedTargetUpdateSafety` (timestamp gate, QUARANTINE on
   conflict). Route UPDATE no longer overwrites `status`/`visibility`/
   `authorId`. Delete-sync of WP-deleted rows is still absent and remains
-  a freeze→final-rerun cutover issue.
+  a freeze→final-rerun cutover issue. Source drift 2026-08-14T10:44:34Z →
+  11:15Z: 0 added/removed/hash-changed rows; 0 new users/attachments;
+  0 trash. Policy (not implemented): at freeze, emit the lineage keys
+  present in PROD and absent from live WP scope; owner approves
+  archive/keep per row; no automatic delete or tombstone.
 - Dependencies: owner policy for the freeze window (new/changed/deleted
   WP rows).
 - Acceptance criteria: documented final-sync behavior for new / changed /
@@ -2918,9 +2929,117 @@ P3 — cleanup / polish / optional
   exists but live WP user SELECT does not include an avatar column, and
   Voxel profile media is not mapped.
 - Current state: documented schema gap. Place logos, Offer/Event/Article/
-  Route media are on the FULL path.
+  Route media are on the FULL path. PROD initial import (2026-08-14) created
+  no Business/User profile images. If owner keeps these in final approved
+  scope, treat as **cutover completeness P1** until imported or explicitly
+  excluded.
 - Dependencies: product decision whether Business/User images are in
-  mamaGo 2.0 before cutover.
+  mamaGo 2.0 before cutover. Explicit exclusion required to remain P2.
 - Acceptance criteria: either a target field + importer, or an explicit
   owner exclusion that Business/User profile images are out of FULL PROD.
 - Source: Phoenix FULL PROD readiness (2026-08-14)
+
+## [BACKLOG-109] Phoenix commit does not write MediaUsage rows
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / Media / Admin
+- Added: 2026-08-14
+- Reason deferred: public rendering of migrated Places/Events/Articles/
+  Offers/Routes does not query `MediaUsage`; it uses `PlaceImage`,
+  `Activity.coverImageId`/`ActivityImage`, `Article.coverImageId` +
+  `contentJson` image blocks, `Offer.coverImage`/`galleryImages`, and
+  `RouteStop.photoUrl`. PROD after initial import: MediaAsset 1551,
+  MediaUsage 0.
+- Context: `MediaUsage` feeds the admin media library “used in” map and
+  metadata autogen. Phoenix commit uses a bare `PrismaClient` and never
+  calls `syncPlaceMediaUsage` / equivalent.
+- Current state: acceptable for public pages; admin library usage counts
+  are empty for migrated files.
+- Dependencies: none for public cutover. Needed if admin usage tracking
+  must be correct on day one.
+- Acceptance criteria: documented backfill (or importer write) of
+  MediaUsage for migrated entity image fields, or explicit owner
+  exclusion that admin usage tracking can wait.
+- Source: Phoenix initial PROD QA (2026-08-14)
+
+## [BACKLOG-110] PROD storage contains macOS AppleDouble `._*` sidecars from tar copy
+
+- Status: OPEN
+- Priority: P3
+- Area: Migration / Storage
+- Added: 2026-08-14
+- Reason deferred: not content duplicates and not referenced by
+  MediaAsset. Do not delete during QA. `find /app/storage` = 9534 files
+  vs staging 4766 because the Mac `tar` of `media-staging/uploads`
+  included AppleDouble forks (`._*.webp`, 4767 files, ~14KB total) plus
+  4766 real webp (466832226 bytes) plus `._uploads` / `.gitkeep`.
+- Context: copy used `tar -C media-staging -cf - uploads | docker exec
+  tar -xf - -C /app/storage`. Unique real files = 4766; duplicate
+  basenames among real webp = 0.
+- Current state: unexpected files are AppleDouble only. No nested
+  duplicate hierarchy of image bytes.
+- Dependencies: none.
+- Acceptance criteria: future copies use COPYFILE_DISABLE=1 / `--noleaf`
+  / `tar --disable-copyfile`; optional later cleanup of `._*` after
+  owner approval. Do not delete in the current QA window.
+- Source: Phoenix initial PROD QA (2026-08-14)
+
+## [BACKLOG-111] Commit CLI DEFAULT_LIMIT=100 silently truncates entity batches
+
+- Status: OPEN
+- Priority: P2
+- Area: Migration / CLI
+- Added: 2026-08-14
+- Reason deferred: recovered in the same session with `--limit 20000`;
+  not a data-loss bug once the flag is passed. It did truncate the first
+  Articles pass (40 of 117) until rerun.
+- Context: `src/lib/migration/adapters/wordpress-db/sql.ts`
+  `DEFAULT_LIMIT = 100`, `MAX_LIMIT = 20000`. FULL PROD must always pass
+  `--limit 20000`.
+- Current state: operational footgun. Canonical command in the execution
+  prompt already includes `--limit 20000`.
+- Dependencies: none.
+- Acceptance criteria: fail-closed when FULL/PROD profile is used
+  without an explicit limit, or default FULL limit = MAX_LIMIT.
+- Source: Phoenix initial PROD QA (2026-08-14)
+
+## [BACKLOG-112] RouteStop can store only one photo; 510 WP stop images cannot be imported
+
+- Status: OPEN
+- Priority: P1 — owner requirement is that the final PROD migration keep
+  all meaningful Route images. Current importer correctly refuses to
+  invent storage; extras are warned, not treated as full-media success.
+- Area: Migration / Media / Routes / Schema
+- Added: 2026-08-14
+- Reason deferred: schema cannot store `>1` image per RouteStop today.
+  No Prisma migration in the Route cover-mapping session — owner decision
+  required before extras can be imported.
+- Context: live WP (2026-08-14) for 14 published routes:
+  unique source media IDs 612; covers 14/14 (`_thumbnail_id`); stop image
+  occurrences 604; first images 94; extra images 510; 3 stops have no
+  images; 13 attachment IDs have no `wp_posts` row (1 first-stop `41226`,
+  12 extras, 0 covers). Public UI already has a stop `photos[]` carousel
+  and the editor wizard holds multiple uploads, but persist/API/DB keep
+  only `photoUrl` = first photo. `MediaUsage` indexes `stopPhotoUrl` as
+  one field; there is no `RouteStopImage` (or JSON gallery) relation.
+- Current state: Phoenix maps first usable stop attachment →
+  `RouteStop.photoUrl` and reports `ROUTE_STOP_MEDIA_EXTRA_ATTACHMENTS_SKIPPED`.
+  Cover mapping (`Route.coverImageUrl`) is separate and does not need this
+  schema change.
+- Recommended storage: `RouteStopImage` join table (`routeStopId`,
+  `mediaId`/`url`, `order`) mirroring `ActivityImage`, plus keep
+  `photoUrl` as denormalized first image. Alternative: JSON `photos`
+  column on `RouteStop` — weaker, no MediaAsset FK.
+- UI impact: public `RouteDetailClient` already renders `stop.photos`;
+  `src/app/(public)/routes/[slug]/page.tsx` does not populate it (only
+  `photoUrl`). Editor `RouteEditor` collects many photos then saves
+  `photos?.[0]?.url`. Admin/public/edit/API all need to persist and read
+  the full list. Prisma migration required (`migrate deploy`, never
+  `migrate dev` / `db push`).
+- Dependencies: owner approval of the storage shape; then importer +
+  public/admin persist; then Route-only PROD rerun.
+- Acceptance criteria: every extra in-scope stop image is stored,
+  linked, rerun-safe (MediaAsset lineage), and visible in public/admin
+  without dropping the first `photoUrl`.
+- Source: Phoenix Route media gap closure (2026-08-14)

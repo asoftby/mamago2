@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { RouteStopMediaSyncer, type RouteStopMediaSyncerPrismaClient } from "./RouteStopMediaSyncer";
+import {
+  RouteStopMediaSyncer,
+  uniqueAttachmentIds,
+  type RouteStopMediaSyncerPrismaClient,
+} from "./RouteStopMediaSyncer";
 import type { NormalizedRouteCandidate } from "./buildRouteCreateDraft";
 import type { WordPressAttachmentRow } from "../../adapters/wordpress-db/types";
 import type { MediaImporterLike } from "../../media/types";
@@ -43,6 +47,7 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
   const assets = new Map<string, { id: string; publicUrl: string; deletedAt: null }>();
   const lineages = new Map<string, string>();
   const stopUpdates: unknown[] = [];
+  const routeUpdates: unknown[] = [];
   const importCalls: unknown[] = [];
   const lineageCalls: unknown[] = [];
 
@@ -53,6 +58,12 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
   }
 
   const prisma: RouteStopMediaSyncerPrismaClient = {
+    route: {
+      update: (async (args: unknown) => {
+        routeUpdates.push(args);
+        return { id: "route-1" };
+      }) as unknown as RouteStopMediaSyncerPrismaClient["route"]["update"],
+    },
     routeStop: {
       updateMany: (async (args: unknown) => {
         stopUpdates.push(args);
@@ -74,6 +85,7 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
   };
 
   const attachments = new Map<number, WordPressAttachmentRow>([
+    [9, attachment(9)],
     [10, attachment(10)],
     [11, attachment(11)],
     [12, attachment(12)],
@@ -95,10 +107,13 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
   const syncer = new RouteStopMediaSyncer({
     prisma,
     attachmentResolver: {
-      getAttachmentsByIds: async (ids) => new Map(ids.flatMap((id) => {
-        const row = attachments.get(id);
-        return row ? [[id, row] as const] : [];
-      })),
+      getAttachmentsByIds: async (ids) =>
+        new Map(
+          ids.flatMap((id) => {
+            const row = attachments.get(id);
+            return row ? [[id, row] as const] : [];
+          }),
+        ),
     },
     mediaImporterFactory: () => importer,
     lineageWriter: {
@@ -115,7 +130,7 @@ function createHarness(options: { failImportIds?: readonly number[]; existingMed
     },
   });
 
-  return { syncer, stopUpdates, importCalls, lineageCalls, attachments };
+  return { syncer, stopUpdates, routeUpdates, importCalls, lineageCalls, attachments };
 }
 
 function syncInput(overrides: Partial<Parameters<RouteStopMediaSyncer["sync"]>[0]> = {}) {
@@ -132,16 +147,51 @@ function syncInput(overrides: Partial<Parameters<RouteStopMediaSyncer["sync"]>[0
   };
 }
 
-async function testNoStopMediaDoesNothing() {
-  const { syncer, stopUpdates, importCalls } = createHarness();
+function coverUpdate(routeUpdates: unknown[]): { coverImageUrl: string | null } {
+  const last = routeUpdates.at(-1) as { data: { coverImageUrl: string | null } };
+  return last.data;
+}
+
+async function testNoStopMediaClearsCoverAndDoesNotImport() {
+  const { syncer, stopUpdates, importCalls, routeUpdates } = createHarness();
 
   const result = await syncer.sync(
-    syncInput({ candidate: candidateFixture({ stops: [{ index: 1, title: "First", description: null, imageAttachmentIds: [], placeId: null }] }) }),
+    syncInput({
+      candidate: candidateFixture({
+        stops: [{ index: 1, title: "First", description: null, imageAttachmentIds: [], placeId: null }],
+      }),
+    }),
   );
 
   assert.deepEqual(result.warnings, []);
   assert.deepEqual(stopUpdates, []);
   assert.deepEqual(importCalls, []);
+  assert.equal(coverUpdate(routeUpdates).coverImageUrl, null);
+}
+
+async function testCoverImportedFromThumbnailId() {
+  const { syncer, routeUpdates, lineageCalls } = createHarness();
+
+  const result = await syncer.sync(
+    syncInput({ candidate: candidateFixture({ media: { featuredAttachmentId: 9 } }) }),
+  );
+
+  assert.equal(coverUpdate(routeUpdates).coverImageUrl, "/uploads/9.webp");
+  assert.equal(
+    (lineageCalls[0] as { targetRole?: string }).targetRole,
+    "route-cover",
+  );
+  assert.ok(result.warnings.some((w) => w.code === "ROUTE_COVER_IMPORTED"));
+}
+
+async function testMissingCoverLeavesCoverImageUrlNull() {
+  const { syncer, routeUpdates, importCalls } = createHarness();
+
+  const result = await syncer.sync(syncInput());
+
+  assert.equal(coverUpdate(routeUpdates).coverImageUrl, null);
+  assert.ok(!result.warnings.some((w) => w.code === "ROUTE_COVER_IMPORTED"));
+  assert.ok(importCalls.length > 0, "stop images must still import when cover is absent");
 }
 
 async function testSingleAttachmentLinkedToCorrectStopOrder() {
@@ -158,11 +208,12 @@ async function testSingleAttachmentLinkedToCorrectStopOrder() {
 }
 
 async function testMultipleAttachmentsUseFirstImportedAndWarnAboutExtras() {
-  const { syncer, stopUpdates } = createHarness();
+  const { syncer, stopUpdates, importCalls } = createHarness();
 
   const result = await syncer.sync(syncInput());
 
   assert.equal((stopUpdates[1] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/11.webp");
+  assert.ok(!importCalls.some((call) => String((call as { sourceRecordKey: string }).sourceRecordKey).endsWith(":12")));
   const extraWarning = result.warnings.find((w) => w.code === "ROUTE_STOP_MEDIA_EXTRA_ATTACHMENTS_SKIPPED");
   assert.ok(extraWarning);
   assert.deepEqual(extraWarning.details?.skippedAttachmentIds, [12]);
@@ -189,23 +240,50 @@ async function testInvalidAttachmentUrlWarnsAndSkips() {
 }
 
 async function testRepeatedSyncReusesLineageAndDoesNotReimport() {
-  const { syncer, importCalls, lineageCalls } = createHarness();
+  const { syncer, importCalls, lineageCalls, routeUpdates } = createHarness();
+  const input = syncInput({ candidate: candidateFixture({ media: { featuredAttachmentId: 9 } }) });
 
-  await syncer.sync(syncInput());
-  const second = await syncer.sync(syncInput());
+  await syncer.sync(input);
+  const firstImports = importCalls.length;
+  const firstLineages = lineageCalls.length;
+  const second = await syncer.sync(input);
 
-  assert.equal(lineageCalls.length, 2);
-  assert.equal(importCalls.length, 2, "second run must reuse existing MEDIA_ASSET lineage");
+  assert.equal(firstLineages, 3, "cover + two first-stop images");
+  assert.equal(importCalls.length, firstImports, "second run must reuse existing MEDIA_ASSET lineage");
+  assert.equal(lineageCalls.length, firstLineages);
   assert.ok(second.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_DEDUP_REUSED"));
+  assert.equal(coverUpdate(routeUpdates).coverImageUrl, "/uploads/9.webp");
+}
+
+async function testCoverAndStopSharingAttachmentDoNotDuplicateLineage() {
+  const { syncer, importCalls, lineageCalls, routeUpdates, stopUpdates } = createHarness();
+
+  const result = await syncer.sync(
+    syncInput({ candidate: candidateFixture({ media: { featuredAttachmentId: 10 } }) }),
+  );
+
+  const attachmentKeys = lineageCalls.map((call) => (call as { sourceRecordKey: string }).sourceRecordKey);
+  assert.deepEqual(
+    attachmentKeys.filter((key, index, all) => all.indexOf(key) === index),
+    ["wordpress-db:attachment:10", "wordpress-db:attachment:11"],
+  );
+  assert.equal(
+    importCalls.filter((call) => String((call as { sourceRecordKey: string }).sourceRecordKey).endsWith(":10")).length,
+    1,
+  );
+  assert.equal(coverUpdate(routeUpdates).coverImageUrl, "/uploads/10.webp");
+  assert.equal((stopUpdates[0] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/10.webp");
+  assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_DEDUP_REUSED"));
 }
 
 async function testMissingOwnerSkipsMediaWithWarning() {
-  const { syncer, stopUpdates, importCalls } = createHarness();
+  const { syncer, stopUpdates, importCalls, routeUpdates } = createHarness();
 
   const result = await syncer.sync(syncInput({ mediaOwnerUserId: null }));
 
   assert.deepEqual(stopUpdates, []);
   assert.deepEqual(importCalls, []);
+  assert.deepEqual(routeUpdates, []);
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_OWNER_MISSING"));
 }
 
@@ -219,15 +297,38 @@ async function testFailedDownloadDoesNotBlockOtherStopMedia() {
   assert.ok(result.warnings.some((w) => w.code === "ROUTE_STOP_MEDIA_DOWNLOAD_FAILED"));
 }
 
+async function testMissingCoverAttachmentWarnsAndDoesNotBlockStops() {
+  const { syncer, attachments, routeUpdates, stopUpdates } = createHarness();
+  attachments.delete(9);
+
+  const result = await syncer.sync(
+    syncInput({ candidate: candidateFixture({ media: { featuredAttachmentId: 9 } }) }),
+  );
+
+  assert.equal(coverUpdate(routeUpdates).coverImageUrl, null);
+  assert.equal((stopUpdates[0] as { data: { photoUrl: string | null } }).data.photoUrl, "/uploads/10.webp");
+  assert.ok(result.warnings.some((w) => w.code === "ROUTE_COVER_ATTACHMENT_MISSING"));
+}
+
+async function testUniqueAttachmentIdsIncludesCoverOnce() {
+  assert.deepEqual(uniqueAttachmentIds(candidateFixture({ media: { featuredAttachmentId: 10 } })), [10, 11, 12]);
+  assert.deepEqual(uniqueAttachmentIds(candidateFixture({ media: { featuredAttachmentId: 9 } })), [9, 10, 11, 12]);
+}
+
 async function main() {
-  await testNoStopMediaDoesNothing();
+  await testNoStopMediaClearsCoverAndDoesNotImport();
+  await testCoverImportedFromThumbnailId();
+  await testMissingCoverLeavesCoverImageUrlNull();
   await testSingleAttachmentLinkedToCorrectStopOrder();
   await testMultipleAttachmentsUseFirstImportedAndWarnAboutExtras();
   await testMissingAttachmentWarnsAndUsesNextValidForSameStop();
   await testInvalidAttachmentUrlWarnsAndSkips();
   await testRepeatedSyncReusesLineageAndDoesNotReimport();
+  await testCoverAndStopSharingAttachmentDoNotDuplicateLineage();
   await testMissingOwnerSkipsMediaWithWarning();
   await testFailedDownloadDoesNotBlockOtherStopMedia();
+  await testMissingCoverAttachmentWarnsAndDoesNotBlockStops();
+  await testUniqueAttachmentIdsIncludesCoverOnce();
 }
 
 main()

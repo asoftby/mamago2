@@ -34,6 +34,7 @@ export class MediaPolicyGatedRouteStopMediaSyncer implements RouteStopMediaSynce
     }
 
     if (mediaPolicy.name === "METADATA") {
+      const featuredAttachmentId = input.candidate.media.featuredAttachmentId;
       const stopsWithMedia = input.candidate.stops
         .filter((stop) => stop.imageAttachmentIds.length > 0)
         .map((stop) => ({
@@ -41,7 +42,7 @@ export class MediaPolicyGatedRouteStopMediaSyncer implements RouteStopMediaSynce
           attachmentIds: stop.imageAttachmentIds,
         }));
 
-      if (stopsWithMedia.length === 0) {
+      if (featuredAttachmentId === null && stopsWithMedia.length === 0) {
         return { warnings: [] };
       }
 
@@ -50,8 +51,8 @@ export class MediaPolicyGatedRouteStopMediaSyncer implements RouteStopMediaSynce
           warning(
             input.sourceRecordKey,
             "ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED",
-            "Route stop image attachment evidence found but not imported (media policy METADATA).",
-            { stops: stopsWithMedia },
+            "Route image attachment evidence found but not imported (media policy METADATA).",
+            { featuredAttachmentId, stops: stopsWithMedia },
           ),
         ],
       };

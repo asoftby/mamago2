@@ -12,6 +12,7 @@ export interface RouteStopMediaAttachmentResolver {
 }
 
 export interface RouteStopMediaSyncerPrismaClient {
+  route: Pick<PrismaClient["route"], "update">;
   routeStop: Pick<PrismaClient["routeStop"], "updateMany">;
   mediaAsset: Pick<PrismaClient["mediaAsset"], "findFirst">;
   migrationLineage: Pick<PrismaClient["migrationLineage"], "findFirst">;
@@ -32,7 +33,7 @@ export interface RouteStopMediaSyncResult {
   warnings: MigrationWarning[];
 }
 
-type ImportedRouteStopMedia = {
+type ImportedRouteMedia = {
   mediaId: string;
   publicUrl: string;
 };
@@ -47,8 +48,12 @@ function warning(
   return { code, message, severity, sourceRecordKey, ...(details ? { details } : {}) };
 }
 
-function uniqueAttachmentIds(candidate: NormalizedRouteCandidate): number[] {
-  const ids = candidate.stops.flatMap((stop) => stop.imageAttachmentIds);
+export function uniqueAttachmentIds(candidate: NormalizedRouteCandidate): number[] {
+  const featuredId = candidate.media.featuredAttachmentId;
+  const ids = [
+    ...(featuredId !== null ? [featuredId] : []),
+    ...candidate.stops.flatMap((stop) => stop.imageAttachmentIds),
+  ];
   return ids.filter((id, index, all) => all.indexOf(id) === index);
 }
 
@@ -63,11 +68,12 @@ function isUsableHttpUrl(value: string | null | undefined): boolean {
 }
 
 /**
- * Imports WordPress route stop attachments through the shared Phoenix media
- * pipeline and links one image per stop through the existing
- * `RouteStop.photoUrl` column. The current Prisma model has no stop gallery
- * relation; extra valid attachment ids are reported as warnings instead of
- * inventing storage.
+ * Imports WordPress route media through the shared Phoenix pipeline:
+ * - `_thumbnail_id` → existing `Route.coverImageUrl` (URL column, MediaAsset lineage reused)
+ * - first usable `images-location-N` id → `RouteStop.photoUrl`
+ *
+ * The current Prisma model has no stop gallery relation; extra valid
+ * attachment ids are reported as warnings instead of inventing storage.
  */
 export class RouteStopMediaSyncer {
   constructor(
@@ -81,8 +87,14 @@ export class RouteStopMediaSyncer {
 
   async sync(input: RouteStopMediaSyncInput): Promise<RouteStopMediaSyncResult> {
     const warnings: MigrationWarning[] = [];
+    const featuredId = input.candidate.media.featuredAttachmentId;
     const ids = uniqueAttachmentIds(input.candidate);
+
     if (ids.length === 0) {
+      await this.deps.prisma.route.update({
+        where: { id: input.routeId },
+        data: { coverImageUrl: null },
+      });
       return { warnings };
     }
 
@@ -92,8 +104,8 @@ export class RouteStopMediaSyncer {
         warning(
           input.sourceRecordKey,
           "ROUTE_STOP_MEDIA_OWNER_MISSING",
-          "Route stop media was skipped because no mediaOwnerUserId was available for migrated MediaAsset ownership.",
-          { attachmentIds: ids },
+          "Route media was skipped because no mediaOwnerUserId was available for migrated MediaAsset ownership.",
+          { attachmentIds: ids, featuredAttachmentId: featuredId },
         ),
       );
       return { warnings };
@@ -101,44 +113,48 @@ export class RouteStopMediaSyncer {
 
     const attachments = await this.deps.attachmentResolver.getAttachmentsByIds(ids);
     const importer = this.deps.mediaImporterFactory(ownerUserId);
+    const importContext = {
+      importer,
+      sourceId: input.sourceId,
+      sourceHash: input.sourceHash ?? input.sourceRecordKey,
+      runId: input.runId ?? null,
+      recordId: input.recordId ?? null,
+      sourceRecordKey: input.sourceRecordKey,
+      warnings,
+    };
+
+    const cover = await this.importCover({
+      featuredId,
+      attachments,
+      ...importContext,
+    });
+    await this.deps.prisma.route.update({
+      where: { id: input.routeId },
+      data: { coverImageUrl: cover?.publicUrl ?? null },
+    });
+    if (cover && featuredId !== null) {
+      warnings.push(
+        warning(
+          input.sourceRecordKey,
+          "ROUTE_COVER_IMPORTED",
+          "Route cover was imported and linked through Route.coverImageUrl.",
+          { attachmentId: featuredId, mediaAssetId: cover.mediaId },
+          "INFO",
+        ),
+      );
+    }
 
     const stopsInCommitOrder = [...input.candidate.stops].sort((a, b) => a.index - b.index);
     for (const [position, stop] of stopsInCommitOrder.entries()) {
       const order = position + 1;
-      let primary: { attachmentId: number; media: ImportedRouteStopMedia } | null = null;
+      let primary: { attachmentId: number; media: ImportedRouteMedia } | null = null;
       for (const id of stop.imageAttachmentIds) {
         if (primary) break;
-        const attachment = attachments.get(id);
-        if (!attachment) {
-          warnings.push(
-            warning(input.sourceRecordKey, "ROUTE_STOP_MEDIA_ATTACHMENT_MISSING", "WordPress attachment row was not found.", {
-              attachmentId: id,
-              sourceStopIndex: stop.index,
-            }),
-          );
-          continue;
-        }
-        if (!isUsableHttpUrl(attachment.guid)) {
-          warnings.push(
-            warning(input.sourceRecordKey, "ROUTE_STOP_MEDIA_URL_INVALID", "WordPress attachment guid is not a valid http(s) URL.", {
-              attachmentId: id,
-              sourceStopIndex: stop.index,
-              guid: attachment.guid,
-            }),
-          );
-          continue;
-        }
-
-        const importedMedia = await this.importOrReuseAttachment({
+        const importedMedia = await this.importStopAttachment({
           attachmentId: id,
-          attachment,
-          importer,
-          sourceId: input.sourceId,
-          sourceHash: input.sourceHash ?? input.sourceRecordKey,
-          runId: input.runId ?? null,
-          recordId: input.recordId ?? null,
-          sourceRecordKey: input.sourceRecordKey,
-          warnings,
+          sourceStopIndex: stop.index,
+          attachments,
+          ...importContext,
         });
         if (importedMedia) {
           primary = { attachmentId: id, media: importedMedia };
@@ -191,6 +207,125 @@ export class RouteStopMediaSyncer {
     return { warnings };
   }
 
+  private async importCover(input: {
+    featuredId: number | null;
+    attachments: Map<number, WordPressAttachmentRow>;
+    importer: MediaImporterLike;
+    sourceId: string;
+    sourceHash: string;
+    runId: string | null;
+    recordId: string | null;
+    sourceRecordKey: string;
+    warnings: MigrationWarning[];
+  }): Promise<ImportedRouteMedia | null> {
+    if (input.featuredId === null) return null;
+    return this.resolveAndImportAttachment({
+      attachmentId: input.featuredId,
+      attachments: input.attachments,
+      missingCode: "ROUTE_COVER_ATTACHMENT_MISSING",
+      invalidUrlCode: "ROUTE_COVER_URL_INVALID",
+      downloadFailedCode: "ROUTE_COVER_DOWNLOAD_FAILED",
+      downloadFailedMessage: "Route cover import failed; the Route commit remains successful.",
+      targetRole: "route-cover",
+      importer: input.importer,
+      sourceId: input.sourceId,
+      sourceHash: input.sourceHash,
+      runId: input.runId,
+      recordId: input.recordId,
+      sourceRecordKey: input.sourceRecordKey,
+      warnings: input.warnings,
+    });
+  }
+
+  private async importStopAttachment(input: {
+    attachmentId: number;
+    sourceStopIndex: number;
+    attachments: Map<number, WordPressAttachmentRow>;
+    importer: MediaImporterLike;
+    sourceId: string;
+    sourceHash: string;
+    runId: string | null;
+    recordId: string | null;
+    sourceRecordKey: string;
+    warnings: MigrationWarning[];
+  }): Promise<ImportedRouteMedia | null> {
+    return this.resolveAndImportAttachment({
+      attachmentId: input.attachmentId,
+      attachments: input.attachments,
+      missingCode: "ROUTE_STOP_MEDIA_ATTACHMENT_MISSING",
+      invalidUrlCode: "ROUTE_STOP_MEDIA_URL_INVALID",
+      downloadFailedCode: "ROUTE_STOP_MEDIA_DOWNLOAD_FAILED",
+      downloadFailedMessage: "Route stop media import failed; the Route commit remains successful.",
+      targetRole: "route-stop-photo",
+      details: { sourceStopIndex: input.sourceStopIndex },
+      importer: input.importer,
+      sourceId: input.sourceId,
+      sourceHash: input.sourceHash,
+      runId: input.runId,
+      recordId: input.recordId,
+      sourceRecordKey: input.sourceRecordKey,
+      warnings: input.warnings,
+    });
+  }
+
+  private async resolveAndImportAttachment(input: {
+    attachmentId: number;
+    attachments: Map<number, WordPressAttachmentRow>;
+    missingCode: string;
+    invalidUrlCode: string;
+    downloadFailedCode: string;
+    downloadFailedMessage: string;
+    targetRole: string;
+    details?: Record<string, unknown>;
+    importer: MediaImporterLike;
+    sourceId: string;
+    sourceHash: string;
+    runId: string | null;
+    recordId: string | null;
+    sourceRecordKey: string;
+    warnings: MigrationWarning[];
+  }): Promise<ImportedRouteMedia | null> {
+    const attachment = input.attachments.get(input.attachmentId);
+    if (!attachment) {
+      input.warnings.push(
+        warning(input.sourceRecordKey, input.missingCode, "WordPress attachment row was not found.", {
+          attachmentId: input.attachmentId,
+          ...input.details,
+        }),
+      );
+      return null;
+    }
+    if (!isUsableHttpUrl(attachment.guid)) {
+      input.warnings.push(
+        warning(
+          input.sourceRecordKey,
+          input.invalidUrlCode,
+          "WordPress attachment guid is not a valid http(s) URL.",
+          {
+            attachmentId: input.attachmentId,
+            guid: attachment.guid,
+            ...input.details,
+          },
+        ),
+      );
+      return null;
+    }
+    return this.importOrReuseAttachment({
+      attachmentId: input.attachmentId,
+      attachment,
+      importer: input.importer,
+      sourceId: input.sourceId,
+      sourceHash: input.sourceHash,
+      runId: input.runId,
+      recordId: input.recordId,
+      sourceRecordKey: input.sourceRecordKey,
+      targetRole: input.targetRole,
+      downloadFailedCode: input.downloadFailedCode,
+      downloadFailedMessage: input.downloadFailedMessage,
+      warnings: input.warnings,
+    });
+  }
+
   private async importOrReuseAttachment(input: {
     attachmentId: number;
     attachment: WordPressAttachmentRow;
@@ -200,8 +335,11 @@ export class RouteStopMediaSyncer {
     runId: string | null;
     recordId: string | null;
     sourceRecordKey: string;
+    targetRole: string;
+    downloadFailedCode: string;
+    downloadFailedMessage: string;
     warnings: MigrationWarning[];
-  }): Promise<ImportedRouteStopMedia | null> {
+  }): Promise<ImportedRouteMedia | null> {
     const attachmentSourceRecordKey = buildWordPressAttachmentSourceRecordKey(input.attachmentId);
     const existingLineage = await this.deps.prisma.migrationLineage.findFirst({
       where: {
@@ -222,7 +360,7 @@ export class RouteStopMediaSyncer {
           warning(
             input.sourceRecordKey,
             "ROUTE_STOP_MEDIA_DEDUP_REUSED",
-            "Existing imported MediaAsset lineage was reused for route stop media.",
+            "Existing imported MediaAsset lineage was reused for route media.",
             { attachmentId: input.attachmentId, mediaAssetId: asset.id },
             "INFO",
           ),
@@ -243,22 +381,17 @@ export class RouteStopMediaSyncer {
         sourceEntityType: "wordpress-db:attachment",
         sourceStableKey: `attachment:${input.attachmentId}`,
         sourceHash: input.sourceHash,
-        targetRole: "route-stop-photo",
+        targetRole: input.targetRole,
         runId: input.runId,
         recordId: input.recordId,
       });
       return { mediaId: result.mediaId, publicUrl: result.publicUrl };
     } catch (error) {
       input.warnings.push(
-        warning(
-          input.sourceRecordKey,
-          "ROUTE_STOP_MEDIA_DOWNLOAD_FAILED",
-          "Route stop media import failed; the Route commit remains successful.",
-          {
-            attachmentId: input.attachmentId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        ),
+        warning(input.sourceRecordKey, input.downloadFailedCode, input.downloadFailedMessage, {
+          attachmentId: input.attachmentId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
       );
       return null;
     }

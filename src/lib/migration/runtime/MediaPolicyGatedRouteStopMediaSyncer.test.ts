@@ -6,7 +6,10 @@ import type { MigrationWarning } from "../types";
 import { MEDIA_POLICIES } from "./MigrationProfile";
 import { MediaPolicyGatedRouteStopMediaSyncer } from "./MediaPolicyGatedRouteStopMediaSyncer";
 
-function candidate(mediaIds: readonly number[] = [10, 11]): NormalizedRouteCandidate {
+function candidate(
+  mediaIds: readonly number[] = [10, 11],
+  overrides: Partial<NormalizedRouteCandidate> = {},
+): NormalizedRouteCandidate {
   return {
     title: "Family Route",
     slug: "family-route",
@@ -20,6 +23,7 @@ function candidate(mediaIds: readonly number[] = [10, 11]): NormalizedRouteCandi
     seo: { title: null, focusKeyword: null },
     sourceTerms: [],
     rawMeta: {},
+    ...overrides,
   };
 }
 
@@ -56,12 +60,15 @@ async function testFullDelegatesToInnerSyncer() {
   assert.equal(result.warnings[0]?.code, "INNER_CALLED");
 }
 
-async function testMetadataReportsEvidenceWithoutCallingInner() {
+async function testMetadataReportsCoverAndStopEvidenceWithoutCallingInner() {
   const { inner, callCount } = countingInner([]);
   const gated = new MediaPolicyGatedRouteStopMediaSyncer({ inner, mediaPolicy: MEDIA_POLICIES.METADATA });
-  const result = await gated.sync(baseInput(candidate()));
+  const result = await gated.sync(
+    baseInput(candidate([10, 11], { media: { featuredAttachmentId: 9 } })),
+  );
   assert.equal(callCount(), 0);
   assert.equal(result.warnings[0]?.code, "ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED");
+  assert.equal(result.warnings[0]?.details?.featuredAttachmentId, 9);
   assert.deepEqual(result.warnings[0]?.details?.stops, [{ sourceStopIndex: 1, attachmentIds: [10, 11] }]);
 }
 
@@ -83,7 +90,7 @@ async function testNoneFullySkips() {
 
 async function main() {
   await testFullDelegatesToInnerSyncer();
-  await testMetadataReportsEvidenceWithoutCallingInner();
+  await testMetadataReportsCoverAndStopEvidenceWithoutCallingInner();
   await testMetadataWithNoMediaReportsNoEvidence();
   await testNoneFullySkips();
 }
