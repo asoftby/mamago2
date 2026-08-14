@@ -114,6 +114,7 @@ function testWebStoryTextAndFeaturedImage() {
     .map((block) => ("text" in block ? block.text : ""))
     .join(" ");
   assert.match(text, /Story body text/);
+  assert.ok(record.mediaRefs);
   assert.equal(record.mediaRefs[0], "900");
 }
 
