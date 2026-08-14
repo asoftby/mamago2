@@ -29,7 +29,7 @@ Documentation HEAD at time of writing: see `git rev-parse HEAD` in this worktree
 | Business-linked Users | 38/38 ownership + 38/38 BUSINESS_OWNER elevation | Reviewed, part of the 578 total | checklist §3.4 | No separate delta — subset of Users |
 | Businesses/ownership | Derived from the 38 business-linked users above | Reviewed | checklist §3.4 | CREATE ≈38 Business rows tied 1:1 to owner |
 | Places | 83 total rows; 82/82 lineage; 80/80 publishable PUBLISHED, 2 CITY_BLOCKED (PENDING), 1 non-migration seed | **Frozen 2026-07-30** — `docs/migration/manifests/places-preview-2026-07-30.json`, hash `ca217c18ab59882ff3326e460ad6f825ad62f1b052b5d06d29dfc37ab17a7c6c` | `pnpm migration:preview:wordpress-db --entity place --allow-remote-readonly` (live WP-source, read-only, zero writes) | CREATE/UPDATE 78 SKIP_UNCHANGED + 4 expected `UPDATE_CONFLICT` (manually-protected 437/895/5389/43023, never overridden); 2 CITY_BLOCKED remain PENDING by design |
-| Offers | 63/63 published (safe canonical scope); 99 source published, 91 canonical, 28 Class H (no Place relation) + 8 Class I (alias) held back | **Frozen 2026-07-30 (from committed local state, not a live WP re-preview — see blocker note below)** — `docs/migration/manifests/offers-local-manifest-2026-07-30.json`, hash `e1dda8fd86dfe8df98e6ab4fe1e495f19a53579581aaae9401c8840aaf62dadf` | Local DB export (Offer + active OFFER `MigrationLineage`, 63/63 cross-referenced, 0 orphans) | CREATE 63 in safe scope; 36 (28+8) excluded pending founder decision (see backlog) |
+| Offers | 63/63 published (safe canonical scope); 99 source published, 91 canonical, 28 Class H (no Place relation) + 8 Class I (alias) held back | **Frozen 2026-07-30 (from committed local state, not a live WP re-preview — see blocker note below)** — `docs/migration/manifests/offers-local-manifest-2026-07-30.json`, hash `e1dda8fd86dfe8df98e6ab4fe1e495f19a53579581aaae9401c8840aaf62dadf` | Local DB export (Offer + active OFFER `MigrationLineage`, 63/63 cross-referenced, 0 orphans) | CREATE 63 in safe scope; 28 Class H **permanently excluded by owner decision 2026-08-14** (see "2026-08-14 update" below); 8 Class I still pending founder decision (see backlog) |
 | Events (Activity) | 10 lineage records, 109 ActivitySession rows; 8/8 future-valid PUBLISHED + 1 protected legacy PUBLISHED; 1 EXPIRED_SOURCE_PENDING excluded | Reviewed, not called out as deferred | checklist §5.3 | CREATE 9 published Activities; 1 excluded (64159) pending founder decision |
 | Routes | 14/14 lineage; 13/13 reviewed PUBLISHED; 1 CITY_BLOCKED (Mogilev, `marshrut-mogilev`) kept DRAFT | Reviewed | checklist §5.4 | CREATE 13 published Routes; 1 stays DRAFT by design |
 | RouteStops | 90 rows (86 reviewed + Mogilev's 4); 12 mojibake fixes applied | Reviewed | checklist §5.4 | CREATE 90 |
@@ -137,3 +137,52 @@ documented rerun showed "564 SKIP_UNCHANGED" (checklist §3.3).
 
 Neither rehearsal touched the working `mamago2` database or its storage
 directory; both used disposable copies that were deleted after verification.
+
+## 2026-08-14 update: owner decision — 28 Class H legacy Offers excluded permanently
+
+The "28 Class H (no Place relation)" Offers mentioned in the frozen
+2026-07-30 Offers row above were, in the meantime, imported by a later
+Phoenix rerun as unassigned (no-Place) DRAFT Offers — a capability added by
+the "Allow DRAFT Offer without Place" change. The owner manually reviewed
+all 28 in PROD and judged them obsolete/garbage; they were deleted from
+PROD directly.
+
+**Decision: these 28 legacy WordPress Offer post IDs are permanently
+excluded from Phoenix migration and must never be recreated by any future
+rerun.** Exact legacy post ID match only (never title/slug/fuzzy):
+
+```
+42237, 42299, 43089, 43097, 43300, 43302, 43305, 43318, 43323, 43325,
+43597, 43604, 43607, 43609, 43671, 43673, 43759, 43807, 43809, 43811,
+43813, 43815, 43817, 44457, 44458, 44459, 44460, 6147
+```
+
+Mechanism: `OWNER_EXCLUDED_LEGACY_OFFER_IDS` +
+`isOwnerExcludedLegacyOfferSourceRecordKey()` in
+`src/lib/migration/validators/policies.ts`, consulted unconditionally (not
+behind an opt-in filter flag) at the top of the discover→normalize loop in
+`src/lib/migration/core/orchestrator.ts` (`runDiscoverNormalizeLoop`) —
+before `normalizeRecord()`, before any lineage lookup is consulted, and
+before an `executionCandidate` is ever created. Each excluded record plans
+as `action: "SKIP_POLICY"` / `status: "SKIPPED"` with
+`summary.reasonCode: "OWNER_EXCLUDED_LEGACY_OFFER"` — the same
+non-error vocabulary already used for the past-events exclusion policy, so
+it is never counted as a `FAILED`/error record in plan stats
+(`skippedCount`, not `failedCount`) and never reaches
+`buildOfferCreateDraft`/`OfferCommitWriter` for CREATE or media import.
+This is a permanent policy check, not a one-time manifest filter — a rerun
+against a live WP source will always re-exclude the same 28 IDs, even if a
+stale `MigrationLineage` row still references one of them.
+
+The **8 Class I (alias)** Offers mentioned in the same frozen manifest row
+are a separate, unrelated group and remain pending a founder decision — not
+covered by this exclusion.
+
+Existing migration scope is otherwise unchanged: the already-migrated,
+Place-linked Offers (the frozen local manifest's 63 `PUBLISHED` rows, or a
+smaller currently-valid count depending on when this is read) continue to
+import/rerun exactly as before — this exclusion only ever intercepts the 28
+listed legacy post IDs.
+
+See `docs/engineering/backlog.md` BACKLOG-113 (closed as moot for this
+batch) for the media-sync gap this decision makes irrelevant for these 28.

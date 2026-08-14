@@ -379,6 +379,115 @@ async function testEventPastOnlyWarningProducesSkipPolicyItemWithoutExecutionCan
   assert.equal(executionPlan.plan.stats!.actionCounts["CREATE"], 1);
 }
 
+/**
+ * Owner-approved exclusion of 28 legacy Offer post IDs: matched purely by
+ * legacy WordPress post ID (never title/slug/fuzzy), short-circuits before
+ * normalizeRecord() is even called, and must never produce an execution
+ * candidate or count as an error. Uses two real excluded IDs (42237, 6147)
+ * plus one non-excluded Offer to prove the check doesn't over-match.
+ */
+async function testOwnerExcludedLegacyOfferProducesSkipPolicyItemWithoutExecutionCandidate() {
+  let normalizeCallCount = 0;
+  registerMockAdapter("mock-owner-excluded-offers", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "wordpress-db:hb-programs:42237", sourceEntityType: "wordpress-db:hb-programs" }),
+        envelope({ sourceRecordKey: "wordpress-db:services:6147", sourceEntityType: "wordpress-db:services" }),
+        envelope({ sourceRecordKey: "wordpress-db:hb-programs:99999", sourceEntityType: "wordpress-db:hb-programs" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      normalizeCallCount += 1;
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "OFFER",
+        normalizedPayload: { title: "Valid offer" },
+      };
+    },
+  });
+
+  const executionPlan = await createMigrationRunExecutionPlan({
+    adapterKey: "mock-owner-excluded-offers",
+    sourceNamespace: "test",
+  });
+
+  for (const excludedKey of ["wordpress-db:hb-programs:42237", "wordpress-db:services:6147"]) {
+    const item = executionPlan.plan.items.find((i) => i.sourceRecordKey === excludedKey);
+    assert.equal(item?.action, "SKIP_POLICY", `${excludedKey} must be SKIP_POLICY`);
+    assert.equal(item?.status, "SKIPPED", `${excludedKey} must be SKIPPED`);
+    assert.equal(item?.targetType, "OFFER");
+    assert.equal(item?.summary?.reasonCode, "OWNER_EXCLUDED_LEGACY_OFFER");
+    assert.ok(
+      !executionPlan.executionCandidates.some((candidate) => candidate.planItem.sourceRecordKey === excludedKey),
+      `${excludedKey} must never reach execution candidates (the commit runner must never be invoked for it)`,
+    );
+  }
+
+  const validItem = executionPlan.plan.items.find(
+    (item) => item.sourceRecordKey === "wordpress-db:hb-programs:99999",
+  );
+  assert.equal(validItem?.action, "CREATE", "a non-excluded Offer must still import normally");
+  assert.ok(
+    executionPlan.executionCandidates.some(
+      (candidate) => candidate.planItem.sourceRecordKey === "wordpress-db:hb-programs:99999",
+    ),
+  );
+
+  assert.equal(normalizeCallCount, 1, "normalizeRecord must never be called for an excluded record");
+  assert.ok(executionPlan.plan.stats);
+  assert.equal(executionPlan.plan.stats!.actionCounts["SKIP_POLICY"], 2);
+  assert.equal(executionPlan.plan.stats!.actionCounts["CREATE"], 1);
+  // SKIP_POLICY must never be counted as an error/failure — it's an
+  // intentional, explained exclusion, not an unexplained missing record.
+  assert.equal(executionPlan.plan.stats!.failedCount, 0);
+  assert.equal(executionPlan.plan.errors.length, 0);
+}
+
+/**
+ * The 28 excluded Offers were imported by a prior rerun, then manually
+ * deleted from PROD by the owner — so a real rerun's lineage lookup may
+ * still find an active MigrationLineage row pointing at a now-deleted
+ * target for one of these keys. The exclusion must win regardless: never
+ * resolve to UPDATE, never touch the lineage decision, and stay identical
+ * across repeated runs (idempotent — an excluded Offer never "comes back").
+ */
+async function testOwnerExcludedLegacyOfferWinsOverStaleLineageAndIsIdempotentAcrossReruns() {
+  const excludedKey = "wordpress-db:hb-programs:43089";
+  registerMockAdapter("mock-owner-excluded-stale-lineage", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: excludedKey, sourceEntityType: "wordpress-db:hb-programs", sourceHash: "hash-v1" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "OFFER",
+        normalizedPayload: { title: "Deleted-from-PROD legacy offer" },
+      };
+    },
+  });
+
+  const staleLedger: MigrationLineageLookup = {
+    async findLineageBySourceRecordKeys() {
+      return new Map([[excludedKey, [lineageRow({ sourceRecordKey: excludedKey, targetType: "OFFER", lastSourceHash: "hash-v1" })]]]);
+    },
+  };
+
+  for (let run = 1; run <= 2; run += 1) {
+    const executionPlan = await createMigrationRunExecutionPlan({
+      adapterKey: "mock-owner-excluded-stale-lineage",
+      sourceNamespace: "test",
+      ledger: staleLedger,
+    });
+    const item = executionPlan.plan.items.find((i) => i.sourceRecordKey === excludedKey);
+    assert.equal(item?.action, "SKIP_POLICY", `run ${run}: exclusion must win even with an active stale lineage row`);
+    assert.equal(item?.status, "SKIPPED");
+    assert.equal(item?.summary?.reasonCode, "OWNER_EXCLUDED_LEGACY_OFFER");
+    assert.ok(!executionPlan.executionCandidates.some((c) => c.planItem.sourceRecordKey === excludedKey));
+  }
+}
+
 async function testStatsPresentAndCorrect() {
   registerMockAdapter("mock-stats", {
     async discoverRecords() {
@@ -810,6 +919,8 @@ async function main() {
   await testWarningsPreservedOnItem();
   await testExcludePastEventsProducesSkipPolicyItem();
   await testEventPastOnlyWarningProducesSkipPolicyItemWithoutExecutionCandidate();
+  await testOwnerExcludedLegacyOfferProducesSkipPolicyItemWithoutExecutionCandidate();
+  await testOwnerExcludedLegacyOfferWinsOverStaleLineageAndIsIdempotentAcrossReruns();
   await testStatsPresentAndCorrect();
   await testZeroRecordPlanDoesNotThrow();
   await testLedgerNoLineageIsCreate();

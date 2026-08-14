@@ -3030,16 +3030,23 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-113] Placeless-import Offer media never syncs after a Place is assigned later
 
-- Status: OPEN
-- Priority: P3 — cosmetic gap for a small, known batch (28 legacy Offers).
+- Status: **RESOLVED-MOOT (2026-08-14)** — the batch this item was tracking
+  (28 legacy Offers) is now permanently excluded from Phoenix migration by
+  owner decision (`OWNER_EXCLUDED_LEGACY_OFFER`,
+  `src/lib/migration/validators/policies.ts`,
+  `OWNER_EXCLUDED_LEGACY_OFFER_IDS`) — they will never be imported again, so
+  the specific gap described below (their media never syncing after a later
+  Place assignment) cannot occur anymore. No longer a cutover blocker.
+- Priority: was P3 (cosmetic gap for a small, known batch); now moot for
+  that batch.
 - Area: Migration / Media / Offers
 - Added: 2026-08-14
-- Reason deferred: out of scope for "allow DRAFT Offer without Place" —
-  fixing it means either widening the shared `mediaImporterFactory`
-  (`(ownerUserId: string) => MediaImporterLike`, used by Place/Article/
-  Event/Route too) to accept a null owner, or adding a new "resync media on
-  Place assignment" trigger. Both are real scope beyond making `placeId`
-  nullable.
+- Reason deferred (original): out of scope for "allow DRAFT Offer without
+  Place" — fixing it means either widening the shared
+  `mediaImporterFactory` (`(ownerUserId: string) => MediaImporterLike`,
+  used by Place/Article/Event/Route too) to accept a null owner, or adding
+  a new "resync media on Place assignment" trigger. Both are real scope
+  beyond making `placeId` nullable.
 - Context: `OfferCommitRunner.execute` only calls `OfferMediaSyncer.sync`
   on Offer CREATE (`!isUpdate`), never on a later PATCH. For a Phoenix
   Offer imported with no Place relation (`buildOfferCreateDraft`'s
@@ -3055,12 +3062,23 @@ P3 — cleanup / polish / optional
 - Current state: unassigned-import Offers get `coverImage`/`galleryImages`
   populated only if manually re-run through a Phoenix path that resolves a
   Place, or someone builds a dedicated backfill.
-- Acceptance criteria: after a Place is assigned to a previously placeless
-  imported Offer, its original WordPress cover/gallery images end up on
+- Acceptance criteria (original, no longer needed for the 28): after a
+  Place is assigned to a previously placeless imported Offer, its original
+  WordPress cover/gallery images end up on
   `Offer.coverImage`/`galleryImages`, without fabricating an owner and
   without changing the shared media importer's signature for every other
   entity.
-- Source: "Allow DRAFT Offer without Place" (2026-08-14)
+- Residual generic gap (P3, open, non-blocking): the underlying mechanism
+  — `OfferCommitRunner` skipping media sync whenever `context.ownerUserId`
+  is `null` — is generic, not specific to these 28 IDs. DRAFT-without-Place
+  remains a supported product capability (owner decision, "Allow DRAFT
+  Offer without Place" task) — if a *future* Phoenix source ever produces
+  another genuinely placeless Offer (a new `MISSING`-collapse record, not
+  in the exclusion list), the same media-sync gap would apply to it. No
+  known current instance exists, so this is not a cutover blocker; revisit
+  only if a new placeless batch appears.
+- Source: "Allow DRAFT Offer without Place" (2026-08-14); closed by
+  "Exclude 28 legacy Offers from Phoenix migration" (2026-08-14)
 
 ## [BACKLOG-114] `Offer.cityId` is never written by the business create/update API (pre-existing, unrelated)
 

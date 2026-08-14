@@ -4,7 +4,12 @@ import { materializeEventScheduleSessions } from "@/lib/event/materializeSchedul
 import { getMigrationAdapter } from "../adapters/registry";
 import { getLineageActionForRecord } from "../ledger";
 import { buildHumanReport, buildMachineReport } from "../reporters/buildReports";
-import { PHOENIX_V1_PAST_EVENTS_EXCLUSION_POLICY, shouldExcludePastEvent } from "../validators/policies";
+import {
+  OWNER_EXCLUDED_LEGACY_OFFERS_POLICY,
+  PHOENIX_V1_PAST_EVENTS_EXCLUSION_POLICY,
+  isOwnerExcludedLegacyOfferSourceRecordKey,
+  shouldExcludePastEvent,
+} from "../validators/policies";
 import type { FindLineageBySourceRecordKeysInput, LineageAction, LineageMap } from "../ledger";
 import type {
   MigrationAdapterContext,
@@ -193,6 +198,26 @@ function toSkipPolicyItem(record: SourceRecordEnvelope): MigrationPlanItem {
   };
 }
 
+/**
+ * Pre-normalize, unconditional (not gated behind a filter flag like
+ * `excludePastEvents`) — the owner's exclusion decision must never depend on
+ * a caller remembering to pass a flag. Never reaches `normalizeRecord()`, so
+ * it never produces an `executionCandidate` and never touches lineage.
+ */
+function toOwnerExcludedLegacyOfferSkipItem(record: SourceRecordEnvelope): MigrationPlanItem {
+  return {
+    sourceRecordKey: record.sourceRecordKey,
+    sourceEntityType: record.sourceEntityType,
+    action: "SKIP_POLICY",
+    status: "SKIPPED",
+    targetType: OWNER_EXCLUDED_LEGACY_OFFERS_POLICY.targetType,
+    summary: {
+      policyKey: OWNER_EXCLUDED_LEGACY_OFFERS_POLICY.policyKey,
+      reasonCode: OWNER_EXCLUDED_LEGACY_OFFERS_POLICY.reasonCode,
+    },
+  };
+}
+
 const EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE = "EVENT_PAST_ONLY_EXCLUDED";
 
 /** Set by `normalizeEvent()` (post-normalize, since only the parsed schedule can tell a past-only multi-date event from a real one) — never a pre-normalize `metadata.startsAt` check like `isExcludedPastEvent` above. */
@@ -376,6 +401,11 @@ async function runDiscoverNormalizeLoop(
 
   const normalizeStartedAt = performance.now();
   for (const record of records) {
+    if (isOwnerExcludedLegacyOfferSourceRecordKey(record.sourceRecordKey)) {
+      items.push(toOwnerExcludedLegacyOfferSkipItem(record));
+      continue;
+    }
+
     if (input.filters?.excludePastEvents && isExcludedPastEvent(record, input.now)) {
       items.push(toSkipPolicyItem(record));
       continue;
