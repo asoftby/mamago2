@@ -31,6 +31,7 @@ import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
+import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
 import {
   OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
   shouldBlockPublishedOfferEdit,
@@ -313,7 +314,18 @@ export async function PATCH(
       }
     }
 
-    if (shouldRejectUnlinkedPlaceForOfferMutation({
+    const resultantStatus = data.status ?? existingOffer.status;
+    if (offerStatusRequiresPlace(resultantStatus) && !targetPlace) {
+      return NextResponse.json(
+        {
+          error: "Место обязательно для отправки на модерацию или публикации",
+          code: "PLACE_REQUIRED_FOR_SUBMISSION",
+        },
+        { status: 422 },
+      );
+    }
+
+    if (targetPlace && shouldRejectUnlinkedPlaceForOfferMutation({
       role: user.role,
       status: data.status,
       ownerBusinessId: targetPlace.ownerBusinessId,

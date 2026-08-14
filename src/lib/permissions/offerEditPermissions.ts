@@ -4,7 +4,7 @@ import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function canEditOfferForUser(
   user: CurrentUser,
-  offer: { place: { createdByUserId: string; ownerBusinessId: string | null } }
+  offer: { place: { createdByUserId: string; ownerBusinessId: string | null } | null }
 ): Promise<boolean> {
   return await canManagePlaceAsync(user, offer.place);
 }

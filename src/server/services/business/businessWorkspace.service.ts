@@ -234,6 +234,7 @@ export async function getBusinessWorkspaceData(params: {
   }
 
   for (const offer of placeOffers) {
+    if (!offer.placeId) continue;
     const current = linkedPublicationsByPlace.get(offer.placeId);
     if (current) current.offers += 1;
   }

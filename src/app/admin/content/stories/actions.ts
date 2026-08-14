@@ -35,9 +35,9 @@ export async function addOfferOccurrenceAction(formData: FormData) {
   if (!session) throw new Error("Опубликованный occurrence Offer не найден для выбранного города");
   const timeZone = getCityTimeZone(parsed.cityId);
   const storyDate = zonedDayRange(parsed.date, 1, timeZone).start;
-  const sourceCityId = session.offer.cityId ?? session.offer.place.cityId;
+  const sourceCityId = session.offer.cityId ?? session.offer.place?.cityId;
   if (sourceCityId !== parsed.cityId) throw new Error("Occurrence относится к другому городу");
-  const citySlug = session.offer.place.city?.slug;
+  const citySlug = session.offer.place?.city?.slug;
   if (!citySlug) throw new Error("У города Offer отсутствует публичный slug");
   const href = `/${citySlug}/offers/${session.offer.slug ?? session.offerId}`;
   const unique = { cityId_sourceType_sourceId_occurrenceKey_storyDate: {

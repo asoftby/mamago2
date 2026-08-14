@@ -22,6 +22,25 @@ export async function hydrateOfferContextsFromPlaceLineage(input: {
       offerPostId: record.candidate.sourcePostId,
       relations: record.candidate.placeRelation.relations,
     });
+    if (collapse.status === "MISSING") {
+      // No Place relation at all in the source (never had one) — a
+      // deliberate placeless DRAFT import, not a guess: no owner/city is
+      // fabricated. buildOfferCreateDraft recognizes this exact all-null
+      // shape and lets it through only for a "MISSING" collapse.
+      const offerContext: OfferCommitContext = {
+        placeId: null,
+        legacyPlaceId: null,
+        ownerUserId: null,
+        businessId: null,
+        cityId: null,
+        mediaPolicy: input.mediaPolicyName,
+      };
+      overrides[record.sourceRecordKey] = {
+        ...(overrides[record.sourceRecordKey] ?? {}),
+        offer: { ...(overrides[record.sourceRecordKey]?.offer ?? {}), ...offerContext },
+      };
+      continue;
+    }
     if (collapse.status !== "RESOLVED") continue;
     const placeKey = `wordpress-db:places:${collapse.effectiveLegacyPlaceId}`;
     const lineages = await input.prisma.migrationLineage.findMany({

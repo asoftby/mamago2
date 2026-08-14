@@ -92,6 +92,36 @@ async function main() {
   assert.equal(missing.overridesBySourceRecordKey?.[candidate.sourceRecordKey], undefined);
 }
 
+{
+  // No Place relation rows at all in the source (the 28 legacy Offers case)
+  // — allowed through as an explicit all-null placeless override, never
+  // hitting migrationLineage/place lookups since there is nothing to look up.
+  const noRelationCandidate: NormalizedOfferCandidate = {
+    ...candidate,
+    sourceRecordKey: "wordpress-db:hb-programs:99999",
+    sourcePostId: 99999,
+    placeRelation: { status: "SINGLE_PLACE_RELATION", placeSourcePostIds: [], relations: [] },
+  };
+  let lineageCalled = false;
+  const result = await hydrateOfferContextsFromPlaceLineage({
+    records: [{ sourceRecordKey: noRelationCandidate.sourceRecordKey, candidate: noRelationCandidate }],
+    contextConfig: { defaults: {} },
+    mediaPolicyName: "FULL",
+    prisma: {
+      migrationLineage: { findMany: async () => { lineageCalled = true; return []; } } as never,
+      place: { findUnique: async () => null } as never,
+    },
+  });
+  const offerContext = result.overridesBySourceRecordKey?.[noRelationCandidate.sourceRecordKey]?.offer;
+  assert.equal(lineageCalled, false);
+  assert.equal(offerContext?.placeId, null);
+  assert.equal(offerContext?.legacyPlaceId, null);
+  assert.equal(offerContext?.ownerUserId, null);
+  assert.equal(offerContext?.businessId, null);
+  assert.equal(offerContext?.cityId, null);
+  assert.equal(offerContext?.mediaPolicy, "FULL");
+}
+
 console.log("hydrateOfferContextsFromPlaceLineage tests: OK");
 }
 

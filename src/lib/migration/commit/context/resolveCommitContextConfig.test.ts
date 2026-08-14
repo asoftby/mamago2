@@ -251,6 +251,89 @@ function testExactShallowMergeOverrideWins() {
   });
 }
 
+function offerExecutionCandidateFixture(): MigrationExecutionCandidate {
+  return executionCandidateFixture({
+    planItem: planItemFixture({ sourceRecordKey: "wordpress-db:hb-programs:501", targetType: "OFFER" }),
+  });
+}
+
+function testOfferFullyResolvedContextResolves() {
+  const config: MigrationCommitContextConfig = {
+    defaults: {
+      offer: { placeId: "place-1", legacyPlaceId: 8901, ownerUserId: "user-1", cityId: "city-1", mediaPolicy: "FULL" },
+    },
+  };
+  const result = resolveCommitContextForExecutionCandidate({
+    executionCandidate: offerExecutionCandidateFixture(),
+    config,
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.targetType, "OFFER");
+  assert.deepEqual(result.context, {
+    placeId: "place-1", legacyPlaceId: 8901, ownerUserId: "user-1", cityId: "city-1", mediaPolicy: "FULL",
+  });
+}
+
+// Placeless DRAFT import: hydrateOfferContextsFromPlaceLineage sets
+// placeId/legacyPlaceId/ownerUserId/cityId to `null` together, deliberately,
+// for a source Offer with zero Place relation rows — that exact all-null
+// shape must resolve, not be treated as an incomplete context.
+function testOfferAllNullPlacelessContextResolves() {
+  const config: MigrationCommitContextConfig = {
+    defaults: {
+      offer: { placeId: null, legacyPlaceId: null, ownerUserId: null, businessId: null, cityId: null, mediaPolicy: "FULL" },
+    },
+  };
+  const result = resolveCommitContextForExecutionCandidate({
+    executionCandidate: offerExecutionCandidateFixture(),
+    config,
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.targetType, "OFFER");
+  assert.deepEqual(result.context, {
+    placeId: null, legacyPlaceId: null, ownerUserId: null, businessId: null, cityId: null, mediaPolicy: "FULL",
+  });
+}
+
+// A single field left unset (not deliberately null-everything) is an
+// incomplete context, not a placeless one, and must still block.
+function testOfferPartialNullContextReturnsOkFalse() {
+  const config: MigrationCommitContextConfig = {
+    defaults: {
+      offer: { placeId: null, legacyPlaceId: 8901, ownerUserId: "user-1", cityId: "city-1", mediaPolicy: "FULL" },
+    },
+  };
+  const result = resolveCommitContextForExecutionCandidate({
+    executionCandidate: offerExecutionCandidateFixture(),
+    config,
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.errorCode, "MISSING_REQUIRED_CONTEXT_FIELD");
+}
+
+function testOfferMissingMediaPolicyReturnsOkFalse() {
+  const config: MigrationCommitContextConfig = {
+    defaults: {
+      offer: { placeId: "place-1", legacyPlaceId: 8901, ownerUserId: "user-1", cityId: "city-1" },
+    },
+  };
+  const result = resolveCommitContextForExecutionCandidate({
+    executionCandidate: offerExecutionCandidateFixture(),
+    config,
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.errorCode, "MISSING_REQUIRED_CONTEXT_FIELD");
+  assert.match(result.errorMessage, /mediaPolicy/);
+}
+
 function main() {
   testPlaceDefaultResolved();
   testEventDefaultResolved();
@@ -266,6 +349,10 @@ function main() {
   testMissingTargetTypeReturnsOkFalse();
   testNoMutationOfConfigObject();
   testExactShallowMergeOverrideWins();
+  testOfferFullyResolvedContextResolves();
+  testOfferAllNullPlacelessContextResolves();
+  testOfferPartialNullContextReturnsOkFalse();
+  testOfferMissingMediaPolicyReturnsOkFalse();
 }
 
 main();

@@ -13,7 +13,7 @@ export interface OfferCommitOrchestratorLike {
     candidate: NormalizedOfferCandidate;
     context: OfferCommitContext;
     action: "CREATE" | "UPDATE";
-    updateCas?: { id: string; expectedTitle: string; expectedUpdatedAt: Date; placeId: string };
+    updateCas?: { id: string; expectedTitle: string; expectedUpdatedAt: Date; placeId: string | null };
   }): Promise<ExecuteOfferCommitResult>;
 }
 export interface OfferLineageWriterLike {
@@ -83,7 +83,12 @@ export class OfferCommitRunner {
       const errorMessage = committed.status === "BLOCKED" ? committed.blockReasons.map(reason => `${reason.code}: ${reason.message}`).join("; ") : committed.errorMessage;
       return this.fail(input.migrationRecord.id, errorCode, errorMessage, state?.offer.id);
     }
-    if (!isUpdate && this.deps.mediaSyncer) {
+    // A placeless DRAFT import has no owner to attribute media to (Offer
+    // ownership is entirely derived from Place). sourceMediaAttachmentIds
+    // stay on the draft/canonical hash either way; the actual attachment
+    // download+import resumes once a Place (and therefore an owner) is
+    // assigned — never fabricate an owner just to force media through.
+    if (!isUpdate && this.deps.mediaSyncer && input.context.ownerUserId) {
       try {
         await this.deps.mediaSyncer.sync({
           offerId: committed.offerId,

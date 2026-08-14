@@ -18,8 +18,12 @@ export function isOfferPubliclyVisible(
 ): boolean {
   if (!offer) return false;
   if (offer.status !== "PUBLISHED") return false;
+  // A PUBLISHED Offer without a Place should never exist (write-side gates
+  // enforce this), but visibility must not silently pass a corrupted row —
+  // defense in depth, not a state this function ever expects to see.
+  if (!offer.place) return false;
   if (offer.archivedAt) return false;
-  if (offer.place?.archivedAt) return false;
+  if (offer.place.archivedAt) return false;
 
   const operationalStatus = offer.place?.ownerBusiness?.operationalStatus;
   if (operationalStatus && operationalStatus !== "ACTIVE") {

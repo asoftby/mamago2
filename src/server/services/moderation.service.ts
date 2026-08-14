@@ -512,13 +512,14 @@ export async function submitOfferForModeration(
     select: {
       status: true,
       archivedAt: true,
+      placeId: true,
       place: { select: { ownerBusiness: { select: { ownerUserId: true } } } },
     },
   });
   if (!offer) throw new Error("Offer not found");
 
   if (actor.type === "OWNER") {
-    const ownerUserId = offer.place.ownerBusiness?.ownerUserId;
+    const ownerUserId = offer.place?.ownerBusiness?.ownerUserId;
     if (!ownerUserId || ownerUserId !== actor.userId) {
       throw new Error("Not authorized to submit this Offer for moderation");
     }
@@ -533,6 +534,9 @@ export async function submitOfferForModeration(
   }
   if (offer.status !== "DRAFT") {
     throw new Error(`Cannot submit for moderation from status: ${offer.status}`);
+  }
+  if (!offer.placeId) {
+    throw new Error("Cannot submit an Offer for moderation without a Place");
   }
 
   await prisma.offer.update({ where: { id: offerId }, data: { status: "PENDING" } });
@@ -549,11 +553,12 @@ export async function approveOffer(
   const timer = createPublishTimer("publish:offer");
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { status: true, title: true, slug: true, place: { select: { ownerBusinessId: true } } },
+    select: { status: true, title: true, slug: true, placeId: true, place: { select: { ownerBusinessId: true } } },
   });
 
   if (!offer) throw new Error("Offer not found");
   if (offer.status !== "PENDING") throw new Error(`Cannot approve from status: ${offer.status}`);
+  if (!offer.placeId) throw new Error("Cannot approve/publish an Offer without a Place");
 
   // EVENT_SEARCH_INDEX_PUBLICATION_RACE fix: this status update and the
   // slug/canonical sync below are two sequential writes to the same row.

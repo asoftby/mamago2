@@ -3027,3 +3027,70 @@ P3 — cleanup / polish / optional
   linked, rerun-safe (MediaAsset lineage), and visible in public/admin
   without dropping the first `photoUrl`.
 - Source: Phoenix Route media gap closure (2026-08-14)
+
+## [BACKLOG-113] Placeless-import Offer media never syncs after a Place is assigned later
+
+- Status: OPEN
+- Priority: P3 — cosmetic gap for a small, known batch (28 legacy Offers).
+- Area: Migration / Media / Offers
+- Added: 2026-08-14
+- Reason deferred: out of scope for "allow DRAFT Offer without Place" —
+  fixing it means either widening the shared `mediaImporterFactory`
+  (`(ownerUserId: string) => MediaImporterLike`, used by Place/Article/
+  Event/Route too) to accept a null owner, or adding a new "resync media on
+  Place assignment" trigger. Both are real scope beyond making `placeId`
+  nullable.
+- Context: `OfferCommitRunner.execute` only calls `OfferMediaSyncer.sync`
+  on Offer CREATE (`!isUpdate`), never on a later PATCH. For a Phoenix
+  Offer imported with no Place relation (`buildOfferCreateDraft`'s
+  `allowUnassignedPlace` branch), `context.ownerUserId` is `null`, so media
+  sync is skipped entirely at creation
+  (`src/lib/migration/commit/offer/OfferCommitRunner.ts`) — there is no
+  owner to attribute a `MediaAsset.uploadedById` to (Offer ownership is
+  derived only from Place). `draft.sourceMediaAttachmentIds` and the
+  canonical hash still carry the original WordPress attachment IDs, so no
+  evidence is lost, but nothing re-imports them once an admin assigns a
+  Place via `AssignOfferPlaceControl`
+  (`src/components/admin/offers/AssignOfferPlaceControl.tsx`).
+- Current state: unassigned-import Offers get `coverImage`/`galleryImages`
+  populated only if manually re-run through a Phoenix path that resolves a
+  Place, or someone builds a dedicated backfill.
+- Acceptance criteria: after a Place is assigned to a previously placeless
+  imported Offer, its original WordPress cover/gallery images end up on
+  `Offer.coverImage`/`galleryImages`, without fabricating an owner and
+  without changing the shared media importer's signature for every other
+  entity.
+- Source: "Allow DRAFT Offer without Place" (2026-08-14)
+
+## [BACKLOG-114] `Offer.cityId` is never written by the business create/update API (pre-existing, unrelated)
+
+- Status: OPEN
+- Priority: P3 — `cityId` is a routing/indexing snapshot; public offer
+  pages already resolve city via `offer.place?.city?.slug`, not
+  `Offer.cityId`, so this has not been observed to break anything user
+  facing. Found while auditing all `Offer.placeId`/`cityId` write paths for
+  the "allow DRAFT Offer without Place" change — not caused by it, not
+  fixed by it (out of scope, rule 11: pre-existing/foreign, recorded not
+  silently patched).
+- Area: Offers / Data integrity
+- Added: 2026-08-14
+- Reason deferred: unrelated to the current task's scope; needs its own
+  audit of what actually reads `Offer.cityId` (the `@@unique([cityId,
+  slug])` constraint and sitemap filters are the only confirmed
+  consumers so far) before deciding the right fix.
+- Context: neither `POST /api/business/offers` nor
+  `PATCH /api/business/offers/[id]` ever sets `cityId` in their Prisma
+  write payload — grepped both files, zero hits. The schema comment on
+  `Offer.cityId` (`prisma/schema.prisma`) says it is "filled by a
+  save-hook", but no such hook (Prisma `$extends`/`$use` middleware, DB
+  trigger, or explicit write) was found anywhere in `src/` or
+  `prisma/migrations/*/migration.sql`. Only the Phoenix commit writer
+  (`OfferCommitWriter.ts`) actually sets it, from
+  `draft.ownership.cityId`.
+- Current state: business-wizard-created/edited Offers likely have
+  `cityId: null` regardless of their Place's city.
+- Acceptance criteria (for whoever picks this up): confirm whether
+  `Offer.cityId` is load-bearing anywhere beyond the unique-slug
+  constraint and sitemap query, then either wire a real save-hook or drop
+  the "filled by a save-hook" schema comment if it's stale.
+- Source: "Allow DRAFT Offer without Place" (2026-08-14)

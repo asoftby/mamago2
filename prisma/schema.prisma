@@ -1927,7 +1927,11 @@ model OpeningHoursExceptionInterval {
 
 model Offer {
   id                       String             @id @default(cuid())
-  placeId                  String
+  /// Nullable: DRAFT Offers may temporarily exist without a Place (e.g.
+  /// legacy Phoenix imports with no resolvable Place relation). PENDING/
+  /// PUBLISHED always require a Place — enforced in application code
+  /// (see src/lib/offers/offerPlaceRequirement.ts), not by this schema.
+  placeId                  String?
   productType              OfferProductType?
   /// Источник контактных данных предложения: manual | place
   contactSource            String?            @default("manual")
@@ -2073,7 +2077,7 @@ model Offer {
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   placements      OfferPlacement[]
-  place           Place              @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  place           Place?             @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
   sessions        OfferSession[]

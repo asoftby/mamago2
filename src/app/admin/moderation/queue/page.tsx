@@ -129,9 +129,9 @@ async function getQueueItems(): Promise<QueueItem[]> {
     moderationId: offer.id,
     kind: "OFFER",
     title: offer.title,
-    cityName: offer.place.city?.name ?? null,
+    cityName: offer.place?.city?.name ?? null,
     businessName:
-      offer.place.createdBy.business?.name || offer.place.createdBy.email,
+      offer.place?.createdBy.business?.name || offer.place?.createdBy.email || "—",
     submittedAt: offer.createdAt,
     submittedAtLabel: formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru }),
     reviewHref: `/editor/offer/${offer.id}/edit?returnTo=${encodeURIComponent(QUEUE_RETURN)}`,

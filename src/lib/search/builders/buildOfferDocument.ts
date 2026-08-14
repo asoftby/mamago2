@@ -21,7 +21,7 @@ export async function buildOfferDocument(
     },
   });
 
-  if (!offer || offer.archivedAt || offer.place.archivedAt) return null;
+  if (!offer || offer.archivedAt || !offer.place || offer.place.archivedAt) return null;
 
   const searchText = buildSearchText([
     offer.title,

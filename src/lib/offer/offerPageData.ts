@@ -241,7 +241,7 @@ export async function getOfferPreviewPageDataById(
 
   const data = await buildOfferPageDataFromOffer(
     offer,
-    offer.place.city?.slug ?? "minsk",
+    offer.place?.city?.slug ?? "minsk",
   );
 
   return { offer, data };
@@ -256,24 +256,27 @@ async function buildOfferPageDataFromOffer(
     ? await resolvePlaceLogoUrlFromDb(offer.place.images, offer.place.logoImageId)
     : undefined;
 
-  // 2. Fetch reviews from PlaceReview (only MAMAGO source)
-  const reviews = await prisma.placeReview.findMany({
-    where: {
-      placeId: offer.placeId,
-      source: "MAMAGO",
-    },
-    orderBy: { publishedAt: "desc" },
-    take: 12,
-    select: {
-      id: true,
-      authorName: true,
-      authorAvatarUrl: true,
-      rating: true,
-      text: true,
-      publishedAt: true,
-      relativeTimeDescription: true,
-    },
-  });
+  // 2. Fetch reviews from PlaceReview (only MAMAGO source). No Place yet
+  // (unassigned DRAFT) means no reviews to show.
+  const reviews = offer.placeId
+    ? await prisma.placeReview.findMany({
+        where: {
+          placeId: offer.placeId,
+          source: "MAMAGO",
+        },
+        orderBy: { publishedAt: "desc" },
+        take: 12,
+        select: {
+          id: true,
+          authorName: true,
+          authorAvatarUrl: true,
+          rating: true,
+          text: true,
+          publishedAt: true,
+          relativeTimeDescription: true,
+        },
+      })
+    : [];
 
   const selectedCampCharacteristics =
     offer.campProgramType && offer.discoverySignalIds.length > 0

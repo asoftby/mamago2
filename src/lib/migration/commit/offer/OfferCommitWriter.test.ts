@@ -80,10 +80,38 @@ async function testCreateRejectsNonDraftStatus() {
   await assert.rejects(() => writer.createOfferFromDraft(badDraft));
 }
 
+// A deliberate placeless DRAFT import (allowUnassignedPlace in
+// buildOfferCreateDraft) sets placeId to `null`, not an empty string — the
+// writer must accept that and persist a null placeId/cityId, never reject it.
+async function testCreateAcceptsNullPlaceIdForDraft() {
+  const { client, createCalls } = createFakeClient();
+  const writer = new OfferCommitWriter(client);
+  const result = await writer.createOfferFromDraft(
+    draftFixture({ placeId: null, ownership: { ownerUserId: null, businessId: null, cityId: null } }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(createCalls.length, 1);
+  assert.equal(createCalls[0].data.placeId, null);
+  assert.equal(createCalls[0].data.cityId, null);
+  assert.equal(createCalls[0].data.status, "DRAFT");
+}
+
+// An empty-string placeId is always a bug (distinct from a deliberate null)
+// and must still be rejected.
+async function testCreateRejectsBlankPlaceId() {
+  const { client } = createFakeClient();
+  const writer = new OfferCommitWriter(client);
+  const badDraft = draftFixture({ placeId: "   " });
+  await assert.rejects(() => writer.createOfferFromDraft(badDraft));
+}
+
 async function main() {
   await testHappyPathCallsCreateOnce();
   await testCreateWritesCityIdFromOwnership();
   await testCreateRejectsNonDraftStatus();
+  await testCreateAcceptsNullPlaceIdForDraft();
+  await testCreateRejectsBlankPlaceId();
 }
 
 main()

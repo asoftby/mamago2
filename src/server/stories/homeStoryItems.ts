@@ -229,11 +229,11 @@ export async function syncOfferHomeStoryPlacements(offerId: string) {
   const sourceActive = offer?.status === OfferStatus.PUBLISHED;
   await prisma.$transaction(placements.map((item) => {
     const session = sessions.get(item.occurrenceKey);
-    const valid = sourceActive && session && (offer?.cityId ?? offer?.place.cityId) === item.cityId;
+    const valid = sourceActive && session && (offer?.cityId ?? offer?.place?.cityId) === item.cityId;
     return prisma.homeStoryItem.update({ where: { id: item.id }, data: valid && offer ? {
       status: HomeStoryItemStatus.ACTIVE, inactiveReason: null, startsAt: session.startAt, endsAt: session.endAt,
       titleSnapshot: offer.title, subtitleSnapshot: offer.description, coverUrlSnapshot: offer.coverImage,
-      hrefSnapshot: `/${offer.place.city?.slug ?? ""}/offers/${offer.slug ?? offer.id}`,
+      hrefSnapshot: `/${offer.place?.city?.slug ?? ""}/offers/${offer.slug ?? offer.id}`,
     } : {
       status: HomeStoryItemStatus.INACTIVE,
       inactiveReason: sourceActive ? "Occurrence больше не существует" : "Исходная активность недоступна",

@@ -98,9 +98,18 @@ export default async function PublicationsOffersPage({
         orderBy: { createdAt: "desc" },
       })
     : [];
+  // offers was filtered by placeId: { in: placeIds } above, so place can
+  // never be null here — this narrows the type without a blind assertion.
+  const placedOffers = offers.map((offer) => {
+    if (!offer.place) {
+      throw new Error(`Offer ${offer.id} matched the business's placeId filter but has no place`);
+    }
+    return { ...offer, placeId: offer.place.id, place: offer.place };
+  });
+
   const metricsByEntity = await getPerformanceMetricsByEntity({
     events: [],
-    offers: offers.map((offer) => ({
+    offers: placedOffers.map((offer) => ({
       id: offer.id,
       title: offer.title,
       updatedAt: offer.createdAt,
@@ -108,7 +117,7 @@ export default async function PublicationsOffersPage({
     })),
   });
 
-  const offersWithMetrics = offers.map((offer) => ({
+  const offersWithMetrics = placedOffers.map((offer) => ({
     ...offer,
     metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
       views: 0,

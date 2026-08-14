@@ -236,8 +236,9 @@ export async function previewEditorialRequestMatches(params: {
   const grouped = new Map<string, EditorialBusinessMatch>();
 
   for (const offer of offers) {
-    const business = offer.place.ownerBusiness;
-    if (!business) continue;
+    const place = offer.place;
+    const business = place?.ownerBusiness;
+    if (!place || !business) continue;
 
     const matchedDiscoverySignals = offer.discoverySignalIds
       .filter((id) => selectedSignalIds.includes(id))
@@ -270,17 +271,17 @@ export async function previewEditorialRequestMatches(params: {
         businessName: business.name,
         businessPhone: business.phone,
         ownerEmail: business.owner.email,
-        cityName: offer.place.city?.name ?? null,
+        cityName: place.city?.name ?? null,
         places: [],
         matchedOffers: [],
         matchedOfferCount: 0,
         matchReason: "",
       } satisfies EditorialBusinessMatch);
 
-    if (!current.places.some((place) => place.id === offer.place.id)) {
+    if (!current.places.some((place) => place.id === place.id)) {
       current.places.push({
-        id: offer.place.id,
-        title: offer.place.title,
+        id: place.id,
+        title: place.title,
       });
     }
 
@@ -288,8 +289,8 @@ export async function previewEditorialRequestMatches(params: {
       id: offer.id,
       title: offer.title,
       status: offer.status,
-      cityName: offer.place.city?.name ?? null,
-      placeTitle: offer.place.title,
+      cityName: place.city?.name ?? null,
+      placeTitle: place.title,
       matchedDiscoverySignals,
       matchedClassChips,
     });

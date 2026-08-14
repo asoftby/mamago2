@@ -51,8 +51,11 @@ assert.equal(collapseOfferPlaceRelations({ offerPostId, relations: [{ ...row(), 
 
 const blockedAmbiguous = buildOfferCreateDraft({ candidate: candidate([row(8901), row(8902)]), context });
 assert.equal(blockedAmbiguous.ok, false);
-const blockedMissing = buildOfferCreateDraft({ candidate: candidate([]), context });
-assert.equal(blockedMissing.ok, false);
+// Zero relation rows is allowed through as a placeless DRAFT (not blocked),
+// regardless of what `context` resolved to (no owner/city is fabricated).
+const unassignedMissing = buildOfferCreateDraft({ candidate: candidate([]), context });
+assert.equal(unassignedMissing.ok, true);
+if (unassignedMissing.ok) assert.equal(unassignedMissing.draft.placeId, null);
 const blockedAlias = buildOfferCreateDraft({ candidate: { ...candidate([row()]), sourcePostType: "offers" as "hb-programs" }, context });
 assert.equal(blockedAlias.ok, false);
 

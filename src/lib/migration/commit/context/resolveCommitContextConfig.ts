@@ -123,9 +123,19 @@ export function resolveCommitContextForExecutionCandidate(
 
   if (targetType === "OFFER") {
     const context = shallowMerge(config.defaults?.offer, override?.offer) as OfferCommitContext;
-    const required = [context.placeId, context.ownerUserId, context.cityId];
-    if (required.some(value => !value?.trim()) || !Number.isInteger(context.legacyPlaceId) || !context.mediaPolicy) {
-      return { ok: false, errorCode: "MISSING_REQUIRED_CONTEXT_FIELD", errorMessage: `OfferCommitContext placeId/legacyPlaceId/ownerUserId/cityId/mediaPolicy is incomplete for "${sourceRecordKey}".` };
+    if (!context.mediaPolicy) {
+      return { ok: false, errorCode: "MISSING_REQUIRED_CONTEXT_FIELD", errorMessage: `OfferCommitContext.mediaPolicy is missing for "${sourceRecordKey}".` };
+    }
+    // A placeless DRAFT import (hydrateOfferContextsFromPlaceLineage's
+    // "MISSING" collapse branch) sets placeId/legacyPlaceId/ownerUserId/
+    // cityId to `null` together, deliberately — that exact all-null shape is
+    // valid. Anything else (a field left `undefined`, or only some fields
+    // null) is an incomplete context and still blocks.
+    const placeFields = [context.placeId, context.ownerUserId, context.cityId];
+    const allPlaceFieldsResolved = placeFields.every(value => typeof value === "string" && value.trim() !== "") && Number.isInteger(context.legacyPlaceId);
+    const allPlaceFieldsNull = placeFields.every(value => value === null) && context.legacyPlaceId === null;
+    if (!allPlaceFieldsResolved && !allPlaceFieldsNull) {
+      return { ok: false, errorCode: "MISSING_REQUIRED_CONTEXT_FIELD", errorMessage: `OfferCommitContext placeId/legacyPlaceId/ownerUserId/cityId is incomplete for "${sourceRecordKey}".` };
     }
     return { ok: true, targetType: "OFFER", context };
   }

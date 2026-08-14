@@ -2,11 +2,14 @@ import type { Offer, Prisma, PrismaClient } from "@prisma/client";
 import type { OfferCreateDraft } from "./types";
 export interface OfferCommitWriterPrismaClient { offer: Pick<PrismaClient["offer"], "create" | "updateMany"> }
 export type OfferCommitWriteResult = { ok: true; offerId: string } | { ok: false; errorCode: string; errorMessage: string };
-export interface OfferTitleCasInput { id: string; expectedTitle: string; expectedUpdatedAt: Date; placeId: string; newTitle: string }
+export interface OfferTitleCasInput { id: string; expectedTitle: string; expectedUpdatedAt: Date; placeId: string | null; newTitle: string }
 export class OfferCommitWriter {
   constructor(private readonly prisma: OfferCommitWriterPrismaClient) {}
   async createOfferFromDraft(draft: OfferCreateDraft): Promise<OfferCommitWriteResult> {
-    if (!draft.placeId.trim() || !draft.title.trim() || draft.status !== "DRAFT") throw new Error("OfferCreateDraft failed writer invariants.");
+    // draft.placeId is null only for a deliberate placeless DRAFT import
+    // (buildOfferCreateDraft's allowUnassignedPlace path); a non-null but
+    // blank string is always a bug.
+    if ((draft.placeId !== null && !draft.placeId.trim()) || !draft.title.trim() || draft.status !== "DRAFT") throw new Error("OfferCreateDraft failed writer invariants.");
     // draft.ownership.cityId is required and validated by buildOfferCreateDraft
     // (MISSING_CITY blocks the draft otherwise) — it must be spread onto the
     // row here, or every created Offer silently ends up with cityId: null

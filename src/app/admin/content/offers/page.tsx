@@ -33,6 +33,7 @@ import {
   DataCardRow,
   DataCardActions,
 } from "@/components/ui/data-card-list";
+import { AssignOfferPlaceControl } from "@/components/admin/offers/AssignOfferPlaceControl";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -168,6 +169,7 @@ function OffersTable({
     });
     const publicOfferHref =
       !isArchived &&
+      offer.place &&
       !offer.place.archivedAt &&
       offer.status === "PUBLISHED" &&
       offer.slug &&
@@ -241,11 +243,20 @@ function OffersTable({
               {rows.map(({ offer, lifecycleViewModel, actionsMenu }) => (
                 <tr key={offer.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{offer.title}</td>
-                  <td className="px-4 py-3 text-gray-600">{offer.place.title}</td>
-                  <td className="px-4 py-3 text-gray-600">{offer.place.city?.name || "—"}</td>
                   <td className="px-4 py-3 text-gray-600">
-                    {offer.place.ownerBusiness?.name ||
-                      offer.place.ownerBusiness?.owner?.email ||
+                    {offer.place ? (
+                      offer.place.title
+                    ) : (
+                      <span className="flex flex-col items-start gap-1">
+                        <span className="text-amber-700">Место не назначено</span>
+                        <AssignOfferPlaceControl offerId={offer.id} />
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{offer.place?.city?.name || "—"}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {offer.place?.ownerBusiness?.name ||
+                      offer.place?.ownerBusiness?.owner?.email ||
                       "—"}
                   </td>
                   <td className="px-4 py-3">
@@ -272,12 +283,24 @@ function OffersTable({
               badge={<ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />}
             />
             <DataCardBody>
-              <DataCardRow label="Место" value={offer.place.title} />
+              {offer.place ? (
+                <DataCardRow label="Место" value={offer.place.title} />
+              ) : (
+                <DataCardRow
+                  label="Место"
+                  value={
+                    <span className="flex flex-col items-start gap-1">
+                      <span className="text-amber-700">Не назначено</span>
+                      <AssignOfferPlaceControl offerId={offer.id} />
+                    </span>
+                  }
+                />
+              )}
               <DataCardRow label="Возраст" value={offer.agePolicy === "SPECIFIC" ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths) : agePolicyLabel(offer.agePolicy)} />
-              <DataCardRow label="Город" value={offer.place.city?.name} />
+              <DataCardRow label="Город" value={offer.place?.city?.name} />
               <DataCardRow
                 label="Бизнес"
-                value={offer.place.ownerBusiness?.name || offer.place.ownerBusiness?.owner?.email}
+                value={offer.place?.ownerBusiness?.name || offer.place?.ownerBusiness?.owner?.email}
               />
               <DataCardRow
                 label="Создано"

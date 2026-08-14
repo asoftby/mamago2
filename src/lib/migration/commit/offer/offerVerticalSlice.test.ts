@@ -22,7 +22,15 @@ assert.equal(golden.ok,true); if(!golden.ok)throw new Error();
 assert.deepEqual({placeId:golden.draft.placeId,kind:golden.draft.kind,productType:golden.draft.productType,status:golden.draft.status,media:golden.draft.sourceMediaAttachmentIds},{placeId:"place_1",kind:"SERVICE",productType:null,status:"DRAFT",media:[10,11]});
 assert.equal(buildOfferCreateDraft({candidate:candidate(),context}).ok,true,"canonical hash/draft is stable");
 
-assert.equal(buildOfferCreateDraft({candidate:candidate({placeRelation:{status:"NO_PLACE_RELATION",placeSourcePostIds:[],relations:[]}}),context}).ok,false,"missing Place blocks");
+// Zero Place relation rows at all (never had one, e.g. legacy Phoenix
+// content) is allowed through as a placeless DRAFT — no owner/city guessed.
+const noPlaceRelation=buildOfferCreateDraft({candidate:candidate({placeRelation:{status:"NO_PLACE_RELATION",placeSourcePostIds:[],relations:[]}}),context});
+assert.equal(noPlaceRelation.ok,true,"zero Place relation rows import as a placeless DRAFT, not a block");
+if(noPlaceRelation.ok){
+  assert.equal(noPlaceRelation.draft.placeId,null);
+  assert.equal(noPlaceRelation.draft.status,"DRAFT");
+  assert.deepEqual(noPlaceRelation.draft.ownership,{ownerUserId:null,businessId:null,cityId:null});
+}
 const ambiguous=buildOfferCreateDraft({candidate:candidate({placeRelation:{status:"MULTIPLE_PLACE_RELATIONS",placeSourcePostIds:[100,101],relations:[relation(100),relation(101)]}}),context}); assert.equal(ambiguous.ok,false); if(!ambiguous.ok)assert.ok(ambiguous.reasons.some(r=>r.code==="AMBIGUOUS_PLACE_RELATION"));
 const noLocal=buildOfferCreateDraft({candidate:candidate(),context:{...context,placeId:""}});assert.equal(noLocal.ok,false);if(!noLocal.ok)assert.ok(noLocal.reasons.some(r=>r.code==="MISSING_LOCAL_PLACE"));
 const noOwner=buildOfferCreateDraft({candidate:candidate(),context:{...context,ownerUserId:""}});assert.equal(noOwner.ok,false);if(!noOwner.ok)assert.ok(noOwner.reasons.some(r=>r.code==="MISSING_OWNER"));
