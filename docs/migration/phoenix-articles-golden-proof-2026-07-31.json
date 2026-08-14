@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "proof": "phoenix-articles-first-release-golden",
+  "target": "disposable PostgreSQL schema phoenix_articles_golden_20260731_codex (removed after audit)",
+  "artifactSha256": "def08a4a6a31b91583c6dd502a2322b1a8e9577abacf3160a430e226c5866529",
+  "sourceRecordKey": "wordpress-db:post:24695",
+  "domainHash": "wordpress-db-domain-v2:63e4b2f0172c6870885f0929aa0f59478f702b4bf3e24d24973cf8661b5abce0",
+  "runtimeArtifactRoot": {
+    "environmentVariable": "PHOENIX_RELEASE_ARTIFACT_ROOT",
+    "articleRelativePath": "articles/capture.json",
+    "contract": "identical in LOCAL, DEV and PROD after secure artifact transfer"
+  },
+  "firstRun": {
+    "plan": "CREATE",
+    "articleDelta": 1,
+    "lineageDelta": 1,
+    "migrationRecordDelta": 1
+  },
+  "rerun": {
+    "plan": "SKIP_UNCHANGED",
+    "create": 0,
+    "update": 0,
+    "articleCountStable": true,
+    "lineageCountStable": true,
+    "migrationRecordDelta": 1
+  },
+  "persisted": {
+    "targetIdMatches": true,
+    "domainHashMatches": true
+  },
+  "forbiddenTablesUnchanged": true,
+  "mediaBinaryWrites": 0
+}

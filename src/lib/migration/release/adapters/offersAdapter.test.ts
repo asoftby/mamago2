@@ -52,12 +52,13 @@ function testRealManifestOffersScopeIsSixtyThreeAllCreate(): void {
     offers.records.every((r) => r.action === "CREATE"),
     "every committed Offers record must already be declared CREATE for a fresh target",
   );
-  // A live clean DEV baseline (0 Offer/lineage rows for these 63 keys) has
-  // since been proven, so the phase is BLOCKED for a different, real reason
-  // now: OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING — there is still no
-  // reproducible raw WordPress loadCandidate source for these 63 records.
-  assert.equal(offers.status, "BLOCKED");
-  assert.equal(offers.blockerCode, "OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING");
+  // A live clean DEV baseline (0 Offer/lineage rows for these 63 keys) was
+  // proven, and FrozenOfferSourceRepository + a golden CREATE-then-
+  // SKIP_UNCHANGED proof against a disposable schema closed
+  // OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING — the phase is READY.
+  assert.equal(offers.status, "READY");
+  assert.equal(offers.blocker, undefined, "READY phase must carry no leftover blocker");
+  assert.equal(offers.blockerCode, undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +145,7 @@ function testSixtyThreeRecordsAllSkipUnchangedOnRerun(): void {
 
 function fakeDeps(overrides: Partial<OffersMigrationDependencies> = {}): OffersMigrationDependencies {
   return {
-    loadCandidate: (sourceRecordKey) => fixtureCandidate({ sourceRecordKey }),
+    loadCandidate: async (sourceRecordKey) => fixtureCandidate({ sourceRecordKey }),
     resolveTargetState: async () => cleanTarget(),
     resolveDependencies: async () => ({ placeId: "place-1", ownerUserId: "user-1", businessId: null, cityId: "city-1" }),
     write: async () => ({ targetId: "offer-1" }),
@@ -267,7 +268,7 @@ async function testExecutorRuntimeResolutionAlwaysCalledEvenWhenPlannedAsFuture(
     },
   });
   const deps = fakeDeps({
-    loadCandidate: () => candidate,
+    loadCandidate: async () => candidate,
     resolveDependencies: async () => {
       resolveDependenciesCalls += 1;
       return { placeId: "place-1", ownerUserId: "user-1", businessId: null, cityId: "city-1" };

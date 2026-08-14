@@ -59,9 +59,17 @@ const founderExcludedSet = new Set(usersFounderExclusions.excludedSourceRecordKe
 const usersExecutableRecords = usersClean.entries
   .filter((entry) => !founderExcludedSet.has(entry.sourceRecordKey))
   .map((entry) => ({ sourceRecordKey: entry.sourceRecordKey, action: entry.expectedFirstAction }));
-if (usersExecutableRecords.length !== 559) {
-  throw new Error(`Expected exactly 559 executable Users records, computed ${usersExecutableRecords.length}.`);
+if (usersExecutableRecords.length !== 560) {
+  throw new Error(`Expected exactly 560 executable Users records, computed ${usersExecutableRecords.length}.`);
 }
+// Founder ownership dispositions are explicit Users-phase prerequisites,
+// outside the 564-record clean track: user:1 adopts an existing ADMIN and
+// user:129 replays the already-approved manual/privileged track.
+usersExecutableRecords.unshift(
+  { sourceRecordKey: "wordpress-db:user:1", action: "CREATE" },
+  { sourceRecordKey: "wordpress-db:user:129", action: "CREATE" },
+  { sourceRecordKey: "wordpress-db:user:27", action: "CREATE" },
+);
 if (usersExecutableRecords.some((r) => founderExcludedSet.has(r.sourceRecordKey))) {
   throw new Error("A founder-excluded sourceRecordKey leaked into the executable Users records.");
 }
@@ -104,9 +112,9 @@ const manifest = {
           sha256: sha256(usersCleanManifestPath),
           executable: true,
           description:
-            "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. 559/564 " +
+            "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. 560/564 " +
             "reproduced 2026-07-30 via a bounded read-only WP capture reconciled against approved LOCAL " +
-            "MigrationRecord.normalizedPayload ground truth; the remaining 5 are excluded from this first " +
+            "MigrationRecord.normalizedPayload ground truth; the remaining 4 are excluded from this first " +
             "release (see phoenix-users-founder-exclusions-2026-07-31.json).",
         },
         {
@@ -114,7 +122,7 @@ const manifest = {
           sha256: sha256(usersFounderExclusionsPath),
           executable: false,
           description:
-            "Founder-approved EXCLUDE_FROM_FIRST_RELEASE decision for the 5 unresolved sourceRecordKeys " +
+            "Founder-approved EXCLUDE_FROM_FIRST_RELEASE decision for the 4 unresolved sourceRecordKeys " +
             "(2026-07-31) — temporary release exclusion, not a deletion; tracked as a post-release backlog item.",
         },
         {
@@ -136,7 +144,11 @@ const manifest = {
       exclusionReasons: Object.fromEntries([...founderExcludedSet].map((key) => [key, "EXCLUDE_FROM_FIRST_RELEASE"])),
       deterministicConflicts: [],
       mediaPolicy: "NONE",
-      prerequisites: ["technicalMigrationCreator logical identity"],
+      prerequisites: [
+        "WP_USER_1_MAP_TO_PLATFORM_OWNER via PHOENIX_PLATFORM_OWNER_EMAIL exact ADMIN identity",
+        "WP_USER_129_REUSE_EXISTING_TRACK via PHOENIX_MANUAL_PRIVILEGED_CAPTURE",
+        "WP_USER_43_REINCLUDED_FOR_CONTENT_OWNERSHIP",
+      ],
     },
     {
       name: "businesses",

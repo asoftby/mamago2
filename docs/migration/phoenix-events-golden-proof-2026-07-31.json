@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "proof": "phoenix-events-first-release-golden",
+  "target": "disposable PostgreSQL schema phoenix_events_golden_20260731_codex (removed after audit)",
+  "sourceRecordKey": "wordpress-db:events:64505",
+  "artifactSha256": "1ae318559c10727e3d7fc315ea3be69c4e0e3506f97220e8a55979607af83840",
+  "firstRun": {
+    "preflight": "PASS",
+    "plan": "CREATE",
+    "activityDelta": 1,
+    "scheduleDateDelta": 1,
+    "eventLineageDelta": 1,
+    "migrationRecordDelta": 1
+  },
+  "rerun": {
+    "plan": "SKIP_UNCHANGED",
+    "create": 0,
+    "update": 0,
+    "activityCountStable": true,
+    "scheduleDateCountStable": true,
+    "lineageCountStable": true,
+    "migrationRecordDelta": 1
+  },
+  "persistedHashMatches": true,
+  "forbiddenTablesUnchanged": true,
+  "mediaBinaryWrites": 0
+}

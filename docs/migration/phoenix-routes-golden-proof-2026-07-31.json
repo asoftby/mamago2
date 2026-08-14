@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "proof": "phoenix-routes-first-release-golden",
+  "target": "disposable PostgreSQL schema phoenix_routes_golden_20260731_codex (removed after audit)",
+  "sourceRecordKey": "wordpress-db:routes:17822",
+  "artifactSha256": "ec07611ecf20982add9c2f7bb4fc79b233bfef39f03d75cf7e1d492b6407768a",
+  "naturalIdentity": "Route.slug @unique",
+  "firstRun": { "plan": "CREATE", "routeDelta": 1, "routeStopDelta": 6, "lineageDelta": 1, "migrationRecordDelta": 1 },
+  "rerun": { "plan": "SKIP_UNCHANGED", "create": 0, "update": 0, "routeCountStable": true, "routeStopCountStable": true, "lineageCountStable": true, "migrationRecordDelta": 1 },
+  "routeLevelLocationPolicy": "PASS",
+  "forbiddenTablesUnchanged": true,
+  "binaryMediaWrites": 0
+}

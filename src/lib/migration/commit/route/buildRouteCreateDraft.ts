@@ -106,6 +106,14 @@ export function buildRouteCreateDraft(input: BuildRouteCreateDraftInput): RouteC
 
   const cityId = trimToNull(context.cityId);
   const warnings: MigrationWarning[] = [];
+  if (candidate.locationRaw?.trim()) {
+    warnings.push({
+      code: "ROUTE_LEVEL_LOCATION_DROPPED",
+      message: "Route-level location remains in normalized raw metadata and is not imported into Route or RouteStop fields.",
+      severity: "INFO",
+      sourceRecordKey,
+    });
+  }
   if (!cityId) {
     warnings.push({
       code: "ROUTE_CITY_UNRESOLVED",

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-routes-dev-release-scope-2026-07-31",
+  "entity": "routes",
+  "sourceCaptureTimestamp": "2026-07-31T15:41:08.035Z",
+  "canonicalization": "wordpress-db-domain-v2 (src/lib/migration/adapters/wordpress-db/canonicalSourceHash.ts)",
+  "total": 14,
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:routes:17822",
+      "sourceHash": "wordpress-db-domain-v2:92bc306ef1bf39df974167a5de29ba0fe9e7f8d3a8b1138ffc150b0201dba7d4",
+      "sourceUpdatedAt": "2024-11-12 17:35:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:18437",
+      "sourceHash": "wordpress-db-domain-v2:666498fd5024f8e9b7479df5889c91c5b739bf99c5922d1824dd5075b4f2dd6f",
+      "sourceUpdatedAt": "2024-11-12 17:36:47"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:19413",
+      "sourceHash": "wordpress-db-domain-v2:cdce715c88474e91d867ef0a99e0ff15ab61bde1f434cba40dd4a864fee4a1dc",
+      "sourceUpdatedAt": "2025-08-29 13:29:38"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:22133",
+      "sourceHash": "wordpress-db-domain-v2:0df63ca2830a85f352f90bd0356f8c11d5b96b466385c0b84912fee1425fc90a",
+      "sourceUpdatedAt": "2025-08-29 13:58:22"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:24298",
+      "sourceHash": "wordpress-db-domain-v2:eadca75668032a835aee8c751910dcd28a0b863eec07c7ce5892eee3d01a235d",
+      "sourceUpdatedAt": "2024-11-12 17:50:31"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:24917",
+      "sourceHash": "wordpress-db-domain-v2:5e9ef1cfd66c78bb1afd59d3517018c232c5924c682daf1145d8447389bfefa1",
+      "sourceUpdatedAt": "2024-11-12 17:57:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:25888",
+      "sourceHash": "wordpress-db-domain-v2:94283661c4da2332775a466149a957427c87fbff309e1a1c153184e98516a3b5",
+      "sourceUpdatedAt": "2024-11-12 18:02:07"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:29290",
+      "sourceHash": "wordpress-db-domain-v2:d71c0a3a6902e1e4d775479762943655cbe0a2c3047ebbdd3a0c0581eaeafc2f",
+      "sourceUpdatedAt": "2025-08-29 13:57:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:32543",
+      "sourceHash": "wordpress-db-domain-v2:af08ddc460e83ff8873c119c9c64efe19635200ec972f1151c0193e5179cdd61",
+      "sourceUpdatedAt": "2025-08-29 13:56:29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:34581",
+      "sourceHash": "wordpress-db-domain-v2:020e0078c76e2580886162020216a3b0c0b56553cb0767fa0793929bfbee9187",
+      "sourceUpdatedAt": "2025-08-29 13:31:25"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:46963",
+      "sourceHash": "wordpress-db-domain-v2:bf3d993bafaa9b9d211cc5414a2c33eafb57d04fb3e8ba473c71f423ef2b621e",
+      "sourceUpdatedAt": "2025-06-20 14:35:38"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:47932",
+      "sourceHash": "wordpress-db-domain-v2:e313d4ba3ae08f90ceb6f6302d52a2094c4a06f860684c7ddf4dd4e9be57050f",
+      "sourceUpdatedAt": "2025-10-24 00:12:08"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:48687",
+      "sourceHash": "wordpress-db-domain-v2:a40ed12326e8eb20aca3243e08b48c84b8725ada330d8f7a7d30fefb67540454",
+      "sourceUpdatedAt": "2025-08-29 14:24:28"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:51442",
+      "sourceHash": "wordpress-db-domain-v2:7f29e282111065b7c87f886701c1521596856315b7f9e5ef824c3faf2b8e56ad",
+      "sourceUpdatedAt": "2025-10-23 18:56:05"
+    }
+  ],
+  "privateArtifact": {
+    "path": "routes/capture.json",
+    "sha256": "ec07611ecf20982add9c2f7bb4fc79b233bfef39f03d75cf7e1d492b6407768a",
+    "transferRequirement": "Never committed; raw content lives only at this immutable local path (mode 0600). Any transfer to another machine/session must use an out-of-band secure channel and must not be pasted into chat or logs."
+  }
+}

@@ -20,13 +20,13 @@
           "path": "docs/migration/users-slice5-clean-manifest.json",
           "sha256": "50fe394d38b6d9055975532e670e9c6eae50d80469468ecbd14e2a5950a405ec",
           "executable": true,
-          "description": "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. 559/564 reproduced 2026-07-30 via a bounded read-only WP capture reconciled against approved LOCAL MigrationRecord.normalizedPayload ground truth; the remaining 5 are excluded from this first release (see phoenix-users-founder-exclusions-2026-07-31.json)."
+          "description": "Frozen 564-user clean-batch classification with canonicalCandidateHash per record. 560/564 reproduced 2026-07-30 via a bounded read-only WP capture reconciled against approved LOCAL MigrationRecord.normalizedPayload ground truth; the remaining 4 are excluded from this first release (see phoenix-users-founder-exclusions-2026-07-31.json). wordpress-db:user:43 was originally a 5th exclusion but was reincluded 2026-07-31 by explicit founder decision (WP_USER_43_REINCLUDED_FOR_CONTENT_OWNERSHIP) — its missing surname has no schema dependency (User has no lastName column)."
         },
         {
           "path": "docs/migration/manifests/phoenix-users-founder-exclusions-2026-07-31.json",
-          "sha256": "1762deaadb828af82cc4b7c746eb617d93ccd64c5bcee4a629a58c0f1602d512",
+          "sha256": "3771f53154ffc1cd99da6b5e2bd97cb78c5a3fbe15d4619be9c268a5e6bfc199",
           "executable": false,
-          "description": "Founder-approved EXCLUDE_FROM_FIRST_RELEASE decision for the 5 unresolved sourceRecordKeys (2026-07-31) — temporary release exclusion, not a deletion; tracked as a post-release backlog item."
+          "description": "Founder-approved EXCLUDE_FROM_FIRST_RELEASE decision for the 4 unresolved sourceRecordKeys (2026-07-31) — temporary release exclusion, not a deletion; tracked as a post-release backlog item."
         },
         {
           "path": "docs/migration/users-production-activation-manifest.json",
@@ -39,9 +39,27 @@
           "sha256": "e8fc0553a0f9a21b0fc6173978579c64ede16c991c205c00a852e81a4dcfd003",
           "executable": false,
           "description": "Manual privileged-user evidence."
+        },
+        {
+          "path": "docs/migration/manifests/phoenix-users-dev-release-scope-2026-07-31.json",
+          "sha256": "e4b3a5a9ec41fa936af597ff672e9e8fbfb4372c93aee74d36c02c3ddc5e0d16",
+          "executable": true,
+          "description": "Public five-hundred-sixty-record User scope (approved sourceRecordKeys + content hashes; zero PII). Raw content (email/name) remains private under PHOENIX_RELEASE_ARTIFACT_ROOT. Real Prisma-backed wiring (usersProductionWiring.ts, wrapping the already-proven planUserMigration/writeUserMigration) plus a golden CREATE-then-SKIP_UNCHANGED proof against a disposable schema prove this phase is genuinely executable, not manifest-echo readiness. No password/session/activation data ever captured; buildUserDraft always sets role=USER, passwordHash=null regardless of source; 0 admin candidates found in the approved 559, plus wordpress-db:user:43 reincluded 2026-07-31 by explicit founder decision (WP_USER_43_REINCLUDED_FOR_CONTENT_OWNERSHIP)."
         }
       ],
       "records": [
+        {
+          "sourceRecordKey": "wordpress-db:user:1",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:129",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:27",
+          "action": "CREATE"
+        },
         {
           "sourceRecordKey": "wordpress-db:user:2",
           "action": "CREATE"
@@ -2277,6 +2295,10 @@
         {
           "sourceRecordKey": "wordpress-db:user:600",
           "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:user:43",
+          "action": "CREATE"
         }
       ],
       "protectedSourceRecordKeys": [],
@@ -2284,20 +2306,20 @@
         "wordpress-db:user:7",
         "wordpress-db:user:17",
         "wordpress-db:user:22",
-        "wordpress-db:user:42",
-        "wordpress-db:user:43"
+        "wordpress-db:user:42"
       ],
       "exclusionReasons": {
         "wordpress-db:user:7": "EXCLUDE_FROM_FIRST_RELEASE",
         "wordpress-db:user:17": "EXCLUDE_FROM_FIRST_RELEASE",
         "wordpress-db:user:22": "EXCLUDE_FROM_FIRST_RELEASE",
-        "wordpress-db:user:42": "EXCLUDE_FROM_FIRST_RELEASE",
-        "wordpress-db:user:43": "EXCLUDE_FROM_FIRST_RELEASE"
+        "wordpress-db:user:42": "EXCLUDE_FROM_FIRST_RELEASE"
       },
       "deterministicConflicts": [],
       "mediaPolicy": "NONE",
       "prerequisites": [
-        "technicalMigrationCreator logical identity"
+        "WP_USER_1_MAP_TO_PLATFORM_OWNER via PHOENIX_PLATFORM_OWNER_EMAIL exact ADMIN identity",
+        "WP_USER_129_REUSE_EXISTING_TRACK via PHOENIX_MANUAL_PRIVILEGED_CAPTURE",
+        "WP_USER_43_REINCLUDED_FOR_CONTENT_OWNERSHIP"
       ]
     },
     {
@@ -2306,7 +2328,7 @@
       "artifacts": [
         {
           "path": "docs/migration/manifests/phoenix-business-ownership-base-2026-07-30.json",
-          "sha256": "be2a4a8497c845afa539538157e39c5e89eb14eef6cf99efdb27576f0aedc98b",
+          "sha256": "285330b19717e28dca3c4d9dac39867104413ef457b4779dfa105b56e393ffb2",
           "executable": true,
           "description": "Generic 36 EXACT_LINK_CANDIDATE business-ownership + BUSINESS_OWNER elevation scope."
         },
@@ -2463,21 +2485,21 @@
           "action": "CREATE"
         },
         {
+          "sourceRecordKey": "wordpress-db:user:43",
+          "action": "CREATE"
+        },
+        {
           "sourceRecordKey": "wordpress-db:user:89",
           "action": "CREATE"
         }
       ],
       "protectedSourceRecordKeys": [],
-      "excludedSourceRecordKeys": [
-        "wordpress-db:user:43"
-      ],
-      "exclusionReasons": {
-        "wordpress-db:user:43": "EXCLUDED_BY_USER_DECISION"
-      },
+      "excludedSourceRecordKeys": [],
+      "exclusionReasons": {},
       "deterministicConflicts": [],
       "mediaPolicy": "NONE",
       "prerequisites": [
-        "users phase completed for all 37 dependent sourceRecordKeys"
+        "users phase completed for all 38 dependent sourceRecordKeys"
       ]
     },
     {
@@ -2489,320 +2511,326 @@
           "sha256": "ca217c18ab59882ff3326e460ad6f825ad62f1b052b5d06d29dfc37ab17a7c6c",
           "executable": true,
           "description": "Frozen live WordPress Place preview."
+        },
+        {
+          "path": "docs/migration/manifests/phoenix-places-dev-release-scope-2026-07-31.json",
+          "sha256": "ac63ac569721d52db2333da64752dfd89e129a94cc7e10d60a093b44cbf0c7ea",
+          "executable": true,
+          "description": "Public seventy-eight-record Place scope and canonical hashes (wordpress-db-domain-v2); raw content remains private under PHOENIX_RELEASE_ARTIFACT_ROOT. Real Prisma-backed create-only wiring (placesAdapter.ts/placesProductionWiring.ts/frozenPlaceSourceRepository.ts), atomic Place+MigrationLineage write, and a golden CREATE-then-SKIP_UNCHANGED proof against a disposable schema prove this phase is genuinely executable for a clean DEV target. All 78 records' expected action corrected from SKIP_UNCHANGED to CREATE — the prior value reflected LOCAL reconciliation (all 78 already exist there), not a clean DEV target, which has never had Places written to it. Owner (createdByUserId) resolved via WordPress post_author -> MigrationLineage USER lookup, never a hardcoded target UUID. Opening-hours import deliberately deferred (same MVP scope as buildPlaceCreateDraft's existing media/category/tags deferrals)."
         }
       ],
       "records": [
         {
           "sourceRecordKey": "wordpress-db:places:5457",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:5492",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:5515",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:5528",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:5579",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:5594",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:8901",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:9312",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:9865",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:9870",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:9948",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:10343",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:10370",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:10380",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:10515",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:11087",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:11408",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:11463",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:11892",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:12447",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:12884",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:12923",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13164",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13311",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13317",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13322",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13323",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13324",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13327",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13331",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:13487",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:18886",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:19800",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:20069",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:21778",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:25756",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:26215",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:27759",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:30346",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:30411",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:30426",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:30502",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:30963",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:31267",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:32271",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:32409",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:32633",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:32636",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:32637",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:34933",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:36245",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:41193",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:42218",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:43071",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:43247",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:43356",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:43622",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:43635",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:45603",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:45634",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:45846",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:47316",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:47916",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:48312",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:48372",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:48375",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:48875",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:49952",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:49977",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:50033",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:50902",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:51109",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:54625",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:55950",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:55953",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:60742",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:61420",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         },
         {
           "sourceRecordKey": "wordpress-db:places:63360",
-          "action": "SKIP_UNCHANGED"
+          "action": "CREATE"
         }
       ],
       "protectedSourceRecordKeys": [
@@ -2825,7 +2853,7 @@
     },
     {
       "name": "offers",
-      "status": "BLOCKED",
+      "status": "READY",
       "artifacts": [
         {
           "path": "docs/migration/manifests/offers-local-manifest-2026-07-30.json",
@@ -2844,6 +2872,12 @@
           "sha256": "4e38481d5274f0d132b70d522af26971fff6979933dc9ed4dd355c45a46bd933",
           "executable": false,
           "description": "Non-PII LOCAL read-only field reconciliation for the exact unified 63-key scope."
+        },
+        {
+          "path": "docs/migration/manifests/phoenix-offers-dev-release-scope-2026-07-31.json",
+          "sha256": "dcdc7d941ca8873012009cde776c047220703a6c93a692a569374fb41ba81938",
+          "executable": true,
+          "description": "Public sixty-three-record Offer scope and canonical hashes (wordpress-db-domain-v2); raw content remains private under PHOENIX_RELEASE_ARTIFACT_ROOT. Real Prisma-backed create-only wiring (offersAdapter.ts/offersProductionWiring.ts/frozenOfferSourceRepository.ts), atomic Offer+MigrationLineage write, and a golden CREATE-then-SKIP_UNCHANGED proof against a disposable schema (scripts/phoenix-offers-golden-proof.ts) close OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING. All 63 records independently verified to load/normalize/resolve dependencies/produce a unique OfferDomainHashV2 (scripts/phoenix-offers-load-all-proof.ts)."
         }
       ],
       "records": [
@@ -3109,51 +3143,206 @@
         "Businesses phase READY.",
         "Places phase READY.",
         "Per-record stable Place, owner, business and city logical dependency map."
-      ],
-      "blocker": "The fresh-DEV-target create-only planning/dependency-resolution wiring (src/lib/migration/release/adapters/offersAdapter.ts, offersProductionWiring.ts) is proven against a live clean DEV baseline (0 Offer rows, 0 MigrationLineage rows for the exact 63 sourceRecordKeys). The write path still has no reproducible raw WordPress loadCandidate source for these 63 records — no committed or locally captured raw snapshot exists (unlike Users/Articles/Activities) — so the phase cannot actually execute a real CREATE yet. The prior OFFERS_DOMAIN_HASH_TRANSITION_PENDING_DISPOSITIONS blocker described a different, LOCAL-only reconciliation problem (63 already-migrated LOCAL Offer rows conflicting with OfferDomainHashV2) that is out of scope for this clean DEV target and remains separate historical evidence.",
-      "blockerCode": "OFFERS_EXECUTABLE_SOURCE_LOADER_MISSING"
+      ]
     },
     {
       "name": "routes",
-      "status": "BLOCKED",
-      "artifacts": [],
-      "records": [],
-      "protectedSourceRecordKeys": [],
-      "excludedSourceRecordKeys": [],
-      "deterministicConflicts": [],
-      "mediaPolicy": "METADATA",
-      "prerequisites": [
-        "Frozen executable Route sourceRecordKey manifest and expected actions."
+      "status": "READY",
+      "artifacts": [
+        {
+          "path": "docs/migration/manifests/phoenix-routes-dev-release-scope-2026-07-31.json",
+          "sha256": "9da25be119e7b872f3260c85e16243e48cdbd984e1c0a894d9925e66495c9e0a",
+          "executable": true,
+          "description": "Public fourteen-record Route scope and canonical hashes; raw content remains private."
+        }
       ],
-      "blocker": "Route review/apply artifacts are historical review evidence, not a release execution scope."
-    },
-    {
-      "name": "events",
-      "status": "BLOCKED",
-      "artifacts": [],
-      "records": [],
-      "protectedSourceRecordKeys": [],
-      "excludedSourceRecordKeys": [],
-      "deterministicConflicts": [],
-      "mediaPolicy": "METADATA",
-      "prerequisites": [
-        "Frozen executable Event sourceRecordKey manifest and ownership identities."
+      "records": [
+        {"sourceRecordKey": "wordpress-db:routes:17822", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:18437", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:19413", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:22133", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:24298", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:24917", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:25888", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:29290", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:32543", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:34581", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:46963", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:47932", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:48687", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:routes:51442", "action": "CREATE"}
       ],
-      "blocker": "No committed executable approved Event scope artifact exists."
-    },
-    {
-      "name": "articles",
-      "status": "BLOCKED",
-      "artifacts": [],
-      "records": [],
       "protectedSourceRecordKeys": [],
       "excludedSourceRecordKeys": [],
       "deterministicConflicts": [],
       "mediaPolicy": "NONE",
       "prerequisites": [
-        "Committed two-record Article manifest with sourceRecordKeys and hash."
+        "Frozen executable Route sourceRecordKey manifest and canonical hashes.",
+        "Global Route.slug natural identity remains unoccupied or exactly lineage-linked."
+      ]
+    },
+    {
+      "name": "events",
+      "status": "READY",
+      "artifacts": [
+        {
+          "path": "docs/migration/manifests/phoenix-events-dev-release-scope-2026-07-31.json",
+          "sha256": "508f2ac81f15dce0e5d74046ded02f380d12cd5e5bb2f90b75d24c8055089007",
+          "executable": true,
+          "description": "Public eight-record Event scope and canonical source hashes; raw content remains private."
+        }
       ],
-      "blocker": "The approved Article keys/hash exist only in narrative/proof files, not one executable frozen artifact."
+      "records": [
+        {"sourceRecordKey": "wordpress-db:events:56062", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:56226", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:56479", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:60404", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:62977", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:63510", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:64251", "action": "CREATE"},
+        {"sourceRecordKey": "wordpress-db:events:64505", "action": "CREATE"}
+      ],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [
+        "wordpress-db:events:55980",
+        "wordpress-db:events:64159"
+      ],
+      "exclusionReasons": {
+        "wordpress-db:events:55980": "EXPIRED_IN_FROZEN_WORDPRESS_SOURCE",
+        "wordpress-db:events:64159": "EXPIRED_IN_FROZEN_WORDPRESS_SOURCE"
+      },
+      "deterministicConflicts": [],
+      "mediaPolicy": "NONE",
+      "prerequisites": [
+        "Fresh target has zero Activity rows without ACTIVITY MigrationLineage.",
+        "Event owner User dependencies resolve at runtime by logical MigrationLineage keys."
+      ]
+    },
+    {
+      "name": "articles",
+      "status": "READY",
+      "artifacts": [
+        {
+          "path": "docs/migration/manifests/phoenix-articles-dev-release-scope-2026-07-31.json",
+          "sha256": "e627ed9188c2c06b47fafa1cb962ae1f1ef47bc1c60cfedcd80769c86d50517d",
+          "executable": true,
+          "description": "Public twenty-six-record Article scope and canonical hashes; raw content remains private."
+        }
+      ],
+      "records": [
+        {
+          "sourceRecordKey": "wordpress-db:post:24695",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:24772",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:24774",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:24988",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:26068",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:26605",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:27355",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:28546",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:30049",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:30593",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:30642",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:30700",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:31021",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:32082",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:32217",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:33172",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:33899",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:34363",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:34997",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:35329",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:37026",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:39844",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:40724",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:56250",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:57731",
+          "action": "CREATE"
+        },
+        {
+          "sourceRecordKey": "wordpress-db:post:9704",
+          "action": "CREATE"
+        }
+
+      ],
+      "protectedSourceRecordKeys": [],
+      "excludedSourceRecordKeys": [],
+      "deterministicConflicts": [],
+      "mediaPolicy": "NONE",
+      "prerequisites": [
+        "Article author resolution is deferred (Article.authorUserId nullable); no logical dependency to resolve at write time."
+      ]
     },
     {
       "name": "redirects",

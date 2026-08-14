@@ -1,0 +1,34 @@
+import { execFileSync } from "node:child_process";
+import { PrismaClient } from "@prisma/client";
+import { buildRouteCreateDraft } from "../src/lib/migration/commit/route/buildRouteCreateDraft";
+import { planRoutesCreateAction } from "../src/lib/migration/release/adapters/routesAdapter";
+import { createRoutesCandidateLoader, createRoutesTargetStateResolver, createRoutesWriter } from "../src/lib/migration/release/adapters/routesProductionWiring";
+import { FrozenRouteSourceRepository } from "../src/lib/migration/release/adapters/frozenRouteSourceRepository";
+const SCHEMA = "phoenix_routes_golden_20260731_codex";
+const KEY = "wordpress-db:routes:17822";
+const HASH = "wordpress-db-domain-v2:92bc306ef1bf39df974167a5de29ba0fe9e7f8d3a8b1138ffc150b0201dba7d4";
+const ARTIFACT_SHA = "ec07611ecf20982add9c2f7bb4fc79b233bfef39f03d75cf7e1d492b6407768a";
+function schemaUrl(value: string) { const url = new URL(value); url.searchParams.set("schema", SCHEMA); return url.toString(); }
+async function main() {
+  const base = process.env.DATABASE_URL; if (!base) throw new Error("DATABASE_URL is required"); if (!process.env.PHOENIX_RELEASE_ARTIFACT_ROOT) throw new Error("PHOENIX_RELEASE_ARTIFACT_ROOT is required");
+  const admin = new PrismaClient(); const exists = await admin.$queryRawUnsafe<Array<{ exists: boolean }>>(`select exists(select 1 from information_schema.schemata where schema_name = '${SCHEMA}')`); if (exists[0]?.exists) throw new Error(`Disposable schema already exists: ${SCHEMA}`); await admin.$executeRawUnsafe(`create schema "${SCHEMA}"`); await admin.$disconnect();
+  const url = schemaUrl(base);
+  try {
+    execFileSync("pnpm", ["prisma", "db", "push", "--skip-generate", "--schema", "prisma/schema.prisma"], { cwd: process.cwd(), env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
+    const prisma = new PrismaClient({ datasources: { db: { url } } });
+    try {
+      const source = await prisma.migrationSource.create({ data: { adapterKey: "wordpress-db", sourceNamespace: "phoenix-routes-golden", name: "Disposable Phoenix Routes golden proof" } });
+      const raw = FrozenRouteSourceRepository.fromEnvironment(ARTIFACT_SHA); const load = createRoutesCandidateLoader(raw, new Map([[KEY, HASH]])); const candidate = load(KEY); const resolveState = createRoutesTargetStateResolver(prisma, source.id); const write = createRoutesWriter(prisma, raw, source.id);
+      const loaded = raw.load(KEY); const policy = buildRouteCreateDraft({ candidate: loaded.normalized, context: {}, sourceRecordKey: KEY }); if (!policy.ok || !policy.warnings.some((w) => w.code === "ROUTE_LEVEL_LOCATION_DROPPED") || "location" in policy.draft || policy.draft.stops.some((s) => "location" in s)) throw new Error("Route-level location policy failed");
+      const before = { routes: await prisma.route.count(), stops: await prisma.routeStop.count(), lineages: await prisma.migrationLineage.count(), media: await prisma.mediaAsset.count(), activities: await prisma.activity.count(), articles: await prisma.article.count(), offers: await prisma.offer.count(), places: await prisma.place.count() };
+      const run1 = await prisma.migrationRun.create({ data: { sourceId: source.id, mode: "COMMIT", status: "RUNNING", adapterVersion: "phoenix-routes-v1" } }); const rec1 = await prisma.migrationRecord.create({ data: { sourceId: source.id, runId: run1.id, status: "PLANNED", sourceEntityType: "wordpress-db:routes", sourceStableKey: KEY, sourceRecordKey: KEY, sourceHash: HASH, targetTypeHint: "ROUTE", planAction: "CREATE" } });
+      const firstPlan = planRoutesCreateAction(HASH, await resolveState(candidate)); if (firstPlan.action !== "CREATE") throw new Error(`Expected CREATE, got ${firstPlan.action}`); await write(candidate); await prisma.migrationRecord.update({ where: { id: rec1.id }, data: { status: "COMPLETED" } }); await prisma.migrationRun.update({ where: { id: run1.id }, data: { status: "COMPLETED", finishedAt: new Date() } });
+      const afterFirst = { routes: await prisma.route.count(), stops: await prisma.routeStop.count(), lineages: await prisma.migrationLineage.count(), records: await prisma.migrationRecord.count() };
+      const run2 = await prisma.migrationRun.create({ data: { sourceId: source.id, mode: "COMMIT", status: "RUNNING", adapterVersion: "phoenix-routes-v1" } }); const secondPlan = planRoutesCreateAction(HASH, await resolveState(candidate)); if (secondPlan.action !== "SKIP_UNCHANGED") throw new Error(`Expected SKIP_UNCHANGED, got ${secondPlan.action}`); await prisma.migrationRecord.create({ data: { sourceId: source.id, runId: run2.id, status: "COMPLETED", sourceEntityType: "wordpress-db:routes", sourceStableKey: KEY, sourceRecordKey: KEY, sourceHash: HASH, targetTypeHint: "ROUTE", planAction: "SKIP_UNCHANGED" } }); await prisma.migrationRun.update({ where: { id: run2.id }, data: { status: "COMPLETED", finishedAt: new Date() } });
+      const after = { routes: await prisma.route.count(), stops: await prisma.routeStop.count(), lineages: await prisma.migrationLineage.count(), records: await prisma.migrationRecord.count(), media: await prisma.mediaAsset.count(), activities: await prisma.activity.count(), articles: await prisma.article.count(), offers: await prisma.offer.count(), places: await prisma.place.count() };
+      const report = { schema: SCHEMA, sourceRecordKey: KEY, artifactSha256: ARTIFACT_SHA, firstRun: { plan: firstPlan.action, routeDelta: afterFirst.routes - before.routes, routeStopDelta: afterFirst.stops - before.stops, lineageDelta: afterFirst.lineages - before.lineages, migrationRecordDelta: afterFirst.records }, rerun: { plan: secondPlan.action, create: 0, update: 0, routeCountStable: after.routes === afterFirst.routes, routeStopCountStable: after.stops === afterFirst.stops, lineageCountStable: after.lineages === afterFirst.lineages, migrationRecordDelta: after.records - afterFirst.records }, routeLevelLocationPolicy: "PASS", forbiddenTablesUnchanged: before.media === after.media && before.activities === after.activities && before.articles === after.articles && before.offers === after.offers && before.places === after.places, binaryMediaWrites: 0 };
+      if (report.firstRun.routeDelta !== 1 || report.firstRun.routeStopDelta !== loaded.normalized.stops.length || report.firstRun.lineageDelta !== 1 || !report.rerun.routeCountStable || !report.rerun.routeStopCountStable || !report.rerun.lineageCountStable || !report.forbiddenTablesUnchanged) throw new Error("Routes golden invariant failed"); console.log(JSON.stringify(report, null, 2));
+    } finally { await prisma.$disconnect(); }
+  } finally { const cleanup = new PrismaClient(); await cleanup.$executeRawUnsafe(`drop schema if exists "${SCHEMA}" cascade`); await cleanup.$disconnect(); }
+}
+void main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });

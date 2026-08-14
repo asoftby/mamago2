@@ -1,5 +1,6 @@
 import type { ExactRecordExecutor } from "../adapter";
 import type { PhoenixExpectedRecord, PhoenixRecordResult } from "../types";
+import { isRerunForbiddenLiveCreate, isRerunIdempotentCreateSkip, type PhoenixExecuteOptions } from "./rerunIdempotency";
 
 /**
  * Thin Phoenix wrapper for the first Offers release onto a FRESH (clean)
@@ -70,7 +71,14 @@ export interface OffersMigrationWriteResult {
 }
 
 export interface OffersMigrationDependencies {
-  loadCandidate(sourceRecordKey: string): OffersMigrationCandidate;
+  /**
+   * Async because, unlike Article/Event/Route, Offer's dependencyPlan
+   * (specifically `businessSourceKey`) reflects a target-system fact — the
+   * already-migrated Place's `ownerBusinessId` — not something derivable
+   * from raw source content alone. See `createOffersLoadCandidate` in
+   * `offersProductionWiring.ts`.
+   */
+  loadCandidate(sourceRecordKey: string): Promise<OffersMigrationCandidate>;
   resolveTargetState(candidate: OffersMigrationCandidate): Promise<OffersTargetLineageState>;
   /**
    * Must re-resolve Place/Business/owner dependencies against real target
@@ -125,13 +133,17 @@ export function classifyDependencyReadiness(input: {
 export class OffersPhaseExecutor implements ExactRecordExecutor {
   constructor(private readonly deps: OffersMigrationDependencies) {}
 
-  async execute(sourceRecordKey: string, expectedAction: PhoenixExpectedRecord["action"]): Promise<PhoenixRecordResult> {
+  async execute(
+    sourceRecordKey: string,
+    expectedAction: PhoenixExpectedRecord["action"],
+    options?: PhoenixExecuteOptions,
+  ): Promise<PhoenixRecordResult> {
     // Every dependency call is guarded: an unexpected throw from a real
     // implementation must become a structured FAILED result, never an
     // escaped exception — otherwise `runSequential`'s stop-on-first-error
     // loop and its report-store audit trail are bypassed entirely.
     try {
-      const candidate = this.deps.loadCandidate(sourceRecordKey);
+      const candidate = await this.deps.loadCandidate(sourceRecordKey);
       const target = await this.deps.resolveTargetState(candidate);
       const plan = planOffersCreateAction(candidate, target);
 
@@ -141,7 +153,13 @@ export class OffersPhaseExecutor implements ExactRecordExecutor {
       if (plan.action === "CONFLICT") {
         return { sourceRecordKey, action: expectedAction, outcome: "PROTECTED_CONFLICT", error: plan.reason ?? "CONFLICT" };
       }
+      if (isRerunForbiddenLiveCreate(plan.action, options)) {
+        return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: "RERUN_LIVE_CREATE_FORBIDDEN" };
+      }
       if (plan.action !== expectedAction) {
+        if (isRerunIdempotentCreateSkip(expectedAction, plan.action, options)) {
+          return { sourceRecordKey, action: expectedAction, outcome: "SKIPPED" };
+        }
         return { sourceRecordKey, action: expectedAction, outcome: "FAILED", error: `UNEXPECTED_PLAN_ACTION:${plan.action}` };
       }
       if (plan.action === "SKIP_UNCHANGED") {

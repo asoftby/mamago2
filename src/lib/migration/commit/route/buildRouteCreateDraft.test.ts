@@ -69,9 +69,22 @@ function testMissingCityLeavesNullAndWarns() {
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.draft.cityId, null);
-  assert.equal(result.warnings.length, 1);
-  assert.equal(result.warnings[0].code, "ROUTE_CITY_UNRESOLVED");
-  assert.equal(result.warnings[0].sourceRecordKey, "wordpress-db:routes:701");
+  const cityWarning = result.warnings.find((warning) => warning.code === "ROUTE_CITY_UNRESOLVED");
+  assert(cityWarning);
+  assert.equal(cityWarning.sourceRecordKey, "wordpress-db:routes:701");
+}
+
+function testRouteLevelLocationIsDroppedWithInformationalWarning() {
+  const withLocation = buildRouteCreateDraft({ candidate: candidateFixture(), context: contextFixture(), sourceRecordKey: "wordpress-db:routes:701" });
+  assert(withLocation.ok);
+  assert(withLocation.warnings.some((warning) => warning.code === "ROUTE_LEVEL_LOCATION_DROPPED" && warning.severity === "INFO"));
+  assert(!("location" in withLocation.draft));
+  assert(!("locationRaw" in withLocation.draft));
+  assert(withLocation.draft.stops.every((stop) => !("location" in stop) && !("locationRaw" in stop)));
+
+  const empty = buildRouteCreateDraft({ candidate: candidateFixture({ locationRaw: "", location: null }), context: contextFixture() });
+  assert(empty.ok);
+  assert(!empty.warnings.some((warning) => warning.code === "ROUTE_LEVEL_LOCATION_DROPPED"));
 }
 
 function testBlocksMissingRequiredFields() {
@@ -133,6 +146,7 @@ function main() {
   testBuildsDraftWithPrivateDraftNoAuthor();
   testStopsAreOrderedAndMappedWithoutMedia();
   testMissingCityLeavesNullAndWarns();
+  testRouteLevelLocationIsDroppedWithInformationalWarning();
   testBlocksMissingRequiredFields();
   testHtmlToPlainTextParagraphsAndBreaksBecomeNewlines();
   testHtmlToPlainTextStripsNestedAndInlineTags();

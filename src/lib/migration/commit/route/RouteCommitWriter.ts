@@ -6,7 +6,7 @@ export interface RouteCommitWriterPrismaClient {
   route: Pick<PrismaClient["route"], "create" | "findUnique" | "update">;
   routeStop: Pick<PrismaClient["routeStop"], "deleteMany" | "createMany">;
   routeSlugHistory: Pick<PrismaClient["routeSlugHistory"], "findUnique">;
-  $transaction: PrismaClient["$transaction"];
+  $transaction?: PrismaClient["$transaction"];
 }
 
 export interface RouteCommitResult {
@@ -125,6 +125,7 @@ export class RouteCommitWriter {
       throw new Error("routeId is required for Route update.");
     }
 
+    if (!this.prisma.$transaction) throw new Error("Route UPDATE requires a top-level transaction-capable Prisma client.");
     const route: Route = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.route.update({
         where: { id: routeId },

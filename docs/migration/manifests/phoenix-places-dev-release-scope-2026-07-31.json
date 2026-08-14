@@ -1,0 +1,405 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-places-dev-release-scope-2026-07-31",
+  "entity": "places",
+  "sourceCaptureTimestamp": "2026-07-31T19:35:03.658Z",
+  "canonicalization": "wordpress-db-domain-v2 (src/lib/migration/adapters/wordpress-db/canonicalSourceHash.ts)",
+  "total": 78,
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:places:10343",
+      "sourceHash": "wordpress-db-domain-v2:7c580b917d2078e3f255831919cca9343ef051768b40969dcc9b5fe24a53dbe5",
+      "sourceUpdatedAt": "2024-05-18 17:23:59"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10370",
+      "sourceHash": "wordpress-db-domain-v2:85a47a9ce39de967e39d9d834407873c3c269c8e7ba5be78a5250db4562b1f57",
+      "sourceUpdatedAt": "2024-05-18 17:31:11"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10380",
+      "sourceHash": "wordpress-db-domain-v2:38e48b4f238fbf27d601950cfded52159272fed2b39baabdab08c0a6d5b2c840",
+      "sourceUpdatedAt": "2024-05-18 17:23:20"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10515",
+      "sourceHash": "wordpress-db-domain-v2:07d8b5a9cb4c551eb3badd0ba7fe7c41ef305b57436c111049c9e840a507b845",
+      "sourceUpdatedAt": "2026-01-22 09:14:31"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11087",
+      "sourceHash": "wordpress-db-domain-v2:98a5048c5fb8ae3ab1b9fbea8729dffb43f2e605cc2dd0c0272535e462ae726d",
+      "sourceUpdatedAt": "2025-08-31 15:59:04"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11408",
+      "sourceHash": "wordpress-db-domain-v2:96c74dd5fe5e2f328aa57d89a19f48391e0acb192173872e3137fffa11361020",
+      "sourceUpdatedAt": "2025-04-30 10:35:29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11463",
+      "sourceHash": "wordpress-db-domain-v2:df855c5f4bdb7d877574e88e16f1d463559cadc0ca72e96c78558f5bba61d1ca",
+      "sourceUpdatedAt": "2025-04-30 10:49:46"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11892",
+      "sourceHash": "wordpress-db-domain-v2:2824bde0a60b1b5e86a2934c609879a6a2f8df6103425bd32d573f14ca420adc",
+      "sourceUpdatedAt": "2024-05-18 17:31:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:12447",
+      "sourceHash": "wordpress-db-domain-v2:55b9113d4e18f84b9f339aad56a5d174ece406db46f655cc6e254aa6379ebd8e",
+      "sourceUpdatedAt": "2025-09-17 22:33:02"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:12884",
+      "sourceHash": "wordpress-db-domain-v2:8820478df1da0e3075091946abbb8ad1f721b3bf18e24e9d075b154f0fc8d7d4",
+      "sourceUpdatedAt": "2025-04-30 10:50:54"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:12923",
+      "sourceHash": "wordpress-db-domain-v2:2004f7c561b7811ddbbad05324cfc460b1679974ca00ad827d90e48213b63b55",
+      "sourceUpdatedAt": "2024-03-12 18:43:08"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13164",
+      "sourceHash": "wordpress-db-domain-v2:3f7af78edd13416d30ac137c4565a9332633a8f193202f6e77bc823aafbe1c54",
+      "sourceUpdatedAt": "2025-05-08 12:07:25"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13311",
+      "sourceHash": "wordpress-db-domain-v2:b67dc3cbb7d269d75e3c121677525b90c41c681d168fdaa865557ca244f3b00e",
+      "sourceUpdatedAt": "2024-05-18 17:30:18"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13317",
+      "sourceHash": "wordpress-db-domain-v2:8a00e9c28c76cf3e85fa96ea277043b1949e1b9cd701dd47975b0a4eef51d094",
+      "sourceUpdatedAt": "2025-06-01 17:57:28"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13322",
+      "sourceHash": "wordpress-db-domain-v2:421682b90d2c31364b9f5e3fa26efc49ad231d57feff4eac03c6988f12bf6d12",
+      "sourceUpdatedAt": "2024-12-20 12:11:56"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13323",
+      "sourceHash": "wordpress-db-domain-v2:ef7bdf53ef283becf725c8833bf80930ec607525573c238285f8b8c88e7b5ed3",
+      "sourceUpdatedAt": "2024-05-18 17:26:22"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13324",
+      "sourceHash": "wordpress-db-domain-v2:f83ad1855f2c2924603ff8db5a4ae946948b0c5ed3104dff03c99b23d0889747",
+      "sourceUpdatedAt": "2024-05-18 17:26:39"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13327",
+      "sourceHash": "wordpress-db-domain-v2:e444be82ad25e25872f2eb2c99efa0f2f2fbf549d1a7b16998ede769dd815b1b",
+      "sourceUpdatedAt": "2024-05-18 17:43:49"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13331",
+      "sourceHash": "wordpress-db-domain-v2:66573386c3eaa3c946c242bebbfbd24207d2eda288cd6c21bc5714afeee8ea4f",
+      "sourceUpdatedAt": "2024-05-18 17:51:20"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13487",
+      "sourceHash": "wordpress-db-domain-v2:e179a65b60cb66499839020f6fad5e3f603ee61f38caea22cf4abcb4a567013f",
+      "sourceUpdatedAt": "2025-04-30 09:43:40"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:18886",
+      "sourceHash": "wordpress-db-domain-v2:c575e6f862a3c6692c554fed25f9f6a66a12e211307744c03ce992be19b87d09",
+      "sourceUpdatedAt": "2025-11-26 00:06:17"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:19800",
+      "sourceHash": "wordpress-db-domain-v2:3564788c11e77edc1942cc41cd8647d6e03818ccba9da42c3dcb890bf92cbbe2",
+      "sourceUpdatedAt": "2025-04-30 09:43:12"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:20069",
+      "sourceHash": "wordpress-db-domain-v2:e9934ca3335f32813f10b7fa93bc37c8937fc09fa97ef5385e160864744f108b",
+      "sourceUpdatedAt": "2025-04-30 10:33:57"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:21778",
+      "sourceHash": "wordpress-db-domain-v2:01b2128979c002fd1823588e0b7093117fb3343662974306f32e45dda3ed337f",
+      "sourceUpdatedAt": "2026-02-26 12:59:55"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:25756",
+      "sourceHash": "wordpress-db-domain-v2:c836098f8ea7f3dd937ea1553595cd89e6b7aec19399d259de6c3ec3aee2b64f",
+      "sourceUpdatedAt": "2025-04-30 10:43:24"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:26215",
+      "sourceHash": "wordpress-db-domain-v2:ea60f12786afc8244574dc2bbbdc9f5b738feec07d80b490fe753d49cb2731ed",
+      "sourceUpdatedAt": "2025-11-18 14:21:12"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:27759",
+      "sourceHash": "wordpress-db-domain-v2:7176920648579fd8136fb822d18eea2eea1ec3a45f09a8a277a5940ffc7aff0d",
+      "sourceUpdatedAt": "2025-03-28 00:08:18"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30346",
+      "sourceHash": "wordpress-db-domain-v2:809c783ef3f52a3550cc13c8c5250c54789831dc95a372ea0175144a8123a8a6",
+      "sourceUpdatedAt": "2025-08-24 13:41:01"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30411",
+      "sourceHash": "wordpress-db-domain-v2:fa28b8e00b997b9a3d6b8a50f366a5648fc0bed52caec58ee00eb4fc673cbdb5",
+      "sourceUpdatedAt": "2024-10-22 10:59:48"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30426",
+      "sourceHash": "wordpress-db-domain-v2:516d5070b55850b9146e21a8de49b32bf03db8c16900d22a621c4f526ebbaf06",
+      "sourceUpdatedAt": "2024-10-22 10:53:26"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30502",
+      "sourceHash": "wordpress-db-domain-v2:08e0208096273dd39f2ea7ecb3887e2310a5b24fa3cfdcd2b0c88a64bbe32a5d",
+      "sourceUpdatedAt": "2024-10-23 13:12:09"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30963",
+      "sourceHash": "wordpress-db-domain-v2:e5411c306e3264aa02cd9258b7e8969f8d7b688bf353709dd10ef88e633fcb64",
+      "sourceUpdatedAt": "2025-10-02 16:00:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:31267",
+      "sourceHash": "wordpress-db-domain-v2:a691bec3762153a570b6a4d6af11f862d3b48f1094b322f902fd1d112331e5d6",
+      "sourceUpdatedAt": "2025-05-25 00:52:15"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32271",
+      "sourceHash": "wordpress-db-domain-v2:2f6dd635e35afb15067c66c743e9e440867caa6ef4dee48f9933894c200c1b69",
+      "sourceUpdatedAt": "2024-11-18 17:48:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32409",
+      "sourceHash": "wordpress-db-domain-v2:3856c0985d80cff0c76fde964e36d9ca9122b26c902e6c2499ef1d0511f8eb9b",
+      "sourceUpdatedAt": "2025-10-02 15:06:11"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32633",
+      "sourceHash": "wordpress-db-domain-v2:fc6dd82fd5562879a2959420034e333836ae4834d62e8e0aad2e344236a29cda",
+      "sourceUpdatedAt": "2024-12-20 11:33:44"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32636",
+      "sourceHash": "wordpress-db-domain-v2:4a6bd605e427cfd3e57fd59b6e55683ac763ea9b0ad3dd29cbf2082706557bf0",
+      "sourceUpdatedAt": "2024-12-20 11:33:31"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32637",
+      "sourceHash": "wordpress-db-domain-v2:a23c794c944b2a4ca12a55f39e8251222ae3a0acab77c8ebe9b03de6669a8707",
+      "sourceUpdatedAt": "2024-12-20 11:33:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:34933",
+      "sourceHash": "wordpress-db-domain-v2:15c989d2106bde3298b8a8770c53524b79091ef59b3b6595420928511ce02039",
+      "sourceUpdatedAt": "2025-05-28 16:32:45"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:36245",
+      "sourceHash": "wordpress-db-domain-v2:155fcbb76bd991f4f4cb039ca8609fe2e151aa1149b0b62a030bfd309afbf72e",
+      "sourceUpdatedAt": "2025-05-28 16:32:59"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:41193",
+      "sourceHash": "wordpress-db-domain-v2:1d6ece5e0a1d18fd24945906c10d6225fb57725f647fa94626d32dab048c4f51",
+      "sourceUpdatedAt": "2025-10-28 11:27:48"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:42218",
+      "sourceHash": "wordpress-db-domain-v2:57128f9f87554876ae3e2dab0fa8d7467e897931af098c4cfda6e06fa072b434",
+      "sourceUpdatedAt": "2026-03-10 14:42:35"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43071",
+      "sourceHash": "wordpress-db-domain-v2:50082a37dd37addbd526f593cd32c9ea4e3eee282c306f402536cfbf26808930",
+      "sourceUpdatedAt": "2026-03-10 14:49:47"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43247",
+      "sourceHash": "wordpress-db-domain-v2:fe92b185a10ab3527105a77896b519fa471b91c0c931dd19fb38f333b1f03988",
+      "sourceUpdatedAt": "2025-05-28 16:33:19"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43356",
+      "sourceHash": "wordpress-db-domain-v2:3d2b90fce4a7af8e1c90f33bad247073bb6ceeb00660b99ebe6def66ceed5dd3",
+      "sourceUpdatedAt": "2025-05-28 16:33:25"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43622",
+      "sourceHash": "wordpress-db-domain-v2:780fb1ebde9fbcc7e9873f6e859a246f5cd77299424dfdc24c60f133197a172f",
+      "sourceUpdatedAt": "2025-05-28 16:31:28"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43635",
+      "sourceHash": "wordpress-db-domain-v2:87d9993d55552087185c8ae2d1e91483876785f1bc7bd2af5415cdf4348eab96",
+      "sourceUpdatedAt": "2026-05-10 12:17:46"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:45603",
+      "sourceHash": "wordpress-db-domain-v2:31b95642e6c7b399e98381be85024d4cacdee069a5e8652d93d53fd35151d58f",
+      "sourceUpdatedAt": "2025-05-26 13:01:00"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:45634",
+      "sourceHash": "wordpress-db-domain-v2:01e12b7f6d900217be8d70dd475deeb4fcff8aec8eee86d3addce25510d4ca9b",
+      "sourceUpdatedAt": "2025-05-26 15:53:13"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:45846",
+      "sourceHash": "wordpress-db-domain-v2:f3aea706f10eb9b096eb1593585e6b663ac0fb53a4893651339d8bd90c3eb3b2",
+      "sourceUpdatedAt": "2025-09-18 08:51:52"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:47316",
+      "sourceHash": "wordpress-db-domain-v2:12e00a30bc9c605ae3942fcdd82964907a0aef54c986306d3a6b70e9b6d2f1eb",
+      "sourceUpdatedAt": "2025-07-01 23:43:28"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:47916",
+      "sourceHash": "wordpress-db-domain-v2:78fbd483f5f04155ab35d8ca94211631117b24eff764cea06697cc928cf58036",
+      "sourceUpdatedAt": "2025-07-28 15:24:25"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48312",
+      "sourceHash": "wordpress-db-domain-v2:190f1596e35e2389360b8e47f6af7eb34959f3386f6dcdd62415aa7d3bb0f423",
+      "sourceUpdatedAt": "2025-08-20 20:04:31"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48372",
+      "sourceHash": "wordpress-db-domain-v2:8f66fc723c2ed82bb82c9c8d2c0f83622ab778d6963fb34bebca90fb7200c09e",
+      "sourceUpdatedAt": "2025-09-25 15:23:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48375",
+      "sourceHash": "wordpress-db-domain-v2:01715270c99c58d958dc58e50323988892101a11ffa85e72c8b94bd0184a456a",
+      "sourceUpdatedAt": "2025-08-14 22:46:19"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48875",
+      "sourceHash": "wordpress-db-domain-v2:2d6f557f066bb75945ffadf655ef5afd8134284c58f8a80686e0fef896f55f47",
+      "sourceUpdatedAt": "2025-09-01 10:26:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:49952",
+      "sourceHash": "wordpress-db-domain-v2:f0abf002160af645098c6bb21ec30b294ec1f356786b10f9536da73da44092ac",
+      "sourceUpdatedAt": "2025-10-02 11:41:25"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:49977",
+      "sourceHash": "wordpress-db-domain-v2:a28cbfeff3ebcf540d9b20489a374594e0d0d761d0e82f95f87091f9cd5bebb8",
+      "sourceUpdatedAt": "2025-09-17 23:01:21"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:50033",
+      "sourceHash": "wordpress-db-domain-v2:5db808270bfa8e56f31b2d8cf7228af3431c7a465593d2e067395555d90ccca1",
+      "sourceUpdatedAt": "2025-09-22 21:00:00"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:50902",
+      "sourceHash": "wordpress-db-domain-v2:9d97d28a446ec3aaad4eac8a7722832a4ff9dcc7f9f0c1a9821477dc08f4af65",
+      "sourceUpdatedAt": "2026-01-25 15:00:05"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:51109",
+      "sourceHash": "wordpress-db-domain-v2:3ea3cfef19dafcec4e0c4472adde5e9c444cfb2eefe40733886c91db4a34a108",
+      "sourceUpdatedAt": "2026-01-16 15:35:40"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5457",
+      "sourceHash": "wordpress-db-domain-v2:079522484f7dcf59a0586f167ac20d9396edac78145bbbec11b908668970e846",
+      "sourceUpdatedAt": "2024-05-18 16:44:06"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:54625",
+      "sourceHash": "wordpress-db-domain-v2:13f237e8c69018f0aee44b45aba3dcfa96de577aa6c2410cc20d35bb1258c11e",
+      "sourceUpdatedAt": "2026-01-25 13:33:56"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5492",
+      "sourceHash": "wordpress-db-domain-v2:2f15dc04e5738f76dc91bdd6456b09ca15093d71b8bf8ee2d09c579407d51694",
+      "sourceUpdatedAt": "2024-05-18 16:42:59"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5515",
+      "sourceHash": "wordpress-db-domain-v2:8e9c88db37bf83576bc860fee136ba4f4a30b474a6efc6c4af37ef157fa6772c",
+      "sourceUpdatedAt": "2024-12-14 23:45:43"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5528",
+      "sourceHash": "wordpress-db-domain-v2:b46ed1aedb19755964e7a93d8ace9f5024e12b1b726852232e23b27d0fa1e059",
+      "sourceUpdatedAt": "2025-06-24 13:08:17"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5579",
+      "sourceHash": "wordpress-db-domain-v2:6ddfa0393a76c7f3f16ea27719b514cee0589ffc33cb1f53c42547916a1a01ca",
+      "sourceUpdatedAt": "2024-05-18 17:20:54"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5594",
+      "sourceHash": "wordpress-db-domain-v2:4f3dd12ead7df171bc54e378f39c0e56e4c0ee4888e79c0bb19ba4fa1d561cd1",
+      "sourceUpdatedAt": "2025-06-24 13:42:08"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:55950",
+      "sourceHash": "wordpress-db-domain-v2:8a9101097fa7d48500c8db6b2e98204450f13548f7197a39abedcaaff6269aaa",
+      "sourceUpdatedAt": "2026-01-25 14:49:53"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:55953",
+      "sourceHash": "wordpress-db-domain-v2:85645e5aa51b561b135115f29bce5d14546a346b380416d2b42213c60c1367a6",
+      "sourceUpdatedAt": "2026-01-25 14:51:01"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:60742",
+      "sourceHash": "wordpress-db-domain-v2:c1986afdd6e180d4539477e9452d8c87e5e1b661f9adf67687bb2d8ffa772cdd",
+      "sourceUpdatedAt": "2026-03-10 17:07:51"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:61420",
+      "sourceHash": "wordpress-db-domain-v2:5945e7c94fb677a36c131311887c10c32d31603bdc1094fa4dfe4030cdf21bed",
+      "sourceUpdatedAt": "2026-02-16 11:32:10"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:63360",
+      "sourceHash": "wordpress-db-domain-v2:52bcd02d16b6b9ed0fd9f5e416e760960f4cecb06c890ade89ecd974719868c2",
+      "sourceUpdatedAt": "2026-03-11 10:53:24"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:8901",
+      "sourceHash": "wordpress-db-domain-v2:7b301ab2f56e9b35d4c827665cea1ba5166d8e9d460723c026979c84d1d0e5c8",
+      "sourceUpdatedAt": "2025-02-18 13:27:44"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9312",
+      "sourceHash": "wordpress-db-domain-v2:3fea2a9a08caecae7a50bbc2ef1c9ebc3fd117a9c166e2ae1eb31c06f47507c4",
+      "sourceUpdatedAt": "2025-06-24 13:42:30"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9865",
+      "sourceHash": "wordpress-db-domain-v2:c0105cf949e176b05f3fa6d126b1350a3ee4055aac661ec1ae3a55227eafbfbc",
+      "sourceUpdatedAt": "2025-04-30 10:36:29"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9870",
+      "sourceHash": "wordpress-db-domain-v2:a4cbf10ecd988e7f1c005840703b370fba25c436e86689cb1e1174f47995519e",
+      "sourceUpdatedAt": "2025-04-30 10:50:03"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9948",
+      "sourceHash": "wordpress-db-domain-v2:e8316a67472ad52fb05c7c09ebd64c069cb3cabf307718b8f65ce7dd28d3ac7f",
+      "sourceUpdatedAt": "2025-04-30 10:36:38"
+    }
+  ],
+  "privateArtifact": {
+    "path": "places/capture.json",
+    "sha256": "b588271570a001a3eb9a4977b446299311b80595ee9ea92bcb3e2d9d3dd36879",
+    "transferRequirement": "Never committed; raw content lives only at this immutable local path (mode 0600). Any transfer to another machine/session must use an out-of-band secure channel and must not be pasted into chat or logs."
+  }
+}
