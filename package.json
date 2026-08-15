@@ -64,6 +64,8 @@
     "migration:user:live": "tsx scripts/migration-user-live.ts",
     "migration:user:avatar-backfill": "tsx scripts/migration-user-avatar-backfill.ts",
     "seo:slug-backfill": "tsx scripts/seo-slug-backfill.ts",
+    "migration:article-geoscope-owner-review": "tsx scripts/build-article-geoscope-owner-review.ts",
+    "test:article-geoscope-owner-review": "tsx scripts/build-article-geoscope-owner-review.test.ts",
     "test:seo-url-architecture": "tsx src/lib/seo/classifyArticleScope.test.ts && tsx scripts/seo-slug-backfill.test.ts && tsx src/lib/slug/publicSlug.test.ts",
     "test:user-avatar-migration": "tsx src/lib/migration/commit/user/voxelAvatarSource.test.ts && tsx src/lib/migration/commit/user/UserAvatarSyncer.test.ts && tsx scripts/migration-user-avatar-backfill.test.ts && tsx src/lib/migration/adapters/wordpress-db/WordPressRepository.test.ts",
     "migration:scope:wordpress-db": "tsx scripts/migration-scope-wordpress-db.ts",
