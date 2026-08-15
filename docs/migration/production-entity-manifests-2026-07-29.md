@@ -186,3 +186,33 @@ listed legacy post IDs.
 
 See `docs/engineering/backlog.md` BACKLOG-113 (closed as moot for this
 batch) for the media-sync gap this decision makes irrelevant for these 28.
+
+## 2026-08-15 update: owner decision — legacy Event 64586 excluded permanently
+
+Legacy WordPress Event post ID 64586 has no `event_date` postmeta at all
+(`MISSING_SCHEDULE`) — unlike Event 64588, which has an equally unusual
+schedule shape but imports successfully under the existing tolerant
+schedule-parsing fallback. The owner reviewed 64586 and decided it must
+never be created by Phoenix.
+
+**Decision: WordPress Event post ID 64586 is permanently excluded from
+Phoenix migration and must never be recreated by any future rerun.** Exact
+legacy post ID match only (never title/slug/fuzzy). Event 64588 is
+deliberately **not** excluded and continues to import normally.
+
+Mechanism: `OWNER_EXCLUDED_LEGACY_EVENT_IDS` +
+`isOwnerExcludedLegacyEventSourceRecordKey()` in
+`src/lib/migration/validators/policies.ts`, consulted unconditionally
+(not behind an opt-in filter flag) at the top of the discover→normalize
+loop in `src/lib/migration/core/orchestrator.ts`
+(`runDiscoverNormalizeLoop`) — before `normalizeRecord()`, before any
+lineage lookup is consulted, and before an `executionCandidate` is ever
+created. Mirrors the 28-Offer exclusion above exactly, one policy layer
+earlier in the same loop. The record plans as `action: "SKIP_POLICY"` /
+`status: "SKIPPED"` with `summary.reasonCode:
+"OWNER_EXCLUDED_LEGACY_EVENT"` — never counted as `FAILED` in plan stats
+(`skippedCount`, not `failedCount`), and never reaches
+`buildEventCreateDraft`/`EventCommitRunner` (or equivalent) for CREATE,
+UPDATE, or media import. This is a permanent policy check, not a one-time
+manifest filter — a rerun against a live WP source will always re-exclude
+64586, even if a stale `MigrationLineage` row still references it.

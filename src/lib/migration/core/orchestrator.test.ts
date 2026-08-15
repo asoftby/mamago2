@@ -488,6 +488,108 @@ async function testOwnerExcludedLegacyOfferWinsOverStaleLineageAndIsIdempotentAc
   }
 }
 
+/**
+ * Owner-approved exclusion of legacy Event post ID 64586 (no `event_date`
+ * postmeta, `MISSING_SCHEDULE`): matched purely by legacy WordPress post
+ * ID, short-circuits before normalizeRecord() is even called, and must
+ * never produce an execution candidate or count as an error. Event 64588
+ * (imports fine under the existing tolerant-schedule fallback) is
+ * deliberately included as a non-excluded control to prove the check
+ * doesn't over-match.
+ */
+async function testOwnerExcludedLegacyEvent64586ProducesSkipPolicyItemWithoutExecutionCandidate() {
+  let normalizeCallCount = 0;
+  registerMockAdapter("mock-owner-excluded-events", {
+    async discoverRecords() {
+      return [
+        envelope({ sourceRecordKey: "wordpress-db:events:64586", sourceEntityType: "wordpress-db:events" }),
+        envelope({ sourceRecordKey: "wordpress-db:events:64588", sourceEntityType: "wordpress-db:events" }),
+      ];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      normalizeCallCount += 1;
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ACTIVITY",
+        normalizedPayload: { title: "Valid event" },
+      };
+    },
+  });
+
+  const executionPlan = await createMigrationRunExecutionPlan({
+    adapterKey: "mock-owner-excluded-events",
+    sourceNamespace: "test",
+  });
+
+  const excludedItem = executionPlan.plan.items.find((i) => i.sourceRecordKey === "wordpress-db:events:64586");
+  assert.equal(excludedItem?.action, "SKIP_POLICY");
+  assert.equal(excludedItem?.status, "SKIPPED");
+  assert.equal(excludedItem?.targetType, "ACTIVITY");
+  assert.equal(excludedItem?.summary?.reasonCode, "OWNER_EXCLUDED_LEGACY_EVENT");
+  assert.ok(
+    !executionPlan.executionCandidates.some((candidate) => candidate.planItem.sourceRecordKey === "wordpress-db:events:64586"),
+    "64586 must never reach execution candidates (the commit runner must never be invoked for it)",
+  );
+
+  const nonExcludedItem = executionPlan.plan.items.find((i) => i.sourceRecordKey === "wordpress-db:events:64588");
+  assert.equal(nonExcludedItem?.action, "CREATE", "64588 must still import normally, never excluded");
+  assert.ok(
+    executionPlan.executionCandidates.some((candidate) => candidate.planItem.sourceRecordKey === "wordpress-db:events:64588"),
+  );
+
+  assert.equal(normalizeCallCount, 1, "normalizeRecord must never be called for the excluded 64586 record");
+  assert.ok(executionPlan.plan.stats);
+  assert.equal(executionPlan.plan.stats!.actionCounts["SKIP_POLICY"], 1);
+  assert.equal(executionPlan.plan.stats!.actionCounts["CREATE"], 1);
+  // SKIP_POLICY must never be counted as an error/failure — it's an
+  // intentional, explained exclusion, not an unexplained missing record.
+  assert.equal(executionPlan.plan.stats!.failedCount, 0);
+  assert.equal(executionPlan.plan.errors.length, 0);
+}
+
+/**
+ * If Event 64586 was ever imported by an earlier rerun, a real rerun's
+ * lineage lookup may still find an active MigrationLineage row for it. The
+ * exclusion must win regardless: never resolve to UPDATE, never touch the
+ * lineage decision, and stay identical across repeated runs.
+ */
+async function testOwnerExcludedLegacyEvent64586WinsOverStaleLineageAndIsIdempotentAcrossReruns() {
+  const excludedKey = "wordpress-db:events:64586";
+  registerMockAdapter("mock-owner-excluded-event-stale-lineage", {
+    async discoverRecords() {
+      return [envelope({ sourceRecordKey: excludedKey, sourceEntityType: "wordpress-db:events", sourceHash: "hash-v1" })];
+    },
+    async normalizeRecord(record): Promise<NormalizedRecord> {
+      return {
+        sourceRecordKey: record.sourceRecordKey,
+        sourceEntityType: record.sourceEntityType,
+        targetTypeHint: "ACTIVITY",
+        normalizedPayload: { title: "Legacy event with no schedule" },
+      };
+    },
+  });
+
+  const staleLedger: MigrationLineageLookup = {
+    async findLineageBySourceRecordKeys() {
+      return new Map([[excludedKey, [lineageRow({ sourceRecordKey: excludedKey, targetType: "ACTIVITY", lastSourceHash: "hash-v1" })]]]);
+    },
+  };
+
+  for (let run = 1; run <= 2; run += 1) {
+    const executionPlan = await createMigrationRunExecutionPlan({
+      adapterKey: "mock-owner-excluded-event-stale-lineage",
+      sourceNamespace: "test",
+      ledger: staleLedger,
+    });
+    const item = executionPlan.plan.items.find((i) => i.sourceRecordKey === excludedKey);
+    assert.equal(item?.action, "SKIP_POLICY", `run ${run}: exclusion must win even with an active stale lineage row`);
+    assert.equal(item?.status, "SKIPPED");
+    assert.equal(item?.summary?.reasonCode, "OWNER_EXCLUDED_LEGACY_EVENT");
+    assert.ok(!executionPlan.executionCandidates.some((c) => c.planItem.sourceRecordKey === excludedKey));
+  }
+}
+
 async function testStatsPresentAndCorrect() {
   registerMockAdapter("mock-stats", {
     async discoverRecords() {
@@ -921,6 +1023,8 @@ async function main() {
   await testEventPastOnlyWarningProducesSkipPolicyItemWithoutExecutionCandidate();
   await testOwnerExcludedLegacyOfferProducesSkipPolicyItemWithoutExecutionCandidate();
   await testOwnerExcludedLegacyOfferWinsOverStaleLineageAndIsIdempotentAcrossReruns();
+  await testOwnerExcludedLegacyEvent64586ProducesSkipPolicyItemWithoutExecutionCandidate();
+  await testOwnerExcludedLegacyEvent64586WinsOverStaleLineageAndIsIdempotentAcrossReruns();
   await testStatsPresentAndCorrect();
   await testZeroRecordPlanDoesNotThrow();
   await testLedgerNoLineageIsCreate();

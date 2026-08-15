@@ -2916,9 +2916,17 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-108] Business/User profile images have no mamaGo 2.0 target field
 
-- Status: OPEN — User avatars: implementation ready, PROD replay pending.
-  Business logos: owner-excluded, out of scope for current cutover (not a
-  blocker).
+- Status: RESOLVED (2026-08-15) — User avatars: PROD replay complete, 48
+  imported, 18 broken refs explained, `wordpress-db:user:1` explained by
+  existing founder/USER-lineage exclusion (never migrated as a User, so
+  never eligible for an avatar write — see `UserAvatarSyncer`'s
+  USER_NOT_MIGRATED_YET path). Business logos: owner-excluded, out of
+  scope for current cutover, non-blocking.
+  **Provenance note:** the PROD backfill run itself (preview + write) was
+  executed and reported by the project owner directly — this session's own
+  SSH path to PROD was interrupted mid-preflight before it could
+  independently run or re-verify the backfill, so these counts are
+  recorded as owner-reported, not independently confirmed by this session.
 - Priority: P2
 - Area: Migration / Media / Schema
 - Added: 2026-08-14
@@ -2951,20 +2959,21 @@ P3 — cleanup / polish / optional
   575 Phoenix-eligible users, 49 importable Voxel avatar attachments, 18
   broken references (attachment id present in usermeta, `wp_posts` row
   missing — reported as an explained skip, not a failure).
-  **Not yet executed against PROD** — this session did not run the
-  importer (no SSH/live WP/PROD access used); PROD replay is a separate,
-  explicitly authorized follow-up step.
-- Dependencies: none remaining for Business logos (owner-excluded). User
-  avatars depend only on running `migration:user:avatar-backfill
-  --confirm-writes` against PROD once authorized, then verifying the
-  49/18 counts land as expected.
-- Acceptance criteria: User avatars — PROD replay executed and verified
-  (imported count matches the 49-attachment inventory, 18 broken refs
-  reported as skips, zero unrelated User fields changed). Business
-  logos — closed as owner-excluded, no further action required for
-  current cutover.
+  **PROD replay executed 2026-08-15** (owner-run/reported, see provenance
+  note above): 48 of the 49 valid attachments imported (the 49th belongs
+  to `wordpress-db:user:1`, excluded from Phoenix User migration entirely
+  by the pre-existing founder exclusion, so it was never an eligible
+  target — `USER_NOT_MIGRATED_YET`, not a failure), 18 broken refs skipped
+  as explained (`AVATAR_ATTACHMENT_MISSING`), zero unrelated User fields
+  changed, zero duplicate MediaAsset/files.
+- Dependencies: none remaining — Business logos owner-excluded, User
+  avatars PROD replay complete.
+- Acceptance criteria: User avatars — met (PROD replay executed, 48/49
+  imported with the 1 exclusion explained, 18 broken refs reported as
+  skips, zero unrelated User fields changed). Business logos — closed as
+  owner-excluded, no further action required for current cutover.
 - Source: Phoenix FULL PROD readiness (2026-08-14); User avatar migration
-  support (2026-08-15).
+  support (2026-08-15); PROD replay (2026-08-15).
 
 ## [BACKLOG-109] Phoenix commit does not write MediaUsage rows
 

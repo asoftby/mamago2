@@ -5,8 +5,10 @@ import { getMigrationAdapter } from "../adapters/registry";
 import { getLineageActionForRecord } from "../ledger";
 import { buildHumanReport, buildMachineReport } from "../reporters/buildReports";
 import {
+  OWNER_EXCLUDED_LEGACY_EVENTS_POLICY,
   OWNER_EXCLUDED_LEGACY_OFFERS_POLICY,
   PHOENIX_V1_PAST_EVENTS_EXCLUSION_POLICY,
+  isOwnerExcludedLegacyEventSourceRecordKey,
   isOwnerExcludedLegacyOfferSourceRecordKey,
   shouldExcludePastEvent,
 } from "../validators/policies";
@@ -218,6 +220,26 @@ function toOwnerExcludedLegacyOfferSkipItem(record: SourceRecordEnvelope): Migra
   };
 }
 
+/**
+ * Same pre-normalize, unconditional treatment as
+ * `toOwnerExcludedLegacyOfferSkipItem` — for Event 64586 only (see
+ * `OWNER_EXCLUDED_LEGACY_EVENT_IDS`). Never reaches `normalizeRecord()`, so
+ * it never produces an `executionCandidate` and never touches lineage.
+ */
+function toOwnerExcludedLegacyEventSkipItem(record: SourceRecordEnvelope): MigrationPlanItem {
+  return {
+    sourceRecordKey: record.sourceRecordKey,
+    sourceEntityType: record.sourceEntityType,
+    action: "SKIP_POLICY",
+    status: "SKIPPED",
+    targetType: OWNER_EXCLUDED_LEGACY_EVENTS_POLICY.targetType,
+    summary: {
+      policyKey: OWNER_EXCLUDED_LEGACY_EVENTS_POLICY.policyKey,
+      reasonCode: OWNER_EXCLUDED_LEGACY_EVENTS_POLICY.reasonCode,
+    },
+  };
+}
+
 const EVENT_PAST_ONLY_EXCLUDED_WARNING_CODE = "EVENT_PAST_ONLY_EXCLUDED";
 
 /** Set by `normalizeEvent()` (post-normalize, since only the parsed schedule can tell a past-only multi-date event from a real one) — never a pre-normalize `metadata.startsAt` check like `isExcludedPastEvent` above. */
@@ -403,6 +425,11 @@ async function runDiscoverNormalizeLoop(
   for (const record of records) {
     if (isOwnerExcludedLegacyOfferSourceRecordKey(record.sourceRecordKey)) {
       items.push(toOwnerExcludedLegacyOfferSkipItem(record));
+      continue;
+    }
+
+    if (isOwnerExcludedLegacyEventSourceRecordKey(record.sourceRecordKey)) {
+      items.push(toOwnerExcludedLegacyEventSkipItem(record));
       continue;
     }
 

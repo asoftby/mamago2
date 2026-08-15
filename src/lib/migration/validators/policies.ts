@@ -54,3 +54,37 @@ export function isOwnerExcludedLegacyOfferSourceRecordKey(sourceRecordKey: strin
   if (!match) return false;
   return OWNER_EXCLUDED_LEGACY_OFFER_ID_SET.has(Number(match[1]));
 }
+
+/**
+ * Legacy WordPress Event post ID 64586, owner-excluded from Phoenix
+ * migration (2026-08-15) — see
+ * `docs/migration/production-entity-manifests-2026-07-29.md` (2026-08-15
+ * update). Has no `event_date` postmeta at all (`MISSING_SCHEDULE`), unlike
+ * 64588 which imports fine under the existing tolerant-schedule fallback —
+ * that ID is deliberately NOT in this list and must keep importing
+ * normally. Exact legacy post ID match only, never title/slug/fuzzy.
+ */
+export const OWNER_EXCLUDED_LEGACY_EVENT_IDS: readonly number[] = [64586] as const;
+
+export const OWNER_EXCLUDED_LEGACY_EVENTS_POLICY = {
+  policyKey: "OWNER_EXCLUDED_LEGACY_EVENTS_2026_08_15",
+  targetType: "ACTIVITY",
+  reasonCode: "OWNER_EXCLUDED_LEGACY_EVENT",
+  message:
+    "Owner-approved exclusion: legacy WordPress Event has no event_date postmeta (MISSING_SCHEDULE) and must not be imported.",
+} as const;
+
+const OWNER_EXCLUDED_LEGACY_EVENT_ID_SET = new Set(OWNER_EXCLUDED_LEGACY_EVENT_IDS);
+
+/** Event source-record-key shape only: `wordpress-db:events:<legacy post ID>`. */
+const EVENT_SOURCE_RECORD_KEY_PATTERN = /^wordpress-db:events:(\d+)$/;
+
+/**
+ * Exact legacy post ID match against `OWNER_EXCLUDED_LEGACY_EVENT_IDS` —
+ * never title/slug/fuzzy. Non-Event keys (or malformed ones) never match.
+ */
+export function isOwnerExcludedLegacyEventSourceRecordKey(sourceRecordKey: string): boolean {
+  const match = EVENT_SOURCE_RECORD_KEY_PATTERN.exec(sourceRecordKey);
+  if (!match) return false;
+  return OWNER_EXCLUDED_LEGACY_EVENT_ID_SET.has(Number(match[1]));
+}
