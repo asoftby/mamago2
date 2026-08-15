@@ -1,0 +1,41 @@
+{
+  "auditDate": "2026-08-15",
+  "sourceRecoveredFrom": "/tmp/article-geoscope-audit-20260815 (classification.json + derived CSVs)",
+  "totalArticles": 116,
+  "autoResolvable": {
+    "count": 9,
+    "classification": "CITY_RELATIONAL",
+    "citySlug": "minsk",
+    "artifact": "docs/migration/reviews/article-geoscope-auto-2026-08-15.csv"
+  },
+  "ownerDecision": {
+    "count": 107,
+    "unknown": 106,
+    "ambiguous": 1,
+    "rowsWithUsableContent": 107,
+    "rowsEmptyContent": 0,
+    "bodyModeCounts": {
+      "full": 95,
+      "truncated": 12,
+      "empty": 0
+    },
+    "suggestedBuckets": {
+      "LIKELY_CITY": 68,
+      "UNCLEAR": 38,
+      "LIKELY_GLOBAL": 1
+    },
+    "artifact": "docs/migration/reviews/article-geoscope-source-2026-08-15.ndjson"
+  },
+  "countsFromLiveAudit": {
+    "CITY_RELATIONAL": 9,
+    "AMBIGUOUS": 1,
+    "UNKNOWN": 106,
+    "AUTO_RESOLVABLE": 9,
+    "OWNER_DECISION": 107
+  },
+  "purpose": "Editorial geo-scope review dataset for Claude Code — no SSH required. Do not write to PROD from this file alone without owner approval.",
+  "urlContract": {
+    "GLOBAL": "/blog/{slug}",
+    "CITY": "/{city}/blog/{slug}"
+  }
+}
