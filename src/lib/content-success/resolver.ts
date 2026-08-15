@@ -152,15 +152,7 @@ function resolvePublicHref(payload: ContentSuccessPayload): string | null {
     payload.citySlug &&
     payload.offerKind
   ) {
-    return getOfferPublicUrl(
-      {
-        kind: payload.offerKind,
-        durationType: payload.offerDurationType ?? null,
-        campProgramType: payload.offerCampProgramType ?? null,
-        slug: payload.slug,
-      },
-      payload.citySlug,
-    );
+    return getOfferPublicUrl({ slug: payload.slug }, payload.citySlug);
   }
 
   if (

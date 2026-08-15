@@ -2,6 +2,20 @@
  * SEO-stable slug backfill/report for Place, Event (Activity), Offer, and a
  * GLOBAL/CITY/UNKNOWN scope report for Article.
  *
+ * Final canonical paths (owner-confirmed contract, 2026-08-15):
+ *   Place:  /{city}/places/{slug}
+ *   Event:  /{city}/events/{slug}
+ *   Offer:  /{city}/offers/{slug}          (no {section} — see BACKLOG-116)
+ *   Article (GLOBAL): /blog/{slug}
+ *   Article (CITY):   /{city}/blog/{slug}
+ *   Route:  /routes/{slug}                 (unchanged, out of scope here)
+ *
+ * Place/Event/Offer are all city-scoped (`@@unique([cityId, slug])`), so a
+ * row with no resolvable city cannot get a `finalCanonicalPath` at all —
+ * reported as `outcome: "UNRESOLVED"` / `unresolvedReason: "NO_CITY"`
+ * rather than guessed. See
+ * `docs/migration/seo/final-url-architecture-2026-08-15.md`.
+ *
  * Local-DB only by default (`localhost:5433/mamago2`) — the same
  * fail-closed `assertMigrationDatabaseTarget` gate as the Phoenix
  * importers. PROD requires `--confirm-production` on top of
@@ -29,6 +43,8 @@
 import { PrismaClient } from "@prisma/client";
 
 import { classifyArticleScope } from "../src/lib/seo/classifyArticleScope";
+import { buildCityPublicPath } from "../src/lib/routing/cityPaths";
+import { getOfferPublicPath } from "../src/lib/offers/offerPublicUrl";
 import { generateActivitySlugFromTitle, assignActivitySlugIfMissing } from "../src/lib/slug/activitySlugService";
 import { generateOfferSlugFromTitle, assignOfferSlugIfMissing } from "../src/lib/slug/offerSlugService";
 import { generatePlaceSlug, assignPlaceSlugIfMissing, type PlaceForSlug } from "../src/lib/slug/placeSlugService";
@@ -82,26 +98,47 @@ interface RowReport {
   id: string;
   title: string;
   cityId: string | null;
+  citySlug: string | null;
+  currentSlug: string | null;
   proposedSlug?: string;
+  /** The final permanent public path this row will resolve at, once slugged — null when unresolved (no city). */
+  finalCanonicalPath: string | null;
   inBatchCollision?: boolean;
-  outcome: "PROPOSED" | "ASSIGNED" | "SKIPPED_EXISTING" | "ERROR";
+  unresolvedReason?: "NO_CITY";
+  outcome: "PROPOSED" | "ASSIGNED" | "SKIPPED_EXISTING" | "UNRESOLVED" | "ERROR";
   error?: string;
 }
 
 async function runPlace(prisma: PrismaClient, args: Args): Promise<RowReport[]> {
   const places = await prisma.place.findMany({
     where: { slug: null },
-    select: { id: true, title: true, cityId: true, formattedAddr: true, customAddress: true, shortAddress: true },
+    select: {
+      id: true,
+      title: true,
+      cityId: true,
+      formattedAddr: true,
+      customAddress: true,
+      shortAddress: true,
+      city: { select: { slug: true } },
+    },
     take: args.limit,
     orderBy: { id: "asc" },
   });
   const reports: RowReport[] = [];
   const seenByCity = new Map<string, Set<string>>();
   for (const place of places) {
+    const citySlug = place.city?.slug ?? null;
+    const base = { id: place.id, title: place.title, cityId: place.cityId, citySlug, currentSlug: null as string | null };
+    if (!citySlug) {
+      // Place has no city — see docs/migration/seo/final-url-architecture-2026-08-15.md §2.
+      // No canonical path can be proposed until a city is assigned.
+      reports.push({ ...base, finalCanonicalPath: null, unresolvedReason: "NO_CITY", outcome: "UNRESOLVED" });
+      continue;
+    }
     try {
       if (args.confirmWrites) {
         const slug = await assignPlaceSlugIfMissing(place.id, place.title);
-        reports.push({ id: place.id, title: place.title, cityId: place.cityId, proposedSlug: slug, outcome: "ASSIGNED" });
+        reports.push({ ...base, proposedSlug: slug, finalCanonicalPath: buildCityPublicPath({ citySlug, type: "place", slug }), outcome: "ASSIGNED" });
         continue;
       }
       const proposed = await generatePlaceSlug({ ...place, slug: null } satisfies PlaceForSlug);
@@ -110,9 +147,9 @@ async function runPlace(prisma: PrismaClient, args: Args): Promise<RowReport[]> 
       const inBatchCollision = seen.has(proposed);
       seen.add(proposed);
       seenByCity.set(cityKey, seen);
-      reports.push({ id: place.id, title: place.title, cityId: place.cityId, proposedSlug: proposed, inBatchCollision, outcome: "PROPOSED" });
+      reports.push({ ...base, proposedSlug: proposed, finalCanonicalPath: buildCityPublicPath({ citySlug, type: "place", slug: proposed }), inBatchCollision, outcome: "PROPOSED" });
     } catch (error) {
-      reports.push({ id: place.id, title: place.title, cityId: place.cityId, outcome: "ERROR", error: error instanceof Error ? error.message : String(error) });
+      reports.push({ ...base, finalCanonicalPath: null, outcome: "ERROR", error: error instanceof Error ? error.message : String(error) });
     }
   }
   return reports;
@@ -125,13 +162,25 @@ async function runEvent(prisma: PrismaClient, args: Args): Promise<RowReport[]> 
     take: args.limit,
     orderBy: { id: "asc" },
   });
+  // Activity.cityId has no Prisma relation to City (bare FK-shaped
+  // column) — resolve city slugs with a single batched lookup instead.
+  const cityIds = [...new Set(activities.map((a) => a.cityId).filter((id): id is string => Boolean(id)))];
+  const cities = cityIds.length > 0 ? await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true } }) : [];
+  const citySlugByCityId = new Map(cities.map((c) => [c.id, c.slug]));
+
   const reports: RowReport[] = [];
   const seenByCity = new Map<string, Set<string>>();
   for (const activity of activities) {
+    const citySlug = (activity.cityId && citySlugByCityId.get(activity.cityId)) ?? null;
+    const base = { id: activity.id, title: activity.title, cityId: activity.cityId, citySlug, currentSlug: null as string | null };
+    if (!citySlug) {
+      reports.push({ ...base, finalCanonicalPath: null, unresolvedReason: "NO_CITY", outcome: "UNRESOLVED" });
+      continue;
+    }
     try {
       if (args.confirmWrites) {
         const slug = await assignActivitySlugIfMissing(activity.id, activity.title);
-        reports.push({ id: activity.id, title: activity.title, cityId: activity.cityId, proposedSlug: slug, outcome: "ASSIGNED" });
+        reports.push({ ...base, proposedSlug: slug, finalCanonicalPath: `/${citySlug}/events/${slug}`, outcome: "ASSIGNED" });
         continue;
       }
       const proposed = await generateActivitySlugFromTitle(activity.title, activity.cityId, activity.id);
@@ -140,9 +189,9 @@ async function runEvent(prisma: PrismaClient, args: Args): Promise<RowReport[]> 
       const inBatchCollision = seen.has(proposed);
       seen.add(proposed);
       seenByCity.set(cityKey, seen);
-      reports.push({ id: activity.id, title: activity.title, cityId: activity.cityId, proposedSlug: proposed, inBatchCollision, outcome: "PROPOSED" });
+      reports.push({ ...base, proposedSlug: proposed, finalCanonicalPath: `/${citySlug}/events/${proposed}`, inBatchCollision, outcome: "PROPOSED" });
     } catch (error) {
-      reports.push({ id: activity.id, title: activity.title, cityId: activity.cityId, outcome: "ERROR", error: error instanceof Error ? error.message : String(error) });
+      reports.push({ ...base, finalCanonicalPath: null, outcome: "ERROR", error: error instanceof Error ? error.message : String(error) });
     }
   }
   return reports;
@@ -151,17 +200,25 @@ async function runEvent(prisma: PrismaClient, args: Args): Promise<RowReport[]> 
 async function runOffer(prisma: PrismaClient, args: Args): Promise<RowReport[]> {
   const offers = await prisma.offer.findMany({
     where: { slug: null },
-    select: { id: true, title: true, cityId: true },
+    select: { id: true, title: true, cityId: true, city: { select: { slug: true } } },
     take: args.limit,
     orderBy: { id: "asc" },
   });
   const reports: RowReport[] = [];
   const seenByCity = new Map<string, Set<string>>();
   for (const offer of offers) {
+    const citySlug = offer.city?.slug ?? null;
+    const base = { id: offer.id, title: offer.title, cityId: offer.cityId, citySlug, currentSlug: null as string | null };
+    if (!citySlug) {
+      // Offer.cityId is unset — see BACKLOG-114. No canonical path can be
+      // proposed until the Offer (or its Place) has a resolvable city.
+      reports.push({ ...base, finalCanonicalPath: null, unresolvedReason: "NO_CITY", outcome: "UNRESOLVED" });
+      continue;
+    }
     try {
       if (args.confirmWrites) {
         const slug = await assignOfferSlugIfMissing(offer.id, offer.title);
-        reports.push({ id: offer.id, title: offer.title, cityId: offer.cityId, proposedSlug: slug, outcome: "ASSIGNED" });
+        reports.push({ ...base, proposedSlug: slug, finalCanonicalPath: getOfferPublicPath({ slug }, citySlug), outcome: "ASSIGNED" });
         continue;
       }
       const proposed = await generateOfferSlugFromTitle(offer.title, offer.cityId, offer.id);
@@ -170,9 +227,9 @@ async function runOffer(prisma: PrismaClient, args: Args): Promise<RowReport[]> 
       const inBatchCollision = seen.has(proposed);
       seen.add(proposed);
       seenByCity.set(cityKey, seen);
-      reports.push({ id: offer.id, title: offer.title, cityId: offer.cityId, proposedSlug: proposed, inBatchCollision, outcome: "PROPOSED" });
+      reports.push({ ...base, proposedSlug: proposed, finalCanonicalPath: getOfferPublicPath({ slug: proposed }, citySlug), inBatchCollision, outcome: "PROPOSED" });
     } catch (error) {
-      reports.push({ id: offer.id, title: offer.title, cityId: offer.cityId, outcome: "ERROR", error: error instanceof Error ? error.message : String(error) });
+      reports.push({ ...base, finalCanonicalPath: null, outcome: "ERROR", error: error instanceof Error ? error.message : String(error) });
     }
   }
   return reports;
@@ -221,24 +278,22 @@ async function main(): Promise<void> {
     });
 
     const mode = args.confirmWrites ? "WRITE" : "PREVIEW";
+    const summarize = (entity: string, rows: RowReport[]) => {
+      for (const row of rows) console.log(JSON.stringify({ entity, mode, ...row }));
+      console.log(JSON.stringify({
+        entity,
+        mode,
+        complete: true,
+        count: rows.length,
+        errors: rows.filter((r) => r.outcome === "ERROR").length,
+        collisions: rows.filter((r) => r.inBatchCollision).length,
+        unresolved: rows.filter((r) => r.outcome === "UNRESOLVED").length,
+      }));
+    };
 
-    if (args.entities.has("place")) {
-      const rows = await runPlace(prisma, args);
-      for (const row of rows) console.log(JSON.stringify({ entity: "place", mode, ...row }));
-      console.log(JSON.stringify({ entity: "place", mode, complete: true, count: rows.length, errors: rows.filter((r) => r.outcome === "ERROR").length, collisions: rows.filter((r) => r.inBatchCollision).length }));
-    }
-
-    if (args.entities.has("event")) {
-      const rows = await runEvent(prisma, args);
-      for (const row of rows) console.log(JSON.stringify({ entity: "event", mode, ...row }));
-      console.log(JSON.stringify({ entity: "event", mode, complete: true, count: rows.length, errors: rows.filter((r) => r.outcome === "ERROR").length, collisions: rows.filter((r) => r.inBatchCollision).length }));
-    }
-
-    if (args.entities.has("offer")) {
-      const rows = await runOffer(prisma, args);
-      for (const row of rows) console.log(JSON.stringify({ entity: "offer", mode, ...row }));
-      console.log(JSON.stringify({ entity: "offer", mode, complete: true, count: rows.length, errors: rows.filter((r) => r.outcome === "ERROR").length, collisions: rows.filter((r) => r.inBatchCollision).length }));
-    }
+    if (args.entities.has("place")) summarize("place", await runPlace(prisma, args));
+    if (args.entities.has("event")) summarize("event", await runEvent(prisma, args));
+    if (args.entities.has("offer")) summarize("offer", await runOffer(prisma, args));
 
     if (args.entities.has("article")) {
       // Always report-only — see file-level doc comment.

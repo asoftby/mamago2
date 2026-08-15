@@ -44,12 +44,16 @@ export async function syncActivityCanonical(activityId: string): Promise<void> {
 export async function syncPlaceCanonical(placeId: string): Promise<void> {
   const row = await prisma.place.findUnique({
     where: { id: placeId },
-    select: { id: true, slug: true, seoCanonicalSource: true },
+    select: { id: true, slug: true, seoCanonicalSource: true, city: { select: { slug: true } } },
   });
   if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
+  // A cityless Place can't get a valid city-scoped canonical — see
+  // docs/migration/seo/final-url-architecture-2026-08-15.md §2. Leaves the
+  // existing seoCanonicalUrl untouched rather than writing a wrong one.
+  if (!row.city?.slug) return;
 
   const seg = row.slug?.trim() || row.id;
-  const path = `/places/${seg}`;
+  const path = buildCityPublicPath({ citySlug: row.city.slug, type: "place", slug: seg });
   const absolute = `${absoluteBase()}${path}`;
   const hasSlug = !!row.slug?.trim();
 
@@ -69,23 +73,17 @@ export async function syncOfferCanonical(offerId: string): Promise<void> {
     select: {
       id: true,
       slug: true,
-      kind: true,
-      campProgramType: true,
       seoCanonicalSource: true,
       place: { select: { city: { select: { slug: true } } } },
     },
   });
   if (!row || row.seoCanonicalSource === SeoCanonicalSource.MANUAL) return;
+  // A placeless/cityless Offer can't get a valid city-scoped canonical —
+  // see docs/migration/seo/final-url-architecture-2026-08-15.md §2-3.
+  // Leaves the existing seoCanonicalUrl untouched rather than guessing.
+  if (!row.place?.city?.slug) return;
 
-  const citySlug = row.place?.city?.slug || "minsk";
-  const path = getOfferPublicPath(
-    {
-      kind: row.kind,
-      campProgramType: row.campProgramType,
-      slug: row.slug,
-    },
-    citySlug,
-  );
+  const path = getOfferPublicPath({ slug: row.slug }, row.place.city.slug);
   const absolute = `${absoluteBase()}${path}`;
   const hasSlug = !!row.slug?.trim();
 

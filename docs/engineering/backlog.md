@@ -3161,67 +3161,89 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-115] Place canonical URL is not city-scoped, but Place.slug uniqueness is
 
-- Status: OPEN
-- Priority: P2 — dormant until a second city launches (only Minsk is
-  currently seeded), but is a real cross-city collision once it does.
+- Status: RESOLVED (2026-08-15) — owner decided (a): city-scope the Place
+  URL.
+- Priority: P2 (was)
 - Area: SEO / Routing / Schema
 - Added: 2026-08-15
-- Reason deferred: OWNER_DECISION_REQUIRED — fixing this means either
-  restructuring the live canonical route for 81 already-PUBLISHED Places
-  (`/places/{slug}` → `/{city}/places/{slug}`) or changing slug-uniqueness
-  enforcement to global; neither is a safe silent change.
 - Context: `Place.slug` is `@@unique([cityId, slug])` (partial, per-city —
-  `20260608114243_city_scoped_slugs`), but `resolvePlaceCanonicalUrl.ts`
-  hardcodes `/places/{slug}` (no city segment) and
-  `findPlaceBySlug()` (`src/lib/slug/placeSlugService.ts:293`) looks up by
-  `prisma.place.findFirst({ where: { slug } })` with no `cityId` filter.
-  Two Places in different cities could independently generate the same
-  slug (slug-generation only checks availability within its own city) and
-  `/places/{slug}` would then resolve nondeterministically — not a 404,
-  wrong content silently served.
-- Current state: documented in
-  `docs/migration/seo/final-url-architecture-2026-08-15.md` §2. Not fixed.
-- Dependencies: owner decision — city-scope the Place URL (mirrors how
-  Offer's URL already includes `/{city}/`) vs. enforce global slug
-  uniqueness at the application layer.
-- Acceptance criteria: either the canonical route is flipped to
-  `/{city}/places/{slug}` (with `/places/{slug}` becoming the
-  redirect-only legacy alias, matching Offer's existing pattern) and
-  `findPlaceBySlug` becomes city-aware, or slug generation is made
-  globally unique across all cities.
-- Source: SEO-stable URL architecture audit (2026-08-15)
+  `20260608114243_city_scoped_slugs`), but the canonical URL had no city
+  segment and the lookup wasn't city-scoped — a real cross-city collision
+  risk once a second city launches.
+- Resolution: canonical flipped to `/{city}/places/{slug}`
+  (`src/app/(public)/[city]/places/[slug]/page.tsx` — was previously a
+  redirect stub, now the real detail page). `/places/{slug}`
+  (`src/app/(public)/places/[slug]/page.tsx`) is now the redirect-only
+  legacy alias: resolves the place globally (unavoidable — the city isn't
+  known from that URL), then 301s to its real city-scoped canonical.
+  `findPlaceBySlugInCity()` (`src/lib/slug/placeSlugService.ts`) is the
+  new city-scoped lookup the canonical route uses (scoped by `cityId`,
+  closing the collision gap); the global `findPlaceBySlug()` remains, used
+  only by the legacy redirect resolver. `resolvePlaceCanonicalUrl.ts` now
+  requires `citySlug`. Sitemap, search index, SEO admin provider,
+  `syncPlaceCanonical()`, and the primary public-facing internal links
+  (related-places, Offer↔Place cross-links, `PlaceCard`) were updated to
+  build city-scoped paths; a residual set of lower-traffic internal links
+  (admin dashboards, direct-message threads, `my-plan`) still point at the
+  legacy path, which correctly redirects — tracked under BACKLOG-118.
+  A Place with no resolvable city cannot get a canonical at all (confirmed
+  0/81 published Places are cityless in local DB) — reported as
+  `UNRESOLVED`/`NO_CITY` by `seo-slug-backfill.ts`, never guessed.
+  Verified end-to-end in the browser: canonical route renders, legacy
+  `/places/{slug}` 301s to it. See
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §2 (updated).
+- Tests: `resolvePlaceCanonicalUrl.test.ts` (city in canonical, same slug
+  in two cities resolves independently, old global path never trusted as
+  stored canonical).
+- Source: SEO-stable URL architecture audit (2026-08-15); Place/Offer
+  final contract implementation (2026-08-15).
 
 ## [BACKLOG-116] Offer `{section}` URL segment is computed from stale/dead fields, not a persisted taxonomy
 
-- Status: OPEN
-- Priority: P3 — current behavior works for the only Offer kinds that
-  exist today (`EVENT`/`SERVICE`); risk is latent, not active.
+- Status: RESOLVED (2026-08-15) — owner decided: drop `{section}` from
+  the canonical URL entirely rather than make it deterministic.
+- Priority: P3 (was)
 - Area: SEO / Routing / Offer
 - Added: 2026-08-15
-- Reason deferred: redefining the canonical `{section}` taxonomy is a
-  product decision, not a technical cleanup — no persisted field
-  currently backs it reliably.
 - Context: `getOfferPublicSection()`
-  (`src/lib/offers/offerPublicUrl.ts:16-47`) branches on `offer.kind` +
-  `durationType` + `campProgramType` using string literals (`"CLASS"`,
-  `"PARTY"`, `"VISIT"`, etc.) that don't match the current `OfferKind`
-  enum (`EVENT | SERVICE` only) — apparent dead branches from a wider
-  historical kind set. The schema's `OfferProductType` enum looks like a
-  better fit but is never read by this function, and no WP import or
-  business flow sets `productType`/`kind` consistently. Also,
-  `findOfferBySlug()` (`src/lib/slug/offerSlugService.ts:112`) looks up by
-  slug only — no city/section filter — so the URL's `{city}`/`{section}`
-  segments are currently cosmetic for resolution, same latent-collision
-  shape as BACKLOG-115. Related: BACKLOG-114 (`Offer.cityId` often unset
-  for business-created Offers).
-- Current state: documented in
-  `docs/migration/seo/final-url-architecture-2026-08-15.md` §3. Not fixed.
-- Dependencies: owner decision on the canonical `{section}` value set
-  (does it map to `OfferProductType`? something new?).
-- Acceptance criteria: `{section}` is derived from one persisted,
-  deterministic field; `findOfferBySlug` is scoped by that same field (and
-  city) to close the collision gap.
-- Source: SEO-stable URL architecture audit (2026-08-15)
+  (`src/lib/offers/offerPublicUrl.ts`) branches on `offer.kind` +
+  `durationType` + `campProgramType` using string literals that don't all
+  match the current `OfferKind` enum (`EVENT | SERVICE` only) — dead
+  branches from a wider historical kind set — and `findOfferBySlug()`
+  looked up by slug only, no city/section filter, so the URL's
+  `{city}`/`{section}` segments were cosmetic for resolution, the same
+  latent-collision shape as BACKLOG-115. Related: BACKLOG-114
+  (`Offer.cityId` often unset for business-created Offers).
+- Resolution: canonical is now `/{city}/offers/{slug}` — `{section}` is no
+  longer part of Offer identity at all (owner: "Section/category остаётся
+  data field/filter/navigation concept, НЕ является частью canonical
+  URL"). `getOfferPublicPath()`/`getOfferPublicUrl()`
+  (`src/lib/offers/offerPublicUrl.ts`) no longer accept
+  `kind`/`durationType`/`campProgramType`; `getOfferPublicSection()` is
+  unchanged and still used for taxonomy/filter/listing purposes, just
+  never for the detail canonical. The collision gap is separately closed:
+  `findOfferBySlugInCity()` (`src/lib/slug/offerSlugService.ts`) scopes by
+  `Offer.cityId` — the field the DB's own `@@unique([cityId, slug])`
+  constraint is built on — and is what the new canonical route
+  (`src/app/(public)/[city]/offers/[slug]/page.tsx`) uses first, falling
+  back to a global lookup only to find the offer's real city for a
+  redirect (never rendering under a mismatched city). `Offer.cityId`
+  reliability (BACKLOG-114) is unaffected by this fix and remains a
+  separate, open issue — a scoped-lookup miss safely falls through to the
+  global-lookup path rather than 404ing.
+  `/{city}/offers/{section}/{slug}` (moved to
+  `src/app/(public)/[city]/offers/[slug]/[legacySlug]/page.tsx` — Next.js
+  requires sibling dynamic segments at one path depth to share a param
+  name, hence the directory rename) and `/offers/{slug}` are both
+  redirect-only legacy aliases now. Verified end-to-end in the browser:
+  canonical route renders, both legacy paths 301 to it. See
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §3 (updated).
+- Tests: `resolveOfferCanonicalUrl.test.ts` (section-free canonical, old
+  section-scoped stored value never trusted, same slug in two cities
+  resolves independently) + new `offerPublicUrl.test.ts` (section changes
+  never affect the canonical path).
+- Source: SEO-stable URL architecture audit (2026-08-15); Place/Offer
+  final contract implementation (2026-08-15).
 
 ## [BACKLOG-117] Three independent Cyrillic transliteration/slugify implementations
 
@@ -3248,34 +3270,38 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-118] Internal hrefs for Place/Route/Event/blog are hand-built, not via the canonical-URL builders
 
-- Status: OPEN
-- Priority: P3 — cosmetic/consistency issue; the canonical `<link
-  rel="canonical">` metadata already goes through the correct single-
-  source-of-truth resolvers, only plain internal `href=`/`Link` links
-  don't.
+- Status: OPEN — partially addressed 2026-08-15 alongside BACKLOG-115/116.
+- Priority: P2 for the remaining Place call sites (now point at a
+  redirect, not dead — but every extra hop is avoidable cost); P3 for
+  Route/Event/blog, unchanged.
 - Area: SEO / Code Quality
 - Added: 2026-08-15
-- Reason deferred: ~70+ scattered call sites (27 Place, 25 Route, 11
-  Event, 5 blog) — migrating them all is a wide, mechanical refactor out
-  of proportion for this task ("не усложнять систему сейчас").
+- Reason deferred: fixing every remaining call site is a wide, mechanical
+  refactor out of proportion for a single task ("не усложнять систему
+  сейчас").
 - Context: `resolvePlaceCanonicalUrl.ts`/`resolveEventCanonicalUrl.ts`/
   `resolveRouteCanonicalUrl.ts`/`resolveArticleCanonicalUrl.ts` are each
   the correct source of truth for canonical metadata, but internal
-  navigation links are built with manual template literals
-  (`` `/places/${slug}` ``, `` `/routes/${slug}` ``, etc.) at each call
-  site instead of a shared plain-path builder. Offer
-  (`getOfferPublicPath`) and city-scoped paths
-  (`buildCityPublicPath`/`buildArticlePublicPath`) already have and use a
-  single reusable builder — this gap is specifically Place/Route/Event/
-  blog-internal-link.
+  navigation links are built with manual template literals at each call
+  site instead of a shared plain-path builder.
+- Progress (2026-08-15, Place city-scoping work): `src/lib/placePublicUrl.ts`
+  now accepts an optional `citySlug` (backward-compatible — falls back to
+  the legacy path, which still 301s, when omitted);
+  `PlaceCard.tsx` gained an optional `citySlug` prop; fixed the
+  higher-traffic call sites — `buildPlaceDocument.ts` (search index),
+  `place.ts`/`offer.ts` SEO admin providers, `syncPlaceCanonical()`,
+  `sitemap.ts`, `OfferHero.tsx`/`OfferPlace.tsx` (offer→place cross-link,
+  now threads `citySlug` through `OfferPageView`→`OfferPlace`). Still
+  legacy-path (redirects, not broken): admin dashboards/moderation views,
+  direct-message thread links, `my-plan` feature, Route stop JSON-LD,
+  admin search-index debug tool, business "preview my place" page.
 - Current state: documented in
-  `docs/migration/seo/final-url-architecture-2026-08-15.md` §10. Not
-  fixed.
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §10.
 - Dependencies: none.
 - Acceptance criteria: one exported plain-path builder per entity (can
   reuse the `expectedPath` logic already inside each `resolve*CanonicalUrl`
-  — just needs extracting/exporting), scattered call sites migrated
-  incrementally.
+  — just needs extracting/exporting), remaining scattered call sites
+  migrated incrementally.
 - Source: SEO-stable URL architecture audit (2026-08-15)
 
 ## [BACKLOG-119] Three independent implementations of "resolve the public base host"

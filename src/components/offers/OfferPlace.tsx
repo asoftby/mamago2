@@ -5,9 +5,10 @@ import type { OfferPageData } from "@/lib/offer/offerPageTypes";
 
 interface OfferPlaceProps {
   place: NonNullable<OfferPageData["place"]>;
+  citySlug: string;
 }
 
-export function OfferPlace({ place }: OfferPlaceProps) {
+export function OfferPlace({ place, citySlug }: OfferPlaceProps) {
   const hasCoords =
     typeof place.lat === "number" && typeof place.lng === "number";
 
@@ -29,7 +30,7 @@ export function OfferPlace({ place }: OfferPlaceProps) {
       lat={place.lat ?? undefined}
       lng={place.lng ?? undefined}
       routeUrl={mapsHref}
-      placeHref={place.slug ? `/places/${place.slug}` : undefined}
+      placeHref={place.slug ? `/${citySlug}/places/${place.slug}` : undefined}
       kicker="Где проходит"
     />
   );

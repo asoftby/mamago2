@@ -89,7 +89,7 @@ export function OfferHero({
             {data.place && (
               <>
                 <span aria-hidden="true">›</span>
-                <Link href={`/places/${data.place.slug}`} className="hover:text-[#3A332B] transition-colors truncate max-w-[160px]">
+                <Link href={`/${data.citySlug}/places/${data.place.slug}`} className="hover:text-[#3A332B] transition-colors truncate max-w-[160px]">
                   {data.place.name}
                 </Link>
               </>
@@ -432,7 +432,7 @@ function BookingCard({
               address={data.place.address}
               district={data.place.district}
               metro={data.place.metro}
-              href={data.place.slug ? `/places/${data.place.slug}` : undefined}
+              href={data.place.slug ? `/${data.citySlug}/places/${data.place.slug}` : undefined}
             />
           </div>
         )}

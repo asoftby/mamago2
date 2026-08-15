@@ -104,7 +104,11 @@ export function buildCityPublicPath(params: CityPublicPathParams): string {
       path = `/${city}/offers/${section}`;
       break;
     case "offer":
-      path = `/${city}/offers/${section}/${slug}`;
+      // Section-free canonical — {section} is a mutable taxonomy/filter
+      // concept, not part of the Offer's permanent identity. See
+      // docs/migration/seo/final-url-architecture-2026-08-15.md §3,
+      // BACKLOG-116.
+      path = `/${city}/offers/${slug}`;
       break;
     case "routes":
       path = `/${city}/routes`;

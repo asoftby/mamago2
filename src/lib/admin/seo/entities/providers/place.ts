@@ -8,6 +8,7 @@ import {
 import { buildSegmentEntityDiagnostics } from "../buildEntityDiagnostics";
 import { applyPlaceSeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
 import { buildPlaceJsonLd } from "@/lib/seo/schema/buildPlaceJsonLd";
+import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
@@ -41,13 +42,16 @@ export const placeProvider: SeoEntityProvider = {
         seoCanonicalUrl: true,
         seoCanonicalSource: true,
         seoRobots: true,
+        city: { select: { slug: true } },
       },
     });
 
     return places.map((p) => {
       const published = p.status === ContentStatus.PUBLISHED;
       const seg = p.slug?.trim() || p.id;
-      const path = `/places/${seg}`;
+      // A cityless Place can't get a city-scoped path — see
+      // docs/migration/seo/final-url-architecture-2026-08-15.md §2.
+      const path = p.city?.slug ? buildCityPublicPath({ citySlug: p.city.slug, type: "place", slug: seg }) : `/places/${seg}`;
       const canonical = p.seoCanonicalUrl?.trim() || path;
       const entityDiagnostics = buildSegmentEntityDiagnostics("place", {
         entityId: p.id,
@@ -186,6 +190,7 @@ export const placeProvider: SeoEntityProvider = {
         googleRating: true,
         googleUserRatingsTotal: true,
         seoJsonLdOverride: true,
+        city: { select: { slug: true } },
       },
     });
     if (!p) return null;
@@ -193,9 +198,10 @@ export const placeProvider: SeoEntityProvider = {
       return p.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    const canonicalUrl = p.slug
-      ? `${publicBase}/places/${p.slug}`
-      : `${publicBase}/places/${entityId}`;
+    const seg = p.slug || entityId;
+    const canonicalUrl = p.city?.slug
+      ? `${publicBase}${buildCityPublicPath({ citySlug: p.city.slug, type: "place", slug: seg })}`
+      : `${publicBase}/places/${seg}`;
     return buildPlaceJsonLd({
       canonicalUrl,
       name: p.title,

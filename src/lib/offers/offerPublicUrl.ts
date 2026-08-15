@@ -48,15 +48,21 @@ export function getOfferPublicSection(offer: {
 
 /**
  * Возвращает канонический публичный путь для Offer.
- * Формат: /[city]/offers/[section]/[slug]
+ * Формат: /[city]/offers/[slug]
+ *
+ * `{section}` (see `getOfferPublicSection` above) is deliberately NOT part
+ * of the canonical identity — it's a mutable product taxonomy/filter
+ * concept computed from `kind`/`durationType`/`campProgramType`, which can
+ * evolve or be edited without changing the Offer's permanent URL. See
+ * `docs/migration/seo/final-url-architecture-2026-08-15.md` §3 /
+ * BACKLOG-116.
  */
 export function getOfferPublicPath(
-  offer: { kind: string; durationType?: string | null; campProgramType?: string | null; slug: string | null },
+  offer: { slug: string | null },
   citySlug: string
 ): string {
   if (!offer.slug) return `/${citySlug}`;
-  const section = getOfferPublicSection(offer);
-  return `/${citySlug}/offers/${section}/${offer.slug}`;
+  return `/${citySlug}/offers/${offer.slug}`;
 }
 
 /**
@@ -64,7 +70,7 @@ export function getOfferPublicPath(
  * Полезно для ссылок из поддоменов (business, admin) на основной сайт.
  */
 export function getOfferPublicUrl(
-  offer: { kind: string; durationType?: string | null; campProgramType?: string | null; slug: string | null },
+  offer: { slug: string | null },
   citySlug: string
 ): string {
   const path = getOfferPublicPath(offer, citySlug);

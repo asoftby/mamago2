@@ -127,3 +127,35 @@ export async function findOfferBySlug(slug: string): Promise<{
 
   return null;
 }
+
+/**
+ * City-scoped variant of `findOfferBySlug` — the canonical
+ * `/{city}/offers/{slug}` route must use this, not the global lookup
+ * above: `Offer.slug` is only unique per-city (`@@unique([cityId,
+ * slug])`), so a global `findFirst` can silently resolve to the wrong
+ * city's Offer once two cities happen to generate the same slug. Scoped
+ * by `Offer.cityId` — the field the DB uniqueness constraint is actually
+ * built on (not `Offer.place.cityId`; see BACKLOG-114 for the separate,
+ * pre-existing gap where `Offer.cityId` isn't always reliably populated).
+ * The global `findOfferBySlug` remains in use only for legacy-route
+ * redirect resolution, which must find an offer before it can know which
+ * city to redirect to.
+ */
+export async function findOfferBySlugInCity(
+  cityId: string,
+  slug: string,
+): Promise<{ offerId: string; isRedirect: boolean } | null> {
+  const current = await prisma.offer.findFirst({
+    where: { slug, cityId },
+    select: { id: true },
+  });
+  if (current) return { offerId: current.id, isRedirect: false };
+
+  const hist = await prisma.offerSlugHistory.findFirst({
+    where: { slug, cityId },
+    select: { offerId: true },
+  });
+  if (hist) return { offerId: hist.offerId, isRedirect: true };
+
+  return null;
+}

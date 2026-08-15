@@ -267,14 +267,7 @@ async function resolveActivityCard(
     }
 
     const citySlug = o.place?.city?.slug ?? "minsk";
-    const href = getOfferPublicPath(
-      {
-        kind: o.kind,
-        campProgramType: o.campProgramType,
-        slug: o.slug,
-      },
-      citySlug,
-    );
+    const href = getOfferPublicPath({ slug: o.slug }, citySlug);
 
     const offerData = await getOfferPageData({
       citySlug,

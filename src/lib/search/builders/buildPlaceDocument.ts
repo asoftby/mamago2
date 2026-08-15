@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { placeMetaLine } from "@/lib/search/metaLines";
 import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
+import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import type { SearchDocUpsertFields } from "./buildActivityDocument";
 
 export async function buildPlaceDocument(
@@ -11,7 +12,7 @@ export async function buildPlaceDocument(
   const place = await db.place.findUnique({
     where: { id: placeId },
     include: {
-      city: { select: { name: true } },
+      city: { select: { name: true, slug: true } },
       districtManual: { select: { name: true } },
       images: { take: 1, orderBy: { sortOrder: "asc" }, select: { url: true } },
     },
@@ -45,7 +46,9 @@ export async function buildPlaceDocument(
   });
 
   const slug = place.slug?.trim();
-  const urlPath = slug ? `/places/${slug}` : `/places/${place.id}`;
+  const urlPath = place.city?.slug
+    ? buildCityPublicPath({ citySlug: place.city.slug, type: "place", slug: slug || place.id })
+    : `/places/${slug || place.id}`;
   const isPublished = place.status === "PUBLISHED" && Boolean(slug);
 
   return {

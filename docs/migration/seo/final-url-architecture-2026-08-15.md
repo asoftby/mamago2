@@ -1,16 +1,73 @@
 # FINAL SEO-STABLE PUBLIC URL ARCHITECTURE — audit + preview backfill (2026-08-15)
 
-Status: **CONTRACT CONFIRMED, backfill mechanism ready** — this is
-preparation for owner manual QA, not the redirect manifest itself (that is
-a separate, later task once the owner has verified final URLs). No PROD
-data was touched; no PROD/live WP was accessed in this session.
+Status: **IMPLEMENTED** (updated 2026-08-15, same day) — the owner made
+the final call on the two open questions this doc originally raised (§2
+Place, §3 Offer), and both are now built and verified. This remains
+preparation for owner manual QA, not the redirect manifest itself (a
+separate, later task once the owner has verified final URLs). No PROD
+data was touched; no PROD/live WP was accessed in this or the prior
+session.
 
 This is a companion to `docs/migration/seo-migration-closure.md`/
 `docs/migration/seo/redirect-audit-summary.md` — this doc defines the
 *target* side (final mamaGo URLs) the next redirect reconciliation will
 map legacy WordPress URLs onto.
 
-## 1. Final URL contract
+## 2026-08-15 update: Place and Offer canonical contract implemented
+
+Owner decision, same day as the original audit below: Place must be
+city-scoped now (its slug uniqueness already is — `@@unique([cityId,
+slug])` — a global-path canonical was a real cross-city collision risk),
+and Offer's `{section}` must never be part of the canonical URL at all
+(computed from stale/mutable fields, not identity). See BACKLOG-115 and
+BACKLOG-116 (both now RESOLVED) for the full implementation writeup;
+§1/§2/§3 below are kept as the original same-day audit for context but
+are **superseded** by this update where they conflict.
+
+**Final contract, as built:**
+
+| Entity | Canonical |
+|---|---|
+| Place | `/{city}/places/{slug}` |
+| Event | `/{city}/events/{slug}` (unchanged) |
+| Offer | `/{city}/offers/{slug}` (no `{section}`) |
+| Article (GLOBAL) | `/blog/{slug}` (unchanged) |
+| Article (CITY) | `/{city}/blog/{slug}` (unchanged) |
+| Route | `/routes/{slug}` (unchanged) |
+
+- Place: `src/app/(public)/[city]/places/[slug]/page.tsx` is now the real
+  canonical detail page (previously a redirect stub);
+  `src/app/(public)/places/[slug]/page.tsx` is now the redirect-only
+  legacy alias. City-scoped lookup: `findPlaceBySlugInCity()`
+  (`src/lib/slug/placeSlugService.ts`).
+- Offer: `src/app/(public)/[city]/offers/[slug]/page.tsx` is the new
+  canonical; the old 3-segment route moved to
+  `src/app/(public)/[city]/offers/[slug]/[legacySlug]/page.tsx` (Next.js
+  requires sibling dynamic segments at one depth to share a param name,
+  hence the directory rename — the route itself is unchanged, still
+  `/{city}/offers/{section}/{slug}`, redirect-only) and
+  `src/app/(public)/offers/[slug]/page.tsx` remains the global legacy
+  alias. City-scoped lookup: `findOfferBySlugInCity()`
+  (`src/lib/slug/offerSlugService.ts`), scoped by `Offer.cityId` — falls
+  back to a global lookup only to find the real city for a redirect,
+  never renders under a mismatched city (guards against a redirect loop
+  when `Offer.cityId` is stale/unset, per BACKLOG-114).
+- `resolvePlaceCanonicalUrl.ts` now requires `citySlug`;
+  `resolveOfferCanonicalUrl.ts` dropped its `offer: {kind,...}` param down
+  to just `slug` — section is structurally impossible to pass into the
+  canonical path builder now, not just unused.
+- Verified end-to-end in the browser (dev server, local DB): canonical
+  Place and Offer pages render; `/places/{slug}`,
+  `/{city}/offers/{section}/{slug}`, and `/offers/{slug}` all 301 to the
+  new canonical.
+- Cityless rows (can't get a canonical at all): 0/81 published Places
+  locally; 2 PENDING Places (already slug-less, now also flagged
+  `UNRESOLVED`/`NO_CITY` by the updated `seo-slug-backfill.ts`) — never
+  guessed into a path.
+- No schema/migration change was needed — `Place`/`Offer` were already
+  `@@unique([cityId, slug])` before this task.
+
+## 1. Final URL contract (original same-day audit — see update above for what shipped)
 
 Almost the entire contract **already exists in the codebase** — this audit
 found it, rather than needing to build it. Two entities deviate from what
@@ -19,9 +76,9 @@ as open questions rather than silently changed.
 
 | Entity | Canonical | Status |
 |---|---|---|
-| Place | `/places/{slug}` | **Confirmed as-is — differs from a city-scoped preference. See §2.** |
+| Place | `/places/{slug}` | ~~Confirmed as-is — differs from a city-scoped preference. See §2.~~ **Superseded — now city-scoped, see update above.** |
 | Event | `/{city}/events/{slug}` (id fallback only while slug is null) | Matches contract |
-| Offer | `/{city}/offers/{section}/{slug}` | Matches contract structurally; `{section}` computation has a data-quality caveat, see §3 |
+| Offer | `/{city}/offers/{section}/{slug}` | ~~Matches contract structurally; `{section}` computation has a data-quality caveat, see §3~~ **Superseded — `{section}` dropped, see update above.** |
 | Article (GLOBAL) | `/blog/{slug}` | Matches contract, already live |
 | Article (CITY) | `/{city}/blog/{slug}` | Matches contract, already live |
 | Route | `/routes/{slug}` (no city segment) | Kept unchanged, per instruction — already the live canonical |
@@ -40,6 +97,9 @@ Public route files: `src/app/(public)/places/[slug]/page.tsx`,
 `src/app/(public)/routes/[slug]/page.tsx`.
 
 ## 2. OWNER_DECISION_REQUIRED — Place is not city-scoped in the URL, but its slug uniqueness is
+
+**RESOLVED same day — see the 2026-08-15 update at the top of this doc.
+The description below is the original audit finding, kept for context.**
 
 `Place.slug` is `@@unique([cityId, slug])` (partial, per-city) — the
 `20260608114243_city_scoped_slugs` migration deliberately moved Place off
@@ -74,6 +134,9 @@ the current per-city DB constraint). Tracked in
 `docs/engineering/backlog.md`.
 
 ## 3. Offer `{section}` is computed, not stored — and has stale branches
+
+**RESOLVED same day — see the 2026-08-15 update at the top of this doc.
+The description below is the original audit finding, kept for context.**
 
 `getOfferPublicSection()` (`src/lib/offers/offerPublicUrl.ts:16-47`)
 computes the URL's `{section}` segment at request time from

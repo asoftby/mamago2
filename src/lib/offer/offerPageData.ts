@@ -20,7 +20,8 @@ import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 interface GetOfferPageDataParams {
   citySlug: string;
-  section: string;
+  /** @deprecated unused — section is not part of Offer identity, see BACKLOG-116. Kept optional for old callers. */
+  section?: string;
   slug: string;
 }
 

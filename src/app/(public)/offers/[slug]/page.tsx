@@ -122,24 +122,22 @@ export default async function OfferPage({ params }: OfferPageProps) {
     select: {
       id: true,
       slug: true,
-      kind: true,
-      campProgramType: true,
       status: true,
       archivedAt: true,
-      place: { 
-        select: { 
+      place: {
+        select: {
           archivedAt: true,
           ownerBusiness: { select: { operationalStatus: true } },
-          city: { select: { slug: true } }
-        } 
+          city: { select: { slug: true } },
+        },
       },
     },
   });
-  
+
   if (!offer || !isOfferPubliclyVisible(offer)) notFound();
-  
-  const citySlug = offer.place?.city?.slug || "minsk";
-  const canonicalPath = getOfferPublicPath(offer, citySlug);
-  
+  if (!offer.place?.city?.slug) notFound();
+
+  const canonicalPath = getOfferPublicPath(offer, offer.place.city.slug);
+
   permanentRedirect(canonicalPath);
 }

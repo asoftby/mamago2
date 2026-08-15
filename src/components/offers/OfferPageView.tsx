@@ -376,7 +376,7 @@ export function OfferPageView({
         {data.place ? (
           <>
             <OfferSectionNote text={sectionNotes?.place} />
-            <OfferPlace place={data.place} />
+            <OfferPlace place={data.place} citySlug={data.citySlug} />
           </>
         ) : null}
 

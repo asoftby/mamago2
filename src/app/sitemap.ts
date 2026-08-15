@@ -144,13 +144,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       where: {
         AND: [getPublicPublishedPlaceWhere(), { OR: [{ cityId: null }, { city: { isActive: true } }] }],
       },
-      select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true, seoRobots: true },
+      select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true, seoRobots: true, city: { select: { slug: true } } },
     });
     for (const place of places) {
       if (hasNoindexRobots(place.seoRobots)) continue;
+      // A Place with no city can't get a valid city-scoped canonical —
+      // see docs/migration/seo/final-url-architecture-2026-08-15.md §2/
+      // BACKLOG-115. Skipped rather than guessed into the sitemap.
+      if (!place.city?.slug) continue;
       entries.push({
         url: resolvePlaceCanonicalUrl({
           seoCanonicalUrl: place.seoCanonicalUrl,
+          citySlug: place.city.slug,
           slug: place.slug,
           id: place.id,
           publicBase: baseUrl,
@@ -175,8 +180,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       select: {
         id: true,
         slug: true,
-        kind: true,
-        campProgramType: true,
         seoCanonicalUrl: true,
         updatedAt: true,
         seoRobots: true,
@@ -185,12 +188,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     for (const offer of offers) {
       if (hasNoindexRobots(offer.seoRobots)) continue;
-      const citySlug = offer.place?.city?.slug || "minsk";
+      // A placeless/cityless Offer can't get a valid city-scoped
+      // canonical — see docs/migration/seo/final-url-architecture-2026-08-15.md
+      // §2-3. Skipped rather than guessed into the sitemap.
+      if (!offer.place?.city?.slug) continue;
       entries.push({
         url: resolveOfferCanonicalUrl({
           seoCanonicalUrl: offer.seoCanonicalUrl,
-          offer: { kind: offer.kind, campProgramType: offer.campProgramType, slug: offer.slug },
-          citySlug,
+          slug: offer.slug,
+          citySlug: offer.place.city.slug,
           publicBase: baseUrl,
         }),
         lastModified: offer.updatedAt,
