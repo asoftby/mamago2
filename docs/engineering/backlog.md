@@ -2918,10 +2918,17 @@ P3 — cleanup / polish / optional
 
 - Status: RESOLVED (2026-08-15) — User avatars: PROD replay complete, 48
   imported, 18 broken refs explained, `wordpress-db:user:1` explained by
-  existing founder/USER-lineage exclusion (never migrated as a User, so
-  never eligible for an avatar write — see `UserAvatarSyncer`'s
-  USER_NOT_MIGRATED_YET path). Business logos: owner-excluded, out of
-  scope for current cutover, non-blocking.
+  the existing `PRIVILEGED_ACCOUNT_COLLISION` policy (its WordPress email
+  collides with the existing mamaGo ADMIN, so `migration:user:live` never
+  created a User for it — correction 2026-08-15: this is a distinct,
+  runtime email-collision check in `UserMigrationVerticalSlice.planUserMigration`/
+  `liveWordPressUserSource.ts`, **not** the static
+  `phoenix-users-founder-exclusions-2026-07-31.json` list, which covers a
+  different, unrelated set of 5 user IDs (7/17/22/42/43) and does not
+  contain ID 1). Never migrated as a User, so never eligible for an
+  avatar write — see `UserAvatarSyncer`'s USER_NOT_MIGRATED_YET path.
+  Business logos: owner-excluded, out of scope for current cutover,
+  non-blocking.
   **Provenance note:** the PROD backfill run itself (preview + write) was
   executed and reported by the project owner directly — this session's own
   SSH path to PROD was interrupted mid-preflight before it could
@@ -2961,9 +2968,10 @@ P3 — cleanup / polish / optional
   missing — reported as an explained skip, not a failure).
   **PROD replay executed 2026-08-15** (owner-run/reported, see provenance
   note above): 48 of the 49 valid attachments imported (the 49th belongs
-  to `wordpress-db:user:1`, excluded from Phoenix User migration entirely
-  by the pre-existing founder exclusion, so it was never an eligible
-  target — `USER_NOT_MIGRATED_YET`, not a failure), 18 broken refs skipped
+  to `wordpress-db:user:1`, blocked from Phoenix User migration entirely
+  by `PRIVILEGED_ACCOUNT_COLLISION` — see correction note above, this is
+  not the founder-exclusion list — so it was never an eligible target —
+  `USER_NOT_MIGRATED_YET`, not a failure), 18 broken refs skipped
   as explained (`AVATAR_ATTACHMENT_MISSING`), zero unrelated User fields
   changed, zero duplicate MediaAsset/files.
 - Dependencies: none remaining — Business logos owner-excluded, User

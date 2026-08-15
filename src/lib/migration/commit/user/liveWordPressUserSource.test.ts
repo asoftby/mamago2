@@ -65,6 +65,45 @@ async function main() {
 }
 
 {
+  // The real-world case: legacy WordPress user ID 1 (the founder/admin
+  // account) colliding with the existing mamaGo ADMIN by email. Not a
+  // stand-in ID (unlike the `admin`/ID 99 case above) — this is literally
+  // `wordpress-db:user:1`, the exact key the avatar backfill reports as
+  // USER_NOT_MIGRATED_YET, because no User was ever created for it.
+  const founder = normalizeUserCandidate(
+    userSourceCandidateFromWordPressRow({
+      ID: 1,
+      user_login: "founder",
+      user_email: "admin@example.com",
+      user_registered: "2019-01-01 00:00:00",
+      display_name: "Founder",
+    }),
+  );
+  assert.equal(founder.sourceRecordKey, "wordpress-db:user:1");
+
+  const plan = await planUserMigration(fakePrisma as never, founder, "wordpress-db-live-users");
+  assert.equal(plan.action, "BLOCKED");
+  assert.equal(plan.reason, "PRIVILEGED_ACCOUNT_COLLISION");
+  assert.equal(plan.draft, null, "no User draft is ever built for a privileged collision");
+  assert.equal(plan.targetId, null, "no target User id — none was ever created");
+  // `writeUserMigration`'s BLOCKED branch (see UserMigrationVerticalSlice.ts)
+  // never issues a `tx.user` write for this action — proven generically by
+  // the real-DB integration test "existing email collision blocks and
+  // rollback leaves no bookkeeping" in
+  // UserMigrationVerticalSlice.integration.test.ts (same `if (collision)
+  // return {...}` line handles both PRIVILEGED_ACCOUNT_COLLISION and
+  // EXISTING_USER_EMAIL_COLLISION before any DB write is attempted).
+
+  // Rerun: re-planning the exact same candidate must stay BLOCKED, never
+  // transition to CREATE — this is what keeps a rerun idempotent-safe and
+  // is exactly what the golden manifest (users-slice4-golden-manifest.json)
+  // documents as `expectedRerunAction: "BLOCKED"`.
+  const rerunPlan = await planUserMigration(fakePrisma as never, founder, "wordpress-db-live-users");
+  assert.equal(rerunPlan.action, "BLOCKED");
+  assert.equal(rerunPlan.reason, "PRIVILEGED_ACCOUNT_COLLISION");
+}
+
+{
   const taken = normalizeUserCandidate(
     userSourceCandidateFromWordPressRow({
       ID: 100,

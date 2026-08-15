@@ -216,3 +216,63 @@ earlier in the same loop. The record plans as `action: "SKIP_POLICY"` /
 UPDATE, or media import. This is a permanent policy check, not a one-time
 manifest filter — a rerun against a live WP source will always re-exclude
 64586, even if a stale `MigrationLineage` row still references it.
+
+## 2026-08-15 audit: privileged legacy `wordpress-db:user:1` collision — RESOLVED, not a blocker
+
+Audited whether `wordpress-db:user:1` (the legacy WordPress
+founder/admin account) needs a separate migration fix or owner decision
+before final Phoenix reconciliation. **Conclusion: no — the existing
+implementation already fully closes this, no new exclusion needed.**
+
+Mechanism (already in place, not new): `wordpress-db:user:1`'s WordPress
+email collides with the existing mamaGo ADMIN account. Every
+`planUserMigration()` call (both the live path,
+`liveWordPressUserSource.ts` → `UserMigrationVerticalSlice.ts`, and the
+snapshot/vertical-slice path) looks up the target `User` by normalized
+email and, when the match has `role: "ADMIN"` or `"MODERATOR"`, returns
+`action: "BLOCKED"`, `reason: "PRIVILEGED_ACCOUNT_COLLISION"` — before any
+`User` draft is built, before any lineage row is created, and before any
+write is attempted. This is a **runtime email-collision check, distinct
+from** the static `phoenix-users-founder-exclusions-2026-07-31.json` list
+(which covers 5 unrelated user IDs — 7, 17, 22, 42, 43 — for a completely
+different reason, `HISTORICAL_NAME_INPUT_UNRECOVERABLE`, and does not
+contain ID 1). Referring to user:1 as "founder-excluded" is imprecise;
+"privileged-collision-blocked" is the accurate mechanism.
+
+Confirmed safe:
+- **Never recreated.** Every rerun re-evaluates the same email-collision
+  check against current DB state and re-blocks identically — not a cached
+  decision. `docs/migration/users-slice4-golden-manifest.json` documents
+  the expectation explicitly: `expectedFirstAction: "BLOCKED"`,
+  `expectedRerunAction: "BLOCKED"`, `expectedFirstDeltas: { User: 0,
+  MigrationLineage: 0, ... }`.
+- **Existing ADMIN never touched.** The `if (collision) return {...}`
+  branch in `planUserMigration()` returns before any `User` write; a real
+  Prisma integration test (`UserMigrationVerticalSlice.integration.test.ts`,
+  "existing email collision blocks and rollback leaves no bookkeeping")
+  proves the colliding target row is byte-for-byte unchanged after a
+  BLOCKED write attempt on the same code path. No password/role transfer,
+  no merge, no duplicate privileged account — `UserCreateDraft` always
+  hardcodes `role: "USER"`, `passwordHash: null`, and is never even built
+  (`buildUserDraft` returns `null`) for a privileged-collision candidate.
+- **Explained, not unexplained-missing.** Recorded as `MigrationRecord`
+  status `QUARANTINED` with `reasonCode: "PRIVILEGED_ACCOUNT_COLLISION"` —
+  a named, tracked skip category, not a silent gap. Reconciliation never
+  needs a `MigrationLineage` row or a manual link for user:1.
+- **Guarded against regression.** `UserCleanBatch.ts`'s golden-policy check
+  throws (`CLEAN_MANIFEST_GOLDEN_POLICY_MISMATCH`) if `wordpress-db:user:1`
+  is ever present in a create-eligible clean manifest — an automated,
+  always-on trip-wire, not just a manual review step.
+
+Tests: `UserMigrationVerticalSlice.test.ts` ("privileged collision is
+blocking and has no create draft"), `UserMigrationVerticalSlice.integration.test.ts`
+("existing email collision blocks and rollback leaves no bookkeeping",
+real DB), `UserCleanBatch.test.ts` (manifest never contains user:1;
+injecting it throws), and (added 2026-08-15)
+`liveWordPressUserSource.test.ts` (literal `wordpress-db:user:1`/ID 1
+through the live path: BLOCKED, `PRIVILEGED_ACCOUNT_COLLISION`, no draft,
+no target id, and a same-candidate rerun stays BLOCKED).
+
+No code changes were required for this audit — see BACKLOG-108 for the
+User-avatar-specific corollary (user:1's avatar attachment correctly
+reported `USER_NOT_MIGRATED_YET` for this same reason).
