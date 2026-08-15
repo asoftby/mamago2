@@ -88,3 +88,40 @@ export function isOwnerExcludedLegacyEventSourceRecordKey(sourceRecordKey: strin
   if (!match) return false;
   return OWNER_EXCLUDED_LEGACY_EVENT_ID_SET.has(Number(match[1]));
 }
+
+/**
+ * Legacy WordPress Article (post) ID 46472, owner-excluded from Phoenix
+ * migration (2026-08-15) — see
+ * `docs/migration/production-entity-manifests-2026-07-29.md` (2026-08-15
+ * update). Empty `post_content`/`post_excerpt`, no Elementor or Web Story
+ * content either — no usable content exists to migrate, and none may be
+ * artificially generated. Previously only enforced reactively by the
+ * generic `MISSING_CONTENT` fail-closed validation (which still applies to
+ * every other Article), so a preview still showed `CREATE` and a commit
+ * failed closed instead of resolving deterministically. Exact legacy post
+ * ID match only, never title/slug/fuzzy.
+ */
+export const OWNER_EXCLUDED_LEGACY_ARTICLE_IDS: readonly number[] = [46472] as const;
+
+export const OWNER_EXCLUDED_LEGACY_ARTICLES_POLICY = {
+  policyKey: "OWNER_EXCLUDED_LEGACY_ARTICLES_2026_08_15",
+  targetType: "ARTICLE",
+  reasonCode: "OWNER_EXCLUDED_LEGACY_ARTICLE",
+  message:
+    "Owner-approved exclusion: legacy WordPress Article has no usable content (empty, no Elementor/Web Story data) and must not be imported.",
+} as const;
+
+const OWNER_EXCLUDED_LEGACY_ARTICLE_ID_SET = new Set(OWNER_EXCLUDED_LEGACY_ARTICLE_IDS);
+
+/** Article source-record-key shape only: `wordpress-db:post:<legacy post ID>`. */
+const ARTICLE_SOURCE_RECORD_KEY_PATTERN = /^wordpress-db:post:(\d+)$/;
+
+/**
+ * Exact legacy post ID match against `OWNER_EXCLUDED_LEGACY_ARTICLE_IDS` —
+ * never title/slug/fuzzy. Non-Article keys (or malformed ones) never match.
+ */
+export function isOwnerExcludedLegacyArticleSourceRecordKey(sourceRecordKey: string): boolean {
+  const match = ARTICLE_SOURCE_RECORD_KEY_PATTERN.exec(sourceRecordKey);
+  if (!match) return false;
+  return OWNER_EXCLUDED_LEGACY_ARTICLE_ID_SET.has(Number(match[1]));
+}

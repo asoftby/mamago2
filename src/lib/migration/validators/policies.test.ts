@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 
 import {
+  OWNER_EXCLUDED_LEGACY_ARTICLE_IDS,
   OWNER_EXCLUDED_LEGACY_EVENT_IDS,
   OWNER_EXCLUDED_LEGACY_OFFER_IDS,
+  isOwnerExcludedLegacyArticleSourceRecordKey,
   isOwnerExcludedLegacyEventSourceRecordKey,
   isOwnerExcludedLegacyOfferSourceRecordKey,
 } from "./policies";
@@ -71,6 +73,31 @@ function main() {
   assert.equal(isOwnerExcludedLegacyEventSourceRecordKey(""), false);
   assert.equal(isOwnerExcludedLegacyEventSourceRecordKey("64586"), false);
   assert.equal(isOwnerExcludedLegacyEventSourceRecordKey("wordpress-db:events:"), false);
+
+  // Article 46472: exactly one owner-excluded legacy Article ID (empty,
+  // no usable content — see policies.ts doc comment).
+  assert.equal(OWNER_EXCLUDED_LEGACY_ARTICLE_IDS.length, 1, "exactly 1 owner-approved legacy Article ID");
+  assert.deepEqual(OWNER_EXCLUDED_LEGACY_ARTICLE_IDS, [46472]);
+
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:post:46472"), true);
+  // A neighboring, non-matching Article ID must never be excluded.
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:post:46471"), false);
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:post:46473"), false);
+
+  // Never matches by fuzzy substring/prefix — exact numeric ID only.
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:post:464720"), false);
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:post:146472"), false);
+
+  // Never matches a non-Article source-record-key, even with a numerically
+  // colliding ID — this is Article-scoped only.
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:places:46472"), false);
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:events:46472"), false);
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:hb-programs:46472"), false);
+
+  // Malformed keys never throw, never match.
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey(""), false);
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("46472"), false);
+  assert.equal(isOwnerExcludedLegacyArticleSourceRecordKey("wordpress-db:post:"), false);
 }
 
 main();

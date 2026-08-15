@@ -276,3 +276,49 @@ no target id, and a same-candidate rerun stays BLOCKED).
 No code changes were required for this audit — see BACKLOG-108 for the
 User-avatar-specific corollary (user:1's avatar attachment correctly
 reported `USER_NOT_MIGRATED_YET` for this same reason).
+
+## 2026-08-15 update: owner decision — legacy Article 46472 excluded permanently
+
+Legacy WordPress Article (post) ID 46472 ("Иван Купала 2025 или где
+отметить Купалье в Минске") has empty `post_content`/`post_excerpt`, no
+Elementor payload, no Web Story content — no usable content exists to
+migrate. The owner decided it must never be imported, and no content may
+be artificially generated to work around the gap.
+
+Before this change, this decision was **not yet codified**: a preview
+still showed `CREATE` for 46472, and only the generic `MISSING_CONTENT`
+fail-closed validation (which still applies to every other Article)
+caught it at commit time, resulting in a fail-closed error rather than a
+deterministic, explained skip. The 116 other valid, already-migrated
+Articles were and remain unaffected — `SKIP_UNCHANGED` on rerun, same as
+before.
+
+**Decision: WordPress Article (post) ID 46472 is permanently excluded
+from Phoenix migration and must never be recreated by any future rerun.**
+Exact legacy post ID match only (never title/slug/fuzzy).
+
+Mechanism: `OWNER_EXCLUDED_LEGACY_ARTICLE_IDS` +
+`isOwnerExcludedLegacyArticleSourceRecordKey()` in
+`src/lib/migration/validators/policies.ts`, consulted unconditionally (not
+behind an opt-in filter flag) at the top of the discover→normalize loop in
+`src/lib/migration/core/orchestrator.ts` (`runDiscoverNormalizeLoop`) —
+before `normalizeRecord()` (so it never even reaches the generic
+`MISSING_CONTENT` validation), before any lineage lookup is consulted,
+and before an `executionCandidate` is ever created. Mirrors the 28-Offer
+and Event 64586 exclusions exactly, one policy layer earlier in the same
+loop. The record plans as `action: "SKIP_POLICY"` / `status: "SKIPPED"`
+with `summary.reasonCode: "OWNER_EXCLUDED_LEGACY_ARTICLE"` — never
+counted as `FAILED` in plan stats (`skippedCount`, not `failedCount`),
+never media work, and never reaches `ArticleCommitRunner` (or equivalent)
+for CREATE, UPDATE, or media import. Preview and commit behave
+identically (both go through the same shared loop). This is a permanent
+policy check, not a one-time manifest filter — a rerun against a live WP
+source will always re-exclude 46472, even if a stale `MigrationLineage`
+row still references it.
+
+The general `MISSING_CONTENT` fail-closed protection is unchanged and
+still applies to every other Article — confirmed by
+`articlePhoenixGapClosure.test.ts`'s existing
+`testEmptyUnusableArticleFailClosed` (still passes unmodified, exercising
+the content-validation function directly, independent of this
+orchestrator-level exclusion).
