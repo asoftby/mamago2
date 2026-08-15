@@ -48,6 +48,20 @@ assert.equal(
   "moy-slug",
 );
 
+// TITLE RENAME != SLUG RENAME: an already-set slug survives an ordinary
+// title edit even when wasSlugTouched is false (i.e. the title field
+// changed, not the slug field) — the SEO rule this whole module exists to
+// enforce.
+assert.equal(
+  buildSlugPreview({
+    title: "Совершенно новый заголовок после переименования",
+    slug: "stable-existing-slug",
+    wasSlugTouched: false,
+    emptyFallback: "article",
+  }),
+  "stable-existing-slug",
+);
+
 // ── empty after normalization ───────────────────────────────────────────────
 
 assert.equal(normalizeSlugStrict(""), "");

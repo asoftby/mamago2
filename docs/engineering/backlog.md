@@ -3158,3 +3158,164 @@ P3 — cleanup / polish / optional
   constraint and sitemap query, then either wire a real save-hook or drop
   the "filled by a save-hook" schema comment if it's stale.
 - Source: "Allow DRAFT Offer without Place" (2026-08-14)
+
+## [BACKLOG-115] Place canonical URL is not city-scoped, but Place.slug uniqueness is
+
+- Status: OPEN
+- Priority: P2 — dormant until a second city launches (only Minsk is
+  currently seeded), but is a real cross-city collision once it does.
+- Area: SEO / Routing / Schema
+- Added: 2026-08-15
+- Reason deferred: OWNER_DECISION_REQUIRED — fixing this means either
+  restructuring the live canonical route for 81 already-PUBLISHED Places
+  (`/places/{slug}` → `/{city}/places/{slug}`) or changing slug-uniqueness
+  enforcement to global; neither is a safe silent change.
+- Context: `Place.slug` is `@@unique([cityId, slug])` (partial, per-city —
+  `20260608114243_city_scoped_slugs`), but `resolvePlaceCanonicalUrl.ts`
+  hardcodes `/places/{slug}` (no city segment) and
+  `findPlaceBySlug()` (`src/lib/slug/placeSlugService.ts:293`) looks up by
+  `prisma.place.findFirst({ where: { slug } })` with no `cityId` filter.
+  Two Places in different cities could independently generate the same
+  slug (slug-generation only checks availability within its own city) and
+  `/places/{slug}` would then resolve nondeterministically — not a 404,
+  wrong content silently served.
+- Current state: documented in
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §2. Not fixed.
+- Dependencies: owner decision — city-scope the Place URL (mirrors how
+  Offer's URL already includes `/{city}/`) vs. enforce global slug
+  uniqueness at the application layer.
+- Acceptance criteria: either the canonical route is flipped to
+  `/{city}/places/{slug}` (with `/places/{slug}` becoming the
+  redirect-only legacy alias, matching Offer's existing pattern) and
+  `findPlaceBySlug` becomes city-aware, or slug generation is made
+  globally unique across all cities.
+- Source: SEO-stable URL architecture audit (2026-08-15)
+
+## [BACKLOG-116] Offer `{section}` URL segment is computed from stale/dead fields, not a persisted taxonomy
+
+- Status: OPEN
+- Priority: P3 — current behavior works for the only Offer kinds that
+  exist today (`EVENT`/`SERVICE`); risk is latent, not active.
+- Area: SEO / Routing / Offer
+- Added: 2026-08-15
+- Reason deferred: redefining the canonical `{section}` taxonomy is a
+  product decision, not a technical cleanup — no persisted field
+  currently backs it reliably.
+- Context: `getOfferPublicSection()`
+  (`src/lib/offers/offerPublicUrl.ts:16-47`) branches on `offer.kind` +
+  `durationType` + `campProgramType` using string literals (`"CLASS"`,
+  `"PARTY"`, `"VISIT"`, etc.) that don't match the current `OfferKind`
+  enum (`EVENT | SERVICE` only) — apparent dead branches from a wider
+  historical kind set. The schema's `OfferProductType` enum looks like a
+  better fit but is never read by this function, and no WP import or
+  business flow sets `productType`/`kind` consistently. Also,
+  `findOfferBySlug()` (`src/lib/slug/offerSlugService.ts:112`) looks up by
+  slug only — no city/section filter — so the URL's `{city}`/`{section}`
+  segments are currently cosmetic for resolution, same latent-collision
+  shape as BACKLOG-115. Related: BACKLOG-114 (`Offer.cityId` often unset
+  for business-created Offers).
+- Current state: documented in
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §3. Not fixed.
+- Dependencies: owner decision on the canonical `{section}` value set
+  (does it map to `OfferProductType`? something new?).
+- Acceptance criteria: `{section}` is derived from one persisted,
+  deterministic field; `findOfferBySlug` is scoped by that same field (and
+  city) to close the collision gap.
+- Source: SEO-stable URL architecture audit (2026-08-15)
+
+## [BACKLOG-117] Three independent Cyrillic transliteration/slugify implementations
+
+- Status: OPEN
+- Priority: P3 — each is correctly used by its own entity today, no known
+  bug; pure duplication risk (drift between mappings over time).
+- Area: SEO / Code Quality
+- Added: 2026-08-15
+- Reason deferred: not blocking, and touching all call sites of any one
+  implementation is a wider, riskier change than this task's scope.
+- Context: `src/lib/slugify.ts` (`slugifyRu`, used by Activity/Offer/Route
+  slug services), `src/lib/slug/slugUtils.ts` (a separate transliteration
+  map, used only by Place's name/address-based slug builder), and
+  `src/lib/slugifyLabelToValue.ts` (used for taxonomy/admin label→value,
+  not entity slugs) each implement their own Cyrillic→Latin mapping with
+  slightly different rules (e.g. `х→h` vs `х→kh`).
+- Current state: documented in
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §10.
+- Dependencies: none.
+- Acceptance criteria: consolidate to one shared transliteration table (or
+  explicitly document why entity slugs and taxonomy labels need different
+  rules, if they genuinely do).
+- Source: SEO-stable URL architecture audit (2026-08-15)
+
+## [BACKLOG-118] Internal hrefs for Place/Route/Event/blog are hand-built, not via the canonical-URL builders
+
+- Status: OPEN
+- Priority: P3 — cosmetic/consistency issue; the canonical `<link
+  rel="canonical">` metadata already goes through the correct single-
+  source-of-truth resolvers, only plain internal `href=`/`Link` links
+  don't.
+- Area: SEO / Code Quality
+- Added: 2026-08-15
+- Reason deferred: ~70+ scattered call sites (27 Place, 25 Route, 11
+  Event, 5 blog) — migrating them all is a wide, mechanical refactor out
+  of proportion for this task ("не усложнять систему сейчас").
+- Context: `resolvePlaceCanonicalUrl.ts`/`resolveEventCanonicalUrl.ts`/
+  `resolveRouteCanonicalUrl.ts`/`resolveArticleCanonicalUrl.ts` are each
+  the correct source of truth for canonical metadata, but internal
+  navigation links are built with manual template literals
+  (`` `/places/${slug}` ``, `` `/routes/${slug}` ``, etc.) at each call
+  site instead of a shared plain-path builder. Offer
+  (`getOfferPublicPath`) and city-scoped paths
+  (`buildCityPublicPath`/`buildArticlePublicPath`) already have and use a
+  single reusable builder — this gap is specifically Place/Route/Event/
+  blog-internal-link.
+- Current state: documented in
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §10. Not
+  fixed.
+- Dependencies: none.
+- Acceptance criteria: one exported plain-path builder per entity (can
+  reuse the `expectedPath` logic already inside each `resolve*CanonicalUrl`
+  — just needs extracting/exporting), scattered call sites migrated
+  incrementally.
+- Source: SEO-stable URL architecture audit (2026-08-15)
+
+## [BACKLOG-119] Three independent implementations of "resolve the public base host"
+
+- Status: OPEN
+- Priority: P3 — currently consistent in practice (`mamago.by` prod
+  default in all three), pure duplication risk.
+- Area: SEO / Code Quality
+- Added: 2026-08-15
+- Reason deferred: not blocking; low risk while all three agree.
+- Context: `src/lib/config/publicAppUrl.ts` (`getCanonicalPublicAppUrl`),
+  `src/lib/seo/globalNoindex.ts` (`DEFAULT_PUBLIC_SITE_URL`), and
+  `src/lib/seo/buildOgMeta.ts` each independently read
+  `APP_PUBLIC_URL`/`NEXT_PUBLIC_APP_URL`/`NEXT_PUBLIC_SITE_URL` with
+  slightly different fallback chains/defaults.
+- Current state: documented in
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §10.
+- Dependencies: none.
+- Acceptance criteria: one shared function all three call into.
+- Source: SEO-stable URL architecture audit (2026-08-15)
+
+## [BACKLOG-120] No public 301 is served from *SlugHistory after a manual slug edit
+
+- Status: OPEN
+- Priority: P3 — feature gap, not a bug; `*SlugHistory` tables exist and
+  are correctly written on every slug change, but nothing yet serves a
+  redirect off them for every entity's public detail route (Place's
+  `findPlaceBySlug` does check history and return `isRedirect: true`;
+  unclear whether every entity's public page actually acts on that flag).
+- Area: SEO / Routing
+- Added: 2026-08-15
+- Reason deferred: explicitly out of scope for this task ("Не строить
+  сейчас redirect history feature, если её ещё нет — вынести отдельно в
+  backlog при необходимости").
+- Context: `PlaceSlugHistory`/`ActivitySlugHistory`/`OfferSlugHistory`/
+  `ArticleSlugHistory`/`RouteSlugHistory` all exist and are written by
+  `update*Slug()` (`src/lib/admin/seo/entities/applyEntitySeoUpdate.ts`).
+- Current state: documented in
+  `docs/migration/seo/final-url-architecture-2026-08-15.md` §10.
+- Dependencies: none.
+- Acceptance criteria: audit + confirm (or fix) that every entity's public
+  detail page 301s from a retired slug to the current one, not just Place.
+- Source: SEO-stable URL architecture audit (2026-08-15)
