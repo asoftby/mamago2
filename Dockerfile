@@ -48,6 +48,10 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+# Operations Center worker entrypoint (node dist/worker/index.js) — same
+# image as web, different command. Not compiled by `next build`; built
+# separately via tsup (pnpm build:worker, part of pnpm build:ci above).
+COPY --from=builder /app/dist ./dist
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 

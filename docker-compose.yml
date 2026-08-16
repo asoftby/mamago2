@@ -32,6 +32,25 @@ services:
       # MEDIA_STORAGE_ROOT must point to this mounted directory.
       - mamago2_storage:/app/storage
 
+  # Operations Center worker (§21 Step 2) — same image as `app`, different
+  # command, no published port. One replica; the snapshot builder's
+  # advisory lock keeps it safe under a temporary two-worker overlap during
+  # rolling deploys. APP_PUBLIC_URL is the existing app-wide "public base
+  # URL" var (see .env.example) — reused here rather than introducing a
+  # differently-named duplicate for the same value.
+  worker:
+    build: .
+    container_name: mamago2-worker
+    command: ["node", "dist/worker/index.js"]
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://mamago:mamago@db:5432/mamago2
+
 volumes:
   mamago2_pg:
   mamago2_storage:
