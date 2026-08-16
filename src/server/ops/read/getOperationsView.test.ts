@@ -12,7 +12,7 @@ import {
   STALE_THRESHOLD_SEC,
   OPERATIONS_DATA_STALE_FINGERPRINT,
 } from "./getOperationsView";
-import { collectSnapshotPayload } from "../snapshot/payload";
+import { emptySnapshotPayload } from "../snapshot/payload";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -62,7 +62,7 @@ async function main() {
           generatedAt: staleGeneratedAt,
           startedAt: staleGeneratedAt,
           completedAt: staleGeneratedAt,
-          payload: collectSnapshotPayload() as object,
+          payload: emptySnapshotPayload() as object,
         },
         update: {
           generatedAt: staleGeneratedAt,
@@ -83,7 +83,7 @@ async function main() {
     {
       const userId = await makeUser(prisma);
       const freshPayload = {
-        ...collectSnapshotPayload(),
+        ...emptySnapshotPayload(),
         nodes: [
           { key: "PROD", state: "OK" },
           { key: "DB", state: "WARNING" },

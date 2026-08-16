@@ -119,18 +119,19 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-export interface ExecuteDetectorDeps {
+export interface ExecuteDetectorDeps<TProbe = unknown> {
   prisma: PrismaClient;
   lock: GlobalLock;
   workerId: string;
   /**
-   * Seam for future persistence (Step 3+): given a successful DetectorResult,
-   * persist samples/signals and return the counts actually written. Not
-   * implemented in Step 2 (no MetricSample collectors, no OperationalSignal
-   * reconciliation) — when omitted, a successful run always records zero
-   * counts, which is honest since nothing was persisted.
+   * Persistence seam: given a successful DetectorResult (and the raw probe
+   * value, so e.g. health_endpoint's ReleaseEvent observation can reuse the
+   * already-fetched payload instead of a second HTTP call), persist
+   * samples/signals and return the counts actually written. When omitted, a
+   * successful run always records zero counts, which is honest since
+   * nothing was persisted.
    */
-  persistResult?: (result: DetectorResult) => Promise<DetectorRunCounts>;
+  persistResult?: (result: DetectorResult, probe: TProbe) => Promise<DetectorRunCounts>;
 }
 
 /**
@@ -141,7 +142,7 @@ export interface ExecuteDetectorDeps {
 export async function executeDetector<TProbe>(
   detector: Detector<TProbe>,
   ctx: DetectorContext,
-  deps: ExecuteDetectorDeps,
+  deps: ExecuteDetectorDeps<TProbe>,
 ): Promise<DetectorRun> {
   const lockName = detectorLockName(detector.name);
   const acquired = await deps.lock.tryAcquire(lockName);
@@ -160,7 +161,7 @@ export async function executeDetector<TProbe>(
     try {
       const probe = await withTimeout(detector.probe(ctx), detector.timeoutMs);
       const result = detector.evaluate(probe);
-      const counts = deps.persistResult ? await deps.persistResult(result) : ZERO_COUNTS;
+      const counts = deps.persistResult ? await deps.persistResult(result, probe) : ZERO_COUNTS;
       return await markDetectorRunOk(deps.prisma, run, counts);
     } catch (err) {
       if (err instanceof DetectorTimeoutError) {

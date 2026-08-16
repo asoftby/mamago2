@@ -1,11 +1,9 @@
 /**
- * DetectorRegistry (§21 Step 2). Registration infrastructure only.
+ * DetectorRegistry (§21 Step 2, populated starting Step 3).
  *
- * MUST contain zero actual detectors in Step 2 — real detectors (
- * health_endpoint, db_degraded, detector_stale, global_noindex,
- * sitemap_unavailable, ...) are Step 3+ work. No fake/no-op detector is
- * registered here merely to exercise the framework; tests that need a
- * detector construct one locally, without registering it.
+ * Step 3 registers exactly health_endpoint, db_degraded, detector_stale —
+ * see src/server/ops/detectors/index.ts. global_noindex,
+ * sitemap_unavailable, and other Step 4+ detectors are not registered here.
  */
 import type { Detector } from "./types";
 
@@ -16,6 +14,14 @@ const detectors = new Map<string, Detector<any>>();
 export function registerDetector(detector: Detector<any>): void {
   if (detectors.has(detector.name)) {
     throw new Error(`Detector "${detector.name}" is already registered`);
+  }
+  if (detector.hysteresis) {
+    const { open, close } = detector.hysteresis;
+    if (!(close > open)) {
+      throw new Error(
+        `Detector "${detector.name}" has invalid hysteresis: close (${close}) must be > open (${open})`,
+      );
+    }
   }
   detectors.set(detector.name, detector);
 }

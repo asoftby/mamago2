@@ -22,6 +22,8 @@ import { collectSnapshotPayload, type OperationsSnapshotPayload } from "./payloa
 export interface BuildSnapshotDeps {
   prisma: PrismaClient;
   lock: GlobalLock;
+  /** DB-derived worker start time — threaded into detector-staleness cold-start grace. */
+  workerStartedAt: Date;
 }
 
 export interface BuildSnapshotResult {
@@ -77,7 +79,7 @@ export async function buildSnapshot(deps: BuildSnapshotDeps): Promise<BuildSnaps
 
   try {
     const startedAt = await getDbNow(deps.prisma);
-    const payload = collectSnapshotPayload();
+    const payload = await collectSnapshotPayload(deps.prisma, startedAt, deps.workerStartedAt);
     const { accepted } = await upsertSnapshotMonotonic(deps.prisma, { startedAt, payload });
     return { attempted: true, accepted };
   } finally {

@@ -21,6 +21,12 @@ export type NodeState = "OK" | "WARNING" | "CRITICAL" | "NO_DATA";
 export interface DetectorContext {
   prisma: PrismaClient;
   fetch: typeof globalThis.fetch;
+  /**
+   * DB-derived worker start time (Step 2 WorkerContext.workerStartedAt).
+   * Added in Step 3 — the only channel a detector's probe() has to reach
+   * this value, needed for detector_stale's cold-start grace.
+   */
+  workerStartedAt: Date;
 }
 
 export interface SampleDraft {

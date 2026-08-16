@@ -11,12 +11,14 @@ import { PrismaClient } from "@prisma/client";
 
 import { GlobalLock } from "../lock/GlobalLock";
 import { buildSnapshot, upsertSnapshotMonotonic } from "./buildSnapshot";
-import { collectSnapshotPayload } from "./payload";
+import { emptySnapshotPayload } from "./payload";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   throw new Error("DATABASE_URL must point at an isolated test database");
 }
+
+const workerStartedAt = new Date();
 
 async function main() {
   const prisma = new PrismaClient({ datasourceUrl: DATABASE_URL });
@@ -27,15 +29,15 @@ async function main() {
     await prisma.operationsSnapshot.deleteMany({ where: { id: "current" } });
 
     // 1. First build creates id = "current".
-    const first = await buildSnapshot({ prisma, lock: lockA });
+    const first = await buildSnapshot({ prisma, lock: lockA, workerStartedAt });
     assert.equal(first.attempted, true);
     assert.equal(first.accepted, true);
     const row1 = await prisma.operationsSnapshot.findUniqueOrThrow({ where: { id: "current" } });
     assert.equal(row1.id, "current");
 
     // 2. Repeated builds: still exactly ONE OperationsSnapshot row.
-    await buildSnapshot({ prisma, lock: lockA });
-    await buildSnapshot({ prisma, lock: lockA });
+    await buildSnapshot({ prisma, lock: lockA, workerStartedAt });
+    await buildSnapshot({ prisma, lock: lockA, workerStartedAt });
     const count = await prisma.operationsSnapshot.count();
     assert.equal(count, 1, "must remain a true singleton across repeated builds");
 
@@ -50,7 +52,7 @@ async function main() {
     const newer = new Date(row2.startedAt.getTime() + 60_000);
     const older = new Date(row2.startedAt.getTime() - 60_000);
 
-    const newerPayload = { ...collectSnapshotPayload(), release: { marker: "newer" } };
+    const newerPayload = { ...emptySnapshotPayload(), kpis: { marker: "newer" } };
     const acceptedNewer = await upsertSnapshotMonotonic(prisma, {
       startedAt: newer,
       payload: newerPayload,
@@ -61,7 +63,7 @@ async function main() {
     const generatedAtAfterNewer = afterNewer.generatedAt;
 
     // 4. An attempted write carrying an OLDER startedAt CANNOT replace newer payload.
-    const staleePayload = { ...collectSnapshotPayload(), release: { marker: "stale-must-not-apply" } };
+    const staleePayload = { ...emptySnapshotPayload(), kpis: { marker: "stale-must-not-apply" } };
     const acceptedOlder = await upsertSnapshotMonotonic(prisma, {
       startedAt: older,
       payload: staleePayload,
@@ -96,13 +98,13 @@ async function main() {
       assert.equal(heldByA, true, "lockA re-acquires (same session already released after prior builds)");
 
       // While A holds the lock, B's build attempt must be skipped, not collect.
-      const skipped = await buildSnapshot({ prisma, lock: lockB });
+      const skipped = await buildSnapshot({ prisma, lock: lockB, workerStartedAt });
       assert.equal(skipped.attempted, false, "B must skip the cycle while A holds the builder lock");
 
       await lockA.release("operations.snapshot_builder");
 
       // Now B can build successfully.
-      const recovered = await buildSnapshot({ prisma, lock: lockB });
+      const recovered = await buildSnapshot({ prisma, lock: lockB, workerStartedAt });
       assert.equal(recovered.attempted, true);
       assert.equal(recovered.accepted, true);
     } finally {
