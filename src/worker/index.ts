@@ -1,12 +1,13 @@
 /**
  * Operations Center worker entrypoint (§21 Step 2 Phases G/H, extended by
- * Step 3 Phase G).
+ * Step 3/4 Phase G).
  *
  * Separate Node process from the web server — same image, different
  * command (`node dist/worker/index.js`), no HTTP server, no published
- * port. Runs the snapshot-builder scheduler plus the three Step 3 core
- * detectors (health_endpoint, db_degraded, detector_stale) at their
- * configured intervals.
+ * port. Runs the snapshot-builder scheduler plus all seven registered
+ * detectors (see detectors/index.ts) at their configured intervals —
+ * this file never hardcodes a detector list, it wires whatever
+ * DetectorRegistry currently contains.
  */
 import type { DetectorRunCounts } from "@/server/ops/detectorRun";
 import { executeDetector } from "@/server/ops/detectorRun";
