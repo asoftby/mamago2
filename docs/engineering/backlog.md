@@ -3345,3 +3345,29 @@ P3 — cleanup / polish / optional
 - Acceptance criteria: audit + confirm (or fix) that every entity's public
   detail page 301s from a retired slug to the current one, not just Place.
 - Source: SEO-stable URL architecture audit (2026-08-15)
+
+## [BACKLOG-121] DEV host has no NAT hairpin/loopback for its own public IP — health_endpoint detector permanently CRITICAL on DEV
+
+- Status: DONE
+- Priority: P2 — infra config (was blocking green DEV Operations Center baseline)
+- Area: Infra / DEV host networking (`134.17.17.134`, `/opt/mamago/dev`)
+- Added: 2026-08-16
+- Resolved: 2026-08-16
+- Context: Operations Center `health_endpoint` must probe
+  `${APP_PUBLIC_URL}/api/health` (`https://dev.mamago.by` → `134.17.17.134`)
+  from `dev-worker-1` via the real public path (DNS → TLS → Traefik → web).
+  External clients were fine; container/host TCP to the floating public IP
+  timed out (~5s) because `134.17.17.134` is upstream NAT and not on the
+  host NIC (`192.168.185.209`), with no hairpin back to local Traefik.
+- Root cause: missing DEV-container hairpin to the upstream floating IP.
+- Fix: one DEV-source-subnet-scoped HTTPS DNAT only:
+  `-s 172.19.0.0/16 -d 134.17.17.134 -p tcp --dport 443`
+  → `192.168.185.209:443` (local Traefik publish). No OUTPUT rules, no
+  port 80, no MASQUERADE, no PROD subnet (`172.20.0.0/16`) match.
+- Persistence: `/etc/systemd/system/mamago-dev-hairpin.service`
+  (oneshot, `iptables -C || -I`, enabled; ExecStop removes the same rule).
+- Verification: worker → public health ~130ms HTTP 200 (`dev-313`);
+  `health.endpoint_failed:prod` auto-RESOLVED (`resolution=AUTO`);
+  Step 3 node matrix PROD/DB/Operations/Indexability = OK/OK/OK/NO_DATA.
+- Source: Operations Center Step 3 DEV acceptance + BACKLOG-121 host fix
+  (2026-08-16)
