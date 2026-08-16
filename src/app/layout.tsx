@@ -11,9 +11,10 @@ import { PendingActionProvider } from "@/contexts/PendingActionContext";
 import { GateFlowController } from "@/components/auth/GateFlowController";
 import { LogoutSuccessListener } from "@/components/auth/LogoutSuccessListener";
 import { MobileTapDiagnostics } from "@/components/dev/MobileTapDiagnostics";
+import { BrandingProvider } from "@/contexts/BrandingContext";
 import { getBrandingConfig } from "@/lib/branding";
 import {
-  getBrandingFaviconMimeType,
+  BRANDING_FAVICON_MIME_TYPE,
   getBrandingFaviconRouteHref,
 } from "@/lib/brandingFavicon";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
@@ -40,7 +41,6 @@ export default async function RootLayout({
     getBrandingConfig(),
   ]);
   const faviconHref = getBrandingFaviconRouteHref(branding);
-  const faviconMimeType = getBrandingFaviconMimeType(branding);
 
   return (
     <html lang="ru" className={`${ntSomic.variable} ${ptSerif.variable}`}>
@@ -59,14 +59,14 @@ export default async function RootLayout({
         <link
           rel="icon"
           href={faviconHref}
-          type={faviconMimeType}
+          type={BRANDING_FAVICON_MIME_TYPE}
           sizes="any"
           data-branding-favicon="true"
         />
         <link
           rel="shortcut icon"
           href={faviconHref}
-          type={faviconMimeType}
+          type={BRANDING_FAVICON_MIME_TYPE}
           sizes="any"
           data-branding-favicon="true"
         />
@@ -74,20 +74,22 @@ export default async function RootLayout({
       <body
         className="antialiased min-h-screen text-foreground"
       >
-        <SaveIntentProvider>
-          <AuthProvider initialUser={initialAuthUser}>
-            <PendingActionProvider>
-              <AccountModeProvider>
-                {children}
-                <GateFlowController />
-                <MobileTapDiagnostics />
-                <Suspense fallback={null}>
-                  <LogoutSuccessListener />
-                </Suspense>
-              </AccountModeProvider>
-            </PendingActionProvider>
-          </AuthProvider>
-        </SaveIntentProvider>
+        <BrandingProvider logoUrl={branding.logoUrl}>
+          <SaveIntentProvider>
+            <AuthProvider initialUser={initialAuthUser}>
+              <PendingActionProvider>
+                <AccountModeProvider>
+                  {children}
+                  <GateFlowController />
+                  <MobileTapDiagnostics />
+                  <Suspense fallback={null}>
+                    <LogoutSuccessListener />
+                  </Suspense>
+                </AccountModeProvider>
+              </PendingActionProvider>
+            </AuthProvider>
+          </SaveIntentProvider>
+        </BrandingProvider>
         <Sonner />
       </body>
     </html>

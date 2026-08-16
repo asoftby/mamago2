@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+const DEFAULT_LOGO_SRC = "/favico_mamago.webp";
+
 type MamaGoLogoMarkProps = {
   href?: string;
   className?: string;
@@ -9,6 +11,8 @@ type MamaGoLogoMarkProps = {
   priority?: boolean;
   /** Screen readers: defaults to "MamaGo" or home link label when `href` is set. */
   ariaLabel?: string;
+  /** Branding logo override; falls back to the static asset when unset. */
+  src?: string | null;
 };
 
 /**
@@ -20,11 +24,12 @@ export function MamaGoLogoMark({
   imageClassName = "h-8 w-auto md:h-9",
   priority,
   ariaLabel,
+  src,
 }: MamaGoLogoMarkProps) {
   const mark = (
     <>
       <Image
-        src="/favico_mamago.webp"
+        src={src || DEFAULT_LOGO_SRC}
         alt=""
         width={100}
         height={100}
