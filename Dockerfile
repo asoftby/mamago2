@@ -32,6 +32,14 @@ RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Runtime build/release identity for /api/health — baked in at image build
+# time from CI (see .github/workflows/docker.yml), never derived from a
+# .git directory at runtime.
+ARG BUILD_ID
+ENV BUILD_ID=${BUILD_ID}
+ARG GIT_COMMIT_SHA
+ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
+
 RUN apk add --no-cache curl
 
 COPY --from=builder /app/node_modules ./node_modules
