@@ -108,6 +108,7 @@ model User {
   telegramConnections               TelegramConnection[]
   telegramLinkTokens                TelegramLinkToken[]
   behaviorProfile                   UserBehaviorProfile?
+  operationsViewState               OperationsViewState?
   userEvents                        UserEvent[]
   performedModerationActions        UserModerationAction[]           @relation("ModeratorUser")
   moderationActions                 UserModerationAction[]           @relation("TargetUser")
@@ -5332,4 +5333,158 @@ model BrandingConfig {
   fontHeading     String?
   fontBody        String?
   updatedAt       DateTime    @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// Operations Center v1 — Step 1 persistence layer.
+// Spec: "mamaGo Operations Center v1 — Specification", rev 1.2.1, §21 Step 1.
+// `OperationalSignalStatus` is named with the model prefix (rather than the
+// spec's bare `SignalStatus`) because `SignalStatus` is already taken by the
+// unrelated SignalDefinition (discovery taxonomy) enum above.
+// DB-level guarantees (partial unique index, CHECK constraints) live in the
+// migration SQL — see prisma/migrations/*_add_operations_center_persistence.
+// ─────────────────────────────────────────────────────────────
+
+enum OperationalSignalStatus {
+  PENDING
+  OPEN
+  ABORTED
+  RESOLVED
+}
+
+enum SignalSeverity {
+  CRITICAL
+  WARNING
+}
+
+enum SignalResolution {
+  AUTO
+  MANUAL
+  ABORTED
+}
+
+enum DetectorRunStatus {
+  RUNNING
+  OK
+  FAILED
+  TIMEOUT
+  SKIPPED_LOCKED
+}
+
+enum ReleaseEventKind {
+  BUILD_CHANGED
+  PROCESS_RESTART
+}
+
+/// Append-only metric time series. One row = one metric/dimension/value at
+/// one collection instant. Never updated after insert.
+model MetricSample {
+  id          BigInt   @id @default(autoincrement())
+  metric      String   @db.VarChar(64)
+  dimKey      String   @default("") @db.VarChar(128)
+  value       Float
+  collectedAt DateTime @default(now())
+
+  @@index([metric, dimKey, collectedAt(sort: Desc)])
+  @@index([collectedAt])
+}
+
+/// Detector-observed operational signal. Historical (resolved) rows with the
+/// same fingerprint intentionally coexist — only one LIVE (unresolved) row
+/// per fingerprint is allowed, enforced by a partial unique index in SQL
+/// (not a Prisma @@unique, which would also constrain resolved history).
+model OperationalSignal {
+  id          String @id @default(cuid())
+  fingerprint String @db.VarChar(255)
+  detector    String @db.VarChar(64)
+  type        String @db.VarChar(64)
+
+  status   OperationalSignalStatus @default(PENDING)
+  severity SignalSeverity
+
+  title      String  @db.VarChar(255)
+  summary    String? @db.Text
+  detailsUrl String? @db.VarChar(512)
+  entityType String? @db.VarChar(64)
+  entityId   String? @db.VarChar(64)
+  payload    Json?
+
+  consecutiveHits   Int @default(0)
+  consecutiveMisses Int @default(0)
+
+  firstSeenAt        DateTime          @default(now())
+  lastSeenAt         DateTime          @default(now())
+  openedAt           DateTime?
+  attentionChangedAt DateTime?
+  resolvedAt         DateTime?
+  resolution         SignalResolution?
+
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  snoozedUntil   DateTime?
+  resolvedBy     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, severity, openedAt])
+  @@index([status, attentionChangedAt(sort: Desc)])
+  @@index([detector, status])
+  @@index([fingerprint, createdAt(sort: Desc)])
+}
+
+/// One execution of one detector (worker-owned; no execution logic here).
+model DetectorRun {
+  id         String            @id @default(cuid())
+  detector   String            @db.VarChar(64)
+  status     DetectorRunStatus @default(RUNNING)
+  startedAt  DateTime          @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+  error      String?           @db.Text
+  workerId   String?           @db.VarChar(64)
+
+  signalsOpened   Int @default(0)
+  signalsResolved Int @default(0)
+  samplesWritten  Int @default(0)
+
+  @@index([detector, status, finishedAt(sort: Desc)])
+  @@index([startedAt(sort: Desc)])
+}
+
+/// Singleton table — the only legal row has id = "current", enforced by a
+/// DB CHECK constraint (see migration SQL), not just this default.
+/// startedAt = DB time at start of data collection (content monotonicity).
+/// generatedAt = DB time of successful snapshot write (freshness only).
+model OperationsSnapshot {
+  id          String   @id
+  generatedAt DateTime
+  startedAt   DateTime
+  completedAt DateTime
+  payload     Json
+}
+
+/// Per-admin "last viewed Operations Center" marker. Keyed directly by
+/// userId (no synthetic id) per the frozen contract; the User relation
+/// below is added only for referential integrity, per existing repo
+/// convention for user-owned rows.
+model OperationsViewState {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastViewedAt DateTime @default(now())
+}
+
+/// One observed PROD/DEV runtime instance (buildId + processStartedAt).
+/// Runtime correlation logic (who writes this, when) is Step 3 — this is
+/// persistence only.
+model ReleaseEvent {
+  id               String           @id @default(cuid())
+  kind             ReleaseEventKind
+  buildId          String           @db.VarChar(64)
+  gitSha           String?          @db.VarChar(64)
+  processStartedAt DateTime
+  detectedAt       DateTime         @default(now())
+
+  @@unique([buildId, processStartedAt])
+  @@index([detectedAt(sort: Desc)])
 }
