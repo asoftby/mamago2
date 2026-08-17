@@ -15,6 +15,9 @@ import { registerCoreDetectors } from "@/server/ops/detectors";
 import { extractHealthReleaseMetadata, type HealthEndpointProbeOutcome } from "@/server/ops/detectors/healthEndpoint";
 import { listDetectors } from "@/server/ops/detectorRegistry";
 import { GlobalLock } from "@/server/ops/lock/GlobalLock";
+import { runMetricCollector } from "@/server/ops/metrics/collectorRun";
+import { registerCoreMetricCollectors } from "@/server/ops/metrics/collectors";
+import { listMetricCollectors } from "@/server/ops/metrics/metricCollectorRegistry";
 import { persistDetectorResult } from "@/server/ops/persistDetectorResult";
 import { observeReleaseEvent } from "@/server/ops/releaseEvent";
 import { buildSnapshot } from "@/server/ops/snapshot/buildSnapshot";
@@ -23,6 +26,13 @@ import { createWorkerContext, disposeWorkerContext, type WorkerContext } from ".
 import { Scheduler } from "./scheduler";
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
+/**
+ * Deterministic per-collector startup stagger, so nine collectors don't
+ * all open their first DB round-trip in the same tick as the seven
+ * detectors and the snapshot builder. Detector/snapshot cadence and
+ * their own immediate-run behavior are unchanged (§21 Step 5, Phase L).
+ */
+const COLLECTOR_STARTUP_STAGGER_MS = 250;
 
 function makePersistResult(
   ctx: WorkerContext,
@@ -59,6 +69,7 @@ function wireScheduler(
   scheduler: Scheduler,
   ctx: WorkerContext,
   detectorLocks: Map<string, GlobalLock>,
+  collectorLocks: Map<string, GlobalLock>,
 ): void {
   scheduler.scheduleRepeating({
     name: "operations.snapshot_builder",
@@ -99,6 +110,30 @@ function wireScheduler(
       },
     });
   }
+
+  listMetricCollectors().forEach((collector, index) => {
+    const lock = collectorLocks.get(collector.name);
+    if (!lock) throw new Error(`No dedicated lock connection for metric collector "${collector.name}"`);
+
+    scheduler.scheduleRepeating({
+      name: `metric_collector:${collector.name}`,
+      intervalMs: collector.intervalSec * 1000,
+      // First run is deferred by a deterministic per-collector stagger
+      // instead of firing immediately alongside every detector and the
+      // snapshot builder on worker startup.
+      runImmediately: false,
+      run: async () => {
+        const run = await runMetricCollector(collector, { prisma: ctx.prisma, lock });
+        console.log(
+          `[worker] metric_collector=${collector.name} attempted=${run.attempted} succeeded=${run.succeeded} samplesWritten=${run.samplesWritten}`,
+        );
+      },
+    });
+
+    setTimeout(() => {
+      void scheduler.runNow(`metric_collector:${collector.name}`);
+    }, index * COLLECTOR_STARTUP_STAGGER_MS);
+  });
 }
 
 async function main() {
@@ -108,11 +143,14 @@ async function main() {
   }
 
   registerCoreDetectors();
+  registerCoreMetricCollectors();
 
   const ctx = await createWorkerContext(databaseUrl);
   console.log(
     `[worker] started workerId=${ctx.workerId} workerStartedAt=${ctx.workerStartedAt.toISOString()} detectors=${listDetectors()
       .map((d) => d.name)
+      .join(",")} metricCollectors=${listMetricCollectors()
+      .map((c) => c.name)
       .join(",")}`,
   );
 
@@ -123,8 +161,15 @@ async function main() {
     detectorLocks.set(detector.name, lock);
   }
 
+  const collectorLocks = new Map<string, GlobalLock>();
+  for (const collector of listMetricCollectors()) {
+    const lock = new GlobalLock(databaseUrl);
+    await lock.connect();
+    collectorLocks.set(collector.name, lock);
+  }
+
   const scheduler = new Scheduler();
-  wireScheduler(scheduler, ctx, detectorLocks);
+  wireScheduler(scheduler, ctx, detectorLocks, collectorLocks);
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {
@@ -132,7 +177,11 @@ async function main() {
     shuttingDown = true;
     console.log(`[worker] received ${signal}, shutting down`);
     scheduler.stop();
-    Promise.all([disposeWorkerContext(ctx), ...Array.from(detectorLocks.values()).map((lock) => lock.close())])
+    Promise.all([
+      disposeWorkerContext(ctx),
+      ...Array.from(detectorLocks.values()).map((lock) => lock.close()),
+      ...Array.from(collectorLocks.values()).map((lock) => lock.close()),
+    ])
       .catch((err) => console.error("[worker] error during shutdown:", err))
       .finally(() => process.exit(0));
   };

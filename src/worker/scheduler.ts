@@ -17,6 +17,7 @@ export interface ScheduledTask {
 
 export class Scheduler {
   private readonly timers = new Map<string, ReturnType<typeof setInterval>>();
+  private readonly ticks = new Map<string, () => Promise<void>>();
   private readonly running = new Set<string>();
   private stopped = false;
 
@@ -44,10 +45,19 @@ export class Scheduler {
 
     const timer = setInterval(() => void tick(), task.intervalMs);
     this.timers.set(task.name, timer);
+    this.ticks.set(task.name, tick);
 
     if (task.runImmediately !== false) {
       void tick();
     }
+  }
+
+  /** Manually fire a task's next tick immediately (used for a deterministic startup stagger). */
+  async runNow(name: string): Promise<void> {
+    if (this.stopped) return;
+    const tick = this.ticks.get(name);
+    if (!tick) throw new Error(`No such scheduled task "${name}"`);
+    await tick();
   }
 
   stop(): void {

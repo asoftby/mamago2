@@ -15,6 +15,7 @@ import { listDetectors } from "../detectorRegistry";
 import { NODE_REGISTRY } from "../nodeRegistry";
 import type { NodeKey, NodeState } from "../types";
 import { collectDetectorSummaries, type DetectorSummary } from "./detectorSummaries";
+import { projectOperationsKpis, projectOperationsQueues } from "./metricProjection";
 import { projectNodeStates } from "./nodeProjection";
 
 export interface OperationsSnapshotNode {
@@ -80,9 +81,11 @@ export async function collectSnapshotPayload(
 ): Promise<OperationsSnapshotPayload> {
   const detectorSummaries = await collectDetectorSummaries(prisma, now, workerStartedAt);
   const nodes = await projectNodeStates(prisma, detectorSummaries);
-  const [latestRelease, existingSnapshot] = await Promise.all([
+  const [latestRelease, existingSnapshot, queues, kpis] = await Promise.all([
     prisma.releaseEvent.findFirst({ orderBy: { detectedAt: "desc" } }),
     prisma.operationsSnapshot.findUnique({ where: { id: "current" } }),
+    projectOperationsQueues(prisma),
+    projectOperationsKpis(prisma),
   ]);
 
   const existingPayload = existingSnapshot?.payload as OperationsSnapshotPayload | null | undefined;
@@ -91,8 +94,8 @@ export async function collectSnapshotPayload(
   return {
     nodes,
     detectors: detectorSummaries.map(toDetectorSummaryPayload),
-    queues: {},
-    kpis: {},
+    queues: queues as unknown as Record<string, unknown>,
+    kpis: kpis as unknown as Record<string, unknown>,
     release: latestRelease
       ? {
           kind: latestRelease.kind,

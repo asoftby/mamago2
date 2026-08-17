@@ -13,41 +13,19 @@
  * DISTINCT ON query avoids N+1 across sources, using the existing
  * (sourceId, status) index.
  */
-import type { PrismaClient } from "@prisma/client";
-
+import { getLatestImportSourceOutcomes, type LatestImportSourceOutcome } from "../importSourceOutcomes";
 import type { Detector, DetectorContext, DetectorResult, SignalDraft } from "../types";
 
 export function importSourceFailedFingerprint(sourceId: string): string {
   return `import.source_failed:${sourceId}`;
 }
 
-interface LatestOutcomeRow {
-  sourceId: string;
-  sourceName: string;
-  status: "COMPLETED" | "FAILED";
-  finishedAt: Date;
-  errorMessage: string | null;
-}
-
 export interface ImportSourceFailedProbe {
-  outcomes: LatestOutcomeRow[];
+  outcomes: LatestImportSourceOutcome[];
 }
 
 export async function probeImportSourceFailed(ctx: DetectorContext): Promise<ImportSourceFailedProbe> {
-  const outcomes = await ctx.prisma.$queryRaw<LatestOutcomeRow[]>`
-    SELECT DISTINCT ON (ir."sourceId")
-      ir."sourceId"      AS "sourceId",
-      s.name             AS "sourceName",
-      ir.status          AS "status",
-      COALESCE(ir."finishedAt", ir."createdAt") AS "finishedAt",
-      ir."errorMessage"  AS "errorMessage"
-    FROM "ImportRun" ir
-    JOIN "ImportSource" s ON s.id = ir."sourceId"
-    WHERE s."isActive" = true
-      AND ir.status IN ('COMPLETED', 'FAILED')
-      AND ir."isArchived" = false
-    ORDER BY ir."sourceId", COALESCE(ir."finishedAt", ir."createdAt") DESC
-  `;
+  const outcomes = await getLatestImportSourceOutcomes(ctx.prisma);
   return { outcomes };
 }
 
@@ -82,7 +60,3 @@ export const importSourceFailedDetector: Detector<ImportSourceFailedProbe> = {
   probe: probeImportSourceFailed,
   evaluate: evaluateImportSourceFailed,
 };
-
-// Re-exported for tests that need to construct a probe purely (no DB).
-export type { LatestOutcomeRow as ImportSourceLatestOutcomeRow };
-export type ImportSourcePrisma = PrismaClient;
