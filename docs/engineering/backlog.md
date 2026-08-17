@@ -3371,3 +3371,43 @@ P3 — cleanup / polish / optional
   Step 3 node matrix PROD/DB/Operations/Indexability = OK/OK/OK/NO_DATA.
 - Source: Operations Center Step 3 DEV acceptance + BACKLOG-121 host fix
   (2026-08-16)
+
+## [BACKLOG-122] Repo-wide ESLint has 14 pre-existing errors; not enforced in CI/check:push
+
+- Status: OPEN
+- Priority: P3 — code quality debt, not a release blocker; none of the 14
+  findings are in Operations Center Step 5/6 code.
+- Area: Tooling / Code quality
+- Added: 2026-08-17
+- Reason deferred: out of scope for Operations Center Step 6 (audit
+  adapter + retention); fixing them would mix unrelated changes into that
+  commit. Flagged per CLAUDE.md rule 11 (pre-existing/foreign errors must
+  be recorded, not silently fixed or scope-crept into the current task).
+- Context: while auditing Step 6's ESLint validation gate, discovered
+  `npx eslint` was completely unrunnable repo-wide — crashed on every
+  file (`TypeError: expand is not a function`) because the
+  `"brace-expansion@<1.1.13": ">=1.1.13"` pnpm override (no upper bound)
+  collapsed `minimatch@3.1.4`'s `brace-expansion` dependency (needs
+  `^1.1.7`) onto the unrelated `brace-expansion@5.0.6` override group.
+  Fixed in isolated commit `f5043ed5` (`fix(deps): scope brace-expansion
+  override to its own major line`) by bounding the override to `<2.0.0`;
+  lockfile diff is limited to that one dependency edge.
+- Current state: with `f5043ed5` applied, `npx eslint src --quiet`
+  now runs to completion and reports exactly 14 pre-existing errors,
+  none introduced by Step 6:
+  - `src/components/**` (3 files): `react-hooks/set-state-in-effect`
+  - `src/lib/migration/commit/context/resolveEventCommitContextWithMatching.ts`
+    + its `.test.ts`: `@typescript-eslint/no-explicit-any` (7 occurrences)
+  - `src/server/ops/detectors/moderationQueueStale.test.ts` (Step 4):
+    `prefer-const` (1 occurrence)
+  Neither `pnpm check:push` (`tsc --noEmit && pnpm build`) nor the GitHub
+  Actions "CI" workflow (`.github/workflows/ci.yml`, `typecheck` job
+  only) run ESLint at all — only `pnpm check`/`pnpm lint` do, and those
+  are not part of any automated gate today.
+- Dependencies: none.
+- Acceptance criteria: fix all 14 pre-existing findings (or their
+  root causes) so `pnpm lint` is repo-wide green; then add an ESLint
+  step to CI and/or `check:push` so future regressions are caught
+  automatically instead of silently accumulating.
+- Source: Operations Center Step 6 (audit adapter + retention) ESLint
+  validation-gate audit (2026-08-17)
