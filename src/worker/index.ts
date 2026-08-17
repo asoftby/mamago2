@@ -1,13 +1,14 @@
 /**
  * Operations Center worker entrypoint (§21 Step 2 Phases G/H, extended by
- * Step 3/4 Phase G).
+ * Step 3/4 Phase G, Step 5 Phase L, Step 6 Phase P).
  *
  * Separate Node process from the web server — same image, different
  * command (`node dist/worker/index.js`), no HTTP server, no published
- * port. Runs the snapshot-builder scheduler plus all seven registered
- * detectors (see detectors/index.ts) at their configured intervals —
- * this file never hardcodes a detector list, it wires whatever
- * DetectorRegistry currently contains.
+ * port. Runs the snapshot-builder scheduler, all seven registered
+ * detectors, all nine registered metric collectors, and the retention
+ * job at their configured intervals — this file never hardcodes a
+ * detector/collector list, it wires whatever DetectorRegistry/
+ * MetricCollectorRegistry currently contain.
  */
 import type { DetectorRunCounts } from "@/server/ops/detectorRun";
 import { executeDetector } from "@/server/ops/detectorRun";
@@ -20,12 +21,14 @@ import { registerCoreMetricCollectors } from "@/server/ops/metrics/collectors";
 import { listMetricCollectors } from "@/server/ops/metrics/metricCollectorRegistry";
 import { persistDetectorResult } from "@/server/ops/persistDetectorResult";
 import { observeReleaseEvent } from "@/server/ops/releaseEvent";
+import { runOperationsRetentionWithLock } from "@/server/ops/retention/retentionRun";
 import { buildSnapshot } from "@/server/ops/snapshot/buildSnapshot";
 import type { Detector, DetectorContext, DetectorResult } from "@/server/ops/types";
 import { createWorkerContext, disposeWorkerContext, type WorkerContext } from "./context";
 import { Scheduler } from "./scheduler";
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
+const RETENTION_INTERVAL_MS = 86_400_000;
 /**
  * Deterministic per-collector startup stagger, so nine collectors don't
  * all open their first DB round-trip in the same tick as the seven
@@ -33,6 +36,13 @@ const SNAPSHOT_INTERVAL_MS = 60_000;
  * their own immediate-run behavior are unchanged (§21 Step 5, Phase L).
  */
 const COLLECTOR_STARTUP_STAGGER_MS = 250;
+/**
+ * Retention's first run is deferred until after the collector stagger
+ * group has had its own turn, so a fresh deploy's startup burst resolves
+ * detectors → collectors → retention in that order rather than all at
+ * once (§21 Step 6, Phase L).
+ */
+const RETENTION_STARTUP_DELAY_MS = 5_000;
 
 function makePersistResult(
   ctx: WorkerContext,
@@ -70,6 +80,7 @@ function wireScheduler(
   ctx: WorkerContext,
   detectorLocks: Map<string, GlobalLock>,
   collectorLocks: Map<string, GlobalLock>,
+  retentionLock: GlobalLock,
 ): void {
   scheduler.scheduleRepeating({
     name: "operations.snapshot_builder",
@@ -134,6 +145,28 @@ function wireScheduler(
       void scheduler.runNow(`metric_collector:${collector.name}`);
     }, index * COLLECTOR_STARTUP_STAGGER_MS);
   });
+
+  scheduler.scheduleRepeating({
+    name: "operations.retention",
+    intervalMs: RETENTION_INTERVAL_MS,
+    runImmediately: false,
+    run: async () => {
+      const outcome = await runOperationsRetentionWithLock(ctx.prisma, retentionLock);
+      if (!outcome.attempted) {
+        console.log("[worker] retention run skipped — lock held elsewhere");
+      } else if (!outcome.succeeded) {
+        console.warn("[worker] retention run failed — will retry on the next scheduled cycle");
+      } else if (outcome.result) {
+        const { deleted } = outcome.result;
+        console.log(
+          `[worker] retention run succeeded metricSamples=${deleted.metricSamples} detectorRuns=${deleted.detectorRuns} resolvedSignals=${deleted.resolvedSignals} abortedSignals=${deleted.abortedSignals}`,
+        );
+      }
+    },
+  });
+  setTimeout(() => {
+    void scheduler.runNow("operations.retention");
+  }, RETENTION_STARTUP_DELAY_MS);
 }
 
 async function main() {
@@ -168,8 +201,11 @@ async function main() {
     collectorLocks.set(collector.name, lock);
   }
 
+  const retentionLock = new GlobalLock(databaseUrl);
+  await retentionLock.connect();
+
   const scheduler = new Scheduler();
-  wireScheduler(scheduler, ctx, detectorLocks, collectorLocks);
+  wireScheduler(scheduler, ctx, detectorLocks, collectorLocks, retentionLock);
 
   let shuttingDown = false;
   const shutdown = (signal: string) => {
@@ -181,6 +217,7 @@ async function main() {
       disposeWorkerContext(ctx),
       ...Array.from(detectorLocks.values()).map((lock) => lock.close()),
       ...Array.from(collectorLocks.values()).map((lock) => lock.close()),
+      retentionLock.close(),
     ])
       .catch((err) => console.error("[worker] error during shutdown:", err))
       .finally(() => process.exit(0));
