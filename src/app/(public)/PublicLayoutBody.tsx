@@ -10,6 +10,7 @@ import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 
 const MOBILE_MAIN_BOTTOM =
   "pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0";
@@ -36,6 +37,7 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <PageViewTracker />
       <NotificationSurfaceBootstrap surface="public" />
 
       <main

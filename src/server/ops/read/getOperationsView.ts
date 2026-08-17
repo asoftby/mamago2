@@ -12,6 +12,7 @@ import sharedPrisma from "@/lib/prisma";
 import { NODE_REGISTRY } from "../nodeRegistry";
 import type { NodeKey, NodeState } from "../types";
 import type { OperationsSnapshotPayload } from "../snapshot/payload";
+import { correlateSignalReleases, type CorrelatedRelease } from "./correlateReleaseEvents";
 
 export const SNAPSHOT_INTERVAL_SEC = 60;
 /** max(3 * SNAPSHOT_INTERVAL_SEC, 300) = 300 seconds, per the frozen contract. */
@@ -43,6 +44,8 @@ export interface OperationsView {
   syntheticSignals: OperationsSyntheticSignal[];
   /** OPEN, non-snoozed OperationalSignal rows. */
   signals: OperationalSignal[];
+  /** Per-signal ReleaseEvent within openedAt ±30min, keyed by signal id. */
+  signalReleases: Record<string, CorrelatedRelease | null>;
   /** The PREVIOUS lastViewedAt, read before this call updates it. */
   lastViewedAt: Date | null;
 }
@@ -90,6 +93,11 @@ export async function getOperationsViewWithClient(
 
   const payload = snapshot?.payload as unknown as OperationsSnapshotPayload | undefined;
 
+  // One bounded query covering every visible signal's ±30min window —
+  // shown regardless of `stale`, since OPEN incidents remain real facts
+  // even when the snapshot's own node-state computation is stale.
+  const signalReleases = await correlateSignalReleases(prisma, openSignals);
+
   const view: OperationsView = stale
     ? {
         stale: true,
@@ -101,6 +109,7 @@ export async function getOperationsViewWithClient(
         release: null,
         syntheticSignals: [staleSyntheticSignal()],
         signals: openSignals,
+        signalReleases,
         lastViewedAt: previousLastViewedAt,
       }
     : {
@@ -115,6 +124,7 @@ export async function getOperationsViewWithClient(
         release: payload!.release,
         syntheticSignals: [],
         signals: openSignals,
+        signalReleases,
         lastViewedAt: previousLastViewedAt,
       };
 

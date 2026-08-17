@@ -122,6 +122,14 @@ async function main() {
       assert.deepEqual(view.queues, {}, "queues must stay empty — no MetricSample scan");
     }
 
+    // 7b. signalReleases is always present and empty when there are no
+    // OPEN signals with an openedAt to correlate.
+    {
+      const userId = await makeUser(prisma);
+      const view = await getOperationsViewWithClient(prisma, userId);
+      assert.deepEqual(view.signalReleases, {}, "no visible signals -> no correlation queries, empty map");
+    }
+
     // 8. lastViewedAt is read before being updated.
     {
       const userId = await makeUser(prisma);
