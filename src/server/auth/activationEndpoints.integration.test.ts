@@ -27,7 +27,7 @@ function request(url: string, body: unknown, ip: string): NextRequest {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "cf-connecting-ip": ip,
+      "x-real-ip": ip,
       "user-agent": "activation-integration-test",
     },
     body: JSON.stringify(body),

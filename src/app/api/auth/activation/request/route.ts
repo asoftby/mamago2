@@ -4,9 +4,9 @@ import { normalizeEmail } from "@/lib/auth/email";
 import { requestMigratedAccountActivationByEmail } from "@/server/auth/activationRequestFlow";
 import {
   readSizeLimitedJson,
-  trustedClientIp,
   waitForGenericResponseFloor,
 } from "@/server/auth/activationHttpSecurity";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export const runtime = "nodejs";
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!z.string().email().safeParse(email).success) {
     return acceptedResponse(startedAt);
   }
-  const ip = trustedClientIp(request);
+  const ip = getTrustedClientIp(request);
   if (!ip) {
     // Preserves the endpoint's original behavior: without a trusted proxy,
     // this anonymous, unauthenticated endpoint does nothing at all rather

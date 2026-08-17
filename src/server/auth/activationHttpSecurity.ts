@@ -1,4 +1,3 @@
-import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 
 export async function readSizeLimitedJson(
@@ -20,34 +19,9 @@ export async function readSizeLimitedJson(
   return JSON.parse(text) as unknown;
 }
 
-function normalizeIp(value: string): string | null {
-  const candidate = value.trim().toLowerCase();
-  const version = isIP(candidate);
-  if (version === 4) {
-    return candidate;
-  }
-  if (version === 6) {
-    const hostname = new URL(`http://[${candidate}]/`).hostname;
-    return hostname.slice(1, -1).toLowerCase();
-  }
-  return null;
-}
-
-/** Proxy headers are accepted only when the deployment explicitly trusts its proxy. */
-export function trustedClientIp(
-  request: NextRequest,
-  trustProxyHeaders = process.env.TRUST_PROXY_HEADERS === "true",
-): string | null {
-  if (!trustProxyHeaders) {
-    return null;
-  }
-  const raw =
-    request.headers.get("cf-connecting-ip") ??
-    request.headers.get("x-real-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0] ??
-    "";
-  return normalizeIp(raw);
-}
+// Trusted client-IP extraction lives in @/lib/security/clientIp
+// (getTrustedClientIp) — the single canonical helper for the whole app.
+// Do not re-implement IP extraction here.
 
 export async function waitForGenericResponseFloor(
   startedAt: number,

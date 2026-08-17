@@ -34,13 +34,9 @@ export function countsFromGroupBy(
 
 export function ratingVoterIdentifier(args: {
   userId: string | null | undefined;
-  forwardedFor: string | null;
-  realIp: string | null;
+  /** Resolve via getTrustedClientIp() at the call site — never read raw proxy headers here. */
+  ip: string | null;
 }): string {
   if (args.userId) return args.userId;
-  const ip =
-    args.forwardedFor?.split(",")[0]?.trim() ||
-    args.realIp?.trim() ||
-    "anonymous";
-  return `ip:${ip}`;
+  return `ip:${args.ip ?? "anonymous"}`;
 }

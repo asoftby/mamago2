@@ -5,27 +5,9 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
 import prisma from "@/lib/prisma";
 import { completeOnboardingNotification } from "@/server/services/notification.service";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export const runtime = "nodejs";
-
-/**
- * Extracts client IP with support for Cloudflare and proxies.
- */
-function getClientIp(request: NextRequest): string {
-  const cf = request.headers.get("cf-connecting-ip");
-  if (cf) return cf;
-
-  const real = request.headers.get("x-real-ip");
-  if (real) return real;
-
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  return "unknown";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit check: 5 attempts per 10 minutes per IP + Phone
-    const ip = getClientIp(request);
+    const ip = getTrustedClientIp(request) ?? "unknown";
     const rateLimitKey = `otp_verify:${ip}:${phoneE164}`;
     const rl = await checkRateLimit(rateLimitKey, 5, 10 * 60 * 1000);
     if (!rl.allowed) {

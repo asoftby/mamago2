@@ -6,6 +6,7 @@ import {
   emptyEmojiRatingCounts,
   ratingVoterIdentifier,
 } from "@/lib/content-rating/emojiRating";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export async function GET(
   req: NextRequest,
@@ -21,8 +22,7 @@ export async function GET(
     const user = await getCurrentUser();
     const identifier = ratingVoterIdentifier({
       userId: user?.id,
-      forwardedFor: req.headers.get("x-forwarded-for"),
-      realIp: req.headers.get("x-real-ip"),
+      ip: getTrustedClientIp(req),
     });
 
     const [counts, existing] = await Promise.all([

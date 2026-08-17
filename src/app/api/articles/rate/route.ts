@@ -6,6 +6,7 @@ import {
   isEmojiRatingType,
   ratingVoterIdentifier,
 } from "@/lib/content-rating/emojiRating";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 async function assertPublicArticle(articleId: string) {
   return prisma.article.findFirst({
@@ -40,8 +41,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     const identifier = ratingVoterIdentifier({
       userId: user?.id,
-      forwardedFor: req.headers.get("x-forwarded-for"),
-      realIp: req.headers.get("x-real-ip"),
+      ip: getTrustedClientIp(req),
     });
 
     const existing = await prisma.articleRating.findUnique({

@@ -13,23 +13,17 @@
  *     session count as a visitor here. This is a deliberate narrower
  *     definition than /admin/performance's `trackedVisitors` (which counts
  *     DISTINCT sessionId over ALL UserEvent types).
- *   - "Region distribution" (`regions`) remains a GAP, but for a different
- *     reason than before: PAGE_VIEW telemetry now exists, but resolving a
- *     visitor's physical geography requires (a) a canonical trusted
- *     client-IP extraction strategy and (b) a local GeoIP source, neither
- *     of which can be safely implemented yet:
- *       (a) Traefik's actual trusted-header/CDN configuration lives on the
- *           deployment host, outside this repo (`/opt/mamago/*`), and
- *           cannot be verified from source — the existing in-repo
- *           `cf-connecting-ip`/`x-forwarded-for` readers are largely
- *           ungated and would trust a spoofable client header without that
- *           host-side confirmation.
- *       (b) No local GeoIP dependency/database exists in this repo. The
- *           queued choice (pending (a)) is `maxmind` + a manually
- *           downloaded `GeoLite2-City.mmdb`, which needs a new Dockerfile
- *           build step and a license-key/refresh process — real new
- *           deploy infrastructure, not something to add silently here.
- *     Do not populate `regions` until both are resolved and approved.
+ *   - "Region distribution" (`regions`) remains a GAP. The trusted-IP
+ *     question is now resolved: the live Traefik contract is verified
+ *     (`forwardedHeaders.trustedIPs` empty, no CDN in front — only
+ *     `X-Real-IP` is trustworthy, gated behind `TRUST_PROXY_HEADERS`; see
+ *     `getTrustedClientIp()` in `@/lib/security/clientIp`) and every
+ *     spoofable-header reader in the app has been migrated to it. What's
+ *     still missing is (a) a local GeoIP source — no `maxmind`/`.mmdb` in
+ *     this repo yet, a real new deploy-infra decision — and (b) actually
+ *     flipping `TRUST_PROXY_HEADERS=true` on the live hosts, which is a
+ *     deployment step outside this repo. Do not populate `regions` until
+ *     both are done and approved.
  *
  * Today-vs-yesterday uses `resolveElapsedTodayVsYesterday()` — elapsed
  * "today so far" against the exact same elapsed duration yesterday, never

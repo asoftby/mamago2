@@ -15,7 +15,7 @@ function statusRequest(body: unknown): NextRequest {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "cf-connecting-ip": "203.0.113.50",
+      "x-real-ip": "203.0.113.50",
       "user-agent": "activate-page-integration-test",
     },
     body: JSON.stringify(body),
@@ -27,7 +27,7 @@ function completeRequest(body: unknown): NextRequest {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "cf-connecting-ip": "203.0.113.50",
+      "x-real-ip": "203.0.113.50",
       "user-agent": "activate-page-integration-test",
     },
     body: JSON.stringify(body),

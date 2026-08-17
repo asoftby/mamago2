@@ -5,10 +5,8 @@ import {
   checkActivationRateLimit,
 } from "@/server/auth/activationRateLimit";
 import { checkActivationTokenStatus } from "@/server/auth/activationTokenStatus";
-import {
-  readSizeLimitedJson,
-  trustedClientIp,
-} from "@/server/auth/activationHttpSecurity";
+import { readSizeLimitedJson } from "@/server/auth/activationHttpSecurity";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export const runtime = "nodejs";
 
@@ -22,7 +20,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ status: "INVALID" }, { status: 200, headers: { "Cache-Control": "no-store" } });
   }
 
-  const ip = trustedClientIp(request);
+  const ip = getTrustedClientIp(request);
   if (!ip) {
     return NextResponse.json({ status: "INVALID" }, { status: 200, headers: { "Cache-Control": "no-store" } });
   }

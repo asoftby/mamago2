@@ -27,18 +27,24 @@ assert.deepEqual(
 assert.equal(
   ratingVoterIdentifier({
     userId: "u1",
-    forwardedFor: "1.2.3.4",
-    realIp: null,
+    ip: "1.2.3.4",
   }),
   "u1",
 );
 assert.equal(
   ratingVoterIdentifier({
     userId: null,
-    forwardedFor: "9.9.9.9, 8.8.8.8",
-    realIp: null,
+    ip: "9.9.9.9",
   }),
   "ip:9.9.9.9",
+);
+assert.equal(
+  ratingVoterIdentifier({
+    userId: null,
+    ip: null,
+  }),
+  "ip:anonymous",
+  "null ip (gate off or malformed header) must fall back to the anonymous literal, not crash or produce a fabricated identity",
 );
 
 console.log("✅ emojiRating.test.ts");

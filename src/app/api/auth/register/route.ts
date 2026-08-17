@@ -9,30 +9,12 @@ import { normalizeEmail } from "@/lib/auth/email";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
 import { ensureUserOnboardingNotifications } from "@/server/services/notification.service";
 import { checkRateLimit } from "@/lib/security/rateLimit";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: passwordSchema,
 });
-
-/**
- * Extracts client IP with support for Cloudflare and proxies.
- */
-function getClientIp(request: NextRequest): string {
-  const cf = request.headers.get("cf-connecting-ip");
-  if (cf) return cf;
-
-  const real = request.headers.get("x-real-ip");
-  if (real) return real;
-
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  return "unknown";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +26,7 @@ export async function POST(request: NextRequest) {
     const password = parsed.password;
 
     // Rate limit check: 5 attempts per 15 minutes per IP + Email
-    const ip = getClientIp(request);
+    const ip = getTrustedClientIp(request) ?? "unknown";
     const rateLimitKey = `register:${ip}:${email}`;
     const rl = await checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
 

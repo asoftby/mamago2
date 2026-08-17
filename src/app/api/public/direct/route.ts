@@ -8,6 +8,7 @@ import {
   DirectThreadError,
 } from "@/server/services/direct/directThread.service";
 import { notifyDirectCreated } from "@/server/services/notification.service";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const createThreadSchema = z
   .object({
@@ -35,17 +36,6 @@ function composeInitialMessage(input: z.infer<typeof createThreadSchema>): strin
   return `${input.comment.trim()}\n\n${extra.map((line) => `— ${line}`).join("\n")}`;
 }
 
-function getClientIp(request: NextRequest): string {
-  const real = request.headers.get("x-real-ip")?.trim();
-  if (real) return real;
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",").map((p) => p.trim()).find(Boolean);
-    if (first) return first;
-  }
-  return "unknown";
-}
-
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -56,7 +46,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ip = getClientIp(request);
+    const ip = getTrustedClientIp(request) ?? "unknown";
     const rateLimit = await checkRateLimit(`direct_create:${user.id}:${ip}`, 10, 10 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });

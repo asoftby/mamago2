@@ -6,10 +6,8 @@ import {
   checkActivationRateLimit,
 } from "@/server/auth/activationRateLimit";
 import { completeMigratedAccountActivation } from "@/server/auth/activationCompletion.service";
-import {
-  readSizeLimitedJson,
-  trustedClientIp,
-} from "@/server/auth/activationHttpSecurity";
+import { readSizeLimitedJson } from "@/server/auth/activationHttpSecurity";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export const runtime = "nodejs";
 
@@ -35,7 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return invalidResponse();
   }
 
-  const ip = trustedClientIp(request);
+  const ip = getTrustedClientIp(request);
   if (!ip) {
     return invalidResponse(429);
   }

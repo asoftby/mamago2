@@ -8,6 +8,7 @@ import {
   recordGuestSuccessfulGeneration,
   resolveGuestUsageKey,
 } from "@/server/services/guestPlanQuota";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const bodySchema = z.object({
   anonymousId: z.string().optional().nullable(),
@@ -16,16 +17,6 @@ const bodySchema = z.object({
   exclude: z.array(z.string()).optional(),
   ageRanges: z.array(z.string()).optional(),
 });
-
-function clientIp(request: NextRequest): string | null {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  return realIp || null;
-}
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
@@ -95,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     const key = resolveGuestUsageKey(
       anonymousId ?? null,
-      clientIp(request),
+      getTrustedClientIp(request),
       request.headers.get("user-agent"),
     );
     if (!key) {

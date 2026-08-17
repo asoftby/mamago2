@@ -8,32 +8,13 @@ import { acceptBusinessInvite } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
 import { maskEmail, requestMigratedAccountActivationByEmail } from "@/server/auth/activationRequestFlow";
-import { trustedClientIp } from "@/server/auth/activationHttpSecurity";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
   invitationToken: z.string().min(1).optional(),
 });
-
-/**
- * Extracts client IP with support for Cloudflare and proxies.
- */
-function getClientIp(request: NextRequest): string {
-  const cf = request.headers.get("cf-connecting-ip");
-  if (cf) return cf;
-
-  const real = request.headers.get("x-real-ip");
-  if (real) return real;
-
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  return "unknown";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,7 +27,7 @@ export async function POST(request: NextRequest) {
     const invitationToken = parsed.invitationToken?.trim() || null;
 
     // Rate limit check: 5 attempts per 15 minutes per IP + Email
-    const ip = getClientIp(request);
+    const ip = getTrustedClientIp(request) ?? "unknown";
     const rateLimitKey = `login:${ip}:${email}`;
     const rl = await checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
 
@@ -78,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (user && !isValid && user.status === "PENDING_ACTIVATION") {
       const outcome = await requestMigratedAccountActivationByEmail({
         email: user.email,
-        ip: trustedClientIp(request),
+        ip: getTrustedClientIp(request),
         source: "LOGIN_FLOW",
       });
       return NextResponse.json(

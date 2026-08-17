@@ -34,6 +34,8 @@ async function main(): Promise<void> {
   const otherEmail = `register-ratelimit-other-${marker}@example.invalid`;
   const otherIp = `198.51.100.${(Date.now() % 200) + 1}`;
   const userIds: string[] = [];
+  const previousTrustProxyHeaders = process.env.TRUST_PROXY_HEADERS;
+  process.env.TRUST_PROXY_HEADERS = "true";
 
   try {
     // First attempt for a brand-new email: not rate-limited, real account
@@ -75,6 +77,9 @@ async function main(): Promise<void> {
 
     console.log("register rate-limit integration tests: OK");
   } finally {
+    if (previousTrustProxyHeaders === undefined) delete process.env.TRUST_PROXY_HEADERS;
+    else process.env.TRUST_PROXY_HEADERS = previousTrustProxyHeaders;
+
     await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.rateLimitEntry.deleteMany({
       where: {
