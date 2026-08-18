@@ -1,4 +1,5 @@
-import { rootCertificates, X509Certificate } from "node:tls";
+import { X509Certificate } from "node:crypto";
+import { rootCertificates } from "node:tls";
 
 /**
  * family.by currently serves an incomplete AlphaSSL/GlobalSign chain. Browsers
