@@ -2,19 +2,19 @@ import { X509Certificate } from "node:crypto";
 import { rootCertificates } from "node:tls";
 
 /**
- * family.by currently serves an incomplete AlphaSSL/GlobalSign chain. Browsers
- * can often recover the missing intermediate automatically; Node/OpenSSL does
- * not, and rejects the connection with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+ * family.by currently serves an incomplete GlobalSign chain. Browsers can
+ * often recover a missing intermediate automatically; Node/OpenSSL does not,
+ * and rejects the connection with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
  *
- * These are the two current AlphaSSL RSA intermediates published by GlobalSign
- * for the 2025/2026 transition. They are public CA certificates, not private
- * material. TLS verification and hostname verification remain enabled.
+ * Keep this workaround deliberately source-scoped: only HTTPS requests to
+ * family.by/www.family.by receive a CA bundle that extends Node's normal
+ * trusted roots with the current public GlobalSign RSA intermediates that can
+ * issue the site's DV/AlphaSSL leaf certificate. Certificate verification and
+ * hostname verification stay enabled; no TLS bypass is used.
  *
- * Source of truth:
+ * Sources of truth:
  * https://support.globalsign.com/ssl/products/alphassl/alphassl-root-and-intermediate-certificates
- *
- * R6 2025 SHA-1: 43:19:55:E6:E5:DA:BE:85:7F:13:36:C0:23:68:E5:49:5F:14:3E:ED
- * R46 2025 SHA-1: E7:AE:6D:3B:B2:65:B2:04:B7:EA:3D:73:2E:DE:C0:79:9A:B2:24:88
+ * https://support.globalsign.com/ca-certificates/intermediate-certificates/domainssl-intermediate-certificates
  */
 const GLOBALSIGN_GCC_R6_ALPHASSL_CA_2025 = `-----BEGIN CERTIFICATE-----
 MIIFjTCCA3WgAwIBAgIRAIN9TriekS/nLK07x2kt3CAwDQYJKoZIhvcNAQELBQAw
@@ -82,10 +82,74 @@ gJBL58/BSqH1KWGnHyp9s7VwFJPI3LoSEqLd5BryAOQg/5P5uW339YFmbJCcqS3G
 3CVvDrQnx+qrRlxBrS/QeigQ
 -----END CERTIFICATE-----`;
 
+const GLOBALSIGN_GCC_R46_DV_TLS_CA_2025 = `-----BEGIN CERTIFICATE-----
+MIIFfDCCA2SgAwIBAgIRAIRDWIEh21qyhJn/roBnC6QwDQYJKoZIhvcNAQELBQAw
+RjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExHDAaBgNV
+BAMTE0dsb2JhbFNpZ24gUm9vdCBSNDYwHhcNMjUwOTE3MDI1NTQ0WhcNMjkwNjIz
+MDAwMDAwWjBUMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFsU2lnbiBudi1z
+YTEqMCgGA1UEAxMhR2xvYmFsU2lnbiBHQ0MgUjQ2IERWIFRMUyBDQSAyMDI1MIIB
+IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApT+6pung92y3k3sp2FQMmKv2
+OqcOBNr9uk8IJUf/EyIHKfYRcIdgRuUu5T2PxIsvGYCAHQ3uSG/p6E1a16aMu9LV
+EG9DMXcW+rx6Why5IDOIOvRHjfPyQzAGurD4V/e71U4fW81n7pKIDtcWDFeSXoai
+t1cemN088vJH/L4iCSeQQ1qWsmo9VV4F8jrwWJEjOSrLLYBGHvvuteMlXzpjX2A7
+pKcjOooEYU78ygS2K0YOdyN7W2hIUvScVv5yG3sA/q4/tWXY1kyUC/Bb70IgL0/n
+wAYMia+OgDo5RPb+U8RUsBN4QH9qxgM75nBiOlqh/aTrrMYfYrbWOR3vioZQDQID
+AQABo4IBVTCCAVEwDgYDVR0PAQH/BAQDAgGGMBMGA1UdJQQMMAoGCCsGAQUFBwMB
+MBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFAhp6X+lq/TDYeXNjntH74sp
+ZI3sMB8GA1UdIwQYMBaAFANcq3OBh6jMsKbVlOI2lkn/BZksMHsGCCsGAQUFBwEB
+BG8wbTAuBggrBgEFBQcwAYYiaHR0cDovL29jc3AuZ2xvYmFsc2lnbi5jb20vcm9v
+dHI0NjA7BggrBgEFBQcwAoYvaHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9j
+YWNlcnQvcm9vdHI0Ni5jcnQwNgYDVR0fBC8wLTAroCmgJ4YlaHR0cDovL2NybC5n
+bG9iYWxzaWduLmNvbS9yb290cjQ2LmNybDAhBgNVHSAEGjAYMAgGBmeBDAECATAM
+BgorBgEEAaAyCgEDMA0GCSqGSIb3DQEBCwUAA4ICAQAqoA/ThPjFFFZKSDkoKTKx
+KA/K5/1469Z9wYkqd2P5btK/Hi+pUOpuJo39cHmXaNJrmVgYwTxo4n3VAB7DQWsm
+OXYOz5wOGLl6Aj5eR8aJ0GXGz1zS2iXsWwFjakS2WfLC25HE2t6XI2pQgNG0HyEY
+oS90ddxMW51dsm5fUDy9AMGitsgHFjzibI7UbHr4i3srXk08E4Br8N7Sz0YAxjhC
+PANw4A8FaB9Q17CpGZI47CRLJSr4kzxk7sIB39FoqPYd5gtfL6NugWt/x2oRQ1xM
+NVa5QQDWRbiVxYoWkBmXwAWLYir/eRiEB195/CbzTDCEtqQBaId9jTFONPjkm0TZ
+ryomaCABk93+GUYgeZzb/ovJ4QS6wxXTzq+ZDxHCTPF+dksaqD/CW6jmCJvEZqPy
+NhgQ96lPYc7ejqY9yET/4CtYMNPupjVbfepeLzE3n/wnTLKlR3n9V0dIhCjcrlJl
+m7WCAJy9nxkx0xmfUFzhFweDOCDsxfsdJ8GnOcFD2b0hyEIDnC+OSVF2G8MCwfn9
+0yfY/6Vg8dmStmLCpfmlndG9aFhxQkuXTBn/5Ojy/mJaT2mt8Idr2m3pxVSpGL1h
+qfCsCW+4rC3XQhQlmfaBc0205o3G8jVadKn/1yNrraM/BOBGESALCWJZTca/Z3+z
+zTYbjxDvBHjVJOwXrqfjyQ==
+-----END CERTIFICATE-----`;
+
+const GLOBALSIGN_GCC_R3_DV_TLS_CA_2020 = `-----BEGIN CERTIFICATE-----
+MIIEsDCCA5igAwIBAgIQd70OB0LV2enQSdd00CpvmjANBgkqhkiG9w0BAQsFADBM
+MSAwHgYDVQQLExdHbG9iYWxTaWduIFJvb3QgQ0EgLSBSMzETMBEGA1UEChMKR2xv
+YmFsU2lnbjETMBEGA1UEAxMKR2xvYmFsU2lnbjAeFw0yMDA3MjgwMDAwMDBaFw0y
+OTA3MTgwMDAwMDBaMFMxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWdu
+IG52LXNhMSkwJwYDVQQDEyBHbG9iYWxTaWduIEdDQyBSMyBEViBUTFMgQ0EgMjAy
+MDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKxnlJV/de+OpwyvCXAJ
+IcxPCqkFPh1lttW2oljS3oUqPKq8qX6m7K0OVKaKG3GXi4CJ4fHVUgZYE6HRdjqj
+hhnuHY6EBCBegcUFgPG0scB12Wi8BHm9zKjWxo3Y2bwhO8Fvr8R42pW0eINc6OTb
+QXC0VWFCMVzpcqgz6X49KMZowAMFV6XqtItcG0cMS//9dOJs4oBlpuqX9INxMTGp
+6EASAF9cnlAGy/RXkVS9nOLCCa7pCYV+WgDKLTF+OK2Vxw3RUJ/p8009lQeUARv2
+UCcNNPCifYX1xIspvarkdjzLwzOdLahDdQbJON58zN4V+lMj0msg+c0KnywPIRp3
+BMkCAwEAAaOCAYUwggGBMA4GA1UdDwEB/wQEAwIBhjAdBgNVHSUEFjAUBggrBgEF
+BQcDAQYIKwYBBQUHAwIwEgYDVR0TAQH/BAgwBgEB/wIBADAdBgNVHQ4EFgQUDZjA
+c3+rvb3ZR0tJrQpKDKw+x3wwHwYDVR0jBBgwFoAUj/BLf6guRSSuTVD6Y5qL3uLd
+G7wwewYIKwYBBQUHAQEEbzBtMC4GCCsGAQUFBzABhiJodHRwOi8vb2NzcDIuZ2xv
+YmFsc2lnbi5jb20vcm9vdHIzMDsGCCsGAQUFBzAChi9odHRwOi8vc2VjdXJlLmds
+b2JhbHNpZ24uY29tL2NhY2VydC9yb290LXIzLmNydDA2BgNVHR8ELzAtMCugKaAn
+hiVodHRwOi8vY3JsLmdsb2JhbHNpZ24uY29tL3Jvb3QtcjMuY3JsMEcGA1UdIARA
+MD4wPAYEVR0gADA0MDIGCCsGAQUFBwIBFiZodHRwczovL3d3dy5nbG9iYWxzaWdu
+LmNvbS9yZXBvc2l0b3J5LzANBgkqhkiG9w0BAQsFAAOCAQEAy8j/c550ea86oCkf
+r2W+ptTCYe6iVzvo7H0V1vUEADJOWelTv07Obf+YkEatdN1Jg09ctgSNv2h+LMTk
+KRZdAXmsE3N5ve+z1Oa9kuiu7284LjeS09zHJQB4DJJJkvtIbjL/ylMK1fbMHhAW
+i0O194TWvH3XWZGXZ6ByxTUIv1+kAIql/Mt29PmKraTT5jrzcVzQ5A9jw16yysuR
+XRrLODlkS1hyBjsfyTNZrmL1h117IFgntBA5SQNVl9ckedq5r4RSAU85jV8XK5UL
+REjRZt2I6M9Po9QL7guFLu4sPFJpwR1sPJvubS2THeo7SxYoNDtdyBHs7euaGcMa
+D/fayQ==
+-----END CERTIFICATE-----`;
+
 const FAMILY_BY_EXTRA_INTERMEDIATES = [
   GLOBALSIGN_GCC_R6_ALPHASSL_CA_2025,
   GLOBALSIGN_GCC_R46_ALPHASSL_CA_2025,
-] as const;
+  GLOBALSIGN_GCC_R46_DV_TLS_CA_2025,
+  GLOBALSIGN_GCC_R3_DV_TLS_CA_2020,
+];
 
 const FAMILY_BY_CA_BUNDLE = [...rootCertificates, ...FAMILY_BY_EXTRA_INTERMEDIATES];
 
@@ -95,8 +159,8 @@ function isFamilyByHostname(hostname: string): boolean {
 
 /**
  * Return a CA bundle only for family.by HTTPS requests. The bundle extends
- * Node's normal trusted roots with GlobalSign's published AlphaSSL
- * intermediates so an incomplete server chain can still be verified.
+ * Node's normal trusted roots with pinned public GlobalSign intermediates so
+ * the upstream's incomplete chain can still be verified.
  */
 export function resolveSourceSpecificTlsCa(url: URL): string[] | undefined {
   if (url.protocol !== "https:" || !isFamilyByHostname(url.hostname)) {
@@ -106,7 +170,7 @@ export function resolveSourceSpecificTlsCa(url: URL): string[] | undefined {
   return FAMILY_BY_CA_BUNDLE;
 }
 
-/** Exposed for a narrow regression test of the pinned public certificates. */
+/** Exposed for narrow regression tests of the pinned public certificates. */
 export function getFamilyByIntermediateCertificates(): readonly X509Certificate[] {
   return FAMILY_BY_EXTRA_INTERMEDIATES.map((pem) => new X509Certificate(pem));
 }
