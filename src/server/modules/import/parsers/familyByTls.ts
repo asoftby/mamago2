@@ -98,7 +98,7 @@ function isFamilyByHostname(hostname: string): boolean {
  * Node's normal trusted roots with GlobalSign's published AlphaSSL
  * intermediates so an incomplete server chain can still be verified.
  */
-export function resolveSourceSpecificTlsCa(url: URL): readonly string[] | undefined {
+export function resolveSourceSpecificTlsCa(url: URL): string[] | undefined {
   if (url.protocol !== "https:" || !isFamilyByHostname(url.hostname)) {
     return undefined;
   }
