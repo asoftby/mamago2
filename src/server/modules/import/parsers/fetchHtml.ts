@@ -1,6 +1,8 @@
 import * as http from "node:http";
 import * as https from "node:https";
 
+import { resolveSourceSpecificTlsCa } from "./familyByTls";
+
 export interface FetchHtmlOptions {
   timeoutMs?: number;
   /**
@@ -200,6 +202,7 @@ async function fetchHtmlViaNodeHttp(
   }
 
   const transport = parsedUrl.protocol === "https:" ? https : http;
+  const sourceSpecificTlsCa = resolveSourceSpecificTlsCa(parsedUrl);
 
   return new Promise<FetchHtmlResult>((resolve, reject) => {
     const request = transport.request(
@@ -212,6 +215,10 @@ async function fetchHtmlViaNodeHttp(
           // native fetch. Ask the upstream for the raw HTML body.
           "Accept-Encoding": "identity",
         },
+        // Source-specific CA bundles only extend the normal trusted roots for
+        // known upstreams with incomplete chains. Verification is never
+        // disabled, and unrelated hosts keep Node's default TLS behavior.
+        ca: sourceSpecificTlsCa,
         // The fallback intentionally uses IPv4. It is only reached after
         // native fetch has already failed, and avoids broken IPv6 routes on
         // legacy upstream infrastructure without weakening TLS verification.
