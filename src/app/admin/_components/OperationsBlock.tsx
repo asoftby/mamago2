@@ -1,13 +1,20 @@
 "use client";
 
-import { CheckCircle2, AlertTriangle, AlertOctagon, HelpCircle, type LucideIcon } from "lucide-react";
+import { CheckCircle2, AlertTriangle, AlertOctagon, HelpCircle, Info, type LucideIcon } from "lucide-react";
 import type { NodeKey, NodeState } from "@/server/ops/types";
 import {
   sortSignals,
   isSignalNew,
   isHealthyEmpty,
+  isIndexabilityDevExpected,
+  isDevExpectedNoindexSignal,
   NODE_STATE_LABEL,
   NODE_STATE_STYLE,
+  NODE_KEY_DISPLAY_LABEL,
+  DEV_EXPECTED_NODE_LABEL,
+  DEV_EXPECTED_NODE_STYLE,
+  DEV_EXPECTED_SIGNAL_HEADING,
+  DEV_EXPECTED_SIGNAL_BODY,
   type SortableSignal,
 } from "../_lib/operationsSignalPresentation";
 import { OperationsSignalCard, type DisplaySignal } from "./OperationsSignalCard";
@@ -19,7 +26,9 @@ const NODE_ICON: Record<NodeState, LucideIcon> = {
   NO_DATA: HelpCircle,
 };
 
-export interface DashboardSignal extends SortableSignal, Omit<DisplaySignal, "isNew"> {}
+export interface DashboardSignal extends SortableSignal, Omit<DisplaySignal, "isNew" | "devContextNote"> {
+  type: string;
+}
 
 export interface OperationsBlockProps {
   stale: boolean;
@@ -29,6 +38,8 @@ export interface OperationsBlockProps {
   previousLastViewedAt: Date | null;
   canResolve: boolean;
   now: Date;
+  /** Server-computed via isProductionAppEnv() — never inferred client-side. */
+  isDev: boolean;
 }
 
 /**
@@ -47,9 +58,11 @@ export function OperationsBlock({
   previousLastViewedAt,
   canResolve,
   now,
+  isDev,
 }: OperationsBlockProps) {
   const sortedSignals = sortSignals(signals, previousLastViewedAt);
   const isEmpty = isHealthyEmpty(stale, sortedSignals.length, !!staleSyntheticTitle);
+  const visibleSignalTypes = signals.map((s) => s.type);
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-4 md:p-6 space-y-6">
@@ -58,17 +71,19 @@ export function OperationsBlock({
       {/* Four-node status strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {nodes.map((node) => {
-          const style = NODE_STATE_STYLE[node.state];
-          const Icon = NODE_ICON[node.state];
+          const devExpected = isIndexabilityDevExpected(node.key, node.state, isDev, visibleSignalTypes);
+          const style = devExpected ? DEV_EXPECTED_NODE_STYLE : NODE_STATE_STYLE[node.state];
+          const Icon = devExpected ? Info : NODE_ICON[node.state];
+          const label = devExpected ? DEV_EXPECTED_NODE_LABEL : NODE_STATE_LABEL[node.state];
           return (
             <div
               key={node.key}
               className={`flex items-center justify-between gap-2 rounded-lg border px-4 py-3 ${style.bg} ${style.border}`}
             >
-              <span className="text-sm font-semibold text-gray-800">{node.key}</span>
+              <span className="text-sm font-semibold text-gray-800">{NODE_KEY_DISPLAY_LABEL[node.key]}</span>
               <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${style.text}`}>
                 <Icon className="w-4 h-4" aria-hidden="true" />
-                {NODE_STATE_LABEL[node.state]}
+                {label}
               </span>
             </div>
           );
@@ -115,6 +130,9 @@ export function OperationsBlock({
                   acknowledgedAt: signal.acknowledgedAt,
                   release: signal.release,
                   isNew: isSignalNew(signal, previousLastViewedAt),
+                  devContextNote: isDevExpectedNoindexSignal(signal.type, isDev)
+                    ? { heading: DEV_EXPECTED_SIGNAL_HEADING, body: DEV_EXPECTED_SIGNAL_BODY }
+                    : null,
                 }}
               />
             ))}

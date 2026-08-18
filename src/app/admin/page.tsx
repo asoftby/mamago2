@@ -13,11 +13,13 @@ import {
 import { AdminDashboardShell } from "./_components/AdminDashboardShell";
 import type { DashboardSignal } from "./_components/OperationsBlock";
 import { OperationsLoadErrorState } from "./_components/OperationsLoadErrorState";
+import { isProductionAppEnv } from "@/lib/config/productionEnvGuard";
 
 function toDashboardSignal(signal: OperationalSignal, view: OperationsView): DashboardSignal {
   const release = view.signalReleases[signal.id] ?? null;
   return {
     id: signal.id,
+    type: signal.type,
     severity: signal.severity,
     title: signal.title,
     summary: signal.summary,
@@ -85,6 +87,7 @@ export default async function AdminDashboardPage() {
       previousLastViewedAt={view.lastViewedAt}
       canResolve={user.role === "ADMIN"}
       serverNow={now}
+      isDev={!isProductionAppEnv()}
       traffic={traffic}
       product={product}
       engagement={engagement}

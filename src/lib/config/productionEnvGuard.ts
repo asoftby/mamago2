@@ -2,7 +2,7 @@ function readBooleanEnv(name: string): boolean {
   return process.env[name]?.trim().toLowerCase() === "true";
 }
 
-function isProductionAppEnv(): boolean {
+export function isProductionAppEnv(): boolean {
   const appEnv = process.env.APP_ENV?.trim().toLowerCase();
   return appEnv === "production" || appEnv === "prod";
 }

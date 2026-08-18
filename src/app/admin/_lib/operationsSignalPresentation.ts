@@ -4,7 +4,7 @@
  * framework-free and directly unit-tested; no Prisma enum ordering is
  * relied on from the backend query.
  */
-import type { NodeState } from "@/server/ops/types";
+import type { NodeKey, NodeState } from "@/server/ops/types";
 
 export interface SortableSignal {
   id: string;
@@ -108,3 +108,64 @@ export const NODE_STATE_STYLE: Record<NodeState, { dot: string; text: string; bg
   CRITICAL: { dot: "bg-red-500", text: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
   NO_DATA: { dot: "bg-gray-400", text: "text-gray-500", bg: "bg-gray-50", border: "border-gray-200" },
 };
+
+/**
+ * Display label for the node strip — presentation only, never the
+ * NodeKey/enum/DB value itself. "PROD" reads as an internal deployment
+ * term to non-engineers; everything else already reads fine as-is.
+ */
+export const NODE_KEY_DISPLAY_LABEL: Record<NodeKey, string> = {
+  PROD: "Приложение",
+  DB: "DB",
+  Operations: "Operations",
+  Indexability: "Indexability",
+};
+
+/**
+ * The only signal type whose Indexability impact is an intentional,
+ * environment-driven condition rather than a real defect — see
+ * src/lib/seo/globalNoindex.ts / GLOBAL_NOINDEX_FINGERPRINT. A genuinely
+ * broken sitemap (SITEMAP_UNAVAILABLE) is still a real problem on DEV too,
+ * so it must never be swept into this "expected" bucket.
+ */
+const DEV_EXPECTED_INDEXABILITY_SIGNAL_TYPE = "GLOBAL_NOINDEX";
+/** Every signal type the Indexability node can currently receive (see nodeRegistry.ts futureCoverage). */
+const INDEXABILITY_SIGNAL_TYPES = new Set(["GLOBAL_NOINDEX", "SITEMAP_UNAVAILABLE"]);
+
+export const DEV_EXPECTED_NODE_LABEL = "Ожидаемо для DEV";
+export const DEV_EXPECTED_NODE_STYLE = {
+  dot: "bg-blue-500",
+  text: "text-blue-700",
+  bg: "bg-blue-50",
+  border: "border-blue-200",
+};
+export const DEV_EXPECTED_SIGNAL_HEADING = "Ожидаемо на DEV";
+export const DEV_EXPECTED_SIGNAL_BODY = "Индексация DEV намеренно отключена. Действий не требуется.";
+
+/**
+ * True only when the Indexability node's WARNING/CRITICAL state is fully
+ * explained by the intentional DEV-noindex condition — i.e. every visible
+ * Indexability-relevant signal is GLOBAL_NOINDEX, none are
+ * SITEMAP_UNAVAILABLE (or any future unrelated Indexability signal type).
+ * A mixed cause (e.g. GLOBAL_NOINDEX + a real broken sitemap) must never
+ * present as "expected" — that would mask a genuine problem. On PROD this
+ * always returns false regardless of state.
+ */
+export function isIndexabilityDevExpected(
+  nodeKey: NodeKey,
+  nodeState: NodeState,
+  isDev: boolean,
+  visibleSignalTypes: string[],
+): boolean {
+  if (nodeKey !== "Indexability") return false;
+  if (!isDev) return false;
+  if (nodeState !== "WARNING" && nodeState !== "CRITICAL") return false;
+  const relevant = visibleSignalTypes.filter((type) => INDEXABILITY_SIGNAL_TYPES.has(type));
+  if (relevant.length === 0) return false;
+  return relevant.every((type) => type === DEV_EXPECTED_INDEXABILITY_SIGNAL_TYPE);
+}
+
+/** Per-signal-card DEV context note — independent of the node-strip rollup above. */
+export function isDevExpectedNoindexSignal(signalType: string, isDev: boolean): boolean {
+  return isDev && signalType === DEV_EXPECTED_INDEXABILITY_SIGNAL_TYPE;
+}

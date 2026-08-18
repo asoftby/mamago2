@@ -32,6 +32,8 @@ export interface AdminDashboardShellProps {
   previousLastViewedAt: Date | null;
   canResolve: boolean;
   serverNow: Date;
+  /** Server-computed via isProductionAppEnv() — never inferred client-side. */
+  isDev: boolean;
   // Product blocks — pre-derived view-models, sourced from the SAME
   // single getOperationsView() call (kpis/queues) plus one small bounded
   // Traffic query. Never re-fetched client-side; a refresh re-runs the
@@ -52,6 +54,7 @@ export function AdminDashboardShell({
   previousLastViewedAt,
   canResolve,
   serverNow,
+  isDev,
   traffic,
   product,
   engagement,
@@ -116,6 +119,7 @@ export function AdminDashboardShell({
         previousLastViewedAt={previousLastViewedAt}
         canResolve={canResolve}
         now={now}
+        isDev={isDev}
       />
 
       {/* Blocks 2-6 — the quieter modular product grid */}

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, AlertOctagon, Check, Clock, MoreHorizontal } from "lucide-react";
+import { AlertTriangle, AlertOctagon, Check, Clock, MoreHorizontal, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +33,8 @@ export interface DisplaySignal {
   acknowledgedAt: Date | null;
   isNew: boolean;
   release: { buildId: string; detectedAt: Date } | null;
+  /** DEV-only, GLOBAL_NOINDEX-only explanatory context — never changes severity/title/summary. */
+  devContextNote: { heading: string; body: string } | null;
 }
 
 export interface OperationsSignalCardProps {
@@ -154,6 +156,16 @@ export function OperationsSignalCard({ signal, now, canResolve }: OperationsSign
 
       <p className="mt-2 text-sm font-medium text-gray-900 break-words">{signal.title}</p>
       {signal.summary && <p className="mt-1 text-sm text-gray-600 break-words">{signal.summary}</p>}
+
+      {signal.devContextNote && (
+        <div className="mt-2 flex items-start gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5">
+          <Info className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-xs text-blue-800">
+            <span className="font-semibold">{signal.devContextNote.heading}.</span>{" "}
+            {signal.devContextNote.body}
+          </p>
+        </div>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
         {signal.openedAt && (
