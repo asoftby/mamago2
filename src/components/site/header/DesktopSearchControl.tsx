@@ -1000,6 +1000,7 @@ function DiscoveryDesktopSearchControl({
                 }}
               >
                 <LocationPanel
+                  variant={currentIntent === "kuda" ? "cityHub" : "default"}
                   citySlug={pendingCitySlug}
                   selectedCitySlug={pendingCitySlug}
                   onCityPick={(slug) => {

@@ -1,0 +1,337 @@
+{
+  "source": "wordpress-db",
+  "generatedAt": "2026-07-13T15:24:02.211Z",
+  "entity": "route",
+  "limit": null,
+  "stats": {
+    "discoveredCount": 14,
+    "plannedCount": 14,
+    "normalizedCount": 14,
+    "failedCount": 0,
+    "skippedCount": 0,
+    "successRate": 1,
+    "actionCounts": {
+      "CREATE": 14
+    },
+    "statusCounts": {
+      "PLANNED": 14
+    },
+    "targetTypeCounts": {
+      "ROUTE": 14
+    },
+    "sourceEntityTypeCounts": {
+      "wordpress-db:routes": 14
+    },
+    "warningCounts": {
+      "ROUTE_LEVEL_LOCATION_DROPPED": 10,
+      "ROUTE_META_KEY_UNPARSEABLE_INDEX": 3
+    },
+    "durationsMs": {
+      "discover": 1496.9966670000001,
+      "filter": 0.13087500000006003,
+      "normalize": 4.332208000000037,
+      "plan": 0.2922089999999571,
+      "total": 1501.927208
+    }
+  },
+  "candidates": [
+    {
+      "sourceRecordKey": "wordpress-db:routes:17822",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут по Дроздам: живописно и развлекательно",
+      "slug": "marshrut-po-drozdam-zhivopisno-i-razvlekatelno",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:17822",
+          "details": {
+            "locationRaw": "{\"address\":\"53.94599, 27.47237\",\"map_picker\":true,\"latitude\":53.945990000000002,\"longitude\":27.472370000000002}"
+          }
+        }
+      ],
+      "mediaRefCount": 32,
+      "relationRefCount": 5
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:18437",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут «Курасовщина зоологически-экстремальная»",
+      "slug": "marshrut-kurosovshchina-zoologicheski-ekstremalnaya",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:18437",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u0417\\\\u043e\\\\u043e\\\\u043b\\\\u043e\\\\u0433\\\\u0438\\\\u0447\\\\u0435\\\\u0441\\\\u043a\\\\u0438\\\\u0439 \\\\u043c\\\\u0443\\\\u0437\\\\u0435\\\\u0439 \\\\u0411\\\\u0413\\\\u0423, \\\\u0443\\\\u043b\\\\u0438\\\\u0446\\\\u0430 \\\\u041a\\\\u0443\\\\u0440\\\\u0447\\\\u0430\\\\u0442\\\\u043e\\\\u0432\\\\u0430, \\\\u041c\\\\u0438\\\\u043d\\\\u0441\\\\u043a, \\\\u0411\\\\u0435\\\\u043b\\\\u0430\\\\u0440\\\\u0443\\\\u0441\\\\u044c\",\"map_picker\":false,\"latitude\":53.836370000000002,\"longitude\":27.468900000000001}"
+          }
+        }
+      ],
+      "mediaRefCount": 23,
+      "relationRefCount": 6
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:19413",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут «Маяк Минска»: красиво и активно",
+      "slug": "marshrut-majak-minska-krasivo-i-aktivno",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:19413",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u041d\\\\u0430\\\\u0446\\\\u0438\\\\u043e\\\\u043d\\\\u0430\\\\u043b\\\\u044c\\\\u043d\\\\u0430\\\\u044f \\\\u0431\\\\u0438\\\\u0431\\\\u043b\\\\u0438\\\\u043e\\\\u0442\\\\u0435\\\\u043a\\\\u0430 \\\\u0411\\\\u0435\\\\u043b\\\\u0430\\\\u0440\\\\u0443\\\\u0441\\\\u0438, \\\\u043f\\\\u0440\\\\u043e\\\\u0441\\\\u043f\\\\u0435\\\\u043a\\\\u0442 \\\\u041d\\\\u0435\\\\u0437\\\\u0430\\\\u0432\\\\u0438\\\\u0441\\\\u0438\\\\u043c\\\\u043e\\\\u0441\\\\u0442\\\\u0438, \\\\u041c\\\\u0438\\\\u043d\\\\u0441\\\\u043a, \\\\u0411\\\\u0435\\\\u043b\\\\u0430\\\\u0440\\\\u0443\\\\u0441\\\\u044c\",\"map_picker\":false,\"latitude\":53.93147,\"longitude\":27.64616}"
+          }
+        }
+      ],
+      "mediaRefCount": 24,
+      "relationRefCount": 5
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:22133",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут «Нарочанский»: живописно и пешеходно",
+      "slug": "marshrut-narochanskij-zhivopisno-i-peshehodno",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [],
+      "mediaRefCount": 93,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:24298",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Кобрин — Брест маршрут для прогулки.",
+      "slug": "chto-posmotret-turistu-za-2-dnya-v-kobrine-i-breste",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [],
+      "mediaRefCount": 28,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:24917",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут Малиновка",
+      "slug": "marshrut-malinovka",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:24917",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u041f\\\\u0430\\\\u0440\\\\u043a \\\\u041c\\\\u0438\\\\u0445\\\\u0430\\\\u0438\\\\u043b\\\\u0430 \\\\u041f\\\\u0430\\\\u0432\\\\u043b\\\\u043e\\\\u0432\\\\u0430, \\\\u043f\\\\u0440\\\\u043e\\\\u0441\\\\u043f\\\\u0435\\\\u043a\\\\u0442 \\\\u041b\\\\u044e\\\\u0431\\\\u0438\\\\u043c\\\\u043e\\\\u0432\\\\u0430, \\\\u041c\\\\u0438\\\\u043d\\\\u0441\\\\u043a\",\"map_picker\":false,\"latitude\":53.857480000000002,\"longitude\":27.473569999999999}"
+          }
+        }
+      ],
+      "mediaRefCount": 26,
+      "relationRefCount": 5
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:25888",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут Тракторный завод",
+      "slug": "marshrut-traktornyj-zavod",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:25888",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u041f\\\\u0430\\\\u0440\\\\u043a \\\\u041f\\\\u0430\\\\u0432\\\\u043b\\\\u043e\\\\u0432\\\\u0430, \\\\u0443\\\\u043b\\\\u0438\\\\u0446\\\\u0430 \\\\u0411\\\\u0435\\\\u043b\\\\u0435\\\\u0446\\\\u043a\\\\u043e\\\\u0433\\\\u043e, \\\\u041c\\\\u0438\\\\u043d\\\\u0441\\\\u043a\",\"map_picker\":false,\"latitude\":53.85557,\"longitude\":27.467390000000002}"
+          }
+        }
+      ],
+      "mediaRefCount": 54,
+      "relationRefCount": 5
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:29290",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут Браслав — «Nomad Houses», что посмотреть в Браславе",
+      "slug": "marshrut-braslav-nomad-houses-chto-posmotret-v-braslave",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_META_KEY_UNPARSEABLE_INDEX",
+          "message": "Meta key \"title-location\" matches field \"title\" but has no valid numeric index; excluded from grouping.",
+          "severity": "WARNING",
+          "details": {
+            "key": "title-location",
+            "field": "title"
+          },
+          "sourceRecordKey": "wordpress-db:routes:29290"
+        },
+        {
+          "code": "ROUTE_META_KEY_UNPARSEABLE_INDEX",
+          "message": "Meta key \"description-location\" matches field \"description\" but has no valid numeric index; excluded from grouping.",
+          "severity": "WARNING",
+          "details": {
+            "key": "description-location",
+            "field": "description"
+          },
+          "sourceRecordKey": "wordpress-db:routes:29290"
+        },
+        {
+          "code": "ROUTE_META_KEY_UNPARSEABLE_INDEX",
+          "message": "Meta key \"images-location\" matches field \"images\" but has no valid numeric index; excluded from grouping.",
+          "severity": "WARNING",
+          "details": {
+            "key": "images-location",
+            "field": "images"
+          },
+          "sourceRecordKey": "wordpress-db:routes:29290"
+        },
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:29290",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u0411\\\\u0440\\\\u0430\\\\u0441\\\\u043b\\\\u0430\\\\u0432\",\"map_picker\":false,\"latitude\":55.63917,\"longitude\":27.03193}"
+          }
+        }
+      ],
+      "mediaRefCount": 67,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:32543",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут Щорсы",
+      "slug": "marshrut-shchorsy",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:32543",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u0429\\\\u043e\\\\u0440\\\\u0441\\\\u044b\",\"map_picker\":false,\"latitude\":53.65186,\"longitude\":26.17002}"
+          }
+        }
+      ],
+      "mediaRefCount": 43,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:34581",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Новогодний маршрут",
+      "slug": "novogodniy-marshrut",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [],
+      "mediaRefCount": 45,
+      "relationRefCount": 2
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:46963",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут Могилев",
+      "slug": "marshrut-mogilev",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:46963",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u0443\\\\u043b\\\\u0438\\\\u0446\\\\u0430 \\\\u041b\\\\u0435\\\\u043f\\\\u0435\\\\u0448\\\\u0438\\\\u043d\\\\u0441\\\\u043a\\\\u043e\\\\u0433\\\\u043e, \\\\u041c\\\\u043e\\\\u0433\\\\u0438\\\\u043b\\\\u0451\\\\u0432\",\"map_picker\":false,\"latitude\":53.90245,\"longitude\":30.34088}"
+          }
+        }
+      ],
+      "mediaRefCount": 27,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:47932",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "5 мини–путешествий на 1 день недалеко от Минска",
+      "slug": "5-mini-puteshestvij-na-1-den-nedaleko-ot-minska",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [],
+      "mediaRefCount": 72,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:48687",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут на автодоме: зоопарк — водопады — сафари — Гомель",
+      "slug": "marshrut-na-avtodome-zoopark-vodopady-safari-gomel",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:48687",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u0413\\\\u043e\\\\u043c\\\\u0435\\\\u043b\\\\u044c\",\"map_picker\":false,\"latitude\":52.43134,\"longitude\":30.99367}"
+          }
+        }
+      ],
+      "mediaRefCount": 35,
+      "relationRefCount": 4
+    },
+    {
+      "sourceRecordKey": "wordpress-db:routes:51442",
+      "sourceEntityType": "wordpress-db:routes",
+      "targetTypeHint": "ROUTE",
+      "title": "Маршрут по Питеру: культурная программа на 2 суток без детей",
+      "slug": "marshrut-po-piteru-kulturnaya-programma-na-2-sutok-bez-detej",
+      "action": "CREATE",
+      "status": "PLANNED",
+      "warnings": [
+        {
+          "code": "ROUTE_LEVEL_LOCATION_DROPPED",
+          "message": "Route-level legacy location JSON is preserved in normalizedPayload.locationRaw/rawMeta for audit, but is intentionally not imported into Route or RouteStop.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:routes:51442",
+          "details": {
+            "locationRaw": "{\"address\":\"\\\\u0421\\\\u0430\\\\u043d\\\\u043a\\\\u0442-\\\\u041f\\\\u0435\\\\u0442\\\\u0435\\\\u0440\\\\u0431\\\\u0443\\\\u0440\\\\u0433, \\\\u0420\\\\u043e\\\\u0441\\\\u0441\\\\u0438\\\\u044f\",\"map_picker\":false,\"latitude\":59.93106,\"longitude\":30.36091}"
+          }
+        }
+      ],
+      "mediaRefCount": 43,
+      "relationRefCount": 4
+    }
+  ]
+}

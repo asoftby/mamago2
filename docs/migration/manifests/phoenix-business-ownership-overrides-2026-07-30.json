@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-business-ownership-overrides-2026-07-30",
+  "description": "Manual override scope for the 2 partial-coverage business-linked users excluded from the generic 36-candidate rule (business-ownership-plan.json classifies both as MANUAL_REVIEW / NO_TARGET_BUSINESS). Approved Place scope is copied verbatim from the committed Slice 12/13 script constants — not recomputed from current WordPress, DEV or LOCAL state. Missing, extra, or reordered Place IDs versus this exact list must fail closed before any write.",
+  "entries": [
+    {
+      "sourceRecordKey": "wordpress-db:user:130",
+      "legacyUserId": 130,
+      "approvedPlaceSourcePostIds": [
+        "18886"
+      ],
+      "excludedPlaceSourcePostIds": [
+        "30605"
+      ],
+      "excludedPlaceSourcePostIdsRationale": "draft status, never imported",
+      "expectedAction": "CREATE",
+      "expectedRoleTransition": "USER_TO_BUSINESS_OWNER_AFTER_OWNERSHIP_WRITE",
+      "rationale": "Deliberately reduced to the single publish-status owned Place; the user's other owned Place (wordpress-db:places:30605, draft) is intentionally excluded and was never imported.",
+      "provenance": {
+        "scriptPath": "scripts/migration-partial-coverage-ownership-golden.ts",
+        "commitSha": "0c844aad7034269134ae230b0ff3d83452fafd71",
+        "sliceName": "USERS Slice 12",
+        "sourceReference": "docs/migration/business-ownership-plan.json"
+      }
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:89",
+      "legacyUserId": 89,
+      "approvedPlaceSourcePostIds": [
+        "437",
+        "5457",
+        "5492",
+        "5515",
+        "5528",
+        "5579",
+        "12447",
+        "12923",
+        "13311",
+        "13317",
+        "13322",
+        "13323",
+        "13324",
+        "13327",
+        "13331",
+        "45846",
+        "48372",
+        "49952",
+        "49977"
+      ],
+      "excludedPlaceSourcePostIdsCount": 195,
+      "excludedPlaceSourcePostIdsRationale": "187 unpublished + 8 draft, never imported",
+      "expectedAction": "CREATE",
+      "expectedRoleTransition": "USER_TO_BUSINESS_OWNER_AFTER_OWNERSHIP_WRITE",
+      "rationale": "Deliberately reduced to the 19 already-migrated publish-status Places out of 214 owned in WordPress; the other 195 (187 unpublished, 8 draft) are intentionally excluded and were never imported.",
+      "provenance": {
+        "scriptPath": "scripts/migration-partial-coverage-ownership-user89.ts",
+        "commitSha": "c0405ab30efb5640a8aba6976bddd51df94dfb8a",
+        "sliceName": "USERS Slice 13",
+        "sourceReference": "docs/migration/business-ownership-plan.json"
+      }
+    }
+  ],
+  "recordCount": 2,
+  "totalApprovedPlaceCount": 20
+}

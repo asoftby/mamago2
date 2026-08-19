@@ -1,37 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/lib/auth/crypto";
+import { verifyLoginPassword } from "@/lib/auth/credentials";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
 import { acceptBusinessInvite } from "@/server/business/businessInvite.service";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { checkRateLimit, resetRateLimit } from "@/lib/security/rateLimit";
+import { maskEmail, requestMigratedAccountActivationByEmail } from "@/server/auth/activationRequestFlow";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
   invitationToken: z.string().min(1).optional(),
 });
-
-/**
- * Extracts client IP with support for Cloudflare and proxies.
- */
-function getClientIp(request: NextRequest): string {
-  const cf = request.headers.get("cf-connecting-ip");
-  if (cf) return cf;
-
-  const real = request.headers.get("x-real-ip");
-  if (real) return real;
-
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  return "unknown";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,9 +27,9 @@ export async function POST(request: NextRequest) {
     const invitationToken = parsed.invitationToken?.trim() || null;
 
     // Rate limit check: 5 attempts per 15 minutes per IP + Email
-    const ip = getClientIp(request);
+    const ip = getTrustedClientIp(request) ?? "unknown";
     const rateLimitKey = `login:${ip}:${email}`;
-    const rl = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+    const rl = await checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
 
     if (!rl.allowed) {
       return NextResponse.json(
@@ -63,22 +46,34 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!user) {
+    // Unknown, ineligible, and wrong-password accounts share the same timing
+    // profile — verifyLoginPassword always runs a real bcrypt comparison
+    // (against a dummy hash when there's nothing real to check), so a
+    // migrated PENDING_ACTIVATION account (passwordHash: null, therefore
+    // never eligible/matching here) costs exactly as much time as a wrong
+    // password or an unknown email. Only AFTER that constant-time check do
+    // migrated accounts get a distinct (still non-revealing-of-password)
+    // response.
+    const isValid = await verifyLoginPassword(password, user);
+
+    if (user && !isValid && user.status === "PENDING_ACTIVATION") {
+      const outcome = await requestMigratedAccountActivationByEmail({
+        email: user.email,
+        ip: getTrustedClientIp(request),
+        source: "LOGIN_FLOW",
+      });
       return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
+        {
+          success: false,
+          pendingActivation: true,
+          delivered: outcome.delivered,
+          maskedEmail: maskEmail(user.email),
+        },
+        { status: 200 },
       );
     }
 
-    // Verify password
-    if (!user.passwordHash) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-    const isValid = await verifyPassword(password, user.passwordHash);
-    if (!isValid) {
+    if (!user || !isValid) {
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
@@ -128,11 +123,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Success: reset rate limit counter for this IP + Email
-    resetRateLimit(`login:${ip}:${email}`);
+    await resetRateLimit(`login:${ip}:${email}`);
     
     // Create response with user data
     const response = NextResponse.json({
       success: true,
+      authAction: "login" as const,
       user: {
         id: user.id,
         email: user.email,

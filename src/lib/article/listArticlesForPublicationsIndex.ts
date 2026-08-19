@@ -46,6 +46,8 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       slug: true,
       subtitle: true,
       status: true,
+      geoScope: true,
+      cityId: true,
       publishedAt: true,
       updatedAt: true,
       contentJson: true,
@@ -141,6 +143,9 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
     const normalizedCityLabel = rawCityContext
       ? cityNameFromSlug(rawCityContext, cityCatalog) || rawCityContext
       : "—";
+    const citySlug = r.cityId
+      ? (cityCatalog.find((city) => city.id === r.cityId)?.slug ?? null)
+      : null;
     return {
       id: r.id,
       title: r.title,
@@ -156,6 +161,8 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       hasCover: !!(coverId && String(coverId).trim()),
       hasSlug: !!(r.slug && r.slug.trim()),
       hasBlocks: content.blocks.length > 0,
+      geoScope: r.geoScope ?? null,
+      citySlug,
     };
   });
 }

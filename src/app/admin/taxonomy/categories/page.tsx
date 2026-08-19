@@ -280,7 +280,10 @@ export default function TaxonomyCategoriesPage() {
             description="Создайте первую корневую или дочернюю категорию с помощью формы выше."
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable
+            minWidthClassName="min-w-[800px]"
+            scrollLabel="Таблица категорий, прокручивается по горизонтали"
+          >
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh()}>Название (RU)</th>

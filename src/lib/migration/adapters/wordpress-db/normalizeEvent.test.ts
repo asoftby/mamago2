@@ -1,0 +1,683 @@
+import assert from "node:assert/strict";
+
+import { normalizeEvent, type NormalizedEventCandidate } from "./normalizeEvent";
+import type { WordPressEventBundle, WordPressPostRow, WordPressTermRow } from "./types";
+
+function payloadOf(record: ReturnType<typeof normalizeEvent>): NormalizedEventCandidate {
+  return record.normalizedPayload as NormalizedEventCandidate;
+}
+
+const basePost: WordPressPostRow = {
+  ID: 401,
+  post_author: 5,
+  post_date: "2026-01-01 00:00:00",
+  post_content: "<p>Event desc</p>",
+  post_title: "Kids Fest",
+  post_excerpt: "A fun kids event",
+  post_status: "publish",
+  post_name: "kids-fest",
+  post_modified: "2026-01-02 00:00:00",
+  post_parent: 0,
+  guid: "https://example.com/?p=401",
+  post_type: "events",
+  post_mime_type: "",
+};
+
+const eventTerms: WordPressTermRow[] = [
+  { post_id: 401, term_id: 30, name: "Festival", slug: "festival", taxonomy: "events-category" },
+  { post_id: 401, term_id: 31, name: "Summer", slug: "summer", taxonomy: "occasion" },
+];
+
+function buildBundle(overrides: Partial<WordPressEventBundle> = {}): WordPressEventBundle {
+  return {
+    post: basePost,
+    postMeta: {
+      event_date: ["2026-08-15 10:00:00"],
+      "event-place-name": ["Central Park"],
+      location: ["Minsk, Central Park"],
+      "adress-event-place": ["ul. Central, 1"],
+      event_city: ["Minsk"],
+      "event-cost": ["<p>10 <b>BYN</b></p>"],
+      "url-buy-ticket": ["https://tickets.example.com/kids-fest"],
+      external_event_id: ["ext-401"],
+      external_last_updated: ["2026-01-02 12:00:00"],
+      "trailer-url": ["https://video.example.com/trailer.mp4"],
+      rank_math_title: ["SEO Title"],
+      rank_math_focus_keyword: ["kids fest"],
+    },
+    terms: eventTerms,
+    ...overrides,
+  };
+}
+
+function testFullEvent() {
+  const record = normalizeEvent(buildBundle());
+
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:401");
+  assert.equal(record.sourceEntityType, "wordpress-db:events");
+  assert.equal(record.targetTypeHint, "ACTIVITY");
+
+  const payload = payloadOf(record);
+  assert.equal(payload.title, "Kids Fest");
+  assert.equal(payload.slug, "kids-fest");
+  assert.equal(payload.content, "<p>Event desc</p>");
+  assert.equal(payload.excerpt, "A fun kids event");
+  assert.equal(payload.status, "publish");
+  assert.equal(payload.publishedAt, "2026-01-01 00:00:00");
+  assert.equal(payload.modifiedAt, "2026-01-02 00:00:00");
+  assert.equal(payload.venueNameRaw, "Central Park");
+  assert.equal(payload.locationRaw, "Minsk, Central Park");
+  assert.equal(payload.addressEventPlaceRaw, "ul. Central, 1");
+  assert.equal(payload.cityRaw, "Minsk");
+  assert.equal(payload.priceRaw, "10 BYN");
+  assert.equal(payload.ticketUrlRaw, "https://tickets.example.com/kids-fest");
+  assert.equal(payload.externalEventId, "ext-401");
+  assert.equal(payload.externalLastUpdatedRaw, "2026-01-02 12:00:00");
+  assert.equal(payload.trailerUrlRaw, "https://video.example.com/trailer.mp4");
+  assert.deepEqual(payload.seo, { title: "SEO Title", focusKeyword: "kids fest" });
+
+  assert.deepEqual(payload.media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
+  assert.deepEqual(record.mediaRefs, []);
+  assert.deepEqual(record.relationRefs, ["term:events-category:festival", "term:occasion:summer"]);
+}
+
+function testScheduleDraftOneTime() {
+  const record = normalizeEvent(buildBundle({ postMeta: { ...buildBundle().postMeta, event_date: ["2026-08-15 10:00:00"] } }));
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.eventDatesRaw, ["2026-08-15 10:00:00"]);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-08-15"]);
+  assert.ok(payload.scheduleDraft?.scheduleItems && payload.scheduleDraft.scheduleItems.length === 1);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-08-15");
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.startTime, "10:00");
+  assert.ok(!record.warnings?.some((w) => w.code.startsWith("EVENT_SCHEDULE")));
+}
+
+function testScheduleDraftMultiDate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ["2026-08-15 10:00:00", "2026-08-16 10:00:00", "2026-08-17 10:00:00"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "MULTI_DATE");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-08-15", "2026-08-16", "2026-08-17"]);
+}
+
+function testScheduleMissingWarns() {
+  const record = normalizeEvent(buildBundle({ postMeta: { ...buildBundle().postMeta, event_date: [] } }));
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft, null);
+  assert.deepEqual(payload.eventDatesRaw, []);
+  const warning = record.warnings?.find((w) => w.code === "EVENT_SCHEDULE_MISSING");
+  assert.ok(warning);
+  assert.equal(warning?.severity, "WARNING");
+}
+
+function testScheduleAmbiguousWarns() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ["2026-08-15 10:00:00", "not-a-real-date"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft, null, "any unparseable value blocks the whole schedule draft, not just that entry");
+  const warning = record.warnings?.find((w) => w.code === "EVENT_SCHEDULE_AMBIGUOUS");
+  assert.ok(warning);
+  assert.deepEqual(warning?.details?.eventDatesRaw, ["2026-08-15 10:00:00", "not-a-real-date"]);
+}
+
+function testScheduleDraftVoxelJsonArray() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-07-12 16:00:00","end":"2026-07-12 17:30:00","multiday":false,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-12"]);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-07-12");
+  assert.ok(!payload.scheduleDraft?.scheduleItems?.[0]?.dateEnd);
+  assert.ok(!record.warnings?.some((w) => w.code.startsWith("EVENT_SCHEDULE")));
+}
+
+function testScheduleDraftVoxelStartEndPreservesRange() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-07-12 16:00:00","end":"2026-07-14 17:30:00","multiday":true,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-12", "2026-07-14"]);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-07-12");
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.dateEnd, "2026-07-14");
+}
+
+function testScheduleDraftVoxelEndBeforeStartNormalizesAndWarns() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-07-14 16:00:00","end":"2026-07-12 17:30:00","multiday":true,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_DATE_RANGE_NORMALIZED"));
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-12", "2026-07-14"]);
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.date, "2026-07-12");
+  assert.equal(payload.scheduleDraft?.scheduleItems?.[0]?.dateEnd, "2026-07-14");
+}
+
+function testScheduleDraftMalformedEventDateWarnsAmbiguous() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ['[{"start": "not-a-date"}]'],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft, null);
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_SCHEDULE_AMBIGUOUS"));
+}
+
+function testScheduleDraftVoxelJsonMultiDate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: [
+          '[{"start":"2026-06-28 14:00:00","end":"2026-06-28 15:30:00","multiday":false,"allday":false},{"start":"2026-07-19 16:00:00","end":"2026-07-19 17:30:00","multiday":false,"allday":false}]',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft?.mode, "MULTI_DATE");
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-06-28", "2026-07-19"]);
+}
+
+function testMediaEvidenceExtractedWhenPresent() {
+  const withThumbnail = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, _thumbnail_id: ["999"] } }),
+  );
+  assert.deepEqual(payloadOf(withThumbnail).media, { featuredAttachmentId: 999, galleryAttachmentIds: [] });
+  assert.deepEqual(withThumbnail.mediaRefs, ["999"]);
+
+  const withGallery = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111", "222"] } }),
+  );
+  assert.deepEqual(payloadOf(withGallery).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222] });
+  assert.deepEqual(withGallery.mediaRefs, ["111", "222"]);
+
+  const withoutMedia = normalizeEvent(buildBundle());
+  assert.ok(!withoutMedia.warnings?.some((w) => w.code.startsWith("EVENT_MEDIA")));
+}
+
+function testMediaEvidenceDedupesDuplicateIds() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: ["111"],
+        gallery: ["111", "222", "222"],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: 111, galleryAttachmentIds: [111, 222] });
+  assert.deepEqual(record.mediaRefs, ["111", "222"]);
+}
+
+function testInvalidMediaSourceWarnsWithoutFailingCandidate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: ["not-an-id"],
+        gallery: ["333", "0", "-1"],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [333] });
+  assert.deepEqual(record.mediaRefs, ["333"]);
+  const warnings = record.warnings?.filter((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID") ?? [];
+  assert.equal(warnings.length, 3);
+}
+
+function testEmptyMediaSourceWarnsWithoutFailingCandidate() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: [""],
+        gallery: [""],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_FEATURED_IMAGE_MISSING"));
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_GALLERY_EMPTY"));
+}
+
+// ---------------------------------------------------------------------------
+// gallery comma-separated attachment ids — WordPress sometimes stores the
+// whole gallery as one comma-joined meta value instead of one meta row per
+// id (confirmed live for wordpress-db:events:60404).
+// ---------------------------------------------------------------------------
+
+function testGallerySingleIntegerValueUnchanged() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111] });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"));
+}
+
+function testGallerySeparateMetaValuesUnchanged() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111", "222", "333"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222, 333] });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"));
+}
+
+function testGalleryCommaSeparatedStringSplits() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["60407,60408,60409,60410"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, {
+    featuredAttachmentId: null,
+    galleryAttachmentIds: [60407, 60408, 60409, 60410],
+  });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"));
+}
+
+function testGalleryCommaSeparatedStringWithWhitespaceTrims() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: [" 111 , 222 ,333"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222, 333] });
+}
+
+function testGalleryCommaSeparatedStringPreservesOrder() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["333,111,222"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [333, 111, 222] });
+}
+
+function testGalleryCommaSeparatedStringDedupesKeepingFirstOccurrence() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["111,222,111,333,222"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [111, 222, 333] });
+}
+
+function testGalleryMixedValidInvalidTokensKeepsValidAndWarnsOnlyInvalid() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["60407,abc,60409,-1,60410,1.5"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, {
+    featuredAttachmentId: null,
+    galleryAttachmentIds: [60407, 60409, 60410],
+  });
+  const warnings = record.warnings?.filter((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID") ?? [];
+  assert.deepEqual(
+    warnings.map((w) => (w.details as { value?: string } | undefined)?.value),
+    ["abc", "-1", "1.5"],
+  );
+}
+
+function testGalleryFullyInvalidValueYieldsEmptyResultAndWarning() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, gallery: ["abc,def,-1"] } }),
+  );
+  assert.deepEqual(payloadOf(record).media, { featuredAttachmentId: null, galleryAttachmentIds: [] });
+  const warnings = record.warnings?.filter((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID") ?? [];
+  assert.equal(warnings.length, 3);
+}
+
+/** Regression fixture for wordpress-db:events:60404 — real observed shape. */
+function testGalleryCommaSeparatedRegression_60404() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        _thumbnail_id: ["60406"],
+        gallery: ["60407,60408,60409,60410"],
+      },
+    }),
+  );
+
+  assert.deepEqual(payloadOf(record).media, {
+    featuredAttachmentId: 60406,
+    galleryAttachmentIds: [60407, 60408, 60409, 60410],
+  });
+  assert.ok(
+    !record.warnings?.some((w) => w.code === "EVENT_MEDIA_SOURCE_INVALID"),
+    "EVENT_MEDIA_SOURCE_INVALID must no longer fire for this real comma-joined gallery value",
+  );
+}
+
+function testCategoryOccasionTermsNotMapped() {
+  const record = normalizeEvent(buildBundle());
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.sourceTerms, [
+    { termId: 30, taxonomy: "events-category", name: "Festival", slug: "festival", normalizedName: "festival" },
+    { termId: 31, taxonomy: "occasion", name: "Summer", slug: "summer", normalizedName: "summer" },
+  ]);
+}
+
+function testPriceStrippedToPlainText() {
+  const record = normalizeEvent(buildBundle());
+  assert.equal(payloadOf(record).priceRaw, "10 BYN");
+
+  const withEmptyPrice = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, "event-cost": ["<p></p>"] } }),
+  );
+  assert.equal(payloadOf(withEmptyPrice).priceRaw, null);
+}
+
+function testEmptyOrBrokenMetaDoesNotThrow() {
+  const record = normalizeEvent(buildBundle({ postMeta: {}, terms: [] }));
+  const payload = payloadOf(record);
+  assert.equal(payload.venueNameRaw, null);
+  assert.equal(payload.locationRaw, null);
+  assert.equal(payload.addressEventPlaceRaw, null);
+  assert.equal(payload.cityRaw, null);
+  assert.equal(payload.priceRaw, null);
+  assert.equal(payload.ticketUrlRaw, null);
+  assert.equal(payload.externalEventId, null);
+  assert.equal(payload.trailerUrlRaw, null);
+  assert.equal(payload.scheduleDraft, null);
+  assert.deepEqual(payload.sourceTerms, []);
+  assert.deepEqual(payload.rawMeta, {});
+  assert.deepEqual(record.mediaRefs, []);
+  assert.deepEqual(record.relationRefs, []);
+  assert.equal(record.warnings?.length, 1);
+  assert.equal(record.warnings?.[0]?.code, "EVENT_SCHEDULE_MISSING");
+}
+
+function testAgeEvidencePlus() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        age: ["3+"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(payload.ageEvidence);
+  assert.equal(payload.ageEvidence?.confidence, "MATCHED_HIGH");
+  assert.deepEqual(payload.ageEvidence?.parsed, { minYears: 3 });
+}
+
+function testAgeEvidenceRange() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        age_text: ["3–7"],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(payload.ageEvidence);
+  assert.equal(payload.ageEvidence?.confidence, "MATCHED_HIGH");
+  assert.deepEqual(payload.ageEvidence?.parsed, { minYears: 3, maxYears: 7 });
+}
+
+function testAgeEvidenceTextMalyshiLowConfidence() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, post_title: "Концерт для малышей" },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.ok(payload.ageEvidence);
+  assert.equal(payload.ageEvidence?.confidence, "MATCHED_LOW");
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_AGE_LOW_CONFIDENCE"));
+}
+
+function testAgeEvidenceUnknownWarnsUnmatched() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        age: ["для всей семьи"],
+      },
+    }),
+  );
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_AGE_UNMATCHED"));
+}
+
+// Fixed migration clock (Europe/Minsk local day) mirroring the real
+// 2026-07-18 read-only Event audit — never `new Date()`, so these tests stay
+// deterministic regardless of when they actually run.
+const MIGRATION_NOW = new Date("2026-07-18T00:00:00+03:00");
+
+function testNoClockMeansNoPruning() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, event_date: ["2020-01-01 00:00:00"] } }),
+  );
+  const payload = payloadOf(record);
+  assert.deepEqual(
+    payload.scheduleDraft?.dates,
+    ["2020-01-01"],
+    "without an injected clock, normalizeEvent never prunes or excludes sessions",
+  );
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_PAST_ONLY_EXCLUDED"));
+}
+
+function testPastOnlyEventExcluded_49842() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 49842 },
+      postMeta: { ...buildBundle().postMeta, event_date: ["2025-12-13 00:00:00", "2026-03-14 00:00:00"] },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:49842");
+  const payload = payloadOf(record);
+  assert.equal(payload.scheduleDraft, null, "past-only event must not carry a schedule draft forward");
+  const warning = record.warnings?.find((w) => w.code === "EVENT_PAST_ONLY_EXCLUDED");
+  assert.ok(warning, "expected EVENT_PAST_ONLY_EXCLUDED warning");
+  assert.deepEqual(warning?.details?.droppedPastDates, ["2025-12-13", "2026-03-14"]);
+}
+
+function testMixedPastFuturePrunesPastSessions_42041() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 42041 },
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ["2026-03-28 00:00:00", "2026-05-30 00:00:00", "2026-07-19 00:00:00"],
+      },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:42041");
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-19"]);
+  assert.equal(payload.scheduleDraft?.mode, "ONE_TIME");
+  const warning = record.warnings?.find((w) => w.code === "EVENT_PAST_SESSIONS_PRUNED");
+  assert.ok(warning);
+  assert.deepEqual(warning?.details?.droppedPastDates, ["2026-03-28", "2026-05-30"]);
+}
+
+function testMixedPastFuturePrunesPastSessions_56226() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 56226 },
+      postMeta: { ...buildBundle().postMeta, event_date: ["2026-06-28 00:00:00", "2026-07-19 00:00:00"] },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:56226");
+  assert.deepEqual(payloadOf(record).scheduleDraft?.dates, ["2026-07-19"]);
+}
+
+function testTodaySessionCountsAsActive_62097() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 62097 },
+      postMeta: { ...buildBundle().postMeta, event_date: ["2026-07-10 00:00:00", "2026-07-18 00:00:00"] },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:62097");
+  assert.deepEqual(
+    payloadOf(record).scheduleDraft?.dates,
+    ["2026-07-18"],
+    "today's session must count as active, not past",
+  );
+}
+
+function testDateRangeCrossingTodayCountsAsActive() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ['[{"start":"2026-07-15 10:00:00","end":"2026-07-20 18:00:00","multiday":true,"allday":false}]'],
+      },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  // Retained (underway, end >= today), but the start is clamped to today —
+  // the original past start (2026-07-15) must never reach the writer.
+  assert.deepEqual(
+    payloadOf(record).scheduleDraft?.dates,
+    ["2026-07-18", "2026-07-20"],
+    "a range already underway must be retained with its start clamped to today",
+  );
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_ACTIVE_RANGE_START_CLAMPED"));
+}
+
+function testActiveRangeClamped_64251() {
+  const record = normalizeEvent(
+    buildBundle({
+      post: { ...basePost, ID: 64251 },
+      postMeta: {
+        ...buildBundle().postMeta,
+        event_date: ['[{"start":"2026-06-01 08:30:00","end":"2026-08-21 18:00:00","multiday":true,"allday":false}]'],
+      },
+    }),
+    { now: MIGRATION_NOW },
+  );
+  assert.equal(record.sourceRecordKey, "wordpress-db:events:64251");
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.scheduleDraft?.dates, ["2026-07-18", "2026-08-21"]);
+  assert.deepEqual(payload.scheduleDraft?.scheduleItems, [
+    { date: "2026-07-18", dateEnd: "2026-08-21", startTime: "08:30" },
+  ]);
+  const warning = record.warnings?.find((w) => w.code === "EVENT_ACTIVE_RANGE_START_CLAMPED");
+  assert.ok(warning);
+  assert.deepEqual(warning?.details, {
+    originalStartDate: "2026-06-01",
+    clampedStartDate: "2026-07-18",
+    endDate: "2026-08-21",
+    droppedPastDayCount: 47,
+  });
+}
+
+function testLocationParsedFromJsonMeta() {
+  const record = normalizeEvent(
+    buildBundle({
+      postMeta: {
+        ...buildBundle().postMeta,
+        location: [
+          '{"address":"улица Мясникова 44, Минск","map_picker":false,"latitude":53.89602,"longitude":27.53968}',
+        ],
+      },
+    }),
+  );
+  const payload = payloadOf(record);
+  assert.deepEqual(payload.location, { address: "улица Мясникова 44, Минск", lat: 53.89602, lng: 27.53968 });
+  assert.ok(!record.warnings?.some((w) => w.code === "EVENT_LOCATION_JSON_INVALID"));
+}
+
+function testLocationParsedFromPlainText() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, location: ["Минск, Central Park"] } }),
+  );
+  assert.deepEqual(payloadOf(record).location, { address: "Минск, Central Park", lat: null, lng: null });
+}
+
+function testLocationMalformedJsonWarns() {
+  const record = normalizeEvent(
+    buildBundle({ postMeta: { ...buildBundle().postMeta, location: ['{"address":"broken'] } }),
+  );
+  assert.equal(payloadOf(record).location, null);
+  assert.ok(record.warnings?.some((w) => w.code === "EVENT_LOCATION_JSON_INVALID"));
+}
+
+function main() {
+  testFullEvent();
+  testScheduleDraftOneTime();
+  testScheduleDraftMultiDate();
+  testScheduleMissingWarns();
+  testScheduleAmbiguousWarns();
+  testScheduleDraftVoxelJsonArray();
+  testScheduleDraftVoxelStartEndPreservesRange();
+  testScheduleDraftVoxelEndBeforeStartNormalizesAndWarns();
+  testScheduleDraftMalformedEventDateWarnsAmbiguous();
+  testScheduleDraftVoxelJsonMultiDate();
+  testMediaEvidenceExtractedWhenPresent();
+  testMediaEvidenceDedupesDuplicateIds();
+  testInvalidMediaSourceWarnsWithoutFailingCandidate();
+  testEmptyMediaSourceWarnsWithoutFailingCandidate();
+  testGallerySingleIntegerValueUnchanged();
+  testGallerySeparateMetaValuesUnchanged();
+  testGalleryCommaSeparatedStringSplits();
+  testGalleryCommaSeparatedStringWithWhitespaceTrims();
+  testGalleryCommaSeparatedStringPreservesOrder();
+  testGalleryCommaSeparatedStringDedupesKeepingFirstOccurrence();
+  testGalleryMixedValidInvalidTokensKeepsValidAndWarnsOnlyInvalid();
+  testGalleryFullyInvalidValueYieldsEmptyResultAndWarning();
+  testGalleryCommaSeparatedRegression_60404();
+  testCategoryOccasionTermsNotMapped();
+  testPriceStrippedToPlainText();
+  testEmptyOrBrokenMetaDoesNotThrow();
+  testAgeEvidencePlus();
+  testAgeEvidenceRange();
+  testAgeEvidenceTextMalyshiLowConfidence();
+  testAgeEvidenceUnknownWarnsUnmatched();
+  testNoClockMeansNoPruning();
+  testPastOnlyEventExcluded_49842();
+  testMixedPastFuturePrunesPastSessions_42041();
+  testMixedPastFuturePrunesPastSessions_56226();
+  testTodaySessionCountsAsActive_62097();
+  testDateRangeCrossingTodayCountsAsActive();
+  testActiveRangeClamped_64251();
+  testLocationParsedFromJsonMeta();
+  testLocationParsedFromPlainText();
+  testLocationMalformedJsonWarns();
+}
+
+main();
+console.log("normalizeEvent tests: OK");

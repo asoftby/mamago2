@@ -1,0 +1,901 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "phoenix-offers-domain-hash-v2-audit-2026-07-31",
+  "generatedFrom": {
+    "unifiedScopeManifestHash": "4ecdd602ecd8d78459a118cd505a28932700da9d7042c6a2ade1852abc91695d",
+    "rawSnapshotCommitted": false,
+    "targetEnvironment": "LOCAL_READ_ONLY"
+  },
+  "total": 63,
+  "frozenPredecessorMatchCount": 63,
+  "freshLegacyHashExactCount": 16,
+  "lineageTransitionCandidateCount": 0,
+  "safeUpdateCount": 0,
+  "conflictCount": 63,
+  "blockedCount": 0,
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18932",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7a6e74cbead69b1500cae35acbf295f664abfd961533931ffa3364c50c6fa3ec"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18929",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:969fc546e3f28869b10c8880c0a9bc0b66f4d6dea1311a9a4f6c15ad16844d1f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18931",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:b56a0f3b4fb7cd7cd14c5bba073ed357e65eba0af475317ed067df41f75c4381"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18933",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9b7dcd3abd9d3aae27a02eef225cf6fb65900abaadeef6a9a0f1ca4b587f76cb"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:18934",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:ce1b5cace1cf950b007c498813f8094a7a6ccda821e6b051441e50d30c6443ed"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29113",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:98d02344ba05938697af6b66a1f1d597170df8a610fef7fba13645cc86f5e739"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29124",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:e6aaaf45eb132f66319c3843c2e0ae3278e0634ec6f3324743d2ba7016abbcb5"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29135",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:37343d832cf9af96a60fcb0d254247d950a67c79f705fe0176d1755005ecffe0"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29155",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:bb7eeb3075fccdfc30501e9298f60576aa6d0fc8bf1268e0857a7c89f022e804"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:29158",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:817ffa1547fd19bd3e8bbbcd8774195f727c47578be6a69580422b5694f463bb"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:32683",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:21ff426c9c699b3dfa2f1012feb91c16e3d742a7db974365e0a48679942997de"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33312",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:567d042e107b7ce7548c0188f8d90e165305496e7d61f1906e72392b8fddc288"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33317",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:e589d7d5a70b74b14c1569e1bddac87595945160124ae7b8937042c7a0318053"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33345",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9a8c36dff1782d24481873e225965a1dd446ddd9d1e2970fbf96271da5f68140"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33613",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9484acf0b7b4d3bc213baf0847dae233b5f278e8ed27976391ab1a5b51a0179a"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33649",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:4996a8d413d65973995ca38eab94101d10d070b5af3139cff2c8faff56def189"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33652",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:f26e792c4ca687d43e9c626a4ac89f424890594feb995624b3c5d288f92de103"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33654",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:77c985cfea1ad033b13f440df07df9dbcf9c559872542ff50aa8f99a32999849"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33660",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7716031ed3f3fa29a4b043d94262dc1a8c3615c105a1ca5c720c6c7ec430a503"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33667",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:f6b45b6621af4b6a1690de6f5701474d5e17af083160c5419e1cbffee7298c75"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:33673",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:3e50c448ed9f20e3a58ee883b4f633ea78d8611f1e1b74b6d55c8f2a3f76ace4"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:42304",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7151eab805036894db531474a4dd1d12c8cb154a7819c7aba69c1e166dfed339"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43038",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9b1cb3ad502bf20990e0bdd49df95357544884a6b52333e152befee8e27a8c5e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43065",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:43154076d65529ded0df16d5bf232925cee33e6219060dbc9eb969c24f0cd0d1"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43068",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:97fbdc498533bdd356a10d870c949073b6ca7423613c34a7e738d5dc6a2bbb6d"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43103",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:34619b71282107ed4495cbf5d52b972205e8724719df1de4f6fd6ba9cb87ec20"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43259",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:a20880c231eae7916a9d587e8d7769e612ce4e17fae6ffb32a449cd40c2007be"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43267",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:c9f5b5e643ea71ba65802c8d2a0d2a3aa0c3887d7808f77ea76df2b49be80e34"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43269",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9ac44421bf64b2a6304f26d46d5021028590e080e20516bc067eb0cfdfc42d06"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43278",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:5cd501c28c15f52a4a1ea23e8259ca804c6a90bfacc48affdf6694268bf6f9b2"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43309",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:cebaf2ec3aa1caad1f7a4279d507e20cc169f09c49885c0ba298b0135913122e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43313",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7532f332df90838527176f4d1f78272ef56f5a38953bedfb8d58f69b1fb8081a"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43316",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:a073d5afd3e1acb3be67d16d9fbcfb7ce2c555a09e417bd0d77a28d56968100b"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43331",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:294e81bfd708bf438b333bcde7da5cc51448f02d64721c64b667560a2e361eda"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43340",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:e5f9a5930a43e424f53927d59bf5f0b08f6859073a8ad8bf30ddab4b88bba30f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43348",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:faeb72cf21d15cb733346c610cc6c6cd96a9db14e5251563173288c970fc5a89"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43350",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:c8d99a9d39c4419d4c1bf933bc1d23d86e86e61da7a7d3fc71d62a65361985b9"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43352",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9d015c8242137a3f099e9da0a3e618c4d8b8e4ee5129e4760a4942b299f34b68"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43354",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:1bb4a0a279958a91de3e734146588d1a46ae566b1698c99010071962e3239698"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43365",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7956360a90edf5d0d905e44984eeb17bc404d9cccdc2aa3ef66716b654e28a47"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43370",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:9b437a039274ed464ac30aea33795d9da6b4ee372168eecf64729a2fc6d53ca4"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43386",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:287807fdad432d3da30a2511832963d95f305bddc72dd7f8e3b0ad245f961eb2"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43388",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:797b426cc15fc3fd93c32ed40c24644f9c0f88d44d99bf234e281a117fc8abe4"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43408",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:31e3ff845c6688e5dbb7ceb9735cc79934f627da269687b5c6389849fdbea823"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43410",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7aab5865c28a4ab83545a8cab0200abbcc2ef0a38c4cfe6f9196772b1e317661"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43412",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:3ac5484130e59f5aae957d701ac6a8b532d5104114bd870acf159e793253c0c7"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43646",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:cd5bd730f647bb1e1fd16821ca9d0774ced5685ff70ceb20acc0de9391cf877b"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43648",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:2747bd9c27262840a3cef77c8a80730c06d5f6a645d32f8ee1836f439c661879"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43650",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:8d8c4051aaba8e7dbef215a05695d54687ae90b80a708360ee57c17f97c123ce"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43653",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:565ce4051a85747425142ffe199a1aa9c2e79277b5ce1083c1a8e8091b795222"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43655",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:ec72649ef0e20e3d9835595f084c081c539ac8a1ceadaada93fc4fd90c400c6c"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43657",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:1f86bc22201e67fc7feb225b166d5ad6ce11e62c4a738b736644ddf4c921f9c0"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43659",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:840d7b823ba1817aaf0bf19491a494ddeed74c75ee6b1f622f31d36c2ca7f41f"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43661",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:800471ae3ce5142f409ea60dcbdfa8a42f7f2a1dddc22ab6889c977575c9b55e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43663",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7c70fe1fbd477f09f91704e4b03b5e9011a36b01f3919894e9e9577cc865c3a2"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43665",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:7d207f8da5208d39c8788ea4fd6d5fc95a570941b25394eb13e3857f18aac272"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43667",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:4fb09316576724863760e21c557ce2cf199f600a53f4477eede3a5c2374988b1"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43669",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:5aaece1d4713ce9858757a090cfd6055589cb0cc61421922c2b97c8f3f95695b"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:43675",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": true,
+      "changedFieldCategories": [
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:b704b2288449c392e8b4fcb76f6d91f2f851600bc65c6ee19c68db0179282623"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:51435",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "CONTENT",
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SEO",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "CONTENT+MEDIA_REFERENCES_UNRECONCILED+SEO+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:6d6cd914ef2fee6b24f3890713b363601fbe0ddfa3a6883d9c9127ce91e0289a"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:15941",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:79bb0a67c3924952dd4574d65d776bf7ab33eb10f2ed70f3dbcb6b903780114d"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:16403",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:bf169b8a28f33557d15a6bf111686ee8bbfbeb47ef9384c4860c0344cb57b53e"
+    },
+    {
+      "sourceRecordKey": "wordpress-db:hb-programs:16458",
+      "frozenPredecessorMatches": true,
+      "freshLegacyHashMatches": false,
+      "changedFieldCategories": [
+        "MEDIA_REFERENCES_UNRECONCILED",
+        "SCHEDULE_UNSUPPORTED",
+        "SEO",
+        "SLUG",
+        "STATUS_VISIBILITY"
+      ],
+      "disposition": "CONFLICT",
+      "reasonCode": "UNSUPPORTED_MULTI_FIELD_DRIFT",
+      "requiredWriterCapability": "MEDIA_REFERENCES_UNRECONCILED+SCHEDULE_UNSUPPORTED+SEO+SLUG+STATUS_VISIBILITY",
+      "domainHashV2": "offer-domain-v2:10e470b388db6b2d017e03129d48001836e4b82bd8e8762721c55839ec7be01d"
+    }
+  ]
+}

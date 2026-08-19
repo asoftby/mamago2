@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { toast } from "@/lib/toast";
 import { Toggle } from "@/components/ui/Toggle";
-import { Input } from "@/components/ui/input";
 import { LoadingBlock } from "@/components/admin/ui/StateBlock";
 
 type BoostSettings = {
@@ -21,23 +19,15 @@ const TOGGLES: { key: keyof BoostSettings; label: string; description: string }[
   { key: "allowBoostInFree",  label: "Буст в «Бесплатно»",  description: "Разрешить продвигаемый контент в интенте Free" },
 ];
 
-const NUMBERS: { key: keyof BoostSettings; label: string; description: string; min: number; max: number }[] = [
-  { key: "maxBoostedItemsPerStory", label: "Макс. буст-карточек в story",  description: "Максимум продвигаемых позиций на одну story", min: 0, max: 10 },
-  { key: "maxBoostScore",           label: "Макс. boost score",            description: "Потолок скора буста при ранжировании", min: 0, max: 1000 },
-  { key: "repeatCooldown",          label: "Cooldown повтора (часы)",       description: "Через сколько часов один и тот же буст может появиться снова", min: 0, max: 168 },
+const NUMBERS: { key: keyof BoostSettings; label: string; description: string }[] = [
+  { key: "maxBoostedItemsPerStory", label: "Макс. буст-карточек в story",  description: "Максимум продвигаемых позиций на одну story" },
+  { key: "maxBoostScore",           label: "Макс. boost score",            description: "Потолок скора буста при ранжировании" },
+  { key: "repeatCooldown",          label: "Cooldown повтора (часы)",       description: "Через сколько часов один и тот же буст может появиться снова" },
 ];
 
 export default function BoostRulesPage() {
-  const [settings, setSettings] = useState<BoostSettings>({
-    allowBoostInToday: true,
-    allowBoostInNew: true,
-    allowBoostInFree: false,
-    maxBoostedItemsPerStory: 2,
-    maxBoostScore: 100,
-    repeatCooldown: 24,
-  });
+  const [settings, setSettings] = useState<BoostSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,22 +44,6 @@ export default function BoostRulesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const save = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/admin/ranking", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "boost", data: settings }),
-      });
-      if (res.ok) toast.success("Настройки сохранены");
-      else toast.error("Ошибка сохранения");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <div className="p-6 max-w-2xl space-y-6">
       <div>
@@ -79,11 +53,19 @@ export default function BoostRulesPage() {
         </p>
       </div>
 
-      {loading ? (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm text-amber-900">
+        <p className="font-medium">Только для чтения</p>
+        <p className="mt-1 text-amber-800">
+          Аудит подтвердил: реальный коммерческий буст (модель <code>Boost</code>, offer-промо в
+          discovery-лентах) не использует эти поля — они сохраняются в базе, но нигде не читаются
+          production-кодом. Редактирование отключено до завершения редизайна раздела Ranking.
+        </p>
+      </div>
+
+      {loading || !settings ? (
         <LoadingBlock title="Загрузка настроек буста..." compact />
       ) : (
         <div className="space-y-4">
-          {/* Toggles */}
           <div className="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100">
             {TOGGLES.map(({ key, label, description }) => (
               <div key={key} className="flex items-center justify-between px-5 py-4">
@@ -93,42 +75,29 @@ export default function BoostRulesPage() {
                 </div>
                 <Toggle
                   checked={settings[key] as boolean}
-                  onChange={(val) => setSettings((s) => ({ ...s, [key]: val }))}
+                  onChange={() => {}}
+                  disabled
                   aria-label={label}
                 />
               </div>
             ))}
           </div>
 
-          {/* Number inputs */}
           <div className="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-100">
-            {NUMBERS.map(({ key, label, description, min, max }) => (
+            {NUMBERS.map(({ key, label, description }) => (
               <div key={key} className="flex items-center justify-between px-5 py-4">
                 <div className="flex-1 min-w-0 mr-4">
                   <p className="text-sm font-medium text-gray-900">{label}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{description}</p>
                 </div>
-                <Input
-                  type="number"
-                  min={min}
-                  max={max}
-                  value={settings[key] as number}
-                  onChange={(e) => setSettings((s) => ({ ...s, [key]: Number(e.target.value) }))}
-                  className="h-9 w-20 shrink-0 px-2 py-0 text-center text-sm"
-                />
+                <div className="shrink-0 text-sm font-semibold text-gray-500 tabular-nums">
+                  {settings[key] as number}
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      <button
-        onClick={save}
-        disabled={saving || loading}
-        className="h-10 px-6 rounded-2xl bg-[#EF8759] text-white text-sm font-semibold hover:bg-[#e8784a] disabled:opacity-40 transition-colors"
-      >
-        {saving ? "Сохранение..." : "Сохранить"}
-      </button>
     </div>
   );
 }

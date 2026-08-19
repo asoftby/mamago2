@@ -80,10 +80,15 @@ export function whenLabel(filters: {
   return "Выберите…";
 }
 
-/** Окончание заголовка страницы (H1) при выборе пресета «когда» в URL */
-export function whenPresetPageTitleSuffix(whenPreset: WhenPreset): string {
-  if (whenPreset === "TODAY") return " сегодня";
-  if (whenPreset === "TOMORROW") return " завтра";
-  if (whenPreset === "WEEKEND") return " на выходных";
+/** Окончание H1 должно описывать ту же дату, которой ограничен запрос. */
+export function whenPresetPageTitleSuffix(filters: {
+  whenPreset: WhenPreset;
+  dateFrom: string | null;
+  dateTo: string | null;
+}): string {
+  if (filters.whenPreset === "TODAY") return " сегодня";
+  if (filters.whenPreset === "TOMORROW") return " завтра";
+  if (filters.whenPreset === "WEEKEND") return " на выходных";
+  if (filters.dateFrom) return ` — ${whenLabel(filters)}`;
   return "";
 }

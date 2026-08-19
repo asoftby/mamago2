@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { mapRouteStopPublicPhotos } from "@/lib/routes/mapRouteStopPublicPhotos";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "Маршруты — mamaGo",
@@ -43,6 +44,7 @@ export default async function RoutesPage() {
         address: s.place?.title ?? s.customTitle ?? s.address ?? "",
         note: s.note,
         photoUrl: s.photoUrl ?? "",
+        photos: mapRouteStopPublicPhotos({ photoUrl: s.photoUrl, images: s.images }),
         lat: s.lat ?? undefined,
         lng: s.lng ?? undefined,
       })),

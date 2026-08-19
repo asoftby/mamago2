@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import type { SecondaryFilterGroup } from "@/lib/discovery/filterConfigByIntent";
+import type { Intent } from "@/lib/intent";
+import { isExecutableAdminFilterKey } from "@/lib/discovery/executableFilterRegistry";
 
 export const runtime = "nodejs";
+
+function isIntent(value: string): value is Intent {
+  return value === "kuda" || value === "classes" || value === "birthday" || value === "routes";
+}
 
 /**
  * GET /api/public/discovery-filters?intent=kuda
@@ -16,7 +22,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const intent = searchParams.get("intent");
 
-  if (!intent) {
+  if (!intent || !isIntent(intent)) {
     return NextResponse.json({ error: "intent required" }, { status: 400 });
   }
 
@@ -40,7 +46,7 @@ export async function GET(req: Request) {
   });
 
   const groups: SecondaryFilterGroup[] = placements
-    .filter((p) => p.filter.isActive)
+    .filter((p) => p.filter.isActive && isExecutableAdminFilterKey(intent as Intent, p.filter.slug))
     .map((p) => {
       const f = p.filter;
       const ui = f.ui as SecondaryFilterGroup["ui"];

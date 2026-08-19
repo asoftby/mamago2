@@ -660,34 +660,6 @@ export function PlaceLocationPicker({
 
   return (
     <div className="space-y-6">
-      {/* Debug Panel (dev-only) */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4">
-          <h4 className="text-xs font-semibold text-yellow-900 mb-2">🔍 Debug: Geo Data</h4>
-          <pre className="text-xs text-yellow-800 overflow-auto">
-            {JSON.stringify(
-              {
-                lat: location?.lat || null,
-                lng: location?.lng || null,
-                cityId: cityId || null,
-                districtAutoId: districtAutoId || null,
-                districtManualId: districtManualId || null,
-                metroAutoId: metroAutoId || null,
-                metroAutoDistanceM: metroAutoDistanceM || null,
-                metroManualId: metroManualId || null,
-                metroManualDistanceM: metroManualDistanceM || null,
-                geoOptionsDebug,
-                geoOptionsWarning,
-                selectsVisible: showSelects,
-                readOnlyVisible: showReadOnlyEnrichment,
-              },
-              null,
-              2
-            )}
-          </pre>
-        </div>
-      )}
-
       {/* Status indicators */}
       {(isSaving || isSaved || error) && (
         <div className="flex items-center gap-2">

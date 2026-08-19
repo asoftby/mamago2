@@ -6,6 +6,10 @@ import {
   deleteActivity,
   canManageActivity,
 } from "@/server/services/activity.service";
+import {
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -97,10 +101,16 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await deleteActivity(id);
+    await deleteActivity(id, user.role);
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete activity error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

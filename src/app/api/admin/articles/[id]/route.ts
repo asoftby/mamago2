@@ -7,6 +7,11 @@ import {
 import { getArticleForEditor, saveArticleDraft } from "@/lib/article/articleAdminService";
 import prisma from "@/lib/prisma";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 export async function GET(
   _req: NextRequest,
@@ -72,7 +77,7 @@ export async function PUT(
 }
 
 /**
- * Удаление: черновики (DRAFT) — сразу; опубликованные/прочее — только после ARCHIVED.
+ * Удаление: только полностью изолированные черновики.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -94,23 +99,35 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const canDelete =
-    row.status === "DRAFT" || row.status === "ARCHIVED";
+  const deleteOperation =
+    row.status === "ARCHIVED" ? "deleteArchived" : "deleteDraft";
 
-  if (!canDelete) {
+  if (deleteOperation === "deleteArchived" && user.role !== "ADMIN") {
     return NextResponse.json(
-      {
-        error: "DELETE_NOT_ALLOWED",
-        message: "Сначала архивируйте материал, затем удалите",
-      },
-      { status: 400 },
+      { error: "Удаление из архива доступно только администратору" },
+      { status: 403 },
     );
   }
 
   try {
+    await assertContentLifecycleOperationAllowed({
+      contentType: "ARTICLE",
+      contentId: id,
+      operation: deleteOperation,
+      status: row.status,
+      actorRole: user.role,
+      prisma,
+    });
+
     await prisma.article.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    if (isContentLifecycleOperationError(e)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(e),
+        { status: e.statusCode },
+      );
+    }
     console.error("[admin/articles DELETE]", e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Delete failed" },

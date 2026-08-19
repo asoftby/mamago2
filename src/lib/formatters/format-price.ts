@@ -4,9 +4,9 @@
  * RULE: user-facing prices must be displayed only through this formatter layer.
  * Technical currency codes like `BYN` may still exist in DB/API/schema contexts.
  */
-import { DEFAULT_CURRENCY } from "@/config/currency";
+import { BELARUSIAN_RUBLE_SYMBOL } from "@/lib/currency";
 
-export const BELARUS_CURRENCY_SYMBOL = DEFAULT_CURRENCY.symbol;
+export const BELARUS_CURRENCY_SYMBOL = BELARUSIAN_RUBLE_SYMBOL;
 export const BYN_SYMBOL = BELARUS_CURRENCY_SYMBOL;
 
 type FormatPriceOptions = {
@@ -16,7 +16,9 @@ type FormatPriceOptions = {
   hideZero?: boolean;
 };
 
-const UI_CURRENCY_RE = /\bBYN\b|\bBr\b|руб\.?|р\.|₽/gi;
+const UI_CURRENCY_RE = /\bBYN\b|\bBr\b|руб\.?|р\.|₽|₿/gi;
+const LEGACY_BELARUS_CURRENCY_GLYPH = "\uE901";
+const LEGACY_WIZARD_CURRENCY_RE = /(\d(?:[\s\u00A0]?\d)*(?:[.,]\d+)?)\s*[ВвBb](?=$|[\s.,;:!?)\]])/gu;
 
 function formatNumber(value: number): string {
   // Always 2 decimal places: 15 → "15,00", 15.5 → "15,50"
@@ -33,15 +35,47 @@ function parseNumberish(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Числовой/структурный канон валюты: всё приводится к `U+E901` (символ из
+ * шрифта nbrb), который на контролируемых JSX-рендерах превращается в
+ * <BelarusianRubleIcon/> через renderPriceWithIcon/renderCurrencyText.
+ * Применять для прайс-чипов, балансов, коротких прайс-лейблов.
+ */
 export function normalizeUiCurrencyText(
   value: string | null | undefined,
   currencySymbol: string = BELARUS_CURRENCY_SYMBOL,
 ): string {
   if (!value) return "";
   return value
+    .replaceAll(LEGACY_BELARUS_CURRENCY_GLYPH, currencySymbol)
+    .replace(LEGACY_WIZARD_CURRENCY_RE, `$1 ${currencySymbol}`)
     .replace(UI_CURRENCY_RE, currencySymbol)
     .replace(/\s{2,}/g, " ")
     .replace(new RegExp(`${currencySymbol}\\s*${currencySymbol}`, "g"), currencySymbol)
+    .trim();
+}
+
+/** Текстовый канон бел. рубля для рич-текст-канала (TipTap/хранимый HTML/SEO). */
+export const RICH_TEXT_CURRENCY_TOKEN = "BYN";
+
+/**
+ * Рич-текст канон валюты: всё приводится к тексту `BYN`.
+ *
+ * У знака бел. рубля нет кодпоинта в Unicode, а `U+E901` (PUA, шрифт nbrb)
+ * рендерится тофу в неконтролируемых контекстах — хранимый HTML, письма, PDF,
+ * копипаст, SEO-сниппеты. Поэтому в рич-текст-канале каноном служит текст `BYN`.
+ * На контролируемых JSX-рендерах деталей `BYN` приводится обратно к иконке тем
+ * же путём, что прайс-чипы: normalizeUiCurrencyText + renderCurrencyText.
+ */
+export function normalizeRichTextCurrency(value: string | null | undefined): string {
+  if (!value) return "";
+  const token = RICH_TEXT_CURRENCY_TOKEN;
+  return value
+    .replaceAll(LEGACY_BELARUS_CURRENCY_GLYPH, token)
+    .replace(LEGACY_WIZARD_CURRENCY_RE, `$1 ${token}`)
+    .replace(UI_CURRENCY_RE, token)
+    .replace(/\s{2,}/g, " ")
+    .replace(new RegExp(`${token}\\s*${token}`, "g"), token)
     .trim();
 }
 

@@ -1,4 +1,4 @@
-import { PlaceKind } from "@prisma/client";
+import { AgePolicy, PlaceKind } from "@prisma/client";
 import type { PlaceFormData } from "./types";
 
 /**
@@ -12,6 +12,7 @@ export function getDefaultFormData(): PlaceFormData {
     shortDesc: "",
     description: null,
     ageTags: [],
+    agePolicy: AgePolicy.UNRESTRICTED,
     visitFormats: [],
     primaryCategoryId: null,
     subcategoryIds: [],
@@ -33,7 +34,15 @@ export function getDefaultFormData(): PlaceFormData {
     
     // Step 3: Contacts
     phone: null,
+    phoneLabel: null,
+    phone2: null,
+    phone2Label: null,
+    phone3: null,
+    phone3Label: null,
     website: null,
+    bookingEnabled: false,
+    bookingPhone: null,
+    bookingNote: null,
     instagramHandle: null,
     instagramUrl: null,
     
@@ -41,6 +50,7 @@ export function getDefaultFormData(): PlaceFormData {
     logoImageId: null,
     logoUrl: null,
     images: [],
+    reelsUrl: null,
 
     // Step 5: Opening Hours
     openingHoursId: null,
@@ -48,6 +58,7 @@ export function getDefaultFormData(): PlaceFormData {
 
     // Prices
     priceItems: { items: [], note: "" },
+    faqItems: [],
 
     // Hierarchy
     placeKind: PlaceKind.STANDALONE,
@@ -98,7 +109,16 @@ export function hasMeaningfulContent(data: PlaceFormData): boolean {
   }
   
   // Check contacts
-  if (data.phone || data.website || data.instagramHandle) {
+  if (
+    data.phone ||
+    data.phone2 ||
+    data.phone3 ||
+    data.website ||
+    data.bookingEnabled ||
+    data.bookingPhone ||
+    data.bookingNote ||
+    data.instagramHandle
+  ) {
     return true;
   }
   

@@ -2,6 +2,7 @@
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
 import type { OfferFormData, SocialLink } from "./types";
+import { AgePolicy } from "@prisma/client";
 
 export function createDefaultSocialLink(id?: string): SocialLink {
   return {
@@ -19,12 +20,10 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     requestedPlacements: [],
     placementStatuses: {},
     birthdayDetails: {
-      role: null,
       locationType: null,
       durationMinutes: null,
       minChildren: null,
       maxChildren: null,
-      priceFrom: "",
       included: "",
       program: "",
       note: "",
@@ -42,6 +41,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     shortDescription: "",
     description: "",
     ageGroups: [],
+    agePolicy: AgePolicy.UNRESTRICTED,
     campProgramType: null,
     
     // Step 3: Media
@@ -67,16 +67,9 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     campCanSelectDays: false,
     campHasExtendedCare: false,
     
-    // Party fields
-    partyProgram: "",
-    partyDuration: "",
-    partyChildrenCount: "",
-    partyIncluded: "",
-    
-    // Service fields
-    serviceDescription: "",
-    serviceDuration: "",
-    serviceDeliveryArea: "",
+    // PARTY_SERVICE filterable fields (Phase 3b-2); PARTY_PACKAGE shares occasions (Phase 3b-3)
+    partyCategory: null,
+    occasions: [],
     
     // Step 5 (for CAMP): Accommodation
     accommodationProvided: false,
@@ -102,8 +95,14 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     // Step 6/7: Contacts
     contactSource: "manual",
     phone: "",
+    phoneLabel: null,
+    phone2: null,
+    phone2Label: null,
+    phone3: null,
+    phone3Label: null,
     website: "",
     socialLinks: [],
+    faqItems: [],
     
     // Step 7/8: CTA and Publication
     publicationAccess: null,

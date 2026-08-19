@@ -323,3 +323,36 @@ export async function findPlaceBySlug(slug: string): Promise<{
   // Not found anywhere
   return null;
 }
+
+/**
+ * City-scoped variant of `findPlaceBySlug` — the canonical `/{city}/places/{slug}`
+ * route must use this, not the global lookup above: `Place.slug` is only
+ * unique per-city (`@@unique([cityId, slug])`), so a global `findFirst` can
+ * silently resolve to the wrong city's Place once two cities happen to
+ * generate the same slug. Scoping by `cityId` here closes that gap for the
+ * canonical page; the global `findPlaceBySlug` remains in use only for the
+ * legacy `/places/{slug}` redirect resolver, which must find a place before
+ * it can know which city to redirect to.
+ */
+export async function findPlaceBySlugInCity(
+  cityId: string,
+  slug: string,
+): Promise<{ placeId: string; isRedirect: boolean } | null> {
+  const place = await prisma.place.findFirst({
+    where: { slug, cityId },
+    select: { id: true },
+  });
+  if (place) {
+    return { placeId: place.id, isRedirect: false };
+  }
+
+  const historyEntry = await prisma.placeSlugHistory.findFirst({
+    where: { slug, cityId },
+    select: { placeId: true },
+  });
+  if (historyEntry) {
+    return { placeId: historyEntry.placeId, isRedirect: true };
+  }
+
+  return null;
+}

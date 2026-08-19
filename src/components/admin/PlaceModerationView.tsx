@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink } from "lucide-react";
+import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink, Clock, Building2 } from "lucide-react";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +18,10 @@ import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { Textarea } from "@/components/ui/textarea";
 import { getFormatLabel } from "@/lib/placeChips";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
+import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySection";
+import { DAY_SHORT_LABELS, ALL_DAYS, MODE_LABELS } from "@/components/openingHours/openingHours.types";
+import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
+import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 
 const STATUS_CONFIG = {
   DRAFT: { label: "Черновик", variant: "secondary" as const, className: "" },
@@ -32,8 +36,11 @@ interface PlaceModerationViewProps {
     id: string;
     title: string;
     status: string;
+    displayAddress?: string | null;
     formattedAddr?: string | null;
     customAddress?: string | null;
+    locationName?: string | null;
+    directionsNote?: string | null;
     districtManual?: { name: string } | null;
     districtAuto?: { name: string } | null;
     metroManual?: { name: string } | null;
@@ -44,13 +51,19 @@ interface PlaceModerationViewProps {
     images: Array<{ id: string; url: string; kind: string; sortOrder: number; width?: number | null; height?: number | null; blurhash?: string | null }>;
     shortDesc?: string | null;
     description?: string | null;
+    faqItems?: unknown;
     lat?: number | null;
     lng?: number | null;
+    placeKind?: string | null;
+    floor?: string | null;
+    unit?: string | null;
+    unitLabel?: string | null;
     phone?: string | null;
     website?: string | null;
     instagramHandle?: string | null;
     instagramUrl?: string | null;
     ageTags: string[];
+    agePolicy?: import("@prisma/client").AgePolicy;
     visitFormats: string[];
     activityTypes: string[];
     googlePlaceId?: string | null;
@@ -59,25 +72,92 @@ interface PlaceModerationViewProps {
     googleReviewsJson?: unknown;
     slug?: string | null;
     shortAddress?: string | null;
-    owner?: { business: { name: string } | null } | null;
+    ownerBusiness?: { id: string; name: string } | null;
+    createdBy?: { business: { name: string } | null; email?: string | null } | null;
+    openingHours?: OpeningHoursWithRelations | null;
     createdAt: Date;
   };
+  canDeletePlace?: boolean;
 }
 
-export function PlaceModerationView({ place }: PlaceModerationViewProps) {
+function formatOpeningHours(openingHours: OpeningHoursWithRelations | null | undefined) {
+  if (!openingHours) {
+    return null;
+  }
+
+  if (openingHours.mode === "ALWAYS_OPEN") {
+    return <p className="text-sm text-gray-700">Круглосуточно</p>;
+  }
+
+  if (openingHours.mode === "BY_APPOINTMENT") {
+    return <p className="text-sm text-gray-700">По записи</p>;
+  }
+
+  if (openingHours.mode === "TEMPORARILY_CLOSED") {
+    return (
+      <div className="space-y-1">
+        <p className="text-sm text-gray-700">
+          {MODE_LABELS[openingHours.mode as keyof typeof MODE_LABELS]}
+        </p>
+        {openingHours.note ? <p className="text-sm text-gray-500">{openingHours.note}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {ALL_DAYS.map((dayOfWeek) => {
+        const rule = openingHours.rules.find((item) => item.dayOfWeek === dayOfWeek);
+        const label = DAY_SHORT_LABELS[dayOfWeek];
+
+        let value = "Выходной";
+        if (rule?.isOpen) {
+          if (rule.allDay) {
+            value = "Круглосуточно";
+          } else if (rule.intervals.length > 0) {
+            value = rule.intervals.map((interval) => `${interval.startTime}-${interval.endTime}`).join(", ");
+          }
+        }
+
+        return (
+          <div key={dayOfWeek} className="flex items-center justify-between gap-4 text-sm">
+            <span className="font-medium text-gray-700">{label}</span>
+            <span className="text-right text-gray-600">{value}</span>
+          </div>
+        );
+      })}
+      {openingHours.note ? <p className="pt-1 text-sm text-gray-500">{openingHours.note}</p> : null}
+    </div>
+  );
+}
+
+export function PlaceModerationView({
+  place,
+  canDeletePlace = false,
+}: PlaceModerationViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const backLink = getPlaceDetailBackLink(searchParams.get("returnTo"));
 
   const statusConfig = STATUS_CONFIG[place.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.DRAFT;
 
   // Get display values
-  const displayAddress = place.formattedAddr || place.customAddress || "Адрес не указан";
+  const displayAddress =
+    place.displayAddress || place.formattedAddr || place.customAddress || "Адрес не указан";
   const districtName = place.districtManual?.name ?? place.districtAuto?.name;
   const metroName = place.metroManual?.name ?? place.metroAuto?.name;
   const metroDistance = place.metroManualDistanceM ?? place.metroAutoDistanceM;
   const cityHasMetro = place.city?.hasMetro ?? false;
   const metroMaxDistance = place.city?.metroMaxDistanceM ?? 2500;
+  const businessName = place.ownerBusiness?.name ?? place.createdBy?.business?.name ?? null;
+  const locationMeta: string[] = [
+    place.locationName ? `Ориентир: ${place.locationName}` : null,
+    place.directionsNote ? `Как найти: ${place.directionsNote}` : null,
+    place.floor ? `Этаж: ${place.floor}` : null,
+    place.unit ? `${place.unitLabel || "Помещение"}: ${place.unit}` : null,
+  ].filter((value): value is string => Boolean(value));
 
   const shouldShowMetro =
     metroName &&
@@ -140,11 +220,11 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
       <div className="mb-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Link
-            href="/admin/moderation/queue"
+            href={backLink.href}
             className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to queue
+            {backLink.label}
           </Link>
           <Button variant="outline" size="sm" asChild>
             <Link
@@ -154,7 +234,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
             </Link>
           </Button>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Place Moderation</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Модерация места</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -168,6 +248,12 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 alt={place.title}
                 fill
                 className="object-cover"
+                // Next's built-in optimizer proxies same-origin images through
+                // a cookie-less internal request, so it can never satisfy our
+                // auth-gated /api/media/file/* route for not-yet-published
+                // content — skip it and let the browser fetch src directly
+                // (with the real session cookie).
+                unoptimized
               />
             </div>
           )}
@@ -175,7 +261,25 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
           {/* Title and Basic Info */}
           <div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">{place.title}</h2>
-            <p className="text-lg text-gray-600">{place.shortDesc}</p>
+            {place.shortDesc ? <p className="text-lg text-gray-600">{place.shortDesc}</p> : null}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {place.placeKind ? (
+                <Badge variant="outline" className="bg-white text-gray-700">
+                  {place.placeKind}
+                </Badge>
+              ) : null}
+              {place.city ? (
+                <Badge variant="outline" className="bg-white text-gray-700">
+                  {place.city.name}
+                </Badge>
+              ) : null}
+              {businessName ? (
+                <Badge variant="outline" className="bg-white text-gray-700">
+                  <Building2 className="mr-1 h-3 w-3" />
+                  {businessName}
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           {/* Description */}
@@ -189,11 +293,20 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
             </div>
           )}
 
+          <FaqReadonlySection items={place.faqItems} />
+
           {/* Location */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Местоположение</h3>
             <div className="space-y-2">
               <p className="text-gray-700">{displayAddress}</p>
+              {locationMeta.length > 0 && (
+                <div className="space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                  {locationMeta.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+              )}
               <GoogleReviewsStatusBadge
                 googlePlaceId={place.googlePlaceId}
                 googleRating={place.googleRating}
@@ -221,14 +334,14 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
 
               {place.lat && place.lng && (
                 <p className="text-sm text-gray-500">
-                  Coordinates: {place.lat.toFixed(6)}, {place.lng.toFixed(6)}
+                  Координаты: {place.lat.toFixed(6)}, {place.lng.toFixed(6)}
                 </p>
               )}
             </div>
           </div>
 
           {/* Contacts */}
-          {(place.phone || place.website || place.instagramHandle) && (
+          {(place.phone || place.website || place.instagramHandle || place.instagramUrl) && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Контакты</h3>
               <div className="space-y-2">
@@ -255,7 +368,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                   </div>
                 )}
 
-                {place.instagramHandle && (
+                {(place.instagramHandle || place.instagramUrl) && (
                   <div className="flex items-center gap-2 text-gray-700">
                     <Instagram className="w-4 h-4" />
                     <a
@@ -264,10 +377,22 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                       rel="noopener noreferrer"
                       className="hover:text-blue-600"
                     >
-                      @{place.instagramHandle}
+                      {place.instagramHandle ? `@${place.instagramHandle}` : place.instagramUrl}
                     </a>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {place.openingHours && (
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-gray-700" />
+                <h3 className="text-lg font-semibold text-gray-900">Режим работы</h3>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                {formatOpeningHours(place.openingHours)}
               </div>
             </div>
           )}
@@ -287,6 +412,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                       alt=""
                       fill
                       className="object-cover"
+                      unoptimized
                     />
                   </div>
                 ))}
@@ -295,10 +421,11 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
           )}
 
           {/* Tags */}
-          {(place.ageTags.length > 0 || place.visitFormats.length > 0 || place.activityTypes.length > 0) && (
+          {(place.agePolicy || place.ageTags.length > 0 || place.visitFormats.length > 0 || place.activityTypes.length > 0) && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Теги</h3>
               <div className="space-y-2">
+                {place.agePolicy && place.agePolicy !== "SPECIFIC" && <div><span className="text-sm font-medium text-gray-600">Возраст: </span><span className="text-sm text-gray-700">{place.agePolicy === "ADULT_ONLY" ? "Только 18+" : place.agePolicy === "UNRESTRICTED" ? "Любой возраст" : "Возраст не указан"}</span></div>}
                 {place.ageTags.length > 0 && (
                   <div>
                     <span className="text-sm font-medium text-gray-600">Возраст: </span>
@@ -327,38 +454,38 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
         {/* RIGHT COLUMN: Moderation Panel (Sticky) */}
         <div className="lg:col-span-1">
           <div className="sticky top-6 border border-gray-200 rounded-lg p-6 bg-white shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Moderation</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Модерация</h3>
 
             {/* Place Info */}
             <div className="space-y-3 mb-6 pb-6 border-b">
               <div>
-                <span className="text-sm font-medium text-gray-600">Status:</span>
+                <span className="text-sm font-medium text-gray-600">Статус:</span>
                 <div className="mt-1">
                   <Badge variant={statusConfig.variant} className={statusConfig.className}>{statusConfig.label}</Badge>
                 </div>
               </div>
 
               <div>
-                <span className="text-sm font-medium text-gray-600">Type:</span>
-                <p className="text-sm text-gray-900 mt-1">Place</p>
+                <span className="text-sm font-medium text-gray-600">Тип:</span>
+                <p className="text-sm text-gray-900 mt-1">Место</p>
               </div>
 
               {place.city && (
                 <div>
-                  <span className="text-sm font-medium text-gray-600">City:</span>
+                  <span className="text-sm font-medium text-gray-600">Город:</span>
                   <p className="text-sm text-gray-900 mt-1">{place.city.name}</p>
                 </div>
               )}
 
-              {place.owner?.business && (
+              {businessName && (
                 <div>
-                  <span className="text-sm font-medium text-gray-600">Business:</span>
-                  <p className="text-sm text-gray-900 mt-1">{place.owner.business.name}</p>
+                  <span className="text-sm font-medium text-gray-600">Бизнес:</span>
+                  <p className="text-sm text-gray-900 mt-1">{businessName}</p>
                 </div>
               )}
 
               <div>
-                <span className="text-sm font-medium text-gray-600">Submitted:</span>
+                <span className="text-sm font-medium text-gray-600">Создано:</span>
                 <p className="text-sm text-gray-900 mt-1">
                   {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
                 </p>
@@ -386,7 +513,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 disabled={isSubmitting || place.status === "PUBLISHED"}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
-                {isSubmitting ? "Processing..." : "Approve"}
+                {isSubmitting ? "Обработка..." : "Одобрить"}
               </Button>
 
               <Button
@@ -395,7 +522,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 variant="outline"
                 className="w-full"
               >
-                Needs Revision
+                На доработку
               </Button>
 
               <Button
@@ -404,7 +531,7 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
                 variant="destructive"
                 className="w-full"
               >
-                Reject
+                Отклонить
               </Button>
             </div>
 
@@ -439,7 +566,11 @@ export function PlaceModerationView({ place }: PlaceModerationViewProps) {
 
             {/* Danger Zone */}
             <div className="mt-6 pt-4 border-t">
-              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
+              <PlaceDangerZone
+                placeId={place.id}
+                placeTitle={place.title}
+                canDelete={canDeletePlace}
+              />
             </div>
           </div>
         </div>

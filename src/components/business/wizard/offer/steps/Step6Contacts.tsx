@@ -8,8 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { PlaceSearchAutocomplete } from "@/components/business/wizard/event/steps/location/PlaceSearchAutocomplete";
+import { MultiPhoneFields } from "@/components/business/wizard/shared/MultiPhoneFields";
 import { createDefaultSocialLink } from "../defaults";
 import type { OfferFormData, SocialLink } from "../types";
 
@@ -24,6 +24,11 @@ interface PlaceSummary {
   title: string;
   address: string;
   phone: string;
+  phoneLabel: string;
+  phone2: string;
+  phone2Label: string;
+  phone3: string;
+  phone3Label: string;
   website: string;
   socialLinks: SocialLink[];
 }
@@ -90,6 +95,11 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
           title: payload.title,
           address: payload.address,
           phone: payload.phone ?? "",
+          phoneLabel: payload.phoneLabel ?? "",
+          phone2: payload.phone2 ?? "",
+          phone2Label: payload.phone2Label ?? "",
+          phone3: payload.phone3 ?? "",
+          phone3Label: payload.phone3Label ?? "",
           website: payload.website ?? "",
           socialLinks: Array.isArray(payload.socialLinks) ? payload.socialLinks : [],
         });
@@ -121,6 +131,11 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
     const nextSocialLinks = normalizePlaceSocialLinks(placeSummary.socialLinks);
     if (
       data.phone === placeSummary.phone &&
+      data.phoneLabel === (placeSummary.phoneLabel || null) &&
+      data.phone2 === (placeSummary.phone2 || null) &&
+      data.phone2Label === (placeSummary.phone2Label || null) &&
+      data.phone3 === (placeSummary.phone3 || null) &&
+      data.phone3Label === (placeSummary.phone3Label || null) &&
       data.website === placeSummary.website &&
       sameSocialLinks(data.socialLinks, nextSocialLinks)
     ) {
@@ -129,14 +144,38 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
 
     onChange({
       phone: placeSummary.phone,
+      phoneLabel: placeSummary.phoneLabel || null,
+      phone2: placeSummary.phone2 || null,
+      phone2Label: placeSummary.phone2Label || null,
+      phone3: placeSummary.phone3 || null,
+      phone3Label: placeSummary.phone3Label || null,
       website: placeSummary.website,
       socialLinks: nextSocialLinks,
     });
-  }, [data.contactSource, data.phone, data.socialLinks, data.website, onChange, placeSummary]);
+  }, [
+    data.contactSource,
+    data.phone,
+    data.phoneLabel,
+    data.phone2,
+    data.phone2Label,
+    data.phone3,
+    data.phone3Label,
+    data.socialLinks,
+    data.website,
+    onChange,
+    placeSummary,
+  ]);
 
   const placeContactItems = useMemo(
     () => [
-      { label: "Телефон", value: placeSummary?.phone?.trim() || "Не указан", icon: Phone },
+      {
+        label: "Телефон",
+        value:
+          [placeSummary?.phone, placeSummary?.phone2, placeSummary?.phone3]
+            .filter((value): value is string => Boolean(value?.trim()))
+            .join(", ") || "Не указан",
+        icon: Phone,
+      },
       { label: "Сайт", value: placeSummary?.website?.trim() || "Не указан", icon: Globe },
       {
         label: "Соцсети",
@@ -155,6 +194,11 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
     onChange({
       contactSource: "place",
       phone: placeSummary.phone,
+      phoneLabel: placeSummary.phoneLabel || null,
+      phone2: placeSummary.phone2 || null,
+      phone2Label: placeSummary.phone2Label || null,
+      phone3: placeSummary.phone3 || null,
+      phone3Label: placeSummary.phone3Label || null,
       website: placeSummary.website,
       socialLinks: normalizePlaceSocialLinks(placeSummary.socialLinks),
     });
@@ -378,19 +422,28 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
 
       {showManualFields ? (
         <>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Телефон</Label>
-            <InternationalPhoneInput
-              id="phone"
-              value={data.phone}
-              onChange={(value) => onChange({ phone: value, contactSource: "manual" })}
-              placeholder="+375 29 123 45 67"
-              disabled={!isEditable}
-            />
-            <p className="text-xs text-muted-foreground">
-              Дополнительный номер для связи с клиентами
-            </p>
-          </div>
+          <MultiPhoneFields
+            idPrefix="offer-contact"
+            isEditable={isEditable}
+            primary={{ phone: data.phone || null, label: data.phoneLabel }}
+            secondary={{ phone: data.phone2, label: data.phone2Label }}
+            tertiary={{ phone: data.phone3, label: data.phone3Label }}
+            onChange={(slot, value) => {
+              const updates: Partial<OfferFormData> = { contactSource: "manual" };
+              if (slot === "primary") {
+                updates.phone = value.phone ?? "";
+                updates.phoneLabel = value.label;
+              } else if (slot === "secondary") {
+                updates.phone2 = value.phone;
+                updates.phone2Label = value.label;
+              } else {
+                updates.phone3 = value.phone;
+                updates.phone3Label = value.label;
+              }
+              onChange(updates);
+            }}
+            hint="Подпись поможет клиентам выбрать нужный номер: бронирование, администратор."
+          />
 
           <div className="space-y-2">
             <Label htmlFor="website">Веб-сайт</Label>

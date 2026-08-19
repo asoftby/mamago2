@@ -1,10 +1,12 @@
 /**
- * SEO migration manifest: canonical new_url targets and article slug-history redirects.
+ * SEO migration manifest: canonical new_url targets, article slug-history
+ * redirects (from the DB) and the static WordPress redirect map
+ * (scripts/data/wp-redirect-map.json, curated from GSC click data).
  * Output: manifest.csv (project root).
  *
  * Run: pnpm build-migration-manifest
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ContentStatus } from "@prisma/client";
 import prisma from "../src/lib/prisma";
@@ -47,8 +49,56 @@ function toCsv(rows: ManifestRow[]): string {
   return `${lines.join("\n")}\n`;
 }
 
+interface WpRedirectMapRecord {
+  source: string;
+  destination: string;
+  permanent: boolean;
+  type: string;
+  clicks: number;
+  confidence: string;
+}
+
+/**
+ * Static WP → 2.0 redirect map (curated, no-trailing-slash policy).
+ * Fail-loud: a malformed record aborts the run — the manifest must never
+ * silently lose migration rows.
+ */
+function loadWpRedirectMapRows(): ManifestRow[] {
+  const mapPath = join(process.cwd(), "scripts", "data", "wp-redirect-map.json");
+  const records = JSON.parse(readFileSync(mapPath, "utf8")) as WpRedirectMapRecord[];
+
+  const seenSources = new Set<string>();
+  return records.map((record, index) => {
+    const { source, destination } = record;
+    const bad = (reason: string) =>
+      new Error(`[wp-redirect-map] record ${index} (${source}): ${reason}`);
+
+    if (!source?.startsWith("/") || (source !== "/" && source.endsWith("/"))) {
+      throw bad("source must be an internal path without trailing slash");
+    }
+    if (
+      !destination?.startsWith("/") ||
+      (destination !== "/" && destination.endsWith("/"))
+    ) {
+      throw bad("destination must be an internal path without trailing slash");
+    }
+    if (source === destination) throw bad("self-redirect");
+    if (seenSources.has(source)) throw bad("duplicate source");
+    seenSources.add(source);
+
+    return {
+      rule_type: "wp_map",
+      old_url: abs(source),
+      new_url: abs(destination),
+      entity_type: record.type,
+      entity_id: "",
+      notes: `wp map; ${record.clicks} clicks; ${record.confidence}`,
+    };
+  });
+}
+
 async function main() {
-  const rows: ManifestRow[] = [];
+  const rows: ManifestRow[] = [...loadWpRedirectMapRows()];
 
   const articles = await prisma.article.findMany({
     where: {

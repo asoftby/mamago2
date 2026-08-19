@@ -21,6 +21,7 @@ interface PlacePreviewCardProps {
     website: string | null;
     instagramHandle: string | null;
     ageTags: string[];
+    agePolicy?: import("@prisma/client").AgePolicy;
     activityTypes: string[];
     visitFormats: string[];
     images: Array<{
@@ -129,7 +130,10 @@ export function PlacePreviewCard({ place }: PlacePreviewCardProps) {
         )}
 
         {/* Age Tags */}
-        {place.ageTags && place.ageTags.length > 0 && (
+        {place.agePolicy && place.agePolicy !== "SPECIFIC" && (
+          <div><h3 className="font-semibold text-gray-900 mb-2">Возраст</h3><p>{place.agePolicy === "ADULT_ONLY" ? "Только 18+" : place.agePolicy === "UNRESTRICTED" ? "Любой возраст" : "Возраст не указан"}</p></div>
+        )}
+        {place.agePolicy === "SPECIFIC" && place.ageTags && place.ageTags.length > 0 && (
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Возраст</h3>
             <div className="flex flex-wrap gap-2">

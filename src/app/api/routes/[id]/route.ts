@@ -7,8 +7,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { updateRoute, normalizeStops } from "@/server/services/route.service";
-import type { BudgetLevel, RouteVisibility } from "@prisma/client";
+import { AgePolicy, type BudgetLevel, type RouteVisibility } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import type { RouteStopPriceType } from "@/lib/routes/routeBudget";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 // ─── Shared helper ─────────────────────────────────────────────────────────────
 
@@ -44,6 +50,7 @@ export async function PATCH(
     const {
       title,
       ageTags = [],
+      agePolicy = AgePolicy.UNKNOWN,
       budgetLevel,
       visibility = "PRIVATE",
       publish = false,
@@ -51,6 +58,7 @@ export async function PATCH(
     } = body as {
       title: string;
       ageTags?: string[];
+      agePolicy?: AgePolicy;
       budgetLevel?: BudgetLevel;
       visibility?: RouteVisibility;
       publish?: boolean;
@@ -85,14 +93,24 @@ export async function PATCH(
       }
     }
 
-    const result = await updateRoute(user.id, routeId, {
-      title: title.trim(),
-      ageTags,
-      budgetLevel,
-      visibility,
-      publish,
-      stops,
-    });
+    // Admin/moderator save any route via the shared editor — including
+    // authorless editorial routes (imported from WordPress).
+    const isPrivilegedEditor = user.role === "ADMIN" || user.role === "MODERATOR";
+    const normalizedAge = normalizeAgePolicy({ agePolicy, ageTags });
+    const result = await updateRoute(
+      user.id,
+      routeId,
+      {
+        title: title.trim(),
+        ageTags: normalizedAge.ageTags,
+        agePolicy: normalizedAge.agePolicy,
+        budgetLevel,
+        visibility,
+        publish,
+        stops,
+      },
+      { allowAnyAuthor: isPrivilegedEditor },
+    );
 
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
@@ -144,22 +162,32 @@ export async function DELETE(
     // Find the route
     const route = await prisma.route.findUnique({
       where: { id: resolvedId },
-      select: { id: true, authorId: true, title: true },
+      select: { id: true, authorId: true, title: true, status: true },
     });
 
     if (!route) {
       return NextResponse.json({ error: "Route not found" }, { status: 404 });
     }
 
-    // Check if user is the author
-    if (route.authorId !== user.id) {
+    // Check if user is the author (admin/moderator may delete any route;
+    // the lifecycle guard below still restricts what can be deleted)
+    const canDeleteAny = user.role === "ADMIN" || user.role === "MODERATOR";
+    if (!canDeleteAny && route.authorId !== user.id) {
       return NextResponse.json(
         { error: "You can only delete your own routes" },
         { status: 403 },
       );
     }
 
-    // Delete the route (cascade will delete related stops, slug history, etc.)
+    await assertContentLifecycleOperationAllowed({
+      contentType: "ROUTE",
+      contentId: resolvedId,
+      operation: "deleteDraft",
+      status: route.status,
+      prisma,
+    });
+
+    // Delete the draft route (cascade will delete related stops, slug history, etc.)
     await prisma.route.delete({
       where: { id: resolvedId },
     });
@@ -169,6 +197,12 @@ export async function DELETE(
       { status: 200 },
     );
   } catch (err) {
+    if (isContentLifecycleOperationError(err)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(err),
+        { status: err.statusCode },
+      );
+    }
     console.error("[API] DELETE /api/routes/[id] error:", err);
     return NextResponse.json(
       { error: "Internal server error" },

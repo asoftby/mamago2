@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
+import { contentHashOf, findOwnedMediaByContentHash } from "@/lib/media/dedup";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -64,10 +65,14 @@ function buildFilename(recordId: string, url: string): string {
  *
  * - Idempotent: if a MediaAsset with the same storageKey already exists, returns it.
  * - Does NOT throw — returns { ok: false, error } on any failure.
+ *
+ * `uploadedById` is the acting user (import is always triggered by an admin) —
+ * the created asset is owned, never null, and dedup is per-owner.
  */
 export async function optimizeImportedImage(
   originalUrl: string,
   importedRecordId: string,
+  uploadedById: string,
 ): Promise<OptimizeImageOutcome> {
   if (!originalUrl?.trim()) {
     return { ok: false, error: "Empty URL", originalUrl };
@@ -165,6 +170,25 @@ export async function optimizeImportedImage(
     };
   }
 
+  // ── Dedup raw downloaded bytes before sharp/write ──────────────────────────
+  // Per-owner dedup (acting admin owns the imported asset).
+  const contentHash = contentHashOf(buffer);
+  const duplicate = await findOwnedMediaByContentHash(uploadedById, contentHash);
+  if (duplicate?.publicUrl) {
+    console.log(
+      `[import-image-optimizer] ♻️  Dedup hit ${duplicate.id} — reusing, no new file`,
+    );
+    return {
+      ok: true,
+      mediaAssetId: duplicate.id,
+      publicUrl: duplicate.publicUrl,
+      width: duplicate.width ?? 0,
+      height: duplicate.height ?? 0,
+      sizeBytes: duplicate.sizeBytes,
+      originalUrl,
+    };
+  }
+
   // ── Process with sharp ─────────────────────────────────────────────────────
   let webpBuffer: Buffer;
   let width: number;
@@ -220,6 +244,10 @@ export async function optimizeImportedImage(
       height,
       storageKey: upload.publicUrl,
       publicUrl: upload.publicUrl,
+      // Content hash of the raw downloaded original (before sharp).
+      contentHash,
+      // Owned by the acting admin — never null (per-owner dedup invariant).
+      uploadedById,
       sourceType: MediaSourceType.SYSTEM_GENERATED,
       alt: null,
       title: null,

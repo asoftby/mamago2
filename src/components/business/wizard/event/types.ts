@@ -1,6 +1,6 @@
 // Event Wizard Types
 
-import type { ActivityFormat } from "@prisma/client";
+import type { ActivityFormat, AgePolicy } from "@prisma/client";
 import type { EventFormatPreset } from "@/lib/business/eventFormatSignals";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type {
@@ -9,6 +9,8 @@ import type {
 } from "@/lib/age/ageMapping";
 import type { PublicationAccess } from "@/features/publication-access";
 import type { PriceData } from "@/lib/priceItems";
+import type { FaqItem } from "@/lib/faq/faqItems";
+import type { CtaStepFormValue } from "@/components/business/wizard/shared/CtaStep";
 
 export type EventWizardMode = "create" | "edit";
 
@@ -33,6 +35,14 @@ export interface PendingLocation {
   lng?: number;
   source?: "manual" | "parser";
   raw?: unknown;
+  /** Google Places identifier resolved at selection time (NEW_PLACE only). */
+  googlePlaceId?: string | null;
+  /** Google address_components, kept for future enrichment/dedup use. */
+  addressJson?: unknown[] | null;
+  /** Auto-resolved district/metro from /api/geo/enrich-location (NEW_PLACE only). */
+  districtAutoId?: string | null;
+  metroAutoId?: string | null;
+  metroAutoDistanceM?: number | null;
 }
 
 /**
@@ -62,6 +72,7 @@ export interface EventFormData {
   primaryRootHasChildren: boolean;
   /** id опций сигнала age (Discovery / Signals) */
   ageRangeIds: string[];
+  agePolicy: AgePolicy;
   /** Значения сигнала age для поля Activity.ageTags (синхронизируется с ageRangeIds) */
   ageTags: string[];
   ageDetection?: {
@@ -91,9 +102,16 @@ export interface EventFormData {
   /** Категории «в программе» (many-to-many, только selectableInProgram). */
   programCategoryIds: string[];
 
+  /**
+   * Единая «Продолжительность» (минуты) одного сеанса/посещения — уровень
+   * события. Показывается для категорий из EVENT_DURATION_CATEGORY_SLUGS
+   * (см. supportsDurationForCategorySlug). Канон scheduleJson.durationMinutes,
+   * заменяет частный cinema.duration.
+   */
+  durationMinutes?: number;
+
   // Cinema-specific (conditional on category slug, см. isCinemaEventCategorySlug)
   cinemaGenre?: string;
-  cinemaDuration?: number;
   cinemaTrailerUrl?: string;
   
   // Step 2: Description
@@ -121,6 +139,7 @@ export interface EventFormData {
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
   priceItems: PriceData;
   publicationAccess: PublicationAccess | null;
+  ctaStepDraft: CtaStepFormValue | null;
   ticketLink: string;
   /** Как попасть на событие (3 сценария; при загрузке старых данных нормализуется в маппере) */
   participationMode: "external-link" | "time-slots" | "walk-in" | "prebook";
@@ -186,8 +205,14 @@ export interface EventFormData {
   // Step 7: Contacts
   contactMode: "inherit" | "override";
   phone: string;
+  phoneLabel: string | null;
+  phone2: string | null;
+  phone2Label: string | null;
+  phone3: string | null;
+  phone3Label: string | null;
   website: string;
   socialLinks: SocialLink[];
+  faqItems: FaqItem[];
   
   // Step 8: Organizer
   organizerMode: "existing" | "import" | "manual";

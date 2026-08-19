@@ -175,6 +175,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
+        authAction: "signup" as const,
         user: {
           id: user.id,
           email: normalizedEmail,
@@ -260,6 +261,7 @@ export async function POST(request: NextRequest) {
     const token = await createSession(newUser.id);
     const response = NextResponse.json({
       success: true,
+      authAction: "signup" as const,
       user: {
         id: newUser.id,
         email: newUser.email,

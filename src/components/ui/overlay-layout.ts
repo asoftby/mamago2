@@ -38,15 +38,17 @@ export const desktopDialogShellLarge = [
  * === AUDIT: modal / sheet / overlay (кратко, 2026) ===
  *
  * Реализации Sheet (@/components/ui/sheet): MyPlanOverlay, AddRouteToPlanSheet,
- * AccountDropdownSurface, AdminHeader, DayScenarioModal, PlanAudienceSheet,
+ * AccountDropdownSurface, AdminHeader,
  * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal,
  * NotificationsDropdown, MobileSelectSheet, when-select, MobileFilterSheet, SeoTemplatesClient,
  * MobileDateSheet, StructuredDataCenterClient, BirthdayBuilderStickyBar, OfferQuickView,
  * PartyForChildSection, ShareSheet, FilterControl.
  *
- * Пары Dialog+Sheet по media: AddRouteToPlanSheet, DayScenarioModal, PlanAudienceSheet,
+ * Пары Dialog+Sheet по media: AddRouteToPlanSheet,
  * AddPersonaTypeModal, PlanSuggestionsSheet, SaveToPlanModal, ShareSheet,
- * OfferQuickView, PartyForChildSection (частично).
+ * OfferQuickView, PartyForChildSection (частично). Day Scenario (Task 7) is
+ * now a standalone page, not a Dialog/Sheet — see
+ * src/app/(public)/[city]/my-plan/[date]/scenario/page.tsx.
  *
  * Только Dialog: DefaultAuthModal, SiteAuthModal, QuickAddChildModal, QuickAddAdultModal,
  * AddParticipantModal, EventPageView, auth modals, и др.

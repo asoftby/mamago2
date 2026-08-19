@@ -28,6 +28,7 @@ import { resolveDisplayFilename } from "@/lib/media/resolveDisplayFilename";
 import { resolveEffectiveMetadata } from "@/lib/media/generateMediaMetadata";
 import { pluralRu } from "@/lib/i18n/pluralRu";
 import { cn } from "@/lib/utils";
+import { TableContainer } from "@/components/ui/table";
 
 export type AdminMediaTableRow = {
   id: string;
@@ -182,7 +183,7 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
             </Button>
           </div>
         )}
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[960px]" scrollLabel="Таблица медиафайлов, прокручивается по горизонтали">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -342,7 +343,7 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
               })}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
 
         {items.length === 0 && (
           <div className="text-center py-12">

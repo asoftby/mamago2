@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isLocalAppEnv, isProductionAppEnv } from "@/lib/config/productionEnvGuard";
+
 export type TelegramRuntimeEnvironment = "DEV" | "PROD";
 
 type TelegramConfig = {
@@ -10,10 +12,23 @@ type TelegramConfig = {
 };
 
 export function getTelegramRuntimeEnvironment(): TelegramRuntimeEnvironment {
-  return process.env.NODE_ENV === "production" ? "PROD" : "DEV";
+  return isProductionAppEnv() ? "PROD" : "DEV";
 }
 
-function normalizeUsername(value: string | undefined): string | null {
+/** Webhook secret is required on every deployed host, optional only for local `next dev`. */
+export function requiresTelegramWebhookSecret(): boolean {
+  return !isLocalAppEnv();
+}
+
+function firstEnv(...names: string[]): string | null {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function normalizeUsername(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   return trimmed.replace(/^@/, "");
@@ -25,17 +40,21 @@ export function getTelegramConfig(): TelegramConfig {
   if (environment === "PROD") {
     return {
       environment,
-      botToken: process.env.TELEGRAM_BOT_TOKEN_PROD?.trim() || null,
-      botUsername: normalizeUsername(process.env.TELEGRAM_BOT_USERNAME_PROD),
-      webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET_PROD?.trim() || null,
+      botToken: firstEnv("TELEGRAM_BOT_TOKEN_PROD", "TELEGRAM_BOT_TOKEN"),
+      botUsername: normalizeUsername(
+        firstEnv("TELEGRAM_BOT_USERNAME_PROD", "TELEGRAM_BOT_USERNAME"),
+      ),
+      webhookSecret: firstEnv("TELEGRAM_WEBHOOK_SECRET_PROD", "TELEGRAM_WEBHOOK_SECRET"),
     };
   }
 
   return {
     environment,
-    botToken: process.env.TELEGRAM_BOT_TOKEN_DEV?.trim() || null,
-    botUsername: normalizeUsername(process.env.TELEGRAM_BOT_USERNAME_DEV),
-    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET_DEV?.trim() || null,
+    botToken: firstEnv("TELEGRAM_BOT_TOKEN_DEV", "TELEGRAM_BOT_TOKEN"),
+    botUsername: normalizeUsername(
+      firstEnv("TELEGRAM_BOT_USERNAME_DEV", "TELEGRAM_BOT_USERNAME"),
+    ),
+    webhookSecret: firstEnv("TELEGRAM_WEBHOOK_SECRET_DEV", "TELEGRAM_WEBHOOK_SECRET"),
   };
 }
 

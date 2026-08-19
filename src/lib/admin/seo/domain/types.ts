@@ -90,6 +90,20 @@ export type AutoRedirectRuleType =
   | "slug_normalization"
   | "category_mapping";
 
+/**
+ * Disposition classification from the shared redirect manifest classifier
+ * (`src/lib/seo/redirectManifestClassifier.ts`) — see
+ * docs/migration/seo/redirect-audit-summary.md for the full taxonomy.
+ */
+export type RedirectDisposition =
+  | "EXACT_REDIRECT"
+  | "VALID_HUB_REMAP"
+  | "P1_START_OR_CONTAINS"
+  | "INVALID_TARGET"
+  | "COLLISION"
+  | "CHAIN"
+  | "LOOP";
+
 /** Системное / автоматическое правило редиректа */
 export interface RedirectRule {
   id: string;
@@ -100,6 +114,10 @@ export interface RedirectRule {
   enabled: boolean;
   status: "active" | "paused";
   lastCheckedAt: string | null;
+  /** Disposition from the manifest classifier — absent for non-migration rules. */
+  disposition?: RedirectDisposition;
+  /** Resolved target entity table (Activity/Article/Place/Offer/City), if resolved. */
+  resolvedTable?: string | null;
 }
 
 /** @deprecated Используйте `RedirectRule` */

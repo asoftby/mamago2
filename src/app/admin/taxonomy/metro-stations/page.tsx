@@ -11,6 +11,7 @@ import { toast } from "@/lib/toast";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { Badge } from "@/components/ui/badge";
 import { randomId } from "@/lib/utils/randomId";
+import { TableContainer } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 
@@ -293,6 +294,7 @@ export default function MetroStationsPage() {
             <div className="text-center text-gray-600 p-8 text-sm">Нет станций для выбранного города</div>
           ) : (
             <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <TableContainer minWidthClassName="min-w-[620px]" scrollLabel="Список станций метро, прокручивается по горизонтали">
               <div className="grid grid-cols-[2fr_1fr_1fr_1fr_100px] gap-4 p-4 font-medium border-b bg-gray-50 text-sm">
                 <div className="text-gray-700">Name</div>
                 <div className="text-gray-700">Lat</div>
@@ -322,6 +324,7 @@ export default function MetroStationsPage() {
                   </div>
                 ))}
               </div>
+              </TableContainer>
             </div>
           )}
         </CardContent>

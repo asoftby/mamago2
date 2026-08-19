@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Heart } from "lucide-react";
+import { Heart, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
@@ -11,6 +11,8 @@ import { OwnerEditDropdown } from "./OwnerEditDropdown";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
 import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
+import { CallActionButton } from "@/components/shared/CallActionButton";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
 
 /**
  * Переформатирует адрес из Google-формата «Улица Дом, Город, Область»
@@ -46,6 +48,7 @@ type EventDecisionPanelProps = {
   data: Pick<
     EventPageData,
     | "id"
+    | "citySlug"
     | "breadcrumbs"
     | "ageFromBadge"
     | "categoryLabel"
@@ -70,6 +73,8 @@ type EventDecisionPanelProps = {
   previewRegionClassName?: Partial<
     Record<"hero" | "venue" | "schedule" | "pricing", string | undefined>
   >;
+  /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
+  directSlot?: React.ReactNode;
 };
 
 /** Split title: first word roman, rest italic-accent. */
@@ -129,6 +134,7 @@ export function EventDecisionPanel({
   planDate,
   className,
   previewRegionClassName: pr,
+  directSlot,
 }: EventDecisionPanelProps) {
   const revealRef = useRef<HTMLDivElement>(null);
   const subtitleRef = useRef<HTMLDivElement>(null);
@@ -336,6 +342,27 @@ export function EventDecisionPanel({
             </button>
           )}
 
+          {data.cta.phones && data.cta.phones.length > 0 && (
+            <CallActionButton
+              phones={data.cta.phones}
+              subtitle={data.title}
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.65)] transition-colors hover:border-[#141210] hover:text-[#141210]"
+              onClick={() =>
+                void postAnalyticsEvent({
+                  eventType: "CTA_CLICK",
+                  entityType: "EVENT",
+                  entityId: data.id,
+                  vertical: "CITY",
+                  citySlug: data.citySlug,
+                  meta: { source: "detail", section: "afisha", targetAction: "call" },
+                })
+              }
+            >
+              <Phone size={20} strokeWidth={1.75} aria-hidden />
+              <span className="sr-only">Позвонить</span>
+            </CallActionButton>
+          )}
+
           <button
             type="button"
             onClick={onPlan}
@@ -358,6 +385,8 @@ export function EventDecisionPanel({
             )}
           </button>
         </div>
+
+        {directSlot && <div className="mt-3">{directSlot}</div>}
 
         {data.cta.simpleBooking && (
           <EventSimpleBookingModal

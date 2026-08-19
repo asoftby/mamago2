@@ -15,6 +15,7 @@ import { BusinessSectionHeader } from "@/components/business/sections/BusinessSe
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
+import { TableContainer } from "@/components/ui/table";
 
 type ApiTransaction = {
   id: string;
@@ -206,7 +207,7 @@ export default function BillingTransactionsPage() {
         />
       ) : !isLoading && !loadError ? (
         <BusinessSurfaceCard className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
+          <TableContainer minWidthClassName="min-w-[760px]" scrollLabel="История операций, таблица">
             <table className="w-full">
               <thead className="bg-stone-50/90">
                 <tr className="border-b border-stone-200">
@@ -328,7 +329,7 @@ export default function BillingTransactionsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         </BusinessSurfaceCard>
       ) : null}
     </div>

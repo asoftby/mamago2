@@ -14,12 +14,16 @@ export async function loadOfferForWizard(offerId: string) {
           createdByUserId: true,
           ownerBusinessId: true,
           title: true,
+          city: {
+            select: {
+              slug: true,
+            },
+          },
         },
       },
       placements: {
         orderBy: { createdAt: "asc" },
       },
-      birthdayDetails: true,
       openingHours: {
         include: {
           rules: {

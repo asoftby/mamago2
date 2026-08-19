@@ -45,6 +45,7 @@ function RecommendationCard({ activity, selectedDate, onAdded }: RecommendationC
           id: data.planItem.id,
           date: result.dateISO,
           startsAt: null,
+          effectiveStartsAt: null,
           activityId: activity.id,
           title: activity.title,
           coverImageUrl: activity.image,

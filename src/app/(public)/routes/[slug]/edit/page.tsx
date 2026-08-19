@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getEditableRouteBySlug } from "@/server/services/route.service";
-import { RouteEditor, makeEmptyStop } from "@/components/routes/RouteEditor";
+import { RouteEditor } from "@/components/routes/RouteEditor";
 import type { EditableRouteStop, WizardState } from "@/components/routes/RouteEditor";
+import {
+  makeEmptyRouteEditorStop,
+  mapPersistedRouteAgeToEditorState,
+} from "@/lib/routes/routeEditorState";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -21,7 +25,12 @@ export default async function EditRoutePage({ params }: Props) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const route = await getEditableRouteBySlug(slug, user.id);
+  // Admin/moderator edit any route via the same shared editor — including
+  // authorless editorial routes (imported from WordPress, authorId === null).
+  const isPrivilegedEditor = user.role === "ADMIN" || user.role === "MODERATOR";
+  const route = await getEditableRouteBySlug(slug, user.id, {
+    allowAnyAuthor: isPrivilegedEditor,
+  });
   if (!route) notFound();
 
   const mappedStops: EditableRouteStop[] = route.stops.map((stop) => {
@@ -79,12 +88,14 @@ export default async function EditRoutePage({ params }: Props) {
 
   // Ensure at least 2 stops so the wizard doesn't render broken
   while (mappedStops.length < 2) {
-    mappedStops.push(makeEmptyStop());
+    mappedStops.push(makeEmptyRouteEditorStop());
   }
+
+  const ageState = mapPersistedRouteAgeToEditorState(route);
 
   const initialState: Partial<WizardState> = {
     title: route.title,
-    ageTags: route.ageTags,
+    ...ageState,
     budgetLevel: route.budgetLevel as WizardState["budgetLevel"],
     visibility: route.visibility as WizardState["visibility"],
     stops: mappedStops,

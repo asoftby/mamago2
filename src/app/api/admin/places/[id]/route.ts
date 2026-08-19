@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ContentStatus, OfferStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
+import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 
 export async function GET(
   req: NextRequest,
@@ -92,7 +99,7 @@ export async function GET(
 
 /**
  * DELETE /api/admin/places/[id]
- * Delete a place and all related data (admin only)
+ * Hard-delete an isolated draft place (admin only).
  */
 export async function DELETE(
   req: NextRequest,
@@ -109,24 +116,73 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Check if place exists
     const place = await prisma.place.findUnique({
       where: { id },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        archivedAt: true,
+        _count: {
+          select: {
+            activities: true,
+            offers: true,
+            bookingRequests: true,
+            children: true,
+            eventVenues: true,
+            routeStops: true,
+            reviews: true,
+            relatedArticles: true,
+            planItems: true,
+            placeIdeas: true,
+            claimRequests: true,
+          },
+        },
+      },
     });
 
     if (!place) {
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Delete place and all related data in a transaction
+    const deleteOperation = place.archivedAt ? "deleteArchived" : "deleteDraft";
+
+    await assertContentLifecycleOperationAllowed({
+      contentType: "PLACE",
+      contentId: id,
+      operation: deleteOperation,
+      status: place.status,
+      archivedAt: place.archivedAt,
+      actorRole: user.role,
+      prisma,
+    });
+
+    await detachImportedRecordsForCatalogEntity(
+      {
+        entityType: "PLACE",
+        entityId: id,
+        reason: "Связанный Place был удалён и больше не считается активной сущностью каталога.",
+      },
+      prisma,
+    );
+
     await prisma.$transaction(async (tx) => {
-      // Delete place images
+      await tx.offer.deleteMany({
+        where: { placeId: id, status: OfferStatus.DRAFT },
+      });
+
+      await tx.activity.deleteMany({
+        where: { placeId: id, status: ContentStatus.DRAFT },
+      });
+
+      await tx.place.deleteMany({
+        where: { parentPlaceId: id, status: ContentStatus.DRAFT },
+      });
+
       await tx.placeImage.deleteMany({
         where: { placeId: id },
       });
 
-      // Delete place revision images
       const revisions = await tx.placeRevision.findMany({
         where: { placeId: id },
         select: { id: true },
@@ -138,12 +194,10 @@ export async function DELETE(
         });
       }
 
-      // Delete place revisions (this will cascade delete opening hours)
       await tx.placeRevision.deleteMany({
         where: { placeId: id },
       });
 
-      // Delete improvement requests
       await tx.improvementRequest.deleteMany({
         where: {
           entityType: "PLACE",
@@ -151,7 +205,6 @@ export async function DELETE(
         },
       });
 
-      // Delete moderation logs
       await tx.moderationLog.deleteMany({
         where: {
           entityType: "PLACE",
@@ -159,7 +212,6 @@ export async function DELETE(
         },
       });
 
-      // Delete place opening hours if exists
       const placeWithOpeningHours = await tx.place.findUnique({
         where: { id },
         select: { openingHoursId: true },
@@ -171,7 +223,6 @@ export async function DELETE(
         });
       }
 
-      // Finally, delete the place itself
       await tx.place.delete({
         where: { id },
       });
@@ -184,6 +235,12 @@ export async function DELETE(
       message: "Place deleted successfully",
     });
   } catch (error: unknown) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("[API] Delete place error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

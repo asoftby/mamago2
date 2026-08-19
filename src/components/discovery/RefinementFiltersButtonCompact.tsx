@@ -16,6 +16,10 @@ import type { Intent } from "@/lib/intent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { useOptionalCity } from "@/contexts/CityContext";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { EventAdvancedFilters } from "@/components/discovery/EventAdvancedFilters";
 
 interface RefinementFiltersButtonCompactProps {
   className?: string;
@@ -33,11 +37,15 @@ export function RefinementFiltersButtonCompact({
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const budgetConfig = budgetCtx?.budgetConfig ?? null;
   const { budget } = useBudgetFilter();
+  const { derived } = useDiscoveryFilters();
+  const citySlug = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
   const budgetActive =
     Boolean(budgetConfig) &&
     budget !== null &&
     budget < (budgetConfig?.max ?? Number.POSITIVE_INFINITY);
-  const activeCount = secondaryActiveCount + (budgetActive ? 1 : 0);
+  const activeCount = safeIntent === "kuda"
+    ? derived.activeCount
+    : secondaryActiveCount + (budgetActive ? 1 : 0);
 
   if (!safeIntent) return null;
 
@@ -91,11 +99,11 @@ export function RefinementFiltersButtonCompact({
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[min(70vh,640px)] overflow-y-auto px-6 py-4">
-          <SecondaryFiltersForm
-            intent={safeIntent}
-            compact
-            onApply={() => setOpen(false)}
-          />
+          {safeIntent === "kuda" ? (
+            <EventAdvancedFilters citySlug={citySlug} onApply={() => setOpen(false)} />
+          ) : (
+            <SecondaryFiltersForm intent={safeIntent} compact onApply={() => setOpen(false)} />
+          )}
         </div>
       </DialogContent>
     </Dialog>

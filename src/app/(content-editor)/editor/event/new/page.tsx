@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import prisma from "@/lib/prisma";
 import { EventWizard } from "@/components/business/wizard/event/EventWizard";
+import { isEventCtaStepFeatureEnabled } from "@/components/business/wizard/event/ctaStepFeatureFlag";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -57,6 +58,7 @@ export default async function EditorNewEventPage({
     returnTo,
     ...routing,
   });
+  const ctaStepEnabled = isEventCtaStepFeatureEnabled(process.env);
 
   if (!business) {
     redirect("/business");
@@ -84,6 +86,7 @@ export default async function EditorNewEventPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         initialStep1Taxonomies={initialStep1Taxonomies}
+        ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>
   );

@@ -14,6 +14,7 @@ export function savePostAuthContext(
   try {
     const ctx: PostAuthContext = {
       source: partial.source,
+      authAction: partial.authAction ?? null,
       pendingAction: partial.pendingAction,
       returnTo: partial.returnTo,
       createdAt: partial.createdAt ?? now(),
@@ -39,6 +40,16 @@ export function getPostAuthContext(): PostAuthContext | null {
   } catch {
     return null;
   }
+}
+
+export function clearPostAuthAction(): void {
+  const context = getPostAuthContext();
+  if (!context || context.authAction == null) return;
+
+  savePostAuthContext({
+    ...context,
+    authAction: null,
+  });
 }
 
 export function clearPostAuthContext(): void {

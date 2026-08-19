@@ -33,8 +33,17 @@ import { Button } from "@/components/ui/button";
 import type { PlaceFormData, PlaceWizardMode } from "./types";
 import type { Place, ContentStatus } from "@prisma/client";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
-import { WIZARD_STEPS, TOTAL_STEPS, getStepLabel } from "./config";
+import {
+  getPlaceWizardSteps,
+  getPlaceWizardTotalSteps,
+  getStepKey,
+  getStepLabel,
+  isPlaceReviewStep,
+} from "./config";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { canEditPlaceInWizard } from "./canEditPlaceInWizard";
+import { resolvePlaceWizardSubmitAction } from "./resolvePlaceWizardSubmitAction";
+import { canNavigateToPlaceWizardStep } from "./canNavigateToPlaceWizardStep";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
@@ -43,8 +52,14 @@ import { Step2Location } from "./steps/Step2Location";
 import { Step3Contacts } from "./steps/Step3Contacts";
 import { Step4Photos } from "./steps/Step4Photos";
 import { Step5OpeningHours } from "./steps/Step5OpeningHours";
-import { Step6Review } from "./steps/Step6Review";
+import { StepCta } from "./steps/StepCta";
+import { FaqStep } from "../shared/FaqStep";
+import { StepReview } from "./steps/StepReview";
 import { CompletionProgress } from "./CompletionProgress";
+import {
+  normalizeRestoredPlaceWizardStep,
+  type PlaceWizardDraftData,
+} from "./draftState";
 import {
   defaultNavForSurface,
   editorPlaceEditHref,
@@ -54,6 +69,11 @@ import {
 import type { Role } from "@prisma/client";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { PlaceStatusBadge } from "@/components/business/place/PlaceStatusBadge";
+import { PlaceGroupSelector } from "@/components/business/place/PlaceGroupSelector";
+import { AdminPlaceGroupManager } from "@/components/admin/AdminPlaceGroupManager";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 /**
  * Validate returnTo URL to prevent open redirects
@@ -90,6 +110,7 @@ interface PlaceWizardProps {
   initialEditStep?: number;
   /** Активная ревизия для overlay-статуса (только edit mode). */
   activeRevision?: { id: string; status: string } | null;
+  ctaStepEnabled?: boolean;
 }
 
 /** POST /api/business/places expects { createRequestId, status, data } — not a flat payload. */
@@ -126,24 +147,36 @@ export function PlaceWizard({
   returnTo,
   initialEditStep,
   activeRevision,
+  ctaStepEnabled = false,
 }: PlaceWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
+  const wizardSteps = useMemo(
+    () => getPlaceWizardSteps(ctaStepEnabled),
+    [ctaStepEnabled],
+  );
+  const totalSteps = useMemo(
+    () => getPlaceWizardTotalSteps(ctaStepEnabled),
+    [ctaStepEnabled],
+  );
+  const firstStepNumber = wizardSteps[0]?.id ?? 1;
   const nav: ContentEditorNav = {
     ...defaultNavForSurface(surface),
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   const [currentStep, setCurrentStep] = useState(() => {
     if (
       mode === "edit" &&
       typeof initialEditStep === "number" &&
-      initialEditStep >= 1 &&
-      initialEditStep <= TOTAL_STEPS
+      initialEditStep >= firstStepNumber &&
+      initialEditStep <= totalSteps
     ) {
       return initialEditStep;
     }
-    return 1;
+    return firstStepNumber;
   });
   const [formData, setFormData] = useState<PlaceFormData>(() => {
     if (mode === "edit" && place) {
@@ -151,32 +184,57 @@ export function PlaceWizard({
     }
     return getDefaultFormData();
   });
-
+  /**
+   * Максимальный посещённый шаг. При создании нового места часть шагов
+   * (CTA, FAQ) валидна на пустой форме — непосещённые шаги не должны
+   * показываться в степпере выполненными. В edit-режиме данные пришли
+   * с сервера, поэтому все шаги считаются посещёнными.
+   */
+  const [maxVisitedStep, setMaxVisitedStep] = useState(() =>
+    mode === "edit" ? totalSteps : firstStepNumber
+  );
+  useEffect(() => {
+    setMaxVisitedStep((prev) => Math.max(prev, currentStep));
+  }, [currentStep]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [autosaveError, setAutosaveError] = useState(false);
+  const [selectedRelatedPlaceIds, setSelectedRelatedPlaceIds] = useState<string[]>([]);
+  const [currentPlaceGroupId, setCurrentPlaceGroupId] = useState<string | null>(
+    place?.placeGroupId ?? null,
+  );
   const [originalData, setOriginalData] = useState<PlaceFormData>(() =>
     mode === "edit" && place ? mapPlaceToFormData(place) : getDefaultFormData()
   );
   const autosaveInFlightRef = useRef(false);
   const pendingAutosaveChangesRef = useRef<Record<string, unknown> | null>(null);
 
+  useEffect(() => {
+    setCurrentPlaceGroupId(place?.placeGroupId ?? null);
+  }, [place?.placeGroupId]);
+
   // isDirty: формула изменилась относительно baseline
   const isDirty = useMemo(
     () => JSON.stringify(formData) !== JSON.stringify(originalData),
     [formData, originalData],
   );
+  const entityUpdatedAtIso =
+    mode === "edit" && place?.updatedAt ? place.updatedAt.toISOString() : null;
 
   // ── useWizardDraft (create mode: LS-черновик + resume-баннер) ───────────────
-  const PLACE_WIZARD_SCHEMA_VERSION = 1;
-  const draft = useWizardDraft<PlaceFormData>({
+  const PLACE_WIZARD_SCHEMA_VERSION = 2;
+  const draft = useWizardDraft<PlaceWizardDraftData>({
     wizardType: "place",
     mode,
     entityId: mode === "edit" ? place?.id ?? null : null,
     schemaVersion: PLACE_WIZARD_SCHEMA_VERSION,
-    data: formData,
+    data: {
+      currentStep,
+      formData,
+    },
     enabled: mode === "create" ? hasMeaningfulContent(formData) : isDirty,
+    entityUpdatedAt: entityUpdatedAtIso,
   });
 
   // createRequestId: для create — берём из draft (стабильный UUID)
@@ -190,38 +248,63 @@ export function PlaceWizard({
   const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange, requestLeave } =
     useUnsavedChangesNavigationGuard(guardActive);
 
+  const draftConflictsWithEntity =
+    mode === "edit" &&
+    draft.hasDraft &&
+    entityUpdatedAtIso != null &&
+    draft.draftEntityUpdatedAt != null &&
+    draft.draftEntityUpdatedAt.toISOString() !== entityUpdatedAtIso;
+
+  const handleRestoreDraft = useCallback(() => {
+    const restored = draft.restoreDraft();
+    if (!restored) return;
+
+    setFormData(restored.formData);
+    setCurrentStep(normalizeRestoredPlaceWizardStep(restored, totalSteps));
+  }, [draft, totalSteps]);
+
   // Wizard session for temp media
-  const { wizardSessionId, clearSession } = useWizardSession({
+  const { wizardSessionId } = useWizardSession({
     userId,
     wizardType: "place",
     entityId: mode === "edit" ? place?.id : undefined,
   });
 
-  // Autosave effect
-  useEffect(() => {
-    if (mode === "create") {
-      // Create mode: draft autosave handled by useWizardDraft hook
-      return;
-    } else if (mode === "edit") {
-      // API autosave for edit mode — only for draft/non-published or admin.
-      // Published non-admin edits go through revision flow on explicit save/submit.
-      const isPublished = place?.status === "PUBLISHED";
-      const isAdmin = userRole === "ADMIN";
-      if (isPublished && !isAdmin) return;
-
-      if (isSaving || isSubmitting || autosaveInFlightRef.current) {
+  const persistRelatedPlacesAfterCreate = useCallback(
+    async (createdPlaceId: string) => {
+      if (selectedRelatedPlaceIds.length === 0) {
         return;
       }
-      const timer = setTimeout(() => {
-        const changes = extractChanges(formData, originalData);
-        if (Object.keys(changes).length > 0) {
-          handleAutoSave(changes);
-        }
-      }, 2000);
 
-      return () => clearTimeout(timer);
-    }
-  }, [formData, mode, originalData, isSaving, isSubmitting, place?.status, userRole]);
+      try {
+        const response = await fetch(`/api/business/places/${createdPlaceId}/group`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ relatedPlaceIds: selectedRelatedPlaceIds }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            message?: string;
+          };
+          throw new Error(
+            payload.message ||
+              payload.error ||
+              "Failed to save related places after creation",
+          );
+        }
+      } catch (error) {
+        console.error("Failed to save related places after create:", error);
+        toast.error(
+          "Место создано, но связанные места не удалось сохранить. Их можно добавить позже в редактировании.",
+        );
+      }
+    },
+    [selectedRelatedPlaceIds],
+  );
 
   // Auto-save for edit mode
   const handleAutoSave = useCallback(async (changes: Record<string, unknown>) => {
@@ -256,6 +339,32 @@ export function PlaceWizard({
     }
   }, [place?.id, isSaving, isSubmitting]);
 
+  // Autosave effect
+  useEffect(() => {
+    if (mode === "create") {
+      // Create mode: draft autosave handled by useWizardDraft hook
+      return;
+    } else if (mode === "edit") {
+      // API autosave for edit mode — only for draft/non-published or admin.
+      // Published non-admin edits go through revision flow on explicit save/submit.
+      const isPublished = place?.status === "PUBLISHED";
+      const isAdmin = userRole === "ADMIN";
+      if (isPublished && !isAdmin) return;
+
+      if (isSaving || isSubmitting || autosaveInFlightRef.current) {
+        return;
+      }
+      const timer = setTimeout(() => {
+        const changes = extractChanges(formData, originalData);
+        if (Object.keys(changes).length > 0) {
+          handleAutoSave(changes);
+        }
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [formData, mode, originalData, isSaving, isSubmitting, place?.status, userRole, handleAutoSave]);
+
   // Update form data
   const handleChange = useCallback(
     (
@@ -271,28 +380,53 @@ export function PlaceWizard({
     [],
   );
 
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface,
+        returnTo,
+        role: userRole,
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [returnTo, surface, userRole],
+  );
+
   // Navigation
   const handleNext = () => {
-    if (currentStep < TOTAL_STEPS && canGoToNextStep(currentStep, formData)) {
+    if (
+      currentStep < totalSteps &&
+      canGoToNextStep(currentStep, formData, ctaStepEnabled)
+    ) {
       setCurrentStep(prev => prev + 1);
     }
   };
 
   const handlePrev = () => {
     // On first step, go back to where user came from
-    if (currentStep === 1) {
+    if (currentStep === firstStepNumber) {
       requestLeave(afterSubmitDestination);
       return;
     }
 
-    if (currentStep > 1 && canGoToPrevStep(currentStep)) {
+    if (currentStep > firstStepNumber && canGoToPrevStep(currentStep)) {
       setCurrentStep(prev => prev - 1);
     }
   };
 
   const handleGoToStep = (step: number) => {
-    // Allow backward navigation freely; forward only up to currentStep+1 (sequential)
-    if (step >= 1 && step <= TOTAL_STEPS && (step <= currentStep + 1 || step < currentStep)) {
+    if (
+      canNavigateToPlaceWizardStep({
+        mode,
+        currentStep,
+        targetStep: step,
+        firstStep: firstStepNumber,
+        totalSteps,
+      })
+    ) {
       setCurrentStep(step);
     }
   };
@@ -333,14 +467,21 @@ export function PlaceWizard({
 
         const result = await response.json();
 
+        await persistRelatedPlacesAfterCreate(result.place.id);
+
         draft.markClean();
-        toast.success("Черновик сохранен");
 
         if (onComplete) {
           onComplete(result.place.id);
         } else {
-          router.push(editorPlaceEditHref(result.place.id));
+          router.replace(editorPlaceEditHref(result.place.id));
         }
+        showSuccessModal({
+          kind: "place",
+          outcome: "draft_saved",
+          id: result.place.id,
+          isEdit: false,
+        });
       } else {
         // Update existing place
         if (!place) {
@@ -370,7 +511,12 @@ export function PlaceWizard({
         }
 
         setOriginalData(formData);
-        toast.success("Изменения сохранены");
+        showSuccessModal({
+          kind: "place",
+          outcome: "draft_saved",
+          id: place.id,
+          isEdit: true,
+        });
       }
     } catch (error: unknown) {
       console.error("Save draft error:", error);
@@ -420,12 +566,15 @@ export function PlaceWizard({
 
         const { revision } = await revisionResponse.json();
 
-        // 2. Сохранить изменения данных в ревизию
-        if (Object.keys(changes).length > 0) {
+        // 2. Сохранить изменения данных в ревизию (+ attach фото/лого из wizardSessionId)
+        if (Object.keys(changes).length > 0 || wizardSessionId) {
           const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ revisionId: revision.id, data: changes }),
+            body: JSON.stringify({
+              revisionId: revision.id,
+              data: { ...changes, wizardSessionId },
+            }),
           });
 
           if (!saveResponse.ok) {
@@ -461,14 +610,21 @@ export function PlaceWizard({
         }
 
         setOriginalData(formData);
-        toast.success("Изменения отправлены на модерацию");
+        showSuccessModal({
+          kind: "place",
+          outcome: "submitted",
+          id: place.id,
+          isEdit: true,
+          slug: place.slug ?? null,
+          status: place.status,
+        });
       } else {
-        // Для черновиков или ADMIN - прямое сохранение
-        if (Object.keys(changes).length > 0) {
+        // Для черновиков или ADMIN - прямое сохранение (+ attach фото/лого из wizardSessionId)
+        if (Object.keys(changes).length > 0 || wizardSessionId) {
           const response = await fetch(`/api/business/places/${place.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(changes),
+            body: JSON.stringify({ ...changes, wizardSessionId }),
           });
 
           if (!response.ok) {
@@ -491,14 +647,14 @@ export function PlaceWizard({
         }
 
         setOriginalData(formData);
-        toast.success("Изменения сохранены");
-      }
-
-      // Navigate back to returnTo or fallback
-      if (isValidReturnTo(returnTo)) {
-        navigateToCompatibleHref(router, returnTo!); // TypeScript: we know it's not undefined from isValidReturnTo check
-      } else {
-        router.back();
+        showSuccessModal({
+          kind: "place",
+          outcome: formData.status === "PUBLISHED" ? "changes_published" : "draft_saved",
+          id: place.id,
+          isEdit: true,
+          slug: place.slug ?? null,
+          status: formData.status,
+        });
       }
     } catch (error: unknown) {
       console.error("Save and close error:", error);
@@ -517,9 +673,9 @@ export function PlaceWizard({
     if (!validation.isValid) {
       toast.error("Заполните все обязательные поля");
       // Go to first incomplete step
-      for (let i = 1; i <= TOTAL_STEPS; i++) {
-        const stepValidation = validateStep(i, formData);
-        if (!stepValidation.isComplete && i < 6) {
+      for (let i = 1; i <= totalSteps; i++) {
+        const stepValidation = validateStep(i, formData, ctaStepEnabled);
+        if (!stepValidation.isComplete && !isPlaceReviewStep(i, ctaStepEnabled)) {
           setCurrentStep(i);
           break;
         }
@@ -551,63 +707,146 @@ export function PlaceWizard({
         perf.log({ status: response.status, mode: publishDirect ? "publish" : "submit" });
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || error.error || "Failed to submit");
+          const errorText = await response.text();
+          let errorPayload: Record<string, unknown> | null = null;
+
+          try {
+            errorPayload = errorText ? (JSON.parse(errorText) as Record<string, unknown>) : null;
+          } catch {
+            errorPayload = errorText ? { raw: errorText } : null;
+          }
+
+          console.error("[PlaceWizard] create place failed", {
+            status: response.status,
+            statusText: response.statusText,
+            response: errorPayload,
+            payload: body,
+          });
+
+          throw new Error(
+            (typeof errorPayload?.message === "string" && errorPayload.message) ||
+              (typeof errorPayload?.error === "string" && errorPayload.error) ||
+              (typeof errorPayload?.details === "string" && errorPayload.details) ||
+              `Failed to submit place (${response.status})`
+          );
         }
 
         const result = await response.json();
 
+        await persistRelatedPlacesAfterCreate(result.place.id);
+
         draft.markClean();
-        toast.success(
-          publishDirect ? "Место опубликовано" : "Место отправлено на модерацию",
-        );
-
-        if (onComplete) {
-          onComplete(result.place.id);
-        } else {
-          router.push(afterSubmitDestination);
-        }
+        showSuccessModal({
+          kind: "place",
+          outcome: publishDirect ? "published" : "submitted",
+          id: result.place.id,
+          isEdit: false,
+          slug: result.place.slug ?? result.place.id,
+          status: publishDirect ? "PUBLISHED" : "PENDING",
+        });
       } else {
-        // Submit existing place or create revision
+        // Existing place — the primary submit button's behavior is fully
+        // determined by status + role, never re-derived inline per branch.
         if (!place) {
-            toast.error("Ошибка: данные места отсутствуют");
-            setIsSubmitting(false);
-            return;
+          toast.error("Ошибка: данные места отсутствуют");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const submitAction = resolvePlaceWizardSubmitAction({ mode, status: place.status, userRole });
+
+        if (submitAction === "FORBIDDEN") {
+          toast.error("У вас нет прав для этого действия");
+        } else if (submitAction === "APPROVE_PENDING") {
+          // Staff approving an imported/submitted PENDING Place: save first,
+          // then publish via the same PENDING → PUBLISHED transition the
+          // moderation queue's own Approve button performs. Never falls
+          // through to /submit, which only accepts DRAFT/REJECTED/
+          // NEEDS_REVISION and correctly rejects an already-PENDING Place.
+          const changes = extractChanges(formData, originalData);
+
+          if (Object.keys(changes).length > 0 || wizardSessionId) {
+            const response = await fetch(`/api/business/places/${place.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...changes, wizardSessionId }),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || error.error || "Failed to save");
+            }
           }
-          if (place.status === "PUBLISHED") {
-          const isAdmin = userRole === "ADMIN" || userRole === "MODERATOR";
 
-          if (isAdmin) {
-            // Admin: save directly without revision
-            const changes = extractChanges(formData, originalData);
-
-            if (Object.keys(changes).length > 0) {
-              const response = await fetch(`/api/business/places/${place.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(changes),
-              });
-              if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || error.error || "Failed to save");
-              }
+          if (formData.openingHoursData !== null) {
+            const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: formData.openingHoursData }),
+            });
+            if (!ohResponse.ok) {
+              const error = await ohResponse.json();
+              throw new Error(error.message || error.error || "Failed to save opening hours");
             }
+          }
 
-            if (formData.openingHoursData !== null) {
-              const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ data: formData.openingHoursData }),
-              });
-              if (!ohResponse.ok) {
-                const error = await ohResponse.json();
-                throw new Error(error.message || error.error || "Failed to save opening hours");
-              }
+          const approveResponse = await fetch(`/api/admin/places/${place.id}/approve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          });
+          if (!approveResponse.ok) {
+            const error = await approveResponse.json().catch(() => ({}));
+            throw new Error(error.message || error.error || "Failed to approve place");
+          }
+          const { place: publishedPlace } = await approveResponse.json();
+
+          setOriginalData(formData);
+          showSuccessModal({
+            kind: "place",
+            outcome: "published",
+            id: publishedPlace.id,
+            isEdit: true,
+            slug: publishedPlace.slug,
+            status: "PUBLISHED",
+          });
+        } else if (submitAction === "SAVE_PUBLISHED_DIRECT") {
+          // Admin: save directly without revision (+ attach фото/лого из wizardSessionId)
+          const changes = extractChanges(formData, originalData);
+
+          if (Object.keys(changes).length > 0 || wizardSessionId) {
+            const response = await fetch(`/api/business/places/${place.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...changes, wizardSessionId }),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.message || error.error || "Failed to save");
             }
+          }
 
-            setOriginalData(formData);
-            toast.success("Изменения сохранены");
-          } else {
+          if (formData.openingHoursData !== null) {
+            const ohResponse = await fetch(`/api/business/places/${place.id}/opening-hours`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ data: formData.openingHoursData }),
+            });
+            if (!ohResponse.ok) {
+              const error = await ohResponse.json();
+              throw new Error(error.message || error.error || "Failed to save opening hours");
+            }
+          }
+
+          setOriginalData(formData);
+          showSuccessModal({
+            kind: "place",
+            outcome: "changes_published",
+            id: place.id,
+            isEdit: true,
+            slug: place.slug ?? place.id,
+            status: "PUBLISHED",
+          });
+        } else if (submitAction === "SUBMIT_PUBLISHED_REVISION") {
           // Non-admin: create/update revision for published place and submit
           const changes = extractChanges(formData, originalData);
           const openingHoursChanged =
@@ -621,12 +860,15 @@ export function PlaceWizard({
           }
           const { revision } = await revisionResponse.json();
 
-          // 2. Сохранить данные в ревизию
-          if (Object.keys(changes).length > 0) {
+          // 2. Сохранить данные в ревизию (+ attach фото/лого из wizardSessionId)
+          if (Object.keys(changes).length > 0 || wizardSessionId) {
             const saveResponse = await fetch(`/api/business/places/${place.id}/revision`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ revisionId: revision.id, data: changes }),
+              body: JSON.stringify({
+                revisionId: revision.id,
+                data: { ...changes, wizardSessionId },
+              }),
             });
             if (!saveResponse.ok) {
               const errorData = await saveResponse.json().catch(() => ({}));
@@ -662,10 +904,17 @@ export function PlaceWizard({
           }
 
           setOriginalData(formData);
-          toast.success("Изменения отправлены на модерацию");
-          }
+          showSuccessModal({
+            kind: "place",
+            outcome: "submitted",
+            id: place.id,
+            isEdit: true,
+            slug: place.slug ?? place.id,
+            status: "PENDING",
+          });
         } else {
-          // Submit draft place
+          // SUBMIT_EXISTING: DRAFT/REJECTED/NEEDS_REVISION → PENDING (or
+          // PUBLISHED directly, if the role allows direct publish).
           const response = await fetch(`/api/business/places/${place.id}/submit`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -698,21 +947,26 @@ export function PlaceWizard({
               toast.error(`Не заполнены обязательные поля: ${missingLabels.join(", ")}`);
 
               // Navigate to appropriate step based on first missing field
-              const fieldToStep: Record<string, number> = {
-                title: 1,
-                category: 1,
-                shortDesc: 1,
-                logoImageId: 4,
-                location: 2,
-                locationSource: 2,
-                parentPlaceId: 2,
-                floor: 2,
-                unit: 2,
+              const fieldToStepKey: Record<string, string> = {
+                title: "profile",
+                category: "profile",
+                shortDesc: "profile",
+                logoImageId: "photos",
+                location: "location",
+                locationSource: "location",
+                parentPlaceId: "location",
+                floor: "location",
+                unit: "location",
               };
 
               for (const field of error.missing) {
-                const step = fieldToStep[field];
-                if (step !== undefined && step < 6) {
+                const step = wizardSteps.find(
+                  (wizardStep) => wizardStep.key === fieldToStepKey[field],
+                )?.id;
+                if (
+                  step !== undefined &&
+                  !isPlaceReviewStep(step, ctaStepEnabled)
+                ) {
                   setCurrentStep(step);
                   break;
                 }
@@ -726,19 +980,14 @@ export function PlaceWizard({
           }
 
           setOriginalData(formData);
-          toast.success(
-            canPublishContentDirectly(userRole)
-              ? "Место опубликовано"
-              : "Место отправлено на модерацию",
-          );
-        }
-
-        if (onComplete) {
-          onComplete(place.id);
-        } else if (returnTo) {
-          navigateToCompatibleHref(router, returnTo);
-        } else if (surface === "admin") {
-          navigateToCompatibleHref(router, nav.afterSubmitListPath);
+          showSuccessModal({
+            kind: "place",
+            outcome: canPublishContentDirectly(userRole) ? "published" : "submitted",
+            id: place.id,
+            isEdit: true,
+            slug: place.slug ?? place.id,
+            status: canPublishContentDirectly(userRole) ? "PUBLISHED" : "PENDING",
+          });
         }
       }
     } catch (error: unknown) {
@@ -749,9 +998,8 @@ export function PlaceWizard({
     }
   };
 
-  // Determine if editable
-  const isEditable = mode === "create" ||
-    (mode === "edit" && place?.status !== "PENDING");
+  // Determine if editable — single source of truth, never re-derive per step.
+  const isEditable = canEditPlaceInWizard({ mode, status: place?.status, userRole });
 
   // Render current step
   const renderStep = () => {
@@ -761,41 +1009,55 @@ export function PlaceWizard({
       isEditable,
     };
 
-    switch (currentStep) {
-      case 1:
+    switch (getStepKey(currentStep, ctaStepEnabled)) {
+      case "profile":
         return <Step1Profile {...commonProps} />;
-      case 2:
+      case "location":
         return <Step2Location {...commonProps} />;
-      case 3:
+      case "contacts":
         return <Step3Contacts {...commonProps} />;
-      case 4:
+      case "photos":
         return <Step4Photos {...commonProps} wizardSessionId={wizardSessionId} />;
-      case 5:
+      case "openingHours":
         return <Step5OpeningHours {...commonProps} />;
-      case 6:
-        return <Step6Review data={formData} isSubmitting={isSubmitting} onGoToStep={handleGoToStep} />;
+      case "cta":
+        return <StepCta {...commonProps} />;
+      case "faq":
+        return (
+          <FaqStep
+            kind="place"
+            value={formData.faqItems}
+            onChange={(faqItems) => handleChange({ faqItems })}
+          />
+        );
+      case "review":
+        return (
+          <StepReview
+            data={formData}
+            isSubmitting={isSubmitting}
+            onGoToStep={handleGoToStep}
+            ctaStepEnabled={ctaStepEnabled}
+          />
+        );
       default:
         return null;
     }
   };
 
-  const stepValidation = validateStep(currentStep, formData);
-  const canNext = currentStep < TOTAL_STEPS;
+  const stepValidation = validateStep(currentStep, formData, ctaStepEnabled);
+  const canNext = currentStep < totalSteps;
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
-  const isReviewStep = currentStep === 6;
-
-  const segments = useMemo(
-    () => WIZARD_STEPS.map((s) => ({ id: s.id, title: s.label })),
-    []
-  );
+  const isReviewStep = isPlaceReviewStep(currentStep, ctaStepEnabled);
 
   const progressSteps = useMemo(
-    () => WIZARD_STEPS.map((s) => ({
+    () => wizardSteps.map((s) => ({
       id: s.id,
       label: s.label,
-      isComplete: s.id < currentStep,
+      isComplete:
+        validateStep(s.id, formData, ctaStepEnabled).isComplete &&
+        s.id <= maxVisitedStep,
     })),
-    [currentStep]
+    [ctaStepEnabled, formData, maxVisitedStep, wizardSteps]
   );
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
@@ -805,18 +1067,28 @@ export function PlaceWizard({
     [userRole],
   );
 
+  const liveTitle = useMemo(() => {
+    const trimmedTitle = formData.title?.trim();
+    return trimmedTitle || businessFormCopy.place.createTitle;
+  }, [formData.title]);
+
+  const currentStepKey = getStepKey(currentStep, ctaStepEnabled);
+  const showBusinessRelatedPlaces =
+    surface === "business" && currentStepKey === "profile";
+  const showAdminRelatedPlaces =
+    surface === "admin" &&
+    mode === "edit" &&
+    currentStepKey === "profile" &&
+    !!place?.id;
+
   return (
     <FormWizardShell>
       <FormWizardHeader
-        title={
-          mode === "create"
-            ? businessFormCopy.place.createTitle
-            : businessFormCopy.place.editTitle(place?.title)
-        }
+        title={liveTitle}
         subtitle={businessFormCopy.stepSubtitle(
           currentStep,
-          TOTAL_STEPS,
-          getStepLabel(currentStep)
+          totalSteps,
+          getStepLabel(currentStep, ctaStepEnabled)
         )}
         trailing={
           <div className="flex flex-col items-end gap-1">
@@ -865,35 +1137,72 @@ export function PlaceWizard({
       </FormWizardHeader>
 
       {/* Resume-баннер черновика (только create mode) */}
-      {mode === "create" && draft.hasDraft && (
+      {draft.hasDraft && (
         <div className="mx-auto w-full max-w-4xl px-4 pt-4 sm:px-6">
           <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-amber-900">
-              У вас есть незавершённый черновик
-              {draft.draftSavedAt
-                ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
-                : ""}
-              . Продолжить с него?
+              {draftConflictsWithEntity ? (
+                <>
+                  Место было изменено после сохранения черновика
+                  {draft.draftSavedAt
+                    ? ` (черновик — ${formatRelativeTimeRu(draft.draftSavedAt)})`
+                    : ""}
+                  . Какую версию использовать?
+                </>
+              ) : (
+                <>
+                  У вас есть незавершённый черновик
+                  {draft.draftSavedAt
+                    ? ` (${formatRelativeTimeRu(draft.draftSavedAt)})`
+                    : ""}
+                  . Продолжить с него?
+                </>
+              )}
             </p>
             <div className="flex shrink-0 gap-2">
               <Button variant="outline" size="sm" onClick={() => draft.discardDraft()}>
-                Начать заново
+                {draftConflictsWithEntity ? "Взять актуальную версию" : "Начать заново"}
               </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  const restored = draft.restoreDraft();
-                  if (restored) setFormData(restored);
-                }}
-              >
-                Продолжить
+              <Button size="sm" onClick={handleRestoreDraft}>
+                {draftConflictsWithEntity ? "Применить черновик" : "Продолжить"}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
+      <FormPrimaryContentCard>
+        <div className="space-y-6">
+          {renderStep()}
+
+          {showBusinessRelatedPlaces ? (
+            <PlaceGroupSelector
+              currentPlaceId={mode === "edit" ? place?.id : undefined}
+              currentGroupId={mode === "edit" ? currentPlaceGroupId : undefined}
+              onGroupIdChange={mode === "edit" ? setCurrentPlaceGroupId : undefined}
+              selectedPlaceIds={mode === "create" ? selectedRelatedPlaceIds : undefined}
+              onSelectedPlaceIdsChange={
+                mode === "create" ? setSelectedRelatedPlaceIds : undefined
+              }
+              disabled={
+                mode === "edit" ? !isEditable || isSaving || isSubmitting : isSaving || isSubmitting
+              }
+              emptyStateDescription={
+                mode === "create"
+                  ? "Пока нет других мест для связи. После создания ещё одного места вы сможете связать их между собой."
+                  : "Пока нет других мест для связи."
+              }
+            />
+          ) : null}
+
+          {showAdminRelatedPlaces ? (
+            <AdminPlaceGroupManager
+              currentPlaceId={place!.id}
+              currentGroupId={currentPlaceGroupId}
+            />
+          ) : null}
+        </div>
+      </FormPrimaryContentCard>
 
       <FormStickyActionBar
         phase={phase}
@@ -912,7 +1221,7 @@ export function PlaceWizard({
           !canNext ||
           isSaving ||
           isSubmitting ||
-          !canGoToNextStep(currentStep, formData)
+          !canGoToNextStep(currentStep, formData, ctaStepEnabled)
         }
         onSubmit={isReviewStep ? handleSubmit : undefined}
         submitDisabled={
@@ -936,6 +1245,12 @@ export function PlaceWizard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
     </FormWizardShell>
   );
 }

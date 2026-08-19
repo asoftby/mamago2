@@ -8,6 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { Badge } from "@/components/ui/badge";
+import { TableContainer } from "@/components/ui/table";
+import {
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardBody,
+  DataCardRow,
+  DataCardActions,
+} from "@/components/ui/data-card-list";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -34,6 +43,7 @@ interface UsersResponse {
 }
 
 const STATUS_COLORS: Record<UserStatus, string> = {
+  PENDING_ACTIVATION: "bg-sky-100 text-sky-800",
   ACTIVE: "bg-green-100 text-green-800",
   LIMITED: "bg-yellow-100 text-yellow-800",
   SUSPENDED: "bg-orange-100 text-orange-800",
@@ -41,6 +51,7 @@ const STATUS_COLORS: Record<UserStatus, string> = {
 };
 
 const STATUS_LABELS: Record<UserStatus, string> = {
+  PENDING_ACTIVATION: "Ожидает активации",
   ACTIVE: "Активен",
   LIMITED: "Ограничен",
   SUSPENDED: "Приостановлен",
@@ -204,6 +215,7 @@ export function UsersListClient() {
           className="w-full md:w-[180px]"
           options={[
             { value: "all", label: "Все статусы" },
+            { value: "PENDING_ACTIVATION", label: "Ожидает активации" },
             { value: "ACTIVE", label: "Активен" },
             { value: "LIMITED", label: "Ограничен" },
             { value: "SUSPENDED", label: "Приостановлен" },
@@ -223,82 +235,143 @@ export function UsersListClient() {
         <div className="text-center py-8 text-gray-500">Пользователи не найдены</div>
       ) : (
         <>
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Телефон</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telegram</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Последний вход</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Регистрация</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {data.users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        {user.email}
-                        {user.emailVerifiedAt && (
-                          <span className="text-green-600" title="Email подтвержден">✓</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {user.phoneE164 ? (
+          {/* Desktop: table */}
+          <div className="hidden md:block border rounded-lg overflow-hidden">
+            <TableContainer minWidthClassName="min-w-[860px]" scrollLabel="Список пользователей, прокручивается по горизонтали">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Телефон</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telegram</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Роль</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Статус</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Последний вход</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Регистрация</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {data.users.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm">
                         <div className="flex items-center gap-2">
+                          {user.email}
+                          {user.emailVerifiedAt && (
+                            <span className="text-green-600" title="Email подтвержден">✓</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {user.phoneE164 ? (
+                          <div className="flex items-center gap-2">
+                            {user.phoneE164}
+                            {user.phoneVerifiedAt && (
+                              <span className="text-green-600" title="Телефон подтвержден">✓</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <TelegramStatusCell user={user} />
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <Badge className={ROLE_COLORS[user.role]}>
+                          {ROLE_LABELS[user.role]}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <Badge className={STATUS_COLORS[user.status]}>
+                          {STATUS_LABELS[user.status]}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {user.lastLoginAt
+                          ? formatDistanceToNow(new Date(user.lastLoginAt), {
+                              addSuffix: true,
+                              locale: ru,
+                            })
+                          : "Никогда"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {formatDistanceToNow(new Date(user.createdAt), {
+                          addSuffix: true,
+                          locale: ru,
+                        })}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <Link href={`/admin/users/${user.id}`}>
+                          <Button variant="ghost" size="sm">
+                            Открыть
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableContainer>
+          </div>
+
+          {/* Mobile: cards — same data, same handlers */}
+          <DataCardList>
+            {data.users.map((user) => (
+              <DataCard key={user.id}>
+                <DataCardHeader
+                  title={
+                    <span className="inline-flex items-center gap-1.5">
+                      {user.email}
+                      {user.emailVerifiedAt && (
+                        <span className="text-green-600" title="Email подтвержден">✓</span>
+                      )}
+                    </span>
+                  }
+                  badge={<Badge className={STATUS_COLORS[user.status]}>{STATUS_LABELS[user.status]}</Badge>}
+                />
+                <DataCardBody>
+                  <DataCardRow label="Роль" value={<Badge className={ROLE_COLORS[user.role]}>{ROLE_LABELS[user.role]}</Badge>} />
+                  <DataCardRow
+                    label="Телефон"
+                    value={
+                      user.phoneE164 ? (
+                        <span className="inline-flex items-center gap-1.5">
                           {user.phoneE164}
                           {user.phoneVerifiedAt && (
                             <span className="text-green-600" title="Телефон подтвержден">✓</span>
                           )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <TelegramStatusCell user={user} />
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Badge className={ROLE_COLORS[user.role]}>
-                        {ROLE_LABELS[user.role]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Badge className={STATUS_COLORS[user.status]}>
-                        {STATUS_LABELS[user.status]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {user.lastLoginAt
-                        ? formatDistanceToNow(new Date(user.lastLoginAt), {
-                            addSuffix: true,
-                            locale: ru,
-                          })
-                        : "Никогда"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {formatDistanceToNow(new Date(user.createdAt), {
-                        addSuffix: true,
-                        locale: ru,
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Link href={`/admin/users/${user.id}`}>
-                        <Button variant="ghost" size="sm">
-                          Открыть
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        </span>
+                      ) : null
+                    }
+                  />
+                  <DataCardRow
+                    label="Telegram"
+                    value={user.telegramId ? <TelegramStatusCell user={user} /> : null}
+                  />
+                  <DataCardRow
+                    label="Последний вход"
+                    value={
+                      user.lastLoginAt
+                        ? formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true, locale: ru })
+                        : "Никогда"
+                    }
+                  />
+                  <DataCardRow
+                    label="Регистрация"
+                    value={formatDistanceToNow(new Date(user.createdAt), { addSuffix: true, locale: ru })}
+                  />
+                </DataCardBody>
+                <DataCardActions>
+                  <Link href={`/admin/users/${user.id}`} className="w-full">
+                    <Button variant="outline" size="sm" className="w-full">
+                      Открыть
+                    </Button>
+                  </Link>
+                </DataCardActions>
+              </DataCard>
+            ))}
+          </DataCardList>
 
           {/* Pagination */}
           {data.totalPages > 1 && (

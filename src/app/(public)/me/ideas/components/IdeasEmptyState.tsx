@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BookmarkPlus, CalendarCheck2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { C } from "../theme";
 
 type EmptyVariant = "INITIAL" | "UNPLANNED" | "PLANNED";
 
@@ -36,29 +36,43 @@ export function IdeasEmptyState({
 }: IdeasEmptyStateProps) {
   const copy = COPY[variant];
   const Icon = copy.icon;
+  const [firstWord, ...restWords] = copy.title.split(" ");
 
   return (
-    <div className="rounded-[30px] border border-[rgba(20,18,16,0.07)] bg-white px-6 py-12 text-center shadow-[0_16px_36px_rgba(20,18,16,0.05)] sm:px-10 sm:py-16">
+    <div
+      className="rounded-[24px] border border-dashed px-6 py-14 text-center sm:px-10 sm:py-16"
+      style={{ borderColor: C.line2, background: C.paper }}
+    >
       <div className="mx-auto flex max-w-xl flex-col items-center space-y-5">
-        <div className="flex size-16 items-center justify-center rounded-full bg-[#FFF1E8] text-[#EF8759]">
+        <div
+          className="flex size-16 items-center justify-center rounded-full"
+          style={{ background: C.accentSoft, color: C.accentDeep }}
+        >
           <Icon className="size-7" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-[24px] font-semibold tracking-[-0.02em] text-[#141210]">
-            {copy.title}
+          <h2
+            className="text-[30px] leading-none tracking-[-0.02em] sm:text-[34px]"
+            style={{ fontFamily: "var(--font-display)", fontWeight: 400 }}
+          >
+            <span style={{ color: C.ink }}>{firstWord}</span>{" "}
+            <span style={{ fontStyle: "italic", color: C.accentDeep }}>
+              {restWords.join(" ")}
+            </span>
           </h2>
-          <p className="text-sm leading-6 text-[rgba(20,18,16,0.6)] sm:text-[15px]">
+          <p className="text-[15px] leading-6" style={{ color: C.ink3 }}>
             {copy.text}
           </p>
         </div>
 
         {variant === "INITIAL" ? (
-          <Button
-            asChild
-            className="mt-2 h-11 rounded-full bg-[#EF8759] px-5 text-white hover:bg-[#E07848]"
+          <Link
+            href={discoveryHref}
+            className="mt-2 inline-flex h-[46px] items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold text-white transition-colors"
+            style={{ background: C.accent }}
           >
-            <Link href={discoveryHref}>Найти идеи</Link>
-          </Button>
+            Куда пойти →
+          </Link>
         ) : null}
       </div>
     </div>

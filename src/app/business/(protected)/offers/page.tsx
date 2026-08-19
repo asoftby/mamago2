@@ -44,8 +44,6 @@ export default async function OffersPage({
 
   const params = await searchParams;
   const view = params.view || "active";
-  const now = new Date();
-
   // Fetch offers for user's places (same ownership scope as getBusinessPlaces)
   const userPlaces = await prisma.place.findMany({
     where: {
@@ -64,18 +62,15 @@ export default async function OffersPage({
         where: {
           placeId: { in: placeIds },
           ...(view === "archived"
-            ? {
-                dateTo: { lt: now },
-              }
-            : {
-                OR: [{ dateTo: null }, { dateTo: { gte: now } }],
-              }),
+            ? { archivedAt: { not: null } }
+            : { archivedAt: null }),
         },
         select: {
           id: true,
           title: true,
           kind: true,
           status: true,
+          archivedAt: true,
           description: true,
           coverImage: true,
           priceFrom: true,
@@ -92,6 +87,7 @@ export default async function OffersPage({
             select: {
               id: true,
               title: true,
+              archivedAt: true,
               city: {
                 select: {
                   slug: true,
@@ -103,9 +99,18 @@ export default async function OffersPage({
         orderBy: { createdAt: "desc" },
       })
     : [];
+  // offers was filtered by placeId: { in: placeIds } above, so place can
+  // never be null here — this narrows the type without a blind assertion.
+  const placedOffers = offers.map((offer) => {
+    if (!offer.place) {
+      throw new Error(`Offer ${offer.id} matched the business's placeId filter but has no place`);
+    }
+    return { ...offer, placeId: offer.place.id, place: offer.place };
+  });
+
   const metricsByEntity = await getPerformanceMetricsByEntity({
     events: [],
-    offers: offers.map((offer) => ({
+    offers: placedOffers.map((offer) => ({
       id: offer.id,
       title: offer.title,
       updatedAt: offer.createdAt,
@@ -113,7 +118,7 @@ export default async function OffersPage({
     })),
   });
 
-  const offersWithMetrics = offers.map((offer) => ({
+  const offersWithMetrics = placedOffers.map((offer) => ({
     ...offer,
     metrics: metricsByEntity.get(`OFFER:${offer.id}`) ?? {
       views: 0,

@@ -16,8 +16,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { type ArticleBlockMvp, newBlock } from "@/lib/publications/articleMvp";
-import { resolveArticleEmbed } from "@/lib/article/articleEmbedSanitize";
+import {
+  LEGACY_ARTICLE_GALLERY_PRESENTATION,
+  type ArticleBlockMvp,
+  newBlock,
+} from "@/lib/publications/articleMvp";
+import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
+import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
 import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCardEntityPicker";
 import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEditorGalleryField";
@@ -136,7 +141,7 @@ function EmbedBlockEditor({
   onChangeEmbedHtml: (v: string) => void;
   onChangeCaption: (v: string) => void;
 }) {
-  const resolved = useMemo(() => resolveArticleEmbed(embedHtml), [embedHtml]);
+  const resolved = useMemo(() => parseArticleEmbed(embedHtml), [embedHtml]);
 
   return (
     <div className="space-y-3">
@@ -145,13 +150,13 @@ function EmbedBlockEditor({
         <Textarea
           id="embed-code"
           rows={5}
-          placeholder="Код iframe YouTube / Instagram или блок Instagram"
+          placeholder="Ссылка YouTube / Instagram или код iframe"
           value={embedHtml}
           onChange={(e) => onChangeEmbedHtml(e.target.value)}
           className="font-mono text-xs"
         />
         <p className="text-xs text-muted-foreground">
-          Вставьте код встраивания YouTube или Instagram
+          Вставьте ссылку YouTube / Instagram либо старый код встраивания
         </p>
       </div>
       <div className="space-y-1">
@@ -164,28 +169,14 @@ function EmbedBlockEditor({
         />
       </div>
       <div className="rounded-lg border border-border/70 bg-muted/25 p-3 text-xs">
-        {resolved.sanitizedHtml ? (
+        {resolved ? (
           <>
             <p className="text-muted-foreground mb-2">Предпросмотр</p>
-            <div
-              className={cn(
-                "max-w-full overflow-hidden article-embed-shell",
-                resolved.requiresInstagramScript && "article-embed-shell--instagram-blockquote",
-                resolved.provider === "instagram" && !resolved.requiresInstagramScript && "article-embed--instagram",
-              )}
-              dangerouslySetInnerHTML={{ __html: resolved.sanitizedHtml }}
-            />
-            {resolved.requiresInstagramScript ? (
-              <p className="mt-2 text-amber-900/90">
-                Для этого блока на странице статьи подключается официальный скрипт Instagram (без произвольного
-                кода из редактора).
-              </p>
-            ) : null}
+            <ArticleEmbedBlock value={embedHtml} caption={caption} compact />
           </>
         ) : embedHtml.trim() ? (
           <p className="text-amber-800">
-            Не удалось распознать код. Поддерживаются iframe YouTube, iframe Instagram или официальный блок
-            Instagram (blockquote).
+            Не удалось распознать значение. Используйте безопасную http/https-ссылку или поддерживаемую вставку.
           </p>
         ) : (
           <p className="text-muted-foreground">
@@ -344,6 +335,26 @@ export function ArticleBlocksMvpEditor({
       )}
       {block.type === "gallery" && (
         <>
+          <div className="space-y-1 max-w-sm">
+            <Label className="text-xs text-muted-foreground">Вид галереи</Label>
+            {hydrated ? (
+              <Select
+                value={block.presentation ?? LEGACY_ARTICLE_GALLERY_PRESENTATION}
+                onValueChange={(presentation: "carousel" | "mosaic" | "sequential") =>
+                  updateAt(i, { ...block, presentation })
+                }
+              >
+                <SelectTrigger aria-label="Вид галереи"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="carousel">Карусель</SelectItem>
+                  <SelectItem value="mosaic">Мозаика</SelectItem>
+                  <SelectItem value="sequential">На всю ширину по порядку</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <SelectSkeleton className="w-full" />
+            )}
+          </div>
           <ArticleEditorGalleryField
             showHeading={false}
             value={block.mediaIds}

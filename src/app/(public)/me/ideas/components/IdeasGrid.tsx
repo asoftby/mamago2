@@ -1,32 +1,5 @@
-import type { ActivityFormat } from "@prisma/client";
-import { ActivityCard } from "@/components/activity/ActivityCard";
-import { OfferCard } from "@/components/offers/OfferCard";
-import { RouteCard } from "@/components/routes/RouteCard";
-import type { PublicRouteCardModel } from "@/components/routes/types";
-import { formatRuShortDayMonth } from "@/lib/formatters/date";
-import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
 import type { IdeaItem } from "../types";
-import { IdeaCardActions } from "./IdeaCardActions";
-
-function buildRouteModel(idea: IdeaItem): PublicRouteCardModel {
-  const href = idea.activity.publicHref ?? "";
-  const slug = href.split("/").filter(Boolean).at(-1) ?? idea.activity.id;
-
-  return {
-    id: idea.activity.id,
-    slug,
-    title: idea.activity.title,
-    ageTags: [],
-    budgetLevel: "FREE",
-    budgetLabel: "Бесплатно",
-    cityName: idea.activity.placeTitle ?? "Минск",
-    coverImageUrl: idea.activity.coverImageUrl ?? "",
-    authorName: null,
-    isEditorial: false,
-    stopsCount: 0,
-    stops: [],
-  };
-}
+import { IdeaPosterCard } from "./IdeaPosterCard";
 
 type IdeasGridProps = {
   ideas: IdeaItem[];
@@ -44,106 +17,17 @@ export function IdeasGrid({
   onRemove,
 }: IdeasGridProps) {
   return (
-    <div className="grid grid-cols-1 justify-items-center gap-x-4 gap-y-8 min-[560px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {ideas.map((idea) => {
-        const activity = idea.activity;
-        const isRemoving = removingIdeaId === idea.id;
-        const isScheduling = planningIdeaId === idea.id;
-        const isPastEvent =
-          idea.ideaType === "ACTIVITY" && activity.temporalState === "PAST";
-        const isFreeByText =
-          typeof activity.priceText === "string" &&
-          activity.priceText.toLowerCase().includes("бесплатно");
-        const priceMin =
-          activity.priceFrom != null
-            ? activity.priceFrom
-            : isFreeByText
-              ? 0
-              : undefined;
-        const ageBounds =
-          idea.ideaType === "ACTIVITY"
-            ? ageBoundsFromActivityFields({
-                ageTags: activity.ageTags ?? [],
-                ageMinMonths: activity.ageMinMonths,
-                ageMaxMonths: activity.ageMaxMonths,
-              })
-            : null;
-        const ageFrom = ageBounds?.ageFrom;
-        const routeModel =
-          idea.ideaType === "ROUTE" ? buildRouteModel(idea) : null;
-
-        return (
-          <div
-            key={idea.id}
-            className="w-full max-w-[230px] sm:max-w-[250px]"
-            style={isPastEvent ? { opacity: 0.8 } : undefined}
-          >
-            <div className="space-y-3">
-              {idea.ideaType === "ACTIVITY" ? (
-                <ActivityCard
-                  activity={{
-                    id: activity.id,
-                    slug: activity.slug ?? null,
-                    citySlug: activity.citySlug ?? null,
-                    href: activity.publicHref ?? undefined,
-                    format: (activity.format as ActivityFormat) ?? null,
-                    title: activity.title,
-                    image: activity.coverImageUrl ?? "",
-                    ageFrom,
-                    dateStart: activity.dateStart ?? null,
-                    dateEnd: activity.dateEnd ?? null,
-                    priceMin,
-                    priceMax: activity.priceMax ?? undefined,
-                    priceListUsesOt: activity.priceListUsesOt ?? undefined,
-                    currency: (activity.currency as "BYN" | null) ?? null,
-                  }}
-                  saveMeta={{
-                    title: activity.title,
-                    dateISO: activity.dateStart ?? null,
-                    dateEndISO: activity.dateEnd ?? null,
-                    dateLabel: activity.dateStart
-                      ? formatRuShortDayMonth(activity.dateStart)
-                      : null,
-                    source: "ideas",
-                  }}
-                />
-              ) : idea.ideaType === "OFFER" ? (
-                <OfferCard
-                  id={activity.id}
-                  title={activity.title}
-                  href={activity.publicHref ?? "#"}
-                  imageUrl={activity.coverImageUrl ?? undefined}
-                  categoryLabel={activity.categoryLabel ?? undefined}
-                  dateLabel={activity.dateLabel ?? undefined}
-                  priceLabel={activity.priceText?.trim() || undefined}
-                  saveDateISO={activity.dateStart ?? null}
-                  saveDateEndISO={activity.dateEnd ?? null}
-                  saveSource="ideas"
-                />
-              ) : routeModel ? (
-                <RouteCard route={routeModel} />
-              ) : null}
-
-              <div className="px-1">
-                {isPastEvent ? (
-                  <div className="mb-2 inline-flex items-center rounded-full bg-[rgba(20,18,16,0.06)] px-2.5 py-1 text-[11px] font-medium text-[rgba(20,18,16,0.68)]">
-                    Уже прошло
-                  </div>
-                ) : null}
-                <IdeaCardActions
-                  isPlanned={idea.isPlanned}
-                  isPast={isPastEvent}
-                  publicHref={activity.publicHref ?? null}
-                  onSchedule={() => onSchedule(idea.id)}
-                  onRemove={() => onRemove(idea)}
-                  isScheduling={isScheduling}
-                  isRemoving={isRemoving}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="grid grid-cols-1 gap-x-6 gap-y-10 min-[720px]:grid-cols-2 lg:grid-cols-3">
+      {ideas.map((idea) => (
+        <IdeaPosterCard
+          key={idea.id}
+          idea={idea}
+          isScheduling={planningIdeaId === idea.id}
+          isRemoving={removingIdeaId === idea.id}
+          onSchedule={() => onSchedule(idea.id)}
+          onRemove={() => onRemove(idea)}
+        />
+      ))}
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { AgePolicy, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
@@ -13,6 +14,7 @@ import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
+import { syncOfferHomeStoryPlacements } from "@/server/stories/homeStoryItems";
 import {
   campMealKeySchema,
   campProgramTypeSchema,
@@ -24,7 +26,21 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
+import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
+import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
+import {
+  OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+  shouldBlockPublishedOfferEdit,
+} from "@/lib/offers/offerPublishedEditGate";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -42,20 +58,13 @@ const offerPlacementKeySchema = z.enum([
   "BIRTHDAY",
 ]);
 
-const birthdayRoleSchema = z.enum([
-  "VENUE",
-  "ANIMATOR",
-  "SHOW",
-  "MASTER_CLASS",
-  "CAKE",
-  "CATERING",
-  "DECOR",
-  "PHOTO_VIDEO",
-  "PACKAGE",
-  "OTHER",
+const partyLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
+
+const partyCategorySchema = z.enum([
+  "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
 ]);
 
-const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
+const partyOccasionSchema = z.enum(["BIRTHDAY", "GRADUATION"]);
 
 const updateOfferSchema = z.object({
   selectedPlace: z.object({
@@ -63,8 +72,9 @@ const updateOfferSchema = z.object({
   }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
-  ageMinMonths: z.number().optional(),
-  ageMaxMonths: z.number().optional(),
+  agePolicy: z.nativeEnum(AgePolicy).optional(),
+  ageMinMonths: z.number().nullable().optional(),
+  ageMaxMonths: z.number().nullable().optional(),
   coverImage: z.string().optional(),
   gallery: z.array(z.string()).optional(),
   /** Видео URL (YouTube, YouTube Shorts, Instagram Reels) */
@@ -88,6 +98,11 @@ const updateOfferSchema = z.object({
   bookingInstructions: z.string().optional(),
   contactSource: z.enum(["manual", "place"]).optional(),
   contactPhone: z.string().optional(),
+  contactPhoneLabel: z.string().nullable().optional(),
+  contactPhone2: z.string().nullable().optional(),
+  contactPhone2Label: z.string().nullable().optional(),
+  contactPhone3: z.string().nullable().optional(),
+  contactPhone3Label: z.string().nullable().optional(),
   contactWebsite: z.string().optional(),
   contactSocialLinks: z.array(
     z.object({
@@ -96,6 +111,7 @@ const updateOfferSchema = z.object({
       url: z.string(),
     }),
   ).optional(),
+  faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -103,20 +119,15 @@ const updateOfferSchema = z.object({
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   productType: offerProductTypeSchema.optional(),
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
-  birthdayDetails: z.object({
-    role: birthdayRoleSchema.nullable().optional(),
-    locationType: birthdayLocationTypeSchema.nullable().optional(),
-    durationMinutes: z.number().int().nullable().optional(),
-    minChildren: z.number().int().nullable().optional(),
-    maxChildren: z.number().int().nullable().optional(),
-    priceFrom: z.number().nullable().optional(),
-    included: z.string().nullable().optional(),
-    program: z.string().nullable().optional(),
-    note: z.string().nullable().optional(),
-  }).nullable().optional(),
   // Camp/accommodation: null = «тип больше не лагерь, затереть в БД»
   /** Type-specific display details (Offer.details JSONB). Null clears the field. */
   details: z.record(z.string(), z.unknown()).nullable().optional(),
+  // PARTY_SERVICE filterable columns (Phase 3b-2)
+  category: partyCategorySchema.nullable().optional(),
+  partyLocationType: partyLocationTypeSchema.nullable().optional(),
+  minChildren: z.number().int().nullable().optional(),
+  maxChildren: z.number().int().nullable().optional(),
+  occasions: z.array(partyOccasionSchema).optional(),
   campProgramType: campProgramTypeSchema.nullable(),
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).nullable().optional(),
@@ -165,10 +176,14 @@ export async function GET(
             customAddress: true,
             ownerBusinessId: true,
             createdByUserId: true,
+            city: {
+              select: {
+                slug: true,
+              },
+            },
           },
         },
         placements: true,
-        birthdayDetails: true,
       },
     });
 
@@ -201,8 +216,31 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
+    const rawBody = await request.text();
+    if (!rawBody.trim()) {
+      console.warn("[offer.patch] ignoring empty request body", {
+        offerId: id,
+        contentLength: request.headers.get("content-length"),
+        referer: request.headers.get("referer"),
+      });
+      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (error) {
+      console.warn("[offer.patch] ignoring invalid json body", {
+        offerId: id,
+        contentLength: request.headers.get("content-length"),
+        referer: request.headers.get("referer"),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
     const data = updateOfferSchema.parse(body);
+    const faqItems = data.faqItems !== undefined ? normalizeFaqItems(data.faqItems) : undefined;
     timer.mark("validate");
 
     if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
@@ -215,9 +253,13 @@ export async function PATCH(
         id: true,
         title: true,
         kind: true,
+        status: true,
         productType: true,
         priceFrom: true,
         priceText: true,
+        agePolicy: true,
+        ageMinMonths: true,
+        ageMaxMonths: true,
         campProgramType: true,
         campSessions: true,
         placeId: true,
@@ -229,7 +271,28 @@ export async function PATCH(
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
+    // Гейт до любой записи в БД и любых сайдэффектов (slug, media, projections):
+    // прямая правка PUBLISHED-оффера минует модерацию — content leak.
+    if (
+      shouldBlockPublishedOfferEdit({
+        role: user.role,
+        currentStatus: existingOffer.status,
+      })
+    ) {
+      return NextResponse.json(
+        {
+          error: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+          message: "Опубликованное предложение нельзя изменить напрямую",
+          description:
+            "Изменения опубликованных предложений проходят модерацию",
+        },
+        { status: 403 },
+      );
+    }
+
     const updateData: Prisma.OfferUpdateInput = {};
+
+    let targetPlace = existingOffer.place;
 
     if (data.selectedPlace?.id) {
       const nextPlace = await prisma.place.findUnique({
@@ -244,9 +307,36 @@ export async function PATCH(
         );
       }
 
+      targetPlace = nextPlace;
+
       if (data.selectedPlace.id !== existingOffer.placeId) {
         updateData.place = { connect: { id: data.selectedPlace.id } };
       }
+    }
+
+    const resultantStatus = data.status ?? existingOffer.status;
+    if (offerStatusRequiresPlace(resultantStatus) && !targetPlace) {
+      return NextResponse.json(
+        {
+          error: "Место обязательно для отправки на модерацию или публикации",
+          code: "PLACE_REQUIRED_FOR_SUBMISSION",
+        },
+        { status: 422 },
+      );
+    }
+
+    if (targetPlace && shouldRejectUnlinkedPlaceForOfferMutation({
+      role: user.role,
+      status: data.status,
+      ownerBusinessId: targetPlace.ownerBusinessId,
+    })) {
+      return NextResponse.json(
+        {
+          error: "Место не привязано к бизнес-профилю",
+          code: "PLACE_NOT_LINKED_TO_BUSINESS",
+        },
+        { status: 422 },
+      );
     }
 
     // Calculate price fields if pricing data is provided
@@ -273,8 +363,16 @@ export async function PATCH(
     
     if (data.title !== undefined) updateData.title = data.title;
     if (data.shortDescription !== undefined) updateData.description = data.shortDescription;
-    if (data.ageMinMonths !== undefined) updateData.ageMinMonths = data.ageMinMonths;
-    if (data.ageMaxMonths !== undefined) updateData.ageMaxMonths = data.ageMaxMonths;
+    if (data.agePolicy !== undefined || data.ageMinMonths !== undefined || data.ageMaxMonths !== undefined) {
+      const normalizedAge = normalizeAgePolicy({
+        agePolicy: data.agePolicy ?? existingOffer.agePolicy,
+        ageMinMonths: data.ageMinMonths !== undefined ? data.ageMinMonths : existingOffer.ageMinMonths,
+        ageMaxMonths: data.ageMaxMonths !== undefined ? data.ageMaxMonths : existingOffer.ageMaxMonths,
+      });
+      updateData.agePolicy = normalizedAge.agePolicy;
+      updateData.ageMinMonths = normalizedAge.ageMinMonths;
+      updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
+    }
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
     if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
@@ -284,11 +382,23 @@ export async function PATCH(
     if (data.discoverySignalIds !== undefined) updateData.discoverySignalIds = data.discoverySignalIds;
     if (data.classChipSlugs !== undefined) updateData.classChipSlugs = data.classChipSlugs;
     if (data.wizardCompletedSteps !== undefined) updateData.wizardCompletedSteps = data.wizardCompletedSteps;
+    if (faqItems !== undefined) updateData.faqItems = faqItems as unknown as Prisma.InputJsonValue;
     if (data.details !== undefined)
       updateData.details =
         data.details === null ? Prisma.DbNull : (data.details as Prisma.InputJsonValue);
+    // PARTY_SERVICE filterable columns
+    if (data.category !== undefined) updateData.category = data.category;
+    if (data.partyLocationType !== undefined) updateData.partyLocationType = data.partyLocationType;
+    if (data.minChildren !== undefined) updateData.minChildren = data.minChildren;
+    if (data.maxChildren !== undefined) updateData.maxChildren = data.maxChildren;
+    if (data.occasions !== undefined) updateData.occasions = data.occasions;
     if (data.contactSource !== undefined) updateData.contactSource = data.contactSource;
     if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
+    if (data.contactPhoneLabel !== undefined) updateData.contactPhoneLabel = data.contactPhoneLabel;
+    if (data.contactPhone2 !== undefined) updateData.contactPhone2 = data.contactPhone2;
+    if (data.contactPhone2Label !== undefined) updateData.contactPhone2Label = data.contactPhone2Label;
+    if (data.contactPhone3 !== undefined) updateData.contactPhone3 = data.contactPhone3;
+    if (data.contactPhone3Label !== undefined) updateData.contactPhone3Label = data.contactPhone3Label;
     if (data.contactWebsite !== undefined) updateData.contactWebsite = data.contactWebsite;
     if (data.contactSocialLinks !== undefined)
       updateData.contactSocialLinks = data.contactSocialLinks as unknown as Prisma.InputJsonValue;
@@ -407,6 +517,24 @@ export async function PATCH(
       updateData.kind = mapProductTypeToLegacyKind(productType);
     }
 
+    // Тип сменился с party (PARTY_SERVICE/PARTY_PACKAGE) на другой — зависшие
+    // party-колонки и party-ветка details затираются (аналог CAMP-wipe выше).
+    const wasPartyOffer =
+      existingOffer.productType === "PARTY_SERVICE" ||
+      existingOffer.productType === "PARTY_PACKAGE";
+    const isPartyOffer =
+      productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE";
+    if (wasPartyOffer && !isPartyOffer) {
+      updateData.category = null;
+      updateData.partyLocationType = null;
+      updateData.minChildren = null;
+      updateData.maxChildren = null;
+      updateData.occasions = [];
+      if (data.details === undefined) {
+        updateData.details = Prisma.DbNull;
+      }
+    }
+
     const offer = await prisma.$transaction(async (tx) => {
       await tx.offer.update({
         where: { id },
@@ -421,9 +549,11 @@ export async function PATCH(
         requestedPlacementsStrategy: "preserve_if_missing",
         requestedPlacements: data.requestedPlacements,
         requestedPlacementsProvided: data.requestedPlacements !== undefined,
-        birthdayDetails: data.birthdayDetails,
-        birthdayDetailsProvided: data.birthdayDetails !== undefined,
       });
+
+      // CAMP: rebuild OfferSession projection from current campSessions canon
+      // (clears all rows when isCampOffer is false, e.g. type switched away from CAMP)
+      await projectCampSessions(tx, id, isCampOffer ? nextCampSessions : []);
 
       return tx.offer.findUniqueOrThrow({
         where: { id },
@@ -436,13 +566,17 @@ export async function PATCH(
           updatedAt: true,
           productType: true,
           placements: true,
-          birthdayDetails: true,
           place: {
             select: {
               id: true,
               title: true,
               formattedAddr: true,
               customAddress: true,
+              city: {
+                select: {
+                  slug: true,
+                },
+              },
             },
           },
         },
@@ -475,6 +609,10 @@ export async function PATCH(
       }
     }
 
+    // Refresh only placements that an admin explicitly created. This function
+    // never auto-enrolls Offer sessions into Stories.
+    await syncOfferHomeStoryPlacements(offer.id);
+
     timer.mark("response");
     timer.log({ status: offer.status });
 
@@ -486,7 +624,7 @@ export async function PATCH(
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.issues },
+        formatZodErrorResponse(error),
         { status: 400 }
       );
     }
@@ -513,11 +651,8 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const offer = await prisma.offer.findFirst({
-      where: {
-        id,
-        status: "DRAFT",
-      },
+    const offer = await prisma.offer.findUnique({
+      where: { id },
       include: {
         place: { select: { ownerBusinessId: true, createdByUserId: true } },
       },
@@ -530,13 +665,39 @@ export async function DELETE(
       );
     }
 
+    const deleteOperation = offer.archivedAt ? "deleteArchived" : "deleteDraft";
+
+    if (deleteOperation === "deleteArchived" && user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Удаление из архива доступно только администратору" },
+        { status: 403 },
+      );
+    }
+
+    await assertContentLifecycleOperationAllowed({
+      contentType: "OFFER",
+      contentId: id,
+      operation: deleteOperation,
+      status: offer.status,
+      archivedAt: offer.archivedAt,
+      actorRole: user.role,
+      prisma,
+    });
+
     await prisma.offer.delete({
       where: { id },
     });
+    await syncOfferHomeStoryPlacements(id);
 
     return NextResponse.json({ success: true });
 
   } catch (error) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete offer error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

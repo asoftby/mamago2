@@ -17,6 +17,7 @@ import {
 } from "@/lib/billing/actionPricing";
 import { formatPrice, formatTransactionAmount } from "@/lib/formatters/format-price";
 import { cn } from "@/lib/utils";
+import { TableContainer } from "@/components/ui/table";
 
 type PeriodPreset = "today" | "7d" | "30d" | "currentMonth" | "previousMonth" | "custom";
 
@@ -478,7 +479,7 @@ export function PartnerFinanceSection({
               Индивидуальные цены не настроены. Применяются глобальные правила.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer minWidthClassName="min-w-[720px]" scrollLabel="Индивидуальные условия, таблица">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
@@ -528,7 +529,7 @@ export function PartnerFinanceSection({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </div>
       </div>
@@ -620,7 +621,7 @@ export function PartnerFinanceSection({
             )}
           </div>
 
-          <div className="overflow-x-auto">
+          <TableContainer minWidthClassName="min-w-[820px]" scrollLabel="Транзакции партнёра, таблица">
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
@@ -711,7 +712,7 @@ export function PartnerFinanceSection({
                 )}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
 
           {pagination && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">

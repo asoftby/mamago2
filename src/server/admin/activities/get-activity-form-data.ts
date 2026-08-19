@@ -4,6 +4,7 @@ import type { EventStep1Taxonomies, PublicGenreOption } from "@/components/busin
 import { getGenresByCategory } from "@/lib/taxonomy/getGenresByCategory";
 
 export const EVENT_STEP1_CATEGORIES_TAG = "event-step1-categories";
+export const EVENT_STEP1_AGES_TAG = "event-step1-ages";
 export const eventStep1GenresTag = (categoryId: string) => `event-step1-genres:${categoryId}`;
 
 const getCachedEventCategories = unstable_cache(
@@ -62,8 +63,8 @@ const getCachedAgeOptions = unstable_cache(
       active: o.isActive,
     }));
   },
-  ["admin-event-age-options-v1"],
-  { revalidate: 3600 },
+  ["admin-event-age-options-v2"],
+  { revalidate: 3600, tags: [EVENT_STEP1_AGES_TAG] },
 );
 
 const getCachedInterestOptions = unstable_cache(

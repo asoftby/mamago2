@@ -1,6 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { adminPath } from "@/lib/routing/surface";
+import { TableContainer } from "@/components/ui/table";
 import type { BusinessAccessRequestStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,10 @@ export default async function BusinessAccessRequestsPage({
         <p className="text-gray-500">Заявок не найдено.</p>
       ) : (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <TableContainer
+            minWidthClassName="min-w-[920px]"
+            scrollLabel="Заявки на доступ к бизнесу, прокручивается по горизонтали"
+          >
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -114,6 +119,7 @@ export default async function BusinessAccessRequestsPage({
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       )}
     </div>

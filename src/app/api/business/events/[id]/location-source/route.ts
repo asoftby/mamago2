@@ -42,7 +42,14 @@ export async function GET(
 
   const normalizedHint = parseEventImportLocationHint(linkedImport?.normalizedData);
   const rawHint = parseEventImportLocationHint(linkedImport?.rawPayload);
-  const hint = normalizedHint ?? rawHint;
+  const hint =
+    normalizedHint || rawHint
+      ? {
+          venueName: normalizedHint?.venueName ?? rawHint?.venueName ?? "",
+          addressText: normalizedHint?.addressText ?? rawHint?.addressText ?? "",
+          cityName: normalizedHint?.cityName ?? rawHint?.cityName ?? "",
+        }
+      : null;
 
   return NextResponse.json({
     venueName: hint?.venueName ?? "",

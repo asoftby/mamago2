@@ -1,24 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import {
+  countsFromGroupBy,
+  emptyEmojiRatingCounts,
+  ratingVoterIdentifier,
+} from "@/lib/content-rating/emojiRating";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { routeId: string } },
+  { params }: { params: Promise<{ routeId: string }> },
 ) {
   try {
-    const { routeId } = params;
+    const { routeId } = await params;
 
     if (!routeId) {
       return NextResponse.json({ error: "Missing routeId" }, { status: 400 });
     }
 
     const user = await getCurrentUser();
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      req.headers.get("x-real-ip") ??
-      "anonymous";
-    const identifier = user?.id ?? `ip:${ip}`;
+    const identifier = ratingVoterIdentifier({
+      userId: user?.id,
+      ip: getTrustedClientIp(req),
+    });
 
     const [counts, existing] = await Promise.all([
       prisma.routeRating.groupBy({
@@ -32,17 +37,15 @@ export async function GET(
       }),
     ]);
 
-    const result = { like: 0, neutral: 0, dislike: 0 };
-    for (const c of counts) {
-      result[c.ratingType as keyof typeof result] = c._count;
-    }
-
     return NextResponse.json({
-      ...result,
+      ...countsFromGroupBy(counts),
       myVote: existing?.ratingType ?? null,
     });
   } catch (error) {
     console.error("Failed to get route ratings:", error);
-    return NextResponse.json({ like: 0, neutral: 0, dislike: 0, myVote: null });
+    return NextResponse.json({
+      ...emptyEmojiRatingCounts(),
+      myVote: null,
+    });
   }
 }

@@ -56,11 +56,6 @@ export class HeroGreetingErrorBoundary extends React.Component<
           </p>
         ) : null}
 
-        <div className="mt-2 flex items-start">
-          <h1 className="min-w-0 flex-1 text-2xl font-semibold leading-tight tracking-tight text-neutral-900 sm:text-3xl [text-wrap:balance]">
-            <span className="whitespace-pre-wrap">{model.title}</span>
-          </h1>
-        </div>
       </div>
     );
   }

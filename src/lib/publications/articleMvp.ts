@@ -3,6 +3,7 @@ import {
   extractPlainTextFromHtml,
   extractPlainTextLinesFromHtml,
 } from "@/lib/richtext/utils";
+import { articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { randomId } from "@/lib/utils/randomId";
 
 /** Версия формата `Article.contentJson` */
@@ -10,6 +11,10 @@ export const ARTICLE_CONTENT_VERSION = 1 as const;
 
 export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
 export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema>;
+
+export const ArticleGalleryPresentationSchema = z.enum(["carousel", "mosaic", "sequential"]);
+export type ArticleGalleryPresentation = z.infer<typeof ArticleGalleryPresentationSchema>;
+export const LEGACY_ARTICLE_GALLERY_PRESENTATION: ArticleGalleryPresentation = "mosaic";
 
 const base = z.object({ id: z.string().min(1) });
 
@@ -42,6 +47,7 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({
     type: z.literal("gallery"),
     mediaIds: z.array(z.string()),
+    presentation: ArticleGalleryPresentationSchema.optional(),
     caption: z.string().optional(),
   }),
   base.extend({
@@ -100,6 +106,17 @@ export function deriveArticleLeadPlainText(
   return text || null;
 }
 
+/** HTML лида (intro) с разметкой редактора — для шапки без потери bold/italic/br. */
+export function deriveArticleLeadHtml(
+  content: ArticleContentPayload | { blocks: ArticleBlockMvp[] },
+): string | null {
+  const intro = content.blocks.find((b) => b.type === "intro");
+  if (!intro || intro.type !== "intro") return null;
+  const html = articleBlockHtmlForPublic(intro.text, "intro");
+  if (!extractPlainTextFromHtml(html).trim()) return null;
+  return html;
+}
+
 /** Превью статьи: первые строки блока intro (лид). */
 export function deriveArticleExcerptFromContent(
   content: ArticleContentPayload,
@@ -135,7 +152,7 @@ export function newBlock(
     case "image":
       return { id: bid, type: "image", mediaId: "", alt: "", caption: "" };
     case "gallery":
-      return { id: bid, type: "gallery", mediaIds: [], caption: "" };
+      return { id: bid, type: "gallery", mediaIds: [], presentation: "carousel", caption: "" };
     case "activityCard":
       return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "" };
     case "embed":

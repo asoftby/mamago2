@@ -9,6 +9,7 @@ import { Intent } from "@/lib/intent";
 import { Label } from "@/components/ui/typography";
 import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { appendCityQuery } from "@/lib/city/appendCityQuery";
+import { ComingSoonBadge } from "@/components/city/ComingSoonBadge";
 
 // Map intent IDs to icons (fallback if no image)
 const TAB_ICONS = {
@@ -25,6 +26,12 @@ interface DiscoveryIntentTabsProps {
   className?: string;
   /** Верхняя строка хедера: иконка + подпись, подчёркивание у активного (как Airbnb). */
   variant?: "default" | "airbnb";
+  /**
+   * `"compact"` — однострочный текстовый режим без ряда иконок (мобильный
+   * `MobileHeader`: вторичная строка под поисковой капсулой, высота ~40px).
+   * Применяется только с `variant="airbnb"`; на `variant="default"` не влияет.
+   */
+  density?: "default" | "compact";
 }
 
 function DiscoveryIntentTabsContent({
@@ -32,9 +39,10 @@ function DiscoveryIntentTabsContent({
   currentIntent,
   className,
   variant = "default",
+  density = "default",
 }: DiscoveryIntentTabsProps) {
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
-  const tabsRef = useRef<(HTMLAnchorElement | null)[]>([]);
+  const tabsRef = useRef<(HTMLAnchorElement | HTMLSpanElement | null)[]>([]);
 
   const activeIndex =
     currentIntent === null
@@ -70,9 +78,71 @@ function DiscoveryIntentTabsContent({
     }
   }, [activeIndex, currentIntent, variant]);
 
+  /** Compact: без sliding-индикатора, только минимальный scroll-into-view активного пункта при первом рендере. */
+  useLayoutEffect(() => {
+    if (!(variant === "airbnb" && density === "compact")) return;
+    if (activeIndex < 0) return;
+    tabsRef.current[activeIndex]?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "nearest" });
+  }, [activeIndex, variant, density]);
+
   // If no city, don't render tabs (after all hooks)
   if (!city) {
     return null;
+  }
+
+  if (variant === "airbnb" && density === "compact") {
+    return (
+      <nav
+        className={cn("relative z-10 w-full bg-transparent", className)}
+        aria-label="Разделы развлечений"
+      >
+        <div className="flex items-center gap-4 overflow-x-auto no-scrollbar px-4 py-2.5 pointer-events-auto">
+          {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
+            const isActive = activeIndex >= 0 && index === activeIndex;
+
+            if (!intentConfig.navigationEnabled) {
+              return (
+                <span
+                  key={intentConfig.id}
+                  role="link"
+                  aria-disabled="true"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    tabsRef.current[index] = el;
+                  }}
+                  className={cn(
+                    "flex shrink-0 cursor-default items-center gap-1 whitespace-nowrap text-sm select-none",
+                    isActive ? "font-semibold text-foreground" : "font-medium text-muted-foreground",
+                  )}
+                >
+                  {intentConfig.label}
+                  <ComingSoonBadge />
+                </span>
+              );
+            }
+
+            return (
+              <Link
+                key={intentConfig.id}
+                href={buildIntentHref(intentConfig.id)}
+                ref={(el) => {
+                  tabsRef.current[index] = el;
+                }}
+                scroll={false}
+                className={cn(
+                  "shrink-0 whitespace-nowrap text-sm transition-colors select-none",
+                  isActive
+                    ? "font-semibold text-foreground"
+                    : "font-medium text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {intentConfig.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    );
   }
 
   if (variant === "airbnb") {
@@ -85,6 +155,54 @@ function DiscoveryIntentTabsContent({
           {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
             const isActive = activeIndex >= 0 && index === activeIndex;
             const Icon = TAB_ICONS[intentConfig.id];
+
+            if (!intentConfig.navigationEnabled) {
+              return (
+                <span
+                  key={intentConfig.id}
+                  role="link"
+                  aria-disabled="true"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    tabsRef.current[index] = el;
+                  }}
+                  className={cn(
+                    "group flex min-w-[68px] max-w-[120px] cursor-default flex-col items-center gap-0.5 border-b-2 px-2 pb-2 pt-1 select-none md:min-w-[80px] md:px-3",
+                    isActive
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground",
+                  )}
+                >
+                  {intentConfig.image ? (
+                    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center md:h-9 md:w-9">
+                      <Image
+                        src={intentConfig.image}
+                        alt={intentConfig.label}
+                        width={36}
+                        height={36}
+                        className={cn(
+                          "h-full w-full object-contain grayscale",
+                          isActive ? "opacity-90" : "opacity-60",
+                        )}
+                      />
+                    </div>
+                  ) : (
+                    <Icon className={cn("h-8 w-8 shrink-0", isActive ? "opacity-90" : "opacity-60")} />
+                  )}
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <span
+                      className={cn(
+                        "text-[11px] leading-tight tracking-normal normal-case md:text-xs",
+                        isActive ? "font-semibold" : "font-medium",
+                      )}
+                    >
+                      {intentConfig.label}
+                    </span>
+                    <ComingSoonBadge />
+                  </span>
+                </span>
+              );
+            }
 
             return (
               <Link
@@ -144,6 +262,50 @@ function DiscoveryIntentTabsContent({
         {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
           const isActive = activeIndex >= 0 && index === activeIndex;
           const Icon = TAB_ICONS[intentConfig.id];
+
+          if (!intentConfig.navigationEnabled) {
+            return (
+              <span
+                key={intentConfig.id}
+                role="link"
+                aria-disabled="true"
+                tabIndex={-1}
+                ref={(el) => {
+                  tabsRef.current[index] = el;
+                }}
+                className={cn(
+                  "group flex min-w-[80px] cursor-default flex-col items-center justify-center gap-0.5 px-3 select-none",
+                  isActive ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {intentConfig.image ? (
+                  <div className="relative h-[40px] w-[40px] flex items-center justify-center">
+                    <Image
+                      src={intentConfig.image}
+                      alt={intentConfig.label}
+                      width={40}
+                      height={40}
+                      className={cn("object-contain grayscale", isActive ? "opacity-90" : "opacity-60")}
+                    />
+                  </div>
+                ) : (
+                  <Icon className={cn("h-4 w-4", isActive ? "opacity-90" : "opacity-60")} />
+                )}
+                <span className="mb-[7px] flex items-center gap-1 whitespace-nowrap">
+                  <Label
+                    as="span"
+                    className={cn(
+                      "text-[12px] leading-none normal-case tracking-normal text-current",
+                      isActive ? "font-bold" : "font-medium",
+                    )}
+                  >
+                    {intentConfig.label}
+                  </Label>
+                  <ComingSoonBadge />
+                </span>
+              </span>
+            );
+          }
 
           return (
             <Link
@@ -208,7 +370,12 @@ function DiscoveryIntentTabsContent({
 }
 
 export function DiscoveryIntentTabs(props: DiscoveryIntentTabsProps) {
-  const h = props.variant === "airbnb" ? "h-[68px]" : "h-[60px]";
+  const h =
+    props.variant === "airbnb" && props.density === "compact"
+      ? "h-10"
+      : props.variant === "airbnb"
+        ? "h-[68px]"
+        : "h-[60px]";
   return (
     <Suspense fallback={<div className={cn("w-full", h)} />}>
       <DiscoveryIntentTabsContent {...props} />

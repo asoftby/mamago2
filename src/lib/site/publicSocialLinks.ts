@@ -3,8 +3,8 @@ export type PublicSocialKey = "instagram" | "tiktok" | "telegram";
 /** Если в .env не задано — чтобы в футере всегда были три иконки. Переопределите через NEXT_PUBLIC_SOCIAL_*. */
 const FALLBACK_SOCIAL: Record<PublicSocialKey, string> = {
   instagram: "https://www.instagram.com/mamago.by/",
-  tiktok: "https://www.tiktok.com/@mamago.by",
-  telegram: "https://t.me/mamago_2_bot",
+  tiktok: "https://www.tiktok.com/@tanya_mamago",
+  telegram: "https://t.me/mamagoby",
 };
 
 function telegramHrefFromBotConfig(): string | null {
@@ -35,4 +35,12 @@ export function getPublicSocialLinks(): { key: PublicSocialKey; href: string }[]
     { key: "tiktok", href: tiktok },
     { key: "telegram", href: telegram },
   ];
+}
+
+/** Публичный Telegram-канал / бот для CTA (футер, intermission статей). */
+export function getPublicTelegramHref(): string {
+  return (
+    getPublicSocialLinks().find((l) => l.key === "telegram")?.href ??
+    FALLBACK_SOCIAL.telegram
+  );
 }

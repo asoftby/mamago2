@@ -9,7 +9,6 @@ import {
   useRef,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
 import { ContentStatus, Activity } from "@prisma/client";
 import { toast } from "@/lib/toast";
 import {
@@ -50,8 +49,6 @@ import {
 import { useEventEditorDraft } from "./useEventEditorDraft";
 
 import { Step9Review } from "./steps/Step9Review";
-import { EventSubmitModerationSuccessDialog } from "./EventSubmitModerationSuccessDialog";
-import { EventPublishedSuccessDialog } from "./EventPublishedSuccessDialog";
 import {
   publicActivityPath,
   toAbsolutePublicUrl,
@@ -74,6 +71,11 @@ import { useAiEnrichment } from "./useAiEnrichment";
 import { applyAiEnrichmentToDraft } from "@/lib/event/applyAiEnrichment";
 import { createClientSavePerf } from "@/lib/perf/clientSavePerf";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
+import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
+import { FaqStep } from "../shared/FaqStep";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 type AiSuggestedFields = {
   participationFormat: boolean;
@@ -106,6 +108,7 @@ interface EventWizardProps {
   importedRecordId?: string | null;
   /** Pre-fetched AI enrichment (from server) — cached, no auto-fetch */
   initialAiEnrichment?: import("@/lib/ai/enrichEvent").EnrichmentResult | null;
+  ctaStepEnabled?: boolean;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
@@ -116,13 +119,6 @@ const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
 const EVENT_SUBMITTED_OR_LIVE_STATUSES: ReadonlySet<ContentStatus> = new Set([
   ContentStatus.PUBLISHED,
   ContentStatus.PENDING,
-  ContentStatus.PENDING_UPDATE,
-  ContentStatus.SCHEDULED,
-]);
-
-/** Публичная витрина: можно открыть карточку на сайте. */
-const EVENT_STATUSES_WITH_LIVE_PUBLIC_PAGE: ReadonlySet<ContentStatus> = new Set([
-  ContentStatus.PUBLISHED,
   ContentStatus.PENDING_UPDATE,
   ContentStatus.SCHEDULED,
 ]);
@@ -277,6 +273,7 @@ function EventWizardInner({
   initialStep1Taxonomies,
   importedRecordId,
   initialAiEnrichment,
+  ctaStepEnabled,
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -286,10 +283,8 @@ function EventWizardInner({
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
-  const [moderationSuccessModalOpen, setModerationSuccessModalOpen] = useState(false);
-  const [moderationSuccessEventId, setModerationSuccessEventId] = useState<string | null>(null);
-  const [publishedSuccessModalOpen, setPublishedSuccessModalOpen] = useState(false);
-  const [publishedActivityHref, setPublishedActivityHref] = useState<string | null>(null);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   const [isLoadingGenres, setIsLoadingGenres] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "validating" | "submitting" | "success" | "error"
@@ -308,6 +303,18 @@ function EventWizardInner({
   const [eventId, setEventId] = useState<string | null>(
     mode === "edit" && event ? event.id : null
   );
+  /**
+   * Максимальный посещённый шаг. При создании нового события дефолты формы
+   * (например, pricingMode: "free") делают isComplete истинным для ещё не
+   * посещённых шагов — в степпере такие шаги не должны показываться выполненными.
+   * В edit-режиме данные пришли с сервера, поэтому все шаги считаются посещёнными.
+   */
+  const [maxVisitedStep, setMaxVisitedStep] = useState(() =>
+    mode === "edit" ? TOTAL_STEPS : 1
+  );
+  useEffect(() => {
+    setMaxVisitedStep((prev) => Math.max(prev, currentStep));
+  }, [currentStep]);
   const {
     draft: formData,
     patchDraft: patchFormData,
@@ -329,14 +336,9 @@ function EventWizardInner({
     }
   }, [mode]);
 
-  useEffect(() => {
-    setOpenSitePublicPath(null);
-  }, [event?.id]);
-
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [openSitePublicPath, setOpenSitePublicPath] = useState<string | null>(null);
   const baselineJsonRef = useRef(eventFormBaselineJson(mode, event));
   const baselineFormDataRef = useRef<EventFormData>(
     mode === "edit" && event
@@ -705,6 +707,21 @@ function EventWizardInner({
     [router, shouldInterceptLeave],
   );
 
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface,
+        returnTo,
+        role: userRole,
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [returnTo, surface, userRole],
+  );
+
   const handleLeaveDiscard = useCallback(() => {
     clearPersistedDraft();
     if (mode === "create" && typeof window !== "undefined") {
@@ -795,6 +812,11 @@ function EventWizardInner({
   const handleGoToStep = (step: number) => {
     if (step < 1 || step > TOTAL_STEPS) return;
 
+    if (mode === "edit" && event?.status === ContentStatus.PUBLISHED) {
+      setCurrentStep(step);
+      return;
+    }
+
     // Allow going back freely
     if (step <= currentStep) {
       setCurrentStep(step);
@@ -863,22 +885,12 @@ function EventWizardInner({
       baselineJsonRef.current = JSON.stringify(formData);
       baselineFormDataRef.current = cloneEventFormData(formData);
       setLastSaved(new Date());
-      toast.success(hadEventId ? "Изменения сохранены" : "Черновик сохранён");
-
-      // После сохранения опубликованного события — возвращаемся назад
-      if (mode === "edit" && hadEventId && returnTo) {
-        router.push(returnTo);
-        return;
-      }
-
-      if (
-        mode === "edit" &&
-        event?.status &&
-        EVENT_STATUSES_WITH_LIVE_PUBLIC_PAGE.has(event.status) &&
-        result.publicPath
-      ) {
-        setOpenSitePublicPath(toAbsolutePublicUrl(result.publicPath));
-      }
+      showSuccessModal({
+        kind: "event",
+        outcome: "draft_saved",
+        id: result.persistedId ?? eventId ?? event?.id ?? "",
+        isEdit: hadEventId,
+      });
 
       if (mode === "create" && typeof window !== "undefined") {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -956,12 +968,17 @@ function EventWizardInner({
 
       baselineJsonRef.current = JSON.stringify(formData);
       baselineFormDataRef.current = cloneEventFormData(formData);
-      setPublishedActivityHref(href);
-      toast.success(
-        canPublishContentDirectly(userRole)
-          ? "Изменения опубликованы"
-          : "Изменения сохранены и отправлены на проверку",
-      );
+      showSuccessModal({
+        kind: "event",
+        outcome: canPublishContentDirectly(userRole)
+          ? "changes_published"
+          : "submitted",
+        id: tid,
+        isEdit: true,
+        slug: eventSlugFromSubmitBody(submitBody),
+        publicPath: href,
+        cityField: formData.city,
+      });
 
       // Clean up AFTER marking success
       if (mode === "create" && typeof window !== "undefined") {
@@ -969,16 +986,6 @@ function EventWizardInner({
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         clearPersistedDraft();
       }
-
-      if (mode === "edit") {
-        if (href) {
-          setOpenSitePublicPath(href);
-        }
-        return;
-      }
-
-      debugEditorLog("navigate after published review save", { href });
-      navigateToCompatibleHref(router, href ?? afterSubmitDestination);
     } catch (error: unknown) {
       console.error("Published review save error:", error);
       setSubmitStatus("error");
@@ -1059,8 +1066,13 @@ function EventWizardInner({
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
             clearPersistedDraft();
           }
-          setModerationSuccessEventId(newId);
-          setModerationSuccessModalOpen(true);
+          showSuccessModal({
+            kind: "event",
+            outcome: "submitted",
+            id: newId,
+            cityField: formData.city,
+            slug: eventSlugFromSubmitBody(submitBody),
+          });
           return;
         }
         if (isPublishedSuccess(submitBody)) {
@@ -1070,21 +1082,18 @@ function EventWizardInner({
             localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
             clearPersistedDraft();
           }
-          setPublishedActivityHref(
-            toAbsolutePublicUrl(
+          showSuccessModal({
+            kind: "event",
+            outcome: "published",
+            id: newId,
+            cityField: formData.city,
+            slug: eventSlugFromSubmitBody(submitBody),
+            publicPath:
               eventPublicPathFromSubmitBody(submitBody) ??
-                publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
-            ),
-          );
-          setPublishedSuccessModalOpen(true);
+              publicActivityPath(newId, formData.city, eventSlugFromSubmitBody(submitBody)),
+          });
           return;
         }
-
-        toast.success(
-          canPublishContentDirectly(userRole)
-            ? "Событие опубликовано"
-            : "Событие отправлено на модерацию",
-        );
 
         // Clean up AFTER marking success
         if (mode === "create" && typeof window !== "undefined") {
@@ -1092,14 +1101,12 @@ function EventWizardInner({
           clearPersistedDraft();
         }
 
-        if (onComplete) {
-          onComplete(newId);
-        } else {
-          debugEditorLog("router.push after create submit", {
-            href: afterSubmitDestination,
-          });
-          router.push(afterSubmitDestination);
-        }
+        showSuccessModal({
+          kind: "event",
+          outcome: canPublishContentDirectly(userRole) ? "published" : "submitted",
+          id: newId,
+          cityField: formData.city,
+        });
         return;
       }
 
@@ -1141,35 +1148,38 @@ function EventWizardInner({
         // Clean up AFTER marking success
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
-          localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
-          clearPersistedDraft();
+            localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+            clearPersistedDraft();
         }
-        setModerationSuccessEventId(targetId);
-        setModerationSuccessModalOpen(true);
+        showSuccessModal({
+          kind: "event",
+          outcome: "submitted",
+          id: targetId,
+          cityField: formData.city,
+          slug: eventSlugFromSubmitBody(submitBody),
+        });
         return;
       }
       if (isPublishedSuccess(submitBody)) {
         // Clean up AFTER marking success
         if (mode === "create" && typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_KEY);
-          localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
-          clearPersistedDraft();
+            localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
+            clearPersistedDraft();
         }
-        setPublishedActivityHref(
-          toAbsolutePublicUrl(
+        showSuccessModal({
+          kind: "event",
+          outcome: mode === "edit" ? "changes_published" : "published",
+          id: targetId,
+          cityField: formData.city,
+          slug: eventSlugFromSubmitBody(submitBody),
+          publicPath:
             eventPublicPathFromSubmitBody(submitBody) ??
-              publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
-          ),
-        );
-        setPublishedSuccessModalOpen(true);
+            publicActivityPath(targetId, formData.city, eventSlugFromSubmitBody(submitBody)),
+          isEdit: mode === "edit",
+        });
         return;
       }
-
-      toast.success(
-        canPublishContentDirectly(userRole)
-          ? "Событие опубликовано"
-          : "Событие отправлено на модерацию",
-      );
 
       baselineJsonRef.current = JSON.stringify(formData);
       baselineFormDataRef.current = cloneEventFormData(formData);
@@ -1181,13 +1191,17 @@ function EventWizardInner({
         localStorage.removeItem(CURRENT_STEP_STORAGE_KEY);
         clearPersistedDraft();
       }
-
-      if (onComplete) {
-        onComplete(targetId);
-      } else if (mode === "create") {
-        debugEditorLog("navigate after submit", { href: afterSubmitDestination, reason: "create" });
-        navigateToCompatibleHref(router, afterSubmitDestination);
-      }
+      showSuccessModal({
+        kind: "event",
+        outcome: canPublishContentDirectly(userRole)
+          ? mode === "edit"
+            ? "changes_published"
+            : "published"
+          : "submitted",
+        id: targetId,
+        cityField: formData.city,
+        isEdit: mode === "edit",
+      });
     } catch (error: unknown) {
       console.error("Submit error:", error);
       setSubmitStatus("error");
@@ -1201,22 +1215,10 @@ function EventWizardInner({
   // Determine if editable
   const isEditable = true; // TODO: Add proper logic
 
-  const displayTitleRaw = formData.title?.trim() ?? "";
-  const displayTitle = (() => {
-    if (mode === "edit") {
-      // В режиме редактирования — всегда показываем "Редактирование события: название"
-      return businessFormCopy.event.editTitle(
-        displayTitleRaw.length > 60
-          ? `${displayTitleRaw.slice(0, 57)}...`
-          : displayTitleRaw || undefined
-      );
-    }
-    // В режиме создания — показываем название по мере ввода
-    if (displayTitleRaw.length === 0) return businessFormCopy.event.createTitle;
-    return displayTitleRaw.length <= 60
-      ? displayTitleRaw
-      : `${displayTitleRaw.slice(0, 57)}...`;
-  })();
+  const displayTitle = resolveDraftTitle(
+    formData.title,
+    businessFormCopy.event.createTitle,
+  );
 
   // Check if form is valid for submission (only on review step)
   const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
@@ -1245,6 +1247,7 @@ function EventWizardInner({
       data: formData,
       onChange: handleChange,
       isEditable,
+      ctaStepEnabled,
     };
 
     // Add import-aware context for steps that depend on the current event entity
@@ -1266,6 +1269,7 @@ function EventWizardInner({
       return (
         <StepComponent
           {...commonProps}
+          allowAgeAutoApplyFromDetection={mode === "create"}
           initialTaxonomies={initialStep1Taxonomies}
           aiEnrichment={aiEnrichment}
           aiAppliedFields={aiAppliedFields}
@@ -1275,6 +1279,16 @@ function EventWizardInner({
           isAiLoading={isAiLoading}
           isAiDone={isAiDone}
           onLoadingGenresChange={setIsLoadingGenres}
+        />
+      );
+    }
+
+    if (stepConfig.key === "faq") {
+      return (
+        <FaqStep
+          kind="event"
+          value={formData.faqItems}
+          onChange={(faqItems) => handleChange({ faqItems })}
         />
       );
     }
@@ -1297,11 +1311,16 @@ function EventWizardInner({
       ...EVENT_WIZARD_STEPS.map((s) => ({
         id: s.id,
         label: s.shortLabel ?? s.title,
-        isComplete: s.isComplete ? s.isComplete(formData) : false,
+        isComplete: s.isComplete
+          ? s.isComplete(formData) && s.id <= maxVisitedStep
+          : false,
+        isOptional: s.isOptional ?? false,
+        // Фактическая заполненность (для презентации степпера), отдельно от isComplete.
+        hasContent: s.hasContent ? s.hasContent(formData) : undefined,
       })),
       { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],
-    [formData]
+    [formData, maxVisitedStep]
   );
 
   const actionLabels = useMemo(() => {
@@ -1383,34 +1402,11 @@ function EventWizardInner({
         }
       />
 
-      {openSitePublicPath ? (
-        <div className="border-t border-[#EBEBEB] bg-white px-4 py-3 text-center text-sm">
-          <Link
-            href={openSitePublicPath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-[#EF8759] underline underline-offset-2 hover:no-underline"
-          >
-            Открыть на сайте
-          </Link>
-        </div>
-      ) : null}
-
-      {moderationSuccessEventId && (
-        <EventSubmitModerationSuccessDialog
-          open={moderationSuccessModalOpen}
-          onOpenChange={setModerationSuccessModalOpen}
-          eventId={moderationSuccessEventId}
-        />
-      )}
-
-      {publishedActivityHref && (
-        <EventPublishedSuccessDialog
-          open={publishedSuccessModalOpen}
-          onOpenChange={setPublishedSuccessModalOpen}
-          activityHref={publishedActivityHref}
-        />
-      )}
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
         <AlertDialogContent>

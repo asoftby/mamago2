@@ -17,6 +17,8 @@ export function CityHomeSection({
   actionLabel,
   actionHref,
   actionIconButton,
+  actionInlineText,
+  headerActionClassName,
   children,
   className,
   innerClassName,
@@ -29,6 +31,8 @@ export function CityHomeSection({
         actionLabel={actionLabel}
         actionHref={actionHref}
         actionIconButton={actionIconButton}
+        actionInlineText={actionInlineText}
+        headerActionClassName={headerActionClassName}
       />
       <div className={cn(innerClassName)}>{children}</div>
     </section>

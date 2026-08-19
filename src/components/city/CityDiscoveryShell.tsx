@@ -17,6 +17,7 @@ import type { BudgetConfig } from "./CityShell";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
+import { EventQuickFilters } from "@/components/discovery/EventQuickFilters";
 
 function BirthdayQuickStartBanner({ city }: { city: string }) {
   return (
@@ -100,7 +101,7 @@ export function CityDiscoveryShell({
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle =
     formatCityTitle(intentConfig.titleTemplate, city) +
-    whenPresetPageTitleSuffix(applied.whenPreset);
+    whenPresetPageTitleSuffix(applied);
 
   useEffect(() => {
     budgetCtx?.setBudgetConfig(budgetConfig ?? null);
@@ -168,6 +169,7 @@ export function CityDiscoveryShell({
         <div className="space-y-4">
           <H1 className="px-1">{pageTitle}</H1>
         </div>
+        {intent === "kuda" ? <EventQuickFilters /> : null}
         {intent === "classes" && classChips && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}

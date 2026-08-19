@@ -36,12 +36,6 @@ interface BalancePageProps {
     description: string;
     occurredAt: Date;
   }>;
-  actionPrices: Array<{
-    actionType: string;
-    title: string;
-    displayPrice: string;
-    isIndividual: boolean;
-  }>;
   hasBillingProfile: boolean;
 }
 
@@ -49,7 +43,6 @@ export function BalancePage({
   balance,
   stats,
   transactions,
-  actionPrices,
   hasBillingProfile,
 }: BalancePageProps) {
   const [showFirstTopUpModal, setShowFirstTopUpModal] = useState(false);
@@ -89,7 +82,7 @@ export function BalancePage({
       <div className="rounded-3xl border border-stone-200 bg-white p-6">
         <h1 className="text-2xl font-bold text-stone-950">Баланс и расходы</h1>
         <p className="mt-2 text-sm text-stone-600">
-          При положительном балансе вам доступны все возможности mamaGo. Средства списываются только за полезные действия.
+          Баланс хранится в BYN и не сгорает. Лиды, заявки и контакты бесплатны; средства списываются только после явного подтверждения Boost.
         </p>
       </div>
 
@@ -120,33 +113,19 @@ export function BalancePage({
       />
 
       <div className="rounded-3xl border border-stone-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-stone-950">Стоимость действий</h3>
+        <h3 className="text-lg font-semibold text-stone-950">First-PROD правила</h3>
         <p className="mt-2 text-sm text-stone-600">
-          Вы платите только за полезные действия клиентов. Если для вашего бизнеса настроены индивидуальные условия, они уже учтены в этом прайсе.
+          Базовое присутствие и MVP-объём публикаций сохраняются при нулевом балансе.
         </p>
-
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {actionPrices.length === 0 ? (
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
-              Сейчас активных правил тарификации нет.
-            </div>
-          ) : (
-            actionPrices.map((price) => (
-              <div key={price.actionType} className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-stone-950">{price.title}</p>
-                    <p className="mt-1 text-base font-semibold text-stone-950">{price.displayPrice}</p>
-                  </div>
-                  {price.isIndividual && (
-                    <span className="inline-flex rounded-full bg-stone-900 px-2.5 py-1 text-xs font-medium text-white">
-                      Индивидуальные условия
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700">
+            <p className="font-semibold text-stone-950">Бесплатно</p>
+            <p className="mt-1">Лиды, заявки, контакты и базовые публикации.</p>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-700">
+            <p className="font-semibold text-stone-950">Платно</p>
+            <p className="mt-1">Только явная покупка Boost по цене, показанной перед подтверждением.</p>
+          </div>
         </div>
       </div>
 

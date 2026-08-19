@@ -15,6 +15,7 @@ import { DashboardPeriodSwitcher } from "@/components/business/dashboard/Dashboa
 import { DashboardOnboarding } from "@/components/business/dashboard/DashboardOnboarding";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
+import { TableContainer } from "@/components/ui/table";
 import type { DashboardPeriod } from "@/server/services/business/businessWorkspace.service";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -216,7 +217,7 @@ function PublicationsCard({
             <span className="text-xl font-semibold text-stone-700">{activePromotions}</span>
             <span className="text-sm text-stone-500">активных продвижений</span>
           </div>
-          <p className="text-sm text-stone-500">Запустите продвижение, чтобы получать лиды</p>
+          <p className="text-sm text-stone-500">Action-based Promotion выключен; лиды бесплатны</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -239,8 +240,8 @@ function PublicationsCard({
         {noPublications
           ? "Создать публикацию"
           : noPromotion
-            ? "Запустить продвижение"
-            : "Управлять продвижением"}
+            ? "Promotion недоступен"
+            : "История Promotion"}
       </Link>
     </BusinessSurfaceCard>
   );
@@ -357,7 +358,7 @@ function PublicationsSection({
           </Link>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[520px]" scrollLabel="Таблица публикаций, прокручивается по горизонтали">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100">
@@ -389,7 +390,7 @@ function PublicationsSection({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       )}
     </BusinessSurfaceCard>
   );

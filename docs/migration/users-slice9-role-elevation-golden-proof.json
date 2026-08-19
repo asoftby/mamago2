@@ -1,0 +1,74 @@
+{
+  "phase": "USERS Slice 9 BUSINESS_OWNER role elevation golden proof",
+  "scope": "exactly one privilege-elevation write — no batch, no other candidate",
+  "goldenCandidate": {
+    "sourceRecordKey": "wordpress-db:user:38",
+    "prerequisitesVerifiedBeforeWrite": [
+      "existing User MigrationLineage (written in Slice 4/5)",
+      "existing BUSINESS MigrationLineage (written in Slice 7)",
+      "Business.ownerUserId matches the target User",
+      "at least one Place already linked via Place.ownerBusinessId (written in Slice 7)"
+    ]
+  },
+  "firstRun": {
+    "action": "ELEVATE",
+    "roleChange": "USER -> BUSINESS_OWNER",
+    "businessChanges": 0,
+    "placeChanges": 0,
+    "statusChanges": 0,
+    "passwordChanges": 0,
+    "emailVerifiedAtChanges": 0,
+    "sessionChanges": 0,
+    "actionTokenChanges": 0,
+    "migrationLineageChanges": 0,
+    "migrationRecordChanges": 0
+  },
+  "rerun": {
+    "action": "SKIP_UNCHANGED",
+    "roleChange": "NONE",
+    "anyMutation": false
+  },
+  "deltas": {
+    "userDelta": 0,
+    "sessionDelta": 0,
+    "userActionTokenDelta": 0,
+    "businessDelta": 0,
+    "placeDelta": 0,
+    "offerDelta": 0,
+    "articleDelta": 0,
+    "routeDelta": 0,
+    "activityDelta": 0,
+    "mediaAssetDelta": 0,
+    "migrationLineageDelta": 0,
+    "migrationRecordDelta": 0
+  },
+  "targetUserFieldProof": {
+    "roleBefore": "USER",
+    "roleAfter": "BUSINESS_OWNER",
+    "statusBefore": "PENDING_ACTIVATION",
+    "statusAfter": "PENDING_ACTIVATION",
+    "passwordHashUnchanged": true,
+    "emailVerifiedAtUnchanged": true,
+    "emailUnchanged": true,
+    "businessRowByteForByteUnchanged": true,
+    "placeOwnerBusinessIdUnchanged": true,
+    "sessionsAfter": 0,
+    "actionTokensAfter": 0
+  },
+  "security": {
+    "emailsSent": 0,
+    "providerCalls": 0,
+    "activationTokensCreated": 0,
+    "sessionsCreated": 0,
+    "otherUsersAffected": 0
+  },
+  "deferredScope": {
+    "remainingRoleElevations": 35,
+    "remainingSourceRecordKeys": "the 35 Users elevated to Business ownership in Slice 8 — role elevation NOT_STARTED for all of them",
+    "partialLineageCandidates": ["wordpress-db:user:89", "wordpress-db:user:130"],
+    "manualPrivilegedUsers": 15,
+    "contentAuthorship": 12,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED"
+  }
+}

@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { BarChart2, ChevronRight, Loader2, MoreHorizontal } from "lucide-react";
-import { toast } from "@/lib/toast";
+import { BarChart2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,23 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
@@ -45,6 +27,32 @@ import {
 import { PUBLICATION_STATUS_LABEL, PUBLICATION_TYPE_LABEL } from "@/lib/publications/labels";
 import { PublicationStatsDrawer } from "./PublicationStatsDrawer";
 import type { PublicationStatsDrawerProps } from "./PublicationStatsDrawer";
+import { resolveContentLinks } from "@/lib/content-success/resolver";
+import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
+import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import {
+  buildAdminArticleLifecycleInput,
+  buildAdminLifecycleViewModel,
+} from "@/lib/contentLifecycle/buildAdminLifecycleViewModel";
+import {
+  blockingDependencyItems,
+  type ContentDependencySummary,
+} from "@/lib/admin/contentDependencySummary";
+import type {
+  deriveArticleArchivedDeletePreflight,
+  deriveArticleDeletePreflight,
+} from "@/server/services/contentDependencySummary.service";
+
+type ArticleLifecycleMeta = {
+  deletePreflight: ReturnType<typeof deriveArticleDeletePreflight>;
+  archivedDeletePreflight: ReturnType<typeof deriveArticleArchivedDeletePreflight>;
+};
+
+const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
+  total: 0,
+  blockingTotal: 0,
+  items: [],
+};
 
 function matchesTab(row: PublicationListRow, tab: PublicationTabFilter): boolean {
   if (tab === PublicationTabFilter.ALL) return true;
@@ -64,6 +72,18 @@ function publicationEditHref(row: PublicationListRow): string | null {
 
 function hasArticleLikeActions(row: PublicationListRow): boolean {
   return row.type === PublicationType.ARTICLE || row.type === PublicationType.NEWS;
+}
+
+function resolveArticleLikeLinks(row: PublicationListRow) {
+  return resolveContentLinks({
+    kind: row.type === PublicationType.NEWS ? "breaking-news" : "article",
+    surface: "admin",
+    outcome: "published",
+    id: row.id,
+    slug: row.slug,
+    geoScope: row.geoScope ?? null,
+    citySlug: row.citySlug ?? null,
+  });
 }
 
 function statusBadgeClass(s: PublicationStatus): string {
@@ -96,9 +116,11 @@ const SORT_LABEL: Record<SortKey, string> = {
 export function PublicationsIndexClient({
   initialRows,
   cities,
+  articleLifecycleMeta = {},
 }: {
   initialRows: PublicationListRow[];
   cities: { id: string; name: string; slug: string }[];
+  articleLifecycleMeta?: Record<string, ArticleLifecycleMeta>;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<PublicationTabFilter>(PublicationTabFilter.ALL);
@@ -118,13 +140,6 @@ export function PublicationsIndexClient({
   const [quickNoSlug, setQuickNoSlug] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    title: string;
-    isDraft: boolean;
-  } | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Drawer статистики
   const [statsDrawer, setStatsDrawer] = useState<PublicationStatsDrawerProps["publication"] | null>(null);
@@ -132,20 +147,26 @@ export function PublicationsIndexClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/admin/articles/editor-options");
-      if (!res.ok || cancelled) return;
-      const data = (await res.json().catch(() => null)) as {
-        authors?: { id: string; label: string; email: string }[];
-      } | null;
-      if (!data?.authors || cancelled) return;
-      setAuthorOptions(data.authors);
+      try {
+        const res = await fetch("/api/admin/articles/editor-options");
+        if (!res.ok || cancelled) return;
+        const data = (await res.json().catch(() => null)) as {
+          authors?: { id: string; label: string; email: string }[];
+        } | null;
+        if (!data?.authors || cancelled) return;
+        setAuthorOptions(data.authors);
+      } catch (error) {
+        if (cancelled) return;
+        console.warn(
+          "[PublicationsIndexClient] failed to load article editor options",
+          error,
+        );
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
-
-  const publicBase = (process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by").replace(/\/$/, "");
 
   const cityNameFilter = useMemo(() => {
     if (!cityId) return "";
@@ -241,7 +262,10 @@ export function PublicationsIndexClient({
 
   /** Публичный путь публикации для запроса статистики */
   function publicationPath(row: PublicationListRow): string {
-    if (row.slug) return `/blog/${row.slug}`;
+    const { publicUrl } = resolveArticleLikeLinks(row);
+    if (publicUrl) {
+      return new URL(publicUrl).pathname;
+    }
     return `/publications/${row.id}`;
   }
 
@@ -255,61 +279,6 @@ export function PublicationsIndexClient({
       path: publicationPath(row),
       updatedAt: row.updatedAt,
     });
-  };
-
-  const confirmDeleteArticle = async () => {
-    if (!deleteTarget) return;
-    setDeletingId(deleteTarget.id);
-    try {
-      const res = await fetch(`/api/admin/articles/${deleteTarget.id}`, { method: "DELETE" });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-      };
-      if (!res.ok) {
-        const msg =
-          typeof data.message === "string"
-            ? data.message
-            : typeof data.error === "string"
-              ? data.error
-              : "Не удалось удалить статью";
-        toast.error(msg);
-        return;
-      }
-      toast.success("Статья удалена");
-      setDeleteTarget(null);
-      router.refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ошибка удаления");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const archiveArticle = async (id: string) => {
-    if (
-      !window.confirm(
-        "Вы уверены, что хотите архивировать статью? Она исчезнет из публичной выдачи.",
-      )
-    ) {
-      return;
-    }
-    setArchivingId(id);
-    try {
-      const res = await fetch(`/api/admin/articles/${id}/archive`, { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const msg = typeof data.error === "string" ? data.error : "Не удалось архивировать";
-        toast.error(msg);
-        return;
-      }
-      toast.success("Статья в архиве");
-      router.refresh();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setArchivingId(null);
-    }
   };
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -369,49 +338,6 @@ export function PublicationsIndexClient({
           publication={statsDrawer}
         />
       )}
-
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deleteTarget?.isDraft ? "Удалить черновик?" : "Удаление статьи"}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  {deleteTarget?.isDraft
-                    ? "Черновик будет удалён из базы. Это не затрагивает уже опубликованные материалы."
-                    : "Вы уверены, что хотите удалить статью?"}
-                </p>
-                {!deleteTarget?.isDraft ? <p>Это действие нельзя отменить.</p> : null}
-                {deleteTarget?.title ? (
-                  <p className="font-medium text-foreground">«{deleteTarget.title}»</p>
-                ) : null}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel type="button">Отмена</AlertDialogCancel>
-            <AlertDialogAction
-              type="button"
-              className="bg-destructive text-white hover:bg-destructive/90"
-              disabled={deletingId !== null}
-              onClick={(e) => {
-                e.preventDefault();
-                void confirmDeleteArticle();
-              }}
-            >
-              {deletingId ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              Удалить
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Tabs
         value={tab}
@@ -661,6 +587,40 @@ export function PublicationsIndexClient({
               <tbody className="divide-y divide-gray-200">
                 {sorted.map((row) => {
                   const editHref = publicationEditHref(row);
+                  const links = resolveArticleLikeLinks(row);
+                  const viewHref =
+                    row.status === PublicationStatus.PUBLISHED
+                      ? links.publicUrl
+                      : links.previewUrl;
+                  const rowMeta = articleLifecycleMeta[row.id] ?? {
+                    deletePreflight: {
+                      allowed: row.status === PublicationStatus.DRAFT,
+                      reasons: [],
+                      message: undefined,
+                      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+                    },
+                    archivedDeletePreflight: {
+                      allowed: row.status === PublicationStatus.ARCHIVED,
+                      reasons: [],
+                      message: undefined,
+                      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+                    },
+                  };
+                  const blockingItems = blockingDependencyItems(
+                    rowMeta.deletePreflight.dependencySummary,
+                  );
+                  const lifecycleViewModel = buildAdminLifecycleViewModel({
+                    ...buildAdminArticleLifecycleInput({
+                      status: row.status,
+                      deletePreflight: rowMeta.deletePreflight,
+                      archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+                    }),
+                    navigationLinks: {
+                      edit: Boolean(editHref),
+                      preview: Boolean(viewHref),
+                    },
+                    actorRoles: ["ADMIN", "MODERATOR"],
+                  });
                   return (
                   <tr key={row.id} className="hover:bg-gray-50/80 group">
                     <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50/80 px-2 py-2 sm:px-3 sm:py-2.5 font-medium text-gray-900 max-w-[min(200px,40vw)] sm:max-w-[220px] truncate shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
@@ -679,15 +639,7 @@ export function PublicationsIndexClient({
                       {PUBLICATION_TYPE_LABEL[row.type]}
                     </td>
                     <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "font-normal border text-[10px] sm:text-xs px-1.5 py-0 h-auto whitespace-normal leading-tight",
-                          statusBadgeClass(row.status),
-                        )}
-                      >
-                        {PUBLICATION_STATUS_LABEL[row.status]}
-                      </Badge>
+                      <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
                     </td>
                     <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 max-w-[140px] truncate align-top">
                       {row.authorLabel}
@@ -705,83 +657,63 @@ export function PublicationsIndexClient({
                     </td>
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-gray-50/80 px-1.5 sm:px-3 py-1.5 sm:py-2 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
                       {hasArticleLikeActions(row) ? (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              aria-label="Действия"
-                              disabled={archivingId === row.id || deletingId === row.id}
-                            >
-                              {archivingId === row.id || deletingId === row.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem asChild>
-                              <Link href={editHref!}>Редактировать</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/preview/articles/${row.id}`} target="_blank">
-                                Предпросмотр
-                              </Link>
-                            </DropdownMenuItem>
-                            {row.status === PublicationStatus.PUBLISHED && row.slug ? (
-                              <DropdownMenuItem asChild>
-                                <Link href={`${publicBase}/blog/${row.slug}`} target="_blank">
-                                  Открыть публично
-                                </Link>
-                              </DropdownMenuItem>
-                            ) : null}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => openStatsDrawer(row)}
-                              className="gap-2"
-                            >
-                              <BarChart2 className="h-4 w-4 text-muted-foreground" />
-                              Статистика
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={
-                                archivingId === row.id || row.status === PublicationStatus.ARCHIVED
-                              }
-                              onClick={() => {
-                                void archiveArticle(row.id);
-                              }}
-                            >
-                              {row.status === PublicationStatus.ARCHIVED
-                                ? "Уже в архиве"
-                                : "Архивировать"}
-                            </DropdownMenuItem>
-                            {row.status === PublicationStatus.ARCHIVED ||
-                            row.status === PublicationStatus.DRAFT ? (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  disabled={deletingId === row.id}
-                                  onClick={() =>
-                                    setDeleteTarget({
-                                      id: row.id,
-                                      title: row.title.trim() || "Без названия",
-                                      isDraft: row.status === PublicationStatus.DRAFT,
-                                    })
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="Статистика"
+                            title="Статистика"
+                            onClick={() => openStatsDrawer(row)}
+                          >
+                            <BarChart2 className="h-4 w-4" />
+                          </Button>
+                          <ContentLifecycleActionsMenu
+                            viewModel={lifecycleViewModel}
+                            contentId={row.id}
+                            contentType="article"
+                            surface="admin"
+                            align="end"
+                            shortcutIcons={false}
+                            links={{
+                              edit: editHref
+                                ? { href: editHref, label: "Редактировать" }
+                                : undefined,
+                              preview: viewHref
+                                ? {
+                                    href: viewHref,
+                                    newTab: true,
+                                    label:
+                                      row.status === PublicationStatus.PUBLISHED
+                                        ? "Открыть публичную страницу"
+                                        : "Открыть предпросмотр",
                                   }
-                                >
-                                  {row.status === PublicationStatus.DRAFT
-                                    ? "Удалить черновик"
-                                    : "Удалить"}
-                                </DropdownMenuItem>
-                              </>
-                            ) : null}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                                : undefined,
+                            }}
+                            deletePreflight={{
+                              deleteDraft: {
+                                blockedDialog: !rowMeta.deletePreflight.allowed
+                                  ? {
+                                      title: "Нельзя удалить черновик",
+                                      description: rowMeta.deletePreflight.message,
+                                      items: blockingItems,
+                                    }
+                                  : null,
+                              },
+                              deleteArchived: {
+                                blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                                  ? {
+                                      title: "Нельзя удалить из архива",
+                                      description:
+                                        rowMeta.archivedDeletePreflight.message,
+                                      items: blockingItems,
+                                    }
+                                  : null,
+                              },
+                            }}
+                          />
+                        </div>
                       ) : null}
                     </td>
                   </tr>

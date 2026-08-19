@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, Plus, Bold, Italic, List } from "lucide-react";
 import type { PriceData, PriceItem } from "@/lib/priceItems";
 import { BELARUS_CURRENCY_SYMBOL } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 
 interface PriceListEditorProps {
   value: PriceData;
@@ -117,11 +118,14 @@ export function PriceListEditor({ value, onChange, disabled }: PriceListEditorPr
             />
             <Input
               className="w-20"
-              placeholder={BELARUS_CURRENCY_SYMBOL}
+              placeholder=""
               value={item.unit}
               onChange={(e) => updateItem(item.id, "unit", e.target.value)}
               disabled={disabled}
             />
+            <span className="shrink-0 text-muted-foreground" aria-hidden>
+              <BelarusianRubleIcon size="sm" />
+            </span>
             <Button
               type="button"
               variant="ghost"

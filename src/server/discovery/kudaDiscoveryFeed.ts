@@ -14,6 +14,7 @@ import {
 } from "@/features/hero-weather/lib/weather-scenario-layer";
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
+import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
 
 /**
  * Опубликованные события (EVENT) в городе для ленты «Куда пойти».
@@ -28,6 +29,7 @@ export async function getKudaDiscoveryFeed(
     take?: number;
     format?: ActivityFormat | null;
     nearby?: boolean;
+    eventFilters?: EventRuntimeFilters;
     weather?: {
       scenario: HomeWeatherScenario;
       timeOfDay: TimeOfDay;
@@ -49,6 +51,13 @@ export async function getKudaDiscoveryFeed(
           ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }]
           : []),
       activityInAnyOfCitiesWhere(expandedCityIds),
+      ...buildEventRuntimeWhere(options?.eventFilters ?? {
+        dateRange: null,
+        free: false,
+        districtId: null,
+        metroId: null,
+        adultOnly: false,
+      }),
       ...pubParts,
     ],
   };

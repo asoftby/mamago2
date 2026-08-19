@@ -2,10 +2,10 @@
 
 import { useRef, type ClipboardEvent, type FocusEvent } from "react";
 import PhoneInput from "react-phone-number-input";
-import type { E164Number } from "libphonenumber-js/core";
 import type { CountryCode } from "libphonenumber-js";
 
-import { resolvePhoneInputToE164 } from "@/lib/phone/e164";
+import { normalizePhoneToE164, resolvePhoneInputToE164 } from "@/lib/phone/e164";
+import { normalizeInternationalPhoneInputInitialValue } from "./internationalPhoneInputValue";
 import { cn } from "@/lib/utils";
 import "./international-phone-input.css";
 
@@ -32,6 +32,7 @@ export function InternationalPhoneInput({
   "aria-invalid": ariaInvalid,
 }: InternationalPhoneInputProps) {
   const countryRef = useRef<CountryCode>(DEFAULT_COUNTRY);
+  const normalizedValue = normalizePhoneToE164(value);
 
   return (
     <div
@@ -51,8 +52,8 @@ export function InternationalPhoneInput({
         limitMaxLength
         autoComplete="tel"
         placeholder={placeholder}
-        value={value ? (value as E164Number) : undefined}
-        onChange={(v) => onChange(v ?? "")}
+        value={normalizeInternationalPhoneInputInitialValue(value)}
+        onChange={(v) => onChange(normalizePhoneToE164(v ?? ""))}
         onCountryChange={(c) => {
           countryRef.current = (c ?? DEFAULT_COUNTRY) as CountryCode;
         }}
@@ -71,7 +72,7 @@ export function InternationalPhoneInput({
           onBlur: (e: FocusEvent<HTMLInputElement>) => {
             const raw = e.currentTarget.value;
             const next = resolvePhoneInputToE164(raw, countryRef.current);
-            if (next && next !== value) {
+            if (next && next !== normalizedValue) {
               onChange(next);
             }
           },

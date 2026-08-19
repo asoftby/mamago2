@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
@@ -12,7 +13,12 @@ import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility
 export type SerializedPlanItem = {
   id: string;
   date: string;
+  /** Raw, authoritative source time — never mutated to reflect a Scenario
+   * override. Presentation should read `effectiveStartsAt` instead. */
   startsAt: string | null;
+  /** Time to display: `startsAt` if set, else a Scenario-assigned override
+   * for this item, else null (untimed). See `resolveMyPlanItemEffectiveTime`. */
+  effectiveStartsAt: string | null;
   activityId: string | null;
   title: string | null;
   coverImageUrl: string | null;
@@ -25,7 +31,6 @@ export type SerializedPlanItem = {
     coverImageUrl: string | null;
     ageLabel: string | null;
     categoryLabel: string | null;
-    priceLabel: string | null;
   } | null;
 };
 
@@ -48,6 +53,8 @@ type Props = {
   ideaActivityIds: string[];
   childrenAges: number[];
   initialIdeas?: SerializedIdea[];
+  /** date -> Scenario status; absent entries mean no Scenario exists yet. */
+  scenarioStatusByDate?: Record<string, "ready" | "changed">;
   activeReminder?: {
     id: string;
     title: string;
@@ -220,9 +227,20 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
   );
 }
 
-export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [] }: Props) {
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function PlanPageClient({
+  initialItems,
+  ideaActivityIds,
+  initialIdeas = [],
+  scenarioStatusByDate = {},
+}: Props) {
   const todayISO = getTodayISO();
-  const [selectedDate, setSelectedDate] = useState(todayISO);
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get("date");
+  const [selectedDate, setSelectedDate] = useState(
+    dateParam && DATE_PATTERN.test(dateParam) ? dateParam : todayISO,
+  );
   const [items, setItems] = useState(initialItems);
 
   const itemsByDate = useMemo(() => {
@@ -370,6 +388,7 @@ export function PlanPageClient({ initialItems, ideaActivityIds, initialIdeas = [
             date={selectedDate}
             items={dayItems}
             onRemove={handleRemoveItem}
+            scenarioStatus={scenarioStatusByDate[selectedDate]}
           />
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
         </div>

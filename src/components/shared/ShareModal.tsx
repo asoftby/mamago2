@@ -117,6 +117,8 @@ export type ShareModalProps = {
   url: string;
   title: string;
   subtitle?: string;
+  /** Подсвеченное слово в заголовке (творительный падеж): «событием» | «местом» | «предложением». */
+  entityNoun?: string;
 };
 
 /* ─── Inner content (Variant B — Editorial) ─── */
@@ -124,6 +126,7 @@ function ShareContent({
   url,
   title,
   subtitle,
+  entityNoun = "событием",
   onClose,
 }: Omit<ShareModalProps, "open" | "onOpenChange"> & { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -221,7 +224,7 @@ function ShareContent({
             color: T.accentDeep,
           }}
         >
-          событием
+          {entityNoun}
         </span>
       </h2>
       <p
@@ -426,6 +429,7 @@ export function ShareModal({
   url,
   title,
   subtitle,
+  entityNoun,
 }: ShareModalProps) {
   const isDesktop = useMediaQuery("(min-width: 640px)");
 
@@ -434,6 +438,7 @@ export function ShareModal({
       url={url}
       title={title}
       subtitle={subtitle}
+      entityNoun={entityNoun}
       onClose={() => onOpenChange(false)}
     />
   );

@@ -76,11 +76,18 @@ export async function getUserBusinessId(userId: string): Promise<string | null> 
  */
 export async function canManagePlaceAsync(
   user: { id: string; role: Role },
-  place: { createdByUserId: string; ownerBusinessId: string | null }
+  place: { createdByUserId: string; ownerBusinessId: string | null } | null
 ): Promise<boolean> {
   // Admin/Moderator - full access
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
     return true;
+  }
+
+  // No place (e.g. an unassigned DRAFT Offer): nothing links it to a
+  // business/creator yet, so only Admin/Moderator can manage it until a
+  // Place is assigned.
+  if (!place) {
+    return false;
   }
 
   // If place has business owner

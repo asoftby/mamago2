@@ -149,14 +149,7 @@ export async function getClassesDiscoveryFeed(
       type: "CLASS_SCHEDULE",
       discoveryIntent: "classes",
       analyticsEntityType: "OFFER",
-      href: getOfferPublicPath(
-        {
-          kind: offer.kind,
-          campProgramType: offer.campProgramType,
-          slug: offer.slug,
-        },
-        cityForPath,
-      ),
+      href: getOfferPublicPath({ slug: offer.slug }, cityForPath),
       title: offer.title,
       description: offer.description ?? "",
       image: offer.coverImage ?? "",

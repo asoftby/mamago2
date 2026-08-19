@@ -14,6 +14,7 @@ export type ProfileDropdownHandlers = {
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
   onGoToPersonalBookings: () => void;
+  onGoToPersonalDirect: () => void;
   onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToAdminAccount: () => void;
@@ -96,6 +97,13 @@ export function useProfileDropdownHandlers(input: {
     navigateToSurface(router, {
       targetSurface: "public",
       targetPath: "/me/bookings",
+    });
+  }, [router]);
+
+  const onGoToPersonalDirect = useCallback(() => {
+    navigateToSurface(router, {
+      targetSurface: "public",
+      targetPath: "/me/direct",
     });
   }, [router]);
 
@@ -191,6 +199,7 @@ export function useProfileDropdownHandlers(input: {
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
     onGoToPersonalBookings,
+    onGoToPersonalDirect,
     onGoToPersonalRoutes,
     onGoToSettings,
     onGoToAdminAccount,

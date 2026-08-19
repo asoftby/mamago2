@@ -14,6 +14,7 @@ import type {
 import type { ImportLinkRecoveryPayload } from "@/server/modules/import/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { TableContainer } from "@/components/ui/table";
 import { Trash2, X } from "lucide-react";
 import { ReviewQueueActions } from "./ReviewQueueActions";
 import {
@@ -120,6 +121,10 @@ export function ReviewQueueTableClient({ records }: Props) {
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+        <TableContainer
+          minWidthClassName="min-w-[860px]"
+          scrollLabel="Очередь ревью импорта, прокручивается по горизонтали"
+        >
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr className="border-b border-gray-200">
@@ -261,6 +266,7 @@ export function ReviewQueueTableClient({ records }: Props) {
             })}
           </tbody>
         </table>
+        </TableContainer>
       </div>
 
       {selectedIds.length > 0 && (

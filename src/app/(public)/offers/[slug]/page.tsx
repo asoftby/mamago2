@@ -8,6 +8,7 @@ import { buildOfferJsonLd } from "@/lib/seo/schema/buildOfferJsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
+import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
 
 interface OfferPageProps {
   params: Promise<{ slug: string }>;
@@ -42,7 +43,15 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
           seoOgImage: true,
           seoRobots: true,
           coverImage: true,
-          place: { select: { title: true } },
+          status: true,
+          archivedAt: true,
+          place: {
+            select: {
+              title: true,
+              archivedAt: true,
+              ownerBusiness: { select: { operationalStatus: true } },
+            },
+          },
         },
       })
     : await (async () => {
@@ -63,12 +72,22 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
             seoOgImage: true,
             seoRobots: true,
             coverImage: true,
-            place: { select: { title: true } },
+            status: true,
+            archivedAt: true,
+            place: {
+              select: {
+                title: true,
+                archivedAt: true,
+                ownerBusiness: { select: { operationalStatus: true } },
+              },
+            },
           },
         });
       })();
 
-  if (!offer) return { title: "Offer Not Found" };
+  if (!offer || !isOfferPubliclyVisible(offer)) {
+    return { title: "Offer Not Found" };
+  }
 
   const publicBase = getCanonicalPublicAppUrl();
   const title = offer.seoTitle?.trim() || offer.title;
@@ -103,20 +122,22 @@ export default async function OfferPage({ params }: OfferPageProps) {
     select: {
       id: true,
       slug: true,
-      kind: true,
-      campProgramType: true,
-      place: { 
-        select: { 
-          city: { select: { slug: true } }
-        } 
+      status: true,
+      archivedAt: true,
+      place: {
+        select: {
+          archivedAt: true,
+          ownerBusiness: { select: { operationalStatus: true } },
+          city: { select: { slug: true } },
+        },
       },
     },
   });
-  
-  if (!offer) notFound();
-  
-  const citySlug = offer.place?.city?.slug || "minsk";
-  const canonicalPath = getOfferPublicPath(offer, citySlug);
-  
+
+  if (!offer || !isOfferPubliclyVisible(offer)) notFound();
+  if (!offer.place?.city?.slug) notFound();
+
+  const canonicalPath = getOfferPublicPath(offer, offer.place.city.slug);
+
   permanentRedirect(canonicalPath);
 }

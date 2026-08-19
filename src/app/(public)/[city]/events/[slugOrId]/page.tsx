@@ -11,11 +11,15 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
+import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { PublicationType } from "@prisma/client";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -75,20 +79,29 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
   if (!fromDb) return {};
 
   const publicBase = getCanonicalPublicAppUrl();
-  const canonical =
-    fromDb.seoCanonicalUrl?.trim() || (fromDb.slug ? `${publicBase}/${city}/events/${fromDb.slug}` : null);
+  const canonical = resolveEventCanonicalUrl({
+    seoCanonicalUrl: fromDb.seoCanonicalUrl,
+    citySlug: city,
+    slug: fromDb.slug,
+    id: fromDb.id,
+    publicBase,
+  });
 
   const title = fromDb.seoTitle?.trim() || `${fromDb.title} в ${cityLabel(city)} — mamaGo`;
   const description =
     fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityLabel(city)}.`;
 
-  return buildOgMeta({
-    title,
-    description,
-    image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
-    url: canonical ?? `${publicBase}/${city}/events/${fromDb.slug ?? fromDb.id}`,
-    robots: parseRobots(fromDb.seoRobots) ?? { index: true, follow: true },
-  });}
+  return {
+    ...buildOgMeta({
+      title,
+      description,
+      image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
+      url: canonical,
+      robots: parseRobots(fromDb.seoRobots) ?? { index: true, follow: true },
+    }),
+    alternates: { canonical },
+  };
+}
 
 export default async function CityEventPublicPage({ params, searchParams }: EventPublicPageProps) {
   const { city, slugOrId } = await params;
@@ -101,9 +114,13 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     }
 
     const publicBase = getCanonicalPublicAppUrl();
-    const canonicalUrl =
-      fromDb.seoCanonicalUrl?.trim() ||
-      `${publicBase}/${city}/events/${fromDb.slug ?? fromDb.id}`;
+    const canonicalUrl = resolveEventCanonicalUrl({
+      seoCanonicalUrl: fromDb.seoCanonicalUrl,
+      citySlug: city,
+      slug: fromDb.slug,
+      id: fromDb.id,
+      publicBase,
+    });
     const locationName =
       fromDb.venue?.place?.title ||
       fromDb.venue?.title ||
@@ -175,6 +192,21 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       previewBannerLabel,
       reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
     });
+    const faqJsonLd = buildFaqJsonLd(data.faqItems);
+
+    // Direct CTA — omitted when the event has no resolvable owning Business (rule 5).
+    const directPublication = await tryResolvePublicationForCta({
+      publicationType: PublicationType.EVENT,
+      activityId: fromDb.id,
+    });
+    const directCta = directPublication
+      ? {
+          activityId: fromDb.id,
+          publicationTitle: fromDb.title,
+          brandName: fromDb.venue?.place?.title || fromDb.place?.title || directPublication.business.name,
+        }
+      : undefined;
+
     return (
       <>
         <AnalyticsDetailBeacon
@@ -184,8 +216,10 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           cityId={fromDb.cityId}
           citySlug={city}
         />
-        <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
-        <EventPageView data={data} />
+        <JsonLd
+          data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}
+        />
+        <EventPageView data={data} direct={directCta} />
       </>
     );
   }

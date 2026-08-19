@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTelegramConfig } from "@/server/config/telegram.config";
+import { getTelegramConfig, requiresTelegramWebhookSecret } from "@/server/config/telegram.config";
 import { TelegramWebhookService, type TelegramUpdate } from "@/server/services/telegram/TelegramWebhookService";
 
 export const runtime = "nodejs";
@@ -13,8 +13,8 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const config = getTelegramConfig();
 
-  // Production guard: webhook secret is mandatory in production
-  if (process.env.NODE_ENV === "production" && !config.webhookSecret) {
+  // Deployed hosts (DEV/staging/PROD) require a webhook secret. Local next dev may omit it.
+  if (requiresTelegramWebhookSecret() && !config.webhookSecret) {
     return NextResponse.json(
       { error: "Webhook not configured" },
       { status: 503 },

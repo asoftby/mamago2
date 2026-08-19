@@ -25,6 +25,8 @@ interface OfferHeroProps {
   onPrimary: () => void;
   onSave: () => void;
   ctaRef?: React.RefObject<HTMLElement | null>;
+  /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
+  directSlot?: React.ReactNode;
 }
 
 /**
@@ -44,6 +46,7 @@ export function OfferHero({
   onPrimary,
   onSave,
   ctaRef,
+  directSlot,
 }: OfferHeroProps) {
   const publicationMedia = useMemo(
     () => mapOfferPageMedia(data.media, data.title),
@@ -86,7 +89,7 @@ export function OfferHero({
             {data.place && (
               <>
                 <span aria-hidden="true">›</span>
-                <Link href={`/places/${data.place.slug}`} className="hover:text-[#3A332B] transition-colors truncate max-w-[160px]">
+                <Link href={`/${data.citySlug}/places/${data.place.slug}`} className="hover:text-[#3A332B] transition-colors truncate max-w-[160px]">
                   {data.place.name}
                 </Link>
               </>
@@ -125,6 +128,7 @@ export function OfferHero({
             onPrimary={onPrimary}
             onSave={onSave}
             ctaRef={ctaRef}
+            directSlot={directSlot}
           />
         </div>
 
@@ -288,6 +292,7 @@ interface BookingCardProps {
   onPrimary: () => void;
   onSave: () => void;
   ctaRef?: React.RefObject<HTMLElement | null>;
+  directSlot?: React.ReactNode;
 }
 
 function BookingCard({
@@ -299,6 +304,7 @@ function BookingCard({
   onPrimary,
   onSave,
   ctaRef,
+  directSlot,
 }: BookingCardProps) {
   const p = data.pricing;
   const nearestShift = useMemo(() => {
@@ -426,7 +432,7 @@ function BookingCard({
               address={data.place.address}
               district={data.place.district}
               metro={data.place.metro}
-              href={data.place.slug ? `/places/${data.place.slug}` : undefined}
+              href={data.place.slug ? `/${data.citySlug}/places/${data.place.slug}` : undefined}
             />
           </div>
         )}
@@ -464,6 +470,8 @@ function BookingCard({
             <Heart className={cn("h-5 w-5", isSaved && "fill-current")} />
           </button>
         </div>
+
+        {directSlot && <div className="mt-3">{directSlot}</div>}
 
         {canEditOffer ? (
           <SidebarCardTopSection mt={16} pt={16}>
@@ -511,7 +519,7 @@ function BookingCard({
                 )}
               </div>
             ) : <span />}
-            <SidebarCardShare title={data.title} />
+            <SidebarCardShare title={data.title} entityNoun="предложением" />
           </div>
         </SidebarCardTopSection>
       </SidebarCard>

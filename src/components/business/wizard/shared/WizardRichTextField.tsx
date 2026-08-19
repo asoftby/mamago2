@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { Label } from "@/components/ui/label";
 import { getRichTextLength } from "@/lib/richtext/utils";
@@ -9,7 +10,7 @@ interface WizardRichTextFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  helperText?: string;
+  helperText?: ReactNode;
   placeholder?: string;
   error?: string;
   disabled?: boolean;

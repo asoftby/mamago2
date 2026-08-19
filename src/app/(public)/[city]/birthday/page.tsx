@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { CityShell } from "@/components/city/CityShell";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
+import { buildCityBirthdayListingMetadata } from "@/lib/seo/cityKudaListingMetadata";
+import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface PageProps {
   params: Promise<{ city: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { city: citySlug } = await params;
+  return applyGlobalRobotsOverride(await buildCityBirthdayListingMetadata(citySlug));
 }
 
 export default async function BirthdayPage({ params, searchParams }: PageProps) {

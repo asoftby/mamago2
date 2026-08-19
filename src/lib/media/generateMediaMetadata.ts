@@ -287,6 +287,7 @@ function getFieldLabel(field: string | null | undefined): string {
     logo: "логотип",
     avatar: "аватар",
     gallery: "галерея",
+    content: "изображение",
     thumbnail: "миниатюра",
     banner: "баннер",
     icon: "иконка",

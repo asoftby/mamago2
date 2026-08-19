@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
+import { AgePolicy, ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   buildActivityManageWhereForUser,
@@ -36,6 +37,7 @@ import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /**
  * POST /api/business/events
@@ -55,6 +57,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const normalizedAge = normalizeAgePolicy({
+      agePolicy: Object.values(AgePolicy).includes(body.agePolicy) ? body.agePolicy : AgePolicy.UNKNOWN,
+      ageTags: Array.isArray(body.ageTags) ? body.ageTags : [],
+      ageMinMonths: typeof body.ageMinMonths === "number" ? body.ageMinMonths : null,
+      ageMaxMonths: typeof body.ageMaxMonths === "number" ? body.ageMaxMonths : null,
+    });
+    const faqItems = normalizeFaqItems(body.faqItems);
     perf.mark("parse");
 
     const title = typeof body.title === "string" && body.title.trim() ? body.title : "Новое событие";
@@ -172,7 +181,11 @@ export async function POST(request: NextRequest) {
         description,
         
         // Age
-        ageTags: body.ageTags || [],
+        ageLabel: typeof body.ageLabel === "string" ? body.ageLabel || null : null,
+        agePolicy: normalizedAge.agePolicy,
+        ageMinMonths: normalizedAge.ageMinMonths,
+        ageMaxMonths: normalizedAge.ageMaxMonths,
+        ageTags: normalizedAge.ageTags,
         
         // Schedule
         scheduleMode: ScheduleMode.MULTI_DATE,
@@ -200,6 +213,15 @@ export async function POST(request: NextRequest) {
         priceTo: body.priceTo,
         priceText: body.priceText,
         currency: body.currency || "BYN",
+        faqItems: faqItems as unknown as Prisma.InputJsonValue,
+
+        // Contact phones
+        phone: typeof body.phone === "string" ? body.phone || null : null,
+        phoneLabel: typeof body.phoneLabel === "string" ? body.phoneLabel || null : null,
+        phone2: typeof body.phone2 === "string" ? body.phone2 || null : null,
+        phone2Label: typeof body.phone2Label === "string" ? body.phone2Label || null : null,
+        phone3: typeof body.phone3 === "string" ? body.phone3 || null : null,
+        phone3Label: typeof body.phone3Label === "string" ? body.phone3Label || null : null,
         
         // Images
         coverImageId: resolvedCoverImageId,
@@ -215,9 +237,13 @@ export async function POST(request: NextRequest) {
     });
     perf.mark("write");
 
-    await replaceActivitySessionsFromScheduleJson(event.id, event.scheduleJson);
+    await replaceActivitySessionsFromScheduleJson({
+      prisma,
+      activityId: event.id,
+      scheduleJson: event.scheduleJson,
+    });
     perf.mark("schedule-sync");
-    await syncActivityNextOccurrenceAt(event.id);
+    await syncActivityNextOccurrenceAt({ prisma, activityId: event.id });
     await replaceActivityGalleryFromMediaIds(
       event.id,
       Array.isArray(body.galleryMediaIds) ? body.galleryMediaIds.filter((id: unknown): id is string => typeof id === "string") : [],

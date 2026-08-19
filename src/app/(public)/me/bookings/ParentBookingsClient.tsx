@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { ParentBookingsResult, ParentBookingItem } from "@/server/services/booking/parentBookings.service";
 import { Reveal } from "./components/Reveal";
-import { IcArrow, IcCalendar } from "./components/icons";
+import { IcCalendar } from "./components/icons";
 import { BookingRecordCard } from "./components/BookingRecordCard";
+import { BookingEmptyStateActions } from "./BookingEmptyStateActions";
 import styles from "./bookings.module.css";
 
 interface Props {
@@ -174,12 +175,10 @@ function EmptyState({ empty }: { empty: boolean }) {
           : "Записей с таким статусом нет. Загляните в другие вкладки или найдите новые занятия."}
       </p>
       <div className={styles.emptyActions}>
-        <Link href="/search" className={`${styles.btn} ${styles.btnAccent}`}>
-          Найти занятия
-        </Link>
-        <Link href="/" className={`${styles.btn} ${styles.btnGhost}`}>
-          Куда пойти <IcArrow />
-        </Link>
+        <BookingEmptyStateActions
+          classesButtonClassName={`${styles.btn} ${styles.btnAccent}`}
+          kudaButtonClassName={`${styles.btn} ${styles.btnGhost}`}
+        />
       </div>
     </Reveal>
   );

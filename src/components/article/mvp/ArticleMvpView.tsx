@@ -1,12 +1,15 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { ArticleHeader } from "@/components/article/ArticleHeader";
 import { ArticleContent } from "@/components/article/ArticleContent";
 import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventCardBlock";
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
 import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
+import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticlePlaceCardBlock } from "@/components/article/blocks/ArticlePlaceCardBlock";
 import {
+  deriveArticleLeadHtml,
   deriveArticleLeadPlainText,
   type ArticleBlockMvp,
 } from "@/lib/publications/articleMvp";
@@ -19,22 +22,24 @@ import {
   type ArticleTocBranch,
 } from "@/lib/article/articleHeadingAnchors";
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
+import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
-import { cn } from "@/lib/utils";
-import { ArticleInstagramScript } from "@/components/article/mvp/ArticleInstagramScript";
-import { BreakingNewsGalleryPreview } from "@/components/article/mvp/BreakingNewsGalleryPreview";
+import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
+import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
   if (branches.length === 0) return null;
   return (
-    <nav aria-label="Содержание статьи" className="not-prose max-w-[720px] mb-8 md:mb-10">
-      <p className="text-sm font-semibold text-foreground mb-2.5">Содержание</p>
-      <ul className="list-none m-0 p-0 space-y-1.5 text-sm text-foreground/90">
+    <nav aria-label="Содержание статьи" className="not-prose max-w-[720px] mb-8 md:mb-10 font-sans">
+      <p className="text-[20px] font-bold tracking-tight text-foreground mb-2.5">
+        Содержание
+      </p>
+      <ul className="list-none m-0 p-0 space-y-0.5 text-[18px] font-normal leading-snug tracking-tight text-foreground/90">
         {branches.map((branch) => (
           <li key={branch.entry.id}>
             <a
@@ -77,11 +82,23 @@ export function ArticleMvpView({
   citySlug,
   /** Доп. scroll-padding (напр. панель предпросмотра под хедером). */
   readingScrollPaddingExtraRem,
+  /**
+   * continuous: first = SSR-статья в ленте; continuation = подгруженная;
+   * standalone = одиночная страница (по умолчанию).
+   */
+  continuousVariant = "standalone",
+  articleAriaLabel,
+  /** Переопределение ссылки «Все материалы» (городский журнал). */
+  journalFooterHref,
+  /** Save/Share actions — опущены на preview (нет id/href для реального сохранения). */
+  articleId,
+  articleHref,
+  coverImageUrl,
 }: {
   title: string;
   subtitle: string | null;
   excerpt: string | null;
-  publishedAt: Date | null;
+  publishedAt: Date | null | string;
   blocks: ArticleMvpResolvedBlock[];
   tags?: Array<{ slug: string; title: string }>;
   editHref?: string;
@@ -89,6 +106,12 @@ export function ArticleMvpView({
   categoryLabel?: string | null;
   citySlug?: string | null;
   readingScrollPaddingExtraRem?: number;
+  continuousVariant?: "standalone" | "first" | "continuation";
+  articleAriaLabel?: string;
+  journalFooterHref?: string;
+  articleId?: string;
+  articleHref?: string;
+  coverImageUrl?: string | null;
 }) {
   // Detect Breaking News by the subtitle marker.
   const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
@@ -97,45 +120,43 @@ export function ArticleMvpView({
   const tocBranches = showToc ? buildArticleTocBranches(headingEntries) : [];
   const firstBodyBlockIndex = blocks.findIndex((b) => b.type !== "intro");
 
-  const needsInstagramEmbedScript = blocks.some(
-    (b) => b.type === "embed" && b.embedRequiresInstagramScript,
-  );
-
   // Filter out the Breaking News marker — never show it as visible subtitle text.
   const subtitleTrim = (isBreakingNews ? "" : subtitle?.trim()) || "";
+  const leadHtml = !isBreakingNews
+    ? deriveArticleLeadHtml({ blocks: blocks as ArticleBlockMvp[] })
+    : null;
   const leadPlain =
     deriveArticleLeadPlainText({ blocks: blocks as ArticleBlockMvp[] }) || "";
   const excerptTrim = excerpt?.trim() || "";
   const cityHomeHref = getCityHomeHref(citySlug);
-  /** Лид в шапке (ArticleHeader subtitle): editorial subtitle → intro → excerpt */
-  const headerDek = subtitleTrim || leadPlain || excerptTrim;
+  const journalHref = citySlug?.trim()
+    ? `/${citySlug.trim()}/blog`
+    : "/blog";
+  /** Лид в шапке: editorial subtitle (plain) → intro HTML → excerpt plain */
+  const headerDekHtml = !subtitleTrim ? leadHtml : null;
+  const headerDekPlain =
+    subtitleTrim || (!headerDekHtml ? excerptTrim || leadPlain : "") || "";
 
-  // For Breaking News: extract gallery image URLs to display above the body.
-  // The first gallery block is promoted to a hero preview; it will be skipped in the main loop.
-  const heroGalleryUrls: string[] = isBreakingNews
-    ? (() => {
-        const galleryBlock = blocks.find((b) => b.type === "gallery") as
-          | (Extract<ArticleMvpResolvedBlock, { type: "gallery" }>)
-          | undefined;
-        return galleryBlock
-          ? (galleryBlock.imageUrls.filter((u): u is string => Boolean(u)))
-          : [];
-      })()
-    : [];
+  const isContinuation = continuousVariant === "continuation";
+  const showChromeBack = continuousVariant !== "continuation";
+  const showJournalFooter = continuousVariant === "standalone";
+  const footerHref = journalFooterHref?.trim() || journalHref;
 
   return (
-    <div className="min-h-screen bg-white">
-      <div
-        className="max-w-3xl mx-auto px-4 sm:px-6 py-10 md:py-16 scroll-smooth"
-        role="article"
+    <div className={cn(continuousVariant === "standalone" && "min-h-screen bg-white")}>
+      <article
+        className={cn(
+          "max-w-3xl mx-auto px-4 sm:px-6 scroll-smooth",
+          isContinuation ? "pt-2 md:pt-4 pb-6 md:pb-10" : "py-10 md:py-16",
+        )}
+        aria-label={articleAriaLabel?.trim() || title}
       >
-      {needsInstagramEmbedScript ? (
-        <ArticleInstagramScript />
-      ) : null}
       <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
-      <div className="mb-4 md:mb-0">
-        <MobileSmartBackButton fallbackHref={cityHomeHref} />
-      </div>
+      {showChromeBack ? (
+        <div className="mb-4 md:mb-0">
+          <MobileSmartBackButton fallbackHref={cityHomeHref} />
+        </div>
+      ) : null}
       {draftWatermark ? (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           Черновик / предпросмотр — так видят только редакторы
@@ -143,19 +164,29 @@ export function ArticleMvpView({
       ) : null}
       <ArticleHeader
         title={title}
-        subtitle={headerDek}
-        category={categoryLabel?.trim() || "Журнал"}
+        subtitle={headerDekPlain || undefined}
+        subtitleHtml={headerDekHtml || undefined}
+        journalLabel="Обзоры и статьи"
+        journalHref={journalHref}
+        category={categoryLabel?.trim() || undefined}
+        categoryHref={categoryLabel?.trim() ? journalHref : undefined}
         readTime={5}
         publishedAt={publishedAt ?? undefined}
         editHref={editHref}
       />
 
-      <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
+      {articleId && articleHref ? (
+        <ArticleDetailActions
+          articleId={articleId}
+          title={title}
+          href={articleHref}
+          coverImageUrl={coverImageUrl}
+          source={`article-detail-${continuousVariant}`}
+          className="mb-6 md:mb-8"
+        />
+      ) : null}
 
-      {/* Breaking News hero gallery — shown before body text */}
-      {heroGalleryUrls.length > 0 && (
-        <BreakingNewsGalleryPreview urls={heroGalleryUrls} />
-      )}
+      <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
 
       <ArticleContent>
         {blocks.map((block, i) => {
@@ -164,11 +195,6 @@ export function ArticleMvpView({
               <ArticleInlineToc branches={tocBranches} />
             ) : null;
 
-          // For Breaking News, skip the gallery block — it's already rendered above.
-          if (isBreakingNews && block.type === "gallery") {
-            return null;
-          }
-
           // Лид показываем только в шапке (excerpt), в теле статьи не дублируем.
           if (block.type === "intro") {
             return null;
@@ -176,6 +202,10 @@ export function ArticleMvpView({
 
           const body = (() => {
             if (block.type === "text") {
+              const legacyEmbed = parseArticleEmbed(block.text);
+              if (legacyEmbed?.provider === "youtube") {
+                return <ArticleEmbedBlock value={block.text} />;
+              }
               return (
                 <div
                   className="font-serif leading-[1.75] md:leading-[1.8] text-foreground/95 mb-6 md:mb-7 last:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-primary/40"
@@ -244,63 +274,11 @@ export function ArticleMvpView({
             }
             if (block.type === "gallery") {
               return (
-                <figure className="not-prose my-8 md:my-10 space-y-3">
-                  <div
-                    className={[
-                      "flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 -mx-1 px-1 sm:mx-0 sm:px-0 sm:grid sm:overflow-visible",
-                      "sm:grid-cols-2 lg:grid-cols-3 sm:gap-2",
-                    ].join(" ")}
-                  >
-                    {block.imageUrls.map((url, j) =>
-                      url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={`${block.id}-${j}`}
-                          src={url}
-                          alt=""
-                          className="h-40 w-[min(78vw,280px)] shrink-0 snap-center sm:h-36 sm:w-full rounded-lg object-cover border border-border/50 sm:max-w-none"
-                        />
-                      ) : (
-                        <div
-                          key={`${block.id}-${j}`}
-                          className="h-40 w-[min(78vw,280px)] shrink-0 snap-center sm:h-36 sm:w-full rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 sm:max-w-none"
-                        />
-                      ),
-                    )}
-                  </div>
-                  {block.caption ? (
-                    <figcaption className="text-sm text-muted-foreground text-center px-1">
-                      {block.caption}
-                    </figcaption>
-                  ) : null}
-                </figure>
+                <ArticleGallery images={block.images} presentation={block.presentation} caption={block.caption} />
               );
             }
             if (block.type === "embed") {
-              const igBlockquote = block.embedRequiresInstagramScript;
-              const embedShellClass = cn(
-                "article-embed-shell w-full overflow-hidden rounded-xl border border-border/60 bg-muted/15",
-                igBlockquote && "article-embed-shell--instagram-blockquote",
-              );
-              return (
-                <figure className="not-prose my-8 md:my-10 max-w-[720px]">
-                  {block.sanitizedEmbedHtml ? (
-                    <div
-                      className={embedShellClass}
-                      dangerouslySetInnerHTML={{ __html: block.sanitizedEmbedHtml }}
-                    />
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-muted-foreground/35 bg-muted/25 px-4 py-6 text-center text-sm text-muted-foreground">
-                      Вставка не распознана. Используйте код встраивания YouTube или Instagram.
-                    </div>
-                  )}
-                  {block.caption ? (
-                    <figcaption className="mt-3 text-sm text-muted-foreground text-center px-1">
-                      {block.caption}
-                    </figcaption>
-                  ) : null}
-                </figure>
-              );
+              return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
             }
             if (block.type === "activityCard") {
               const c = block.card;
@@ -339,12 +317,14 @@ export function ArticleMvpView({
         })}
       </ArticleContent>
 
-      <footer className="mt-14 md:mt-16 pt-8 border-t border-border/60 text-sm text-muted-foreground">
-        <Link href="/blog" className="text-primary hover:underline underline-offset-2">
-          ← Все материалы
-        </Link>
-      </footer>
-      </div>
+      {showJournalFooter ? (
+        <footer className="mt-14 md:mt-16 pt-8 border-t border-border/60 text-sm text-muted-foreground">
+          <Link href={footerHref} className="text-primary hover:underline underline-offset-2">
+            ← Все материалы
+          </Link>
+        </footer>
+      ) : null}
+      </article>
     </div>
   );
 }

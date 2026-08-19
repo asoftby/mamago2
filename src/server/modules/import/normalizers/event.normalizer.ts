@@ -13,6 +13,7 @@ import {
   extractSocialUrlsFromRawPayload,
 } from "./extract-social-urls";
 import { detectEventCategory } from "@/lib/ai/detectEventCategory";
+import { extractEventImportLocationFields } from "@/lib/event-import/extractEventImportLocationFields";
 
 type RawPayload = Record<string, unknown>;
 
@@ -126,8 +127,17 @@ function extractScheduleModeCandidate(raw: RawPayload): string | undefined {
 function detectFormatCandidate(raw: RawPayload): "OFFLINE" | "ONLINE" | "HYBRID" {
   const haystack = [
     extractString(raw, "title", "name", "eventTitle"),
-    extractString(raw, "venue", "venueName", "location", "place", "площадка"),
-    extractString(raw, "addressText", "address", "addressLine", "formattedAddress", "addr"),
+    extractString(raw, "venue", "venueName", "placeName", "location", "place", "площадка"),
+    extractString(
+      raw,
+      "addressText",
+      "placeAddress",
+      "locationAddress",
+      "address",
+      "addressLine",
+      "formattedAddress",
+      "addr",
+    ),
     extractString(raw, "fullDescription", "description", "body", "text"),
     extractString(raw, "scheduleText", "schedule", "timing", "расписание"),
     extractString(raw, "onlineUrl", "onlineLink", "streamUrl", "zoomLink", "webinarLink"),
@@ -151,8 +161,17 @@ function detectFormatCandidate(raw: RawPayload): "OFFLINE" | "ONLINE" | "HYBRID"
   const hasOnlineSignal = onlineSignals.some((signal) => haystack.includes(signal));
 
   const hasPhysicalPlace = Boolean(
-    extractString(raw, "venue", "venueName", "location", "place", "площадка") ||
-      extractString(raw, "addressText", "address", "addressLine", "formattedAddress", "addr"),
+    extractString(raw, "venue", "venueName", "placeName", "location", "place", "площадка") ||
+      extractString(
+        raw,
+        "addressText",
+        "placeAddress",
+        "locationAddress",
+        "address",
+        "addressLine",
+        "formattedAddress",
+        "addr",
+      ),
   );
 
   if (hasOnlineSignal && hasPhysicalPlace) return "HYBRID";
@@ -223,16 +242,10 @@ export function normalizeEventPayload(input: EventNormalizerInput): EventNormali
   if (!scheduleModeCandidate) warnings.push("scheduleModeCandidate missing — Activity.scheduleMode will need manual mapping");
 
   // ── Опциональные ─────────────────────────────────────────────────────────
-  const venueName = extractString(rawPayload, "venue", "venueName", "location", "place", "площадка");
-  const addressText = extractString(
-    rawPayload,
-    "addressText",
-    "address",
-    "addressLine",
-    "formattedAddress",
-    "addr",
-  );
-  const cityName = extractString(rawPayload, "city", "cityName", "town");
+  const locationFields = extractEventImportLocationFields(rawPayload);
+  const venueName = locationFields.venueName;
+  const addressText = locationFields.addressText;
+  const cityName = locationFields.cityName;
 
   if (!venueName && !addressText) warnings.push("venue and address both missing");
   if (!cityName) warnings.push("city missing");

@@ -1,10 +1,14 @@
 name: Docker Build & Push
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
       - dev
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
 
 jobs:
   build-and-push:
@@ -28,6 +32,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute build metadata
+        id: build_meta
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "build_id=prod-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_id=dev-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -47,5 +60,16 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # 850 = static WP map (893 rows in manifest.csv) with headroom for curation;
+          # DB-derived slug_history rows only add on top.
+          # NEXT_PUBLIC_* vars must be passed as build-args (not just runtime env
+          # vars on the host) — Next.js inlines them into the client bundle at
+          # `next build` time. Same key used for both dev and prod builds.
+          build-args: |
+            REDIRECT_MANIFEST_MIN_ROWS=850
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_GOOGLE_MAP_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_MAP_ID }}
+            BUILD_ID=${{ steps.build_meta.outputs.build_id }}
+            GIT_COMMIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

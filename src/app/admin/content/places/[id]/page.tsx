@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import prisma from "@/lib/prisma";
 import { PlaceModerationView } from "@/components/admin/PlaceModerationView";
 import { PlaceRevisionModerationView } from "@/components/admin/PlaceRevisionModerationView";
 import { ImprovementRequestForm } from "@/components/admin/moderation/ImprovementRequestForm";
@@ -8,6 +7,7 @@ import { ImprovementRequestList, type ImprovementRequest } from "@/components/ad
 import { PlaceDangerZone } from "@/components/admin/moderation/PlaceDangerZone";
 import { PlacePreviewCard } from "@/components/admin/moderation/PlacePreviewCard";
 import { PlaceModerationSidebar } from "@/components/admin/moderation/PlaceModerationSidebar";
+import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySection";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,13 +15,22 @@ import { ArrowLeft } from "lucide-react";
 import { PlaceFormData } from "@/components/business/wizard/place/types";
 import { ContentStatus, PlaceKind } from "@prisma/client";
 import Link from "next/link";
+import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { AdminPlaceGroupManager } from "@/components/admin/AdminPlaceGroupManager";
+import {
+  loadImprovementRequestsForPlace,
+  loadPendingPlaceRevision,
+  loadPlaceForBasicModeration,
+  loadPlaceForPublishedAdmin,
+} from "./placeModerationQueries";
 
 export default async function PlaceModerationPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; returnTo?: string }>;
 }) {
   const user = await getCurrentUser();
 
@@ -30,190 +39,115 @@ export default async function PlaceModerationPage({
   }
 
   const { id } = await params;
-  const { mode } = await searchParams;
+  const { mode, returnTo } = await searchParams;
+  const backLink = getPlaceDetailBackLink(returnTo);
 
-  // Get place with all relations
-  const place = await prisma.place.findUnique({
-    where: { id },
-    include: {
-      images: {
-        orderBy: { sortOrder: "asc" },
-      },
-      openingHours: {
-        include: {
-          rules: {
-            include: {
-              intervals: {
-                orderBy: { sortOrder: "asc" },
-              },
-            },
-          },
-          exceptions: {
-            include: {
-              intervals: {
-                orderBy: { sortOrder: "asc" },
-              },
-            },
-          },
-        },
-      },
-      city: {
-        select: {
-          id: true,
-          name: true,
-          hasMetro: true,
-          metroMaxDistanceM: true,
-        },
-      },
-      districtAuto: {
-        select: {
-          name: true,
-        },
-      },
-      districtManual: {
-        select: {
-          name: true,
-        },
-      },
-      metroAuto: {
-        select: {
-          name: true,
-        },
-      },
-      metroManual: {
-        select: {
-          name: true,
-        },
-      },
-      createdBy: {
-        select: {
-          id: true,
-          email: true,
-          business: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-      reviews: {
-        where: {
-          status: "PUBLISHED",
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 5,
-      },
-      _count: {
-        select: {
-          reviews: true,
-        },
-      },
-    },
-  });
+  const place = await loadPlaceForBasicModeration(id);
 
   if (!place) {
     notFound();
+  }
+
+  if (place.status === "PENDING") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <PlaceModerationView
+            place={place}
+            canDeletePlace={false}
+          />
+          <div className="mt-6">
+            <AdminPlaceGroupManager
+              currentPlaceId={place.id}
+              currentGroupId={place.placeGroupId}
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Check if we should show revision mode
   const shouldShowRevision = mode === "revision" || place.status === "PUBLISHED";
 
   if (shouldShowRevision) {
-    // Get active revision
-    const revision = await prisma.placeRevision.findFirst({
-      where: {
-        placeId: place.id,
-        status: {
-          in: ["DRAFT", "PENDING", "NEEDS_REVISION"],
-        },
-      },
-      include: {
-        images: {
-          orderBy: { sortOrder: "asc" },
-        },
-        openingHours: {
-          include: {
-            rules: {
-              include: {
-                intervals: {
-                  orderBy: { sortOrder: "asc" },
-                },
-              },
-            },
-            exceptions: {
-              include: {
-                intervals: {
-                  orderBy: { sortOrder: "asc" },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
+    const fullPlace = await loadPlaceForPublishedAdmin(id);
+
+    if (!fullPlace) {
+      notFound();
+    }
+
+    const revision = await loadPendingPlaceRevision(fullPlace.id);
 
     if (revision && revision.status === "PENDING") {
       // Show revision moderation view
-      return <PlaceRevisionModerationView place={place} revision={revision} />;
+      return (
+        <div className="space-y-6 bg-gray-50 pb-8">
+          <PlaceRevisionModerationView
+            place={fullPlace}
+            revision={revision}
+            canDeletePlace={false}
+          />
+          <div className="mx-auto w-full max-w-7xl px-6">
+            <AdminPlaceGroupManager
+              currentPlaceId={fullPlace.id}
+              currentGroupId={fullPlace.placeGroupId}
+            />
+          </div>
+        </div>
+      );
     }
 
     // If place is PUBLISHED but no pending revision, show improvement request form
-    if (place.status === "PUBLISHED") {
-      // Get improvement requests for this place
-      const improvementRequests = await prisma.improvementRequest.findMany({
-        where: {
-          entityType: "PLACE",
-          entityId: place.id,
-        },
-        include: {
-          createdByModerator: {
-            select: {
-              email: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+    if (fullPlace.status === "PUBLISHED") {
+      const improvementRequests = await loadImprovementRequestsForPlace(fullPlace.id);
 
-      const publicUrl = getPlacePublicUrl(place);
+      const publicUrl = getPlacePublicUrl(fullPlace);
 
       // Map place to form data for completion calculation
       const placeFormData: PlaceFormData = {
-        id: place.id,
-        ownerBusinessId: place.ownerBusinessId,
-        status: place.status as ContentStatus,
-        title: place.title,
-        category: place.category,
-        shortDesc: place.shortDesc,
-        description: place.description,
-        ageTags: place.ageTags || [],
-        visitFormats: place.visitFormats || [],
-        primaryCategoryId: place.primaryCategoryId ?? null,
+        id: fullPlace.id,
+        ownerBusinessId: fullPlace.ownerBusinessId,
+        status: fullPlace.status as ContentStatus,
+        title: fullPlace.title,
+        category: fullPlace.category ?? "",
+        shortDesc: fullPlace.shortDesc,
+        description: fullPlace.description,
+        ageTags: fullPlace.ageTags || [],
+        agePolicy: fullPlace.agePolicy,
+        visitFormats: fullPlace.visitFormats || [],
+        faqItems: normalizeFaqItems(fullPlace.faqItems),
+        primaryCategoryId: fullPlace.primaryCategoryId ?? null,
         subcategoryIds: [],
-        lat: place.lat,
-        lng: place.lng,
-        googlePlaceId: place.googlePlaceId,
-        formattedAddr: place.formattedAddr,
-        addressJson: place.addressJson,
-        customAddress: place.customAddress,
-        cityId: place.cityId,
-        districtAutoId: place.districtAutoId,
-        districtManualId: place.districtManualId,
-        metroAutoId: place.metroAutoId,
-        metroAutoDistanceM: place.metroAutoDistanceM,
-        metroManualId: place.metroManualId,
-        metroManualDistanceM: place.metroManualDistanceM,
-        phone: place.phone,
-        website: place.website,
-        instagramHandle: place.instagramHandle,
-        instagramUrl: place.instagramUrl,
-        logoImageId: place.logoImageId,
-        logoUrl: place.images.find(img => img.kind === "LOGO")?.url || null,
-        images: place.images.map(img => ({
+        lat: fullPlace.lat,
+        lng: fullPlace.lng,
+        googlePlaceId: fullPlace.googlePlaceId,
+        formattedAddr: fullPlace.formattedAddr,
+        addressJson: fullPlace.addressJson,
+        customAddress: fullPlace.customAddress,
+        cityId: fullPlace.cityId,
+        districtAutoId: fullPlace.districtAutoId,
+        districtManualId: fullPlace.districtManualId,
+        metroAutoId: fullPlace.metroAutoId,
+        metroAutoDistanceM: fullPlace.metroAutoDistanceM,
+        metroManualId: fullPlace.metroManualId,
+        metroManualDistanceM: fullPlace.metroManualDistanceM,
+        phone: fullPlace.phone,
+        phoneLabel: fullPlace.phoneLabel,
+        phone2: fullPlace.phone2,
+        phone2Label: fullPlace.phone2Label,
+        phone3: fullPlace.phone3,
+        phone3Label: fullPlace.phone3Label,
+        website: fullPlace.website,
+        bookingEnabled: fullPlace.bookingEnabled,
+        bookingPhone: fullPlace.bookingPhone,
+        bookingNote: fullPlace.bookingNote,
+        instagramHandle: fullPlace.instagramHandle,
+        instagramUrl: fullPlace.instagramUrl,
+        reelsUrl: fullPlace.reelsUrl,
+        logoImageId: fullPlace.logoImageId,
+        logoUrl: fullPlace.images.find(img => img.kind === "LOGO")?.url || null,
+        images: fullPlace.images.map(img => ({
           id: img.id,
           url: img.url,
           kind: img.kind as "LOGO" | "GALLERY",
@@ -223,11 +157,11 @@ export default async function PlaceModerationPage({
           blurhash: img.blurhash || null,
           sortOrder: img.sortOrder,
         })),
-        openingHoursId: place.openingHoursId,
-        openingHoursData: place.openingHours ? {
-          mode: place.openingHours.mode as import("@prisma/client").OpeningHoursMode,
-          timezone: place.openingHours.timezone || "Europe/Minsk",
-          rules: place.openingHours.rules?.map(rule => ({
+        openingHoursId: fullPlace.openingHoursId,
+        openingHoursData: fullPlace.openingHours ? {
+          mode: fullPlace.openingHours.mode as import("@prisma/client").OpeningHoursMode,
+          timezone: fullPlace.openingHours.timezone || "Europe/Minsk",
+          rules: fullPlace.openingHours.rules?.map(rule => ({
             dayOfWeek: rule.dayOfWeek,
             isOpen: rule.isOpen,
             allDay: rule.allDay || false,
@@ -237,20 +171,20 @@ export default async function PlaceModerationPage({
             })) || [],
           })) || [],
         } : null,
-        placeKind: place.placeKind as PlaceKind,
-        floor: place.floor,
-        unit: place.unit,
+        placeKind: fullPlace.placeKind as PlaceKind,
+        floor: fullPlace.floor,
+        unit: fullPlace.unit,
         priceItems: { items: [], note: "" },
-        createdAt: place.createdAt,
-        updatedAt: place.updatedAt,
+        createdAt: fullPlace.createdAt,
+        updatedAt: fullPlace.updatedAt,
       };
 
       const STATUS_LABELS: Record<string, { label: string; color: string }> = {
         PUBLISHED: { label: "Опубликовано", color: "bg-green-100 text-green-800" },
       };
 
-      const statusInfo = STATUS_LABELS[place.status] || {
-        label: place.status,
+      const statusInfo = STATUS_LABELS[fullPlace.status] || {
+        label: fullPlace.status,
         color: "bg-gray-100 text-gray-800",
       };
 
@@ -261,11 +195,11 @@ export default async function PlaceModerationPage({
             <div className="max-w-7xl mx-auto px-6 py-4">
               <div className="flex items-center justify-between mb-4">
                 <Link
-                  href="/admin/moderation/queue"
+                  href={backLink.href}
                   className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
-                  Назад к очереди
+                  {backLink.label}
                 </Link>
               </div>
 
@@ -273,14 +207,14 @@ export default async function PlaceModerationPage({
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-2xl font-bold text-gray-900">
-                      {place.title}
+                      {fullPlace.title}
                     </h1>
                     <Badge className={statusInfo.color}>
                       {statusInfo.label}
                     </Badge>
                   </div>
-                  {place.formattedAddr && (
-                    <p className="text-gray-600">{place.formattedAddr}</p>
+                  {fullPlace.formattedAddr && (
+                    <p className="text-gray-600">{fullPlace.formattedAddr}</p>
                   )}
                 </div>
 
@@ -293,22 +227,31 @@ export default async function PlaceModerationPage({
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
               {/* Left Column - Place Preview */}
               <div>
-                <PlacePreviewCard place={place} />
+                <PlacePreviewCard place={fullPlace} />
+                <div className="mt-6">
+                  <FaqReadonlySection items={fullPlace.faqItems} />
+                </div>
+                <div className="mt-6">
+                  <AdminPlaceGroupManager
+                    currentPlaceId={fullPlace.id}
+                    currentGroupId={fullPlace.placeGroupId}
+                  />
+                </div>
               </div>
 
               {/* Right Column - Moderation Sidebar */}
               <div>
                 <PlaceModerationSidebar
                   place={{
-                    id: place.id,
-                    title: place.title,
-                    status: place.status,
-                    slug: place.slug,
-                    formattedAddr: place.formattedAddr,
-                    owner: place.createdBy,
-                    city: place.city ? {
-                      id: parseInt(place.city.id),
-                      name: place.city.name,
+                    id: fullPlace.id,
+                    title: fullPlace.title,
+                    status: fullPlace.status,
+                    slug: fullPlace.slug,
+                    formattedAddr: fullPlace.formattedAddr,
+                    owner: fullPlace.createdBy,
+                    city: fullPlace.city ? {
+                      id: parseInt(fullPlace.city.id),
+                      name: fullPlace.city.name,
                     } : null,
                   }}
                   placeFormData={placeFormData}
@@ -331,6 +274,7 @@ export default async function PlaceModerationPage({
                   </CardHeader>
                   <CardContent>
                     <ImprovementRequestForm placeId={place.id} />
+                    
                   </CardContent>
                 </Card>
 
@@ -354,7 +298,11 @@ export default async function PlaceModerationPage({
 
             {/* Danger Zone */}
             <div className="mt-8">
-              <PlaceDangerZone placeId={place.id} placeTitle={place.title} />
+              <PlaceDangerZone
+                placeId={place.id}
+                placeTitle={place.title}
+                canDelete={false}
+              />
             </div>
           </div>
         </div>
@@ -362,11 +310,159 @@ export default async function PlaceModerationPage({
     }
   }
 
-  // Show regular place moderation view (for PENDING, NEEDS_REVISION, REJECTED, DRAFT)
+  const fullPlace = await loadPlaceForPublishedAdmin(id);
+
+  if (!fullPlace) {
+    notFound();
+  }
+
+  const publicUrl = getPlacePublicUrl(fullPlace);
+  const placeFormData: PlaceFormData = {
+    id: fullPlace.id,
+    ownerBusinessId: fullPlace.ownerBusinessId,
+    status: fullPlace.status as ContentStatus,
+    title: fullPlace.title,
+    category: fullPlace.category ?? "",
+    shortDesc: fullPlace.shortDesc,
+    description: fullPlace.description,
+    ageTags: fullPlace.ageTags || [],
+    agePolicy: fullPlace.agePolicy,
+    visitFormats: fullPlace.visitFormats || [],
+    faqItems: normalizeFaqItems(fullPlace.faqItems),
+    primaryCategoryId: fullPlace.primaryCategoryId ?? null,
+    subcategoryIds: [],
+    lat: fullPlace.lat,
+    lng: fullPlace.lng,
+    googlePlaceId: fullPlace.googlePlaceId,
+    formattedAddr: fullPlace.formattedAddr,
+    addressJson: fullPlace.addressJson,
+    customAddress: fullPlace.customAddress,
+    cityId: fullPlace.cityId,
+    districtAutoId: fullPlace.districtAutoId,
+    districtManualId: fullPlace.districtManualId,
+    metroAutoId: fullPlace.metroAutoId,
+    metroAutoDistanceM: fullPlace.metroAutoDistanceM,
+    metroManualId: fullPlace.metroManualId,
+    metroManualDistanceM: fullPlace.metroManualDistanceM,
+    phone: fullPlace.phone,
+    phoneLabel: fullPlace.phoneLabel,
+    phone2: fullPlace.phone2,
+    phone2Label: fullPlace.phone2Label,
+    phone3: fullPlace.phone3,
+    phone3Label: fullPlace.phone3Label,
+    website: fullPlace.website,
+    bookingEnabled: fullPlace.bookingEnabled,
+    bookingPhone: fullPlace.bookingPhone,
+    bookingNote: fullPlace.bookingNote,
+    instagramHandle: fullPlace.instagramHandle,
+    instagramUrl: fullPlace.instagramUrl,
+    reelsUrl: fullPlace.reelsUrl,
+    logoImageId: fullPlace.logoImageId,
+    logoUrl: fullPlace.images.find((img) => img.kind === "LOGO")?.url || null,
+    images: fullPlace.images.map((img) => ({
+      id: img.id,
+      url: img.url,
+      kind: img.kind as "LOGO" | "GALLERY",
+      order: img.sortOrder,
+      width: img.width || 0,
+      height: img.height || 0,
+      blurhash: img.blurhash || null,
+      sortOrder: img.sortOrder,
+    })),
+    openingHoursId: fullPlace.openingHoursId,
+    openingHoursData: fullPlace.openingHours
+      ? {
+          mode: fullPlace.openingHours.mode as import("@prisma/client").OpeningHoursMode,
+          timezone: fullPlace.openingHours.timezone || "Europe/Minsk",
+          rules: fullPlace.openingHours.rules?.map((rule) => ({
+            dayOfWeek: rule.dayOfWeek,
+            isOpen: rule.isOpen,
+            allDay: rule.allDay || false,
+            intervals:
+              rule.intervals?.map((int) => ({
+                startTime: int.startTime,
+                endTime: int.endTime,
+              })) || [],
+          })) || [],
+        }
+      : null,
+    placeKind: fullPlace.placeKind as PlaceKind,
+    floor: fullPlace.floor,
+    unit: fullPlace.unit,
+    priceItems: { items: [], note: "" },
+    createdAt: fullPlace.createdAt,
+    updatedAt: fullPlace.updatedAt,
+  };
+
+  const statusInfo = {
+    label: place.status,
+    color: "bg-gray-100 text-gray-800",
+  };
+
+  // Show non-moderation management preview for DRAFT / NEEDS_REVISION / REJECTED without pending revision
   return (
     <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <Link
+              href="/admin/content/places"
+              className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Назад к списку
+            </Link>
+          </div>
+
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-2xl font-bold text-gray-900">{fullPlace.title}</h1>
+                <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+              </div>
+              {fullPlace.formattedAddr && (
+                <p className="text-gray-600">{fullPlace.formattedAddr}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <PlaceModerationView place={place} />
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+          <div>
+            <PlacePreviewCard place={fullPlace} />
+            <div className="mt-6">
+              <FaqReadonlySection items={fullPlace.faqItems} />
+            </div>
+            <div className="mt-6">
+              <AdminPlaceGroupManager
+                currentPlaceId={fullPlace.id}
+                currentGroupId={fullPlace.placeGroupId}
+              />
+            </div>
+          </div>
+          <div>
+            <PlaceModerationSidebar
+              place={{
+                id: fullPlace.id,
+                title: fullPlace.title,
+                status: fullPlace.status,
+                slug: fullPlace.slug,
+                formattedAddr: fullPlace.formattedAddr,
+                owner: fullPlace.createdBy,
+                city: fullPlace.city
+                  ? {
+                      id: parseInt(fullPlace.city.id),
+                      name: fullPlace.city.name,
+                    }
+                  : null,
+              }}
+              placeFormData={placeFormData}
+              publicUrl={publicUrl}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

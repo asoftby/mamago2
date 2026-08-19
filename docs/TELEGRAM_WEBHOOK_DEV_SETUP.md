@@ -2,13 +2,29 @@
 
 ## Как это работает
 
-В dev-режиме (`NODE_ENV !== "production"`) используется **DEV-бот**:
-- Токен: `TELEGRAM_BOT_TOKEN_DEV` из `.env.local`
-- Username: `TELEGRAM_BOT_USERNAME_DEV` из `.env.local`
+Bot credentials are selected by **`APP_ENV`**, not `NODE_ENV`.
+`next start` sets `NODE_ENV=production` even on deployed DEV.
 
-В prod — `TELEGRAM_BOT_TOKEN_PROD` / `TELEGRAM_BOT_USERNAME_PROD`.
+- `APP_ENV=local` / local `next dev`: **DEV-бот** (`TELEGRAM_BOT_TOKEN_DEV`, `TELEGRAM_BOT_USERNAME_DEV`)
+- `APP_ENV=dev|staging|preview`: same **DEV-бот**, webhook origin = `APP_PUBLIC_URL`
+- `APP_ENV=production|prod`: **PROD-бот** (`TELEGRAM_BOT_TOKEN_PROD`, `TELEGRAM_BOT_USERNAME_PROD`)
 
-Логика в `src/server/config/telegram.config.ts`.
+Canonical webhook path (the only active endpoint):
+
+```text
+/api/bot/webhook
+```
+
+Legacy `/api/telegram/webhook` and `/api/integrations/telegram/webhook` return **410 Gone**. Do not register them.
+
+Логика: `src/server/config/telegram.config.ts`.
+
+Deployed expected URLs:
+
+```text
+DEV:  https://dev.mamago.by/api/bot/webhook
+PROD: https://prod.mamago.by/api/bot/webhook
+```
 
 ---
 
@@ -111,6 +127,7 @@ curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook"
 ```dotenv
 TELEGRAM_BOT_TOKEN_DEV=реальный_токен_от_BotFather
 TELEGRAM_BOT_USERNAME_DEV=@имя_бота
+TELEGRAM_WEBHOOK_SECRET_DEV=openssl_rand_hex_32
 ```
 
 > `YOUR_TELEGRAM_BOT_TOKEN` — это плейсхолдер. Никогда не используй его как есть.

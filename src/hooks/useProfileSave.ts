@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
+import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
 
 export interface ProfileSaveInput {
   displayName?: string;
@@ -18,6 +19,7 @@ export interface ProfileSaveResult {
 export function useProfileSave() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const save = async (input: ProfileSaveInput): Promise<ProfileSaveResult | null> => {
     if (!input.displayName?.trim() && !input.avatarFile) return null;
@@ -27,8 +29,20 @@ export function useProfileSave() {
       let avatarUrl: string | undefined;
 
       if (input.avatarFile) {
+        // Prebuilt sharp has no HEVC decoder (see imageProcessor.ts) — this
+        // hook talks to /api/upload directly (its own inline fetch, not
+        // useImageUpload/useWizardImageUpload), so it needs its own HEIC
+        // conversion rather than inheriting it for free.
+        let avatarFile: File;
+        setConverting(true);
+        try {
+          avatarFile = await convertHeicFileToJpegIfNeeded(input.avatarFile);
+        } finally {
+          setConverting(false);
+        }
+
         const form = new FormData();
-        form.append("file", input.avatarFile);
+        form.append("file", avatarFile);
         const uploadRes = await fetch("/api/upload", { method: "POST", body: form });
         if (!uploadRes.ok) {
           const err = await uploadRes.json().catch(() => ({}));
@@ -89,5 +103,5 @@ export function useProfileSave() {
     }
   };
 
-  return { save, removeAvatar, saving };
+  return { save, removeAvatar, saving, converting };
 }

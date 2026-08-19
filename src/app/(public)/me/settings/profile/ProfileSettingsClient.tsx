@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function ProfileSettingsClient({ initial, avatarUrl: initialAvatarUrl, displayName: initialName }: Props) {
-  const { save, saving } = useProfileSave();
+  const { save, saving, converting } = useProfileSave();
   const [name, setName] = useState(initialName ?? "");
   const [preview, setPreview] = useState<string | null>(initialAvatarUrl ?? null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -85,7 +85,7 @@ export function ProfileSettingsClient({ initial, avatarUrl: initialAvatarUrl, di
         disabled={saving || !hasChanges}
         className="w-full h-11 rounded-2xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 transition-colors"
       >
-        {saving ? "Сохранение..." : "Сохранить"}
+        {converting ? "Конвертируем…" : saving ? "Сохранение..." : "Сохранить"}
       </button>
     </div>
   );

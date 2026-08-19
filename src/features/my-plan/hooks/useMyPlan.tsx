@@ -16,9 +16,15 @@ import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store"
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { MY_PLAN_REFETCH_DATE_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { reconcilePlanMarkerCounts } from "../lib/planDateMarkers";
+import {
+  loadPersistedPlanDate,
+  persistSelectedPlanDate,
+} from "../lib/planRecommendationDraftStorage";
 
 function todayISO(): string {
-  return new Date().toISOString().split("T")[0];
+  return getLocalDateKey();
 }
 
 function addDaysIso(dateISO: string, days: number): string {
@@ -86,6 +92,9 @@ interface PlanSummary {
   weekItemsCount: number;
   nextPlanItem: { date: string; item: { title: string | null } } | null;
   countsByDate: Record<string, number>;
+  nearestDate: string | null;
+  nearestCount: number;
+  nearestItems: PlanItemWithActivity[];
 }
 
 const MyPlanStateContext = createContext<ReturnType<typeof useMyPlanStore> | null>(null);
@@ -119,11 +128,32 @@ function useMyPlanStore() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlanDate, setSelectedPlanDate] = useState<string>(todayISO);
+  const selectedPlanDateHydratedRef = useRef(false);
+  const hasPersistedPlanDateRef = useRef(false);
+  useEffect(() => {
+    if (!selectedPlanDateHydratedRef.current) {
+      selectedPlanDateHydratedRef.current = true;
+      const persistedDate = loadPersistedPlanDate();
+      if (persistedDate) {
+        hasPersistedPlanDateRef.current = true;
+        if (persistedDate !== selectedPlanDate) {
+          setSelectedPlanDate(persistedDate);
+          return;
+        }
+      }
+    }
+    persistSelectedPlanDate(selectedPlanDate);
+  }, [selectedPlanDate]);
   const [submittingChild, setSubmittingChild] = useState(false);
 
   /** Chronological plan items by date - sorted by startsAt */
   const [planItemsByDateMap, setPlanItemsByDateMap] = useState<
     Record<string, PlanItemWithActivity[]>
+  >({});
+  const [serverConfirmedPlanDates, setServerConfirmedPlanDates] = useState<string[]>([]);
+  /** Day Scenario status by date — undefined/absent = no Scenario yet. */
+  const [scenarioStatusByDateMap, setScenarioStatusByDateMap] = useState<
+    Record<string, "ready" | "changed">
   >({});
   const [planSummary, setPlanSummary] = useState<PlanSummary | null>(null);
   const [planSummaryLoading, setPlanSummaryLoading] = useState(false);
@@ -339,7 +369,7 @@ function useMyPlanStore() {
   );
 
   const today = todayISO();
-  const summaryTo = useMemo(() => addDaysIso(today, 14), [today]);
+  const summaryTo = useMemo(() => addDaysIso(today, 90), [today]);
 
   const refetchPlanSummary = useCallback(async (): Promise<PlanSummary | null> => {
     if (!isAuthenticated || authLoading) {
@@ -374,6 +404,11 @@ function useMyPlanStore() {
           data?.countsByDate && typeof data.countsByDate === "object"
             ? data.countsByDate
             : {},
+        nearestDate: typeof data?.nearestDate === "string" ? data.nearestDate : null,
+        nearestCount: Number.isFinite(data?.nearestCount) ? data.nearestCount : 0,
+        nearestItems: Array.isArray(data?.nearestItems)
+          ? normalizePlanItemsFromApi(data.nearestItems)
+          : [],
       };
       setPlanSummary(normalized);
       return normalized;
@@ -384,6 +419,15 @@ function useMyPlanStore() {
       setPlanSummaryLoading(false);
     }
   }, [authLoading, isAuthenticated, summaryTo, today]);
+
+  useEffect(() => {
+    if (
+      hasPersistedPlanDateRef.current ||
+      !planSummary?.nearestDate ||
+      selectedPlanDate !== today
+    ) return;
+    setSelectedPlanDate(planSummary.nearestDate);
+  }, [planSummary?.nearestDate, selectedPlanDate, today]);
 
   const planDayFetchGen = useRef(0);
 
@@ -402,13 +446,29 @@ function useMyPlanStore() {
         );
         if (!res.ok) return;
         if (gen !== planDayFetchGen.current) return;
-        const data = (await res.json()) as { items?: unknown[] };
+        const data = (await res.json()) as {
+          items?: unknown[];
+          scenarioStatus?: "ready" | "changed" | null;
+        };
         const raw = Array.isArray(data.items) ? data.items : [];
         const items = sortPlanItemsForDay(normalizePlanItemsFromApi(raw));
         setPlanItemsByDateMap((prev) => ({
           ...prev,
           [date]: items,
         }));
+        if (data.scenarioStatus) {
+          setScenarioStatusByDateMap((prev) => ({ ...prev, [date]: data.scenarioStatus! }));
+        } else {
+          setScenarioStatusByDateMap((prev) => {
+            if (!(date in prev)) return prev;
+            const next = { ...prev };
+            delete next[date];
+            return next;
+          });
+        }
+        setServerConfirmedPlanDates((prev) =>
+          prev.includes(date) ? prev : [...prev, date],
+        );
       } catch {
         /* ignore */
       }
@@ -655,11 +715,7 @@ function useMyPlanStore() {
   const weekDates = getWeekDates();
 
   const effectiveCountsByDate = useMemo(() => {
-    const merged = { ...(planSummary?.countsByDate ?? {}) };
-    for (const [date, items] of Object.entries(planItemsByDateMap)) {
-      merged[date] = items.length;
-    }
-    return merged;
+    return reconcilePlanMarkerCounts(planSummary?.countsByDate, planItemsByDateMap);
   }, [planItemsByDateMap, planSummary?.countsByDate]);
 
   const effectiveTodayCount = useMemo(() => {
@@ -770,6 +826,8 @@ function useMyPlanStore() {
     planItems: filteredItems,
     allPlanItems: planItems,
     planItemsByDate: planItemsByDateMap,
+    scenarioStatusByDate: scenarioStatusByDateMap,
+    serverConfirmedPlanDates,
     todayItems: planItemsByDateMap[today] ?? [],
     weekDates,
     searchQuery,

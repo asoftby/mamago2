@@ -30,6 +30,8 @@ interface PlaceSearchAutocompleteProps {
   placeholder?: string;
   selectedPlaceId?: string | null;
   createPlaceHint?: string | null;
+  initialQuery?: string | null;
+  createPlaceName?: string | null;
   /** Только площадки пользователя (для привязки оффера к месту). */
   ownPlacesOnly?: boolean;
 }
@@ -85,6 +87,8 @@ export function PlaceSearchAutocomplete({
   placeholder = "Найти место по названию или адресу",
   selectedPlaceId,
   createPlaceHint,
+  initialQuery,
+  createPlaceName,
   ownPlacesOnly = false,
 }: PlaceSearchAutocompleteProps) {
   const [query, setQuery] = useState("");
@@ -97,6 +101,14 @@ export function PlaceSearchAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const hasUserEditedQueryRef = useRef(false);
+
+  useEffect(() => {
+    if (hasUserEditedQueryRef.current) return;
+    if (!initialQuery?.trim()) return;
+    if (query.trim().length > 0) return;
+    setQuery(initialQuery.trim());
+  }, [initialQuery, query]);
 
   // Search places
   const searchPlaces = useCallback(async (searchQuery: string) => {
@@ -213,7 +225,7 @@ export function PlaceSearchAutocomplete({
   };
 
   const handleCreatePlace = () => {
-    onCreatePlace(query.trim());
+    onCreatePlace(createPlaceName?.trim() || query.trim());
     setIsOpen(false);
     setHasSearched(false);
   };
@@ -231,7 +243,10 @@ export function PlaceSearchAutocomplete({
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            hasUserEditedQueryRef.current = true;
+            setQuery(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
             if (query.trim().length >= 2) {

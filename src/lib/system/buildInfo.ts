@@ -13,6 +13,8 @@ export type BuildInfo = {
   nodeEnv: string | null;
   vercelEnv: string | null;
   appVersion: string;
+  /** Immutable deployment build/image tag (e.g. "dev-310", "prod-161"), baked in at image build time. Null outside a built image (e.g. local dev). */
+  buildId: string | null;
   /** Version from the Release table (isCurrent = true). Populated by layouts; null if no published release. */
   currentReleaseVersion: string | null;
   branch: string | null;
@@ -92,6 +94,7 @@ export function getBuildInfo(): BuildInfo {
     nodeEnv,
     vercelEnv,
     appVersion: String(packageJson.version ?? "0.0.0"),
+    buildId: readEnv("BUILD_ID"),
     currentReleaseVersion: null,
     branch: readEnv("VERCEL_GIT_COMMIT_REF") ?? readEnv("GIT_BRANCH"),
     commitSha,

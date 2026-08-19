@@ -11,6 +11,7 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { emailService } from "@/features/email/server/email-service";
 import { getTelegramConfig } from "@/server/config/telegram.config";
+import { getTelegramDiagnostics } from "@/server/services/telegram/telegramDiagnostics.service";
 import {
   reconcileStalePendingDeliveries,
   STALE_PENDING_THRESHOLD_MINUTES,
@@ -19,6 +20,7 @@ import {
   AdminNotificationTestButtons,
   ResendDeliveryButton,
 } from "./AdminNotificationsDiagnosticsClient";
+import { TableContainer } from "@/components/ui/table";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -127,6 +129,12 @@ export default async function AdminSystemNotificationsPage({
 
   const emailHealth = emailService.getHealth();
   const telegramConfig = getTelegramConfig();
+  let telegramLive: Awaited<ReturnType<typeof getTelegramDiagnostics>> | null = null;
+  try {
+    telegramLive = await getTelegramDiagnostics();
+  } catch (error) {
+    console.error("[admin:notifications] telegram diagnostics failed", error);
+  }
 
   return (
     <div className="space-y-6">
@@ -147,6 +155,10 @@ export default async function AdminSystemNotificationsPage({
             `EMAIL_ENABLED: ${emailHealth.enabled ? "ON" : "OFF"}`,
             `Configured: ${emailHealth.configured ? "YES" : "NO"}`,
             `Missing env: ${emailHealth.missingKeys.length > 0 ? emailHealth.missingKeys.join(", ") : "none"}`,
+            `Debug redirect: ${emailHealth.debugRedirect ? "ON" : "OFF"}`,
+            `From: ${emailHealth.from ?? "MISSING"}`,
+            `Reply-To: ${emailHealth.replyTo ?? "MISSING"}`,
+            `Public URL: ${emailHealth.publicUrl ?? "MISSING"}`,
           ]}
         />
         <HealthCard
@@ -154,8 +166,20 @@ export default async function AdminSystemNotificationsPage({
           lines={[
             `Environment: ${telegramConfig.environment}`,
             `Bot token: ${telegramConfig.botToken ? "SET" : "MISSING"}`,
-            `Bot username: ${telegramConfig.botUsername ? `@${telegramConfig.botUsername}` : "MISSING"}`,
+            `Configured username: ${telegramConfig.botUsername ? `@${telegramConfig.botUsername}` : "MISSING"}`,
+            `getMe username: ${telegramLive?.botUsername ? `@${telegramLive.botUsername}` : telegramLive?.botError ?? "n/a"}`,
             `Webhook secret: ${telegramConfig.webhookSecret ? "SET" : "MISSING"}`,
+            `Webhook URL: ${telegramLive?.webhook?.url || "(empty)"}`,
+            `Expected webhook: ${telegramLive?.expectedWebhookUrl ?? "unknown"}`,
+            `Webhook match: ${
+              telegramLive?.urlStatus.kind === "ok"
+                ? "YES"
+                : telegramLive?.urlStatus.kind === "mismatch"
+                  ? "NO"
+                  : telegramLive?.urlStatus.kind ?? "n/a"
+            }`,
+            `pending_update_count: ${telegramLive?.webhook?.pendingUpdateCount ?? "n/a"}`,
+            `last error: ${telegramLive?.webhook?.lastErrorMessage ?? "none"}`,
           ]}
         />
         <HealthCard
@@ -220,7 +244,11 @@ export default async function AdminSystemNotificationsPage({
 
       <section className="rounded-3xl border border-stone-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-stone-950">Последние Notification</h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4">
+          <TableContainer
+            minWidthClassName="min-w-[720px]"
+            scrollLabel="Таблица последних уведомлений, прокручивается по горизонтали"
+          >
           <table className="min-w-full text-sm">
             <thead className="text-left text-stone-500">
               <tr>
@@ -258,12 +286,17 @@ export default async function AdminSystemNotificationsPage({
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       </section>
 
       <section className="rounded-3xl border border-stone-200 bg-white p-5">
         <h2 className="text-lg font-semibold text-stone-950">NotificationDelivery</h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4">
+          <TableContainer
+            minWidthClassName="min-w-[820px]"
+            scrollLabel="Таблица доставок уведомлений, прокручивается по горизонтали"
+          >
           <table className="min-w-full text-sm">
             <thead className="text-left text-stone-500">
               <tr>
@@ -302,6 +335,7 @@ export default async function AdminSystemNotificationsPage({
               ))}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       </section>
     </div>

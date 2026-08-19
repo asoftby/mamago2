@@ -1,0 +1,67 @@
+{
+  "phase": "USERS Slice 15 content authorship targeted read-only reconciliation",
+  "scope": "exactly the 12 content-author users from docs/migration/content-authorship-plan.json (Slice 6) — re-verification only, no writes",
+  "readOnly": true,
+  "purpose": "confirm the Slice 6 content authorship numbers still hold after all Slice 7-14 ownership/role writes, before designing any golden authorship write",
+  "reconciliationManifestFile": "users-slice15-content-authorship-reconciliation.json",
+  "manifestByteIdenticalToSlice6Plan": true,
+  "targetFieldsConfirmed": {
+    "ARTICLE": { "field": "Article.authorUserId", "nullable": true, "relation": "ArticleAuthor" },
+    "ROUTE": { "field": "Route.authorId", "nullable": true, "relation": "RouteAuthor" },
+    "ACTIVITY": { "field": "Activity.ownerUserId", "nullable": false, "relation": "ActivityOwner", "note": "required column — a migrated Activity always already has some owner; unset is impossible, so any mismatch is a real conflict, never an absence" }
+  },
+  "actionMapping": {
+    "note": "internal typed actions (unchanged from Slice 6's planContentAuthorship, reused verbatim) mapped to the outcome categories requested for this slice",
+    "EXACT_AUTHOR_LINK_CANDIDATE -> EXACT_LINK_CANDIDATE": 0,
+    "ALREADY_SATISFIED -> ALREADY_SATISFIED": 0,
+    "TARGET_CONTENT_NOT_MIGRATED -> TARGET_NOT_MIGRATED": 10,
+    "CURRENT_AUTHOR_CONFLICT -> EXISTING_AUTHOR_CONFLICT": 1,
+    "MANUAL_REVIEW (partial coverage) -> PARTIAL_LINEAGE": 1,
+    "UNSUPPORTED_CONTENT_TYPE -> UNSUPPORTED_TARGET": 0,
+    "MULTIPLE_SOURCE_AUTHORS / TARGET_CONTENT_AMBIGUOUS": 0
+  },
+  "confirmedTotals": {
+    "users": 12,
+    "TARGET_NOT_MIGRATED": 10,
+    "EXISTING_AUTHOR_CONFLICT": 1,
+    "PARTIAL_LINEAGE": 1,
+    "EXACT_LINK_CANDIDATE": 0,
+    "ALREADY_SATISFIED": 0,
+    "UNSUPPORTED_TARGET": 0,
+    "matchesSlice6Plan": true
+  },
+  "detail": {
+    "targetNotMigrated": {
+      "users": ["wordpress-db:user:42", "wordpress-db:user:105", "wordpress-db:user:116", "wordpress-db:user:142", "wordpress-db:user:341", "wordpress-db:user:450", "wordpress-db:user:462", "wordpress-db:user:567", "wordpress-db:user:568", "wordpress-db:user:575"],
+      "reason": "authored Activities/Article never migrated (0 lineage) — none has any prior MigrationRecord attempt"
+    },
+    "existingAuthorConflict": {
+      "user": "wordpress-db:user:521",
+      "authoredActivities": 43,
+      "migratedActivities": 5,
+      "reason": "all 5 migrated Activities already have Activity.ownerUserId set to a different User (a fallback account from the original Activity migration) — Activity.ownerUserId is a required column, so this is a real conflict, not an absence"
+    },
+    "partialLineage": {
+      "user": "wordpress-db:user:91",
+      "authoredContent": 53,
+      "migratedContent": 15,
+      "contentTypes": ["ARTICLE", "ROUTE"],
+      "reason": "only 15 of 53 authored Article/Route items have been migrated; the 15 migrated ones have no conflict (authorUserId/authorId currently unset) but coverage is incomplete, so no exact/complete link can be claimed yet"
+    }
+  },
+  "readOnlyProof": {
+    "databaseWrites": 0,
+    "authorshipWrites": 0,
+    "roleChanges": 0,
+    "mediaChanges": 0,
+    "emailDeliveries": 0,
+    "beforeAfterCountsIdentical": true
+  },
+  "deferredScope": {
+    "goldenAuthorshipWrite": "NOT_STARTED — next step is one safe exact/conflict-free candidate first, once one exists (none currently qualifies: 0 EXACT_LINK_CANDIDATE)",
+    "batchAuthorshipWrite": "NOT_STARTED — planned only after a golden proof, and only for conflict-free cases",
+    "manualPrivilegedUsers": 15,
+    "profileMedia": "NOT_STARTED",
+    "activationEmailDelivery": "NOT_STARTED"
+  }
+}

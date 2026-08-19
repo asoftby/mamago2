@@ -33,6 +33,7 @@ export const offerProvider: SeoEntityProvider = {
         title: true,
         description: true,
         status: true,
+        archivedAt: true,
         updatedAt: true,
         seoH1: true,
         seoTitle: true,
@@ -40,13 +41,16 @@ export const offerProvider: SeoEntityProvider = {
         seoCanonicalUrl: true,
         seoCanonicalSource: true,
         seoRobots: true,
+        place: { select: { city: { select: { slug: true } } } },
       },
     });
 
     return offers.map((o) => {
-      const published = o.status === OfferStatus.PUBLISHED;
+      const published = o.status === OfferStatus.PUBLISHED && !o.archivedAt;
       const seg = o.slug?.trim() || o.id;
-      const path = `/offers/${seg}`;
+      // A placeless/cityless Offer can't get a city-scoped path — see
+      // docs/migration/seo/final-url-architecture-2026-08-15.md §3.
+      const path = o.place?.city?.slug ? getOfferPublicPath({ slug: seg }, o.place.city.slug) : `/offers/${seg}`;
       const canonical = o.seoCanonicalUrl?.trim() || path;
       const entityDiagnostics = buildSegmentEntityDiagnostics("offer", {
         entityId: o.id,
@@ -87,6 +91,7 @@ export const offerProvider: SeoEntityProvider = {
         description: true,
         slug: true,
         status: true,
+        archivedAt: true,
         seoTitle: true,
         seoDescription: true,
         seoH1: true,
@@ -193,10 +198,10 @@ export const offerProvider: SeoEntityProvider = {
       return o.seoJsonLdOverride as Record<string, unknown>;
     }
     const publicBase = process.env.NEXT_PUBLIC_APP_URL || "https://mamago.by";
-    const citySlug = o.place?.city?.slug || "minsk";
+    const citySlug = o.place?.city?.slug;
     const canonicalUrl =
       o.seoCanonicalUrl?.trim() ||
-      `${publicBase}${getOfferPublicPath(o, citySlug)}`;
+      (citySlug ? `${publicBase}${getOfferPublicPath({ slug: o.slug }, citySlug)}` : `${publicBase}/offers/${o.slug ?? entityId}`);
 
     return buildOfferStructuredData({
       canonicalUrl,
@@ -212,7 +217,7 @@ export const offerProvider: SeoEntityProvider = {
             name: o.place.title,
             slug: o.place.slug,
             address: o.place.formattedAddr || o.place.customAddress,
-            url: o.place.slug ? `/places/${o.place.slug}` : undefined,
+            url: o.place.slug && o.place.city?.slug ? `/${o.place.city.slug}/places/${o.place.slug}` : undefined,
           }
         : null,
       publicBaseUrl: publicBase,

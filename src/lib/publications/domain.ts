@@ -1,3 +1,5 @@
+import type { GeoScope } from "@prisma/client";
+
 /**
  * Доменные типы публикаций (mamaGo 2.0).
  * Готовы к переносу в Prisma: Publication + enum-поля.
@@ -48,6 +50,8 @@ export type PublicationListRow = {
   hasCover: boolean;
   hasSlug: boolean;
   hasBlocks: boolean;
+  geoScope?: GeoScope | null;
+  citySlug?: string | null;
 };
 
 /** Блоки статьи — расширяемый union */

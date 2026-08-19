@@ -22,30 +22,47 @@ function isPrivateOrReservedHost(hostname: string): boolean {
   }
 
   if (h.includes(":")) {
+    // URL.hostname always keeps the brackets for an IPv6 literal
+    // (e.g. "[::1]"), so strip them before matching prefixes below —
+    // otherwise every IPv6 loopback/link-local check here silently never
+    // matches and the host is treated as public.
+    const ipv6 = h.startsWith("[") && h.endsWith("]") ? h.slice(1, -1) : h;
     // IPv6: упрощённо блокируем loopback / link-local префиксы
-    if (h === "::1" || h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
+    if (ipv6 === "::1" || ipv6.startsWith("fe80:") || ipv6.startsWith("fc") || ipv6.startsWith("fd")) {
+      return true;
+    }
   }
 
   return false;
 }
 
+/**
+ * Tagged with `httpStatus: 400` so callers can classify the response without
+ * matching on message text (see /api/media/from-url). Reused for both the
+ * initial URL and every redirect hop when downloading a remote image, so
+ * redirects can't be used to reach a private/reserved host.
+ */
+function safeUrlError(message: string): Error {
+  return Object.assign(new Error(message), { httpStatus: 400 as const });
+}
+
 export function assertSafeRemoteImageUrl(raw: string): URL {
   const trimmed = raw.trim();
-  if (!trimmed) throw new Error("Пустой URL");
+  if (!trimmed) throw safeUrlError("Пустой URL");
 
   let url: URL;
   try {
     url = new URL(trimmed);
   } catch {
-    throw new Error("Некорректный URL");
+    throw safeUrlError("Некорректный URL");
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Разрешены только http и https");
+    throw safeUrlError("Разрешены только http и https");
   }
 
   if (isPrivateOrReservedHost(url.hostname)) {
-    throw new Error("Этот адрес недоступен для импорта");
+    throw safeUrlError("Этот адрес недоступен для импорта");
   }
 
   return url;

@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Intent } from "@/lib/intent";
-import {
-  filterConfigByIntent,
-  type SecondaryFilterGroup,
-} from "@/lib/discovery/filterConfigByIntent";
+import type { SecondaryFilterGroup } from "@/lib/discovery/filterConfigByIntent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
 import { BudgetSliderFilter } from "@/components/discovery/BudgetSliderFilter";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 
 type SecondaryFiltersFormProps = {
   intent: Intent;
@@ -23,26 +21,23 @@ export function SecondaryFiltersForm({
   compact = false,
   onApply,
 }: SecondaryFiltersFormProps) {
-  // Start with static fallback so the form is interactive immediately.
-  // Once the API responds, swap in the DB-managed groups.
-  const [groups, setGroups] = useState<SecondaryFilterGroup[]>(
-    () => filterConfigByIntent[intent] ?? [],
-  );
+  const [groups, setGroups] = useState<SecondaryFilterGroup[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/public/discovery-filters?intent=${intent}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: SecondaryFilterGroup[] | null) => {
-        if (!cancelled && Array.isArray(data) && data.length > 0) {
+        if (!cancelled && Array.isArray(data)) {
           setGroups(data);
         }
       })
-      .catch(() => {/* keep static fallback */});
+      .catch(() => {/* fail closed: unsupported controls must not look functional */});
     return () => { cancelled = true; };
   }, [intent]);
 
   const { values, patch, reset } = useSecondaryFiltersFromUrl(intent);
+  const primaryFilters = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const budgetConfig = budgetCtx?.budgetConfig ?? null;
   const { clearBudget } = useBudgetFilter();
@@ -58,6 +53,7 @@ export function SecondaryFiltersForm({
   const gap = compact ? "space-y-5" : "space-y-8";
   const handleReset = () => {
     reset();
+    primaryFilters.actions.setDraft({ adultOnly: false });
     if (budgetConfig) clearBudget();
   };
 
@@ -69,8 +65,10 @@ export function SecondaryFiltersForm({
         <FilterGroupRenderer
           key={group.id}
           group={group}
-          values={values}
-          patch={patch}
+          values={group.id === "adult_only" ? { ...values, adult_only: primaryFilters.applied.adultOnly } : values}
+          patch={group.id === "adult_only"
+            ? (partial) => primaryFilters.actions.setDraft({ adultOnly: partial.adult_only === true })
+            : patch}
         />
       ))}
 

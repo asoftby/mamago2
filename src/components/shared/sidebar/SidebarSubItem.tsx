@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { buildCurrentBrowserCompatibleDestination } from "@/lib/routing/clientNavigation";
 import { cn } from "@/lib/utils";
 
 interface SidebarSubItemProps {
@@ -20,6 +21,8 @@ export function SidebarSubItem({
   onClick,
   count,
 }: SidebarSubItemProps) {
+  const compatibleHref = buildCurrentBrowserCompatibleDestination(href);
+
   const subItemStateClass =
     sidebarVariant === "business"
       ? isActive
@@ -31,7 +34,7 @@ export function SidebarSubItem({
 
   return (
     <Link
-      href={href}
+      href={compatibleHref}
       onClick={onClick}
       suppressHydrationWarning
       className={cn(

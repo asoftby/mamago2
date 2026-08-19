@@ -1,5 +1,6 @@
 import "server-only";
 import { getResendClient } from "@/features/email/server/resend-client";
+import { resolveEmailRecipient } from "@/features/email/server/email-config";
 import { getTemplateById } from "@/features/email-studio/server/email-template.service";
 import {
   buildEmailPreviewData,
@@ -58,7 +59,7 @@ function getReplyTo(): string {
 }
 
 function getActualRecipient(intendedTo: string): string {
-  return process.env.EMAIL_DEBUG_REDIRECT_TO?.trim() || intendedTo;
+  return resolveEmailRecipient(intendedTo).actualTo;
 }
 
 export async function sendTestEmail(

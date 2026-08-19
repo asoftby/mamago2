@@ -33,13 +33,14 @@ export const campDetails = z.object({
   medicalInfo: z.string().optional(),
 });
 
-// PARTY_SERVICE — услуга для праздника
-// durationMin (Int?) and durationText (String?) both optional — one or the other
+// PARTY_SERVICE — услуга для праздника (Phase 3b-2)
+// Descriptive tail in details JSON; filterable fields (category, partyLocationType, min/maxChildren, occasions) → Offer columns.
+// Replaces orphan serviceDescription/serviceDuration/serviceDeliveryArea (never persisted before).
 export const serviceDetails = z.object({
-  serviceDescription: z.string().optional(),
-  durationMin: z.number().int().nonnegative().optional(),
-  durationText: z.string().optional(),
-  deliveryArea: z.string().optional(),
+  program: z.string().optional(),
+  included: z.string().optional(),
+  note: z.string().optional(),
+  durationMinutes: z.number().int().nonnegative().optional(),
 });
 
 // PARTY_PACKAGE — праздник под ключ

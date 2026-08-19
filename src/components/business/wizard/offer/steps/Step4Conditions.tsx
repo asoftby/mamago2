@@ -4,9 +4,9 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
-import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
-import type { OfferFormData, PlaceAmenityKey } from "../types";
+import type { OfferFormData, PlaceAmenityKey, PartyOccasion } from "../types";
 
 interface Step4ConditionsProps {
   data: OfferFormData;
@@ -19,9 +19,6 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
     data.productType === "ONE_TIME_ACTIVITY" ||
     data.productType === "REGULAR_ACTIVITY";
   const isVisitProduct = data.productType === "PLACE_VISIT";
-  const isPartyProduct =
-    data.productType === "PARTY_SERVICE" ||
-    data.productType === "PARTY_PACKAGE";
 
   const AMENITY_OPTIONS: { key: PlaceAmenityKey; label: string }[] = [
     { key: "parking", label: "Парковка" },
@@ -137,97 +134,131 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
     </div>
   );
 
-  const renderPartyFields = () => (
+  const updateBirthdayDetails = (
+    patch: Partial<OfferFormData["birthdayDetails"]>,
+  ) => {
+    onChange({ birthdayDetails: { ...data.birthdayDetails, ...patch } });
+  };
+
+  /** PARTY_SERVICE: длительность/вместимость/описательные поля — перенесены сюда со шага «Сценарии». */
+  const renderServiceDetailFields = () => (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <WizardRichTextField
-          label="Программа праздника"
-          required
-          helperText="Игры, развлечения, мастер-классы и другие ключевые элементы программы."
-          value={data.partyProgram}
-          onChange={(value) => onChange({ partyProgram: value })}
-          placeholder="Опишите программу: игры, развлечения, мастер-классы..."
-          disabled={!isEditable}
-          minHeight={140}
-        />
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="space-y-2">
+          <Label htmlFor="serviceDuration">Длительность, минут</Label>
+          <Input
+            id="serviceDuration"
+            inputMode="numeric"
+            value={data.birthdayDetails.durationMinutes ?? ""}
+            onChange={(e) =>
+              updateBirthdayDetails({
+                durationMinutes: e.target.value ? Number(e.target.value) : null,
+              })
+            }
+            disabled={!isEditable}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="serviceMinChildren">Минимум детей</Label>
+          <Input
+            id="serviceMinChildren"
+            inputMode="numeric"
+            value={data.birthdayDetails.minChildren ?? ""}
+            onChange={(e) =>
+              updateBirthdayDetails({
+                minChildren: e.target.value ? Number(e.target.value) : null,
+              })
+            }
+            disabled={!isEditable}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="serviceMaxChildren">Максимум детей</Label>
+          <Input
+            id="serviceMaxChildren"
+            inputMode="numeric"
+            value={data.birthdayDetails.maxChildren ?? ""}
+            onChange={(e) =>
+              updateBirthdayDetails({
+                maxChildren: e.target.value ? Number(e.target.value) : null,
+              })
+            }
+            disabled={!isEditable}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="partyDuration">
-          Продолжительность <span className="text-red-500">*</span>
+        <Label htmlFor="serviceIncluded">
+          Что входит <span className="text-red-500">*</span>
         </Label>
-        <Input
-          id="partyDuration"
-          placeholder="Например: 2 часа, 3 часа"
-          value={data.partyDuration}
-          onChange={(e) => onChange({ partyDuration: e.target.value })}
+        <Textarea
+          id="serviceIncluded"
+          value={data.birthdayDetails.included}
+          onChange={(e) => updateBirthdayDetails({ included: e.target.value })}
           disabled={!isEditable}
+          rows={4}
+          placeholder="Например: аренда зала, ведущий, базовый декор, музыка..."
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="partyChildrenCount">Количество детей</Label>
-        <Input
-          id="partyChildrenCount"
-          placeholder="Например: до 10 детей, от 5 до 15"
-          value={data.partyChildrenCount}
-          onChange={(e) => onChange({ partyChildrenCount: e.target.value })}
+        <Label htmlFor="serviceProgram">Описание программы</Label>
+        <Textarea
+          id="serviceProgram"
+          value={data.birthdayDetails.program}
+          onChange={(e) => updateBirthdayDetails({ program: e.target.value })}
           disabled={!isEditable}
+          rows={4}
+          placeholder="Коротко опишите, как проходит праздник или услуга."
         />
       </div>
 
       <div className="space-y-2">
-        <WizardRichTextField
-          label="Что включено"
-          helperText="Коротко перечислите, что уже входит в пакет."
-          value={data.partyIncluded}
-          onChange={(value) => onChange({ partyIncluded: value })}
-          placeholder="Например: украшение зала, торт, подарки..."
+        <Label htmlFor="serviceNote">Важные условия</Label>
+        <Textarea
+          id="serviceNote"
+          value={data.birthdayDetails.note}
+          onChange={(e) => updateBirthdayDetails({ note: e.target.value })}
           disabled={!isEditable}
-          minHeight={140}
+          rows={3}
+          placeholder="Например: доплата за выезд, минимальный заказ, ограничения по возрасту."
         />
       </div>
     </div>
   );
 
-  const renderServiceFields = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <WizardRichTextField
-          label="Описание услуги"
-          required
-          helperText="Что входит в услугу, как проходит процесс и что важно знать заранее."
-          value={data.serviceDescription}
-          onChange={(value) => onChange({ serviceDescription: value })}
-          placeholder="Опишите что включает услуга, как проходит процесс..."
-          disabled={!isEditable}
-          minHeight={140}
-        />
-      </div>
+  const OCCASION_OPTIONS: { key: PartyOccasion; label: string }[] = [
+    { key: "BIRTHDAY", label: "День рождения" },
+    { key: "GRADUATION", label: "Выпускной" },
+  ];
 
-      <div className="space-y-2">
-        <Label htmlFor="serviceDuration">Продолжительность</Label>
-        <Input
-          id="serviceDuration"
-          placeholder="Например: 2 часа, весь день, по договоренности"
-          value={data.serviceDuration}
-          onChange={(e) => onChange({ serviceDuration: e.target.value })}
-          disabled={!isEditable}
-        />
-      </div>
+  const renderOccasionsSection = () => {
+    const toggleOccasion = (key: PartyOccasion, checked: boolean) => {
+      const next = checked
+        ? Array.from(new Set([...data.occasions, key]))
+        : data.occasions.filter((o) => o !== key);
+      onChange({ occasions: next });
+    };
 
+    return (
       <div className="space-y-2">
-        <Label htmlFor="serviceDeliveryArea">Зона обслуживания</Label>
-        <Input
-          id="serviceDeliveryArea"
-          placeholder="Например: Минск и область, весь город"
-          value={data.serviceDeliveryArea}
-          onChange={(e) => onChange({ serviceDeliveryArea: e.target.value })}
-          disabled={!isEditable}
-        />
+        <Label>Для каких праздников подходит</Label>
+        <div className="flex flex-wrap gap-4">
+          {OCCASION_OPTIONS.map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={data.occasions.includes(key)}
+                onCheckedChange={(checked) => toggleOccasion(key, checked === true)}
+                disabled={!isEditable}
+              />
+              <span className="text-sm">{label}</span>
+            </label>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -248,16 +279,21 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
 
       {isVisitProduct ? renderPlaceVisitFields() : null}
 
-      {isPartyProduct ? (
+      {data.productType === "PARTY_SERVICE" ? (
+        <div className="space-y-4">
+          {renderServiceDetailFields()}
+          {renderOccasionsSection()}
+        </div>
+      ) : null}
+
+      {data.productType === "PARTY_PACKAGE" ? (
         <div className="space-y-4">
           <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
             Основные условия для праздника уже задаются на шаге со сценариями
             размещения. Здесь можно оставить дополнительные пояснения в общем
             описании и блоке цены.
           </div>
-          {data.productType === "PARTY_PACKAGE"
-            ? renderPartyFields()
-            : renderServiceFields()}
+          {renderOccasionsSection()}
         </div>
       ) : null}
     </div>

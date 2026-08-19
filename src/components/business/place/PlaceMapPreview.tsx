@@ -29,8 +29,8 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
     }
 
     try {
-      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
-      
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
+
       if (mapId) {
         const markerLib = await GoogleMapsService.getMarkerLibrary();
         const { AdvancedMarkerElement } = markerLib;
@@ -75,9 +75,11 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
 
     try {
       const mapsLib = await GoogleMapsService.getMapsLibrary();
-      const center = lat !== null && lng !== null 
-        ? { lat, lng } 
+      const center = lat !== null && lng !== null
+        ? { lat, lng }
         : { lat: 53.9045, lng: 27.5615 };
+
+      const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID;
 
       const map = new mapsLib.Map(mapRef.current, {
         center,
@@ -90,6 +92,7 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
         streetViewControl: false,
         rotateControl: false,
         fullscreenControl: false,
+        ...(mapId ? { mapId } : {}),
       });
 
       mapInstanceRef.current = map;

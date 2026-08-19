@@ -20,6 +20,7 @@ import {
   replaceActivitySessionsFromScheduleJson,
 } from "@/lib/business/syncEventActivitySessions";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
+import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -106,10 +107,6 @@ export async function POST(
       errors.push("Загрузите главное изображение");
     }
 
-    if (!existing.ageTags || existing.ageTags.length === 0) {
-      errors.push("Выберите возраст");
-    }
-
     perf.mark("validate-fields");
 
     if (errors.length > 0) {
@@ -125,8 +122,18 @@ export async function POST(
         : {};
 
     let sessionSyncRan = false;
-    if (!(await activitySessionsMatchScheduleJson(id, scheduleJsonForSync))) {
-      await replaceActivitySessionsFromScheduleJson(id, scheduleJsonForSync);
+    if (
+      !(await activitySessionsMatchScheduleJson({
+        prisma,
+        activityId: id,
+        scheduleJson: scheduleJsonForSync,
+      }))
+    ) {
+      await replaceActivitySessionsFromScheduleJson({
+        prisma,
+        activityId: id,
+        scheduleJson: scheduleJsonForSync,
+      });
       sessionSyncRan = true;
       perf.mark("session-sync");
     } else {
@@ -234,6 +241,7 @@ export async function POST(
       perf.mark("slug-ensure-published");
     }
 
+    await syncEventHomeStories(event.id);
     const { publicPath } = await revalidateEventMutationPaths(event.id, "publish");
     perf.mark("revalidate");
 

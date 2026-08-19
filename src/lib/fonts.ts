@@ -1,4 +1,3 @@
-import { PT_Serif } from "next/font/google";
 import localFont from "next/font/local";
 
 /**
@@ -38,11 +37,38 @@ export const ntSomic = localFont({
   fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-/** PT Serif — погодная строка героя и другие акцентные serif-поверхности. */
-export const ptSerif = PT_Serif({
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
-  subsets: ["cyrillic", "latin"],
+/**
+ * Editorial serif accent — exposed as `--font-pt-serif`, aliased site-wide
+ * to `--font-editorial` / `--font-serif` / `--font-display` (see
+ * globals.css), used across ~60 files (weather hero, `.font-display`/
+ * `.font-display-italic`, place/article editorial surfaces, etc).
+ *
+ * Loaded locally (Source Serif Pro, already present in
+ * public/fonts/sourceserifpro/, full Cyrillic coverage confirmed in the
+ * Regular/Bold faces) instead of Google Fonts' PT Serif, to remove a
+ * remote fetch from `next build` — Docker builds have no route to
+ * fonts.gstatic.com, which previously failed Docker Build & Push outright.
+ *
+ * Only normal-style faces are registered on purpose: this source's italic
+ * files (`-It`, `-BoldIt`) ship with zero Cyrillic glyphs, so registering
+ * them would silently drop Cyrillic text in `.font-display-italic` to a
+ * different fallback font mid-heading. Browsers synthesize a readable
+ * "faux italic" from the normal face instead when `font-style: italic` is
+ * requested, keeping one consistent face across both scripts.
+ */
+export const ptSerif = localFont({
+  src: [
+    {
+      path: "../../public/fonts/sourceserifpro/SourceSerifPro-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/sourceserifpro/SourceSerifPro-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-pt-serif",
   display: "swap",
   preload: false,

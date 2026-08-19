@@ -6,6 +6,7 @@ import { StoryModal } from "./StoryModal";
 import { useStoryViewer } from "../hooks/useStoryViewer";
 import { resolveStoryRingCoverUrl } from "../lib/resolveStoryRingCoverUrl";
 import type { StoryCollection } from "../types/story";
+import { unseenCount } from "../lib/seen";
 
 interface StoryRingsProps {
   stories: StoryCollection[];
@@ -18,6 +19,7 @@ export function StoryRings({ stories }: StoryRingsProps) {
     activeStoryIndex,
     activeItemIndex,
     seenIds,
+    seenGroupStart,
     progressKey,
     paused,
     open,
@@ -26,17 +28,19 @@ export function StoryRings({ stories }: StoryRingsProps) {
     prev,
     pause,
     resume,
+    markSeen,
   } = useStoryViewer(stories);
 
   return (
     <>
-      {stories.map((story, index) => (
-        <StoryRingItem
+      {stories.map((story, index) => {
+        const newCount = unseenCount(story.items, seenIds);
+        return <StoryRingItem
           key={story.id}
           title={story.title}
-          seen={seenIds.has(story.id)}
-          coverImageUrl={resolveStoryRingCoverUrl(story)}
-          itemCount={story.items.length}
+          seen={newCount === 0}
+          unseenCount={newCount}
+          coverImageUrl={resolveStoryRingCoverUrl(story, seenIds)}
           imagePriority={index === 0}
           fallbackContent={
             story.intent === "breaking_news" ? (
@@ -50,7 +54,7 @@ export function StoryRings({ stories }: StoryRingsProps) {
           }
           onClick={() => open(index)}
         />
-      ))}
+      })}
 
       {isOpen && activeStory && activeStoryIndex !== null && (
         <StoryModal
@@ -60,11 +64,14 @@ export function StoryRings({ stories }: StoryRingsProps) {
           totalStories={stories.length}
           progressKey={progressKey}
           paused={paused}
+          seenOfferIds={seenIds}
+          seenGroupStart={seenGroupStart}
           onNext={next}
           onPrev={prev}
           onClose={close}
           onPause={pause}
           onResume={resume}
+          onItemShown={markSeen}
         />
       )}
     </>

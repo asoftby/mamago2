@@ -6,6 +6,7 @@ import { buildPlaceDocument } from "@/lib/search/builders/buildPlaceDocument";
 import { buildRouteDocument } from "@/lib/search/builders/buildRouteDocument";
 import type { SearchDocUpsertFields } from "@/lib/search/builders/buildActivityDocument";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
+import { SearchIndexQueue } from "@/lib/search/SearchIndexQueue";
 
 const BATCH = 25;
 
@@ -14,92 +15,113 @@ function logIndexerError(context: string, err: unknown) {
 }
 
 export class SearchIndexerService {
+  private readonly queue = new SearchIndexQueue();
+
   constructor(private readonly db: PrismaClient) {}
+
+  private enqueue(
+    entityLabel: string,
+    entityId: string,
+    operation: () => Promise<void>,
+    strict: boolean,
+  ): Promise<void> {
+    const queued = this.queue.enqueue(`${entityLabel}:${entityId}`, operation);
+    if (strict) return queued;
+    return queued.catch((error) => {
+      logIndexerError(`upsert ${entityLabel} ${entityId}`, error);
+    });
+  }
 
   private async upsertDoc(doc: SearchDocUpsertFields | null, entityLabel: string, entityId: string) {
     const started = isServerSavePerfEnabled() ? performance.now() : 0;
     if (!doc) {
-      try {
-        await this.db.searchDocument.deleteMany({
-          where: { entityType: entityLabel as SearchEntityType, entityId },
-        });
-        if (isServerSavePerfEnabled()) {
-          console.info("[search-index-upsert]", {
-            entityLabel,
-            entityId,
-            action: "delete-stale",
-            durationMs: Math.round(performance.now() - started),
-          });
-        }
-      } catch (e) {
-        logIndexerError(`remove stale (${entityLabel})`, e);
-      }
-      return;
-    }
-
-    const { entityType, entityId: eid, ...rest } = doc;
-    try {
-      await this.db.searchDocument.upsert({
-        where: {
-          entityType_entityId: {
-            entityType,
-            entityId: eid,
-          },
-        },
-        create: { entityType, entityId: eid, ...rest },
-        update: rest,
+      await this.db.searchDocument.deleteMany({
+        where: { entityType: entityLabel as SearchEntityType, entityId },
       });
       if (isServerSavePerfEnabled()) {
         console.info("[search-index-upsert]", {
           entityLabel,
           entityId,
-          action: "upsert",
+          action: "delete-stale",
           durationMs: Math.round(performance.now() - started),
         });
       }
-    } catch (e) {
-      logIndexerError(`upsert ${entityLabel} ${entityId}`, e);
+      return;
+    }
+
+    const { entityType, entityId: eid, ...rest } = doc;
+    await this.db.searchDocument.upsert({
+      where: {
+        entityType_entityId: {
+          entityType,
+          entityId: eid,
+        },
+      },
+      create: { entityType, entityId: eid, ...rest },
+      update: rest,
+    });
+    if (isServerSavePerfEnabled()) {
+      console.info("[search-index-upsert]", {
+        entityLabel,
+        entityId,
+        action: "upsert",
+        durationMs: Math.round(performance.now() - started),
+      });
+    }
+  }
+
+  private async upsertActivityNow(activityId: string): Promise<void> {
+    const started = isServerSavePerfEnabled() ? performance.now() : 0;
+    const buildStarted = isServerSavePerfEnabled() ? performance.now() : 0;
+    const doc = await buildActivityDocument(this.db, activityId);
+    const buildMs = isServerSavePerfEnabled() ? Math.round(performance.now() - buildStarted) : 0;
+    const writeStarted = isServerSavePerfEnabled() ? performance.now() : 0;
+    await this.upsertDoc(doc, "activity", activityId);
+    const writeMs = isServerSavePerfEnabled() ? Math.round(performance.now() - writeStarted) : 0;
+    if (isServerSavePerfEnabled()) {
+      console.info("[search-index-activity]", {
+        activityId,
+        buildMs,
+        writeMs,
+        totalMs: Math.round(performance.now() - started),
+      });
     }
   }
 
   async upsertActivity(activityId: string): Promise<void> {
-    const started = isServerSavePerfEnabled() ? performance.now() : 0;
-    try {
-      const buildStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-      const doc = await buildActivityDocument(this.db, activityId);
-      const buildMs = isServerSavePerfEnabled() ? Math.round(performance.now() - buildStarted) : 0;
-      const writeStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-      await this.upsertDoc(doc, "activity", activityId);
-      const writeMs = isServerSavePerfEnabled() ? Math.round(performance.now() - writeStarted) : 0;
-      if (isServerSavePerfEnabled()) {
-        console.info("[search-index-activity]", {
-          activityId,
-          buildMs,
-          writeMs,
-          totalMs: Math.round(performance.now() - started),
-        });
-      }
-    } catch (e) {
-      logIndexerError(`upsertActivity ${activityId}`, e);
-    }
+    return this.enqueue("activity", activityId, () => this.upsertActivityNow(activityId), false);
+  }
+
+  async upsertActivityStrict(activityId: string): Promise<void> {
+    return this.enqueue("activity", activityId, () => this.upsertActivityNow(activityId), true);
   }
 
   async upsertOffer(offerId: string): Promise<void> {
-    try {
+    return this.enqueue("offer", offerId, async () => {
       const doc = await buildOfferDocument(this.db, offerId);
       await this.upsertDoc(doc, "offer", offerId);
-    } catch (e) {
-      logIndexerError(`upsertOffer ${offerId}`, e);
-    }
+    }, false);
+  }
+
+  async upsertOfferStrict(offerId: string): Promise<void> {
+    return this.enqueue("offer", offerId, async () => {
+      const doc = await buildOfferDocument(this.db, offerId);
+      await this.upsertDoc(doc, "offer", offerId);
+    }, true);
   }
 
   async upsertPlace(placeId: string): Promise<void> {
-    try {
+    return this.enqueue("place", placeId, async () => {
       const doc = await buildPlaceDocument(this.db, placeId);
       await this.upsertDoc(doc, "place", placeId);
-    } catch (e) {
-      logIndexerError(`upsertPlace ${placeId}`, e);
-    }
+    }, false);
+  }
+
+  async upsertPlaceStrict(placeId: string): Promise<void> {
+    return this.enqueue("place", placeId, async () => {
+      const doc = await buildPlaceDocument(this.db, placeId);
+      await this.upsertDoc(doc, "place", placeId);
+    }, true);
   }
 
   async upsertRoute(routeId: string): Promise<void> {

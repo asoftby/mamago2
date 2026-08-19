@@ -1,15 +1,19 @@
 /**
  * POST /api/admin/moderation/events/[id]  — moderate activity (approve / needs_revision / reject)
- * DELETE /api/admin/moderation/events/[id] — soft-delete event from moderation queue
+ * DELETE /api/admin/moderation/events/[id] — hard-delete an isolated draft event
  *
  * Notifications are sent inside the service layer.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
+import { deleteActivity } from "@/server/services/activity.service";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { revalidateEventMutationPaths } from "@/lib/business/eventMutationSideEffects";
+import {
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 import {
   approveActivity,
   needsRevisionActivity,
@@ -89,11 +93,24 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    await softDeleteActivityById(id);
+    if (summary.status === "ARCHIVED" && user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Удаление из архива доступно только администратору" },
+        { status: 403 },
+      );
+    }
+
+    await deleteActivity(id, user.role);
     await revalidateEventMutationPaths(id, "visibility-change");
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("[admin] Delete moderation event error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

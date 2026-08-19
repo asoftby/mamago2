@@ -3,6 +3,10 @@
  * Этот файл — единственный источник правды для всех компонентов секции /offers.
  */
 
+import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
+import type { FaqItem } from "@/lib/faq/faqItems";
+import type { CanonicalCtaObject } from "@/lib/cta-platform";
+
 export interface OfferMediaItem {
   id: string;
   url: string;
@@ -176,9 +180,11 @@ export interface OfferPageData {
     /** Legacy extended fields */
     type?: OfferCtaType;
     phone?: string;
+    phones?: NormalizedPhone[];
     link?: string;
     instructions?: string;
   };
+  resolvedCta?: CanonicalCtaObject;
 
   schedule?: {
     type: "classes" | "shifts";
@@ -186,6 +192,7 @@ export interface OfferPageData {
   };
 
   reviews?: OfferReview[];
+  faqItems?: FaqItem[];
 
   /** SEO metadata — used by programs page and JSON-LD builder */
   seo?: {

@@ -30,6 +30,7 @@ export const campMealKeySchema = z.enum(["breakfast", "lunch", "dinner", "snacks
 /** Ключ шага мастера предложения (Offer.wizardCompletedSteps) */
 export const offerWizardStepKeySchema = z.enum([
   "type",
+  "placements",
   "details",
   "photo",
   "conditions",
@@ -37,5 +38,6 @@ export const offerWizardStepKeySchema = z.enum([
   "accommodation",
   "price",
   "contacts",
+  "faq",
   "review",
 ]);

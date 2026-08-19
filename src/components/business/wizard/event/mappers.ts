@@ -2,6 +2,7 @@
 
 import type { EventFormData } from "./types";
 import type { PendingLocation } from "./types";
+import type { CtaStepFormValue } from "@/components/business/wizard/shared/CtaStep";
 import type { Activity, ActivityFormat } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
@@ -16,12 +17,14 @@ import { normalizePhoneToE164 } from "@/lib/phone/e164";
 import { createDefaultScheduleItem, createDefaultSocialLink } from "./defaults";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
 import { detectAgeBuckets } from "@/lib/age/ageMapping";
-import { sortAgeKeys } from "@/lib/config/ages";
+import { AGE_OPTIONS, formatAgeKeys, getCombinedAgeRange, sortAgeKeys } from "@/lib/config/ages";
 import type { EventOrganizerInput } from "@/lib/business/eventOrganizer";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import { normalizeRichTextEditorValue } from "@/lib/richtext/utils";
 import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+import { normalizeRichTextCurrency, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { parsePriceData } from "@/lib/priceItems";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /** Extracts the first numeric value from a price string (e.g. "от 48.00 руб." → 48). */
 function parseNumericPrice(s: string): number | undefined {
@@ -34,6 +37,9 @@ export type ActivityWithRelations = Activity & {
   id: string;
   title: string | null;
   description: string | null;
+  ageLabel?: string | null;
+  ageMaxMonths?: number | null;
+  ageMinMonths?: number | null;
   ageTags: string[];
   scheduleJson: Record<string, unknown> | null;
   coverImageId: string | null;
@@ -72,6 +78,45 @@ export type ActivityWithRelations = Activity & {
   } | null;
   programCategoryLinks?: Array<{ categoryId: string }>;
 };
+
+function normalizeAgeKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return sortAgeKeys(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0));
+}
+
+function ageBucketsFromMonthRange(
+  ageMinMonths: number | null | undefined,
+  ageMaxMonths: number | null | undefined,
+): string[] {
+  if (ageMinMonths == null && ageMaxMonths == null) return [];
+
+  const rangeStart = ageMinMonths ?? 0;
+  const rangeEnd = ageMaxMonths ?? Number.POSITIVE_INFINITY;
+
+  return sortAgeKeys(
+    AGE_OPTIONS.filter((option) => {
+      const bucketStart = option.minMonths;
+      const bucketEnd = option.maxMonths ?? Number.POSITIVE_INFINITY;
+      return rangeStart < bucketEnd && rangeEnd > bucketStart;
+    }).map((option) => option.key),
+  );
+}
+
+function deriveSavedAgeBuckets(event: {
+  ageTags?: string[] | null;
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
+  ageLabel?: string | null;
+}): string[] {
+  const fromAgeTags = normalizeAgeKeys(event.ageTags ?? []);
+  if (fromAgeTags.length > 0) return fromAgeTags;
+
+  const fromMonthRange = ageBucketsFromMonthRange(event.ageMinMonths, event.ageMaxMonths);
+  if (fromMonthRange.length > 0) return fromMonthRange;
+
+  const fromAgeLabel = detectAgeBuckets(event.ageLabel);
+  return sortAgeKeys(fromAgeLabel.suggestedBuckets);
+}
 
 /**
  * Применяет данные из pendingLocation в UI-поля formData.
@@ -127,9 +172,15 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   // Step 1: Basics
   formData.title = event.title || "";
   formData.format = normalizeActivityFormat(event.format, DEFAULT_ACTIVITY_FORMAT);
-  formData.ageTags = Array.isArray(event.ageTags) ? event.ageTags : [];
-
   const scheduleJson = (event.scheduleJson || {}) as Record<string, unknown>;
+  const persistedAgeRangeIds = normalizeAgeKeys(scheduleJson.ageRangeIds);
+  const derivedSavedAgeBuckets = deriveSavedAgeBuckets(event);
+  const resolvedAgeBuckets =
+    persistedAgeRangeIds.length > 0 ? persistedAgeRangeIds : derivedSavedAgeBuckets;
+
+  formData.ageRangeIds = resolvedAgeBuckets;
+  formData.ageTags = resolvedAgeBuckets;
+  formData.agePolicy = event.agePolicy;
 
   formData.eventFormats = resolveEventFormatsFromScheduleJson(scheduleJson);
   // Optional multi-select «Интересы» (за пределами eventFormats).
@@ -153,9 +204,6 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     (typeof scheduleJson.categoryId === "string" ? scheduleJson.categoryId : null) ?? null;
   formData.subcategoryId =
     (typeof scheduleJson.subcategoryId === "string" ? scheduleJson.subcategoryId : null) ?? null;
-  formData.ageRangeIds = Array.isArray(scheduleJson.ageRangeIds)
-    ? (scheduleJson.ageRangeIds as string[])
-    : [];
   const rawAgeDetection = scheduleJson.ageDetection;
   if (rawAgeDetection && typeof rawAgeDetection === "object") {
     const detection = rawAgeDetection as Record<string, unknown>;
@@ -181,18 +229,23 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
       typeof scheduleJson.importedAgeText === "string" ? scheduleJson.importedAgeText : null,
     );
   }
+  const currentAgeSelection = sortAgeKeys(formData.ageRangeIds);
+  const suggestedAgeSelection = sortAgeKeys(formData.ageDetection?.suggestedBuckets ?? []);
+  const currentAgeMatchesDetection =
+    currentAgeSelection.length > 0 &&
+    currentAgeSelection.join("|") === suggestedAgeSelection.join("|");
+  const hasPersistedAgeSelection = currentAgeSelection.length > 0;
+
   formData.ageDetectionUserOverride =
     typeof scheduleJson.ageDetectionUserOverride === "boolean"
       ? scheduleJson.ageDetectionUserOverride
-      : false;
+      : hasPersistedAgeSelection;
   formData.ageDetectionAutoApplied =
     typeof scheduleJson.ageDetectionAutoApplied === "boolean"
-      ? scheduleJson.ageDetectionAutoApplied
+      ? scheduleJson.ageDetectionAutoApplied && currentAgeMatchesDetection
       : !formData.ageDetectionUserOverride &&
         formData.ageDetection?.confidence === "high" &&
-        formData.ageRangeIds.length > 0 &&
-        sortAgeKeys(formData.ageRangeIds).join("|") ===
-          sortAgeKeys(formData.ageDetection?.suggestedBuckets ?? []).join("|");
+        currentAgeMatchesDetection;
   formData.categorySlug =
     (typeof scheduleJson.categorySlug === "string" ? scheduleJson.categorySlug : null) ?? null;
   formData.categoryPathLabel =
@@ -285,11 +338,19 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     formData.genreSlugByRootCategoryId = next;
   }
 
+  // Канон длительности — scheduleJson.durationMinutes (уровень события).
+  // Legacy cinema.duration читаем как fallback для ранее сохранённых кино-событий.
+  const topDurationMinutes =
+    typeof scheduleJson.durationMinutes === "number" ? scheduleJson.durationMinutes : undefined;
+
   if (scheduleJson.cinema && typeof scheduleJson.cinema === "object") {
     const c = scheduleJson.cinema as Record<string, unknown>;
     formData.cinemaGenre = typeof c.genre === "string" ? c.genre : undefined;
-    formData.cinemaDuration = typeof c.duration === "number" ? c.duration : undefined;
     formData.cinemaTrailerUrl = typeof c.trailerUrl === "string" ? c.trailerUrl : undefined;
+    const legacyCinemaDuration = typeof c.duration === "number" ? c.duration : undefined;
+    formData.durationMinutes = topDurationMinutes ?? legacyCinemaDuration;
+  } else {
+    formData.durationMinutes = topDurationMinutes;
   }
 
   if (
@@ -304,9 +365,6 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   }
 
   formData.categoryIds = formData.categoryId ? [formData.categoryId] : [];
-  if (formData.ageRangeIds.length === 0 && formData.ageTags.length > 0) {
-    formData.ageRangeIds = [...formData.ageTags];
-  }
 
   // Step 2: Description
   formData.fullDescription = normalizeRichTextEditorValue(event.description);
@@ -378,7 +436,8 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
         : [createDefaultScheduleItem()];
 
   // Step 5: Pricing & Participation
-  const priceTextRaw = typeof event.priceText === "string" ? event.priceText : "";
+  const priceTextRaw =
+    typeof event.priceText === "string" ? normalizeUiCurrencyText(event.priceText) : "";
   const priceFromDb = event.priceFrom != null ? Number(event.priceFrom) : null;
   const priceToDb = event.priceTo != null ? Number(event.priceTo) : null;
 
@@ -402,9 +461,15 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   }
   formData.priceDetails =
     typeof scheduleJson.priceDetails === "string"
-      ? normalizeRichTextEditorValue(scheduleJson.priceDetails)
+      ? normalizeRichTextEditorValue(normalizeRichTextCurrency(scheduleJson.priceDetails))
       : "";
   formData.priceItems = parsePriceData((event as { priceItems?: unknown }).priceItems);
+  formData.faqItems = normalizeFaqItems((event as { faqItems?: unknown }).faqItems);
+  formData.ctaStepDraft =
+    scheduleJson.ctaStepDraft &&
+    typeof scheduleJson.ctaStepDraft === "object"
+      ? (scheduleJson.ctaStepDraft as CtaStepFormValue)
+      : null;
   formData.ticketLink = typeof scheduleJson.ticketLink === "string" ? scheduleJson.ticketLink : "";
 
   formData.participationMode = normalizeParticipationMode(scheduleJson.participationMode);
@@ -501,8 +566,13 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
         ? "inherit"
         : "override";
   formData.phone = normalizePhoneToE164(
-    typeof contacts?.phone === "string" ? contacts.phone : "",
+    event.phone ?? (typeof contacts?.phone === "string" ? contacts.phone : ""),
   );
+  formData.phoneLabel = event.phoneLabel ?? null;
+  formData.phone2 = event.phone2 ?? null;
+  formData.phone2Label = event.phone2Label ?? null;
+  formData.phone3 = event.phone3 ?? null;
+  formData.phone3Label = event.phone3Label ?? null;
   formData.website = typeof contacts?.website === "string" ? contacts.website : "";
   const rawSocial = Array.isArray(contacts?.socialLinks)
     ? (contacts.socialLinks as EventFormData["socialLinks"])
@@ -567,7 +637,11 @@ type EventPayload = {
   description: string;
   type: "EVENT";
   format: ActivityFormat;
+  ageLabel: string | null;
+  ageMaxMonths: number | null;
+  ageMinMonths: number | null;
   ageTags: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   scheduleMode: "MULTI_DATE";
   eventCategoryId?: string;
   programCategoryIds: string[];
@@ -577,7 +651,14 @@ type EventPayload = {
   priceText: string;
   priceDetails?: string;
   priceItems?: unknown;
+  faqItems?: unknown;
   currency: string;
+  phone?: string | null;
+  phoneLabel?: string | null;
+  phone2?: string | null;
+  phone2Label?: string | null;
+  phone3?: string | null;
+  phone3Label?: string | null;
   coverImageId: string | null;
   galleryMediaIds: string[];
   occasionIds: string[];
@@ -631,10 +712,11 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     (data.categoryId && genreMap[data.categoryId]) ||
     data.cinemaGenre;
 
+  // cinema-неймспейс больше НЕ пишет duration — длительность канонизирована в
+  // scheduleJson.durationMinutes (уровень события). Остаются genre и trailerUrl.
   const cinemaBlock = isCinemaEventCategorySlug(data.categorySlug)
     ? {
         genre: cinemaGenreResolved,
-        duration: data.cinemaDuration,
         trailerUrl: data.cinemaTrailerUrl,
       }
     : undefined;
@@ -643,6 +725,16 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     title: data.title ?? "",
     fullDescriptionHtml: data.fullDescription ?? "",
   });
+  const normalizedAgeBuckets = sortAgeKeys(
+    (data.ageTags.length > 0 ? data.ageTags : data.ageRangeIds).filter(Boolean),
+  );
+  const ageRange = getCombinedAgeRange(normalizedAgeBuckets);
+  const ageLabel =
+    normalizedAgeBuckets.length > 0
+      ? data.ageDetectionAutoApplied && data.ageDetection?.normalizedLabel
+        ? data.ageDetection.normalizedLabel
+        : formatAgeKeys(normalizedAgeBuckets)
+      : null;
 
   const payload: EventPayload = {
     title: data.title,
@@ -652,7 +744,11 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     type: "EVENT",
     format: normalizeActivityFormat(data.format, DEFAULT_ACTIVITY_FORMAT),
 
-    ageTags: data.ageTags,
+    ageLabel,
+    ageMinMonths: ageRange?.minMonths ?? null,
+    ageMaxMonths: ageRange?.maxMonths ?? null,
+    ageTags: normalizedAgeBuckets,
+    agePolicy: data.agePolicy,
 
     scheduleMode: "MULTI_DATE",
 
@@ -691,6 +787,9 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
       ...(Object.keys(genreMap).length > 0 ? { genresByCategoryId: genreMap } : {}),
 
+      // Канон длительности — уровень события, не внутри cinema.
+      ...(data.durationMinutes != null ? { durationMinutes: data.durationMinutes } : {}),
+
       cinema: cinemaBlock,
 
       reelsUrl: data.reelsUrl,
@@ -710,6 +809,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
       pricingMode: data.pricingMode,
       priceDetails: data.priceDetails,
+      ...(data.ctaStepDraft ? { ctaStepDraft: data.ctaStepDraft } : {}),
       ticketLink: data.ticketLink,
       participationMode: normalizeParticipationMode(data.participationMode),
       prebookMethod: data.prebookMethod,
@@ -760,7 +860,14 @@ export function buildEventPayload(data: EventFormData): EventPayload {
           : "",
     priceDetails: data.priceDetails,
     priceItems: data.priceItems,
+    faqItems: normalizeFaqItems(data.faqItems),
     currency: "BYN",
+    phone: normalizePhoneToE164(data.phone) || null,
+    phoneLabel: data.phoneLabel,
+    phone2: data.phone2,
+    phone2Label: data.phone2Label,
+    phone3: data.phone3,
+    phone3Label: data.phone3Label,
 
     coverImageId: data.coverImage,
     galleryMediaIds: Array.isArray(data.gallery) ? data.gallery.filter(Boolean) : [],
@@ -804,6 +911,7 @@ type EventChanges = {
   description?: string;
   format?: ActivityFormat;
   ageTags?: string[];
+  agePolicy?: import("@prisma/client").AgePolicy;
   coverImageId?: string | null;
   galleryMediaIds?: string[];
   scheduleJson?: Record<string, unknown>;
@@ -837,6 +945,7 @@ export function extractChanges(current: EventFormData, original: EventFormData):
   if (JSON.stringify(current.ageTags) !== JSON.stringify(original.ageTags)) {
     changes.ageTags = current.ageTags;
   }
+  if (current.agePolicy !== original.agePolicy) changes.agePolicy = current.agePolicy;
 
   if (current.coverImage !== original.coverImage) {
     changes.coverImageId = current.coverImage;

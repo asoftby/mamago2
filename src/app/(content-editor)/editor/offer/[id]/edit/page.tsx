@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
+import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -99,10 +100,11 @@ export default async function EditorEditOfferPage({
     returnTo,
     ...routing,
   });
+  const ctaStepEnabled = isOfferCtaStepFeatureEnabled(process.env);
 
   return (
     <ContentEditorChrome
-      title="Редактирование предложения"
+      title="Новое предложение"
       backHref={backHref}
       surface={surface}
     >
@@ -120,6 +122,7 @@ export default async function EditorEditOfferPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         initialStepNumber={initialStepNumber}
+        ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>
   );

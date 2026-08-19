@@ -42,6 +42,8 @@ function filtersSignature(f: DiscoveryFilters): string {
     metro: f.metro,
     district: f.district,
     nearby: f.nearby,
+    free: f.free,
+    adultOnly: f.adultOnly,
   });
 }
 
@@ -129,7 +131,7 @@ export function DiscoveryActivitiesGrid({
     </AnalyticsCardViewTracker>
   );
 
-  const showEmpty = !isPending && activities.length === 0;
+  const showEmpty = !isPending && primary.length === 0 && secondary.length === 0;
 
   return (
     <div className={cn("space-y-8", className)}>

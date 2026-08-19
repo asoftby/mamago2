@@ -11,6 +11,7 @@ import { MobileMenuSheet } from "@/components/mobile/MobileMenuSheet";
 import { MobileProfileSheet } from "@/components/mobile/MobileProfileSheet";
 import { PlanPillNavButton } from "@/components/mobile/PlanPillNavButton";
 import { NotificationsMenuContent } from "@/components/site/header/NotificationsMenuContent";
+import { useBranding } from "@/contexts/BrandingContext";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/useUserNotificationBadgeCount";
@@ -43,6 +44,7 @@ export function MobileBottomNav({
 }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { citySlug } = useCity();
+  const { logoUrl } = useBranding();
   const family = useFamilyPersona();
   const isAuthenticated = !family?.loading && !!family?.menuUser;
   const guestPlanPromo = !family?.loading && !family?.menuUser;
@@ -89,9 +91,10 @@ export function MobileBottomNav({
             isActive={isHomeActive}
             ariaLabel="Главная"
             isHomeLogo
+            logoSrc={logoUrl ?? undefined}
             size={NAV_ICON_SIZE}
             chrome="dark"
-            variant="bare"
+            className="border-2 border-white bg-white shadow-[0_4px_14px_rgba(0,0,0,0.14)]"
           />
 
           <PlanPillNavButton

@@ -12,6 +12,7 @@ import type { OfferWizardType, OfferWizardStepKey, OfferFormData } from "./types
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
+import { getRichTextLength } from "@/lib/richtext/utils";
 
 export interface OfferWizardStepDef {
   key: OfferWizardStepKey;
@@ -31,6 +32,7 @@ export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
   "accommodation",
   "price",
   "contacts",
+  "faq",
   "review",
 ];
 
@@ -87,8 +89,8 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       shortLabel: "Формат",
     },
     placements: {
-      title: "Где это может быть полезно родителям?",
-      description: "Выберите сценарии, в которых предложение действительно релевантно.",
+      title: "Что вы предлагаете?",
+      description: "Выберите сценарии — это поможет родителям найти ваше предложение в нужном разделе.",
       shortLabel: "Сценарии",
     },
     details: {
@@ -126,6 +128,11 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       description: "Адрес, телефоны, сайт и социальные сети",
       shortLabel: "Контакты",
     },
+    faq: {
+      title: "Частые вопросы",
+      description: "Необязательный блок с ответами на частые вопросы родителей",
+      shortLabel: "Вопросы",
+    },
     review: {
       title: "Проверка",
       description: "Проверка и отправка на модерацию",
@@ -145,6 +152,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "conditions",
       "price",
       "contacts",
+      "faq",
       "review",
     ];
   } else if (type === "CAMP") {
@@ -158,6 +166,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "accommodation",
       "price",
       "contacts",
+      "faq",
       "review",
     ];
   }
@@ -246,30 +255,43 @@ export function isStepComplete(
   stepKey: OfferWizardStepKey,
   data: OfferFormData
 ): boolean {
+  const detailedDescriptionLength = getRichTextLength(data.description || "");
+
   switch (stepKey) {
     case "type":
       return !!data.offerWizardType && !!data.productType;
 
     case "placements":
       if (data.requestedPlacements.length === 0) return false;
-      if (!data.requestedPlacements.includes("BIRTHDAY")) return true;
-      return Boolean(
-        data.birthdayDetails.role &&
-          (data.birthdayDetails.priceFrom.trim() || data.birthdayDetails.note.trim()) &&
-          (data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim()),
-      );
+      // PARTY_SERVICE: category + format only — duration/included/program/note moved to "conditions" (Phase 3c relayout).
+      if (data.productType === "PARTY_SERVICE") {
+        return Boolean(data.partyCategory && data.birthdayDetails.locationType);
+      }
+      // PARTY_PACKAGE: format + duration/included/program/note are filled here (no "conditions" sub-form for it).
+      if (data.productType === "PARTY_PACKAGE") {
+        return Boolean(
+          data.birthdayDetails.locationType &&
+            (data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim()),
+        );
+      }
+      // Plain "Организовать праздник" checkbox on other product types has no extra fields.
+      return true;
 
     case "details":
       if (data.offerWizardType === "CAMP") {
         return (
           data.title.trim().length >= 3 &&
           data.shortDescription.trim().length >= 10 &&
+          data.shortDescription.length <= 120 &&
+          detailedDescriptionLength >= 20 &&
           !!data.campProgramType
         );
       }
       return (
         data.title.trim().length >= 3 &&
-        data.shortDescription.trim().length >= 10
+        data.shortDescription.trim().length >= 10 &&
+        data.shortDescription.length <= 120 &&
+        detailedDescriptionLength >= 20
       );
 
     case "photo":
@@ -282,6 +304,12 @@ export function isStepComplete(
         data.productType === "REGULAR_ACTIVITY"
       ) {
         return !!(data.classDuration.trim() && data.classFormat);
+      }
+      // PARTY_SERVICE: included/program moved here from "placements" (Phase 3c relayout).
+      if (data.productType === "PARTY_SERVICE") {
+        return Boolean(
+          data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim(),
+        );
       }
       return true;
 
@@ -364,6 +392,9 @@ export function isStepComplete(
     case "contacts":
       return isOfferContactsComplete(data);
 
+    case "faq":
+      return true;
+
     case "review":
       // Review step is complete when all previous steps are complete
       return true;
@@ -381,6 +412,7 @@ export function getMissingFieldsForStep(
   data: OfferFormData
 ): string[] {
   const missing: string[] = [];
+  const detailedDescriptionLength = getRichTextLength(data.description || "");
 
   switch (stepKey) {
     case "type":
@@ -391,14 +423,15 @@ export function getMissingFieldsForStep(
       if (data.requestedPlacements.length === 0) {
         missing.push("Хотя бы один сценарий размещения");
       }
-      if (data.requestedPlacements.includes("BIRTHDAY")) {
-        if (!data.birthdayDetails.role) missing.push("Роль в празднике");
-        if (
-          !data.birthdayDetails.priceFrom.trim() &&
-          !data.birthdayDetails.note.trim()
-        ) {
-          missing.push("Цена от или важные условия");
-        }
+      // PARTY_SERVICE: category + format only — duration/included/program/note moved to "conditions" (Phase 3c relayout).
+      if (data.productType === "PARTY_SERVICE") {
+        if (!data.partyCategory) missing.push("Категория услуги");
+        if (!data.birthdayDetails.locationType) missing.push("Формат проведения");
+        break;
+      }
+      // PARTY_PACKAGE: format + duration/included/program/note are filled here (no "conditions" sub-form for it).
+      if (data.productType === "PARTY_PACKAGE") {
+        if (!data.birthdayDetails.locationType) missing.push("Формат проведения");
         if (
           !data.birthdayDetails.included.trim() &&
           !data.birthdayDetails.program.trim()
@@ -410,8 +443,13 @@ export function getMissingFieldsForStep(
 
     case "details":
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
-      if (!data.shortDescription || data.shortDescription.trim().length < 10)
-        missing.push("Описание");
+      if (
+        !data.shortDescription ||
+        data.shortDescription.trim().length < 10 ||
+        data.shortDescription.length > 120
+      )
+        missing.push("Краткое описание");
+      if (detailedDescriptionLength < 20) missing.push("Подробное описание");
       if (data.offerWizardType === "CAMP" && !data.campProgramType) {
         missing.push("Тип программы лагеря");
       }
@@ -428,6 +466,14 @@ export function getMissingFieldsForStep(
       ) {
         if (!data.classDuration.trim()) missing.push("Продолжительность занятия");
         if (!data.classFormat) missing.push("Формат занятия");
+      }
+      // PARTY_SERVICE: included/program moved here from "placements" (Phase 3c relayout).
+      if (
+        data.productType === "PARTY_SERVICE" &&
+        !data.birthdayDetails.included.trim() &&
+        !data.birthdayDetails.program.trim()
+      ) {
+        missing.push("Что входит или описание программы");
       }
       break;
 
@@ -452,9 +498,7 @@ export function getMissingFieldsForStep(
       break;
 
     case "contacts":
-      if (data.contactSource === "place") {
-        if (!data.placeId) missing.push("Место для контактов");
-      }
+      if (!data.placeId) missing.push("Место для предложения");
       break;
 
     case "price":

@@ -1,5 +1,8 @@
 # Admin Billing Foundation - Complete
 
+> Historical foundation report. See `docs/business/monetization-mvp.md` for
+> the authoritative first-PROD rules and enabled financial operations.
+
 ## Overview
 Реализован полноценный billing foundation для admin части mamaGo 2.0: Prisma схема, seed данные, service layer и admin UI scaffold.
 

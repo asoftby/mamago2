@@ -4,6 +4,7 @@ import type { EventFormData, SocialLink } from "./types";
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
 import { DEFAULT_ACTIVITY_FORMAT } from "@/domain/activities/activity-format";
+import { AgePolicy } from "@prisma/client";
 
 /** Одна стартовая строка соцсетей (Instagram, URL пустой). */
 export function createDefaultSocialLink(id?: string): SocialLink {
@@ -43,6 +44,7 @@ export function getDefaultFormData(): EventFormData {
     subcategoryId: null,
     primaryRootHasChildren: false,
     ageRangeIds: [],
+    agePolicy: AgePolicy.UNRESTRICTED,
     ageTags: [],
     ageDetection: {
       raw: null,
@@ -59,8 +61,8 @@ export function getDefaultFormData(): EventFormData {
     categorySlug: null,
     categoryPathLabel: null,
     programCategoryIds: [],
+    durationMinutes: undefined,
     cinemaGenre: "",
-    cinemaDuration: undefined,
     cinemaTrailerUrl: "",
     
     // Step 2: Description
@@ -88,6 +90,7 @@ export function getDefaultFormData(): EventFormData {
     priceDetails: "",
     priceItems: { items: [], note: "" },
     publicationAccess: null,
+    ctaStepDraft: null,
     ticketLink: "",
     participationMode: "walk-in",
     prebookMethod: null,
@@ -131,8 +134,14 @@ export function getDefaultFormData(): EventFormData {
     // Step 7: Contacts
     contactMode: "inherit",
     phone: "",
+    phoneLabel: null,
+    phone2: null,
+    phone2Label: null,
+    phone3: null,
+    phone3Label: null,
     website: "",
     socialLinks: [createDefaultSocialLink("social-initial")],
+    faqItems: [],
     
     // Step 8: Organizer
     organizerMode: "manual",

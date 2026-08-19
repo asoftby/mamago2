@@ -9,6 +9,10 @@ interface Activity {
   id: string;
   type: ActivityType;
   status: ContentStatus;
+  slug?: string | null;
+  city?: {
+    slug: string;
+  } | null;
   title: string;
   shortDesc: string;
   description: string | null;
@@ -19,6 +23,9 @@ interface Activity {
   place: {
     id: string;
     title: string;
+    city?: {
+      slug: string;
+    } | null;
   } | null;
   images: Array<{
     id: string;
@@ -49,22 +56,16 @@ export function EventsList({ activities, currentView }: EventsListProps) {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(
-        typeof error.error === "string" ? error.error : "Не удалось удалить событие"
+        typeof error.message === "string"
+          ? error.message
+          : typeof error.error === "string"
+            ? error.error
+            : typeof error.code === "string"
+              ? error.code
+              : "Не удалось удалить событие"
       );
     }
 
-  };
-
-  const handleRestore = async (id: string) => {
-    const response = await fetch(`/api/business/events/${id}/restore`, {
-      method: "POST",
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(
-        typeof error.error === "string" ? error.error : "Не удалось восстановить событие",
-      );
-    }
   };
 
   const handleArchive = async (id: string) => {
@@ -74,7 +75,13 @@ export function EventsList({ activities, currentView }: EventsListProps) {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(
-        typeof error.error === "string" ? error.error : "Не удалось архивировать событие",
+        typeof error.message === "string"
+          ? error.message
+          : typeof error.error === "string"
+            ? error.error
+            : typeof error.code === "string"
+              ? error.code
+              : "Не удалось архивировать событие",
       );
     }
   };
@@ -86,7 +93,13 @@ export function EventsList({ activities, currentView }: EventsListProps) {
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(
-        typeof error.error === "string" ? error.error : "Не удалось восстановить событие",
+        typeof error.message === "string"
+          ? error.message
+          : typeof error.error === "string"
+            ? error.error
+            : typeof error.code === "string"
+              ? error.code
+              : "Не удалось восстановить событие",
       );
     }
   };
@@ -110,7 +123,6 @@ export function EventsList({ activities, currentView }: EventsListProps) {
         />
       )}
       onDelete={handleDelete}
-      onRestore={handleRestore}
       deleteEntityLabel="событие"
       getDeleteEntityName={(a) => a.title}
       onArchive={currentView === "active" ? handleArchive : undefined}

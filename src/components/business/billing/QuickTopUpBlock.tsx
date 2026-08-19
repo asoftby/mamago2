@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText } from "lucide-react";
 import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { QUICK_TOPUP_AMOUNTS } from "@/services/billing/mock";
 
 interface QuickTopUpBlockProps {
@@ -80,7 +81,7 @@ export function QuickTopUpBlock({ onGenerateInvoice, disabled = false }: QuickTo
             "
           />
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 font-medium">
-            {BYN_SYMBOL}
+            {renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" })}
           </span>
         </div>
       </div>

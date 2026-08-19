@@ -1,11 +1,10 @@
-import type { OfferKind } from "@prisma/client";
+import type { OfferKind, PartyCategory, PartyOccasion } from "@prisma/client";
 import type {
   OfferFormData,
   CampLodgingTypeKey,
   OfferPlacementKey,
   OfferPlacementStatus,
   OfferProductType,
-  BirthdayRole,
   BirthdayLocationType,
   PlaceAmenityKey,
   PlaceEntryModel,
@@ -14,6 +13,7 @@ import { getDefaultFormData } from "./defaults";
 import {
   placeDetails as placeDetailsSchema,
   classDetails as classDetailsSchema,
+  serviceDetails as serviceDetailsSchema,
 } from "@/lib/offers/offer-types/details-schemas";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
@@ -21,11 +21,19 @@ import {
   normalizeRichTextEditorValue,
   plainTextToRichTextHtml,
 } from "@/lib/richtext/utils";
+import { normalizeRichTextCurrency } from "@/lib/formatters/format-price";
+import {
+  getCombinedAgeRange,
+  isValidAgeKey,
+  sortAgeKeys,
+  AGE_OPTIONS,
+} from "@/lib/config/ages";
 import {
   normalizeCampSessionsFromDb,
   normalizeCampMealsFromDb,
   sortCampSessions,
 } from "./campOfferModel";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 const PLACE_AMENITY_KEYS = new Set<PlaceAmenityKey>([
   "parking",
@@ -46,6 +54,23 @@ function parsePlaceVisitDetailsFromDb(
     amenities: (parsed.data.amenities ?? []).filter((a): a is PlaceAmenityKey =>
       PLACE_AMENITY_KEYS.has(a as PlaceAmenityKey),
     ),
+  };
+}
+
+function parseServiceDetailsFromDb(details: unknown): {
+  program: string;
+  included: string;
+  note: string;
+  durationMinutes: number | null;
+} {
+  const parsed = serviceDetailsSchema.safeParse(details);
+  if (!parsed.success) return { program: "", included: "", note: "", durationMinutes: null };
+  const d = parsed.data;
+  return {
+    program: d.program ?? "",
+    included: d.included ?? "",
+    note: d.note ?? "",
+    durationMinutes: d.durationMinutes ?? null,
   };
 }
 
@@ -128,6 +153,159 @@ function inferProductTypeFromForm(data: OfferFormData): OfferProductType | undef
   return undefined;
 }
 
+function createDefaultBookingSettings(): OfferFormData["bookingSettings"] {
+  return {
+    mode: null,
+    selectionType: null,
+    availableDaysAhead: null,
+    capacityPerUnit: null,
+    leadTime: null,
+    slotDurationMinutes: null,
+    externalUrl: null,
+    externalButtonLabel: null,
+    weeklyAvailability: [
+      { day: "monday", enabled: false, startTime: null, endTime: null },
+      { day: "tuesday", enabled: false, startTime: null, endTime: null },
+      { day: "wednesday", enabled: false, startTime: null, endTime: null },
+      { day: "thursday", enabled: false, startTime: null, endTime: null },
+      { day: "friday", enabled: false, startTime: null, endTime: null },
+      { day: "saturday", enabled: false, startTime: null, endTime: null },
+      { day: "sunday", enabled: false, startTime: null, endTime: null },
+    ],
+    excludedDates: [],
+  };
+}
+
+function inferLegacyOfferCtaFields(offer: {
+  productType?: OfferProductType | null;
+  kind: OfferKind;
+  bookingEnabled?: boolean | null;
+  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingPhone?: string | null;
+  bookingNote?: string | null;
+  contactWebsite?: string | null;
+}): Pick<
+  OfferFormData,
+  "publicationAccess" | "ctaType" | "ctaPhone" | "ctaLink" | "ctaInstructions" | "bookingSettings"
+> {
+  const bookingSettings = createDefaultBookingSettings();
+  const ctaInstructions = offer.bookingNote ?? "";
+
+  if (offer.bookingEnabled) {
+    if (offer.bookingMode === "USE_PUBLICATION_SLOTS") {
+      return {
+        publicationAccess: {
+          method: "timeslots",
+          instructions: ctaInstructions,
+          timeSlots: [
+            {
+              id: "legacy-slot",
+              date: "2099-01-01",
+              startTime: "10:00",
+              endTime: "11:00",
+              capacity: 1,
+            },
+          ],
+        },
+        ctaType: "забронировать",
+        ctaPhone: offer.bookingPhone ?? "",
+        ctaLink: "",
+        ctaInstructions,
+        bookingSettings: {
+          ...bookingSettings,
+          mode: "slot",
+          selectionType: "date_time",
+          availableDaysAhead: 30,
+          capacityPerUnit: 1,
+          slotDurationMinutes: 60,
+          weeklyAvailability: bookingSettings.weeklyAvailability.map((day, index) =>
+            index === 0
+              ? { ...day, enabled: true, startTime: "10:00", endTime: "11:00" }
+              : day,
+          ),
+        },
+      };
+    }
+
+    if (offer.bookingMode === "USE_PUBLICATION_DATES") {
+      return {
+        publicationAccess: {
+          method: "timeslots",
+          instructions: ctaInstructions,
+          timeSlots: [
+            {
+              id: "legacy-date",
+              date: "2099-01-01",
+              startTime: "",
+              endTime: undefined,
+              capacity: 1,
+            },
+          ],
+        },
+        ctaType: "забронировать",
+        ctaPhone: offer.bookingPhone ?? "",
+        ctaLink: "",
+        ctaInstructions,
+        bookingSettings: {
+          ...bookingSettings,
+          mode: "request",
+          selectionType: "date_only",
+          availableDaysAhead: 30,
+          capacityPerUnit: 1,
+        },
+      };
+    }
+
+    return {
+      publicationAccess: {
+        method: "prebooking",
+        phone: offer.bookingPhone ?? "",
+        instructions: ctaInstructions,
+      },
+      ctaType: "записаться",
+      ctaPhone: offer.bookingPhone ?? "",
+      ctaLink: "",
+      ctaInstructions,
+      bookingSettings,
+    };
+  }
+
+  if (offer.contactWebsite?.trim()) {
+    return {
+      publicationAccess: {
+        method: "external",
+        externalUrl: offer.contactWebsite,
+        instructions: ctaInstructions,
+      },
+      ctaType: "перейти_на_сайт",
+      ctaPhone: "",
+      ctaLink: offer.contactWebsite,
+      ctaInstructions,
+      bookingSettings,
+    };
+  }
+
+  if (offer.productType === "CAMP" || offer.kind === "SERVICE") {
+    return {
+      publicationAccess: null,
+      ctaType: "записаться",
+      ctaPhone: "",
+      ctaLink: "",
+      ctaInstructions,
+      bookingSettings,
+    };
+  }
+
+  return {
+    publicationAccess: null,
+    ctaType: null,
+    ctaPhone: "",
+    ctaLink: "",
+    ctaInstructions,
+    bookingSettings,
+  };
+}
+
 function inferRequestedPlacementsFromForm(
   data: OfferFormData,
   productType: OfferProductType | undefined,
@@ -165,38 +343,6 @@ function defaultRequestedPlacementsForProductType(
     default:
       return [];
   }
-}
-
-function mapBirthdayDetailsForApi(
-  data: OfferFormData,
-): {
-  role?: BirthdayRole | null;
-  locationType?: BirthdayLocationType | null;
-  durationMinutes?: number | null;
-  minChildren?: number | null;
-  maxChildren?: number | null;
-  priceFrom?: number | null;
-  included?: string | null;
-  program?: string | null;
-  note?: string | null;
-} | null {
-  if (!data.requestedPlacements.includes("BIRTHDAY")) {
-    return null;
-  }
-
-  const details = data.birthdayDetails;
-  const priceFrom = parsePrice(details.priceFrom);
-  return {
-    role: details.role,
-    locationType: details.locationType,
-    durationMinutes: details.durationMinutes,
-    minChildren: details.minChildren,
-    maxChildren: details.maxChildren,
-    priceFrom: priceFrom ?? null,
-    included: details.included.trim() || null,
-    program: details.program.trim() || null,
-    note: details.note.trim() || null,
-  };
 }
 
 function parsePlacementKeyArray(
@@ -361,8 +507,44 @@ function ageGroupsToMonths(ageGroups: string[]): {
   ageMaxMonths?: number;
 } {
   if (!ageGroups.length) return {};
-  // Best-effort: labels like "0-3" are not parsed here; optional API fields stay unset.
-  return {};
+
+  const normalized = sortAgeKeys(ageGroups.filter(isValidAgeKey));
+  const range = getCombinedAgeRange(normalized);
+  if (!range) return {};
+
+  return {
+    ageMinMonths: range.minMonths,
+    ageMaxMonths: range.maxMonths ?? undefined,
+  };
+}
+
+function monthsToAgeGroups(
+  ageMinMonths: number | null | undefined,
+  ageMaxMonths: number | null | undefined,
+): string[] {
+  if (ageMinMonths == null && ageMaxMonths == null) return [];
+
+  const minMonths = ageMinMonths ?? 0;
+  const maxMonths = ageMaxMonths ?? null;
+  const maxBoundary = maxMonths ?? Number.POSITIVE_INFINITY;
+
+  const exactGroups = AGE_OPTIONS
+    .filter((option) => {
+      const optionMax = option.maxMonths ?? Number.POSITIVE_INFINITY;
+      return option.minMonths >= minMonths && optionMax <= maxBoundary;
+    })
+    .map((option) => option.key);
+
+  if (exactGroups.length > 0) {
+    return exactGroups;
+  }
+
+  return AGE_OPTIONS
+    .filter((option) => {
+      const optionMax = option.maxMonths ?? Number.POSITIVE_INFINITY;
+      return option.minMonths <= minMonths && optionMax >= maxBoundary;
+    })
+    .map((option) => option.key);
 }
 
 /**
@@ -412,7 +594,9 @@ export function buildOfferCreatePayload(
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
-    ...ages,
+    ageMinMonths: data.agePolicy === "SPECIFIC" ? ages.ageMinMonths ?? null : null,
+    ageMaxMonths: data.agePolicy === "SPECIFIC" ? ages.ageMaxMonths ?? null : null,
+    agePolicy: data.agePolicy,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
     priceCaption:
@@ -449,6 +633,11 @@ export function buildOfferCreatePayload(
     bookingInstructions: accessFields.bookingInstructions,
     contactSource: data.contactSource,
     contactPhone: data.phone.trim() || undefined,
+    contactPhoneLabel: data.phoneLabel?.trim() || null,
+    contactPhone2: data.phone2?.trim() || null,
+    contactPhone2Label: data.phone2Label?.trim() || null,
+    contactPhone3: data.phone3?.trim() || null,
+    contactPhone3Label: data.phone3Label?.trim() || null,
     contactWebsite: data.website.trim() || undefined,
     contactSocialLinks: data.socialLinks
       .filter((link) => link.url.trim().length > 0)
@@ -460,12 +649,14 @@ export function buildOfferCreatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     wizardCompletedSteps: opts?.wizardCompletedSteps,
+    faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    birthdayDetails: mapBirthdayDetailsForApi(data),
     details: buildTypeDetails(data),
+    // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
+    ...(buildPartyFilterColumns(data) ?? {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
     // других типов в payload не попадают
     ...(data.offerWizardType === "CAMP" ? buildCampFieldsForCreate(data) : {}),
@@ -491,6 +682,38 @@ function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefi
     if (data.classGroupSize) result.groupSize = data.classGroupSize;
     if (data.classFormat != null) result.format = data.classFormat;
     return Object.keys(result).length > 0 ? result : undefined;
+  }
+  if (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") {
+    const bd = data.birthdayDetails;
+    const result: Record<string, unknown> = {};
+    if (bd.durationMinutes != null) result.durationMinutes = bd.durationMinutes;
+    if (bd.program.trim()) result.program = bd.program.trim();
+    if (bd.included.trim()) result.included = bd.included.trim();
+    if (bd.note.trim()) result.note = bd.note.trim();
+    return Object.keys(result).length > 0 ? result : undefined;
+  }
+  return undefined;
+}
+
+/** Filterable party columns → Offer (single-write). PACKAGE has no single category (composition deferred to Phase 4). */
+function buildPartyFilterColumns(data: OfferFormData): Record<string, unknown> | undefined {
+  if (data.productType === "PARTY_SERVICE") {
+    return {
+      category: data.partyCategory ?? undefined,
+      partyLocationType: data.birthdayDetails.locationType ?? undefined,
+      minChildren: data.birthdayDetails.minChildren ?? undefined,
+      maxChildren: data.birthdayDetails.maxChildren ?? undefined,
+      occasions: data.occasions,
+    };
+  }
+  if (data.productType === "PARTY_PACKAGE") {
+    return {
+      category: null,
+      partyLocationType: data.birthdayDetails.locationType ?? undefined,
+      minChildren: data.birthdayDetails.minChildren ?? undefined,
+      maxChildren: data.birthdayDetails.maxChildren ?? undefined,
+      occasions: data.occasions,
+    };
   }
   return undefined;
 }
@@ -570,7 +793,9 @@ export function buildOfferUpdatePayload(
     title: data.title.trim() || "Новое предложение",
     shortDescription: data.shortDescription.trim() || "—",
     description: data.description?.trim() || "",
-    ...ages,
+    ageMinMonths: data.agePolicy === "SPECIFIC" ? ages.ageMinMonths ?? null : null,
+    ageMaxMonths: data.agePolicy === "SPECIFIC" ? ages.ageMaxMonths ?? null : null,
+    agePolicy: data.agePolicy,
     coverImage: data.coverImage ?? undefined,
     videoUrl: data.videoUrl?.trim() || undefined,
     priceCaption:
@@ -607,6 +832,11 @@ export function buildOfferUpdatePayload(
     bookingInstructions: accessFields.bookingInstructions,
     contactSource: data.contactSource,
     contactPhone: data.phone.trim() || undefined,
+    contactPhoneLabel: data.phoneLabel?.trim() || null,
+    contactPhone2: data.phone2?.trim() || null,
+    contactPhone2Label: data.phone2Label?.trim() || null,
+    contactPhone3: data.phone3?.trim() || null,
+    contactPhone3Label: data.phone3Label?.trim() || null,
     contactWebsite: data.website.trim() || undefined,
     contactSocialLinks: data.socialLinks
       .filter((link) => link.url.trim().length > 0)
@@ -620,8 +850,9 @@ export function buildOfferUpdatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    birthdayDetails: mapBirthdayDetailsForApi(data),
     details: buildTypeDetails(data),
+    // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
+    ...(buildPartyFilterColumns(data) ?? {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
     ...(data.offerWizardType === "CAMP"
       ? buildCampFieldsForCreate(data)
@@ -646,17 +877,6 @@ export function mapOfferToFormData(offer: {
   kind: OfferKind;
   productType?: OfferProductType | null;
   placements?: Array<{ key: OfferPlacementKey; status?: OfferPlacementStatus | null }> | null;
-  birthdayDetails?: {
-    role?: BirthdayRole | null;
-    locationType?: BirthdayLocationType | null;
-    durationMinutes?: number | null;
-    minChildren?: number | null;
-    maxChildren?: number | null;
-    priceFrom?: number | string | null;
-    included?: string | null;
-    program?: string | null;
-    note?: string | null;
-  } | null;
   title: string;
   description: string | null;
   coverImage: string | null;
@@ -669,6 +889,7 @@ export function mapOfferToFormData(offer: {
   priceText: string | null;
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
+  agePolicy: import("@prisma/client").AgePolicy;
   discoverySignalIds?: string[];
   classChipSlugs?: string[];
   // Camp fields
@@ -695,9 +916,25 @@ export function mapOfferToFormData(offer: {
   whatToBring?: string | null;
   contactSource?: string | null;
   contactPhone?: string | null;
+  contactPhoneLabel?: string | null;
+  contactPhone2?: string | null;
+  contactPhone2Label?: string | null;
+  contactPhone3?: string | null;
+  contactPhone3Label?: string | null;
   contactWebsite?: string | null;
+  bookingEnabled?: boolean | null;
+  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingPhone?: string | null;
+  bookingNote?: string | null;
   contactSocialLinks?: unknown;
   details?: unknown;
+  // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)
+  category?: PartyCategory | null;
+  partyLocationType?: BirthdayLocationType | null;
+  minChildren?: number | null;
+  maxChildren?: number | null;
+  occasions?: PartyOccasion[];
+  faqItems?: unknown;
 }): OfferFormData {
   const defaults = getDefaultFormData(offer.placeId ?? null);
 
@@ -720,8 +957,14 @@ export function mapOfferToFormData(offer: {
   const inferredWizardType = inferOfferWizardTypeFromOffer(offer);
   const isCamp = inferredWizardType === "CAMP";
   const productType = inferProductTypeFromOffer(offer);
+  const isPartyService = productType === "PARTY_SERVICE";
+  const isPartyPackage = productType === "PARTY_PACKAGE";
+  // PARTY_PACKAGE shares the same Offer columns + details shape as PARTY_SERVICE (category stays null for PACKAGE).
+  const usesPartyColumns = isPartyService || isPartyPackage;
+  const serviceDetails = usesPartyColumns ? parseServiceDetailsFromDb(offer.details) : null;
   const requestedPlacements = parsePlacementKeyArray(offer.placements);
   const placementStatuses = parsePlacementStatusMap(offer.placements);
+  const legacyCtaFields = inferLegacyOfferCtaFields(offer);
   const socialLinks = Array.isArray(offer.contactSocialLinks)
     ? offer.contactSocialLinks
         .filter(
@@ -755,20 +998,20 @@ export function mapOfferToFormData(offer: {
         ? requestedPlacements
         : defaultRequestedPlacementsForProductType(productType),
     placementStatuses,
+    // birthdayDetails: PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON;
+    // the plain BIRTHDAY-checkbox case (non-party types) has no extra fields to persist.
     birthdayDetails: {
-      role: offer.birthdayDetails?.role ?? null,
-      locationType: offer.birthdayDetails?.locationType ?? null,
-      durationMinutes: offer.birthdayDetails?.durationMinutes ?? null,
-      minChildren: offer.birthdayDetails?.minChildren ?? null,
-      maxChildren: offer.birthdayDetails?.maxChildren ?? null,
-      priceFrom:
-        offer.birthdayDetails?.priceFrom != null
-          ? String(offer.birthdayDetails.priceFrom)
-          : "",
-      included: offer.birthdayDetails?.included ?? "",
-      program: offer.birthdayDetails?.program ?? "",
-      note: offer.birthdayDetails?.note ?? "",
+      locationType: usesPartyColumns ? (offer.partyLocationType ?? null) : null,
+      durationMinutes: usesPartyColumns ? (serviceDetails?.durationMinutes ?? null) : null,
+      minChildren: usesPartyColumns ? (offer.minChildren ?? null) : null,
+      maxChildren: usesPartyColumns ? (offer.maxChildren ?? null) : null,
+      included: usesPartyColumns ? (serviceDetails?.included ?? "") : "",
+      program: usesPartyColumns ? (serviceDetails?.program ?? "") : "",
+      note: usesPartyColumns ? (serviceDetails?.note ?? "") : "",
     },
+    // PARTY_SERVICE only: partyCategory from canon Offer.category. PARTY_PACKAGE has no single category.
+    partyCategory: isPartyService ? (offer.category ?? null) : null,
+    occasions: usesPartyColumns ? (offer.occasions ?? []) : [],
     offerKind:
       productType === "PARTY_PACKAGE"
         ? "birthday"
@@ -789,30 +1032,39 @@ export function mapOfferToFormData(offer: {
     title: offer.title,
     shortDescription: offer.description ?? "",
     description: normalizeRichTextEditorValue(offer.description),
+    ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
+    agePolicy: offer.agePolicy,
     coverImage: offer.coverImage,
     gallery,
     videoUrl: offer.videoUrl ?? null,
     priceCaption: isCamp
       ? ""
       : offer.priceCaption
-        ? offer.priceCaption
+        ? normalizeRichTextCurrency(offer.priceCaption)
         : offer.priceText
-          ? plainTextToRichTextHtml(offer.priceText)
+          ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.priceText))
           : "",
     promotionDetails: isCamp
       ? ""
       : offer.promotionDetails
-        ? offer.promotionDetails
+        ? normalizeRichTextCurrency(offer.promotionDetails)
         : offer.promotionalOffer
-          ? plainTextToRichTextHtml(offer.promotionalOffer)
+          ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.promotionalOffer))
           : "",
     pricingMode: "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: "BYN",
     contactSource: offer.contactSource === "place" ? "place" : "manual",
     phone: offer.contactPhone ?? "",
+    phoneLabel: offer.contactPhoneLabel ?? null,
+    phone2: offer.contactPhone2 ?? null,
+    phone2Label: offer.contactPhone2Label ?? null,
+    phone3: offer.contactPhone3 ?? null,
+    phone3Label: offer.contactPhone3Label ?? null,
     website: offer.contactWebsite ?? "",
     socialLinks,
+    faqItems: normalizeFaqItems(offer.faqItems),
+    ...legacyCtaFields,
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),

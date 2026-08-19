@@ -3,9 +3,8 @@
 import { cn } from "@/lib/utils";
 import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
+import { resolveVisiblePopularTags } from "@/lib/search/popularSearchTags";
 import { SearchResultItem } from "./SearchResultItem";
-
-const POPULAR = ["Театр", "Батуты", "Мастер-классы", "Логопед", "Аниматоры"];
 
 function SkeletonRows() {
   return (
@@ -27,6 +26,39 @@ function SkeletonRows() {
   );
 }
 
+function PopularTagsBlock({
+  tags,
+  onPopularPick,
+  centered = false,
+}: {
+  tags: string[];
+  onPopularPick: (term: string) => void;
+  centered?: boolean;
+}) {
+  if (tags.length === 0) return null;
+
+  return (
+    <div className={centered ? "mt-6" : undefined}>
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
+        Популярное
+      </p>
+      <ul className={cn("flex flex-wrap gap-2", centered && "justify-center")}>
+        {tags.map((term) => (
+          <li key={term}>
+            <button
+              type="button"
+              onClick={() => onPopularPick(term)}
+              className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
+            >
+              {term}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function SearchResults({
   query,
   trimmedQuery,
@@ -35,6 +67,7 @@ export function SearchResults({
   activeIndex,
   onPopularPick,
   onSelectResult,
+  variant = "overlay",
 }: {
   query: string;
   trimmedQuery: string;
@@ -43,25 +76,33 @@ export function SearchResults({
   activeIndex: number;
   onPopularPick: (term: string) => void;
   onSelectResult: (item: SearchResultItemType) => void;
+  /** overlay — десктопный дропдаун (ограниченная высота); sheet — fullscreen mobile */
+  variant?: "overlay" | "sheet";
 }) {
   const lastSearch = useLastPublicSearchQuery();
-  const showPopularEmpty = trimmedQuery.length < 2;
+  // Counts are not wired from SearchQueryLog yet → empty until threshold can be met.
+  const popularTags = resolveVisiblePopularTags();
+  const showEmptyHints = trimmedQuery.length < 2;
   const showNoResults = trimmedQuery.length >= 2 && !loading && results.length === 0;
+  const showEmptyPanel = showEmptyHints && (Boolean(lastSearch) || popularTags.length > 0);
 
   return (
     <div
       className={cn(
-        "mt-3 max-h-[min(50vh,420px)] overflow-y-auto rounded-xl border border-neutral-100 bg-white/95 shadow-inner",
+        "overflow-y-auto rounded-xl border border-neutral-100 bg-white/95 shadow-inner",
+        variant === "sheet"
+          ? "mt-0 min-h-0 flex-1"
+          : "mt-3 max-h-[min(50vh,420px)]",
       )}
     >
-      {showPopularEmpty ? (
+      {showEmptyPanel ? (
         <div className="p-4">
           {lastSearch ? (
             <>
               <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
                 Последний поиск
               </p>
-              <ul className="mb-5 flex flex-wrap gap-2">
+              <ul className={cn("flex flex-wrap gap-2", popularTags.length > 0 && "mb-5")}>
                 <li className="max-w-full">
                   <button
                     type="button"
@@ -75,22 +116,7 @@ export function SearchResults({
               </ul>
             </>
           ) : null}
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
-            Популярное
-          </p>
-          <ul className="flex flex-wrap gap-2">
-            {POPULAR.map((term) => (
-              <li key={term}>
-                <button
-                  type="button"
-                  onClick={() => onPopularPick(term)}
-                  className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
-                >
-                  {term}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <PopularTagsBlock tags={popularTags} onPopularPick={onPopularPick} />
         </div>
       ) : null}
 
@@ -134,28 +160,16 @@ export function SearchResults({
               </ul>
             </div>
           ) : null}
-          <div className="mt-6">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
-              Популярное
-            </p>
-            <ul className="flex flex-wrap justify-center gap-2">
-              {POPULAR.map((term) => (
-                <li key={term}>
-                  <button
-                    type="button"
-                    onClick={() => onPopularPick(term)}
-                    className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
-                  >
-                    {term}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <PopularTagsBlock
+            tags={popularTags}
+            onPopularPick={onPopularPick}
+            centered
+          />
         </div>
       ) : null}
     </div>
   );
 }
 
-export { POPULAR };
+/** @deprecated Use resolveVisiblePopularTags() — hardcoded list is no longer rendered as-is. */
+export { POPULAR_SEARCH_TAG_CANDIDATES as POPULAR } from "@/lib/search/popularSearchTags";

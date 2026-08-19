@@ -1,7 +1,11 @@
 // Offer Wizard Types
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
+import type { PartyCategory, PartyOccasion } from "@prisma/client";
 import type { PublicationAccess } from "@/features/publication-access";
+import type { FaqItem } from "@/lib/faq/faqItems";
+
+export type { PartyCategory, PartyOccasion };
 
 export type OfferWizardMode = "create" | "edit";
 
@@ -21,17 +25,6 @@ export type OfferPlacementKey =
   | "CAMPS"
   | "BIRTHDAY";
 export type OfferPlacementStatus = "REQUESTED" | "APPROVED" | "REJECTED";
-export type BirthdayRole =
-  | "VENUE"
-  | "ANIMATOR"
-  | "SHOW"
-  | "MASTER_CLASS"
-  | "CAKE"
-  | "CATERING"
-  | "DECOR"
-  | "PHOTO_VIDEO"
-  | "PACKAGE"
-  | "OTHER";
 export type BirthdayLocationType = "ON_SITE" | "OFF_SITE" | "BOTH";
 
 /** Смена лагеря (шаг «Смены и расписание») */
@@ -80,6 +73,7 @@ export type OfferWizardStepKey =
   | "accommodation"
   | "price"
   | "contacts"
+  | "faq"
   | "review";
 
 /**
@@ -94,12 +88,10 @@ export interface OfferFormData {
   requestedPlacements: OfferPlacementKey[];
   placementStatuses: Partial<Record<OfferPlacementKey, OfferPlacementStatus>>;
   birthdayDetails: {
-    role: BirthdayRole | null;
     locationType: BirthdayLocationType | null;
     durationMinutes: number | null;
     minChildren: number | null;
     maxChildren: number | null;
-    priceFrom: string;
     included: string;
     program: string;
     note: string;
@@ -117,6 +109,7 @@ export interface OfferFormData {
   shortDescription: string; // max 120 chars
   description: string; // Rich text HTML for full description
   ageGroups: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   
   // Camp-specific details (Step 2 for CAMP type)
   campProgramType: "городской" | "выездной" | "смешанный" | null; // Only for CAMP
@@ -144,16 +137,9 @@ export interface OfferFormData {
   campCanSelectDays: boolean; // Can select individual days
   campHasExtendedCare: boolean; // Has extended care option
   
-  // Party fields
-  partyProgram: string;
-  partyDuration: string;
-  partyChildrenCount: string;
-  partyIncluded: string;
-  
-  // Service fields
-  serviceDescription: string;
-  serviceDuration: string;
-  serviceDeliveryArea: string;
+  // PARTY_SERVICE filterable fields (Phase 3b-2); PARTY_PACKAGE shares occasions (Phase 3b-3)
+  partyCategory: PartyCategory | null;
+  occasions: PartyOccasion[];
   
   // Step 5 (for CAMP): Accommodation
   accommodationProvided: boolean;
@@ -180,8 +166,14 @@ export interface OfferFormData {
   // Step 6/7: Contacts
   contactSource: OfferContactSource;
   phone: string;
+  phoneLabel: string | null;
+  phone2: string | null;
+  phone2Label: string | null;
+  phone3: string | null;
+  phone3Label: string | null;
   website: string;
   socialLinks: SocialLink[];
+  faqItems: FaqItem[];
   
   // Step 7/8: CTA and Publication
   publicationAccess: PublicationAccess | null;

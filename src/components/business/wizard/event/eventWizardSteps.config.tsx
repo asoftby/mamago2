@@ -19,6 +19,7 @@ import { Step4DateTime } from "./steps/Step4DateTime";
 import { Step5PricingParticipation } from "./steps/Step5PricingParticipation";
 import { Step7Contacts } from "./steps/Step7Contacts";
 import { Step8Organizer } from "./steps/Step8Organizer";
+import { FaqStep } from "../shared/FaqStep";
 
 /**
  * Event Wizard Steps Configuration
@@ -110,6 +111,9 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       if (!data.venueKind) return false;
       if (data.venueKind === "PLACE") return !!data.placeId;
       if (data.venueKind === "MANUAL") {
+        if (data.pendingLocation?.mode === "PARSED_LOCATION" && data.pendingLocation.source === "parser") {
+          return Boolean(data.venueName && data.city);
+        }
         return Boolean(data.venueName && data.address && data.city);
       }
       return true; // MOBILE and TBD are complete without additional fields
@@ -140,6 +144,9 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           isMissing: !data.placeId,
         });
       } else if (data.venueKind === "MANUAL") {
+        const isParsedDraft =
+          data.pendingLocation?.mode === "PARSED_LOCATION" &&
+          data.pendingLocation.source === "parser";
         items.push(
           {
             label: "Площадка",
@@ -149,7 +156,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
           {
             label: "Адрес",
             value: data.address || <span className="text-red-500">Не указан</span>,
-            isMissing: !data.address,
+            isMissing: !data.address && !isParsedDraft,
           },
           {
             label: "Город",
@@ -176,8 +183,11 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       } else if (data.venueKind === "PLACE") {
         if (!data.placeId) missing.push("Место проведения");
       } else if (data.venueKind === "MANUAL") {
+        const isParsedDraft =
+          data.pendingLocation?.mode === "PARSED_LOCATION" &&
+          data.pendingLocation.source === "parser";
         if (!data.venueName) missing.push("Название площадки");
-        if (!data.address) missing.push("Адрес");
+        if (!data.address && !isParsedDraft) missing.push("Адрес");
         if (!data.city) missing.push("Город");
       }
       return missing;
@@ -421,7 +431,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     },
   },
   
-  // Step 7: Contacts
+  // Step 7: Contacts (optional)
   {
     id: 7,
     key: "contacts",
@@ -429,9 +439,14 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     title: "Контакты",
     description: "Телефон, сайт и социальные сети",
     component: Step7Contacts,
-    
+    isOptional: true,
+
     isComplete: () => true, // Optional step
-    
+    hasContent: (data) =>
+      Boolean(data.phone?.trim()) ||
+      Boolean(data.website?.trim()) ||
+      data.socialLinks.some((l) => l.url.trim().length > 0),
+
     getSummary: (data) => [
       {
         label: "Телефон",
@@ -453,7 +468,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     getMissingFields: () => [], // Optional step
   },
   
-  // Step 8: Organizer
+  // Step 8: Organizer (optional)
   {
     id: 8,
     key: "organizer",
@@ -461,25 +476,33 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     title: "Организатор",
     description: "Кто организует событие",
     component: Step8Organizer,
-    
-    isComplete: (data) => data.organizerName.trim().length >= 2 && 
-      (data.organizerMode !== "existing" || !!data.organizerId),
-    
+    isOptional: true,
+
+    // Необязательный шаг — всегда завершён (не блокирует переходы/публикацию).
+    isComplete: () => true,
+    hasContent: (data) =>
+      data.organizerName.trim().length > 0 || Boolean(data.organizerId),
+
     getSummary: (data) => [
       {
         label: "Организатор",
-        value: data.organizerName || <span className="text-red-500">Не указан</span>,
-        isMissing: !data.organizerName,
+        value: data.organizerName || (
+          <span className="text-muted-foreground">Не указан</span>
+        ),
       },
-      {
-        label: "Тип",
-        value:
-          data.organizerMode === "existing"
-            ? "Найденный"
-            : data.organizerMode === "import"
-              ? "Из источника"
-              : "Новый",
-      },
+      ...(data.organizerName
+        ? ([
+            {
+              label: "Тип",
+              value:
+                data.organizerMode === "existing"
+                  ? "Найденный"
+                  : data.organizerMode === "import"
+                    ? "Из источника"
+                    : "Новый",
+            },
+          ] as SummaryItem[])
+        : []),
       ...(data.organizerPhone ? [{
         label: "Телефон",
         value: data.organizerPhone,
@@ -497,17 +520,33 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         value: "Указан",
       }] : []),
     ],
-    
-    getMissingFields: (data) => {
-      const missing: string[] = [];
-      if (!data.organizerName || data.organizerName.trim().length < 2) {
-        missing.push("Название организатора");
-      }
-      if (data.organizerMode === "existing" && !data.organizerId) {
-        missing.push("Выбор организатора");
-      }
-      return missing;
-    },
+
+    getMissingFields: () => [],
+  },
+
+  {
+    id: 9,
+    key: "faq",
+    shortLabel: "Вопросы",
+    title: "Частые вопросы",
+    description: "Необязательный блок с важными уточнениями для родителей",
+    component: ({ data, onChange }) => (
+      <FaqStep
+        kind="event"
+        value={data.faqItems}
+        onChange={(faqItems) => onChange({ faqItems })}
+      />
+    ),
+    isOptional: true,
+    isComplete: () => true,
+    hasContent: (data) => data.faqItems.length > 0,
+    getSummary: (data) => [
+      {
+        label: "Вопросы",
+        value: data.faqItems.length > 0 ? `${data.faqItems.length} вопросов` : "Не добавлен",
+      },
+    ],
+    getMissingFields: () => [],
   },
 ];
 

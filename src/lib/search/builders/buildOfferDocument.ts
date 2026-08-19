@@ -14,13 +14,14 @@ export async function buildOfferDocument(
       place: {
         select: {
           title: true,
+          archivedAt: true,
           city: { select: { name: true } },
         },
       },
     },
   });
 
-  if (!offer) return null;
+  if (!offer || offer.archivedAt || !offer.place || offer.place.archivedAt) return null;
 
   const searchText = buildSearchText([
     offer.title,

@@ -1,0 +1,1 @@
+ALTER TABLE "Place" ALTER COLUMN "category" DROP NOT NULL;

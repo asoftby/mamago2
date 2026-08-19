@@ -16,6 +16,8 @@ function isValidPhone(phone: string): boolean {
 
 export function isOfferManualContactsValid(data: OfferFormData): boolean {
   if (data.phone && !isValidPhone(data.phone)) return false;
+  if (data.phone2 && !isValidPhone(data.phone2)) return false;
+  if (data.phone3 && !isValidPhone(data.phone3)) return false;
   if (data.website && !isValidUrl(data.website)) return false;
 
   return data.socialLinks.every((link) => {
@@ -25,8 +27,12 @@ export function isOfferManualContactsValid(data: OfferFormData): boolean {
 }
 
 export function isOfferContactsComplete(data: OfferFormData): boolean {
+  if (!data.placeId) {
+    return false;
+  }
+
   if (data.contactSource === "place") {
-    return Boolean(data.placeId);
+    return true;
   }
 
   return isOfferManualContactsValid(data);

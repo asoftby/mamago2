@@ -9,12 +9,12 @@ interface SearchLayoutProps {
 }
 
 const tabs = [
-  { id: "overview", label: "Overview", href: "/admin/search" },
-  { id: "quick-tags", label: "Quick Tags", href: "/admin/search/quick-tags" },
-  { id: "synonyms", label: "Synonyms", href: "/admin/search/synonyms" },
-  { id: "zero-results", label: "Zero Results", href: "/admin/search/zero-results" },
-  { id: "index", label: "Index", href: "/admin/search/index" },
-  { id: "ranking", label: "Ranking", href: "/admin/search/ranking" },
+  { id: "overview", label: "Обзор", href: "/admin/search" },
+  { id: "quick-tags", label: "Быстрые теги", href: "/admin/search/quick-tags" },
+  { id: "synonyms", label: "Синонимы", href: "/admin/search/synonyms" },
+  { id: "zero-results", label: "Без результата", href: "/admin/search/zero-results" },
+  { id: "index", label: "Индекс", href: "/admin/search/index" },
+  { id: "ranking", label: "Ранжирование", href: "/admin/search/ranking" },
 ];
 
 export function SearchLayout({ children }: SearchLayoutProps) {

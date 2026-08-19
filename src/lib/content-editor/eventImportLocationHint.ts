@@ -1,6 +1,7 @@
 /**
  * Подсказки локации из нормализованного импорта события (без server-only зависимостей).
  */
+import { extractEventImportLocationFields } from "@/lib/event-import/extractEventImportLocationFields";
 
 export type EventImportLocationHint = {
   venueName?: string;
@@ -14,14 +15,39 @@ export type EventImportMediaHint = {
   imageUrls: string[];
 };
 
+function sanitizeLocationField(
+  value: string,
+  options: { maxLength: number; maxWords: number },
+): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+  if (/<\/?[a-z][^>]*>/i.test(normalized)) return "";
+  if (normalized.length > options.maxLength) return "";
+
+  const words = normalized.split(" ").filter(Boolean);
+  if (words.length > options.maxWords) return "";
+
+  return normalized;
+}
+
 export function parseEventImportLocationHint(raw: unknown): EventImportLocationHint | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
-  if (o.entityType !== "EVENT") return null;
+  if (typeof o.entityType === "string" && o.entityType !== "EVENT") return null;
 
-  const venueName = typeof o.venueName === "string" ? o.venueName.trim() : "";
-  const addressText = typeof o.addressText === "string" ? o.addressText.trim() : "";
-  const cityName = typeof o.cityName === "string" ? o.cityName.trim() : "";
+  const extracted = extractEventImportLocationFields(o);
+  const venueName = sanitizeLocationField(
+    extracted.venueName ?? "",
+    { maxLength: 120, maxWords: 12 },
+  );
+  const addressText = sanitizeLocationField(
+    extracted.addressText ?? "",
+    { maxLength: 180, maxWords: 18 },
+  );
+  const cityName = sanitizeLocationField(
+    extracted.cityName ?? "",
+    { maxLength: 80, maxWords: 4 },
+  );
 
   if (!venueName && !addressText && !cityName) return null;
 

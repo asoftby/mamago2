@@ -2,11 +2,16 @@
 
 import { toast } from "@/lib/toast";
 import type { AuthEntryPoint } from "./types";
-import { getPostAuthContext, clearPostAuthContext } from "./storage";
+import { getPostAuthContext, clearPostAuthAction, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";
 import type { ProfileStatePayload } from "./types";
-import { applyPostAuthCompletionOutcome } from "./resolver";
+import { applyPostAuthCompletionOutcome, showAuthSuccessToast } from "./resolver";
 import { trackPostAuthEvent } from "./analytics";
+
+function isPlainAuthFlow(source: AuthEntryPoint): boolean {
+  // `profile` source currently represents plain auth flow without a pending intent.
+  return source === "profile";
+}
 
 export type PostAuthPipelineResult =
   | { kind: "completion"; source: AuthEntryPoint; returnTo: string | null }
@@ -36,6 +41,7 @@ export async function runPostAuthPipeline(
 
   const ctx = getPostAuthContext();
   const source: AuthEntryPoint = ctx?.source ?? defaultSource;
+  const authAction = ctx?.authAction ?? null;
   const returnTo = ctx?.returnTo ?? null;
 
   if (ctx?.pendingAction) {
@@ -55,6 +61,11 @@ export async function runPostAuthPipeline(
 
   const profile = (await res.json()) as ProfileStatePayload;
 
+  if (isPlainAuthFlow(source) && authAction) {
+    showAuthSuccessToast(authAction, toast);
+    clearPostAuthAction();
+  }
+
   if (!profile.isProfileComplete) {
     trackPostAuthEvent("completion_started", { source });
     return { kind: "completion", source, returnTo };
@@ -65,6 +76,7 @@ export async function runPostAuthPipeline(
     router,
     returnTo,
     toast,
+    showProfileCompletionToast: !(isPlainAuthFlow(source) && authAction),
     skipNavigation: skipNavigation ?? false,
   });
   clearPostAuthContext();

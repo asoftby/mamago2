@@ -113,7 +113,11 @@ export function IdeasClient({ initialIdeas, discoveryHref = "/minsk" }: Props) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <IdeasHeader totalCount={ideas.length} />
+      <IdeasHeader
+        totalCount={ideas.length}
+        plannedCount={counts.PLANNED}
+        unplannedCount={counts.UNPLANNED}
+      />
 
       {ideas.length > 0 ? (
         <IdeasTabs value={filter} items={tabItems} onChange={setFilter} />

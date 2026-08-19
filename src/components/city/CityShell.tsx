@@ -16,6 +16,7 @@ import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { computeMaxBudget, getBudgetStep } from "@/lib/discovery/budgetUtils";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
 
 export type BudgetConfig = { max: number; step: number } | null;
 
@@ -62,15 +63,47 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
   let budgetConfig: BudgetConfig = null;
 
   if (intent === "kuda" || intent === "birthday") {
+    // DEFECT (not a TODO): intent === "birthday" reuses getKudaDiscoveryFeed and
+    // renders event/kuda discovery content (Activity/EVENT rows) — content outside
+    // the birthday domain, not the intended architecture for this section. This is
+    // a stand-in, not the target design: when the birthday section is activated,
+    // its feed must be built on party-specific entities (PartyCategory,
+    // PartyOccasion, PartyLocationType) and PARTY_SERVICE/PARTY_PACKAGE Offer rows
+    // — none of which currently have a read-side consumer anywhere in the codebase.
+    // Do not extend getKudaDiscoveryFeed itself with birthday-specific behavior;
+    // the fix is a separate feed function, not a branch added here.
     const formatParam = Array.isArray(searchParams.format)
       ? searchParams.format[0]
       : searchParams.format;
     const nearbyParam = Array.isArray(searchParams.nearby)
       ? searchParams.nearby[0]
       : searchParams.nearby;
+    const scalar = (key: string) => {
+      const value = searchParams[key];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const eventFilters = intent === "kuda"
+      ? {
+          dateRange: resolveEventDateRange({
+            preset:
+              scalar("preset") === "TODAY" ||
+              scalar("preset") === "TOMORROW" ||
+              scalar("preset") === "WEEKEND"
+                ? (scalar("preset") as "TODAY" | "TOMORROW" | "WEEKEND")
+                : null,
+            from: scalar("from") ?? scalar("dateFrom") ?? null,
+            to: scalar("to") ?? scalar("dateTo") ?? null,
+          }),
+          free: scalar("free") === "true",
+          districtId: scalar("district") ?? null,
+          metroId: scalar("metro") ?? null,
+          adultOnly: scalar("adultOnly") === "true",
+        }
+      : undefined;
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
       format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
-      nearby: nearbyParam === "true",
+      nearby: intent === "kuda" ? false : nearbyParam === "true",
+      eventFilters,
     });
     if (budgetEnabled && discoveryActivities) {
       const max = computeMaxBudget(discoveryActivities);

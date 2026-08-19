@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { OccasionType } from "@prisma/client";
 import { occasionTypeLabel } from "@/lib/taxonomy/occasionTypeLabels";
-import { isOccasionCurrentlyActive } from "@/lib/discovery/occasions";
+import { isOccasionCurrentlyActive } from "@/lib/discovery/occasionUtils";
 
 const adminFetch: RequestInit = { credentials: "include" };
 
@@ -274,7 +274,10 @@ export function OccasionsAdminPage() {
             }
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable
+            minWidthClassName="min-w-[880px]"
+            scrollLabel="Таблица поводов Discovery, прокручивается по горизонтали"
+          >
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh()}>Название</th>

@@ -33,6 +33,12 @@ export interface WizardStepConfig<TFormData = Record<string, unknown>> {
   /** Short 1-word label for WizardProgress nav tabs (e.g. "Тип", "Фото") */
   shortLabel?: string;
   description?: string;
+  /**
+   * Необязательный шаг: не блокирует переход/публикацию (это обеспечивает
+   * isComplete: () => true + правки валидации). Влияет только на презентацию
+   * степпера — отдельный приглушённый стиль для пустого необязательного шага.
+   */
+  isOptional?: boolean;
   
   // Component to render for this step
   component: React.ComponentType<{
@@ -48,7 +54,16 @@ export interface WizardStepConfig<TFormData = Record<string, unknown>> {
   
   // Completion check
   isComplete?: (data: TFormData) => boolean;
-  
+
+  /**
+   * Фактическая заполненность шага — независимо от isComplete.
+   * Нужна для презентации степпера: необязательный шаг (isOptional) с пустыми
+   * данными показывается приглушённым «необязательно», а как только пользователь
+   * что-то ввёл (hasContent → true) — обычным «выполнено». Для обязательных шагов
+   * не используется; при отсутствии предиката степпер падает на isComplete.
+   */
+  hasContent?: (data: TFormData) => boolean;
+
   // Get summary for review step
   getSummary?: (data: TFormData) => SummaryItem[];
   

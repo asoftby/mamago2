@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
+import { AgePolicy, ActivityType, ContentStatus, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   canManageActivityById,
@@ -15,7 +16,13 @@ import {
 } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
-import { softDeleteActivityById } from "@/lib/activity/softDeleteActivity";
+import { mergeEventScheduleJson } from "@/lib/business/eventScheduleJsonMerge";
+import { deleteActivity } from "@/server/services/activity.service";
+import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
+import {
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { validateEventProgramCategories } from "@/lib/business/validateEventProgramCategories";
@@ -46,6 +53,7 @@ import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 /**
  * GET /api/business/events/[id]
@@ -159,6 +167,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
+    const faqItems = body.faqItems !== undefined ? normalizeFaqItems(body.faqItems) : undefined;
     perf.mark("parse-body");
 
     const summary = await fetchActivityEventRowSummary(id);
@@ -198,12 +207,22 @@ export async function PATCH(
         status: true,
         slug: true,
         format: true,
+        ageLabel: true,
+        ageMaxMonths: true,
+        ageMinMonths: true,
+        agePolicy: true,
         ageTags: true,
         scheduleMode: true,
         priceFrom: true,
         priceTo: true,
         priceText: true,
         currency: true,
+        phone: true,
+        phoneLabel: true,
+        phone2: true,
+        phone2Label: true,
+        phone3: true,
+        phone3Label: true,
         venue: {
           select: {
             kind: true,
@@ -282,9 +301,14 @@ export async function PATCH(
     }
     perf.mark("place-check");
 
+    // Merge, а не полная замена: неизвестные форме ключи scheduleJson
+    // (legacy, импорт-метаданные) переживают пересохранение.
     let nextScheduleJson =
       body.scheduleJson !== undefined
-        ? ((body.scheduleJson ?? {}) as Record<string, unknown>)
+        ? mergeEventScheduleJson(
+            (existing.scheduleJson ?? {}) as Record<string, unknown>,
+            (body.scheduleJson ?? {}) as Record<string, unknown>,
+          )
         : ((existing.scheduleJson ?? {}) as Record<string, unknown>);
 
     const organizerInput =
@@ -460,11 +484,20 @@ export async function PATCH(
       }
     }
 
-    if (
-      body.ageTags !== undefined &&
-      stableJsonStringify(body.ageTags) !== stableJsonStringify(existing.ageTags)
-    ) {
-      updateData.ageTags = body.ageTags;
+    if (body.agePolicy !== undefined || body.ageTags !== undefined || body.ageMinMonths !== undefined || body.ageMaxMonths !== undefined) {
+      const normalizedAge = normalizeAgePolicy({
+        agePolicy: Object.values(AgePolicy).includes(body.agePolicy) ? body.agePolicy : existing.agePolicy,
+        ageTags: body.ageTags ?? existing.ageTags,
+        ageMinMonths: body.ageMinMonths !== undefined ? body.ageMinMonths : existing.ageMinMonths,
+        ageMaxMonths: body.ageMaxMonths !== undefined ? body.ageMaxMonths : existing.ageMaxMonths,
+      });
+      updateData.agePolicy = normalizedAge.agePolicy;
+      updateData.ageTags = normalizedAge.ageTags;
+      updateData.ageMinMonths = normalizedAge.ageMinMonths;
+      updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
+    }
+    if (body.ageLabel !== undefined && body.ageLabel !== (existing.ageLabel ?? null)) {
+      updateData.ageLabel = typeof body.ageLabel === "string" ? body.ageLabel || null : null;
     }
 
     if (body.scheduleMode !== undefined && body.scheduleMode !== existing.scheduleMode) {
@@ -508,8 +541,29 @@ export async function PATCH(
     if (body.currency !== undefined && body.currency !== existing.currency) {
       updateData.currency = body.currency;
     }
+    if (body.phone !== undefined && body.phone !== (existing.phone ?? "")) {
+      updateData.phone = body.phone || null;
+    }
+    if (body.phoneLabel !== undefined && body.phoneLabel !== existing.phoneLabel) {
+      updateData.phoneLabel = body.phoneLabel || null;
+    }
+    if (body.phone2 !== undefined && body.phone2 !== existing.phone2) {
+      updateData.phone2 = body.phone2 || null;
+    }
+    if (body.phone2Label !== undefined && body.phone2Label !== existing.phone2Label) {
+      updateData.phone2Label = body.phone2Label || null;
+    }
+    if (body.phone3 !== undefined && body.phone3 !== existing.phone3) {
+      updateData.phone3 = body.phone3 || null;
+    }
+    if (body.phone3Label !== undefined && body.phone3Label !== existing.phone3Label) {
+      updateData.phone3Label = body.phone3Label || null;
+    }
     if (body.priceItems !== undefined) {
       updateData.priceItems = body.priceItems ?? null;
+    }
+    if (faqItems !== undefined) {
+      updateData.faqItems = faqItems as unknown as Prisma.InputJsonValue;
     }
 
     if (body.coverImageId !== undefined && resolvedCoverImageId !== existing.coverImageId) {
@@ -601,9 +655,17 @@ export async function PATCH(
       }
 
       const sessionsSyncStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-      await replaceActivitySessionsFromScheduleJson(saved.id, nextScheduleJson);
+      await replaceActivitySessionsFromScheduleJson({
+        prisma,
+        activityId: saved.id,
+        scheduleJson: nextScheduleJson,
+      });
       perf.mark("schedule-sync");
-      const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt(saved.id);
+      const syncedNextOccurrenceAt = await syncActivityNextOccurrenceAt({
+        prisma,
+        activityId: saved.id,
+      });
+      await syncEventHomeStories(saved.id);
 
       if (isServerSavePerfEnabled()) {
         console.info("[event-patch-timing] activity-sessions-sync", {
@@ -825,7 +887,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/business/events/[id]
- * Мягкое удаление события (status = DELETED).
+ * Hard-delete only an isolated draft event through the unified lifecycle contract.
  */
 export async function DELETE(
   _request: NextRequest,
@@ -848,7 +910,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    await softDeleteActivityById(id);
+    await deleteActivity(id, user.role);
+    await syncEventHomeStories(id);
 
     revalidatePath("/admin/moderation/events");
     revalidatePath("/admin/content/events");
@@ -856,6 +919,12 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete event error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

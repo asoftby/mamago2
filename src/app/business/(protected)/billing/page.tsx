@@ -3,11 +3,6 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { getBillingAccountByBusinessId } from "@/server/services/billing/billingAccount.service";
 import { BalancePage } from "./BalancePage";
-import { getBusinessResolvedBillingActionPrices } from "@/server/services/billing/billingActionRateResolver.service";
-import {
-  BILLING_ACTION_SHORT_TITLES,
-  formatBillingActionPrice,
-} from "@/lib/billing/actionPricing";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -80,10 +75,6 @@ export default async function BillingBalancePage() {
   const lastCharge = monthTransactions[0] || null;
   const leadsCount = monthTransactions.filter((tx) => tx.type === "LEAD_CHARGE").length;
 
-  const resolvedPrices = await getBusinessResolvedBillingActionPrices({
-    businessId: business.id,
-  });
-
   // Get last top-up
   const lastTopUp = account
     ? await prisma.billingTransaction.findFirst({
@@ -140,21 +131,11 @@ export default async function BillingBalancePage() {
     occurredAt: tx.occurredAt,
   }));
 
-  const actionPrices = resolvedPrices
-    .filter((item) => item.rule && item.rule.isActive)
-    .map((item) => ({
-      actionType: item.actionType,
-      title: BILLING_ACTION_SHORT_TITLES[item.actionType],
-      displayPrice: item.rule ? formatBillingActionPrice(item.rule) : "Бесплатно",
-      isIndividual: item.source === "BUSINESS",
-    }));
-
   return (
     <BalancePage
       balance={balanceData}
       stats={statsData}
       transactions={transactionsData}
-      actionPrices={actionPrices}
       hasBillingProfile={hasBillingProfile}
     />
   );

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
+import type { AgePolicy, RouteStatus, RouteVisibility, BudgetLevel } from "@prisma/client";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import {
   generateRouteSlugFromTitle,
@@ -10,6 +10,20 @@ import {
   type LegacyBudgetLevel,
   type RouteStopPriceType,
 } from "@/lib/routes/routeBudget";
+import { syncRouteMediaUsage } from "@/server/services/media/media-usage.service";
+
+/**
+ * Keep the route's media-usage projection in sync (Phase B invariant).
+ * Best-effort: a projection hiccup must never fail the user's route save —
+ * the next full recompute will reconcile.
+ */
+async function syncRouteMediaUsageSafe(routeId: string): Promise<void> {
+  try {
+    await syncRouteMediaUsage(routeId);
+  } catch (error) {
+    console.error(`[route.service] media usage sync failed for ${routeId}:`, error);
+  }
+}
 
 const publicRouteStopPlaceWhere = {
   OR: [{ placeId: null }, { place: getPublicPublishedPlaceWhere() }],
@@ -22,6 +36,7 @@ export type RouteWithStops = {
   slug: string;
   title: string;
   ageTags: string[];
+  agePolicy: AgePolicy;
   budgetLevel: BudgetLevel;
   cityId: string | null;
   coverImageUrl: string | null;
@@ -45,6 +60,7 @@ export type RouteWithStops = {
     customTitle: string | null;
     note: string;
     photoUrl: string | null;
+    images: { id: string; url: string; sortOrder: number; mediaAssetId: string | null }[];
     priceType: RouteStopPriceType;
     priceMin: number | null;
     priceMax: number | null;
@@ -79,6 +95,7 @@ export type RouteStopInput = {
 export type RouteWriteInput = {
   title: string;
   ageTags: string[];
+  agePolicy: AgePolicy;
   budgetLevel?: BudgetLevel;
   visibility: RouteVisibility;
   publish?: boolean;
@@ -226,6 +243,11 @@ export async function deriveCityIdFromStops(
 
 // ─── Shared include fragment ───────────────────────────────────────────────────
 
+const routeStopImagesInclude = {
+  orderBy: { sortOrder: "asc" as const },
+  select: { id: true, url: true, sortOrder: true, mediaAssetId: true },
+} as const;
+
 const routeWithStopsInclude = {
   city: { select: { id: true, name: true } },
   author: { select: { id: true, email: true } },
@@ -241,6 +263,7 @@ const routeWithStopsInclude = {
           city: { select: { name: true } },
         },
       },
+      images: routeStopImagesInclude,
     },
   },
 } as const;
@@ -305,10 +328,27 @@ export async function getRouteBySlug(
               city: { select: { name: true } },
             },
           },
+          images: routeStopImagesInclude,
         },
       },
     },
   });
+}
+
+/**
+ * Pure `where` builder for `getEditableRouteBySlug`, split out so the
+ * authorship-bypass rule can be unit-tested without a database.
+ * `allowAnyAuthor` (admin/moderator surface): skips the authorship check so
+ * editors can open any route in the shared RouteEditor — including editorial
+ * routes that have no author at all (`authorId === null`, e.g. the imported
+ * WordPress routes).
+ */
+export function buildEditableRouteWhereClause(
+  routeId: string,
+  userId: string,
+  options?: { allowAnyAuthor?: boolean },
+): { id: string; authorId?: string } {
+  return options?.allowAnyAuthor ? { id: routeId } : { id: routeId, authorId: userId };
 }
 
 /**
@@ -318,12 +358,13 @@ export async function getRouteBySlug(
 export async function getEditableRouteBySlug(
   slug: string,
   userId: string,
+  options?: { allowAnyAuthor?: boolean },
 ): Promise<RouteWithStops | null> {
   const resolved = await findRouteBySlug(slug);
   if (!resolved) return null;
 
   return prisma.route.findUnique({
-    where: { id: resolved.routeId, authorId: userId },
+    where: buildEditableRouteWhereClause(resolved.routeId, userId, options),
     include: routeWithStopsInclude,
   });
 }
@@ -372,6 +413,7 @@ export async function createRoute(
   data: {
     title: string;
     ageTags: string[];
+    agePolicy: AgePolicy;
     budgetLevel?: BudgetLevel;
     visibility: RouteVisibility;
     publish?: boolean;
@@ -402,12 +444,13 @@ export async function createRoute(
     data.budgetLevel ?? null,
   );
 
-  return prisma.route.create({
+  const created = await prisma.route.create({
     data: {
       slug,
       slugUpdatedAt: new Date(),
       title: data.title,
       ageTags: data.ageTags,
+      agePolicy: data.agePolicy,
       budgetLevel,
       coverImageUrl,
       cityId,
@@ -420,13 +463,38 @@ export async function createRoute(
     },
     select: { id: true, slug: true },
   });
+
+  await syncRouteMediaUsageSafe(created.id);
+
+  return created;
 }
 
-/** Update an existing route (draft or published). Slug is never changed. */
+/**
+ * Pure authorization check for `updateRoute`, split out so the
+ * `allowAnyAuthor` save-any-route bypass (admin/moderator surface) can be
+ * unit-tested without a database. Mirrors `buildEditableRouteWhereClause`
+ * for the read side.
+ */
+export function canWriteRoute(
+  existingAuthorId: string | null,
+  userId: string,
+  options?: { allowAnyAuthor?: boolean },
+): boolean {
+  return Boolean(options?.allowAnyAuthor) || existingAuthorId === userId;
+}
+
+/**
+ * Update an existing route (draft or published). Slug is never changed.
+ *
+ * `allowAnyAuthor` (admin/moderator surface): skips the authorship check so
+ * editors can save any route via the shared RouteEditor — including
+ * authorless editorial routes (`authorId === null`, e.g. imported WP routes).
+ */
 export async function updateRoute(
   userId: string,
   routeId: string,
   data: RouteWriteInput,
+  options?: { allowAnyAuthor?: boolean },
 ): Promise<{ id: string; slug: string }> {
   const normalizedStops = normalizeStops(data.stops);
   const coverImageUrl = deriveCoverImageUrl(normalizedStops);
@@ -437,7 +505,7 @@ export async function updateRoute(
     data.budgetLevel ?? null,
   );
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const existing = await tx.route.findUnique({
       where: { id: routeId },
       select: {
@@ -466,7 +534,9 @@ export async function updateRoute(
     });
 
     if (!existing) throw new Error("ROUTE_NOT_FOUND");
-    if (existing.authorId !== userId) throw new Error("ROUTE_FORBIDDEN");
+    if (!canWriteRoute(existing.authorId, userId, options)) {
+      throw new Error("ROUTE_FORBIDDEN");
+    }
 
     const stopsChanged =
       buildRouteStopsFingerprint(normalizedStops) !==
@@ -479,6 +549,7 @@ export async function updateRoute(
     const routeScalarUpdate = {
       title: data.title,
       ageTags: data.ageTags,
+      agePolicy: data.agePolicy,
       budgetLevel,
       visibility: data.visibility,
       status,
@@ -486,7 +557,7 @@ export async function updateRoute(
       coverImageUrl,
     };
 
-    const updated = await tx.route.update({
+    const result = await tx.route.update({
       where: { id: routeId },
       data: stopsChanged
         ? { ...routeScalarUpdate, stops: { create: normalizedStops } }
@@ -494,6 +565,10 @@ export async function updateRoute(
       select: { id: true, slug: true },
     });
 
-    return updated;
+    return result;
   });
+
+  await syncRouteMediaUsageSafe(updated.id);
+
+  return updated;
 }

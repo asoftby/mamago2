@@ -99,6 +99,10 @@ export function contentStatusPublicationPillClass(
   }
 }
 
+export function contentStatusPublicationLabel(status: ContentStatus): string {
+  return CONTENT_STATUS_META[status]?.label ?? status;
+}
+
 export function offerStatusPublicationPillClass(status: OfferStatus): string {
   switch (status) {
     case "DRAFT":

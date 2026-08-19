@@ -31,6 +31,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
+import { TableContainer } from "@/components/ui/table";
 
 const REGEN_LABEL: Record<SitemapRegenerationStatus, string> = {
   idle: "Готово",
@@ -204,8 +205,11 @@ export function SitemapRobotsCenterClient({
           приоритетами обхода.
         </p>
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+          <TableContainer
+            minWidthClassName="min-w-[560px]"
+            scrollLabel="Таблица секций sitemap, прокручивается по горизонтали"
+          >
+            <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-slate-50/90">
                   <th className="px-4 py-3 font-semibold text-gray-800">
@@ -249,7 +253,7 @@ export function SitemapRobotsCenterClient({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         </div>
       </section>
 

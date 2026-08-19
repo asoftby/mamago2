@@ -22,13 +22,22 @@ import { Trash2, AlertTriangle } from "lucide-react";
 interface PlaceDangerZoneProps {
   placeId: string;
   placeTitle: string;
+  canDelete?: boolean;
 }
 
-export function PlaceDangerZone({ placeId, placeTitle }: PlaceDangerZoneProps) {
+export function PlaceDangerZone({
+  placeId,
+  placeTitle,
+  canDelete = true,
+}: PlaceDangerZoneProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  if (!canDelete) {
+    return null;
+  }
 
   const handleDelete = async () => {
     if (confirmText !== "DELETE") {
@@ -45,7 +54,7 @@ export function PlaceDangerZone({ placeId, placeTitle }: PlaceDangerZoneProps) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to delete place");
+        throw new Error(data.message || data.error || data.code || "Failed to delete place");
       }
 
       toast.success("Место успешно удалено");
@@ -69,7 +78,8 @@ export function PlaceDangerZone({ placeId, placeTitle }: PlaceDangerZoneProps) {
             Danger Zone
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            Удаление места необратимо. Все связанные данные (изображения, ревизии, запросы на доработку) будут удалены.
+            Hard delete доступен только для полностью изолированных черновиков. Если у места уже есть связанные
+            данные, удаление будет заблокировано и нужно использовать архивирование.
           </p>
 
           <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -88,14 +98,13 @@ export function PlaceDangerZone({ placeId, placeTitle }: PlaceDangerZoneProps) {
                 <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
                 <AlertDialogDescription className="space-y-3">
                   <p>
-                    Это действие необратимо. Место <strong>{placeTitle}</strong> и все связанные данные будут удалены:
+                    Это действие необратимо. Удаление сработает только если место{" "}
+                    <strong>{placeTitle}</strong> остаётся изолированным черновиком без связанных данных.
                   </p>
                   <ul className="list-disc list-inside text-sm space-y-1">
-                    <li>Все изображения места</li>
-                    <li>Все ревизии (черновики и история)</li>
-                    <li>Все запросы на доработку</li>
-                    <li>История модерации</li>
-                    <li>Связи с активностями</li>
+                    <li>Черновик будет удалён навсегда</li>
+                    <li>При наличии офферов, событий, slug history, media usage или других связей API вернёт блокировку</li>
+                    <li>Для связанных публикаций вместо удаления нужно использовать архивирование</li>
                   </ul>
                   <div className="pt-2">
                     <Label htmlFor="confirm-delete" className="text-sm font-medium">

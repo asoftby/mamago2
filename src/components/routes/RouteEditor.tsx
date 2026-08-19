@@ -43,6 +43,8 @@ import {
   type RouteStopPriceType,
 } from "@/lib/routes/routeBudget";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { makeEmptyRouteEditorStop } from "@/lib/routes/routeEditorState";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ export type EditableRouteStop = {
 export type WizardState = {
   title: string;
   ageTags: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   budgetLevel: LegacyBudgetLevel | null;
   stops: EditableRouteStop[];
   visibility: Visibility;
@@ -120,22 +123,13 @@ const VISIBILITY_OPTIONS: {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function makeEmptyStop(): EditableRouteStop {
-  return {
-    id: `stop-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    location: null,
-    note: "",
-    photos: [],
-    priceType: "UNKNOWN",
-    priceMin: null,
-    priceMax: null,
-    priceCurrency: "BYN",
-    priceNote: "",
-  };
+  return makeEmptyRouteEditorStop();
 }
 
 const BASE_STATE: WizardState = {
   title: "",
   ageTags: [],
+  agePolicy: "UNRESTRICTED",
   budgetLevel: null,
   stops: [makeEmptyStop(), makeEmptyStop()],
   visibility: "PUBLIC",
@@ -223,7 +217,11 @@ function Step1({
     const next = state.ageTags.includes(key)
       ? state.ageTags.filter((k) => k !== key)
       : [...state.ageTags, key];
-    onChange({ ageTags: next });
+    onChange({ ageTags: next, agePolicy: next.length ? "SPECIFIC" : "UNRESTRICTED" });
+  };
+
+  const toggleAllAges = () => {
+    onChange({ ageTags: [], agePolicy: "UNRESTRICTED" });
   };
 
   return (
@@ -256,6 +254,17 @@ function Step1({
           Для кого
         </label>
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={toggleAllAges}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-sm font-medium transition-all border",
+              state.agePolicy === "UNRESTRICTED"
+                ? "bg-neutral-900 text-white border-neutral-900"
+                : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
+            )}
+          >
+            Любой
+          </button>
           {AGE_OPTIONS.map((opt) => (
             <button
               key={opt.key}
@@ -270,6 +279,18 @@ function Step1({
               {opt.shortLabel}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => onChange({ ageTags: [], agePolicy: "ADULT_ONLY" })}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-sm font-medium transition-all border",
+              state.agePolicy === "ADULT_ONLY"
+                ? "bg-neutral-900 text-white border-neutral-900"
+                : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
+            )}
+          >
+            Только 18+
+          </button>
         </div>
       </div>
 
@@ -421,7 +442,7 @@ function StopPriceEditor({
 
       {currentType !== "CUSTOM" && currentType !== "FREE" && currentType !== "UNKNOWN" && (
         <div className="text-[11px] text-neutral-400 px-1">
-          Валюта: {stop.priceCurrency === "BYN" ? BYN_SYMBOL : stop.priceCurrency}
+          Валюта: {stop.priceCurrency === "BYN" ? renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" }) : stop.priceCurrency}
         </div>
       )}
 
@@ -463,6 +484,7 @@ function StopEditor({
       `Точка ${index + 1}`;
 
   const noteError = hasLocation && stop.note.trim().length === 0;
+  const titleError = needsCustomTitle && !stop.customTitle?.trim();
 
   const handleLocationChange = (loc: typeof stop.location) => {
     const locationChanged =
@@ -519,11 +541,22 @@ function StopEditor({
                     onChange={(e) => onChange({ customTitle: e.target.value })}
                     placeholder="Например: Старт прогулки, Кафе у парка, Смотровая точка"
                     maxLength={80}
-                    className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
+                    className={cn(
+                      "w-full h-10 px-3 rounded-xl border bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 transition-all",
+                      titleError
+                        ? "border-red-300 focus:border-red-400"
+                        : "border-neutral-200 focus:border-neutral-400",
+                    )}
                   />
-                  <p className="text-xs text-neutral-400 mt-1.5 px-1">
-                    Название шага маршрута — как его увидят пользователи
-                  </p>
+                  {titleError ? (
+                    <p className="text-xs text-[#ef8855] mt-1.5 px-1">
+                      Добавьте название точки — без него маршрут нельзя опубликовать
+                    </p>
+                  ) : (
+                    <p className="text-xs text-neutral-400 mt-1.5 px-1">
+                      Название шага маршрута — как его увидят пользователи
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -532,7 +565,7 @@ function StopEditor({
                   value={stop.note}
                   onChange={(e) => onChange({ note: e.target.value })}
                   placeholder="Например: лучше приезжать утром или закладывайте около часа"
-                  rows={2}
+                  rows={6}
                   maxLength={200}
                   className={cn(
                     "w-full px-3 py-2.5 rounded-xl border bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 transition-all resize-none",
@@ -813,15 +846,16 @@ function Step3({
           className="flex-1 rounded-2xl font-semibold"
           onClick={onPublish}
           disabled={saving || !canPublish}
-          title={
-            !canPublish
-              ? "Добавьте названия для всех точек без места из каталога"
-              : undefined
-          }
         >
           Опубликовать
         </Button>
       </div>
+      {!canPublish && (
+        <p className="text-xs text-[#ef8855] text-center -mt-2">
+          У некоторых точек не заполнено название — вернитесь назад и добавьте
+          его (поле подсвечено).
+        </p>
+      )}
     </div>
   );
 }
@@ -912,6 +946,7 @@ export function RouteEditor({
       const body = {
         title: state.title,
         ageTags: state.ageTags,
+        agePolicy: state.agePolicy,
         budgetLevel: state.budgetLevel,
         visibility: state.visibility,
         publish,

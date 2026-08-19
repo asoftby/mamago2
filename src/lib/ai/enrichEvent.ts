@@ -257,10 +257,19 @@ function buildSourceContext(params: {
 
   const placeName =
     normalizedData?.venueName?.trim() ||
-    extractString(rawPayload, "venue", "venueName", "location", "place", "площадка");
+    extractString(rawPayload, "venue", "venueName", "placeName", "location", "place", "площадка");
   const addressText =
     normalizedData?.addressText?.trim() ||
-    extractString(rawPayload, "addressText", "address", "addressLine", "formattedAddress", "addr");
+    extractString(
+      rawPayload,
+      "addressText",
+      "placeAddress",
+      "locationAddress",
+      "address",
+      "addressLine",
+      "formattedAddress",
+      "addr",
+    );
   const scheduleText =
     normalizedData?.scheduleText?.trim() ||
     extractString(rawPayload, "scheduleText", "schedule", "timing", "расписание");

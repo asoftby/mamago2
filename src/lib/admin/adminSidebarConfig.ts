@@ -33,7 +33,7 @@ import {
 
 export const NAV_MAIN: AdminSidebarNavItem = {
   id: "main",
-  label: "Главная",
+  label: "Панель управления",
   href: adminPath(""),
   icon: LayoutDashboard,
 };
@@ -77,6 +77,12 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
       href: adminPath("/content/editorial-requests"),
       matchers: [{ type: "prefix", value: adminPath("/content/editorial-requests") }],
     },
+    {
+      id: "communications-direct",
+      label: "Direct",
+      href: adminPath("/communications/direct"),
+      matchers: [{ type: "prefix", value: adminPath("/communications/direct") }],
+    },
   ],
 };
 
@@ -85,6 +91,20 @@ export const NAV_ANALYTICS: AdminSidebarNavItem = {
   label: "Analytics",
   href: adminPath("/analytics"),
   icon: ChartColumn,
+  children: [
+    {
+      id: "performance",
+      label: "Performance",
+      href: adminPath("/performance"),
+      matchers: [{ type: "exact", value: adminPath("/performance") }],
+    },
+    {
+      id: "analytics-detail",
+      label: "Детальная аналитика",
+      href: adminPath("/analytics"),
+      matchers: [{ type: "prefix", value: adminPath("/analytics") }],
+    },
+  ],
 };
 
 // === IMPORT SECTION (STANDALONE TOP-LEVEL) ===
@@ -288,6 +308,12 @@ export const GROUP_CONTENT: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/content/offers") }],
     },
     {
+      id: "content-routes",
+      label: "Маршруты",
+      href: adminPath("/content/routes"),
+      matchers: [{ type: "prefix", value: adminPath("/content/routes") }],
+    },
+    {
       id: "content-publications",
       label: "Публикации",
       href: adminPath("/content/publications"),
@@ -406,7 +432,7 @@ export const GROUP_RANKING: AdminSidebarGroup = {
   children: [
     {
       id: "ranking-stories-intents",
-      label: "Stories Intents",
+      label: "Stories на главной",
       href: adminPath("/ranking/stories-intents"),
       matchers: [{ type: "prefix", value: adminPath("/ranking/stories-intents") }],
     },

@@ -6,10 +6,10 @@ import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   BirthdayLocationType,
-  BirthdayRole,
   OfferFormData,
   OfferPlacementKey,
   OfferPlacementStatus,
+  PartyCategory,
 } from "../types";
 
 interface Step2PlacementsProps {
@@ -55,23 +55,52 @@ const placementStatusLabel: Record<OfferPlacementStatus, string> = {
   REJECTED: "отклонено",
 };
 
-const birthdayRoleOptions = [
-  { value: "VENUE" as const, label: "Площадка / аренда", description: "Локация, пространство или отдельный зал для праздника." },
-  { value: "ANIMATOR" as const, label: "Аниматор / ведущий", description: "Ведущий, герой, аниматор или интерактив." },
-  { value: "SHOW" as const, label: "Шоу / программа", description: "Научное, музыкальное, тематическое или игровое шоу." },
-  { value: "MASTER_CLASS" as const, label: "Мастер-класс", description: "Творческий или образовательный формат для праздника." },
-  { value: "CAKE" as const, label: "Торт / сладкий стол", description: "Кондитерский или сладкий блок праздника." },
-  { value: "CATERING" as const, label: "Еда / кейтеринг", description: "Фуршет, закуски, catering или праздничное меню." },
-  { value: "DECOR" as const, label: "Декор", description: "Украшение пространства, фотозона, шары и оформление." },
-  { value: "PHOTO_VIDEO" as const, label: "Фото / видео", description: "Съёмка, фотограф, видеограф или контент-пакет." },
-  { value: "PACKAGE" as const, label: "Праздник под ключ", description: "Полный пакет с программой и организацией." },
-  { value: "OTHER" as const, label: "Другое", description: "Нестандартный формат, который тоже релевантен празднику." },
-];
-
 const birthdayLocationOptions = [
   { value: "ON_SITE" as const, label: "У нас", description: "Праздник проходит на вашей площадке." },
   { value: "OFF_SITE" as const, label: "С выездом", description: "Вы приезжаете к клиенту или на стороннюю площадку." },
   { value: "BOTH" as const, label: "Оба варианта", description: "Можно провести и у вас, и на выезде." },
+];
+
+/** Категория услуги для PARTY_SERVICE, сгруппированная по смыслу (StableCardSelector групп не умеет — рисуем 5 отдельных селекторов с общим value). */
+const partyCategoryGroups: Array<{
+  groupLabel: string;
+  options: Array<{ value: PartyCategory; label: string; description: string }>;
+}> = [
+  {
+    groupLabel: "Пространство",
+    options: [
+      { value: "VENUE", label: "Площадка / аренда", description: "Локация, пространство или отдельный зал для праздника." },
+    ],
+  },
+  {
+    groupLabel: "Развлечение",
+    options: [
+      { value: "ANIMATOR", label: "Аниматор / ведущий", description: "Ведущий, герой, аниматор или интерактив." },
+      { value: "SHOW", label: "Шоу / программа", description: "Научное, музыкальное, тематическое или игровое шоу." },
+      { value: "MASTER_CLASS", label: "Мастер-класс", description: "Творческий или образовательный формат для праздника." },
+    ],
+  },
+  {
+    groupLabel: "Еда",
+    options: [
+      { value: "CAKE", label: "Торт / сладкий стол", description: "Кондитерский или сладкий блок праздника." },
+      { value: "FOOD", label: "Еда / кейтеринг", description: "Фуршет, закуски, catering или праздничное меню." },
+    ],
+  },
+  {
+    groupLabel: "Медиа и декор",
+    options: [
+      { value: "DECOR", label: "Декор", description: "Украшение пространства, фотозона, шары и оформление." },
+      { value: "PHOTO", label: "Фото / видео", description: "Съёмка, фотограф, видеограф или контент-пакет." },
+    ],
+  },
+  {
+    groupLabel: "Под ключ",
+    options: [
+      { value: "PROGRAM", label: "Праздник под ключ", description: "Полный пакет с программой и организацией." },
+      { value: "OTHER", label: "Другое", description: "Нестандартный формат, который тоже релевантен празднику." },
+    ],
+  },
 ];
 
 export function Step2Placements({
@@ -80,6 +109,8 @@ export function Step2Placements({
   isEditable,
 }: Step2PlacementsProps) {
   const hasBirthdayPlacement = data.requestedPlacements.includes("BIRTHDAY");
+  const isPartyService = data.productType === "PARTY_SERVICE";
+  const isPartyPackage = data.productType === "PARTY_PACKAGE";
 
   const togglePlacement = (key: OfferPlacementKey, checked: boolean) => {
     onChange((prev) => {
@@ -108,11 +139,11 @@ export function Step2Placements({
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-semibold mb-2">
-          Где это может быть полезно родителям?
+          Что вы предлагаете?
         </h2>
         <p className="text-muted-foreground">
-          Выберите только те сценарии, для которых у вас есть отдельные условия.
-          Финальное размещение проверит модератор.
+          Выберите сценарии — это поможет родителям найти ваше предложение
+          в нужном разделе. Финальное размещение проверит модератор.
         </p>
       </div>
 
@@ -156,7 +187,53 @@ export function Step2Placements({
         })}
       </div>
 
-      {hasBirthdayPlacement ? (
+      {isPartyService ? (
+        <div className="space-y-6 rounded-3xl border border-[#EF8759]/30 bg-orange-50/60 p-5">
+          <div>
+            <h3 className="text-lg font-semibold">Услуга для праздника</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Категория и формат проведения помогут родителям и модератору
+              понять, что именно вы предлагаете.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <Label>Категория услуги <span className="text-red-500">*</span></Label>
+            {partyCategoryGroups.map((group) => (
+              <div key={group.groupLabel} className="space-y-2">
+                <Label className="text-sm font-normal text-muted-foreground">
+                  {group.groupLabel}
+                </Label>
+                <StableCardSelector<PartyCategory>
+                  value={data.partyCategory}
+                  onValueChange={(partyCategory) => onChange({ partyCategory })}
+                  options={group.options}
+                  isEditable={isEditable}
+                  className="grid gap-3 md:grid-cols-2"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Формат проведения <span className="text-red-500">*</span></Label>
+            <StableCardSelector<BirthdayLocationType>
+              value={data.birthdayDetails.locationType}
+              onValueChange={(locationType) => updateBirthdayDetails({ locationType })}
+              options={birthdayLocationOptions}
+              isEditable={isEditable}
+              className="grid gap-3 md:grid-cols-3"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border/70 bg-white/60 p-4 text-sm text-muted-foreground">
+            Длительность, цена, что входит, описание и важные условия — на
+            следующих шагах («Условия» и «Цена»).
+          </div>
+        </div>
+      ) : null}
+
+      {isPartyPackage ? (
         <div className="space-y-6 rounded-3xl border border-[#EF8759]/30 bg-orange-50/60 p-5">
           <div>
             <h3 className="text-lg font-semibold">Условия для праздника</h3>
@@ -164,17 +241,6 @@ export function Step2Placements({
               Заполните базовые условия, чтобы модератор и родители понимали,
               как именно предложение работает в сценарии праздника.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Роль в празднике <span className="text-red-500">*</span></Label>
-            <StableCardSelector<BirthdayRole>
-              value={data.birthdayDetails.role}
-              onValueChange={(role) => updateBirthdayDetails({ role })}
-              options={birthdayRoleOptions}
-              isEditable={isEditable}
-              className="grid gap-3 md:grid-cols-2"
-            />
           </div>
 
           <div className="space-y-2">
@@ -188,7 +254,7 @@ export function Step2Placements({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="birthdayDuration">Длительность, минут</Label>
               <Input
@@ -229,21 +295,6 @@ export function Step2Placements({
                   updateBirthdayDetails({
                     maxChildren: e.target.value ? Number(e.target.value) : null,
                   })
-                }
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="birthdayPriceFrom">
-                Цена от <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="birthdayPriceFrom"
-                inputMode="decimal"
-                placeholder="Например, 120"
-                value={data.birthdayDetails.priceFrom}
-                onChange={(e) =>
-                  updateBirthdayDetails({ priceFrom: e.target.value })
                 }
                 disabled={!isEditable}
               />
@@ -291,6 +342,14 @@ export function Step2Placements({
               placeholder="Например: доплата за выезд, минимальный заказ, ограничения по возрасту."
             />
           </div>
+        </div>
+      ) : null}
+
+      {hasBirthdayPlacement && !isPartyService && !isPartyPackage ? (
+        <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
+          Отметка «Организовать праздник» поможет родителям найти это
+          предложение в разделе праздников — дополнительные поля для этого
+          сценария не нужны.
         </div>
       ) : null}
     </div>

@@ -9,8 +9,10 @@ export type AuthEntryPoint =
   | "my_plan"
   | "birthday_constructor";
 
-/** Сущность для сохранения после входа (активность или маршрут). */
-export type PendingEntityType = "activity" | "route";
+export type AuthAction = "login" | "signup";
+
+/** Сущность для сохранения после входа (активность, маршрут или статья). */
+export type PendingEntityType = "activity" | "route" | "article";
 
 export type PendingSaveIdeaAction = {
   kind: "save_idea";
@@ -38,6 +40,7 @@ export type PendingPostAuthAction = PendingSaveIdeaAction | PendingSavePlanActio
 
 export interface PostAuthContext {
   source: AuthEntryPoint;
+  authAction?: AuthAction | null;
   pendingAction: PendingPostAuthAction;
   /** Куда вернуться после полного завершения (pathname + search или абсолютный URL) */
   returnTo: string | null;

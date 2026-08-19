@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, ActivityType } from "@prisma/client";
+import { ContentStatus } from "@prisma/client";
 import { isPlaceRequired } from "@/lib/activity/classification";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
@@ -91,12 +91,6 @@ export async function POST(
         missing.push("placeId");
         fields.placeId = "Place is required for this activity type";
       }
-    }
-
-    // Required: at least one age tag
-    if (!activity.ageTags || activity.ageTags.length === 0) {
-      missing.push("ageTags");
-      fields.ageTags = "At least one age tag is required";
     }
 
     // Required: cover image

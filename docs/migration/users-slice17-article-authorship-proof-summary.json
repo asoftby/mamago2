@@ -1,0 +1,46 @@
+{
+  "phase": "USERS Slice 17 published Article dependency proof",
+  "scope": "exactly the 2 published Articles authored by wordpress-db:user:575, found in Slice 16's durable Activity snapshot",
+  "readOnly": true,
+  "sourceInputs": {
+    "durableActivitySnapshot": "~/.mamago2/migration-snapshots/activities/ (Slice 16, no new capture)",
+    "committedSlice16Manifest": "docs/migration/users-slice16-activity-dependency-inventory.json (cross-checked, byte-identical sourceRecordKeys)",
+    "sshProbes": 0,
+    "wordPressQueries": 0,
+    "newSourceSnapshot": false
+  },
+  "countGate": {
+    "expected": 2,
+    "found": 2,
+    "sourceRecordKeys": ["wordpress-db:post:56250", "wordpress-db:post:57731"]
+  },
+  "canonicalManifestHash": "833e67d396300bd42d67a7218a0340770b7ff9544b68535d90e453c036710b8b",
+  "result": {
+    "wordpress-db:post:56250": { "classification": "ARTICLE_TARGET_NOT_MIGRATED", "reasonCode": "NEVER_ATTEMPTED" },
+    "wordpress-db:post:57731": { "classification": "ARTICLE_TARGET_NOT_MIGRATED", "reasonCode": "NEVER_ATTEMPTED" }
+  },
+  "keyFinding": "Neither article has ever been migrated: no active ARTICLE MigrationLineage exists for either sourceRecordKey, and neither has any MigrationRecord history. wordpress-db:user:575's own USER lineage is active and present (confirmed part of the clean 564). Both are genuinely never-attempted, publish-status Articles with no lineage conflict of any kind.",
+  "goldenCandidateSelection": {
+    "selected": "wordpress-db:post:56250",
+    "reason": "Deterministic tie-break: both candidates are equally minimal (each has exactly one relevant postmeta entry, a single _thumbnail_id, no gallery, no other captured dependency evidence) — the lower legacy WordPress post ID is chosen for determinism, per the fixed sort order already used throughout this planning module.",
+    "note": "Selection only — Slice 17 does not create this Article. A future, separately-authorized Article golden migration slice would use this candidate."
+  },
+  "readOnlyProof": {
+    "databaseWrites": 0,
+    "articleWrites": 0,
+    "authorshipWrites": 0,
+    "userRoleWrites": 0,
+    "mediaWrites": 0,
+    "beforeAfterCountsIdentical": true,
+    "sshProbes": 0,
+    "wordPressQueries": 0
+  },
+  "decision": "ARTICLE_GOLDEN_REQUIRED",
+  "deferredScope": {
+    "articleGoldenMigrationSlice": "NOT_STARTED — required before any authorship write for user:575",
+    "authorshipWriteForUser575": "BLOCKED until at least one of the 2 Articles is migrated",
+    "expiredActivityRelations": "P1_HISTORICAL_EXPIRED_ACTIVITY (Slice 16) — unchanged, not re-litigated here",
+    "user521Conflict": "deferred — unrelated to this slice",
+    "user91PartialLineage": "deferred — unrelated to this slice"
+  }
+}

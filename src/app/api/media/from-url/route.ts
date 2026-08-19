@@ -16,6 +16,7 @@ import {
 } from "@/lib/media/imageProcessor";
 import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
+import { describeFetchError, fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -23,10 +24,22 @@ export const maxDuration = 45;
 const MAX_BYTES = 10 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 25_000;
 
-function mimeFromContentType(header: string | null): string {
+function mimeFromContentType(header: string | null | undefined): string {
   if (!header) return "application/octet-stream";
   const base = header.split(";")[0]?.trim().toLowerCase() ?? "";
   return base || "application/octet-stream";
+}
+
+/**
+ * Every controlled error along the fetch/validation path (SSRF rejection,
+ * redirect limit, size limit, TLS/network failure, timeout) is tagged with
+ * `httpStatus` at the throw site — see safeRemoteImageUrl.ts and fetchHtml.ts
+ * (`fetchBinary`). This avoids classifying errors by matching message text.
+ */
+function errorHttpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const value = (error as { httpStatus?: unknown }).httpStatus;
+  return typeof value === "number" ? value : undefined;
 }
 
 export async function POST(req: NextRequest) {
@@ -48,43 +61,23 @@ export async function POST(req: NextRequest) {
     const urlRaw = body && typeof body.url === "string" ? body.url : "";
     const url = assertSafeRemoteImageUrl(urlRaw);
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let remote: Response;
-    try {
-      remote = await fetch(url.toString(), {
-        signal: controller.signal,
-        redirect: "follow",
-        headers: {
-          Accept: "image/*,*/*;q=0.8",
-          "User-Agent": "MamaGoMediaImporter/1.0",
-        },
-      });
-    } finally {
-      clearTimeout(timer);
-    }
+    // `validateUrl` is called for the initial URL and again for every
+    // redirect hop inside fetchBinary, so a redirect can't be used to reach
+    // a private/reserved host that the initial check would have rejected.
+    const remote = await fetchBinary(url.toString(), {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      maxBytes: MAX_BYTES,
+      headers: {
+        Accept: "image/*,*/*;q=0.8",
+        "User-Agent": "MamaGoMediaImporter/1.0",
+      },
+      validateUrl: (candidate) => {
+        assertSafeRemoteImageUrl(candidate.toString());
+      },
+    });
 
-    if (!remote.ok) {
-      return NextResponse.json(
-        { error: `Не удалось скачать: HTTP ${remote.status}` },
-        { status: 502 },
-      );
-    }
-
-    const lenHeader = remote.headers.get("content-length");
-    if (lenHeader) {
-      const n = parseInt(lenHeader, 10);
-      if (!Number.isNaN(n) && n > MAX_BYTES) {
-        return NextResponse.json({ error: "Файл слишком большой" }, { status: 400 });
-      }
-    }
-
-    const buf = Buffer.from(await remote.arrayBuffer());
-    if (buf.length > MAX_BYTES) {
-      return NextResponse.json({ error: "Файл слишком большой" }, { status: 400 });
-    }
-
-    let mime = mimeFromContentType(remote.headers.get("content-type"));
+    const buf = remote.buffer;
+    let mime = mimeFromContentType(remote.headers["content-type"]);
     if (mime === "application/octet-stream" || !mime.startsWith("image/")) {
       if (buf[0] === 0xff && buf[1] === 0xd8) mime = "image/jpeg";
       else if (buf[0] === 0x89 && buf[1] === 0x50) mime = "image/png";
@@ -140,13 +133,30 @@ export async function POST(req: NextRequest) {
       sourceUrl: url.toString(),
     });
   } catch (e: unknown) {
+    const httpStatus = errorHttpStatus(e);
     const msg = e instanceof Error ? e.message : "Import failed";
-    if (msg.includes("Пустой") || msg.includes("Некорректный") || msg.includes("Разрешены")) {
+
+    // 400: bad/unsafe URL, redirect to a private host, too many redirects,
+    // or the response exceeded MAX_BYTES — these messages are already
+    // user-safe (assertSafeRemoteImageUrl / fetchBinary never put upstream
+    // internals in them).
+    if (httpStatus === 400) {
       return NextResponse.json({ error: msg }, { status: 400 });
     }
-    if (e instanceof Error && e.name === "AbortError") {
+
+    if (httpStatus === 504 || (e instanceof Error && e.name === "AbortError")) {
+      console.warn("media/from-url: timed out", { error: describeFetchError(e) });
       return NextResponse.json({ error: "Превышено время загрузки" }, { status: 504 });
     }
+
+    if (httpStatus === 502) {
+      // Network/TLS failure or a non-2xx upstream response. Keep the
+      // response generic — the actionable cause (TLS error code, DNS
+      // failure, upstream status, etc.) goes to the server log only.
+      console.error("media/from-url: upstream fetch failed", { error: describeFetchError(e) });
+      return NextResponse.json({ error: "Не удалось скачать изображение" }, { status: 502 });
+    }
+
     console.error("media/from-url:", e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

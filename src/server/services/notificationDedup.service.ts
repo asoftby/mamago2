@@ -124,6 +124,13 @@ const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
   RECOMMENDATION: null,
   NEWS: null,
   ANNOUNCEMENT: null,
+
+  // Direct (Phase 1 — boundary only, no caller wired in yet)
+  // One thread-created ping per thread; one message ping per message
+  // (exact dedup via entityId — message notifications use the message id,
+  // not the thread id, so consecutive messages are not suppressed).
+  DIRECT_THREAD_CREATED: null,
+  DIRECT_NEW_MESSAGE: null,
 };
 
 export function isOneTimeNotificationType(type: NotificationType): boolean {

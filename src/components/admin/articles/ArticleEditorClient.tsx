@@ -52,6 +52,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 
 function toLocalDatetimeValue(iso: string | null): string {
@@ -136,11 +140,11 @@ function applySnapshot(setters: {
 
 export function ArticleEditorClient({
   initial,
-  isAdminEditor = false,
+  canModerate = false,
 }: {
   initial: ArticleEditorSnapshot;
-  /** ADMIN: кнопка «Опубликовать» и прямой publish; MODERATOR: «Отправить на модерацию». */
-  isAdminEditor?: boolean;
+  /** Только ADMIN/MODERATOR видят решения по статье в статусе PENDING. */
+  canModerate?: boolean;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -155,6 +159,8 @@ export function ArticleEditorClient({
   const [, setSaveHintTick] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
 
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
@@ -256,6 +262,7 @@ export function ArticleEditorClient({
   );
 
   const dirty = currentComparable !== savedComparableRef.current;
+  const displayTitle = resolveDraftTitle(title, "Новая статья");
 
   const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange } = useUnsavedChangesNavigationGuard(dirty);
 
@@ -332,27 +339,30 @@ export function ArticleEditorClient({
     [content],
   );
 
-  const editorSetters = {
-    setTitle,
-    setSlug,
-    setCoverImageId,
-    setAuthorUserId,
-    setAuthorLabel,
-    setCityContext,
-    setCategoryId,
-    setTagIds,
-    setGeoScope,
-    setCityId,
-    setContent,
-    setStatus,
-    setPublishedAtLocal,
-    setScheduledAtLocal,
-    setSeoTitle,
-    setSeoDescription,
-    setSeoCanonicalUrl,
-    setNoindex,
-    setViews,
-  };
+  const editorSetters = useMemo(
+    () => ({
+      setTitle,
+      setSlug,
+      setCoverImageId,
+      setAuthorUserId,
+      setAuthorLabel,
+      setCityContext,
+      setCategoryId,
+      setTagIds,
+      setGeoScope,
+      setCityId,
+      setContent,
+      setStatus,
+      setPublishedAtLocal,
+      setScheduledAtLocal,
+      setSeoTitle,
+      setSeoDescription,
+      setSeoCanonicalUrl,
+      setNoindex,
+      setViews,
+    }),
+    [],
+  );
 
   const applyEditorSnapshot = useCallback(
     (snap: ArticleEditorSnapshot) => {
@@ -360,7 +370,20 @@ export function ArticleEditorClient({
       setPinnedSlug(snap.slug?.trim() || null);
       hydrateSlug(snap.slug);
     },
-    [hydrateSlug],
+    [editorSetters, hydrateSlug],
+  );
+
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface: "admin",
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [],
   );
 
   const validateGeoScopeForPublish = useCallback((): boolean => {
@@ -452,6 +475,35 @@ export function ArticleEditorClient({
     });
   }, []);
 
+  const showArticleSuccess = useCallback(
+    (
+      outcome: ContentSuccessPayload["outcome"],
+      articleId: string,
+      snap?: ArticleEditorSnapshot | null,
+      isEdit = true,
+    ) => {
+      const source = snap ?? {
+        slug,
+        geoScope,
+        cityId,
+      };
+      const modalCitySlug =
+        source.cityId != null
+          ? (cities.find((city) => city.id === source.cityId)?.slug ?? null)
+          : null;
+      showSuccessModal({
+        kind: "article",
+        outcome,
+        id: articleId,
+        isEdit,
+        slug: source.slug ?? null,
+        geoScope: source.geoScope ?? null,
+        citySlug: modalCitySlug,
+      });
+    },
+    [cities, cityId, geoScope, showSuccessModal, slug],
+  );
+
   const save = useCallback(
     async (opts?: { silent?: boolean; skipLoading?: boolean }): Promise<boolean> => {
       if (!opts?.skipLoading) setSaving(true);
@@ -480,7 +532,7 @@ export function ArticleEditorClient({
           if (!Number.isNaN(updated)) setLastSavedAt(updated);
           else setLastSavedAt(Date.now());
           if (!opts?.silent) {
-            toast.success("Черновик сохранён");
+            showArticleSuccess("draft_saved", next.id, next, false);
           }
           router.replace(`/admin/content/articles/${next.id}/edit`);
           router.refresh();
@@ -509,7 +561,7 @@ export function ArticleEditorClient({
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
         else setLastSavedAt(Date.now());
         if (!opts?.silent) {
-          toast.success("Черновик сохранён");
+          showArticleSuccess("draft_saved", next.id, next, true);
         }
         router.refresh();
         return true;
@@ -522,7 +574,15 @@ export function ArticleEditorClient({
         if (!opts?.skipLoading) setSaving(false);
       }
     },
-    [hasPersistedId, initial.id, payload, persistComparableFromSnapshot, router, applyEditorSnapshot],
+    [
+      applyEditorSnapshot,
+      hasPersistedId,
+      initial.id,
+      payload,
+      persistComparableFromSnapshot,
+      router,
+      showArticleSuccess,
+    ],
   );
 
   const fetchSnapshot = useCallback(
@@ -568,22 +628,14 @@ export function ArticleEditorClient({
         if (!ok) return;
       }
 
-      const res = isAdminEditor
-        ? await fetch(`/api/admin/articles/${articleId}/moderate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ decision: "publish" }),
-          })
-        : await fetch(`/api/admin/articles/${articleId}/submit`, { method: "POST" });
+      const res = await fetch(`/api/admin/articles/${articleId}/submit`, { method: "POST" });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const msg =
           typeof data.error === "string"
             ? data.error
-            : isAdminEditor
-              ? "Не удалось опубликовать"
-              : "Не удалось отправить на модерацию";
+            : "Не удалось отправить на модерацию";
         setError(msg);
         toast.error(msg);
         return;
@@ -595,7 +647,7 @@ export function ArticleEditorClient({
         const updated = Date.parse(next.updatedAt);
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
       }
-      toast.success(isAdminEditor ? "Статья опубликована" : "Отправлено на модерацию");
+      showArticleSuccess("submitted", articleId, next, Boolean(initial.id.trim()));
       router.replace(`/admin/content/articles/${articleId}/edit`);
       router.refresh();
     } catch (e) {
@@ -611,9 +663,9 @@ export function ArticleEditorClient({
     fetchSnapshot,
     persistComparableFromSnapshot,
     router,
-    isAdminEditor,
     validateGeoScopeForPublish,
     applyEditorSnapshot,
+    showArticleSuccess,
   ]);
 
   const moderate = useCallback(
@@ -622,6 +674,10 @@ export function ArticleEditorClient({
       setError(null);
       setModerating(true);
       try {
+        if (decision === "publish") {
+          const saved = await save({ silent: true, skipLoading: true });
+          if (!saved) return;
+        }
         const res = await fetch(`/api/admin/articles/${initial.id}/moderate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -642,7 +698,11 @@ export function ArticleEditorClient({
           const updated = Date.parse(next.updatedAt);
           if (!Number.isNaN(updated)) setLastSavedAt(updated);
         }
-        toast.success(decision === "publish" ? "Статья опубликована" : "Статья отклонена");
+        if (decision === "publish") {
+          showArticleSuccess("published", initial.id, next, true);
+        } else {
+          toast.success("Статья отклонена");
+        }
         router.refresh();
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Ошибка модерации";
@@ -651,7 +711,16 @@ export function ArticleEditorClient({
         setModerating(false);
       }
     },
-    [initial.id, fetchSnapshot, persistComparableFromSnapshot, router, validateGeoScopeForPublish, applyEditorSnapshot],
+    [
+      initial.id,
+      fetchSnapshot,
+      persistComparableFromSnapshot,
+      router,
+      validateGeoScopeForPublish,
+      applyEditorSnapshot,
+      showArticleSuccess,
+      save,
+    ],
   );
 
   const confirmDeleteArticle = useCallback(async () => {
@@ -666,6 +735,8 @@ export function ArticleEditorClient({
             ? (data as { message: string }).message
             : typeof (data as { error?: string }).error === "string"
               ? (data as { error: string }).error
+              : typeof (data as { code?: string }).code === "string"
+                ? (data as { code: string }).code
               : "Не удалось удалить статью";
         setError(msg);
         toast.error(msg);
@@ -701,7 +772,7 @@ export function ArticleEditorClient({
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900 line-clamp-3 break-words">
-            {title.trim() || "Без названия"}
+            {displayTitle}
           </h1>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 text-right ml-auto">
@@ -941,12 +1012,13 @@ export function ArticleEditorClient({
         onAuthorChange={setAuthorUserId}
         authorLabel={authorLabel}
         onAuthorLabelChange={setAuthorLabel}
-        isAdminEditor={isAdminEditor}
+        canModerate={canModerate}
+        hasUnsavedChanges={dirty}
         actionsBusy={actionsBusy}
         submitting={submitting}
         saving={saving}
         moderating={moderating}
-        onPublish={() => void submitForModeration()}
+        onSubmitForModeration={() => void submitForModeration()}
         onSaveDraft={() => void save()}
         onApprove={() => void moderate("publish")}
         onReject={() => void moderate("reject")}
@@ -954,13 +1026,12 @@ export function ArticleEditorClient({
         publicUrl={publicUrl}
       />
 
-      {/* Зона удаления (только для черновиков и архивных) */}
-      {hasPersistedId && (status === "ARCHIVED" || status === "DRAFT") ? (
+      {/* Зона удаления (только для изолированных черновиков) */}
+      {hasPersistedId && status === "DRAFT" ? (
         <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-3 sm:py-4">
           <p className="text-sm text-muted-foreground mb-3">
-            {status === "DRAFT"
-              ? "Удалить черновик — запись исчезнет из списка публикаций. Пока статья не опубликована, публичных страниц нет."
-              : "Удаление навсегда убирает статью из базы. Публичная страница вернёт 404. Доступно только для архивных материалов."}
+            Удалить можно только полностью изолированный черновик. Если у статьи уже появились связанные данные,
+            API вернёт блокировку и нужно будет использовать архивирование.
           </p>
           <Button
             type="button"
@@ -968,7 +1039,7 @@ export function ArticleEditorClient({
             disabled={actionsBusy}
             onClick={() => setDeleteDialogOpen(true)}
           >
-            {status === "DRAFT" ? "Удалить черновик" : "Удалить"}
+            Удалить черновик
           </Button>
         </div>
       ) : null}
@@ -993,10 +1064,9 @@ export function ArticleEditorClient({
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Удаление статьи</AlertDialogTitle>
+            <AlertDialogTitle>Удалить черновик?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>Вы уверены, что хотите удалить статью?</p>
                 <p>Это действие нельзя отменить.</p>
               </div>
             </AlertDialogDescription>
@@ -1020,6 +1090,12 @@ export function ArticleEditorClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
     </div>
   );
 }

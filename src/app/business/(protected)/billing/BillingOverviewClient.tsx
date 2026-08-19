@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/formatters/format-price";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Mail, AlertCircle } from "lucide-react";
+import { TableContainer } from "@/components/ui/table";
 
 interface BillingData {
   businessId: string;
@@ -279,7 +280,7 @@ export function BillingOverviewClient({ businessId, initialBillingData }: Props)
         </div>
 
         {/* Transactions Table */}
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[640px]" scrollLabel="Операции по счёту, таблица">
           {filteredTransactions.length === 0 ? (
             <div className="p-12 text-center">
               <p className="text-gray-600">Нет операций</p>
@@ -330,7 +331,7 @@ export function BillingOverviewClient({ businessId, initialBillingData }: Props)
               </tbody>
             </table>
           )}
-        </div>
+        </TableContainer>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { formatDateTime } from "@/lib/business/billing";
 import { formatPrice, formatTransactionAmount } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { TableContainer } from "@/components/ui/table";
 
 export default async function AdminBillingPage() {
   const user = await getCurrentUser();
@@ -131,7 +132,7 @@ export default async function AdminBillingPage() {
             </Link>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[640px]" scrollLabel="Последние транзакции, таблица">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -166,7 +167,7 @@ export default async function AdminBillingPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       </div>
 
       {/* Businesses Requiring Attention */}

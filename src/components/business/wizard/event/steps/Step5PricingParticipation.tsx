@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { CtaStep } from "@/components/business/wizard/shared/CtaStep";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WizardRichTextField } from "@/components/business/wizard/shared/WizardRichTextField";
@@ -11,13 +12,20 @@ import {
 } from "@/features/publication-access";
 import type { EventFormData } from "../types";
 import { PriceListEditor } from "@/components/shared/PriceListEditor";
-import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, normalizeRichTextCurrency } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import {
+  mapCtaStepValueToEventFormPatch,
+  mapEventFormDataToCtaStepValue,
+} from "../ctaStepMapper";
+import { resolveEventPricingParticipationCtaRenderMode } from "../ctaStepFeatureFlag";
 
 interface Step5PricingParticipationProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
   eventId?: string;
+  ctaStepEnabled?: boolean;
 }
 
 function flattenEventTimeSlots(
@@ -110,6 +118,7 @@ function getPublicationAccessFromEvent(data: EventFormData): PublicationAccess {
 function buildEventAccessPatch(access: PublicationAccess): Partial<EventFormData> {
   if (access.method === "ticket") {
     return {
+      ctaStepDraft: null,
       publicationAccess: access,
       participationMode: "external-link",
       ticketLink: access.ticketUrl ?? "",
@@ -118,6 +127,7 @@ function buildEventAccessPatch(access: PublicationAccess): Partial<EventFormData
 
   if (access.method === "timeslots") {
     return {
+      ctaStepDraft: null,
       publicationAccess: access,
       participationMode: "time-slots",
       timeSlots: buildEventTimeSlots(access.timeSlots),
@@ -126,6 +136,7 @@ function buildEventAccessPatch(access: PublicationAccess): Partial<EventFormData
 
   if (access.method === "prebooking") {
     return {
+      ctaStepDraft: null,
       publicationAccess: access,
       participationMode: "prebook",
       prebookMethod: access.externalUrl?.trim() && !access.phone?.trim() ? "link" : "phone",
@@ -135,6 +146,7 @@ function buildEventAccessPatch(access: PublicationAccess): Partial<EventFormData
   }
 
   return {
+    ctaStepDraft: null,
     publicationAccess: access,
     participationMode: "walk-in",
   };
@@ -144,11 +156,38 @@ export function Step5PricingParticipation({
   data,
   onChange,
   isEditable,
+  eventId,
+  ctaStepEnabled,
 }: Step5PricingParticipationProps) {
   const publicationAccess = useMemo(
     () => getPublicationAccessFromEvent(data),
     [data],
   );
+  const ctaRenderMode = useMemo(
+    () => resolveEventPricingParticipationCtaRenderMode(ctaStepEnabled),
+    [ctaStepEnabled],
+  );
+  const ctaStepValue = useMemo(
+    () =>
+      mapEventFormDataToCtaStepValue(data, {
+        id: eventId ?? "event-wizard-draft",
+      }),
+    [data, eventId],
+  );
+  const currencyMark = renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" });
+  // Placeholder редактора деталей — рич-текст-канон (текст BYN), без PUA-тофу.
+  const pricingDetailsExample = normalizeRichTextCurrency(
+    "Дети — 30 BYN\nВзрослые — 50 BYN\nСемейный билет — 80 BYN",
+  );
+  const handleCtaStepChange = (
+    nextValue: ReturnType<typeof mapEventFormDataToCtaStepValue>,
+  ) => {
+    onChange(
+      mapCtaStepValueToEventFormPatch(nextValue, {
+        id: eventId ?? "event-wizard-draft",
+      }),
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -189,7 +228,9 @@ export function Step5PricingParticipation({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="price">
-                {data.pricingMode === "fixed" ? `Цена (${BYN_SYMBOL})` : `Цена от (${BYN_SYMBOL})`}
+                {data.pricingMode === "fixed" ? "Цена (" : "Цена от ("}
+                {currencyMark}
+                {")"}
               </Label>
               <Input
                 id="price"
@@ -208,7 +249,7 @@ export function Step5PricingParticipation({
                   helperText="Если есть разные цены или условия, укажите их здесь."
                   value={data.priceDetails}
                   onChange={(value) => onChange({ priceDetails: value })}
-                  placeholder={`Дети — 30 ${BYN_SYMBOL}\nВзрослые — 50 ${BYN_SYMBOL}\nСемейный билет — 80 ${BYN_SYMBOL}`}
+                  placeholder={pricingDetailsExample}
                   disabled={!isEditable}
                   minHeight={140}
                 />
@@ -232,13 +273,25 @@ export function Step5PricingParticipation({
         />
       </div>
 
-      <PublicationAccessEditor
-        entityType="event"
-        value={publicationAccess}
-        onChange={(value) => onChange(buildEventAccessPatch(value))}
-        allowedMethods={["details", "ticket", "timeslots", "prebooking"]}
-        disabled={!isEditable}
-      />
+      {ctaRenderMode === "shared" ? (
+        <CtaStep
+          value={ctaStepValue}
+          source={{
+            sourceEntityType: "EVENT",
+            sourceEntityId: eventId ?? "event-wizard-draft",
+          }}
+          disabled={!isEditable}
+          onChange={handleCtaStepChange}
+        />
+      ) : (
+        <PublicationAccessEditor
+          entityType="event"
+          value={publicationAccess}
+          onChange={(value) => onChange(buildEventAccessPatch(value))}
+          allowedMethods={["details", "ticket", "timeslots", "prebooking"]}
+          disabled={!isEditable}
+        />
+      )}
     </div>
   );
 }

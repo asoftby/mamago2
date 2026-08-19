@@ -20,6 +20,16 @@ import {
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
+import { CallModal } from "@/components/shared/CallModal";
+import { FaqSection } from "@/components/public/FaqSection";
+import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
+
+export interface OfferDirectCtaInfo {
+  offerId: string;
+  publicationTitle: string;
+  brandName: string;
+}
 
 interface OfferPageViewProps {
   data: OfferPageData;
@@ -32,6 +42,12 @@ interface OfferPageViewProps {
   onSecondary?: () => void;
   onSave?: () => void;
   onShiftCta?: (ctx: ShiftCtaContext) => void;
+  sectionNotes?: {
+    reviews?: string;
+    place?: string;
+  };
+  /** Direct "Отправить заявку" CTA — omitted when the offer has no resolvable owning Business (rule 5). */
+  direct?: OfferDirectCtaInfo;
 }
 
 type LocalOfferSaveState = {
@@ -87,6 +103,8 @@ export function OfferPageView({
   onPrimary,
   onSave,
   onShiftCta,
+  sectionNotes,
+  direct,
 }: OfferPageViewProps) {
   const ctaRef = useRef<HTMLElement | null>(null);
   const storageKey = `mamago:offer-plan:${data.id}`;
@@ -103,6 +121,7 @@ export function OfferPageView({
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
+  const [callModalOpen, setCallModalOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -196,6 +215,14 @@ export function OfferPageView({
   }, []);
 
   const handlePrimary = useCallback(() => {
+    void postAnalyticsEvent({
+      eventType: "CTA_CLICK",
+      entityType: "OFFER",
+      entityId: data.id,
+      vertical: "CITY",
+      citySlug: data.citySlug,
+      meta: { source: "detail", targetAction: "primary" },
+    });
     if (onPrimary) {
       onPrimary();
       return;
@@ -205,11 +232,16 @@ export function OfferPageView({
       openBookingForShift(nearestShift);
       return;
     }
+    const phones = data.cta.phones ?? [];
+    if (phones.length > 1) {
+      setCallModalOpen(true);
+      return;
+    }
     const phone = data.cta.phone?.replace(/[^\d+]/g, "");
     if (phone && typeof window !== "undefined") {
       window.location.href = `tel:${phone}`;
     }
-  }, [data.cta.phone, onPrimary, openBookingForShift, shiftOptions]);
+  }, [data.citySlug, data.cta.phone, data.cta.phones, data.id, onPrimary, openBookingForShift, shiftOptions]);
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -300,11 +332,25 @@ export function OfferPageView({
           onPrimary={handlePrimary}
           onSave={handleSave}
           ctaRef={ctaRef}
+          directSlot={
+            direct && (
+              <DirectRequestCta
+                publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
+                publicationTitle={direct.publicationTitle}
+                brandName={direct.brandName}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+              >
+                Отправить заявку
+              </DirectRequestCta>
+            )
+          }
         />
 
         <OfferEditorialInsights data={data} />
 
         <OfferAccordion data={data} />
+
+        <FaqSection items={data.faqItems} />
 
         {data.schedule && data.schedule.items.length > 0 && (
           <OfferSchedule
@@ -317,14 +363,22 @@ export function OfferPageView({
         )}
 
         {data.reviews && (
-          <OfferReviews
-            reviews={data.reviews}
-            averageRating={data.averageRating}
-            totalCount={data.reviews.length}
-          />
+          <>
+            <OfferSectionNote text={sectionNotes?.reviews} />
+            <OfferReviews
+              reviews={data.reviews}
+              averageRating={data.averageRating}
+              totalCount={data.reviews.length}
+            />
+          </>
         )}
 
-        {data.place && <OfferPlace place={data.place} />}
+        {data.place ? (
+          <>
+            <OfferSectionNote text={sectionNotes?.place} />
+            <OfferPlace place={data.place} citySlug={data.citySlug} />
+          </>
+        ) : null}
 
         {data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
       </div>
@@ -364,6 +418,23 @@ export function OfferPageView({
         planDate={planDate}
         planStartsAt={null}
       />
+
+      <CallModal
+        open={callModalOpen}
+        onOpenChange={setCallModalOpen}
+        phones={data.cta.phones ?? []}
+        subtitle={data.title}
+      />
     </main>
+  );
+}
+
+function OfferSectionNote({ text }: { text?: string }) {
+  if (!text) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+      {text}
+    </div>
   );
 }

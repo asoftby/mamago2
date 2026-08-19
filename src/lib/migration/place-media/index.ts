@@ -1,0 +1,1 @@
+export { buildWordPressAttachmentSourceRecordKey } from "./attachmentSourceRecordKey";

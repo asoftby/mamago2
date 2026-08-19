@@ -7,6 +7,7 @@ import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
+import { CityHomeAllLink } from "@/features/city-home/components/SectionHeader";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
@@ -18,6 +19,9 @@ import type { ActivityMock } from "@/types/activity";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { cn } from "@/lib/utils";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { ArticleSaveHeart } from "@/features/save/ArticleSaveHeart";
+import { useArticleSaveStatusBatch } from "@/features/save/useArticleSaveStatusBatch";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import {
   buildAudienceLabel,
@@ -27,6 +31,10 @@ import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
+/** Оболочка ширины карточки статьи — тот же ритм, что у ленты «Куда», но 5 карточек в ряду на desktop. */
+const ARTICLE_CARD_SHELL =
+  "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
+  "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -88,14 +96,17 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     [activities, family?.personas, family?.selectedPersonaIds],
   );
 
+  const eventsHref = appendCityQuery(`/${citySlug}/events`);
+  const eventsLabel = "[все события]";
+
   if (preview.length === 0) {
     return (
       <CityHomeSection
         className="pt-[5px]"
         title={title}
-        actionLabel="Смотреть все"
-        actionHref={appendCityQuery(`/${citySlug}/events`)}
-        actionIconButton
+        actionLabel={eventsLabel}
+        actionHref={eventsHref}
+        actionInlineText
       >
         <p className="text-sm text-neutral-500 px-1 py-2 leading-relaxed">
           Пока нет опубликованных событий — загляните позже в раздел «Куда пойти».
@@ -108,11 +119,21 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     <CityHomeSection
       className="pt-[5px]"
       title={title}
-      actionLabel="Смотреть все"
-      actionHref={appendCityQuery(`/${citySlug}/events`)}
-      actionIconButton
+      actionLabel={eventsLabel}
+      actionHref={eventsHref}
+      actionInlineText
+      // На lg ссылка уезжает к стрелкам карусели — скрываем дубль в заголовке
+      headerActionClassName="lg:hidden"
     >
-      <HorizontalCardRow>
+      <HorizontalCardRow
+        navLeading={
+          <CityHomeAllLink
+            href={eventsHref}
+            label={eventsLabel}
+            className="hidden lg:inline-flex"
+          />
+        }
+      >
         {preview.map((activity) => (
           <div key={activity.id} className={kudaCardShell}>
             <EventCard {...activityMockToEventCard(activity, citySlug)} />
@@ -176,20 +197,28 @@ export function CityHomeClassesSection({
                 : undefined;
           return (
             <div key={activity.id} className={cardShell}>
-              <OfferCard
-                id={activity.id}
-                title={activity.title}
-                href={href}
-                imageUrl={activity.image}
-                categoryLabel={[
-                  activity.badge || null,
-                  activity.format ? getActivityFormatLabel(activity.format) : null,
-                ].filter(Boolean).join(" · ") || undefined}
-                dateLabel={dateLabel || undefined}
-                priceLabel={priceLabel}
-                saveDateISO={activity.dateStart ?? null}
-                saveDateEndISO={activity.dateEnd ?? null}
-              />
+              <AnalyticsCardViewTracker
+                entityType="OFFER"
+                entityId={activity.id}
+                vertical="CITY"
+                citySlug={activity.citySlug ?? citySlug}
+                meta={{ section: "classes" }}
+              >
+                <OfferCard
+                  id={activity.id}
+                  title={activity.title}
+                  href={href}
+                  imageUrl={activity.image}
+                  categoryLabel={[
+                    activity.badge || null,
+                    activity.format ? getActivityFormatLabel(activity.format) : null,
+                  ].filter(Boolean).join(" · ") || undefined}
+                  dateLabel={dateLabel || undefined}
+                  priceLabel={priceLabel}
+                  saveDateISO={activity.dateStart ?? null}
+                  saveDateEndISO={activity.dateEnd ?? null}
+                />
+              </AnalyticsCardViewTracker>
             </div>
           );
         })}
@@ -236,61 +265,98 @@ export function CityHomeJournalSection({
 }: {
   articles: CityHomeJournalArticle[];
 }) {
-  const { appendCityQuery } = useCity();
+  const { appendCityQuery, citySlug } = useCity();
 
   const visibleArticles = articles.filter((a) => !a.isBreakingNews);
+  const saveStatuses = useArticleSaveStatusBatch(visibleArticles.map((a) => a.id));
 
   if (visibleArticles.length === 0) {
     return null;
   }
 
+  const blogHref = appendCityQuery(`/${citySlug}/blog`);
+  const blogLabel = "[все статьи и обзоры]";
+
   return (
     <CityHomeSection
       title="Статьи и обзоры"
-      actionLabel="В журнал"
-      actionHref={appendCityQuery("/blog")}
-      actionIconButton
+      actionLabel={blogLabel}
+      actionHref={blogHref}
+      actionInlineText
+      headerActionClassName="lg:hidden"
     >
-      <HorizontalCardRow className="flex-wrap overflow-visible pe-0 snap-none sm:flex-nowrap sm:overflow-x-auto sm:pe-0 sm:snap-x sm:snap-mandatory">
+      <HorizontalCardRow
+        navLeading={
+          <CityHomeAllLink
+            href={blogHref}
+            label={blogLabel}
+            className="hidden lg:inline-flex"
+          />
+        }
+      >
         {visibleArticles.map((a, index) => (
-          <Link
-            key={a.slug}
-            href={a.href}
-            className={cn(
-              cardShell,
-              index === 0
-                ? "w-full min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]"
-                : "w-[calc((100%-0.75rem)/2)] min-w-0 max-w-none sm:w-[42vw] sm:min-w-[156px] sm:max-w-[240px]",
-              "rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors",
-            )}
+          <div key={a.slug} className={cn(ARTICLE_CARD_SHELL, "relative")}>
+          <AnalyticsCardViewTracker
+            entityType="ARTICLE"
+            entityId={a.id}
+            vertical="CITY"
+            citySlug={citySlug}
+            meta={{ section: "journal", position: index }}
           >
-            <div
-              className={cn(
-                "w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
-                [
-                  "from-[#F2C8A7] to-[#E89460]",
-                  "from-[#CDE3D6] to-[#9CC1AC]",
-                  "from-[#F6D567] to-[#E8B935]",
-                  "from-[#E6DBC8] to-[#C9BCA0]",
-                ][index % 4],
-              )}
+            <Link
+              href={a.href}
+              className="block rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors group"
             >
-              {a.coverImageUrl && (
-                <img
-                  src={a.coverImageUrl}
-                  alt={a.title}
-                  className="w-full h-full object-cover"
-                />
+              <div
+                className={cn(
+                  "w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
+                  [
+                    "from-[#F2C8A7] to-[#E89460]",
+                    "from-[#CDE3D6] to-[#9CC1AC]",
+                    "from-[#F6D567] to-[#E8B935]",
+                    "from-[#E6DBC8] to-[#C9BCA0]",
+                  ][index % 4],
+                )}
+              >
+                {a.coverImageUrl && (
+                  <img
+                    src={a.coverImageUrl}
+                    alt={a.title}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+              {a.category && (
+                <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+                  {a.category.name}
+                </p>
               )}
+              <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
+                {a.title}
+              </p>
+              <p className="mt-3 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
+                {a.readTime} мин. чтения
+              </p>
+            </Link>
+          </AnalyticsCardViewTracker>
+            {/* Heart overlay — mirrors the Link's own padding + cover box so it anchors to the cover, not the outer card */}
+            <div className="pointer-events-none absolute inset-0 p-3">
+              <div className="relative w-full aspect-square">
+                <div className="pointer-events-auto absolute right-3 top-3 z-10">
+                  <ArticleSaveHeart
+                    articleId={a.id}
+                    articleTitle={a.title}
+                    coverImageUrl={a.coverImageUrl}
+                    initialStatus={saveStatuses[a.id]}
+                    skipOwnFetch
+                    source="city-home-journal-card"
+                    className="h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
+                    iconClassName="h-4 w-4"
+                  />
+                </div>
+              </div>
             </div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-              {a.category}
-            </p>
-            <p className="text-sm font-semibold text-neutral-900 leading-snug line-clamp-3 mt-2">
-              {a.title}
-            </p>
-            <p className="text-xs text-neutral-400 mt-3">{a.readTime} мин чтения</p>
-          </Link>
+          </div>
         ))}
       </HorizontalCardRow>
     </CityHomeSection>

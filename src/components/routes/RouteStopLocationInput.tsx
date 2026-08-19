@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { PlaceMapModal } from "@/components/business/place/PlaceMapModal";
 import { GoogleMapsService } from "@/services/googleMaps";
+import { toLegacyAddressComponents } from "@/services/googleMaps/toLegacyAddressComponents";
 import {
   MapPin, Search, Building2, Navigation,
   X, Pencil, Loader2, CheckCircle2, Globe,
@@ -77,24 +78,17 @@ type PlaceResult = {
   lng: number | null;
 };
 
-type GoogleResult = {
-  googlePlaceId: string;
-  title: string;
-  address: string;
-  formattedAddress: string;
-  lat: number;
-  lng: number;
-  addressComponents: GoogleAddressComponent[];
-  detectedCountryCode?: string;
-  detectedCountryName?: string;
-  detectedCityName?: string;
-  detectedRegionName?: string;
+/** Lightweight preview of a Google Places (New) autocomplete suggestion — full details are only fetched on selection */
+type GooglePrediction = {
+  id: string;
+  primaryText: string;
+  secondaryText: string;
 };
 
 type SearchState =
   | { kind: "idle" }
   | { kind: "searching" }
-  | { kind: "results"; places: PlaceResult[]; google: GoogleResult[] }
+  | { kind: "results"; places: PlaceResult[]; google: GooglePrediction[] }
   | { kind: "empty" };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -103,7 +97,7 @@ type SearchState =
  * Extract city, region, country from Google address_components.
  */
 function parseAddressComponents(
-  components: google.maps.GeocoderAddressComponent[],
+  components: GoogleAddressComponent[],
 ): {
   detectedCityName: string | undefined;
   detectedRegionName: string | undefined;
@@ -161,12 +155,14 @@ export function RouteStopLocationInput({
   const [isEditing, setIsEditing] = useState(() => !value);
   /** Скрытое предупреждение для адресов вне активных городов mamaGo */
   const [outsideCityWarning, setOutsideCityWarning] = useState<string | null>(null);
+  const [isResolvingGoogleSelection, setIsResolvingGoogleSelection] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const prevValueRef = useRef(value);
+  const googlePredictionsRef = useRef<Map<string, google.maps.places.PlacePrediction>>(new Map());
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
 
   // Sync isEditing when value is set externally (e.g. parent state restore)
   useEffect(() => {
@@ -184,81 +180,110 @@ export function RouteStopLocationInput({
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
-  // ── Google Autocomplete init (WORLDWIDE, no country restriction) ──────────
-  const initGoogleAutocomplete = useCallback(async () => {
-    if (!inputRef.current || !(inputRef.current instanceof HTMLInputElement)) return;
+  const getSessionToken = useCallback(
+    async (): Promise<google.maps.places.AutocompleteSessionToken | undefined> => {
+      if (sessionTokenRef.current) return sessionTokenRef.current;
+      try {
+        const placesLib = await GoogleMapsService.getPlacesLibrary();
+        const AutocompleteSessionToken = placesLib.AutocompleteSessionToken;
+        if (!AutocompleteSessionToken) return undefined;
+        const token = new AutocompleteSessionToken();
+        sessionTokenRef.current = token;
+        return token;
+      } catch {
+        return undefined;
+      }
+    },
+    [],
+  );
+
+  // ── Google Autocomplete (New Places API, WORLDWIDE — no country restriction) ──
+  const searchGoogle = useCallback(async (q: string): Promise<GooglePrediction[]> => {
     try {
       const placesLib = await GoogleMapsService.getPlacesLibrary();
-      const input = inputRef.current;
-      if (!input || !(input instanceof HTMLInputElement)) return;
+      const fetchAutocompleteSuggestions = placesLib.AutocompleteSuggestion?.fetchAutocompleteSuggestions;
+      if (!fetchAutocompleteSuggestions) return [];
 
-      // WORLDWIDE: no componentRestrictions, no strictBounds
-      const autocomplete = new placesLib.Autocomplete(input, {
-        types: ["geocode", "establishment"],
-        fields: ["place_id", "name", "geometry", "formatted_address", "address_components"],
-      });
-      autocompleteRef.current = autocomplete;
+      const sessionToken = await getSessionToken();
+      const { suggestions } = await fetchAutocompleteSuggestions({ input: q, sessionToken });
 
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (!place.place_id || !place.geometry?.location) return;
+      googlePredictionsRef.current.clear();
+      const predictions: GooglePrediction[] = [];
 
-        // Parse address components for city/region/country
-        const rawComponents = place.address_components ?? [];
-        const parsed = parseAddressComponents(rawComponents);
+      for (const suggestion of suggestions) {
+        const prediction = suggestion.placePrediction;
+        const placeId = prediction?.placeId;
+        if (!prediction || !placeId) continue;
 
-        // Clean up raw components for storage (remove circular refs)
-        const cleanComponents = rawComponents.map((c) => ({
-          long_name: c.long_name,
-          short_name: c.short_name,
-          types: c.types ?? [],
-        }));
+        googlePredictionsRef.current.set(placeId, prediction);
+        predictions.push({
+          id: placeId,
+          primaryText: prediction.mainText?.text || prediction.text?.text || "",
+          secondaryText: prediction.secondaryText?.text || "",
+        });
+      }
 
-        const result: RouteStopLocationValue = {
-          source: "GOOGLE",
-          googlePlaceId: place.place_id,
-          title: place.name || place.formatted_address || "",
-          address: place.formatted_address || "",
-          formattedAddress: place.formatted_address || "",
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-          addressComponents: cleanComponents,
-          ...parsed,
-        };
-
-        // Check if detected city is outside mamaGo active cities
-        const isBelarusCity = parsed.detectedCountryCode?.toUpperCase() === "BY";
-        if (!isBelarusCity && parsed.detectedCityName) {
-          setOutsideCityWarning(
-            `Адрес вне активных городов mamaGo. Точка будет сохранена, но маршрут не попадёт в публичную городскую выдачу, пока город не будет подключён.`,
-          );
-        } else {
-          setOutsideCityWarning(null);
-        }
-
-        // Use ref so we always call the latest onChange, never a stale closure
-        onChangeRef.current(result);
-        setIsEditing(false);
-        setSearchState({ kind: "idle" });
-        setQuery("");
-      });
+      return predictions;
     } catch (err) {
-      console.error("[RouteStopLocationInput] Google autocomplete init error:", err);
+      console.error("[RouteStopLocationInput] Google autocomplete error:", err);
+      return [];
+    }
+  }, [getSessionToken]);
+
+  const handleGoogleSelect = useCallback(async (predictionId: string) => {
+    const prediction = googlePredictionsRef.current.get(predictionId);
+    if (!prediction?.toPlace) return;
+
+    setIsResolvingGoogleSelection(true);
+    try {
+      const place = prediction.toPlace();
+      await place.fetchFields({
+        fields: ["id", "displayName", "formattedAddress", "location", "addressComponents"],
+      });
+
+      const lat = place.location?.lat() ?? null;
+      const lng = place.location?.lng() ?? null;
+      if (!place.id || lat === null || lng === null) return;
+
+      const cleanComponents = toLegacyAddressComponents(place.addressComponents);
+      const parsed = parseAddressComponents(cleanComponents);
+
+      const result: RouteStopLocationValue = {
+        source: "GOOGLE",
+        googlePlaceId: place.id,
+        title: place.displayName || place.formattedAddress || "",
+        address: place.formattedAddress || "",
+        formattedAddress: place.formattedAddress || "",
+        lat,
+        lng,
+        addressComponents: cleanComponents,
+        ...parsed,
+      };
+
+      const isBelarusCity = parsed.detectedCountryCode?.toUpperCase() === "BY";
+      if (!isBelarusCity && parsed.detectedCityName) {
+        setOutsideCityWarning(
+          `Адрес вне активных городов mamaGo. Точка будет сохранена, но маршрут не попадёт в публичную городскую выдачу, пока город не будет подключён.`,
+        );
+      } else {
+        setOutsideCityWarning(null);
+      }
+
+      // Start a fresh billing session for the next search
+      sessionTokenRef.current = null;
+
+      onChangeRef.current(result);
+      setIsEditing(false);
+      setSearchState({ kind: "idle" });
+      setQuery("");
+    } catch (err) {
+      console.error("[RouteStopLocationInput] Google place fetch error:", err);
+    } finally {
+      setIsResolvingGoogleSelection(false);
     }
   }, []);
 
-  useEffect(() => {
-    if (!isEditing) return;
-    initGoogleAutocomplete();
-    return () => {
-      if (autocompleteRef.current && typeof google !== "undefined") {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-        autocompleteRef.current = null;
-      }
-    };
-  }, [isEditing, initGoogleAutocomplete]);
-
-  // ── Debounced mamaGo place search ─────────────────────────────────────────
+  // ── Debounced mamaGo place search + Google suggestions ────────────────────
   const searchPlaces = useCallback(async (q: string) => {
     if (q.length < 2) {
       setSearchState({ kind: "idle" });
@@ -268,23 +293,27 @@ export function RouteStopLocationInput({
     setSearchState({ kind: "searching" });
 
     try {
-      const res = await fetch(`/api/routes/stops/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
+      const [placesRes, googlePredictions] = await Promise.all([
+        fetch(`/api/routes/stops/search?q=${encodeURIComponent(q)}`),
+        searchGoogle(q),
+      ]);
+      const data = await placesRes.json();
       const places: PlaceResult[] = data.results ?? [];
+
+      if (places.length === 0 && googlePredictions.length === 0) {
+        setSearchState({ kind: "empty" });
+        return;
+      }
 
       setSearchState({
         kind: "results",
         places,
-        google: [], // Google results come via autocomplete listener
+        google: googlePredictions,
       });
-
-      if (places.length === 0) {
-        setSearchState({ kind: "empty" });
-      }
     } catch {
       setSearchState({ kind: "empty" });
     }
-  }, []);
+  }, [searchGoogle]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
@@ -455,11 +484,11 @@ export function RouteStopLocationInput({
             type="text"
             value={query}
             onChange={handleInputChange}
-            disabled={disabled}
+            disabled={disabled || isResolvingGoogleSelection}
             placeholder="Введите адрес или место"
             className="w-full h-11 pl-9 pr-9 rounded-xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 transition-all"
           />
-          {searchState.kind === "searching" ? (
+          {searchState.kind === "searching" || isResolvingGoogleSelection ? (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 animate-spin" />
           ) : query ? (
             <button
@@ -479,7 +508,7 @@ export function RouteStopLocationInput({
         )}
 
         {/* Dropdown results */}
-        {searchState.kind === "results" && searchState.places.length > 0 && (
+        {searchState.kind === "results" && (searchState.places.length > 0 || searchState.google.length > 0) && (
           <div className="rounded-xl border border-neutral-200 bg-white shadow-lg overflow-hidden">
             {searchState.places.map((place) => (
               <button
@@ -497,6 +526,25 @@ export function RouteStopLocationInput({
                   )}
                 </div>
                 <span className="text-xs text-neutral-300 shrink-0">mamaGo</span>
+              </button>
+            ))}
+            {searchState.google.map((prediction) => (
+              <button
+                key={prediction.id}
+                onClick={() => handleGoogleSelect(prediction.id)}
+                disabled={isResolvingGoogleSelection}
+                className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-neutral-50 transition-colors text-left border-b border-neutral-100 last:border-0 disabled:opacity-50"
+              >
+                <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0 text-neutral-500">
+                  <Search className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-800 truncate">{prediction.primaryText}</p>
+                  {prediction.secondaryText && (
+                    <p className="text-xs text-neutral-400 truncate mt-0.5">{prediction.secondaryText}</p>
+                  )}
+                </div>
+                <span className="text-xs text-neutral-300 shrink-0">Google</span>
               </button>
             ))}
           </div>

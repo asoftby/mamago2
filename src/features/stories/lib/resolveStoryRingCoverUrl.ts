@@ -1,9 +1,11 @@
 import type { StoryCollection } from "../types/story";
+import { orderBySeen } from "./seen";
 
-/** Cover for the homepage story ring: promoted item first, else first item with an image. */
-export function resolveStoryRingCoverUrl(story: StoryCollection): string | null {
-  const promoted = story.items.find((item) => item.isPromoted && item.image?.trim());
-  if (promoted?.image) return promoted.image.trim();
-  const withImage = story.items.find((item) => item.image?.trim());
-  return withImage?.image?.trim() ?? null;
+/** The first unseen offer is the ring cover; all-seen stories retain their source-order cover. */
+export function resolveStoryRingCoverUrl(
+  story: StoryCollection,
+  seenOfferIds: ReadonlySet<string>,
+): string | null {
+  const selected = orderBySeen(story.items, seenOfferIds).find((item) => item.image?.trim());
+  return selected?.image.trim() || null;
 }

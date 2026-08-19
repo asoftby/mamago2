@@ -6,16 +6,21 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
+import { PlacePhoneActionButton, PlacePhoneList } from "@/components/place/PlacePhoneActions";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
 
 interface PlaceSidebarCardProps {
-  phone?: string;
+  placeId: string;
+  phones: NormalizedPlacePhone[];
   website?: string;
   instagramUrl?: string;
   placeName: string;
 }
 
 export function PlaceSidebarCard({
-  phone,
+  placeId,
+  phones,
   website,
   instagramUrl,
   placeName,
@@ -49,7 +54,15 @@ export function PlaceSidebarCard({
         ? `https://${website.trim().replace(/^\/+/, "")}`
         : "";
 
-  const telHref = phone ? `tel:${phone.replace(/\s/g, "")}` : "";
+  const trackCta = (targetAction: string) => {
+    void postAnalyticsEvent({
+      eventType: "CTA_CLICK",
+      entityType: "PLACE",
+      entityId: placeId,
+      vertical: "CITY",
+      meta: { source: "detail", targetAction },
+    });
+  };
 
   const quickBtnClass =
     "h-auto min-h-10 flex-1 basis-0 flex-col gap-0.5 rounded-2xl border border-[#ffd8c4] bg-white/70 px-2 py-2 text-[11px] font-semibold text-neutral-800 shadow-none hover:bg-white [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-primary";
@@ -95,6 +108,7 @@ export function PlaceSidebarCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex flex-col items-center gap-0.5 py-1"
+                    onClick={() => trackCta("website")}
                   >
                     <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     Сайт
@@ -112,6 +126,7 @@ export function PlaceSidebarCard({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex flex-col items-center gap-0.5 py-1"
+                    onClick={() => trackCta("instagram")}
                   >
                     <Instagram className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     Инстаграм
@@ -121,16 +136,20 @@ export function PlaceSidebarCard({
             </div>
           ) : null}
 
-          {telHref ? (
-            <a
-              href={telHref}
+          <PlacePhoneList phones={phones} />
+
+          {phones.length > 0 ? (
+            <PlacePhoneActionButton
+              phones={phones}
+              placeTitle={placeName}
               className={peachPrimaryCtaLinkClassName(
                 "w-full justify-center px-4 py-2.5 text-[11px] sm:py-3 sm:px-[22px] sm:text-sm",
               )}
+              onClick={() => trackCta("call")}
             >
               <Phone className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden />
               Позвонить
-            </a>
+            </PlacePhoneActionButton>
           ) : null}
 
           <div className="grid grid-cols-2 gap-2">

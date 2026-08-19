@@ -1,4 +1,4 @@
-import type { AuthEntryPoint } from "./types";
+import type { AuthAction, AuthEntryPoint } from "./types";
 import { trackPostAuthEvent } from "./analytics";
 import {
   navigateToCompatibleHref,
@@ -8,6 +8,26 @@ import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import { getRandomLoginSuccessMessage } from "@/lib/notifications/authMessages";
 
 type RouterLike = { push: (href: string) => void; replace: (href: string) => void };
+
+export function getAuthSuccessToastMessage(authAction: AuthAction): string {
+  switch (authAction) {
+    case "signup":
+      return "Добро пожаловать в mamaGo!";
+    case "login":
+      return "Вход выполнен — всё готово.";
+    default: {
+      const exhaustiveCheck: never = authAction;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+export function showAuthSuccessToast(
+  authAction: AuthAction,
+  toast: typeof import("sonner").toast,
+): void {
+  toast.success(getAuthSuccessToastMessage(authAction));
+}
 
 /**
  * Действия после полного завершения completion flow (usable-профиль достигнут).
@@ -19,27 +39,35 @@ export function applyPostAuthCompletionOutcome(
     router: RouterLike;
     returnTo: string | null;
     toast: typeof import("sonner").toast;
+    showProfileCompletionToast?: boolean;
     /** Не вызывать router.push/replace (например overlay «Мой план» уже переключается на план) */
     skipNavigation?: boolean;
     /**
      * true — пользователь только что завершил заполнение профиля
      * (показываем «Профиль заполнен»); false/undefined — обычный успешный
-     * вход с уже готовым профилем (показываем приветствие).
+     * вход с уже готовым профилем.
      */
     profileJustCompleted?: boolean;
   },
 ): void {
-  const { isMobile, router, returnTo, toast, skipNavigation, profileJustCompleted } =
-    options;
+  const {
+    isMobile,
+    router,
+    returnTo,
+    toast,
+    showProfileCompletionToast = true,
+    skipNavigation,
+    profileJustCompleted,
+  } = options;
 
   switch (source) {
     case "profile":
       if (!skipNavigation) {
-        toast.success(
-          profileJustCompleted
-            ? "Профиль заполнен"
-            : getRandomLoginSuccessMessage(),
-        );
+        if (profileJustCompleted) {
+          toast.success("Профиль заполнен");
+        } else if (showProfileCompletionToast) {
+          toast.success(getRandomLoginSuccessMessage());
+        }
         const target = getSafeRedirectPath(returnTo, "");
         if (target) {
           navigateToCompatibleHref(router, target, { replace: true });

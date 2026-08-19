@@ -1,0 +1,708 @@
+/* ══════════════════════════════════════════════════════════════════
+   Direct — тот же редакторский дизайн-язык, что и «Мои записи»
+   (bookings.module.css), адаптированный под карточки диалогов.
+══════════════════════════════════════════════════════════════════ */
+
+.page {
+  --font-display: var(--font-pt-serif), Georgia, serif;
+  --font-body: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --page: #ffffff;
+  --bg: #f6f2ea;
+  --paper: #faf7f1;
+  --ink: #141210;
+  --ink-2: #3a332b;
+  --ink-3: rgba(20, 18, 16, 0.55);
+  --line: rgba(20, 18, 16, 0.1);
+  --line-2: rgba(20, 18, 16, 0.18);
+  --accent: #e86a3a;
+  --accent-deep: #c24e22;
+  --accent-soft: #ffe8dc;
+  --ok: #1f8a5b;
+  --ok-bg: rgba(31, 138, 91, 0.1);
+  --warn: #a66207;
+  --warn-bg: rgba(166, 98, 7, 0.1);
+  --hot: #d6342b;
+  --hot-bg: rgba(214, 52, 43, 0.1);
+  --maxw: 1100px;
+
+  position: relative;
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+.serif {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.caps {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+.breadcrumbs {
+  padding-top: 30px;
+  padding-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.breadcrumbs a:hover {
+  color: var(--ink);
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 48px;
+  align-items: flex-end;
+}
+.heroTitle {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: clamp(56px, 8vw, 100px);
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+}
+.heroTitleAccent {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--accent-deep);
+}
+.heroLead {
+  max-width: 540px;
+  margin-top: 22px;
+  margin-bottom: 0;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.heroSide {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+.countCard {
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-width: 240px;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 99px;
+  border: 1px solid var(--line-2);
+  background: var(--paper);
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color 0.15s, background 0.2s, color 0.2s;
+  white-space: nowrap;
+  cursor: pointer;
+  font-weight: 500;
+}
+.pill:hover {
+  border-color: var(--ink);
+}
+.pillSolid {
+  background: var(--ink);
+  color: #faf7f1;
+  border-color: var(--ink);
+  font-weight: 600;
+}
+.pill .count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.pillSolid .count {
+  color: rgba(250, 247, 241, 0.55);
+}
+
+.recList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.recCard {
+  display: block;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 22px 24px;
+  transition: border-color 0.18s, transform 0.18s;
+  text-decoration: none;
+  color: inherit;
+}
+.recCard:hover {
+  border-color: var(--line-2);
+  transform: translateY(-2px);
+}
+.recMain {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  gap: 18px;
+  align-items: center;
+}
+.brandAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.brandAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.recBody {
+  min-width: 0;
+}
+.recKicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.recKicker .threadNumber {
+  color: var(--accent-deep);
+}
+.recTitle {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  display: block;
+}
+.recBrand {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.recPreview {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--ink-3);
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recRail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 99px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.statusOpen {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.statusWaiting {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.statusClosed {
+  background: rgba(20, 18, 16, 0.08);
+  color: var(--ink-3);
+}
+.statusBlocked {
+  background: var(--hot-bg);
+  color: var(--hot);
+}
+.statusArchived {
+  background: rgba(20, 18, 16, 0.05);
+  color: var(--ink-3);
+}
+.lastActivity {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.unreadBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.empty {
+  padding: 72px 32px;
+  background: var(--paper);
+  border: 1px dashed var(--line-2);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.emptySpark {
+  width: 84px;
+  height: 84px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-deep);
+  margin-bottom: 28px;
+}
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(30px, 4vw, 40px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.emptyTitleAccent {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--accent-deep);
+}
+.emptyLead {
+  margin: 14px 0 0;
+  max-width: 440px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+@media (max-width: 900px) {
+  .heroGrid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .heroSide {
+    align-items: flex-start;
+    justify-self: flex-start;
+  }
+}
+@media (max-width: 620px) {
+  .wrap {
+    padding: 0 18px;
+  }
+  .recMain {
+    grid-template-columns: 44px 1fr;
+  }
+  .recRail {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  .brandAvatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Thread screen
+══════════════════════════════════════════════════════════════════ */
+
+.threadWrap {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 20px 60px;
+}
+
+.topCard {
+  margin-top: 24px;
+  padding: 20px 22px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.topCardBody {
+  min-width: 0;
+  flex: 1;
+}
+.topCardTitle {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.topCardBrandRow {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  flex-wrap: wrap;
+}
+.topCardMeta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.messages {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bubbleRow {
+  display: flex;
+}
+.bubbleRowCustomer {
+  justify-content: flex-end;
+}
+.bubbleRowOther {
+  justify-content: flex-start;
+}
+.bubble {
+  max-width: 72%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubbleCustomer {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+.bubbleOther {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-bottom-left-radius: 6px;
+}
+.bubbleSystem {
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.bubbleHidden {
+  opacity: 0.6;
+  font-style: italic;
+}
+.bubbleMeta {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.inputBar {
+  position: sticky;
+  bottom: 0;
+  margin-top: 22px;
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.inputTextarea {
+  flex: 1;
+  resize: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  min-height: 24px;
+  max-height: 140px;
+}
+.sendBtn {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 99px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, opacity 0.15s;
+}
+.sendBtn:hover {
+  background: var(--accent-deep);
+}
+.sendBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.banner {
+  margin-top: 22px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+.bannerBlocked {
+  background: var(--hot-bg);
+  color: var(--hot);
+}
+.bannerArchived {
+  background: rgba(20, 18, 16, 0.05);
+  color: var(--ink-3);
+}
+.bannerWaiting {
+  background: var(--warn-bg);
+  color: var(--warn);
+  text-align: left;
+}
+
+.actionsRow {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+.complainBtn {
+  font-size: 12px;
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.complainBtn:hover {
+  color: var(--ink);
+}
+
+.ratingCard {
+  margin-top: 22px;
+  padding: 24px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(232, 106, 58, 0.25);
+  border-radius: 20px;
+  text-align: center;
+}
+.ratingTitle {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--ink);
+}
+.ratingStars {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.starBtn {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 2px;
+  color: rgba(20, 18, 16, 0.25);
+}
+.starBtnActive {
+  color: #e0a200;
+}
+.ratingNote {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Occasion block ("повод обращения") — separates each publication
+   (occasion/DirectThread) inside one merged per-business conversation.
+══════════════════════════════════════════════════════════════════ */
+.occasionBlock {
+  margin: 20px 0 14px;
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px dashed var(--line-2);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.occasionEmoji {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.occasionBody {
+  min-width: 0;
+  flex: 1;
+}
+.occasionKicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.occasionTitle {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.occasionMeta {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.occasionDate {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Quick "Поводы" nav — compact jump-links to each occasion block,
+   shown when a conversation has accumulated several occasions.
+══════════════════════════════════════════════════════════════════ */
+.occasionNav {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.occasionNavTitle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.occasionNavList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.occasionNavItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  border: 1px solid var(--line-2);
+  background: #fff;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.occasionNavItem:hover {
+  border-color: var(--ink);
+}
+.occasionNavItemActive {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+/* Counterparty role hint on unified list cards — subtle, not a new section. */
+.roleHint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}

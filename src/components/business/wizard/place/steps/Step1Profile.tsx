@@ -6,14 +6,19 @@ import { Label } from "@/components/ui/label";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { canonicalizeAgeTags, isPlaceAgeChipActive } from "../isPlaceAgeChipActive";
 import { useVisitFormats, normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { plainTextToRichTextHtml } from "@/lib/richtext/utils";
 import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import { generateSummary } from "@/lib/openingHours/openingHoursMapper";
 import type { PlaceFormData } from "../types";
+import { AgePolicy } from "@prisma/client";
 
 const MAX_SUBCATEGORIES = 3;
+
+/** UI-only chip id — never stored. "Любой возраст" is represented by `ageTags: []`. */
+const ANY_AGE_CHIP_ID = "__any_age__";
 
 type PlaceCategoryChild = {
   id: string;
@@ -39,15 +44,14 @@ interface Step1ProfileProps {
 }
 
 export function Step1Profile({ data, onChange, isEditable = true }: Step1ProfileProps) {
+  const normalizeDescriptionForEditor = (value: string | null | undefined) => {
+    const raw = value || "";
+    return raw && !/<[a-z][\s\S]*>/i.test(raw) ? plainTextToRichTextHtml(raw) : raw;
+  };
+
   const [title, setTitle] = useState(() => data.title);
   const [shortDesc, setShortDesc] = useState(() => data.shortDesc);
-  const [description, setDescription] = useState(() => {
-    const raw = data.description || "";
-    // Normalize plain text to HTML if needed (legacy data)
-    return raw && !/<[a-z][\s\S]*>/i.test(raw)
-      ? plainTextToRichTextHtml(raw)
-      : raw;
-  });
+  const [description, setDescription] = useState(() => normalizeDescriptionForEditor(data.description));
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [ageTags, setAgeTags] = useState<string[]>(() => data.ageTags || []);
   // Normalize legacy values (indoor → format-indoor) on init
@@ -64,6 +68,34 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
   // Categories from DB
   const [dbCategories, setDbCategories] = useState<PlaceCategoryRoot[] | null>(null);
+
+  useEffect(() => {
+    setTitle(data.title);
+  }, [data.title]);
+
+  useEffect(() => {
+    setShortDesc(data.shortDesc);
+  }, [data.shortDesc]);
+
+  useEffect(() => {
+    setDescription(normalizeDescriptionForEditor(data.description));
+  }, [data.description]);
+
+  useEffect(() => {
+    setAgeTags(data.ageTags || []);
+  }, [data.ageTags]);
+
+  useEffect(() => {
+    setVisitFormats(normalizeVisitFormats(data.visitFormats || []));
+  }, [data.visitFormats]);
+
+  useEffect(() => {
+    setPrimaryCategoryId(data.primaryCategoryId ?? "");
+  }, [data.primaryCategoryId]);
+
+  useEffect(() => {
+    setSubcategoryIds(data.subcategoryIds ?? []);
+  }, [data.subcategoryIds]);
 
   useEffect(() => {
     fetch("/api/public/place-categories")
@@ -118,11 +150,15 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   };
 
   const toggleAgeTag = (tag: string) => {
-    const newTags = ageTags.includes(tag)
+    const rawTags = ageTags.includes(tag)
       ? ageTags.filter((t) => t !== tag)
       : [...ageTags, tag];
+    // If every known age ended up selected, that's the same thing as "any
+    // age" — collapse back to [] so storage never has two representations
+    // of the same "no restriction" meaning.
+    const newTags = canonicalizeAgeTags(rawTags);
     setAgeTags(newTags);
-    onChange({ ageTags: newTags });
+    onChange({ ageTags: newTags, agePolicy: newTags.length ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED });
   };
 
   const toggleVisitFormat = (format: string) => {
@@ -299,17 +335,44 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
         <div className="mt-2">
           <ChipsRow
             layout="masonry"
-            items={AGE_OPTIONS.map((ageOption): ChipItem => ({
-              id: ageOption.key,
-              label: ageOption.shortLabel,
-              active: ageTags.includes(ageOption.key),
-              disabled: !isEditable,
-              onClick: () => isEditable && toggleAgeTag(ageOption.key),
-            }))}
+            items={[
+              {
+                id: ANY_AGE_CHIP_ID,
+                label: "Любой возраст",
+                // Derived, not separate state — ageTags=[] *is* "Любой возраст".
+                // Selecting a specific age naturally clears this (ageTags becomes
+                // non-empty); selecting this chip clears ageTags, which naturally
+                // deactivates every specific-age chip. No dual-selection is possible.
+                active: data.agePolicy === AgePolicy.UNRESTRICTED,
+                disabled: !isEditable,
+                onClick: () => {
+                  if (!isEditable || ageTags.length === 0) return;
+                  setAgeTags([]);
+                  onChange({ ageTags: [], agePolicy: AgePolicy.UNRESTRICTED });
+                },
+              },
+              ...AGE_OPTIONS.map((ageOption): ChipItem => ({
+                id: ageOption.key,
+                label: ageOption.shortLabel,
+                active: isPlaceAgeChipActive({ storedAgeTags: ageTags, chipAgeTag: ageOption.key }),
+                disabled: !isEditable,
+                onClick: () => isEditable && toggleAgeTag(ageOption.key),
+              })),
+              {
+                id: "adult-only",
+                label: "Только 18+",
+                active: data.agePolicy === AgePolicy.ADULT_ONLY,
+                disabled: !isEditable,
+                onClick: () => {
+                  setAgeTags([]);
+                  onChange({ ageTags: [], agePolicy: AgePolicy.ADULT_ONLY });
+                },
+              },
+            ]}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          Выберите хотя бы один возрастной диапазон
+          «Любой возраст» означает, что место подходит детям всех возрастов.
         </p>
       </div>
 

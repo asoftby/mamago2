@@ -56,6 +56,8 @@ export function MobileSearchEntry({
   const { isAuthenticated } = useAuthMe();
   const family = useFamilyPersona();
   const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
+  const loadHeaderGeoFilters = headerGeoFilters?.loadGeoFilters;
+  const headerGeoCitySlug = headerGeoFilters?.citySlug;
   const { options: apiOptions } = useDiscoveryFilterOptions(citySlug, { defer: true });
 
   useEffect(() => {
@@ -64,14 +66,20 @@ export function MobileSearchEntry({
   }, []);
 
   useEffect(() => {
-    if (!headerGeoFilters || headerGeoFilters.citySlug !== citySlug) {
+    if (!loadHeaderGeoFilters || headerGeoCitySlug !== citySlug) {
       return;
     }
     if (!applied.metro && !applied.district) {
       return;
     }
-    void headerGeoFilters.loadGeoFilters();
-  }, [applied.district, applied.metro, citySlug, headerGeoFilters]);
+    void loadHeaderGeoFilters();
+  }, [
+    applied.district,
+    applied.metro,
+    citySlug,
+    headerGeoCitySlug,
+    loadHeaderGeoFilters,
+  ]);
 
   const resolvedIntent: Intent | null =
     currentIntent ?? (cityHubOnly ? null : "kuda");

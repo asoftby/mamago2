@@ -24,7 +24,10 @@ export type CityPathType =
   | "route"      // /[city]/routes/[slug]
   | "journal"    // /[city]/blog  (alias kept for back-compat)
   | "article"    // /[city]/blog/[slug]
-  | "tag";       // /[city]/tags/[slug]
+  | "tag"        // /[city]/tags/[slug]
+  | "classes"    // /[city]/classes
+  | "birthday"   // /[city]/birthday
+  | "programs";  // /[city]/programs
 
 /**
  * Returns the canonical base URL for a country.
@@ -101,7 +104,11 @@ export function buildCityPublicPath(params: CityPublicPathParams): string {
       path = `/${city}/offers/${section}`;
       break;
     case "offer":
-      path = `/${city}/offers/${section}/${slug}`;
+      // Section-free canonical — {section} is a mutable taxonomy/filter
+      // concept, not part of the Offer's permanent identity. See
+      // docs/migration/seo/final-url-architecture-2026-08-15.md §3,
+      // BACKLOG-116.
+      path = `/${city}/offers/${slug}`;
       break;
     case "routes":
       path = `/${city}/routes`;
@@ -117,6 +124,15 @@ export function buildCityPublicPath(params: CityPublicPathParams): string {
       break;
     case "tag":
       path = `/${city}/tags/${slug}`;
+      break;
+    case "classes":
+      path = `/${city}/classes`;
+      break;
+    case "birthday":
+      path = `/${city}/birthday`;
+      break;
+    case "programs":
+      path = `/${city}/programs`;
       break;
   }
 

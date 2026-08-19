@@ -1,0 +1,2267 @@
+{
+  "source": "wordpress-db",
+  "generatedAt": "2026-07-29T21:12:20.708Z",
+  "entity": "place",
+  "limit": null,
+  "stats": {
+    "discoveredCount": 82,
+    "plannedCount": 82,
+    "normalizedCount": 82,
+    "failedCount": 0,
+    "skippedCount": 0,
+    "successRate": 1,
+    "actionCounts": {
+      "UPDATE_CONFLICT": 4,
+      "SKIP_UNCHANGED": 78
+    },
+    "statusCounts": {
+      "BLOCKED": 4,
+      "SKIPPED": 78
+    },
+    "targetTypeCounts": {
+      "PLACE": 82
+    },
+    "sourceEntityTypeCounts": {
+      "wordpress-db:places": 82
+    },
+    "warningCounts": {
+      "PLACE_MEDIA_LEGACY_KEY_USED": 2,
+      "PLACE_ADDRESS_INCOMPLETE": 1,
+      "PLACE_LOGO_EXCLUDED": 47,
+      "PLACE_WORK_HOURS_UNSUPPORTED": 12,
+      "PLACE_PHONE_INVALID": 1
+    },
+    "durationsMs": {
+      "discover": 1993.987833,
+      "filter": 11.22183300000006,
+      "normalize": 10.38195799999994,
+      "plan": 0.21204200000011042,
+      "total": 2015.880959
+    }
+  },
+  "candidates": [
+    {
+      "sourceRecordKey": "wordpress-db:places:437",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Пуговка» на Ратомской, 7",
+      "slug": "pugovka-na-ratomskoj-7",
+      "action": "UPDATE_CONFLICT",
+      "status": "BLOCKED",
+      "targetId": "cmrawk2lp0006wsqo6i2s0jgt",
+      "conflictReason": "LAST_IMPORTED_AT_UNKNOWN",
+      "warnings": [
+        {
+          "code": "PLACE_MEDIA_LEGACY_KEY_USED",
+          "message": "Source has a legacy gallery-place value distinct from gallery; kept as raw evidence, not merged into the imported gallery.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:437",
+          "details": {
+            "legacyKey": "gallery-place",
+            "rawValues": [
+              "766,767,768,769,770,771,772,773,774,775,776"
+            ],
+            "merged": false
+          }
+        },
+        {
+          "code": "PLACE_MEDIA_LEGACY_KEY_USED",
+          "message": "Source has a legacy logo-place value; kept as raw evidence, logos are never auto-imported.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:437",
+          "details": {
+            "legacyKey": "logo-place",
+            "rawValues": [
+              "765"
+            ],
+            "merged": false
+          }
+        }
+      ],
+      "mediaRefCount": 15,
+      "relationRefCount": 21,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ул. Ратомская 7, Минск 220004, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:895",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Пуговка» на Восточной, 137",
+      "slug": "pugovka-na-vostochnoj-137",
+      "action": "UPDATE_CONFLICT",
+      "status": "BLOCKED",
+      "targetId": "cmrn9v5yp000lws4c5dor2xs7",
+      "conflictReason": "TARGET_MODIFIED_AFTER_IMPORT",
+      "warnings": [
+        {
+          "code": "PLACE_ADDRESS_INCOMPLETE",
+          "message": "location.address parsed but is a content-free placeholder (empty, punctuation-only, or a bare street-type word like \"ул\"/\"ул.\"/\"улица\") — never written to the target address field. Needs manual review.",
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:895",
+          "details": {
+            "extractedAddressText": "Ул."
+          }
+        }
+      ],
+      "mediaRefCount": 10,
+      "relationRefCount": 20,
+      "mediaPolicy": "FULL",
+      "plannedMediaAction": "FULL_IMPORT",
+      "addressSummary": null,
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5389",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Family Сlub» (Фэмили клуб)",
+      "slug": "family-slub-femili-klub",
+      "action": "UPDATE_CONFLICT",
+      "status": "BLOCKED",
+      "targetId": "cmrn5kfwv000lwsgmaxr4kyya",
+      "conflictReason": "TARGET_MODIFIED_AFTER_IMPORT",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:5389",
+          "details": {
+            "logoAttachmentIds": [
+              "5390"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 15,
+      "relationRefCount": 10,
+      "mediaPolicy": "FULL",
+      "plannedMediaAction": "FULL_IMPORT",
+      "addressSummary": "улица Первомайская 3а, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5457",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Кофта» на пр-т Мира, 1",
+      "slug": "kofta-na-pr-t-mira-1",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 5,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Мира 1, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5492",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Кофта» на Мстиславца, 2",
+      "slug": "kofta-na-mstislavca-2",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 5,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Петра Мстиславца 2, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5515",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "\"Mousse Art Bakery\" (Мусс Арт Бейкери)",
+      "slug": "mousse",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:5515",
+          "details": {
+            "logoAttachmentIds": [
+              "34554"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 6,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Белинского 23, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5528",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Mousse kids» (Мусс кидс)",
+      "slug": "mousse-kids",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 19,
+      "relationRefCount": 13,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Авиационная 16, Копище, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5579",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Гранд Бублик» (Grand Bublik)",
+      "slug": "grand-bublik",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 10,
+      "relationRefCount": 15,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Братская 6, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:5594",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«ДВА КОТА»",
+      "slug": "dva-kota",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:5594",
+          "details": {
+            "logoAttachmentIds": [
+              "32521"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 17,
+      "relationRefCount": 15,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Дзержинского 123, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:8901",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Penguin» (Пингвин)",
+      "slug": "penguin-pingvin",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:8901",
+          "details": {
+            "logoAttachmentIds": [
+              "16222"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 8,
+      "relationRefCount": 18,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Грибоедова 1, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9312",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Golf Park» (Гольф парк)",
+      "slug": "golf-park-golf-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:9312",
+          "details": {
+            "logoAttachmentIds": [
+              "33678"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 13,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Максима Богдановича 23, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9865",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Бюро детективных квестов «Пинкертон»",
+      "slug": "bjuro-detektivnyh-kvestov-pinkerton",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:9865",
+          "details": {
+            "logoAttachmentIds": [
+              "33999"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 2,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ул. Короля д. 18, Минск, Belarus",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9870",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Трапеция»",
+      "slug": "trapecija",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 5,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Партизанский проспект 2/1, Минск, Belarus",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:9948",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Британская школа» (British school)",
+      "slug": "britanskaja-shkola",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Нёманская 43, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10343",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«mooon» на Тимирязева, 74а",
+      "slug": "mooon-na-timirjazeva-74a",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"10:00\"–\"00:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "10:00",
+            "to": "00:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:10343"
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"10:00\"–\"01:30\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "10:00",
+            "to": "01:30"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:10343"
+        }
+      ],
+      "mediaRefCount": 9,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Тимирязева 74а, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10370",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«mooon Kids»",
+      "slug": "mooon-kids",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 7,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Тимирязева 74а, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10380",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«SilverScreen» в ARENAcity",
+      "slug": "silverscreen",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"10:00\"–\"00:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "10:00",
+            "to": "00:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:10380"
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"10:00\"–\"01:30\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "10:00",
+            "to": "01:30"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:10380"
+        }
+      ],
+      "mediaRefCount": 4,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ТРЦ ARENA City, пр-т. Победителей 84, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:10515",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«ТикТок парк» (TikTok park)",
+      "slug": "tiktok-park-tiktok-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:10515",
+          "details": {
+            "logoAttachmentIds": [
+              "28912"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 15,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "пр. Независимости 3/2, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11087",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Disco Park» (Диско парк)",
+      "slug": "disco-park-disko-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:11087",
+          "details": {
+            "logoAttachmentIds": [
+              "33542"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 13,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Независимости 3/2, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11408",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Симба‎»‎ (Simba)",
+      "slug": "simba",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 9,
+      "relationRefCount": 17,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Проспект Победителей 115, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11463",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Flash Park (Флэш Парк)» в ТРЦ Arena City",
+      "slug": "flash-park-v-trts-arena-citi",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 14,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "Проспект Победителей 84, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:11892",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«mooon» на Мстиславца, 11",
+      "slug": "mooon-na-mstislavca-11",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"10:00\"–\"00:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "10:00",
+            "to": "00:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:11892"
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"10:00\"–\"01:30\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "10:00",
+            "to": "01:30"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:11892"
+        }
+      ],
+      "mediaRefCount": 6,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ул. Петра Мстиславца 11, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:12447",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«MI MI LAND» (Ми ми лэнд) на Тимирязева",
+      "slug": "mi-mi-land",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:12447",
+          "details": {
+            "logoAttachmentIds": [
+              "12987"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 6,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Тимирязева 74A, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:12884",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Flash Park (Флэш Парк)» в ТРЦ DiaMond city",
+      "slug": "flash-park-fljesh-park-v-trc-diamond-city",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 12,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "улица Громова и 28 км МКАД, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:12923",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Bazillion eat&play»",
+      "slug": "bazillion-eat-play",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:12923",
+          "details": {
+            "logoAttachmentIds": [
+              "12987"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 12,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Нововиленская 39, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13164",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Молекула»",
+      "slug": "molekula",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:13164",
+          "details": {
+            "logoAttachmentIds": [
+              "43394"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 11,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Петра Мстиславца 7, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13311",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) на Победителей 133а",
+      "slug": "las-legas-las-legas-na-pobediteley-133a",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Проспект Победителей 133а, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13317",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) в Дана Молл",
+      "slug": "las-legas-las-legas-v-dana-moll",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Петра Мстиславца 9, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13322",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) в Palazzo",
+      "slug": "las-legas-las-legas-v-palazzo",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Тимирязева 74A, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13323",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) в «DiaMond city»",
+      "slug": "las-legas-las-legas-v-diamond-city",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "DiaMond city Mall, Щомыслицкий с/с, Мінск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13324",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) в «Galileo Mall»",
+      "slug": "las-legas-las-legas-v-galileo-mall",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Galileo Mall, улица Бобруйская, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13327",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) в ТЦ «Титан»",
+      "slug": "las-legas-las-legas-v-tc-titan",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Дзержинского 104, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13331",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Лас Легас (Las Legas) на Якуба Коласа, 1",
+      "slug": "las-legas-las-legas-na-jakuba-kolasa-1",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Якуба Коласа 1, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:13487",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Квантум»",
+      "slug": "kvantum",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:13487",
+          "details": {
+            "logoAttachmentIds": [
+              "13490"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 8,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Газеты Правда 29, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:18886",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Playtopia»",
+      "slug": "playtopia",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:18886",
+          "details": {
+            "logoAttachmentIds": [
+              "18888"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 19,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Проспект Победителей 129, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:19800",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "\"ИГRАЙ\" (Играй) на Купревича",
+      "slug": "igraj-igraj-na-kuprevicha",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:19800",
+          "details": {
+            "logoAttachmentIds": [
+              "32874"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 14,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ул. Академика Купревича 18, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:20069",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "\"Территория праздника\"",
+      "slug": "territorija-prazdnika",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 3,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Проспект Победителей 141, Минск, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:21778",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Детский клуб приключений \"Активные дети\" (MY CAMP)",
+      "slug": "detskij-klub-priklyuchenij-aktivnye-deti-my-camp",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:21778",
+          "details": {
+            "logoAttachmentIds": [
+              "36319"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 7,
+      "relationRefCount": 6,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ул. Домбровская 9, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:25756",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Боулинг Хаус»",
+      "slug": "bouling-haus",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:25756",
+          "details": {
+            "logoAttachmentIds": [
+              "43415"
+            ]
+          }
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"13:00\"–\"03:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "13:00",
+            "to": "03:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:25756"
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"11:00\"–\"03:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "11:00",
+            "to": "03:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:25756"
+        }
+      ],
+      "mediaRefCount": 9,
+      "relationRefCount": 10,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Независимости 117А, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:26215",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Актив Парк»",
+      "slug": "aktiv-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:26215",
+          "details": {
+            "logoAttachmentIds": [
+              "28097"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 13,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Казимировская 6, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:27759",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Невидимый мир» на Волгоградской",
+      "slug": "nevidimyj-mir-na-volodarskogo",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "улица Волгоградская 35, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30346",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Музей авиационной техники",
+      "slug": "muzej-aviaczionnoj-tehniki",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:30346",
+          "details": {
+            "logoAttachmentIds": [
+              "30354"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 5,
+      "relationRefCount": 13,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Липковская 12а, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30411",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Космос»",
+      "slug": "kosmos",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:30411",
+          "details": {
+            "logoAttachmentIds": [
+              "30440"
+            ]
+          }
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "\"open\" status has no hours evidence — never auto-mapped to 24/7 without proof.",
+          "details": {
+            "days": [
+              "MON",
+              "TUE",
+              "THU",
+              "WED",
+              "FRI",
+              "SAT",
+              "SUN"
+            ]
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:30411"
+        }
+      ],
+      "mediaRefCount": 7,
+      "relationRefCount": 10,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": null,
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30426",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Парк Уго Чавеса",
+      "slug": "park-ugo-chavesa",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:30426",
+          "details": {
+            "logoAttachmentIds": [
+              "30427"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 8,
+      "relationRefCount": 13,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Парк имени Уго Чавеса, улица Нёманская, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30502",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Центральный ботанический сад НАН Беларуси»",
+      "slug": "centralnyj-botanicheskij-sad-nan-belarusi",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:30502",
+          "details": {
+            "logoAttachmentIds": [
+              "30503"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 8,
+      "relationRefCount": 13,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "пр. Независимости 80a, Минск, Минская область, Беларусь",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:30963",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Neon Park» (Неон парк)",
+      "slug": "neon-park-neon-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:30963",
+          "details": {
+            "logoAttachmentIds": [
+              "33205"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 13,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Независимости 3/2, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:31267",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Boom Kids (Бумкидс)",
+      "slug": "boomkids",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 13,
+      "relationRefCount": 6,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Михаила Савицкого 20, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32271",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Мирский замок",
+      "slug": "mirskiy-zamok",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:32271",
+          "details": {
+            "logoAttachmentIds": [
+              "32273"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 4,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Красноармейская улица 2, Мир",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32409",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Be English",
+      "slug": "be-english",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:32409",
+          "details": {
+            "logoAttachmentIds": [
+              "32763"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 4,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": null,
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32633",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Балетная школа Вежновец» в ДК \"МАЗ\"",
+      "slug": "baletnaya-shkola-vezhnovecz-v-dk-maz",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:32633",
+          "details": {
+            "logoAttachmentIds": [
+              "32121"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 7,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Партизанский проспект 117а, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32636",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Балетная школа Вежновец» на Аранской",
+      "slug": "baletnaya-shkola-vezhnovecz-na-aranskoj",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:32636",
+          "details": {
+            "logoAttachmentIds": [
+              "32121"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 6,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Аранская 11, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:32637",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Балетная школа Вежновец» на Сморговском тракте",
+      "slug": "baletnaya-shkola-vezhnovecz-na-smorgovskom-trakte",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:32637",
+          "details": {
+            "logoAttachmentIds": [
+              "32121"
+            ]
+          }
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "appointments_only does not cover the full week and no other schedule data exists.",
+          "details": {
+            "appointmentDayCount": 5
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:32637"
+        }
+      ],
+      "mediaRefCount": 3,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Сморговский тракт 9, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:34933",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«ИГRАЙ» (Играй) на Свердлова",
+      "slug": "igraj-igraj-na-sverdlova",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:34933",
+          "details": {
+            "logoAttachmentIds": [
+              "32874"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 7,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Свердлова 11, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:36245",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«ТётиМоти»",
+      "slug": "tyotimoti",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:36245",
+          "details": {
+            "logoAttachmentIds": [
+              "43285"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 7,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Рыбалко 2, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:41193",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Молодежный театр эстрады",
+      "slug": "molodezhnyj-teatr-estrady",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_PHONE_INVALID",
+          "message": "phone postmeta value could not be resolved to a valid E.164 number.",
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:41193",
+          "details": {
+            "phoneRaw": "+375 (29) 700 35 05, +375 (17) 373 82 96, +375 (29) 700 33 55"
+          }
+        },
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:41193",
+          "details": {
+            "logoAttachmentIds": [
+              "52114"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 4,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Московская 18а, Минск",
+      "hasCity": true,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:42218",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Monopoly (Монополия)",
+      "slug": "monopoly-monopoliya",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:42218",
+          "details": {
+            "logoAttachmentIds": [
+              "63271"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 13,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "переулок Козлова 29, 7 этаж, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43023",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Атмосфера",
+      "slug": "atmosfera",
+      "action": "UPDATE_CONFLICT",
+      "status": "BLOCKED",
+      "targetId": "cmrnagtxy000hwsr2hy4843rk",
+      "conflictReason": "TARGET_MODIFIED_AFTER_IMPORT",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:43023",
+          "details": {
+            "logoAttachmentIds": [
+              "43024"
+            ]
+          }
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"09:00\"–\"02:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "09:00",
+            "to": "02:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:43023"
+        },
+        {
+          "code": "PLACE_WORK_HOURS_UNSUPPORTED",
+          "message": "Overnight interval \"11:00\"–\"02:00\" is not supported by the target model's isOpenNow() logic.",
+          "details": {
+            "from": "11:00",
+            "to": "02:00"
+          },
+          "severity": "WARNING",
+          "sourceRecordKey": "wordpress-db:places:43023"
+        }
+      ],
+      "mediaRefCount": 12,
+      "relationRefCount": 9,
+      "mediaPolicy": "FULL",
+      "plannedMediaAction": "FULL_IMPORT",
+      "addressSummary": "улица Скрыганова 6/2, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43071",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Джуманджи",
+      "slug": "dzhumandzhi",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:43071",
+          "details": {
+            "logoAttachmentIds": [
+              "63271"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 9,
+      "relationRefCount": 5,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "переулок Козлова 29, 8 этаж, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43247",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Art Shock (Арт Шок)",
+      "slug": "art-shock-art-shok",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:43247",
+          "details": {
+            "logoAttachmentIds": [
+              "43249"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 5,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Олешева 5, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43356",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Quest zone»",
+      "slug": "quest-zone",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:43356",
+          "details": {
+            "logoAttachmentIds": [
+              "43357"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 6,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Куйбышева 22, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43622",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«0,67»",
+      "slug": "067",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:43622",
+          "details": {
+            "logoAttachmentIds": [
+              "43626"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 8,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Долгобродская 43, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:43635",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Colt (Кольт)",
+      "slug": "colt-%d0%ba%d0%be%d0%bb%d1%8c%d1%82",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:43635",
+          "details": {
+            "logoAttachmentIds": [
+              "43637"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 7,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Красивая улица 32, Ратомка",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:45603",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Большой театр Беларуси",
+      "slug": "bolshoj-teatr-belarusi",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:45603",
+          "details": {
+            "logoAttachmentIds": [
+              "45609"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "площадь Парижской Коммуны 1, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:45634",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "SREDA",
+      "slug": "sreda",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:45634",
+          "details": {
+            "logoAttachmentIds": [
+              "45644"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Жореса Алферова, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:45846",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Next Level (Некст Левел)",
+      "slug": "next-level",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 6,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "Логойский тракт 22а/2, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:47316",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Чудный парус»",
+      "slug": "chudnyj-parus",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "улица Энгельса 20, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:47916",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Happy Park",
+      "slug": "happy-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "ул. Каштановая 5, Минск, Минская область 220131, Беларусь",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48312",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Игровые комнаты Drive Room",
+      "slug": "igrovye-komnaty-drive-room",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 4,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "улица Корженевского 12А, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48372",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«N45»",
+      "slug": "n45",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 10,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "улица Нёманская 45, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48375",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Тюбик парк»",
+      "slug": "tyubik-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 8,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "улица Казимировская 6, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:48875",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Банана Сити (Banana City) на Независимости, 134",
+      "slug": "banana-city-na-nezavisimosti",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 19,
+      "relationRefCount": 11,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "проспект Независимости 134, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:49952",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Спорт парк",
+      "slug": "sport-park",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 1,
+      "relationRefCount": 10,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Мясникова 37, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:49977",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«MI MI LAND» (Ми ми лэнд) на Мстиславца",
+      "slug": "mi-mi-land-na-mstislavcza",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 1,
+      "relationRefCount": 9,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "Dana mall, улица Петра Мстиславца, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:50033",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«Технодром»",
+      "slug": "tehnodrom",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [],
+      "mediaRefCount": 0,
+      "relationRefCount": 6,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "NO_MEDIA",
+      "addressSummary": "Торговый центр ALL, Долгиновский тракт, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:50902",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "«IT ШАГ» (Айти ШАГ)",
+      "slug": "it-shag",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:50902",
+          "details": {
+            "logoAttachmentIds": [
+              "51102"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 4,
+      "relationRefCount": 11,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "ул. Карла Маркса 32, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:51109",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "IT ШАГ Колледж (Айти ШАГ)",
+      "slug": "it-shag-kolledzh-ajti-shag",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:51109",
+          "details": {
+            "logoAttachmentIds": [
+              "51102"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 7,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Карла Маркса 32, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:54625",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Программирование для детей ITKids (АйТи Кидс) на Нововиленской, 47",
+      "slug": "programmirovanie-dlya-detej-itkids-ajti-kids-na-novovilenskoj-47",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:54625",
+          "details": {
+            "logoAttachmentIds": [
+              "54626"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 14,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Нововиленская 47, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:55950",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Программирование для детей ITKids (АйТи Кидс) на Неманской, 72",
+      "slug": "programmirovanie-dlya-detej-itkids-ajti-kids-na-nemanskoj-72",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:55950",
+          "details": {
+            "logoAttachmentIds": [
+              "55951"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 14,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Нёманская 72, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:55953",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Программирование для детей ITKids (АйТи Кидс) на Небесной, 1/2",
+      "slug": "programmirovanie-dlya-detej-itkids-ajti-kids-na-nebesnoj-1-2",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:55953",
+          "details": {
+            "logoAttachmentIds": [
+              "55954"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 14,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Небесная 1/2, Копище",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:60742",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Школа архитектурного мышления для детей",
+      "slug": "shkola-arhitekturnogo-myshleniya-dlya-detej",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:60742",
+          "details": {
+            "logoAttachmentIds": [
+              "60756"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 12,
+      "relationRefCount": 11,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": null,
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:61420",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Izum Club (Изюм Клаб)",
+      "slug": "izum-club",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:61420",
+          "details": {
+            "logoAttachmentIds": [
+              "61421"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 1,
+      "relationRefCount": 20,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Мястровская 8, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    },
+    {
+      "sourceRecordKey": "wordpress-db:places:63360",
+      "sourceEntityType": "wordpress-db:places",
+      "targetTypeHint": "PLACE",
+      "title": "Малберри Клаб (Mulberry Club)",
+      "slug": "malberri-klab-mulberry-club",
+      "action": "SKIP_UNCHANGED",
+      "status": "SKIPPED",
+      "warnings": [
+        {
+          "code": "PLACE_LOGO_EXCLUDED",
+          "message": "Source has a logo reference; logos are never auto-imported (see wordpress-to-mamago.md addendum). Not included in media refs.",
+          "severity": "INFO",
+          "sourceRecordKey": "wordpress-db:places:63360",
+          "details": {
+            "logoAttachmentIds": [
+              "63362"
+            ]
+          }
+        }
+      ],
+      "mediaRefCount": 9,
+      "relationRefCount": 19,
+      "mediaPolicy": "METADATA",
+      "plannedMediaAction": "METADATA_ONLY",
+      "addressSummary": "улица Петра Мстиславца 22, Минск",
+      "hasCity": false,
+      "hasCategory": true,
+      "hasCoordinates": true
+    }
+  ]
+}

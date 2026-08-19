@@ -371,6 +371,9 @@ function extractLabeledField(
 const AFISHA_PLACE_LABEL_START =
   /<(?:b|strong)>\s*Место\s*:\s*<\/(?:b|strong)>\s*/i;
 
+const AFISHA_ADDRESS_FRAGMENT_REGEX =
+  /((?:ул\.?|улица|пр-т|просп\.?|проспект|пер\.?|переулок|пл\.?|площадь|наб\.?|набережная|шоссе|б-р|бульвар)\s+[^\n.;:]{1,80}?\d[\dA-Za-zА-Яа-яЁё/-]*)/iu;
+
 /** Следующее поле карточки — обрезаем фрагмент до него, чтобы не захватывать лишний HTML. */
 const AFISHA_PLACE_BLOCK_END =
   /<(?:b|strong)>\s*(?:Возраст|Стоимость|Телефон|Время\s+проведения)\s*:/i;
@@ -388,6 +391,10 @@ export function normalizeAfishaAddressText(raw: string): string | null {
   s = s.replace(/^[,;\s:—–-]+/u, "").replace(/[,;\s:—–-]+$/u, "");
   s = s.replace(/\s*,\s*/g, ", ");
   while (s.includes(", ,")) s = s.replace(/,\s*,/g, ",");
+  const clipped = s.match(AFISHA_ADDRESS_FRAGMENT_REGEX)?.[1]?.trim();
+  if (clipped) {
+    s = clipped.replace(/\s*,\s*/g, ", ");
+  }
   return s.length > 0 ? s : null;
 }
 

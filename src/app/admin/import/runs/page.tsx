@@ -14,6 +14,7 @@ import {
   runStatusClasses,
   runStatusLabels,
 } from "../_lib/import-admin-ui";
+import { TableContainer } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -252,6 +253,10 @@ export default async function ImportRunsPage({
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <TableContainer
+            minWidthClassName="min-w-[640px]"
+            scrollLabel="Прогоны импорта, прокручивается по горизонтали"
+          >
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr className="border-b border-gray-200">
@@ -331,6 +336,7 @@ export default async function ImportRunsPage({
               })}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       )}
     </div>

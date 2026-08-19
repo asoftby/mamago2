@@ -295,7 +295,12 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     // TODO: в будущем это будет отдельное поле в данных
     // Пока используем priceDetails или bookingNotes
     if (data.priceDetails) {
-      return extractPlainTextLinesFromHtml(data.priceDetails);
+      // Рич-текст-канал хранит валюту как текст "BYN" (или легаси `U+E901`/В/₽/Br).
+      // На этом контролируемом JSX-рендере приводим BYN → иконку тем же путём,
+      // что прайс-чипы: normalizeUiCurrencyText (→ `U+E901`) + renderCurrencyText.
+      return extractPlainTextLinesFromHtml(data.priceDetails).map((line) =>
+        renderCurrencyText(normalizeUiCurrencyText(line), { iconSize: "sm" }),
+      );
     }
     return [];
   }, [data.priceDetails]);

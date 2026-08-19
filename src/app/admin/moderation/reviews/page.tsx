@@ -37,6 +37,9 @@ type FilterStatus = "all" | "pending" | "published" | "hidden";
 type FilterSource = "all" | "mamago" | "google";
 type FilterReply = "all" | "with-reply" | "without-reply";
 
+/** SelectTrigger по умолчанию w-fit (~5.5rem); фильтры — в 2.5 раза шире, одинаково. */
+const FILTER_SELECT_WIDTH_CLASS = "w-[13.75rem]";
+
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -226,13 +229,13 @@ export default function ReviewsPage() {
 
         {/* Filters */}
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+          <div className="flex flex-wrap gap-4">
+            <div className={FILTER_SELECT_WIDTH_CLASS}>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Статус
               </label>
               <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as FilterStatus)}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -244,12 +247,12 @@ export default function ReviewsPage() {
               </Select>
             </div>
 
-            <div>
+            <div className={FILTER_SELECT_WIDTH_CLASS}>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Источник
               </label>
               <Select value={filterSource} onValueChange={(v) => setFilterSource(v as FilterSource)}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -260,12 +263,12 @@ export default function ReviewsPage() {
               </Select>
             </div>
 
-            <div>
+            <div className={FILTER_SELECT_WIDTH_CLASS}>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Ответ автора
               </label>
               <Select value={filterReply} onValueChange={(v) => setFilterReply(v as FilterReply)}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

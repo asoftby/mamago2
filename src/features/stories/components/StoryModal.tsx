@@ -6,6 +6,7 @@ import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { StoryModalVisual } from "./StoryModalVisual";
 import { StoryModalActionCard } from "./StoryModalActionCard";
 import type { StoryCollection } from "../types/story";
+import { isSeen } from "../lib/seen";
 
 interface StoryModalProps {
   activeStory: StoryCollection;
@@ -14,11 +15,14 @@ interface StoryModalProps {
   totalStories: number;
   progressKey: number;
   paused: boolean;
+  seenOfferIds: ReadonlySet<string>;
+  seenGroupStart: number | null;
   onNext: () => void;
   onPrev: () => void;
   onClose: () => void;
   onPause: () => void;
   onResume: () => void;
+  onItemShown: (offerId: string) => void;
 }
 
 export function StoryModal({
@@ -28,11 +32,14 @@ export function StoryModal({
   totalStories,
   progressKey,
   paused,
+  seenOfferIds,
+  seenGroupStart,
   onNext,
   onPrev,
   onClose,
   onPause,
   onResume,
+  onItemShown,
 }: StoryModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,6 +51,11 @@ export function StoryModal({
   const nextItem = activeItemIndex < activeStory.items.length - 1
     ? activeStory.items[activeItemIndex + 1]
     : null;
+
+  // Mounting the active modal card is the point at which it was actually shown.
+  useEffect(() => {
+    onItemShown(currentItem?.offerId ?? "");
+  }, [currentItem?.offerId, onItemShown]);
 
   // ── scroll lock ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -132,6 +144,7 @@ export function StoryModal({
             "md:w-[52%] md:h-full",
             // Mobile: top area
             "max-md:h-[52vw] max-md:min-h-[220px] max-md:max-h-[300px]",
+            isSeen(currentItem, seenOfferIds) && "opacity-60",
           )}
         >
           <StoryModalVisual
@@ -156,6 +169,9 @@ export function StoryModal({
             "max-md:flex-1 max-md:overflow-y-auto",
           )}
         >
+          {seenGroupStart === activeItemIndex && (
+            <div data-testid="stories-seen-divider" className="mx-5 border-t border-neutral-200" />
+          )}
           <StoryModalActionCard
             item={currentItem}
             storyTitle={activeStory.title}

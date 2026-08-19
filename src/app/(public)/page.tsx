@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getBaseUrl } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { Container } from "@/components/ui/Container";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -34,18 +35,31 @@ export default async function NationalHubPage() {
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Выберите город</h2>
-        <ul className="flex flex-wrap gap-3">
-          {cities.map((city) => (
-            <li key={city.slug}>
-              <Link
-                href={`/${city.slug}`}
-                className="inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
-              >
-                {city.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {cities.length > 0 ? (
+          <ul className="flex flex-wrap gap-3">
+            {cities.map((city) => (
+              <li key={city.slug}>
+                <Link
+                  href={`/${city.slug}`}
+                  className="inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+                >
+                  {city.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="rounded-2xl border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Пока нет доступных городов.</p>
+            <p className="mt-2 max-w-2xl">
+              Обычно это значит, что в базе ещё не появились активные города для публичного
+              каталога. Проверьте seed и настройки видимости города.
+            </p>
+            <Button asChild className="mt-4">
+              <Link href="/admin/taxonomy/cities">Открыть города в админке</Link>
+            </Button>
+          </div>
+        )}
       </div>
     </Container>
   );

@@ -6,6 +6,7 @@ import { getStepsForOfferType } from "./offerWizardSteps.config";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete, isValidPhone, isValidUrl } from "./contacts";
+import { getRichTextLength } from "@/lib/richtext/utils";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -101,19 +102,18 @@ function validatePlacementsStep(data: OfferFormData): ValidationResult {
     errors.push("Выберите хотя бы один сценарий размещения");
   }
 
-  if (data.requestedPlacements.includes("BIRTHDAY")) {
-    if (!data.birthdayDetails.role) {
-      errors.push("Выберите роль предложения для праздника");
-    }
-    if (
-      !data.birthdayDetails.priceFrom.trim() &&
-      !data.birthdayDetails.note.trim()
-    ) {
-      errors.push("Укажите цену от или важные условия для праздника");
-    }
+  // PARTY_SERVICE/PARTY_PACKAGE persist birthdayDetails (locationType/duration/
+  // included/program/note) via real Offer columns + details JSON. The plain
+  // "Организовать праздник" checkbox on other product types has no extra
+  // fields to fill, so no extra requirements apply there.
+  if (
+    data.requestedPlacements.includes("BIRTHDAY") &&
+    (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE")
+  ) {
     if (
       !data.birthdayDetails.included.trim() &&
-      !data.birthdayDetails.program.trim()
+      !data.birthdayDetails.program.trim() &&
+      !data.birthdayDetails.note.trim()
     ) {
       errors.push("Укажите, что входит, или опишите программу праздника");
     }
@@ -133,6 +133,7 @@ function validatePlacementsStep(data: OfferFormData): ValidationResult {
 function validateStep2(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const signalIdsOptional = data.productType === "PARTY_SERVICE";
 
   if (data.offerWizardType === "CAMP") {
     if (!data.campProgramType) {
@@ -152,7 +153,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
     errors.push("Краткое описание не должно превышать 120 символов");
   }
 
-  if (!data.description || data.description.trim().length < 20) {
+  if (getRichTextLength(data.description || "") < 20) {
     errors.push("Подробное описание должно содержать минимум 20 символов");
   }
 
@@ -163,7 +164,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
   // Validate Discovery Signals (structured groups)
   const signalIds = data.signalIds ?? [];
 
-  if (data.offerWizardType !== "CAMP") {
+  if (data.offerWizardType !== "CAMP" && !signalIdsOptional) {
     // Basic validation: check if signals are selected
     if (signalIds.length === 0) {
       errors.push("Выберите характеристики предложения (активность, формат, участие)");
@@ -184,7 +185,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
     data.title.trim().length >= 3 &&
     data.shortDescription.trim().length >= 10 &&
     data.shortDescription.length <= 120 &&
-    (data.offerWizardType === "CAMP" || signalIds.length >= 3)
+    (data.offerWizardType === "CAMP" || signalIdsOptional || signalIds.length >= 3)
   );
 
   return {
@@ -347,8 +348,12 @@ function validateStep6(data: OfferFormData): ValidationResult {
   const warnings: string[] = [];
   const isComplete = isOfferContactsComplete(data);
 
+  if (!data.placeId && data.contactSource !== "place") {
+    errors.push("Выберите место для предложения");
+  }
+
   if (data.contactSource === "place") {
-    if (!isComplete) {
+    if (!data.placeId) {
       errors.push("Выберите место для контактов или переключитесь на ручной ввод");
     }
     return {

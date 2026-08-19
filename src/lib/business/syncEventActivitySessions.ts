@@ -1,44 +1,14 @@
-import prisma from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
-import { expandScheduleItemDates } from "@/lib/event/expandScheduleItemDates";
+import { extractScheduleDatesAndStartTime } from "@/lib/event/materializeScheduleSessions";
 
-type ScheduleJsonLike = {
-  dates?: unknown;
-  startTime?: unknown;
-  scheduleItems?: unknown;
+type EventActivitySessionsPrisma = {
+  activitySession: Pick<
+    PrismaClient["activitySession"],
+    "createMany" | "deleteMany" | "findMany"
+  >;
 };
-
-function extractScheduleDatesAndStartTime(scheduleJson: unknown): {
-  dates: string[];
-  startTime: string;
-} {
-  const j = scheduleJson as ScheduleJsonLike | null | undefined;
-
-  let dates: string[] = [];
-
-  let startTime =
-    typeof j?.startTime === "string" && /^\d{2}:\d{2}$/.test(j.startTime)
-      ? j.startTime
-      : "10:00";
-
-  if (j && Array.isArray(j.scheduleItems) && j.scheduleItems.length > 0) {
-    const items = j.scheduleItems as Array<{ date?: unknown; dateEnd?: unknown; startTime?: unknown }>;
-    dates = expandScheduleItemDates(items);
-    const firstSt = items[0]?.startTime;
-    if (typeof firstSt === "string" && /^\d{2}:\d{2}$/.test(firstSt)) {
-      startTime = firstSt;
-    }
-  }
-
-  if (dates.length === 0 && j && Array.isArray(j.dates)) {
-    dates = (j.dates as unknown[]).filter(
-      (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
-    );
-  }
-
-  return { dates, startTime };
-}
 
 /**
  * Fingerprint of schedule fields that drive ActivitySession rows (dates + time).
@@ -74,9 +44,13 @@ export function eventSessionFingerprintFromStoredSessions(
 }
 
 export async function activitySessionsMatchScheduleJson(
-  activityId: string,
-  scheduleJson: unknown,
+  input: {
+    prisma: EventActivitySessionsPrisma;
+    activityId: string;
+    scheduleJson: unknown;
+  },
 ): Promise<boolean> {
+  const { prisma, activityId, scheduleJson } = input;
   const fromJson = eventSessionScheduleFingerprint(scheduleJson);
   const rows = await prisma.activitySession.findMany({
     where: { activityId },
@@ -91,9 +65,13 @@ export async function activitySessionsMatchScheduleJson(
  * Required for submit validation and listings that rely on sessions.
  */
 export async function replaceActivitySessionsFromScheduleJson(
-  activityId: string,
-  scheduleJson: unknown,
+  input: {
+    prisma: EventActivitySessionsPrisma;
+    activityId: string;
+    scheduleJson: unknown;
+  },
 ): Promise<number> {
+  const { prisma, activityId, scheduleJson } = input;
   const started = isServerSavePerfEnabled() ? performance.now() : 0;
   const { dates, startTime } = extractScheduleDatesAndStartTime(scheduleJson);
 

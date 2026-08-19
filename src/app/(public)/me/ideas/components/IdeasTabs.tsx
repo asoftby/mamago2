@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { Filter } from "../types";
+import { C } from "../theme";
 
 type TabItem = {
   value: Filter;
@@ -28,20 +29,20 @@ export function IdeasTabs({ value, items, onChange }: IdeasTabsProps) {
               type="button"
               onClick={() => onChange(item.value)}
               className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-all",
-                active
-                  ? "border-[#141210] bg-[#141210] text-white shadow-[0_10px_24px_rgba(20,18,16,0.14)]"
-                  : "border-[rgba(20,18,16,0.1)] bg-white text-[rgba(20,18,16,0.7)] hover:border-[rgba(20,18,16,0.2)] hover:bg-brand-soft",
+                "inline-flex h-[42px] items-center gap-2 rounded-full border px-[18px] text-sm font-medium transition-all",
               )}
+              style={
+                active
+                  ? { borderColor: C.ink, background: C.ink, color: C.paper }
+                  : { borderColor: C.line2, background: "transparent", color: C.ink2 }
+              }
             >
               <span>{item.label}</span>
               <span
-                className={cn(
-                  "inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px]",
-                  active ? "bg-white/12 text-white" : "bg-[rgba(20,18,16,0.05)] text-[rgba(20,18,16,0.55)]",
-                )}
+                className="font-mono text-[11px] tracking-[0.04em]"
+                style={{ color: active ? "rgba(250,247,241,.55)" : C.ink3 }}
               >
-                {item.count}
+                {String(item.count).padStart(2, "0")}
               </span>
             </button>
           );

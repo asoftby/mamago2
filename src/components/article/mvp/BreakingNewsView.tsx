@@ -16,7 +16,9 @@ import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { SaveHeart } from "@/features/save/SaveHeart";
+import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
+import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -231,30 +233,6 @@ function NewsHero({
   author: { displayName: string | null; avatarUrl: string | null } | null;
   editHref?: string;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleShare() {
-    const url = window.location.href;
-    if (navigator.share) {
-      try { await navigator.share({ title, url }); return; } catch {}
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    } else {
-      try {
-        const el = document.createElement("textarea");
-        el.value = url;
-        el.style.cssText = "position:fixed;opacity:0";
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand("copy");
-        document.body.removeChild(el);
-      } catch {}
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   const formattedDate = publishedAt
     ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(publishedAt).replace(/ г\.$/, "")
     : null;
@@ -355,23 +333,13 @@ function NewsHero({
 
             <span style={{ flex: 1 }} />
 
-            {/* Share */}
-            <button
-              onClick={handleShare}
-              aria-label="Поделиться"
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 40, height: 40, borderRadius: 99, cursor: "pointer",
-                border: `1.5px solid ${copied ? "transparent" : C.line2}`,
-                background: copied ? C.accentSoft : "transparent",
-                color: copied ? C.accentDeep : C.ink2,
-              }}
-            >
-              {copied
-                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-              }
-            </button>
+            {/* Save + Share */}
+            <ArticleDetailActions
+              articleId={articleId}
+              title={title}
+              href={typeof window !== "undefined" ? window.location.pathname : ""}
+              source="breaking-news-detail"
+            />
           </div>
         </div>
       </div>
@@ -436,6 +404,9 @@ function Lightbox({ urls, startIndex, onClose }: { urls: string[]; startIndex: n
 
 // ─── Editorial gallery ────────────────────────────────────────────────────────
 
+// Kept temporarily as the previous Breaking News gallery implementation; the
+// shared ArticleGallery now owns rendering so saved presentation modes are honored.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function HeroGallery({ urls, title }: { urls: string[]; title: string }) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -1023,9 +994,7 @@ export function BreakingNewsView({
 }: BreakingNewsViewProps) {
   const cityHomeHref = getCityHomeHref(citySlug);
 
-  // Extract gallery URLs from the gallery block.
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
-  const galleryUrls = galleryBlock ? galleryBlock.imageUrls.filter((u): u is string => Boolean(u)) : [];
 
   // Extract activity card block.
   const activityBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "activityCard" }> => b.type === "activityCard");
@@ -1078,7 +1047,11 @@ export function BreakingNewsView({
           <PublicationTagChips tags={tags} citySlug={citySlug} />
         </div>
       </div>
-      <HeroGallery urls={galleryUrls} title={title} />
+      {galleryBlock ? (
+        <div className="mx-auto w-full max-w-[760px] px-4 sm:px-6">
+          <ArticleGallery images={galleryBlock.images} presentation={galleryBlock.presentation} caption={galleryBlock.caption} />
+        </div>
+      ) : null}
       <ArticleBody blocks={blocks} />
 
       {activityBlock?.card && activityBlock.card.kind === "basic" && activityBlock.card.placeExtra && (

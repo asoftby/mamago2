@@ -6,6 +6,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { OwnerPlaceEditDropdown } from "./OwnerPlaceEditDropdown";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
+import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
+import { postAnalyticsEvent } from "@/lib/analytics/client";
 import {
   SidebarCard,
   SidebarCardSection,
@@ -13,8 +16,9 @@ import {
   SidebarCardAddressRow,
   SidebarCardContactRow,
   SidebarCardShare,
-  SidebarCardPrimaryLink,
 } from "@/components/shared/SidebarCard";
+import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 interface PlaceHeroProps {
   ctaRef?: React.RefObject<HTMLDivElement | null>;
@@ -27,7 +31,7 @@ interface PlaceHeroProps {
   district?: string;
   address?: string;
   metro?: string;
-  phone?: string;
+  phones: NormalizedPlacePhone[];
   website?: string;
   instagramUrl?: string;
   logoUrl?: string | null;
@@ -39,6 +43,11 @@ interface PlaceHeroProps {
   breadcrumbItems: Array<{ label: string; href?: string }>;
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
+  media?: {
+    galleryItems: MediaGalleryItem[];
+  };
+  /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
+  directSlot?: React.ReactNode;
 }
 
 export function PlaceHero({
@@ -52,7 +61,7 @@ export function PlaceHero({
   district,
   address,
   metro,
-  phone,
+  phones,
   website,
   instagramUrl,
   logoUrl,
@@ -62,12 +71,15 @@ export function PlaceHero({
   isOpenNow,
   todayHoursText,
   breadcrumbItems,
+  directSlot,
   onShareClick,
   ownerEditPlaceId,
+  media,
 }: PlaceHeroProps) {
-  const words = title.trim().split(/\s+/);
-  const titleHead = words[0] ?? "";
-  const titleTail = (words.length > 1 ? words.slice(1).join(" ") : "") + ".";
+  const trimmedTitle = title.trim();
+  // Заголовок одной строкой (без принудительного переноса после первого слова),
+  // с editorial-точкой в конце, если её ещё нет.
+  const titleDisplay = /[.!?]$/.test(trimmedTitle) ? trimmedTitle : `${trimmedTitle}.`;
 
   const logoInitials = title
     .split(/\s+/)
@@ -82,6 +94,16 @@ export function PlaceHero({
   const instagramDisplay = instagramUrl
     ? "@" + instagramUrl.replace(/^https?:\/\/(www\.)?instagram\.com\/?/, "").replace(/\/$/, "")
     : null;
+
+  const trackCta = (targetAction: string) => {
+    void postAnalyticsEvent({
+      eventType: "CTA_CLICK",
+      entityType: "PLACE",
+      entityId: placeId,
+      vertical: "CITY",
+      meta: { source: "detail", targetAction },
+    });
+  };
 
   const summaryLines =
     workingHoursSummary
@@ -200,13 +222,7 @@ export function PlaceHero({
               color: "#141210",
             }}
           >
-            {titleHead && (
-              <>
-                {titleHead}
-                <br />
-              </>
-            )}
-            <span>{titleTail}</span>
+            {titleDisplay}
           </h1>
 
           {/* Subtitle */}
@@ -222,6 +238,11 @@ export function PlaceHero({
             {shortDesc}
           </div>
 
+          {media && media.galleryItems.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
+            </div>
+          )}
         </div>
 
         {/* Right: sticky decision card */}
@@ -271,7 +292,7 @@ export function PlaceHero({
               </SidebarCardSection>
             )}
 
-            {/* Contacts */}
+            {/* Contacts (телефоны не дублируем — есть кнопка «Позвонить») */}
             {(website || instagramUrl) && (
               <SidebarCardSection>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -281,6 +302,7 @@ export function PlaceHero({
                       href={website.startsWith("http") ? website : `https://${website}`}
                       value={websiteDisplay}
                       external
+                      onClick={() => trackCta("website")}
                     />
                   )}
                   {instagramUrl && instagramDisplay && (
@@ -289,6 +311,7 @@ export function PlaceHero({
                       href={instagramUrl}
                       value={instagramDisplay}
                       external
+                      onClick={() => trackCta("instagram")}
                     />
                   )}
                 </div>
@@ -298,15 +321,16 @@ export function PlaceHero({
             {/* Позвонить + Сохранить */}
             <SidebarCardTopSection>
               <div ref={ctaRef} className="flex items-center gap-3">
-                {phone && (
-                  <Link
-                    href={`tel:${phone}`}
+                {phones.length > 0 && (
+                  <PlacePhoneActionButton
+                    phones={phones}
+                    placeTitle={title}
                     className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white transition-colors hover:bg-[#E86A3A]"
-                    style={{ textDecoration: "none" }}
+                    onClick={() => trackCta("call")}
                   >
                     <Phone className="h-4 w-4 shrink-0" />
                     Позвонить
-                  </Link>
+                  </PlacePhoneActionButton>
                 )}
                 <PlaceSaveHeart
                   placeId={placeId}
@@ -316,6 +340,7 @@ export function PlaceHero({
                   source="place-detail"
                 />
               </div>
+              {directSlot && <div className="mt-3">{directSlot}</div>}
             </SidebarCardTopSection>
 
             {/* Owner edit */}
@@ -343,7 +368,7 @@ export function PlaceHero({
                     </a>
                   </div>
                 ) : <span />}
-                <SidebarCardShare title={title} />
+                <SidebarCardShare title={title} entityNoun="местом" />
               </div>
             </SidebarCardTopSection>
           </SidebarCard>

@@ -767,6 +767,93 @@ export async function syncArticleMediaUsage(articleId: string) {
 }
 
 /**
+ * Sync media usage for a Route (Phase B — invariant).
+ *
+ * Routes must be a source in the usage projection, otherwise media referenced
+ * only by routes counts as orphaned (usage 0) and the fail-closed cleanup gate
+ * would treat UGC as deletable.
+ *
+ * Phase C — reference vs owned: we only traverse the route's OWN reference
+ * columns (coverImageUrl, seoOgImage), its stops' own photos (photoUrl),
+ * and RouteStopImage gallery rows. Place gallery images shown *inside* a
+ * route stay attached to their Place (reference, not route-owned).
+ */
+export async function syncRouteMediaUsage(routeId: string) {
+  const route = await prisma.route.findUnique({
+    where: { id: routeId },
+    select: {
+      coverImageUrl: true,
+      seoOgImage: true,
+      stops: { select: { photoUrl: true, images: { select: { url: true, mediaAssetId: true, sortOrder: true } } } },
+    },
+  });
+
+  if (!route) {
+    throw new Error(`Route ${routeId} not found`);
+  }
+
+  const mediaIds = new Set<string>();
+  const usageRecords: Array<{ mediaId: string; field: string }> = [];
+
+  const coverAsset = await findMediaAssetByReference(route.coverImageUrl);
+  if (coverAsset) {
+    mediaIds.add(coverAsset.id);
+    usageRecords.push({ mediaId: coverAsset.id, field: "coverImageUrl" });
+  }
+
+  const ogAsset = await findMediaAssetByReference(route.seoOgImage);
+  if (ogAsset) {
+    mediaIds.add(ogAsset.id);
+    usageRecords.push({ mediaId: ogAsset.id, field: "seoOgImage" });
+  }
+
+  for (const stop of route.stops) {
+    const stopAsset = await findMediaAssetByReference(stop.photoUrl);
+    if (stopAsset) {
+      mediaIds.add(stopAsset.id);
+      usageRecords.push({ mediaId: stopAsset.id, field: "stopPhotoUrl" });
+    }
+    for (const image of stop.images) {
+      const galleryAsset =
+        (image.mediaAssetId
+          ? await findMediaAssetByReference(image.mediaAssetId)
+          : null) ?? (await findMediaAssetByReference(image.url));
+      if (galleryAsset) {
+        mediaIds.add(galleryAsset.id);
+        usageRecords.push({ mediaId: galleryAsset.id, field: "stopGalleryUrl" });
+      }
+    }
+  }
+
+  // Remove old usage records for this route
+  await prisma.mediaUsage.deleteMany({
+    where: {
+      entityType: MediaEntityType.ROUTE,
+      entityId: routeId,
+    },
+  });
+
+  // Create new usage records (deduplicated by field+mediaId)
+  const seen = new Set<string>();
+  for (const record of usageRecords) {
+    const key = `${record.mediaId}:${record.field}`;
+    if (!seen.has(key)) {
+      await prisma.mediaUsage.create({
+        data: {
+          mediaId: record.mediaId,
+          entityType: MediaEntityType.ROUTE,
+          entityId: routeId,
+          field: record.field,
+        },
+      });
+      seen.add(key);
+    }
+  }
+
+  return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+}
+
+/**
  * Recompute usage counts for specific media assets
  * Updates the denormalized usageCount cache
  */
@@ -814,6 +901,7 @@ export async function recomputeAllMediaUsageCounts() {
     places: 0,
     offers: 0,
     articles: 0,
+    routes: 0,
     errors: 0,
   };
 
@@ -891,6 +979,25 @@ export async function recomputeAllMediaUsageCounts() {
     }
   } catch (error) {
     console.error("Error fetching articles:", error);
+  }
+
+  // Sync all routes (Phase B — keep route-referenced media out of the orphan set)
+  try {
+    const routes = await prisma.route.findMany({
+      select: { id: true },
+    });
+
+    for (const route of routes) {
+      try {
+        await syncRouteMediaUsage(route.id);
+        stats.routes++;
+      } catch (error) {
+        console.error(`Error syncing route ${route.id}:`, error);
+        stats.errors++;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching routes:", error);
   }
 
   const durationMs = Date.now() - startTime;

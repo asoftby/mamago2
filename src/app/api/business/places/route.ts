@@ -11,7 +11,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { AgePolicy, ContentStatus, PlaceKind, LocationSource, MediaEntityType } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { extractStreetName } from "@/lib/slug/slugUtils";
 import { generatePlaceSlug } from "@/lib/slug/placeSlugService";
@@ -34,6 +36,13 @@ import {
 } from "@/lib/validation/placeCategoryValidation";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import {
+  mapToCreatePayload as mapOpeningHoursToCreatePayload,
+  validateOpeningHours,
+} from "@/lib/openingHours";
+import type { OpeningHoursData } from "@/components/openingHours";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -147,7 +156,29 @@ export async function POST(request: NextRequest) {
           category: String(data.category ?? "").trim() || "other",
         }
       : data;
+    const phones = normalizePlacePhoneFields(d);
+    const faqItems = normalizeFaqItems(d.faqItems);
+    const openingHoursData =
+      d.openingHoursData === undefined ? undefined : (d.openingHoursData as OpeningHoursData | null);
+
+    if (openingHoursData) {
+      const openingHoursValidation = validateOpeningHours(openingHoursData);
+      if (!openingHoursValidation.valid) {
+        return NextResponse.json(
+          {
+            error: "OPENING_HOURS_VALIDATION_ERROR",
+            message: "Opening hours validation failed",
+            details: openingHoursValidation.errors,
+          },
+          { status: 400 }
+        );
+      }
+    }
     timer.mark("validate");
+    const normalizedAge = normalizeAgePolicy({
+      agePolicy: Object.values(AgePolicy).includes(d.agePolicy) ? d.agePolicy : AgePolicy.UNKNOWN,
+      ageTags: Array.isArray(d.ageTags) ? d.ageTags : [],
+    });
 
     // Get user's business (if exists)
     const businessId = await getUserBusinessId(user.id);
@@ -204,10 +235,12 @@ export async function POST(request: NextRequest) {
         category: d.category,
         shortDesc: d.shortDesc,
         description: d.description || null,
-        ageTags: d.ageTags || [],
+        ageTags: normalizedAge.ageTags,
+        agePolicy: normalizedAge.agePolicy,
         visitFormats: d.visitFormats || [],
         primaryCategoryId: d.primaryCategoryId || null,
         discoverySignalIds: Array.isArray(d.discoverySignalIds) ? d.discoverySignalIds : [],
+        faqItems: faqItems as unknown as Prisma.InputJsonValue,
 
         // Step 2 fields
         lat: d.lat || null,
@@ -234,10 +267,16 @@ export async function POST(request: NextRequest) {
         logoImageId: d.wizardSessionId ? null : d.logoImageId || null,
 
         // Step 4 fields
-        phone: d.phone || null,
+        phone: phones.phone,
+        phoneLabel: phones.phoneLabel,
+        phone2: phones.phone2,
+        phone2Label: phones.phone2Label,
+        phone3: phones.phone3,
+        phone3Label: phones.phone3Label,
         website: d.website || null,
         instagramHandle: d.instagramHandle || null,
         instagramUrl: d.instagramUrl || null,
+        reelsUrl: d.reelsUrl || null,
 
         // Hierarchy
         placeKind: d.placeKind || PlaceKind.STANDALONE,
@@ -245,6 +284,18 @@ export async function POST(request: NextRequest) {
         unit: d.unit || null,
       },
     });
+
+    if (openingHoursData) {
+      const openingHours = await prisma.openingHours.create({
+        data: mapOpeningHoursToCreatePayload(openingHoursData),
+        select: { id: true },
+      });
+
+      await prisma.place.update({
+        where: { id: place.id },
+        data: { openingHoursId: openingHours.id },
+      });
+    }
 
     console.log("[places/POST] ✅ Created place:", place.id, "status:", place.status);
     timer.mark("db");
@@ -493,8 +544,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const errorCode =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : undefined;
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
     return NextResponse.json(
-      { error: "INTERNAL_SERVER_ERROR", message: "Failed to create place" },
+      {
+        error: "INTERNAL_SERVER_ERROR",
+        message: errorMessage,
+        code: errorCode,
+        details:
+          process.env.NODE_ENV === "development"
+            ? {
+                name: error instanceof Error ? error.name : undefined,
+                message: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+              }
+            : undefined,
+      },
       { status: 500 }
     );
   }

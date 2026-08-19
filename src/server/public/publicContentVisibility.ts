@@ -115,9 +115,12 @@ export function getPublicActivityDetailWhere(): Prisma.ActivityWhereInput {
 export function getPublicPublishedOfferWhere(
   now: Date = new Date()
 ): Prisma.OfferWhereInput {
-  void now;
   return {
-    AND: [{ status: "PUBLISHED" }, { place: placeOwnerBusinessActiveWhere }],
+    AND: [
+      { status: "PUBLISHED" },
+      { archivedAt: null },
+      { place: getPublicPublishedPlaceWhere(now) },
+    ],
   };
 }
 

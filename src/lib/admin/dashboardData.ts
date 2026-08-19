@@ -58,6 +58,7 @@ export interface RecentActivityItem {
   actor: string;
   action: string;
   entity: string;
+  message?: string;
   timestamp: Date;
   link?: string;
 }
@@ -458,7 +459,8 @@ export async function getRecentActivityData(): Promise<RecentActivityItem[]> {
         type: "creation" as const,
         actor: "Система",
         action: "зарегистрировал пользователя",
-        entity: u.displayName ?? u.email,
+        entity: u.email,
+        message: "Зарегистрирован новый пользователь:",
         timestamp: u.createdAt,
         link: `/admin/users/${u.id}`,
       })),

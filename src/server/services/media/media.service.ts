@@ -9,6 +9,7 @@ import { existsSync } from "fs";
 import { unlink } from "fs/promises";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
+import { isBrandingAsset } from "@/server/media/mediaPublicAccess";
 import {
   resolveLegacyPublicUploadPath,
   resolveStoredMediaPath,
@@ -27,11 +28,14 @@ export interface CreateMediaAssetInput {
   storageKey: string;
   publicUrl?: string;
   checksum?: string;
+  /** SHA-256 of raw original bytes — per-owner dedup key (Phase A). */
+  contentHash?: string;
   alt?: string;
   title?: string;
   caption?: string;
   sourceType: MediaSourceType;
-  uploadedById?: string;
+  /** Required — every MediaAsset must be owned (per-owner dedup invariant). */
+  uploadedById: string;
   // TEMP media fields
   status?: "TEMP" | "ACTIVE";
   wizardSessionId?: string;
@@ -64,6 +68,7 @@ export async function createMediaAsset(input: CreateMediaAssetInput) {
       storageKey: input.storageKey,
       publicUrl: input.publicUrl,
       checksum: input.checksum,
+      contentHash: input.contentHash,
       alt: input.alt,
       title: input.title,
       caption: input.caption,
@@ -293,7 +298,19 @@ export async function recalculateMediaUsageStatus(id: string) {
     return media;
   }
 
-  const newStatus = usageCount > 0 
+  // Branding assets (logo/favicon) are referenced via BrandingConfig FKs, not
+  // MediaUsage rows, so usage-based recalculation must not orphan them.
+  if (await isBrandingAsset(id)) {
+    if (media.status !== MediaAssetStatus.ACTIVE) {
+      return prisma.mediaAsset.update({
+        where: { id },
+        data: { status: MediaAssetStatus.ACTIVE },
+      });
+    }
+    return media;
+  }
+
+  const newStatus = usageCount > 0
     ? MediaAssetStatus.ACTIVE 
     : MediaAssetStatus.ORPHANED;
 

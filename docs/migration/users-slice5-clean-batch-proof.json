@@ -1,0 +1,52 @@
+{
+  "phase": "USERS Slice 5 clean local User batch import",
+  "sourceSnapshotSha256": "569c59f2e0d0a277a98ff5f7fe418170b123c77901c5c42064cecbaa2338f5a4",
+  "manifestSha256": "2534234d977044f262dad5345d54c967bff308e7006463ac9ac91031c99f9c2b",
+  "cleanCandidates": 564,
+  "manualPrivilegedExcluded": 15,
+  "batchSize": 50,
+  "batchCount": 12,
+  "parallelism": 1,
+  "stopOnFirstError": true,
+  "firstRun": {
+    "CREATE": 562,
+    "SKIP_UNCHANGED": 2,
+    "BLOCKED": 0,
+    "ERROR": 0
+  },
+  "rerun": {
+    "CREATE": 0,
+    "SKIP_UNCHANGED": 564,
+    "BLOCKED": 0,
+    "ERROR": 0
+  },
+  "slice5Deltas": {
+    "User": 562,
+    "Session": 0,
+    "UserActionToken": 0,
+    "MigrationLineage": 562,
+    "MigrationRecord": 1128,
+    "Business": 0,
+    "Place": 0,
+    "Offer": 0,
+    "Article": 0,
+    "Route": 0,
+    "MediaAsset": 0
+  },
+  "security": {
+    "pendingUsers": 564,
+    "nonNullPasswordHash": 0,
+    "verifiedEmails": 0,
+    "elevatedRoles": 0,
+    "sessions": 0,
+    "actionTokens": 0,
+    "manualPrivilegedImported": 0,
+    "duplicateNormalizedEmails": 0,
+    "duplicateLineage": 0,
+    "emailsSent": 0,
+    "providerCalls": 0,
+    "ownershipChanges": 0,
+    "profileMediaChanges": 0
+  },
+  "additionalReruns": 0
+}

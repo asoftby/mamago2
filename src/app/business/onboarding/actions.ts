@@ -40,6 +40,7 @@ import {
   isBusinessContactPhoneVerifiedForUser,
   normalizeBusinessContactPhone,
 } from "@/lib/phone-verification/businessContactVerification";
+import { resolveBusinessUnpVerification } from "@/server/egr/resolveUnpVerification";
 
 type ActionState =
   | { ok: true }
@@ -145,7 +146,16 @@ export async function createBusinessAction(
     ) {
       return buildPhoneVerificationFieldError();
     }
-    
+
+    // Автоматическая сверка УНП с ГРП. Fail-open: resolveBusinessUnpVerification
+    // никогда не бросает исключение — недоступность реестра оседает как
+    // unpVerificationStatus: "LOOKUP_FAILED" и не блокирует отправку заявки
+    // (модератор видит статус и официальное название в админке).
+    const unpVerification = await resolveBusinessUnpVerification(
+      validated.unp,
+      validated.legalName,
+    );
+
     // Generate name automatically from legalName or user ID
     const businessName = validated.legalName || `Business ${user.id}`;
     const now = new Date();
@@ -189,6 +199,10 @@ export async function createBusinessAction(
           rejectedAt: null,
           // Legacy: Keep status in sync
           status: "PENDING_VERIFICATION",
+          unpVerificationStatus: unpVerification.status,
+          unpVerifiedAt: unpVerification.verifiedAt,
+          unpOfficialName: unpVerification.officialName,
+          unpLastCheckedAt: unpVerification.checkedAt,
         },
       });
       notifyBusinessVerificationSubmittedBundle({
@@ -212,6 +226,10 @@ export async function createBusinessAction(
           submittedAt: now,
           // Legacy: Keep status in sync
           status: "PENDING_VERIFICATION",
+          unpVerificationStatus: unpVerification.status,
+          unpVerifiedAt: unpVerification.verifiedAt,
+          unpOfficialName: unpVerification.officialName,
+          unpLastCheckedAt: unpVerification.checkedAt,
         },
       });
       notifyBusinessVerificationSubmittedBundle({

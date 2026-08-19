@@ -21,6 +21,7 @@ import {
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { shouldShowDesktopHeaderSearch } from "@/lib/site/shouldShowDesktopHeaderSearch";
+import { useBranding } from "@/contexts/BrandingContext";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
@@ -75,6 +76,7 @@ const HEADER_SEARCH_BAR_WRAP_CLASS = "w-full max-w-[760px]";
  */
 export function SiteHeaderShell() {
   const pathname = usePathname();
+  const { logoUrl } = useBranding();
   const headerVariant = getSiteHeaderVariant(pathname);
   const isLandingHeader = headerVariant === "landing";
   const routeIntent = getIntentFromPath(pathname);
@@ -209,6 +211,7 @@ export function SiteHeaderShell() {
               <div className="flex min-w-0 items-center justify-self-start">
                 <MamaGoLogoMark
                   href={isCityHomePage ? undefined : cityHomeHref}
+                  src={logoUrl}
                   priority
                 />
               </div>

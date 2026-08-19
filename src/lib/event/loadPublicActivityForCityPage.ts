@@ -32,6 +32,7 @@ export async function loadPublicActivityForCityPage(
       seoOgImage: string | null;
       seoRobots: string | null;
       seoJsonLdOverride: unknown | null;
+      faqItems: unknown | null;
       ownerUserId: string;
       _redirectToSlug?: string;
     })
@@ -63,8 +64,9 @@ export async function loadPublicActivityForCityPage(
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, url: true, mediaAssetId: true },
+        select: { id: true, url: true, mediaAssetId: true, width: true, height: true },
       },
+      coverImage: { select: { width: true, height: true } },
       sessions: {
         where: { startsAt: { gte: now } },
         orderBy: { startsAt: "asc" },
@@ -80,6 +82,12 @@ export async function loadPublicActivityForCityPage(
           lat: true,
           lng: true,
           logoImageId: true,
+          phone: true,
+          phoneLabel: true,
+          phone2: true,
+          phone2Label: true,
+          phone3: true,
+          phone3Label: true,
           images: { select: { id: true, url: true, kind: true }, orderBy: { sortOrder: "asc" } },
           districtManual: { select: { name: true } },
           districtAuto: { select: { name: true } },
@@ -100,6 +108,12 @@ export async function loadPublicActivityForCityPage(
               lat: true,
               lng: true,
               logoImageId: true,
+              phone: true,
+              phoneLabel: true,
+              phone2: true,
+              phone2Label: true,
+              phone3: true,
+              phone3Label: true,
               images: { select: { id: true, url: true, kind: true }, orderBy: { sortOrder: "asc" } },
               districtManual: { select: { name: true } },
               districtAuto: { select: { name: true } },
@@ -143,12 +157,15 @@ export async function loadPublicActivityForCityPage(
     description: activity.description,
     format: activity.format,
     ageTags: activity.ageTags,
+    agePolicy: activity.agePolicy,
     priceText: activity.priceText,
     priceFrom: activity.priceFrom,
     currency: activity.currency,
     priceDetails: activity.priceDetails,
+    faqItems: (activity.faqItems as unknown) ?? null,
     scheduleJson: activity.scheduleJson,
     coverImageId: activity.coverImageId,
+    coverImage: activity.coverImage,
     coverImageUrl: resolveActivityCoverUrl({
       coverImageId: activity.coverImageId,
       coverImageUrl: activity.coverImageUrl,
@@ -156,9 +173,17 @@ export async function loadPublicActivityForCityPage(
         id: img.id,
         url: img.url,
         mediaAssetId: img.mediaAssetId,
+        width: img.width,
+        height: img.height,
       })),
     }),
-    images: activity.images.map((img) => ({ id: img.id, url: img.url })),
+    images: activity.images.map((img) => ({
+      id: img.id,
+      url: img.url,
+      mediaAssetId: img.mediaAssetId,
+      width: img.width,
+      height: img.height,
+    })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
     place: place
       ? {

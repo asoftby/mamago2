@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
+import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -79,6 +80,7 @@ export default async function EditorNewOfferPage({
     returnTo,
     ...routing,
   });
+  const ctaStepEnabled = isOfferCtaStepFeatureEnabled(process.env);
 
   return (
     <ContentEditorChrome
@@ -99,6 +101,7 @@ export default async function EditorNewOfferPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         defaultPlaceId={defaultPlaceId}
+        ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>
   );

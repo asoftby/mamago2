@@ -6,9 +6,6 @@ import { cn } from "@/lib/utils";
 type RecommendationDecisionBlockProps = {
   onDecide: () => void;
   onCatalog: () => void;
-  onIdeas: () => void;
-  ideasCount?: number;
-  hasGenerated?: boolean;
   isGenerating?: boolean;
   compact?: boolean;
 };
@@ -22,8 +19,6 @@ const ArrowIcon = () => (
 export function RecommendationDecisionBlock({
   onDecide,
   onCatalog,
-  onIdeas,
-  hasGenerated = false,
   isGenerating = false,
   compact = false,
 }: RecommendationDecisionBlockProps) {
@@ -78,8 +73,8 @@ export function RecommendationDecisionBlock({
             position: "relative", zIndex: 1,
             flexShrink: 0,
           }}>
-            {hasGenerated
-              ? <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+            {isGenerating
+              ? <RefreshCw className="h-4 w-4 animate-spin" />
               : <Sparkles className="h-4 w-4" />}
           </span>
 
@@ -94,7 +89,7 @@ export function RecommendationDecisionBlock({
             <span
               style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
             >
-              {hasGenerated ? "Ещё варианты" : "Реши за меня"}
+              Реши за меня
             </span>
             <span style={{ fontSize: 12, lineHeight: 1.45, color: "#3A332B" }}>
               Подберём идеи за пару секунд
@@ -179,25 +174,6 @@ export function RecommendationDecisionBlock({
           }}>
             Выбрать <ArrowIcon />
           </span>
-        </button>
-      </div>
-
-      {/* Footer link */}
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <button
-          type="button"
-          onClick={onIdeas}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 13, fontWeight: 600,
-            color: "#C24E22",
-            background: "none", border: "none", cursor: "pointer",
-            transition: "gap .18s",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.gap = "10px"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.gap = "6px"; }}
-        >
-          Мои идеи <ArrowIcon />
         </button>
       </div>
     </section>

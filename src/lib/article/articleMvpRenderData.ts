@@ -1,9 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
-import { resolveArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
-import type { ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import { parsePriceData, type PriceData } from "@/lib/priceItems";
@@ -138,13 +136,18 @@ export type ArticleMvpResolvedBlock =
   | (ArticleBlockMvp & { type: "quote" })
   | (ArticleBlockMvp & { type: "heading" })
   | (Extract<ArticleBlockMvp, { type: "image" }> & { imageUrl: string | null })
-  | (Extract<ArticleBlockMvp, { type: "gallery" }> & { imageUrls: (string | null)[] })
+  | (Extract<ArticleBlockMvp, { type: "gallery" }> & {
+      images: Array<{
+        id: string;
+        url: string | null;
+        alt: string | null;
+        caption: string | null;
+        width: number | null;
+        height: number | null;
+      }>;
+    })
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & { card: ResolvedActivityCard | ResolvedOfferEmbedCard | null })
-  | (Extract<ArticleBlockMvp, { type: "embed" }> & {
-      sanitizedEmbedHtml: string;
-      embedProvider: "youtube" | "instagram" | "unknown";
-      embedRequiresInstagramScript: boolean;
-    });
+  | Extract<ArticleBlockMvp, { type: "embed" }>;
 
 function parseRuDateToTimestamp(value?: string | null): number {
   if (!value) return Number.POSITIVE_INFINITY;
@@ -264,14 +267,7 @@ async function resolveActivityCard(
     }
 
     const citySlug = o.place?.city?.slug ?? "minsk";
-    const href = getOfferPublicPath(
-      {
-        kind: o.kind,
-        campProgramType: o.campProgramType,
-        slug: o.slug,
-      },
-      citySlug,
-    );
+    const href = getOfferPublicPath({ slug: o.slug }, citySlug);
 
     const offerData = await getOfferPageData({
       citySlug,
@@ -413,10 +409,11 @@ export async function buildArticleMvpResolvedBlocks(
     mediaIds.size > 0
       ? await prisma.mediaAsset.findMany({
           where: { id: { in: [...mediaIds] } },
-          select: { id: true, publicUrl: true },
+          select: { id: true, publicUrl: true, alt: true, title: true, caption: true, width: true, height: true },
         })
       : [];
   const urlById = new Map(assets.map((a) => [a.id, a.publicUrl]));
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
 
   for (const b of blocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading") {
@@ -433,7 +430,17 @@ export async function buildArticleMvpResolvedBlocks(
     if (b.type === "gallery") {
       out.push({
         ...b,
-        imageUrls: b.mediaIds.map((id) => urlById.get(id) ?? null),
+        images: b.mediaIds.map((id) => {
+          const asset = assetById.get(id);
+          return {
+            id,
+            url: asset?.publicUrl ?? null,
+            alt: asset?.alt?.trim() || asset?.title?.trim() || null,
+            caption: asset?.caption?.trim() || null,
+            width: asset?.width ?? null,
+            height: asset?.height ?? null,
+          };
+        }),
       });
       continue;
     }
@@ -443,13 +450,7 @@ export async function buildArticleMvpResolvedBlocks(
       continue;
     }
     if (b.type === "embed") {
-      const r = resolveArticleEmbed(b.embedHtml);
-      out.push({
-        ...b,
-        sanitizedEmbedHtml: r.sanitizedHtml,
-        embedProvider: r.provider,
-        embedRequiresInstagramScript: r.requiresInstagramScript,
-      });
+      out.push(b);
     }
   }
   return out;

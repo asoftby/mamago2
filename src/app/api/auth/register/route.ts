@@ -8,6 +8,8 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { normalizeEmail } from "@/lib/auth/email";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
 import { ensureUserOnboardingNotifications } from "@/server/services/notification.service";
+import { checkRateLimit } from "@/lib/security/rateLimit";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -18,10 +20,22 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const parsed = registerSchema.parse(body);
-    
+
     // Normalize email (trim + lowercase)
     const email = normalizeEmail(parsed.email);
     const password = parsed.password;
+
+    // Rate limit check: 5 attempts per 15 minutes per IP + Email
+    const ip = getTrustedClientIp(request) ?? "unknown";
+    const rateLimitKey = `register:${ip}:${email}`;
+    const rl = await checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Слишком много попыток регистрации. Попробуйте позже." },
+        { status: 429 }
+      );
+    }
 
     // Check if user already exists (case-insensitive)
     const existingUser = await prisma.user.findFirst({

@@ -20,6 +20,11 @@ import {
 } from "@/lib/auth/activityAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 /**
  * GET - Get activity details
@@ -264,13 +269,13 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Cannot delete PUBLISHED activities
-    if (activity.status === "PUBLISHED") {
-      return NextResponse.json(
-        { error: "Cannot delete published activity. Unpublish it first." },
-        { status: 400 }
-      );
-    }
+    await assertContentLifecycleOperationAllowed({
+      contentType: "ACTIVITY",
+      contentId: id,
+      operation: "deleteDraft",
+      status: activity.status,
+      prisma,
+    });
 
     // Delete activity (cascade will delete images, sessions, etc.)
     await prisma.activity.delete({
@@ -279,6 +284,12 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Delete activity error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

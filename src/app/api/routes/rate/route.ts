@@ -1,25 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
+import {
+  countsFromGroupBy,
+  isEmojiRatingType,
+  ratingVoterIdentifier,
+} from "@/lib/content-rating/emojiRating";
+import { getTrustedClientIp } from "@/lib/security/clientIp";
 
 export async function POST(req: NextRequest) {
   try {
-    const { routeId, ratingType } = await req.json();
+    const body = (await req.json()) as {
+      routeId?: unknown;
+      ratingType?: unknown;
+    };
+    const routeId = typeof body.routeId === "string" ? body.routeId.trim() : "";
+    const ratingType = body.ratingType;
 
-    if (!routeId || !ratingType) {
+    if (!routeId || !isEmojiRatingType(ratingType)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    if (!["like", "neutral", "dislike"].includes(ratingType)) {
-      return NextResponse.json({ error: "Invalid rating type" }, { status: 400 });
-    }
-
     const user = await getCurrentUser();
-    const ip =
-      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      req.headers.get("x-real-ip") ??
-      "anonymous";
-    const identifier = user?.id ?? `ip:${ip}`;
+    const identifier = ratingVoterIdentifier({
+      userId: user?.id,
+      ip: getTrustedClientIp(req),
+    });
 
     const existing = await prisma.routeRating.findUnique({
       where: { routeId_identifier: { routeId, identifier } },
@@ -44,12 +50,7 @@ export async function POST(req: NextRequest) {
       _count: true,
     });
 
-    const result = { like: 0, neutral: 0, dislike: 0 };
-    for (const c of counts) {
-      result[c.ratingType as keyof typeof result] = c._count;
-    }
-
-    return NextResponse.json({ ok: true, counts: result });
+    return NextResponse.json({ ok: true, counts: countsFromGroupBy(counts) });
   } catch (error) {
     console.error("Failed to rate route:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

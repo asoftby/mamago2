@@ -5,12 +5,11 @@ import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { useState } from "react";
 import Link from "next/link";
 import { OfferStatusBadge } from "./OfferStatusBadge";
-import { Pencil, Archive, ArchiveRestore, Trash2, Tag, BarChart3, Zap } from "lucide-react";
+import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Tag, BarChart3, Zap } from "lucide-react";
 import { OfferStatus, OfferKind } from "@prisma/client";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
-import { buildPromotionLaunchHref } from "@/lib/promotion/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PublicationStatisticsDialog } from "@/components/business/shared/PublicationStatisticsDialog";
@@ -24,6 +23,7 @@ import {
 } from "@/components/business/shared/BusinessPublicationCard";
 import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
+import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
 
 interface Offer {
@@ -38,12 +38,14 @@ interface Offer {
   priceText: string | null;
   campSessions?: unknown;
   status: OfferStatus;
+  archivedAt: Date | null;
   dateFrom: Date | null;
   dateTo: Date | null;
   slug: string | null;
   place: {
     id: string;
     title: string;
+    archivedAt: Date | null;
     city?: {
       slug: string;
     } | null;
@@ -97,25 +99,10 @@ export function OfferCardHorizontal({
   onArchive,
   onUnarchive,
 }: OfferCardHorizontalProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
   const getErrorMessage = (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback;
-
-  const handleDelete = async () => {
-    if (!confirm("Вы уверены, что хотите удалить это предложение?")) {
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      await onDelete(offer.id);
-    } catch (error: unknown) {
-      alert(getErrorMessage(error, "Не удалось удалить предложение"));
-      setIsDeleting(false);
-    }
-  };
 
   const handleArchive = async () => {
     if (!onArchive) return;
@@ -148,9 +135,16 @@ export function OfferCardHorizontal({
   const offerImageForCard = offer.coverImage;
 
   const citySlug = offer.place.city?.slug;
-  const publicOfferHref = (offer.status === "PUBLISHED" && citySlug && offer.slug)
+  const publicOfferHref = (
+    !offer.archivedAt &&
+    !offer.place.archivedAt &&
+    offer.status === "PUBLISHED" &&
+    citySlug &&
+    offer.slug
+  )
     ? getOfferPublicUrl(offer, citySlug)
-    : undefined;
+    : null;
+  const viewOfferHref = publicOfferHref ?? getOfferPreviewPath(offer.id);
 
   const cardMetrics = {
     views: offer.metrics.views,
@@ -163,7 +157,7 @@ export function OfferCardHorizontal({
     ? {
         text: "Продвигайте предложение, чтобы получить больше заявок и увеличить охват.",
         ctaLabel: "Узнать больше",
-        ctaHref: buildPromotionLaunchHref({ publicationType: "OFFER", publicationId: offer.id }),
+        ctaHref: `/business/offers/${offer.id}/boost`,
       }
     : null;
 
@@ -175,8 +169,8 @@ export function OfferCardHorizontal({
         imageAlt={offer.title}
         placeholderIcon={Tag}
         title={offer.title}
-        titleHref={publicOfferHref}
-        imageHref={publicOfferHref}
+        titleHref={viewOfferHref}
+        imageHref={viewOfferHref}
         typeChip={
           <BusinessChip tone="muted" size="compact">
             {kindLabel}
@@ -203,31 +197,37 @@ export function OfferCardHorizontal({
             </button>
 
             <Link
-              href={`/business/offers/${offer.id}/edit`}
-              className={cn(
-                BUSINESS_PUBLICATION_ACTION_BUTTON,
-                BUSINESS_PUBLICATION_ACTION_NEUTRAL,
-              )}
+              href={viewOfferHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Просмотр"
+              aria-label="Просмотр"
             >
-              <Pencil className="h-4 w-4 shrink-0" />
-              Редактировать
+              <Eye className="h-4 w-4" />
             </Link>
 
             <Link
-              href={buildPromotionLaunchHref({
-                publicationType: "OFFER",
-                publicationId: offer.id,
-              })}
+              href={`/business/offers/${offer.id}/edit`}
+              className={BUSINESS_PUBLICATION_ACTION_ICON}
+              title="Редактировать"
+              aria-label="Редактировать"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
+
+            <Link
+              href={`/business/offers/${offer.id}/boost`}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
                 BUSINESS_PUBLICATION_ACTION_PROMOTE,
               )}
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
-              Продвигать
+              Купить Boost
             </Link>
 
-            {onArchive ? (
+            {onArchive && offer.status !== "DRAFT" ? (
               <button
                 type="button"
                 onClick={handleArchive}
@@ -257,11 +257,10 @@ export function OfferCardHorizontal({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={handleDelete}
-                disabled={isDeleting}
+                onClick={() => void onDelete(offer.id)}
                 className={BUSINESS_PUBLICATION_ACTION_DANGER_ICON}
-                title="Удалить"
-                aria-label="Удалить"
+                title="Удалить черновик"
+                aria-label="Удалить черновик"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

@@ -35,6 +35,7 @@ import {
 import { SeoPagesEmptyState } from "./SeoPagesEmptyState";
 import { SeoEntityDiagnosticsCard } from "./SeoEntityDiagnosticsCard";
 import { Toggle } from "@/components/ui/Toggle";
+import { TableContainer } from "@/components/ui/table";
 
 const TYPE_LABEL: Record<SeoPageType, string> = {
   preset: "Preset",
@@ -368,8 +369,11 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] border-collapse text-left text-sm">
+          <TableContainer
+            minWidthClassName="min-w-[920px]"
+            scrollLabel="Таблица SEO-страниц, прокручивается по горизонтали"
+          >
+            <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/80">
                   <th className="w-8 px-1 py-3" aria-hidden />
@@ -585,7 +589,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                 })}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
           <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
             Показано {filtered.length} из {initialRows.length}
           </div>

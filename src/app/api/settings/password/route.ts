@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { hashPassword, verifyPassword } from "@/lib/auth/crypto";
+import { hashPassword, verifyPassword, isVerifiablePasswordHash } from "@/lib/auth/crypto";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
 
 const bodySchema = z.object({
@@ -36,9 +36,11 @@ export async function PATCH(request: NextRequest) {
     select: { id: true, passwordHash: true },
   });
 
-  if (!dbUser?.passwordHash) {
+  // Phone stubs (passwordHash === "") and service accounts (disabled sentinel)
+  // have no real password — reject before verifyPassword ever sees the hash.
+  if (!dbUser?.passwordHash || !isVerifiablePasswordHash(dbUser.passwordHash)) {
     return NextResponse.json(
-      { error: "Password is not set for this account" },
+      { error: "Для этого аккаунта пароль не задан — смена пароля недоступна" },
       { status: 400 },
     );
   }

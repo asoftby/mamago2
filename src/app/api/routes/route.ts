@@ -7,7 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { createRoute } from "@/server/services/route.service";
-import type { BudgetLevel, RouteVisibility } from "@prisma/client";
+import { AgePolicy, type BudgetLevel, type RouteVisibility } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import type { RouteStopPriceType } from "@/lib/routes/routeBudget";
 
 export async function POST(request: NextRequest) {
@@ -18,6 +19,7 @@ export async function POST(request: NextRequest) {
     const {
       title,
       ageTags = [],
+      agePolicy = AgePolicy.UNKNOWN,
       budgetLevel,
       visibility = "PUBLIC",
       publish = false,
@@ -25,6 +27,7 @@ export async function POST(request: NextRequest) {
     } = body as {
       title: string;
       ageTags?: string[];
+      agePolicy?: AgePolicy;
       budgetLevel?: BudgetLevel;
       visibility?: RouteVisibility;
       publish?: boolean;
@@ -64,9 +67,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedAge = normalizeAgePolicy({ agePolicy, ageTags });
     const result = await createRoute(user?.id ?? null, {
       title: title.trim(),
-      ageTags,
+      ageTags: normalizedAge.ageTags,
+      agePolicy: normalizedAge.agePolicy,
       budgetLevel,
       visibility,
       publish,

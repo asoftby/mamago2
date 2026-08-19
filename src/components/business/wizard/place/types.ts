@@ -1,6 +1,7 @@
-import type { ContentStatus, PlaceKind, Prisma } from "@prisma/client";
+import type { AgePolicy, ContentStatus, PlaceKind, Prisma } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours";
 import type { PriceData } from "@/lib/priceItems";
+import type { FaqItem } from "@/lib/faq/faqItems";
 
 /**
  * Unified form data for Place wizard
@@ -19,6 +20,7 @@ export interface PlaceFormData {
   shortDesc: string;
   description: string | null;
   ageTags: string[];
+  agePolicy: AgePolicy;
   visitFormats: string[];
   /// Новая структура категорий: ID корневой категории (EventCategory, publicationType=PLACE)
   primaryCategoryId: string | null;
@@ -53,14 +55,23 @@ export interface PlaceFormData {
   
   // Step 3: Contacts
   phone: string | null;
+  phoneLabel: string | null;
+  phone2: string | null;
+  phone2Label: string | null;
+  phone3: string | null;
+  phone3Label: string | null;
   website: string | null;
+  bookingEnabled: boolean;
+  bookingPhone: string | null;
+  bookingNote: string | null;
   instagramHandle: string | null;
   instagramUrl: string | null;
-  
+
   // Step 4: Photos
   logoImageId: string | null;
   logoUrl: string | null;
   images: PlaceImage[];
+  reelsUrl: string | null;
   
   // Temp media tracking (for create mode)
   tempLogoMediaId?: string | null;
@@ -72,6 +83,7 @@ export interface PlaceFormData {
 
   // Prices
   priceItems: PriceData;
+  faqItems: FaqItem[];
   
   // Hierarchy
   placeKind: PlaceKind;

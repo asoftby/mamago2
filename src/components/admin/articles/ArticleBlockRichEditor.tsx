@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo, Undo } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { ARTICLE_DEK_CLASSNAME } from "@/components/article/ArticleHeader";
 import {
   articleBlockHtmlForEditor,
   sanitizeArticleBlockHtml,
@@ -421,7 +422,13 @@ export function ArticleBlockRichEditor({
       <EditorContent
         editor={editor}
         className={cn(
-          "rich-text-editor-surface prose prose-sm max-w-none p-3 text-sm focus:outline-none",
+          "rich-text-editor-surface max-w-none p-3 focus:outline-none",
+          variant === "intro"
+            ? cn(
+                ARTICLE_DEK_CLASSNAME,
+                "[&_.ProseMirror]:!text-[22px] [&_.ProseMirror]:!leading-relaxed [&_.ProseMirror]:font-serif [&_.ProseMirror]:text-muted-foreground",
+              )
+            : "prose prose-sm text-sm",
           minHeightClass,
           proseMirrorMin,
           "[&_.ProseMirror]:outline-none",

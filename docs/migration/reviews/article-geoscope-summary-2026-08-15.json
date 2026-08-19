@@ -1,0 +1,78 @@
+{
+  "auditDate": "2026-08-15",
+  "sourceRecoveredFrom": "/tmp/article-geoscope-audit-20260815 (classification.json + derived CSVs)",
+  "totalArticles": 116,
+  "autoResolvable": {
+    "count": 9,
+    "classification": "CITY_RELATIONAL",
+    "citySlug": "minsk",
+    "artifact": "docs/migration/reviews/article-geoscope-auto-2026-08-15.csv"
+  },
+  "ownerDecision": {
+    "count": 107,
+    "unknown": 106,
+    "ambiguous": 1,
+    "rowsWithUsableContent": 107,
+    "rowsEmptyContent": 0,
+    "bodyModeCounts": {
+      "full": 95,
+      "truncated": 12,
+      "empty": 0
+    },
+    "suggestedBuckets": {
+      "LIKELY_CITY": 68,
+      "UNCLEAR": 38,
+      "LIKELY_GLOBAL": 1
+    },
+    "artifact": "docs/migration/reviews/article-geoscope-source-2026-08-15.ndjson"
+  },
+  "countsFromLiveAudit": {
+    "CITY_RELATIONAL": 9,
+    "AMBIGUOUS": 1,
+    "UNKNOWN": 106,
+    "AUTO_RESOLVABLE": 9,
+    "OWNER_DECISION": 107
+  },
+  "purpose": "Editorial geo-scope review dataset for Claude Code — no SSH required. Do not write to PROD from this file alone without owner approval.",
+  "urlContract": {
+    "GLOBAL": "/blog/{slug}",
+    "CITY": "/{city}/blog/{slug}"
+  },
+  "ownerReviewResult": {
+    "ownerReviewGenerated": "2026-08-15",
+    "generatedBy": "Claude Code (editorial read of title/body/categories/tags/headings/relations for all 107 rows)",
+    "autoCityMinsk": 9,
+    "ownerReviewTotal": 107,
+    "recommendations": {
+      "CITY_MINSK": 71,
+      "GLOBAL": 15,
+      "UNCLEAR": 21
+    },
+    "confidence": {
+      "HIGH": 57,
+      "MEDIUM": 43,
+      "LOW": 7
+    },
+    "specialFlagCounts": {
+      "MIXED_MINSK_BELARUS": 15,
+      "AMBIGUOUS_RELATIONS": 1,
+      "SOFT_SLUG_MISMATCH": 12,
+      "OTHER_REVIEW": 5
+    },
+    "articlesFlagged": 31,
+    "ownerMustInspectCarefully": 39,
+    "bulkApprovalCandidates": {
+      "HIGH_CITY_MINSK": 40,
+      "HIGH_GLOBAL": 9
+    },
+    "softSlugMismatchCrossReferenced": 12,
+    "softSlugMismatchNoteFromTask": "Task mentioned 13 known soft-slug-mismatch articles; source dataset's softSlugMismatch field identifies exactly 12 non-null matches among the 107 — all 12 cross-referenced and flagged; no 13th identifiable from local data.",
+    "ambiguousWpExplicitlyReviewed": [
+      23812
+    ],
+    "artifacts": {
+      "csv": "docs/migration/reviews/article-geoscope-owner-review-2026-08-15.csv",
+      "md": "docs/migration/reviews/article-geoscope-owner-review-2026-08-15.md"
+    }
+  }
+}

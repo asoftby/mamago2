@@ -6,6 +6,12 @@ import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
 import { archiveActivityById } from "@/lib/activity/archiveActivity";
 import { restoreActivityToDraftById } from "@/lib/activity/restoreActivity";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
+import prisma from "@/lib/prisma";
 
 function revalidateBusinessEventLists() {
   revalidatePath("/business/events");
@@ -33,11 +39,25 @@ export async function POST(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
+    await assertContentLifecycleOperationAllowed({
+      contentType: "EVENT",
+      contentId: id,
+      operation: "archiveContent",
+      status: summary.status,
+      prisma,
+    });
+
     await archiveActivityById(id);
     revalidateBusinessEventLists();
 
     return NextResponse.json({ success: true, event: { id, status: "ARCHIVED" } });
   } catch (error: unknown) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Archive event error:", error);
     return NextResponse.json({ error: "Failed to archive event" }, { status: 500 });
   }
@@ -64,11 +84,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
+    await assertContentLifecycleOperationAllowed({
+      contentType: "EVENT",
+      contentId: id,
+      operation: "restoreArchived",
+      status: summary.status,
+      prisma,
+    });
+
     await restoreActivityToDraftById(id);
     revalidateBusinessEventLists();
 
     return NextResponse.json({ success: true, event: { id, status: "DRAFT" } });
   } catch (error: unknown) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("Unarchive event error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

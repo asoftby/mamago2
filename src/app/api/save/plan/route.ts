@@ -4,6 +4,7 @@ import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import {
+  addArticlePlanItem,
   addPlacePlanItem,
   addPlanItem,
   addRoutePlanItem,
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
       planRouteSlug,
       placeId,
       planPlaceSlug,
+      articleId,
       date,
       startsAt,
       activitySessionId,
@@ -39,6 +41,7 @@ export async function POST(request: NextRequest) {
         planRouteSlug?: string;
         placeId?: string;
         planPlaceSlug?: string;
+        articleId?: string;
         date?: string;
         startsAt?: string;
         /** ActivitySession.id — used to derive startsAt; validated server-side */
@@ -54,16 +57,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate that at least one entity type is provided
-    if (!activityId && !routeId && !placeId) {
+    if (!activityId && !routeId && !placeId && !articleId) {
       return NextResponse.json(
-        { error: "activityId, routeId or placeId is required" },
+        { error: "activityId, routeId, placeId or articleId is required" },
         { status: 400 }
       );
     }
 
     let planItem;
 
-    if (placeId) {
+    if (articleId) {
+      planItem = await addArticlePlanItem(user.id, articleId, date, {
+        title: title ?? null,
+        coverImageUrl: coverImageUrl ?? null,
+      });
+
+      const article = await prisma.article.findUnique({
+        where: { id: articleId },
+        select: { cityId: true },
+      });
+      const sessionRowId = await getSessionRowIdFromCookies();
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "PLAN_ADD",
+        entityType: "ARTICLE",
+        entityId: articleId,
+        vertical: "CITY",
+        cityId: article?.cityId ?? null,
+        meta: { source: "detail", section: "journal", targetAction: "plan" },
+      });
+    } else if (placeId) {
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,

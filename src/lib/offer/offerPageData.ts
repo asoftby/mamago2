@@ -11,12 +11,39 @@ import { getMinCampSessionPrice, parseCampSessionPrice } from "@/lib/offers/camp
 import { CAMP_OFFER_DISCOVERY_GROUP_SLUGS } from "@/lib/offers/campOfferDiscoverySignals";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
+import { getNormalizedPhones } from "@/lib/phones/normalizePhones";
+import { getNormalizedOfferPhones } from "@/lib/offer/offerPhones";
+import { getNormalizedPlacePhones } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 interface GetOfferPageDataParams {
   citySlug: string;
-  section: string;
+  /** @deprecated unused — section is not part of Offer identity, see BACKLOG-116. Kept optional for old callers. */
+  section?: string;
   slug: string;
 }
+
+const offerPageInclude = {
+  place: {
+    include: {
+      city: true,
+      districtManual: true,
+      districtAuto: true,
+      metroManual: true,
+      metroAuto: true,
+      images: {
+        select: { id: true, url: true, kind: true },
+        orderBy: { sortOrder: "asc" as const },
+      },
+    },
+  },
+} as const;
+
+type OfferWithPageRelations = Prisma.OfferGetPayload<{
+  include: typeof offerPageInclude;
+}>;
 
 type CampSessionJson = {
   id?: string;
@@ -183,52 +210,74 @@ export async function getOfferPageData({
   // Note: Offer unique constraint is @@unique([cityId, slug]), so findUnique({ where: { slug } })
   // is invalid. Use findFirst to look up by slug across cityId values (including null).
   const offer = await prisma.offer.findFirst({
-    where: { slug },
-    include: {
-      place: {
-        include: {
-          city: true,
-          districtManual: true,
-          districtAuto: true,
-          metroManual: true,
-          metroAuto: true,
-          images: {
-            select: { id: true, url: true, kind: true },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-      },
+    where: {
+      AND: [
+        { slug },
+        getPublicPublishedOfferWhere(),
+      ],
     },
+    include: offerPageInclude,
   });
 
   // Note: place.phone and place.website are available via the include above
 
-  if (!offer || offer.status !== "PUBLISHED") {
+  if (!offer) {
     return null;
   }
+
+  return buildOfferPageDataFromOffer(offer, citySlug);
+}
+
+export async function getOfferPreviewPageDataById(
+  id: string,
+): Promise<{ offer: OfferWithPageRelations; data: OfferPageData } | null> {
+  const offer = await prisma.offer.findUnique({
+    where: { id },
+    include: offerPageInclude,
+  });
+
+  if (!offer) {
+    return null;
+  }
+
+  const data = await buildOfferPageDataFromOffer(
+    offer,
+    offer.place?.city?.slug ?? "minsk",
+  );
+
+  return { offer, data };
+}
+
+async function buildOfferPageDataFromOffer(
+  offer: OfferWithPageRelations,
+  citySlug: string,
+): Promise<OfferPageData> {
 
   const placeLogoUrl = offer.place
     ? await resolvePlaceLogoUrlFromDb(offer.place.images, offer.place.logoImageId)
     : undefined;
 
-  // 2. Fetch reviews from PlaceReview (only MAMAGO source)
-  const reviews = await prisma.placeReview.findMany({
-    where: {
-      placeId: offer.placeId,
-      source: "MAMAGO",
-    },
-    orderBy: { publishedAt: "desc" },
-    take: 12,
-    select: {
-      id: true,
-      authorName: true,
-      authorAvatarUrl: true,
-      rating: true,
-      text: true,
-      publishedAt: true,
-      relativeTimeDescription: true,
-    },
-  });
+  // 2. Fetch reviews from PlaceReview (only MAMAGO source). No Place yet
+  // (unassigned DRAFT) means no reviews to show.
+  const reviews = offer.placeId
+    ? await prisma.placeReview.findMany({
+        where: {
+          placeId: offer.placeId,
+          source: "MAMAGO",
+        },
+        orderBy: { publishedAt: "desc" },
+        take: 12,
+        select: {
+          id: true,
+          authorName: true,
+          authorAvatarUrl: true,
+          rating: true,
+          text: true,
+          publishedAt: true,
+          relativeTimeDescription: true,
+        },
+      })
+    : [];
 
   const selectedCampCharacteristics =
     offer.campProgramType && offer.discoverySignalIds.length > 0
@@ -357,7 +406,30 @@ export async function getOfferPageData({
     primaryLabel = "Записаться";
   }
 
-  const data: OfferPageData = {
+  const cta = (() => {
+    const phones = offer.bookingPhone
+      ? getNormalizedPhones({ phone: offer.bookingPhone })
+      : (() => {
+          const ownPhones = getNormalizedOfferPhones(offer);
+          return ownPhones.length > 0
+            ? ownPhones
+            : offer.place
+              ? getNormalizedPlacePhones(offer.place)
+              : [];
+        })();
+
+    return {
+      type: ctaType,
+      primaryLabel,
+      secondaryLabel: "В план",
+      phone: phones[0]?.value,
+      phones,
+      link: offer.contactWebsite || offer.place?.website || undefined,
+      instructions: offer.bookingNote || undefined,
+    };
+  })();
+
+  return {
     id: offer.id,
     slug: offer.slug || "",
     citySlug: citySlug,
@@ -452,6 +524,7 @@ export async function getOfferPageData({
         year: "numeric" 
       }),
     })),
+    faqItems: normalizeFaqItems(offer.faqItems),
     reviewsCount: reviews.length,
     averageRating: reviews.length > 0 
       ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length 
@@ -463,15 +536,21 @@ export async function getOfferPageData({
             stat: signal.title,
           }))
         : undefined,
-
-    cta: {
-      type: ctaType,
-      primaryLabel,
-      secondaryLabel: "В план",
-      phone: offer.bookingPhone || offer.contactPhone || offer.place?.phone || undefined,
-      link: offer.contactWebsite || offer.place?.website || undefined,
-      instructions: offer.bookingNote || undefined,
-    },
+    cta,
+    resolvedCta: resolveCanonicalCta({
+      entityType: "OFFER",
+      entity: {
+        id: offer.id,
+        ctaType: cta.type,
+        ctaPhone: cta.phone,
+        ctaLink: cta.link,
+        ctaInstructions: cta.instructions,
+        bookingEnabled: offer.bookingEnabled,
+        bookingMode: offer.bookingMode,
+        bookingPhone: offer.bookingPhone,
+        bookingNote: offer.bookingNote,
+      },
+    }),
 
     similar: [], // Will be implemented later
     
@@ -482,6 +561,4 @@ export async function getOfferPageData({
       canonicalUrl: offer.seoCanonicalUrl || undefined,
     },
   };
-
-  return data;
 }

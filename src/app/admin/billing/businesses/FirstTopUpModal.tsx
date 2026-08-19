@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Search, Wallet } from "lucide-react";
 import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 interface Business {
   id: string;
@@ -29,6 +30,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [error, setError] = useState("");
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   // Load businesses on mount
   useEffect(() => {
@@ -93,6 +95,8 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
         body: JSON.stringify({
           businessId: selectedBusiness.id,
           amount: parseFloat(amount),
+          currency: "BYN",
+          idempotencyKey,
           reason,
           note,
         }),
@@ -231,7 +235,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                   placeholder="100.00"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-                  {BYN_SYMBOL}
+                  {renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" })}
                 </span>
               </div>
             </div>

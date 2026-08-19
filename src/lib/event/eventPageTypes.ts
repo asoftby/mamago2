@@ -5,6 +5,9 @@
 
 import type { Intent } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
+import type { FaqItem } from "@/lib/faq/faqItems";
+import type { CanonicalCtaObject } from "@/lib/cta-platform";
 
 export type EventPageBreadcrumb = {
   label: string;
@@ -20,6 +23,9 @@ export type EventPageSession = {
 export type EventPageMedia = {
   posterUrl: string;
   posterAlt: string;
+  /** Intrinsic poster dimensions used to preserve its ratio before it loads. */
+  posterWidth?: number;
+  posterHeight?: number;
   /** 16:9 YouTube embed id — shown after poster. */
   trailerYoutubeId?: string;
   trailerLabel?: string;
@@ -75,6 +81,8 @@ export type EventPageCtaConfig = {
   purchaseUrl?: string;
   /** Данные для записи через встроенную форму (режим simple-booking). */
   simpleBooking?: EventSimpleBookingData;
+  /** Контактные телефоны события (свои или унаследованные от площадки). */
+  phones?: NormalizedPhone[];
 };
 
 export type EventPageSimilar = {
@@ -134,7 +142,9 @@ export type EventPageData = {
   priceDetails?: string;
   /** Registration / tickets utility copy. */
   bookingNotes?: string;
+  faqItems?: FaqItem[];
   cta: EventPageCtaConfig;
+  resolvedCta?: CanonicalCtaObject;
   /**
    * Медиа-галерея под cover image: Reels (первой) + дополнительные фото события.
    * Пустой массив или undefined → блок не отображается.

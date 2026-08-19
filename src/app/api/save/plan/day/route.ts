@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
+import { getDayScenario, computePlanFingerprint } from "@/server/services/dayScenario.service";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -15,5 +16,16 @@ export async function GET(req: NextRequest) {
   if (!date) return NextResponse.json({ error: "date required" }, { status: 400 });
 
   const items = await listPlanItemsByDate(user.id, date);
-  return NextResponse.json({ items });
+
+  // Reuses this same per-date fetch (no extra round trip) so every My Plan
+  // surface — full page and overlay alike — can show the same Scenario CTA
+  // state (Task 7 "single converged entry point" requirement).
+  const scenario = await getDayScenario(user.id, date);
+  const scenarioStatus = scenario
+    ? computePlanFingerprint(items) === scenario.planFingerprint
+      ? "ready"
+      : "changed"
+    : null;
+
+  return NextResponse.json({ items, scenarioStatus });
 }

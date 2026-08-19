@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const rl = checkRateLimit(`notifications-read:${user.id}`, 60, 60 * 1000);
+    const rl = await checkRateLimit(`notifications-read:${user.id}`, 60, 60 * 1000);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Слишком много запросов. Попробуйте позже." },

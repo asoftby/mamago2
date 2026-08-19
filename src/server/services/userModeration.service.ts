@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { UserStatus, UserModerationActionType, Role, Prisma } from "@prisma/client";
 import { logAudit } from "./auditLog.service";
+import { isSessionEligibleStatus } from "@/lib/auth/accountEligibility";
 
 // Types
 export interface UserFilters {
@@ -298,16 +299,23 @@ export async function banUser(params: BanUserParams) {
 export async function unbanUser(params: UnbanUserParams) {
   const { userId, reason, note, moderatorId } = params;
 
-  const [user, action] = await prisma.$transaction([
-    prisma.user.update({
+  const { user, action } = await prisma.$transaction(async (tx) => {
+    const current = await tx.user.findUnique({
       where: { id: userId },
-      data: {
-        status: UserStatus.ACTIVE,
-        statusReason: null,
-        suspendedUntil: null,
-      },
-    }),
-    prisma.userModerationAction.create({
+      select: { status: true },
+    });
+    if (
+      !current ||
+      (current.status !== UserStatus.BANNED && current.status !== UserStatus.SUSPENDED)
+    ) {
+      throw new Error("USER_NOT_BLOCKED");
+    }
+
+    const user = await tx.user.update({
+      where: { id: userId },
+      data: { status: UserStatus.ACTIVE, statusReason: null, suspendedUntil: null },
+    });
+    const action = await tx.userModerationAction.create({
       data: {
         userId,
         actionType: UserModerationActionType.UNBAN,
@@ -315,8 +323,9 @@ export async function unbanUser(params: UnbanUserParams) {
         note,
         createdById: moderatorId,
       },
-    }),
-  ]);
+    });
+    return { user, action };
+  });
 
   await logAudit({
     actorId: moderatorId,
@@ -446,7 +455,16 @@ export async function checkUserStatus(userId: string): Promise<UserStatusCheck> 
     }
   }
 
-  // LIMITED status: document but allow for now
+  if (!isSessionEligibleStatus(user.status)) {
+    return {
+      isAllowed: false,
+      status: user.status,
+      reason: user.statusReason || "Account is not active",
+    };
+  }
+
+  // LIMITED is deliberately session-eligible; feature-level restrictions are
+  // enforced by moderation policy rather than by removing authentication.
   return {
     isAllowed: true,
     status: user.status,

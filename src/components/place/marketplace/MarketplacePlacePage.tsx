@@ -8,13 +8,17 @@ import { PlaceOffersSection } from "./PlaceOffersSection";
 import { PlaceAboutSection } from "./PlaceAboutSection";
 import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
+import { PlaceNetworkSection, type NetworkPlace } from "@/components/place/PlaceNetworkSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
+import { FaqSection } from "@/components/public/FaqSection";
 import type { ActivityMock } from "@/types/activity";
 import type { PriceData } from "@/lib/priceItems";
-import Link from "next/link";
-import Image from "next/image";
-import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
+import type { FaqItem } from "@/lib/faq/faqItems";
+import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
+import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import type { CanonicalCtaObject } from "@/lib/cta-platform";
+import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 
 interface MarketplacePlacePageProps {
   place: {
@@ -28,7 +32,7 @@ interface MarketplacePlacePageProps {
     reviewCount?: number;
 
     // Contact
-    phone?: string;
+    phones: NormalizedPlacePhone[];
     website?: string;
     instagramUrl?: string;
     facebookUrl?: string;
@@ -62,15 +66,15 @@ interface MarketplacePlacePageProps {
     categories?: string[];
 
     // Media
-    images?: Array<{
-      id: string;
-      url: string;
-      alt?: string;
-    }>;
+    media?: {
+      galleryItems: MediaGalleryItem[];
+    };
 
     priceData?: PriceData;
+    faqItems?: FaqItem[];
     updatedAt?: Date | string | null;
     fallbackUrl?: string;
+    resolvedCta?: CanonicalCtaObject;
   };
 
   eventActivities?: ActivityMock[];
@@ -105,6 +109,19 @@ interface MarketplacePlacePageProps {
 
   /** Показать «Редактировать» с шагами визарда (те же права, что у редактора места). */
   ownerEditPlaceId?: string;
+  relatedPlaces?: NetworkPlace[];
+  sectionNotes?: {
+    offers?: string;
+    events?: string;
+    reviews?: string;
+    relatedPlaces?: string;
+  };
+  /** Direct "Отправить заявку" CTA — omitted when the place has no owning Business (rule 5). */
+  direct?: {
+    placeId: string;
+    publicationTitle: string;
+    brandName: string;
+  };
 }
 
 export function MarketplacePlacePage({
@@ -114,6 +131,9 @@ export function MarketplacePlacePage({
   offers = [],
   reviews = [],
   ownerEditPlaceId,
+  relatedPlaces = [],
+  sectionNotes,
+  direct,
 }: MarketplacePlacePageProps) {
   const ctaRef = useRef<HTMLDivElement>(null);
   const hasRenderableReviews = reviews.length > 0;
@@ -132,11 +152,9 @@ export function MarketplacePlacePage({
     }
   };
 
-  // Build meta strip items from available data
+  // Build meta strip items from available data.
+  // Рейтинг намеренно не дублируем в meta-strip — он уже есть в сайдбар-карточке.
   const metaItems: Array<[string, string, string]> = [];
-  if (displayRating != null && (displayReviewCount ?? 0) > 0) {
-    metaItems.push(["Рейтинг", `${displayRating.toFixed(1)} / ${displayReviewCount} отз.`, "01"]);
-  }
   if (place.ageRange) metaItems.push(["Возраст", place.ageRange, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.workingHoursSummary) {
     const hoursFirstLine = place.workingHoursSummary.split("\n")[0].trim();
@@ -147,8 +165,6 @@ export function MarketplacePlacePage({
   }
   if (place.metro) metaItems.push(["Метро", place.metro, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.district && metaItems.length < 5) metaItems.push(["Район", place.district, String(metaItems.length + 1).padStart(2, "0")]);
-
-  const galleryImages = place.images ?? [];
 
   const summaryPrimary = place.workingHoursSummary
     ?.split("\n")
@@ -190,7 +206,7 @@ export function MarketplacePlacePage({
         shortDesc={place.shortDesc}
         address={place.address}
         metro={place.metro}
-        phone={place.phone}
+        phones={place.phones}
         website={place.website}
         instagramUrl={place.instagramUrl}
         logoUrl={place.logoUrl}
@@ -205,6 +221,19 @@ export function MarketplacePlacePage({
         breadcrumbItems={place.breadcrumbItems}
         onShareClick={handleShare}
         ownerEditPlaceId={ownerEditPlaceId}
+        media={place.media}
+        directSlot={
+          direct && (
+            <DirectRequestCta
+              publicationRef={{ publicationType: "PLACE", placeId: direct.placeId }}
+              publicationTitle={direct.publicationTitle}
+              brandName={direct.brandName}
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+            >
+              Отправить заявку
+            </DirectRequestCta>
+          )
+        }
       />
 
       {/* Meta strip */}
@@ -221,14 +250,11 @@ export function MarketplacePlacePage({
         categories={place.categories}
       />
 
+      <FaqSection items={place.faqItems} />
+
       {/* Working Hours */}
       {place.workingHoursSummary && (
         <WorkingHoursSection summary={place.workingHoursSummary} />
-      )}
-
-      {/* Gallery */}
-      {galleryImages.length > 0 && (
-        <GallerySection images={galleryImages} title={place.title} />
       )}
 
       {/* Price list */}
@@ -256,22 +282,38 @@ export function MarketplacePlacePage({
 
       {/* Offers */}
       {offers.length > 0 && (
-        <PlaceOffersSection offers={offers} placeId={place.slug} />
+        <>
+          <SectionNote text={sectionNotes?.offers} />
+          <PlaceOffersSection offers={offers} placeId={place.slug} />
+        </>
       )}
 
       {/* Events */}
       {eventActivities.length > 0 && (
-        <PlaceEventsSection activities={eventActivities} citySlug={citySlug} />
+        <>
+          <SectionNote text={sectionNotes?.events} />
+          <PlaceEventsSection activities={eventActivities} citySlug={citySlug} />
+        </>
       )}
 
       {/* Reviews */}
       {reviews.length > 0 && (
-        <PlaceReviewsSection
-          reviews={reviews}
-          placeId={place.slug}
-          rating={displayRating}
-          reviewCount={displayReviewCount}
-        />
+        <>
+          <SectionNote text={sectionNotes?.reviews} />
+          <PlaceReviewsSection
+            reviews={reviews}
+            placeId={place.slug}
+            rating={displayRating}
+            reviewCount={displayReviewCount}
+          />
+        </>
+      )}
+
+      {relatedPlaces.length > 0 && (
+        <>
+          <SectionNote text={sectionNotes?.relatedPlaces} />
+          <PlaceNetworkSection places={relatedPlaces} />
+        </>
       )}
 
       {/* Address / Location */}
@@ -292,12 +334,36 @@ export function MarketplacePlacePage({
         statusLabel={stickyStatusLabel}
         addressLine={stickyAddressLine}
         detailLine={stickyDetailLine}
-        phone={place.phone}
+        phones={place.phones}
         placeId={place.id}
         placeSlug={place.slug}
         placeTitle={place.title}
         coverImageUrl={place.logoUrl}
+        directSlot={
+          direct && (
+            <DirectRequestCta
+              publicationRef={{ publicationType: "PLACE", placeId: direct.placeId }}
+              publicationTitle={direct.publicationTitle}
+              brandName={direct.brandName}
+              className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-[rgba(250,247,241,0.95)] px-4 text-[14px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+            >
+              Заявка
+            </DirectRequestCta>
+          )
+        }
       />
+    </div>
+  );
+}
+
+function SectionNote({ text }: { text?: string }) {
+  if (!text) return null;
+
+  return (
+    <div className="mx-auto w-full max-w-[1200px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-950">
+        {text}
+      </div>
     </div>
   );
 }
@@ -546,221 +612,6 @@ function WorkingHoursSection({ summary }: { summary: string }) {
         }
         @media (max-width: 520px) {
           .hours-grid { padding: 0 18px !important; }
-        }
-      `}</style>
-    </section>
-  );
-}
-
-/* ─── Gallery ───────────────────────────────────────────────────────────── */
-
-const GALLERY_LAYOUT: Array<{ col: string; row: string }> = [
-  { col: "1 / span 2", row: "1 / span 2" },
-  { col: "3 / span 1", row: "1 / span 1" },
-  { col: "4 / span 1", row: "1 / span 1" },
-  { col: "3 / span 1", row: "2 / span 2" },
-  { col: "4 / span 1", row: "2 / span 1" },
-  { col: "1 / span 2", row: "3 / span 1" },
-  { col: "4 / span 1", row: "3 / span 1" },
-];
-
-function GallerySection({
-  images,
-  title,
-}: {
-  images: Array<{ id: string; url: string; alt?: string }>;
-  title: string;
-}) {
-  const tiles = images.slice(0, 7);
-
-  return (
-    <section
-      style={{
-        padding: "56px 0",
-        borderTop: "1px solid rgba(20,18,16,.10)",
-        background: "#ffffff",
-      }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }} className="gallery-wrap">
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            marginBottom: 24,
-          }}
-        >
-          <div className="kicker-row" style={{ flex: 1 }}>
-            <span className="text-kicker">Фотогалерея</span>
-            <span className="kicker-line" />
-          </div>
-          {images.length > 7 && (
-            <span style={{ fontSize: 14, color: "#3A332B", textDecoration: "underline", textUnderlineOffset: 4, marginLeft: 24 }}>
-              Все {images.length} фото →
-            </span>
-          )}
-        </div>
-
-        {/* Asymmetric grid */}
-        <div
-          className="gallery-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gridAutoRows: "180px",
-            gap: 14,
-          }}
-        >
-          {tiles.map((img, i) => {
-            const layout = GALLERY_LAYOUT[i];
-            return (
-              <div
-                key={img.id}
-                style={{
-                  gridColumn: layout?.col,
-                  gridRow: layout?.row,
-                  borderRadius: 14,
-                  overflow: "hidden",
-                  position: "relative",
-                  background: "repeating-linear-gradient(135deg, rgba(20,18,16,.05) 0 1px, transparent 1px 12px), linear-gradient(180deg, #E9E2D6, #DDD3C2)",
-                }}
-              >
-                {isAppMediaUrl(img.url) ? (
-                  <img
-                    src={img.url}
-                    alt={img.alt ?? title}
-                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transition: "transform 1.2s cubic-bezier(.2,.7,.2,1)" }}
-                  />
-                ) : (
-                  <Image
-                    src={img.url}
-                    alt={img.alt ?? title}
-                    fill
-                    sizes="(max-width: 900px) 50vw, 25vw"
-                    className="object-cover"
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <style>{`
-        @media (max-width: 900px) {
-          .gallery-grid { grid-template-columns: repeat(2, 1fr) !important; grid-auto-rows: 160px !important; }
-          .gallery-grid > div { grid-column: auto !important; grid-row: auto !important; }
-          .gallery-wrap { padding: 0 22px !important; }
-        }
-        @media (max-width: 520px) {
-          .gallery-grid { grid-template-columns: 1fr !important; grid-auto-rows: 220px !important; }
-          .gallery-wrap { padding: 0 18px !important; }
-        }
-      `}</style>
-    </section>
-  );
-}
-
-/* ─── Final CTA ─────────────────────────────────────────────────────────── */
-
-function FinalCTA({ place }: { place: MarketplacePlacePageProps["place"] }) {
-  const hasPhone = !!place.phone;
-  const hasWebsite = !!place.website;
-
-  if (!hasPhone && !hasWebsite) return null;
-
-  return (
-    <section style={{ padding: "96px 0 120px", background: "#ffffff" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div
-          className="final-cta-inner"
-          style={{ textAlign: "center", maxWidth: 900, margin: "0 auto" }}
-        >
-          <h2
-            className="font-display final-cta-h2"
-            style={{
-              fontSize: "clamp(56px, 8vw, 120px)",
-              lineHeight: 0.95,
-              letterSpacing: "-.025em",
-              margin: 0,
-              color: "#141210",
-            }}
-          >
-            Приходите<br />
-            <span className="font-display-italic" style={{ color: "#C24E22" }}>
-              познакомиться
-            </span>
-            .
-          </h2>
-          <p
-            style={{
-              fontSize: 20,
-              color: "#3A332B",
-              maxWidth: 560,
-              margin: "24px auto 36px",
-              lineHeight: 1.5,
-            }}
-          >
-            Свяжитесь с&nbsp;нами — ответим на&nbsp;все вопросы и&nbsp;расскажем подробнее.
-          </p>
-          <div
-            className="final-cta-buttons"
-            style={{ display: "inline-flex", gap: 12 }}
-          >
-            {hasPhone && (
-              <a
-                href={`tel:${place.phone}`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  height: 64,
-                  padding: "0 28px",
-                  borderRadius: 999,
-                  background: "#E86A3A",
-                  color: "#fff",
-                  fontWeight: 600,
-                  fontSize: 17,
-                  textDecoration: "none",
-                }}
-              >
-                Позвонить <span>→</span>
-              </a>
-            )}
-            {hasWebsite && (
-              <a
-                href={place.website!.startsWith("http") ? place.website! : `https://${place.website}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  height: 64,
-                  padding: "0 24px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(20,18,16,.18)",
-                  background: "transparent",
-                  color: "#141210",
-                  fontWeight: 600,
-                  fontSize: 15,
-                  textDecoration: "none",
-                }}
-              >
-                На сайт ↗
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @media (max-width: 900px) {
-          .final-cta-h2 { font-size: clamp(44px, 12vw, 84px) !important; }
-          .final-cta-buttons { flex-direction: column !important; width: 100%; display: flex !important; }
-          .final-cta-buttons > a { width: 100% !important; justify-content: center; }
-          .final-cta-inner { padding: 0 4px; }
         }
       `}</style>
     </section>

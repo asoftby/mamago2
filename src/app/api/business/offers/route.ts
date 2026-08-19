@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { AgePolicy, Prisma } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import {
   canCreateBusinessContent,
   canPublishContentDirectly,
@@ -24,7 +25,11 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
+import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -42,20 +47,13 @@ const offerPlacementKeySchema = z.enum([
   "BIRTHDAY",
 ]);
 
-const birthdayRoleSchema = z.enum([
-  "VENUE",
-  "ANIMATOR",
-  "SHOW",
-  "MASTER_CLASS",
-  "CAKE",
-  "CATERING",
-  "DECOR",
-  "PHOTO_VIDEO",
-  "PACKAGE",
-  "OTHER",
+const partyLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
+
+const partyCategorySchema = z.enum([
+  "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
 ]);
 
-const birthdayLocationTypeSchema = z.enum(["ON_SITE", "OFF_SITE", "BOTH"]);
+const partyOccasionSchema = z.enum(["BIRTHDAY", "GRADUATION"]);
 
 const createOfferSchema = z.object({
   source: z.enum(["PLACE", "EVENT"]),
@@ -70,8 +68,9 @@ const createOfferSchema = z.object({
   kind: z.enum(["VISIT", "CLASS", "PARTY", "EVENT_TICKET"]),
   title: z.string().min(1),
   shortDescription: z.string().min(1),
-  ageMinMonths: z.number().optional(),
-  ageMaxMonths: z.number().optional(),
+  agePolicy: z.nativeEnum(AgePolicy),
+  ageMinMonths: z.number().nullable().optional(),
+  ageMaxMonths: z.number().nullable().optional(),
   coverImage: z.string().optional(),
   /** Публичные URL изображений галереи (как возвращает /api/upload). */
   gallery: z.array(z.string()).optional(),
@@ -96,6 +95,11 @@ const createOfferSchema = z.object({
   bookingInstructions: z.string().optional(),
   contactSource: z.enum(["manual", "place"]).optional(),
   contactPhone: z.string().optional(),
+  contactPhoneLabel: z.string().nullable().optional(),
+  contactPhone2: z.string().nullable().optional(),
+  contactPhone2Label: z.string().nullable().optional(),
+  contactPhone3: z.string().nullable().optional(),
+  contactPhone3Label: z.string().nullable().optional(),
   contactWebsite: z.string().optional(),
   contactSocialLinks: z.array(
     z.object({
@@ -104,6 +108,7 @@ const createOfferSchema = z.object({
       url: z.string(),
     }),
   ).optional(),
+  faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
@@ -111,19 +116,14 @@ const createOfferSchema = z.object({
   wizardCompletedSteps: z.array(offerWizardStepKeySchema).optional(),
   productType: offerProductTypeSchema.optional(),
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
-  birthdayDetails: z.object({
-    role: birthdayRoleSchema.nullable().optional(),
-    locationType: birthdayLocationTypeSchema.nullable().optional(),
-    durationMinutes: z.number().int().nullable().optional(),
-    minChildren: z.number().int().nullable().optional(),
-    maxChildren: z.number().int().nullable().optional(),
-    priceFrom: z.number().nullable().optional(),
-    included: z.string().nullable().optional(),
-    program: z.string().nullable().optional(),
-    note: z.string().nullable().optional(),
-  }).optional(),
   /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
   details: z.record(z.string(), z.unknown()).optional(),
+  // PARTY_SERVICE filterable columns (Phase 3b-2)
+  category: partyCategorySchema.nullable().optional(),
+  partyLocationType: partyLocationTypeSchema.nullable().optional(),
+  minChildren: z.number().int().nullable().optional(),
+  maxChildren: z.number().int().nullable().optional(),
+  occasions: z.array(partyOccasionSchema).optional(),
   campProgramType: campProgramTypeSchema,
   // Camp fields
   campSessions: z.array(campSessionEntrySchema).optional(),
@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const data = createOfferSchema.parse(body);
+    const faqItems = normalizeFaqItems(data.faqItems);
     timer.mark("validate");
 
     if (data.status === "PUBLISHED" && !canPublishContentDirectly(user.role)) {
@@ -196,22 +197,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Место существует, но не привязано к бизнес-профилю: оффер требует привязки.
-      // Подсказку показываем только создателю места — остальным не раскрываем существование.
-      if (!place.ownerBusinessId && place.createdByUserId === user.id) {
+      if (!(await canManagePlaceAsync(user, place))) {
+        return NextResponse.json(
+          { error: "Место не найдено" },
+          { status: 404 },
+        );
+      }
+
+      // Публикация business-owner оффера требует привязки места к бизнесу.
+      // ADMIN / MODERATOR проходят без этого ограничения.
+      if (shouldRejectUnlinkedPlaceForOfferMutation({
+        role: user.role,
+        status: data.status,
+        ownerBusinessId: place.ownerBusinessId,
+      })) {
         return NextResponse.json(
           {
             error: "Место не привязано к бизнес-профилю",
             code: "PLACE_NOT_LINKED_TO_BUSINESS",
           },
           { status: 422 },
-        );
-      }
-
-      if (!(await canManagePlaceAsync(user, place))) {
-        return NextResponse.json(
-          { error: "Место не найдено" },
-          { status: 404 },
         );
       }
 
@@ -275,6 +280,11 @@ export async function POST(request: NextRequest) {
             productType,
             contactSource: data.contactSource ?? "manual",
             contactPhone: data.contactPhone,
+            contactPhoneLabel: data.contactPhoneLabel,
+            contactPhone2: data.contactPhone2,
+            contactPhone2Label: data.contactPhone2Label,
+            contactPhone3: data.contactPhone3,
+            contactPhone3Label: data.contactPhone3Label,
             contactWebsite: data.contactWebsite,
             contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
             title: data.title,
@@ -287,12 +297,23 @@ export async function POST(request: NextRequest) {
             promotionalOffer: data.promotionalOffer,
             priceFrom,
             priceText,
-            ageMinMonths: data.ageMinMonths,
-            ageMaxMonths: data.ageMaxMonths,
+            ...(() => {
+              const age = normalizeAgePolicy({ agePolicy: data.agePolicy, ageMinMonths: data.ageMinMonths, ageMaxMonths: data.ageMaxMonths });
+              return { agePolicy: age.agePolicy, ageMinMonths: age.ageMinMonths, ageMaxMonths: age.ageMaxMonths };
+            })(),
             discoverySignalIds: data.discoverySignalIds,
             classChipSlugs: data.classChipSlugs,
             wizardCompletedSteps: data.wizardCompletedSteps ?? [],
+            faqItems: faqItems as unknown as Prisma.InputJsonValue,
             details: data.details as Prisma.InputJsonValue | undefined,
+            // PARTY_SERVICE/PARTY_PACKAGE: write filterable fields to Offer columns
+            ...(productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE" ? {
+              category: data.category ?? undefined,
+              partyLocationType: data.partyLocationType ?? undefined,
+              minChildren: data.minChildren ?? undefined,
+              maxChildren: data.maxChildren ?? undefined,
+              occasions: data.occasions ?? [],
+            } : {}),
             status: data.status,
             ...(data.campProgramType
               ? {
@@ -335,8 +356,12 @@ export async function POST(request: NextRequest) {
           actorUserId: user.id,
           productType,
           requestedPlacements: data.requestedPlacements,
-          birthdayDetails: data.birthdayDetails,
         });
+
+        // CAMP: project campSessions JSON (canon) into queryable OfferSession rows
+        if (data.campProgramType) {
+          await projectCampSessions(tx, createdOffer.id, data.campSessions);
+        }
 
         return tx.offer.findUniqueOrThrow({
           where: { id: createdOffer.id },
@@ -348,7 +373,17 @@ export async function POST(request: NextRequest) {
             publishedAt: true,
             productType: true,
             placements: true,
-            birthdayDetails: true,
+            place: {
+              select: {
+                id: true,
+                title: true,
+                city: {
+                  select: {
+                    slug: true,
+                  },
+                },
+              },
+            },
           },
         });
       });
@@ -391,7 +426,7 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: error.issues },
+        formatZodErrorResponse(error),
         { status: 400 }
       );
     }
@@ -420,10 +455,14 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               title: true,
+              city: {
+                select: {
+                  slug: true,
+                },
+              },
             },
           },
           placements: true,
-          birthdayDetails: true,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -454,10 +493,14 @@ export async function GET(request: NextRequest) {
                 select: {
                   id: true,
                   title: true,
+                  city: {
+                    select: {
+                      slug: true,
+                    },
+                  },
                 },
               },
               placements: true,
-              birthdayDetails: true,
             },
             orderBy: { createdAt: "desc" },
           })

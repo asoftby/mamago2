@@ -4,6 +4,7 @@ import { EMPTY_BILLING_STATE, formatDate } from "@/lib/business/billing";
 import { formatPrice } from "@/lib/formatters/format-price";
 import { CheckCircle, CreditCard, Info, Sparkles } from "lucide-react";
 import { TransactionStatusBadge } from "@/components/business/billing/TransactionStatusBadge";
+import { TableContainer } from "@/components/ui/table";
 
 // Force dynamic rendering
 export const dynamic = "force-dynamic";
@@ -143,7 +144,7 @@ export default async function BillingPlanPage() {
                 История продлений
               </h2>
             </div>
-            <div className="overflow-x-auto">
+            <TableContainer minWidthClassName="min-w-[560px]" scrollLabel="История продлений, таблица">
               <table className="w-full">
                 <thead className="bg-stone-50">
                   <tr className="border-b border-stone-200">
@@ -183,7 +184,7 @@ export default async function BillingPlanPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
 
           {/* Info Banner */}

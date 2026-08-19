@@ -5,6 +5,7 @@ import { isValidE164Phone } from "@/lib/phone/e164";
 import { isRichTextMeaningful, getRichTextLength } from "@/lib/richtext/utils";
 import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
 import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
+import { supportsDurationForCategorySlug } from "@/lib/business/eventCategoryDuration";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -59,6 +60,8 @@ export function validateStep(step: number, data: EventFormData): ValidationResul
     case 8:
       return validateStep8(data);
     case 9:
+      return validateStep9(data);
+    case 10:
       return validateForSubmit(data);
     default:
       return { isValid: true, isComplete: true, errors: [], warnings: [] };
@@ -90,10 +93,27 @@ function validateStep1(data: EventFormData): ValidationResult {
     warnings.push("Выберите возраст");
   }
 
+  // Единая длительность — для категорий с supportsDuration (см. slug-set).
+  if (
+    supportsDurationForCategorySlug(data.categorySlug) &&
+    data.durationMinutes != null &&
+    (!Number.isInteger(data.durationMinutes) ||
+      data.durationMinutes < 1 ||
+      data.durationMinutes > 600)
+  ) {
+    errors.push("Продолжительность — целое число от 1 до 600 минут");
+  }
+
   // Cinema-specific validation (по slug выбранной категории)
   if (isCinemaEventCategorySlug(data.categorySlug)) {
-    if (data.cinemaTrailerUrl && !isValidUrl(data.cinemaTrailerUrl)) {
-      errors.push("Некорректная ссылка на трейлер");
+    if (data.cinemaTrailerUrl) {
+      if (!isValidUrl(data.cinemaTrailerUrl)) {
+        errors.push("Некорректная ссылка на трейлер");
+      } else if (!data.cinemaTrailerUrl.trim().toLowerCase().startsWith("https://")) {
+        // Warning, не error: ранее сохранённые http-ссылки не должны
+        // блокировать редактирование и публикацию.
+        warnings.push("Ссылка на трейлер должна начинаться с https://");
+      }
     }
   }
 
@@ -129,10 +149,13 @@ export function validateStep2(data: EventFormData): ValidationResult {
         errors.push("Выберите место проведения");
       }
     } else if (data.venueKind === "MANUAL") {
+      const isParsedDraft =
+        data.pendingLocation?.mode === "PARSED_LOCATION" &&
+        data.pendingLocation.source === "parser";
       if (!data.venueName || data.venueName.trim().length === 0) {
         errors.push("Укажите название площадки");
       }
-      if (!data.address || data.address.trim().length === 0) {
+      if (!isParsedDraft && (!data.address || data.address.trim().length === 0)) {
         errors.push("Укажите адрес");
       }
       if (!data.city || data.city.trim().length === 0) {
@@ -145,7 +168,12 @@ export function validateStep2(data: EventFormData): ValidationResult {
   const isComplete = Boolean(
     data.venueKind &&
     (data.venueKind === "PLACE" ? data.placeId : true) &&
-    (data.venueKind === "MANUAL" ? (data.venueName.trim() && data.address.trim() && data.city.trim()) : true)
+    (data.venueKind === "MANUAL"
+      ? data.pendingLocation?.mode === "PARSED_LOCATION" &&
+        data.pendingLocation.source === "parser"
+        ? data.venueName.trim() && data.city.trim()
+        : data.venueName.trim() && data.address.trim() && data.city.trim()
+      : true)
   );
 
   return {
@@ -379,20 +407,16 @@ function validateStep7(data: EventFormData): ValidationResult {
 }
 
 /**
- * Step 8: Organizer
+ * Step 8: Organizer (optional step)
+ *
+ * Организатор необязателен: полностью пустой шаг 8 валиден и завершён.
+ * Проверки формата (УНП/телефон/сайт/Instagram) выдаются только как warnings
+ * и только когда соответствующее поле непустое — они никогда не блокируют
+ * переход дальше или публикацию.
  */
 function validateStep8(data: EventFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-
-  if (!data.organizerName || data.organizerName.trim().length < 2) {
-    errors.push("Укажите название организатора");
-  }
-
-  // Validate based on organizer mode
-  if (data.organizerMode === "existing" && !data.organizerId) {
-    errors.push("Выберите организатора из списка");
-  }
 
   if (data.organizerUnp && !/^\d{9}$/.test(data.organizerUnp)) {
     warnings.push("УНП должен содержать 9 цифр");
@@ -414,8 +438,8 @@ function validateStep8(data: EventFormData): ValidationResult {
     warnings.push("Проверьте формат Instagram");
   }
 
-  const isComplete = data.organizerName.trim().length >= 2 && 
-    (data.organizerMode !== "existing" || !!data.organizerId);
+  // Optional step — always complete, never blocks navigation/publishing.
+  const isComplete = true;
 
   return {
     isValid: errors.length === 0,
@@ -433,7 +457,7 @@ export function validateForSubmit(data: EventFormData): ValidationResult {
   const allWarnings: string[] = [];
 
   // Validate all required steps
-  for (let step = 1; step <= 8; step++) {
+  for (let step = 1; step <= 9; step++) {
     const result = validateStep(step, data);
     if (!result.isComplete) {
       allErrors.push(`Шаг ${step}: не заполнены обязательные поля`);
@@ -448,6 +472,11 @@ export function validateForSubmit(data: EventFormData): ValidationResult {
     errors: allErrors,
     warnings: allWarnings,
   };
+}
+
+function validateStep9(data: EventFormData): ValidationResult {
+  void data;
+  return { isValid: true, isComplete: true, errors: [], warnings: [] };
 }
 
 // Helper functions

@@ -5,6 +5,7 @@ import {
   BillingTransactionType,
   Prisma,
 } from "@prisma/client";
+import { BILLING_CURRENCY, normalizeFinancialAmount } from "@/lib/billing/money";
 
 type BillingTxClient = Prisma.TransactionClient;
 
@@ -33,9 +34,18 @@ export class BillingInsufficientFundsError extends Error {
   }
 }
 
+export class BillingIdempotencyConflictError extends Error {
+  code = "IDEMPOTENCY_CONFLICT" as const;
+
+  constructor() {
+    super("Idempotency key was already used for a different financial operation");
+    this.name = "BillingIdempotencyConflictError";
+  }
+}
+
 export interface DebitBusinessDepositParams {
   accountId: string;
-  amount: number;
+  amount: number | string | Prisma.Decimal;
   type: BillingTransactionType;
   description: string;
   referenceType?: BillingReferenceType;
@@ -47,7 +57,7 @@ export interface DebitBusinessDepositParams {
 
 export interface CreditBusinessDepositParams {
   accountId: string;
-  amount: number;
+  amount: number | string | Prisma.Decimal;
   description: string;
   referenceType?: BillingReferenceType;
   referenceId?: string;
@@ -110,16 +120,10 @@ export async function ensureBillingAccountForBusiness(
 ) {
   const db = tx ?? prisma;
 
-  const existing = await db.billingAccount.findUnique({
+  return db.billingAccount.upsert({
     where: { businessId },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  return db.billingAccount.create({
-    data: {
+    update: {},
+    create: {
       businessId,
       depositBalance: 0,
       currency: "BYN",
@@ -305,15 +309,24 @@ async function creditBusinessDepositInTx(
     metadata,
   } = params;
 
-  if (amount <= 0) {
-    throw new Error("Amount must be positive");
-  }
+  const normalizedAmount = normalizeFinancialAmount(amount);
+
+  // Serialize idempotency check and the balance mutation for this account.
+  await tx.$queryRaw`SELECT id FROM "BillingAccount" WHERE id = ${accountId} FOR UPDATE`;
 
   const existingTransaction = await findExistingTransactionByIdempotencyKey(tx, {
     accountId,
     idempotencyKey,
   });
   if (existingTransaction) {
+    if (
+      existingTransaction.type !== BillingTransactionType.DEPOSIT_TOPUP ||
+      !existingTransaction.amount.equals(normalizedAmount) ||
+      existingTransaction.referenceType !== referenceType ||
+      existingTransaction.referenceId !== (referenceId ?? null)
+    ) {
+      throw new BillingIdempotencyConflictError();
+    }
     return existingTransaction;
   }
 
@@ -322,8 +335,8 @@ async function creditBusinessDepositInTx(
       billingAccountId: accountId,
       type: BillingTransactionType.DEPOSIT_TOPUP,
       status: "SUCCEEDED",
-      amount,
-      currency: "BYN",
+      amount: normalizedAmount,
+      currency: BILLING_CURRENCY,
       description,
       referenceType,
       referenceId,
@@ -336,7 +349,7 @@ async function creditBusinessDepositInTx(
     where: { id: accountId },
     data: {
       depositBalance: {
-        increment: amount,
+        increment: normalizedAmount,
       },
     },
   });
@@ -350,6 +363,20 @@ async function creditBusinessDepositInTx(
  */
 export async function creditBusinessDeposit(params: CreditBusinessDepositParams) {
   return prisma.$transaction(async (tx) => creditBusinessDepositInTx(tx, params));
+}
+
+export async function creditBusinessDepositWithResult(params: CreditBusinessDepositParams) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "BillingAccount" WHERE id = ${params.accountId} FOR UPDATE`;
+    const preExisting = await findExistingTransactionByIdempotencyKey(tx, params);
+    const transaction = await creditBusinessDepositInTx(tx, params);
+    const account = await tx.billingAccount.findUniqueOrThrow({ where: { id: params.accountId } });
+    return {
+      transaction,
+      idempotentReplay: Boolean(preExisting),
+      balance: account.depositBalance.toNumber(),
+    };
+  });
 }
 
 async function debitBusinessDepositInTx(
@@ -368,15 +395,24 @@ async function debitBusinessDepositInTx(
     allowNegative = false,
   } = params;
 
-  if (amount <= 0) {
-    throw new Error("Amount must be positive");
-  }
+  const normalizedAmount = normalizeFinancialAmount(amount);
+
+  // The lock makes the following sufficient-funds check authoritative.
+  await tx.$queryRaw`SELECT id FROM "BillingAccount" WHERE id = ${accountId} FOR UPDATE`;
 
   const existingTransaction = await findExistingTransactionByIdempotencyKey(tx, {
     accountId,
     idempotencyKey,
   });
   if (existingTransaction) {
+    if (
+      existingTransaction.type !== type ||
+      !existingTransaction.amount.equals(normalizedAmount.negated()) ||
+      existingTransaction.referenceType !== referenceType ||
+      existingTransaction.referenceId !== (referenceId ?? null)
+    ) {
+      throw new BillingIdempotencyConflictError();
+    }
     return existingTransaction;
   }
 
@@ -391,14 +427,15 @@ async function debitBusinessDepositInTx(
   const currentBalance = account.depositBalance.toNumber();
   const creditLimit = account.creditLimit.toNumber();
   const availableBalance = currentBalance + creditLimit;
-  const newBalance = currentBalance - amount;
+  const requestedAmount = normalizedAmount.toNumber();
+  const newBalance = currentBalance - requestedAmount;
 
   if (!allowNegative && newBalance < -creditLimit) {
     throw new BillingInsufficientFundsError({
       currentBalance,
       creditLimit,
       availableBalance,
-      requestedAmount: amount,
+      requestedAmount,
       shortfall: Math.abs(newBalance + creditLimit),
     });
   }
@@ -408,7 +445,7 @@ async function debitBusinessDepositInTx(
       billingAccountId: accountId,
       type,
       status: "SUCCEEDED",
-      amount: -amount,
+      amount: normalizedAmount.negated(),
       currency: account.currency,
       description,
       referenceType,
@@ -422,7 +459,7 @@ async function debitBusinessDepositInTx(
     where: { id: accountId },
     data: {
       depositBalance: {
-        decrement: amount,
+        decrement: normalizedAmount,
       },
     },
   });
@@ -436,6 +473,20 @@ async function debitBusinessDepositInTx(
  */
 export async function debitBusinessDeposit(params: DebitBusinessDepositParams) {
   return prisma.$transaction(async (tx) => debitBusinessDepositInTx(tx, params));
+}
+
+export async function debitBusinessDepositWithResult(params: DebitBusinessDepositParams) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "BillingAccount" WHERE id = ${params.accountId} FOR UPDATE`;
+    const preExisting = await findExistingTransactionByIdempotencyKey(tx, params);
+    const transaction = await debitBusinessDepositInTx(tx, params);
+    const account = await tx.billingAccount.findUniqueOrThrow({ where: { id: params.accountId } });
+    return {
+      transaction,
+      idempotentReplay: Boolean(preExisting),
+      balance: account.depositBalance.toNumber(),
+    };
+  });
 }
 
 export async function debitLeadChargeForBookingRequest(params: {

@@ -5,12 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { AgePolicy } from "@prisma/client";
+import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { MediaEntityType } from "@prisma/client";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
 import { validatePlaceCategoriesDraft } from "@/lib/validation/placeCategoryValidation";
 import { createRequestPerf } from "@/server/utils/requestPerf";
@@ -18,6 +21,13 @@ import { syncPlaceMediaUsage } from "@/server/services/media/media-usage.service
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import {
+  assertContentLifecycleOperationAllowed,
+  isContentLifecycleOperationError,
+  lifecycleErrorResponsePayload,
+} from "@/server/services/contentLifecycleOperation.service";
 
 export async function GET(
   request: NextRequest,
@@ -163,7 +173,15 @@ export async function PATCH(
         createdByUserId: true,
         ownerBusinessId: true,
         status: true,
+        phone: true,
+        phoneLabel: true,
+        phone2: true,
+        phone2Label: true,
+        phone3: true,
+        phone3Label: true,
         primaryCategoryId: true,
+        ageTags: true,
+        agePolicy: true,
         subcategories: {
           orderBy: { position: "asc" },
           select: { categoryId: true },
@@ -184,6 +202,21 @@ export async function PATCH(
     if (!canManage) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
+        { status: 403 }
+      );
+    }
+
+    // A PENDING Place is under moderation review — only staff may edit it
+    // there (e.g. to fix imported/submitted data before approving). The
+    // owner/creator can already reach this Place via canManagePlaceAsync
+    // above, but reaching it is not the same as being allowed to change it
+    // while a moderator is reviewing the submission.
+    if (existing.status === "PENDING" && !canEditPendingPlace(user.role)) {
+      return NextResponse.json(
+        {
+          error: "PENDING_PLACE_REQUIRES_STAFF",
+          message: "Pending places can only be edited by staff (ADMIN/MODERATOR) while under moderation review.",
+        },
         { status: 403 }
       );
     }
@@ -220,6 +253,17 @@ export async function PATCH(
     }
     perf.mark("validate");
 
+    const normalizedPhones = normalizePlacePhoneFields({
+      phone: body.phone !== undefined ? body.phone : existing.phone,
+      phoneLabel: body.phoneLabel !== undefined ? body.phoneLabel : existing.phoneLabel,
+      phone2: body.phone2 !== undefined ? body.phone2 : existing.phone2,
+      phone2Label: body.phone2Label !== undefined ? body.phone2Label : existing.phone2Label,
+      phone3: body.phone3 !== undefined ? body.phone3 : existing.phone3,
+      phone3Label: body.phone3Label !== undefined ? body.phone3Label : existing.phone3Label,
+    });
+    const normalizedFaqItems =
+      body.faqItems !== undefined ? normalizeFaqItems(body.faqItems) : undefined;
+
     // Lenient validation for autosave - only check types/formats
     const updateData: Record<string, unknown> = {};
 
@@ -227,6 +271,7 @@ export async function PATCH(
     if (body.category !== undefined) updateData.category = String(body.category);
     if (body.shortDesc !== undefined) updateData.shortDesc = String(body.shortDesc);
     if (body.description !== undefined) updateData.description = body.description ? String(body.description) : null;
+    if (normalizedFaqItems !== undefined) updateData.faqItems = normalizedFaqItems;
     if (body.logoImageId !== undefined) {
       const v = body.logoImageId;
       if (v === null) {
@@ -289,11 +334,33 @@ export async function PATCH(
         }
       }
     }
-    if (body.phone !== undefined) updateData.phone = body.phone ? String(body.phone) : null;
+    if (
+      body.phone !== undefined ||
+      body.phoneLabel !== undefined ||
+      body.phone2 !== undefined ||
+      body.phone2Label !== undefined ||
+      body.phone3 !== undefined ||
+      body.phone3Label !== undefined
+    ) {
+      updateData.phone = normalizedPhones.phone;
+      updateData.phoneLabel = normalizedPhones.phoneLabel;
+      updateData.phone2 = normalizedPhones.phone2;
+      updateData.phone2Label = normalizedPhones.phone2Label;
+      updateData.phone3 = normalizedPhones.phone3;
+      updateData.phone3Label = normalizedPhones.phone3Label;
+    }
     if (body.website !== undefined) updateData.website = body.website ? String(body.website) : null;
     if (body.instagramHandle !== undefined) updateData.instagramHandle = body.instagramHandle ? String(body.instagramHandle) : null;
     if (body.instagramUrl !== undefined) updateData.instagramUrl = body.instagramUrl ? String(body.instagramUrl) : null;
-    if (body.ageTags !== undefined) updateData.ageTags = Array.isArray(body.ageTags) ? body.ageTags : [];
+    if (body.reelsUrl !== undefined) updateData.reelsUrl = body.reelsUrl ? String(body.reelsUrl) : null;
+    if (body.ageTags !== undefined || body.agePolicy !== undefined) {
+      const normalizedAge = normalizeAgePolicy({
+        agePolicy: Object.values(AgePolicy).includes(body.agePolicy) ? body.agePolicy : existing.agePolicy,
+        ageTags: body.ageTags !== undefined ? body.ageTags : existing.ageTags,
+      });
+      updateData.ageTags = normalizedAge.ageTags;
+      updateData.agePolicy = normalizedAge.agePolicy;
+    }
     if (body.visitFormats !== undefined) updateData.visitFormats = Array.isArray(body.visitFormats) ? body.visitFormats : [];
     if (body.placeKind !== undefined) updateData.placeKind = body.placeKind;
     if (body.parentPlaceId !== undefined) updateData.parentPlaceId = body.parentPlaceId;
@@ -323,6 +390,77 @@ export async function PATCH(
     if (body.googleReviewsSyncedAt !== undefined) updateData.googleReviewsSyncedAt = body.googleReviewsSyncedAt;
     if (body.googleMapsUri !== undefined) updateData.googleMapsUri = body.googleMapsUri;
     if (body.priceItems !== undefined) updateData.priceItems = body.priceItems ?? null;
+
+    // Bulk-attach any TEMP media uploaded during this wizard session (gallery photos,
+    // and logo if it wasn't already resolved above via a direct logoImageId tempMedia id).
+    let attachedSessionMedia = false;
+    if (typeof body.wizardSessionId === "string" && body.wizardSessionId.trim()) {
+      const sessionId = body.wizardSessionId.trim();
+      const tempMediaList = await prisma.tempMedia.findMany({
+        where: { ownerUserId: user.id, wizardSessionId: sessionId, status: "TEMP" },
+        orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
+      });
+
+      if (tempMediaList.length > 0) {
+        attachedSessionMedia = true;
+        let newLogoImageId: string | null = null;
+
+        for (const media of tempMediaList) {
+          const kind = media.kind === "PLACE_LOGO" ? "LOGO" : "GALLERY";
+
+          const placeImage = await prisma.placeImage.create({
+            data: {
+              placeId: id,
+              kind,
+              url: media.url,
+              width: media.width,
+              height: media.height,
+              blurhash: media.blurhash,
+              sortOrder: media.sortOrder,
+            },
+          });
+
+          try {
+            let mediaAsset = await prisma.mediaAsset.findFirst({
+              where: { OR: [{ storageKey: media.url }, { publicUrl: media.url }] },
+            });
+            if (!mediaAsset && extractMediaRelativePathFromUrl(media.url)) {
+              mediaAsset = await ensureMediaAssetForStoredFileUrl({
+                publicUrl: media.url,
+                uploadedById: user.id,
+                userRole: user.role,
+                width: media.width,
+                height: media.height,
+                originalName: kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp",
+              });
+            }
+            if (mediaAsset) {
+              await attachMediaToEntity({
+                mediaId: mediaAsset.id,
+                entityType: MediaEntityType.PLACE,
+                entityId: id,
+                field: kind === "LOGO" ? "logo" : "gallery",
+              });
+            }
+          } catch {
+            /* non-fatal — MediaAsset/MediaUsage registration */
+          }
+
+          await prisma.tempMedia.update({
+            where: { id: media.id },
+            data: { status: "ATTACHED", placeId: id },
+          });
+
+          if (kind === "LOGO") {
+            newLogoImageId = placeImage.id;
+          }
+        }
+
+        if (newLogoImageId) {
+          updateData.logoImageId = newLogoImageId;
+        }
+      }
+    }
 
     await prisma.place.update({
       where: { id },
@@ -355,8 +493,13 @@ export async function PATCH(
     }
     perf.mark("write");
 
-    // Auto-assign slug on first meaningful title fill (idempotent).
-    if (body.title !== undefined) {
+    // Auto-assign slug on first meaningful title fill (idempotent) — but
+    // never for a PENDING Place. That auto-assign exists for the normal
+    // DRAFT authoring flow (an early preview URL while a business owner is
+    // still filling in the wizard); a PENDING Place is awaiting moderation
+    // and must only get a slug via the publish/approve action, even when
+    // staff edits+saves other fields while it's under review.
+    if (body.title !== undefined && existing.status !== "PENDING") {
       const t = String(body.title).trim();
       if (t) {
         await assignPlaceSlugIfMissing(id, t);
@@ -376,8 +519,8 @@ export async function PATCH(
     });
     perf.mark("response");
 
-    // Sync media usage if logo changed (don't block on errors)
-    if (body.logoImageId !== undefined) {
+    // Sync media usage if logo or gallery changed (don't block on errors)
+    if (body.logoImageId !== undefined || attachedSessionMedia) {
       try {
         await syncPlaceMediaUsage(id);
       } catch (error) {
@@ -395,7 +538,10 @@ export async function PATCH(
       {
         error: "INTERNAL_SERVER_ERROR",
         message: error instanceof Error ? error.message : "Internal server error",
-        detail: error instanceof Error ? error.stack?.split("\n").slice(0, 3).join(" | ") : undefined,
+        detail:
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.stack?.split("\n").slice(0, 3).join(" | ")
+            : undefined,
       },
       { status: 500 }
     );
@@ -427,9 +573,10 @@ export async function DELETE(
     // Check ownership
     const existing = await prisma.place.findUnique({
       where: { id },
-      select: { 
+      select: {
         createdByUserId: true,
         ownerBusinessId: true,
+        status: true,
         placeKind: true,
       },
     });
@@ -450,22 +597,13 @@ export async function DELETE(
       );
     }
 
-    // Check if COMPLEX has children
-    if (existing.placeKind === "COMPLEX") {
-      const childrenCount = await prisma.place.count({
-        where: { parentPlaceId: id },
-      });
-
-      if (childrenCount > 0) {
-        return NextResponse.json(
-          { 
-            error: "HAS_CHILDREN",
-            message: "Cannot delete complex with units. Delete units first." 
-          },
-          { status: 400 }
-        );
-      }
-    }
+    await assertContentLifecycleOperationAllowed({
+      contentType: "PLACE",
+      contentId: id,
+      operation: "deleteDraft",
+      status: existing.status,
+      prisma,
+    });
 
     await prisma.place.delete({
       where: { id },
@@ -473,6 +611,12 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (isContentLifecycleOperationError(error)) {
+      return NextResponse.json(
+        lifecycleErrorResponsePayload(error),
+        { status: error.statusCode },
+      );
+    }
     console.error("[place-delete] ❌ Error:", error);
     console.error("[place-delete] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(

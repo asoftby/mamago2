@@ -24,6 +24,39 @@ function isEditorRoute(pathname: string): boolean {
   return pathname === "/editor" || pathname.startsWith("/editor/");
 }
 
+/**
+ * Route (маршрут) view/create/edit pages live in the public route group but
+ * are also opened from the admin content list (shared RouteEditor wizard).
+ * Like `isEditorRoute`, they must stay on the current subdomain surface:
+ * the admin-host fallback rewrite would turn `/routes/{slug}/edit` into a
+ * nonexistent `/admin/routes/...` page (404), and a cross-origin redirect
+ * would break App Router RSC navigation from admin.
+ */
+function isRouteContentRoute(pathname: string): boolean {
+  return pathname === "/routes" || pathname.startsWith("/routes/");
+}
+
+/**
+ * `/me/{places|offers|events}/{id}/preview` — opened from the admin content
+ * list (relative link) as well as from the business cabinet. Like
+ * `isEditorRoute`/`isRouteContentRoute`, these must stay on the current
+ * subdomain surface: the admin/business fallback rewrite would turn this
+ * into a nonexistent `/admin/me/...` or `/business/me/...` page (404).
+ * Deliberately an exact-format allowlist, not a blanket `/me/*` bypass —
+ * every other `/me/...` route keeps going through the normal rewrite.
+ */
+const CONTENT_PREVIEW_ROUTE_PATTERN = /^\/me\/(places|offers|events)\/[^/]+\/preview$/;
+
+function isContentPreviewRoute(pathname: string): boolean {
+  return CONTENT_PREVIEW_ROUTE_PATTERN.test(pathname);
+}
+
+const ARTICLE_PREVIEW_ROUTE_PATTERN = /^\/preview\/articles\/[^/]+$/;
+
+function isArticlePreviewRoute(pathname: string): boolean {
+  return ARTICLE_PREVIEW_ROUTE_PATTERN.test(pathname);
+}
+
 function isPublicInviteRoute(pathname: string): boolean {
   return pathname === "/invite/business";
 }
@@ -86,11 +119,33 @@ export function resolveSubdomainMiddlewareDecision(params: {
     return { kind: "next" };
   }
 
-  const isBusinessHost = isHost(host, ["business.mamago.local", "business.mamago.by"]);
-  const isAdminHost = isHost(host, ["admin.mamago.local", "admin.mamago.by"]);
+  const isBusinessHost = isHost(host, [
+    "business.mamago.local",
+    "business.mamago.by",
+    "business.dev.mamago.by",
+    "business.prod.mamago.by",
+  ]);
+  const isAdminHost = isHost(host, [
+    "admin.mamago.local",
+    "admin.mamago.by",
+    "admin.dev.mamago.by",
+    "admin.prod.mamago.by",
+  ]);
   const adminSafeSearch = isAdminHost ? stripPublicDiscoverySearchParams(search) : search;
 
   if (isBusinessHost || isAdminHost) {
+    if (isAdminHost && (pathname === "/dashboard" || pathname === "/admin/dashboard")) {
+      return {
+        kind: "redirect",
+        location: buildSameHostLocation({
+          protocol,
+          host,
+          pathname: "/",
+          search: adminSafeSearch,
+        }),
+      };
+    }
+
     if (isPublicInviteRoute(pathname)) {
       return {
         kind: "redirect",
@@ -135,6 +190,22 @@ export function resolveSubdomainMiddlewareDecision(params: {
       // A cross-origin redirect here breaks App Router RSC navigation from admin.
       return { kind: "next" };
     }
+
+    if (isRouteContentRoute(pathname)) {
+      // Route view/create/edit (shared RouteEditor wizard) — same reasoning
+      // as isEditorRoute: serve the public route-group page on this surface
+      // instead of rewriting into a nonexistent /admin/routes/* or
+      // /business/routes/* page.
+      return { kind: "next" };
+    }
+
+    if (isContentPreviewRoute(pathname)) {
+      return { kind: "next" };
+    }
+
+    if (isAdminHost && isArticlePreviewRoute(pathname)) {
+      return { kind: "next" };
+    }
   }
 
   if (isBusinessHost) {
@@ -153,7 +224,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
 
     return {
       kind: "rewrite",
-      pathname: pathname.startsWith("/business") ? pathname : `/business${pathname}`,
+      pathname: pathname === "/" ? "/business" : `/business${pathname}`,
     };
   }
 
@@ -173,7 +244,7 @@ export function resolveSubdomainMiddlewareDecision(params: {
 
     return {
       kind: "rewrite",
-      pathname: pathname.startsWith("/admin") ? pathname : `/admin${pathname}`,
+      pathname: pathname === "/" ? "/admin" : `/admin${pathname}`,
     };
   }
 

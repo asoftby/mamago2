@@ -8,6 +8,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { EmailTemplateStatusBadge } from "@/components/admin/email-studio/EmailTemplateStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableContainer } from "@/components/ui/table";
 import type { EmailTemplateStatus, EmailTemplateType } from "@/features/email-studio/lib";
 import {
   getEmailTemplateClassification,
@@ -290,8 +291,9 @@ export function EmailTemplatesPageClient() {
               ⚠️ {actionWarning}
             </div>
           ) : null}
-          <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="min-w-full text-sm">
+          <div className="rounded-xl border border-border overflow-hidden">
+            <TableContainer minWidthClassName="min-w-[760px]" scrollLabel="Таблица email-шаблонов, прокручивается по горизонтали">
+            <table className="w-full text-sm">
               <thead className="bg-muted/40">
                 <tr className="text-left text-muted-foreground">
                   <th className="px-4 py-3 font-medium">Название</th>
@@ -389,6 +391,7 @@ export function EmailTemplatesPageClient() {
                 })}
               </tbody>
             </table>
+            </TableContainer>
           </div>
         </CardContent>
       </Card>

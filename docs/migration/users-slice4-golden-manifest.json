@@ -1,0 +1,37 @@
+{
+  "phase": "USERS Slice 4",
+  "sourceSnapshotSha256": "569c59f2e0d0a277a98ff5f7fe418170b123c77901c5c42064cecbaa2338f5a4",
+  "executionPolicy": {
+    "targetedOnly": true,
+    "sequential": true,
+    "stopOnFirstError": true,
+    "reruns": 1
+  },
+  "records": [
+    {
+      "sourceRecordKey": "wordpress-db:user:7",
+      "emailMask": "a***@list.ru",
+      "canonicalCandidateHash": "a7310b38660de18921d6fc8b12ce4742036cc11381815cedc23ffaff58ba22bf",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED",
+      "expectedFirstDeltas": { "User": 1, "MigrationLineage": 1, "MigrationRecord": 1, "Session": 0, "UserActionToken": 0, "Ownership": 0, "MediaAsset": 0 }
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:38",
+      "emailMask": "1***@gmail.com",
+      "canonicalCandidateHash": "326f8efcc30b8a68932e5ffca02b0ba16ba7a960dd6a50da0b0615b2d7614792",
+      "expectedFirstAction": "CREATE",
+      "expectedRerunAction": "SKIP_UNCHANGED",
+      "expectedFirstDeltas": { "User": 1, "MigrationLineage": 1, "MigrationRecord": 1, "Session": 0, "UserActionToken": 0, "Ownership": 0, "MediaAsset": 0 }
+    },
+    {
+      "sourceRecordKey": "wordpress-db:user:1",
+      "emailMask": "a***@gmail.com",
+      "canonicalCandidateHash": "6010e7e05246d918cc96914c5b7ab4a0b5e483df7b42f7735f2fb8f839a69c1f",
+      "expectedFirstAction": "BLOCKED",
+      "expectedReason": "PRIVILEGED_ACCOUNT_COLLISION",
+      "expectedRerunAction": "BLOCKED",
+      "expectedFirstDeltas": { "User": 0, "MigrationLineage": 0, "MigrationRecord": 1, "Session": 0, "UserActionToken": 0, "Ownership": 0, "MediaAsset": 0 }
+    }
+  ]
+}

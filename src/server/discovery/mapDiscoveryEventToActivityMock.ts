@@ -72,6 +72,7 @@ export type DiscoveryEventCardRow = {
   ageTags: string[];
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
+  agePolicy: import("@prisma/client").AgePolicy;
   priceFrom: number | null;
   priceTo: number | null;
   priceText: string | null;
@@ -104,7 +105,10 @@ export function mapDiscoveryEventToActivityMock(
   options: MapDiscoveryEventToActivityMockOptions,
 ): ActivityMock {
   const { ownerFirst, hubPrimaryCityId, engagementScore, citySlugById } = options;
-  const { ageFrom, ageTo } = ageBoundsFromActivityFields(a);
+  const derivedAgeBounds = ageBoundsFromActivityFields(a);
+  const { ageFrom, ageTo } = a.agePolicy === "ADULT_ONLY"
+    ? { ageFrom: 18, ageTo: 99 }
+    : derivedAgeBounds;
   const cover =
     resolveActivityCoverUrl({
       coverImageId: a.coverImageId,
@@ -157,6 +161,7 @@ export function mapDiscoveryEventToActivityMock(
     coverMediaId: a.coverImageId,
     ageFrom,
     ageTo,
+    agePolicy: a.agePolicy,
     priceMin,
     priceMax: a.priceTo != null ? a.priceTo : undefined,
     priceListUsesOt: discoveryCardPriceUsesOtPrefix({

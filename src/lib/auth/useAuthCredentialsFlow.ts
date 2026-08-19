@@ -6,6 +6,7 @@ import { appendBirthdayBuilderAuthParam } from "@/lib/auth/appendBirthdayBuilder
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import { notifyAuthStateChanged, notifyNotificationsChanged } from "@/lib/auth/client";
+import { getPostAuthContext, savePostAuthContext, type AuthAction } from "@/lib/post-auth";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "@/lib/toast";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
@@ -15,9 +16,32 @@ export type AuthFlowMode = "login" | "register";
 
 export type AuthFinishContext = "modal" | "embedded";
 
+export interface ActivationNotice {
+  /** Provider-confirmed send, not just "the account is PENDING_ACTIVATION". */
+  delivered: boolean;
+  maskedEmail: string;
+}
+
+/** Purely a UX throttle against spam-clicking — the real limit is server-side (activationRateLimit). */
+const RESEND_COOLDOWN_SECONDS = 30;
+
 export function isValidEmail(value: string): boolean {
   const v = value.trim();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function parseAuthAction(value: unknown, fallback: AuthAction): AuthAction {
+  return value === "login" || value === "signup" ? value : fallback;
+}
+
+function saveAuthActionToPostAuthContext(authAction: AuthAction) {
+  const context = getPostAuthContext();
+  if (!context) return;
+
+  savePostAuthContext({
+    ...context,
+    authAction,
+  });
 }
 
 
@@ -61,10 +85,15 @@ export function useAuthCredentialsFlow({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activationNotice, setActivationNotice] = useState<ActivationNotice | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
 
   const switchMode = useCallback((m: AuthFlowMode) => {
     setMode(m);
     setError("");
+    setActivationNotice(null);
+    setResendAvailableAt(null);
   }, []);
 
   useEffect(() => {
@@ -74,8 +103,23 @@ export function useAuthCredentialsFlow({
       setPassword("");
       setShowPassword(false);
       setError("");
+      setActivationNotice(null);
+      setResendAvailableAt(null);
     }
   }, [open, initialEmail, initialMode]);
+
+  useEffect(() => {
+    if (resendAvailableAt === null) {
+      setResendSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      setResendSecondsLeft(Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000)));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [resendAvailableAt]);
 
   useEffect(() => {
     setMode(initialMode);
@@ -123,7 +167,58 @@ export function useAuthCredentialsFlow({
       }
       navigateToCompatibleHref(router, target, { replace: true });
     },
-    [embedded, beforeFinishAuthSession, onAuthSuccess, router, skipRedirectAfterAuth],
+    [embedded, beforeFinishAuthSession, nextHref, onAuthSuccess, router, skipRedirectAfterAuth],
+  );
+
+  /**
+   * The one call to /api/auth/login, shared by the initial submit and the
+   * "Отправить ссылку повторно" resend action — a PENDING_ACTIVATION
+   * account's password is never actually checked server-side, so
+   * re-hitting this same endpoint with the same credentials is exactly
+   * "try requesting the activation link again," not a real re-auth attempt.
+   */
+  const attemptLogin = useCallback(
+    async (emailVal: string, passwordVal: string) => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ email: emailVal, password: passwordVal, invitationToken }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.pendingActivation === true) {
+          setError("");
+          setActivationNotice({
+            delivered: data.delivered === true,
+            maskedEmail: typeof data.maskedEmail === "string" ? data.maskedEmail : emailVal,
+          });
+          setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECONDS * 1000);
+          return;
+        }
+        setActivationNotice(null);
+        setResendAvailableAt(null);
+        if (!res.ok) {
+          const raw = typeof data.error === "string" ? data.error : "";
+          setError(
+            raw === "Invalid email or password" ? "Неверный email или пароль" : raw || "Что-то пошло не так",
+          );
+          return;
+        }
+        saveAuthActionToPostAuthContext(parseAuthAction(data.authAction, "login"));
+        const raw =
+          typeof data.redirectTo === "string" && data.redirectTo.length > 0
+            ? data.redirectTo
+            : getSafeRedirectPath(nextHref, getPostAuthRedirect());
+        await finishAuthSession(raw);
+      } catch {
+        setError("Ошибка сети");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [invitationToken, nextHref, finishAuthSession],
   );
 
   const submitLogin = useCallback(async () => {
@@ -133,33 +228,24 @@ export function useAuthCredentialsFlow({
       setError("Введите email и пароль");
       return;
     }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ email: emailVal, password, invitationToken }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const raw = typeof data.error === "string" ? data.error : "";
-        setError(
-          raw === "Invalid email or password" ? "Неверный email или пароль" : raw || "Что-то пошло не так",
-        );
-        return;
-      }
-      const raw =
-        typeof data.redirectTo === "string" && data.redirectTo.length > 0
-          ? data.redirectTo
-          : getSafeRedirectPath(nextHref, getPostAuthRedirect());
-      await finishAuthSession(raw);
-    } catch {
-      setError("Ошибка сети");
-    } finally {
-      setLoading(false);
-    }
-  }, [email, password, invitationToken, nextHref, finishAuthSession]);
+    await attemptLogin(emailVal, password);
+  }, [email, password, attemptLogin]);
+
+  const resendActivationLink = useCallback(async () => {
+    if (resendSecondsLeft > 0) return;
+    const emailVal = email.trim().toLowerCase();
+    if (!emailVal) return;
+    await attemptLogin(emailVal, password);
+  }, [email, password, resendSecondsLeft, attemptLogin]);
+
+  /** "Указать другой email" — back to a blank slate, not just hiding the notice. */
+  const useDifferentEmail = useCallback(() => {
+    setActivationNotice(null);
+    setResendAvailableAt(null);
+    setError("");
+    setEmail("");
+    setPassword("");
+  }, []);
 
   const submitRegister = useCallback(async () => {
     setError("");
@@ -189,6 +275,7 @@ export function useAuthCredentialsFlow({
       if (data.verificationEmailSendFailed === true) {
         toast.message(VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST);
       }
+      saveAuthActionToPostAuthContext(parseAuthAction(data.authAction, "signup"));
       const raw =
         typeof data.redirectTo === "string" && data.redirectTo.length > 0
           ? data.redirectTo
@@ -207,6 +294,8 @@ export function useAuthCredentialsFlow({
     setPassword("");
     setShowPassword(false);
     setError("");
+    setActivationNotice(null);
+    setResendAvailableAt(null);
   }, []);
 
   return {
@@ -225,5 +314,9 @@ export function useAuthCredentialsFlow({
     submitRegister,
     minPasswordLen: PASSWORD_MIN_LENGTH,
     resetCredentials,
+    activationNotice,
+    resendSecondsLeft,
+    resendActivationLink,
+    useDifferentEmail,
   };
 }

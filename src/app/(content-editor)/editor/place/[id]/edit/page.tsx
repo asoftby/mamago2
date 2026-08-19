@@ -10,10 +10,11 @@ import {
 } from "@/lib/content-editor/types";
 import { loadPlaceForWizard } from "@/lib/content-editor/loadPlaceForWizard";
 import { parsePlaceEditorStepQuery } from "@/lib/business/placeEditorStepQuery";
-import { TOTAL_STEPS } from "@/components/business/wizard/place/config";
+import { getPlaceWizardTotalSteps } from "@/components/business/wizard/place/config";
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import prisma from "@/lib/prisma";
+import { isPlaceCtaStepFeatureEnabled } from "@/components/business/wizard/place/ctaStepFeatureFlag";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
@@ -44,12 +45,15 @@ export default async function EditorEditPlacePage({
   const { id } = await params;
   const sp = await searchParams;
   const { returnTo } = sp;
+  const ctaStepEnabled = isPlaceCtaStepFeatureEnabled(process.env);
+  const totalSteps = getPlaceWizardTotalSteps(ctaStepEnabled);
   const stepRaw = Array.isArray(sp.step) ? sp.step[0] : sp.step;
   const parsedStep = parsePlaceEditorStepQuery(
     typeof stepRaw === "string" ? stepRaw : null,
+    ctaStepEnabled,
   );
   const initialEditStep =
-    parsedStep != null && parsedStep >= 1 && parsedStep <= TOTAL_STEPS
+    parsedStep != null && parsedStep >= 1 && parsedStep <= totalSteps
       ? parsedStep
       : undefined;
 
@@ -106,8 +110,7 @@ export default async function EditorEditPlacePage({
     ...routing,
   });
 
-  const title =
-    place.status === "PUBLISHED" ? "Редактирование места" : "Место — черновик";
+  const title = "Новое место";
 
   return (
     <ContentEditorChrome title={title} backHref={backHref} surface={surface}>
@@ -121,6 +124,7 @@ export default async function EditorEditPlacePage({
         returnTo={returnTo}
         initialEditStep={initialEditStep}
         activeRevision={activeRevision}
+        ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,9 +17,9 @@ interface DepositTopUpModalProps {
 // ── Presets ───────────────────────────────────────────────────────────────────
 
 const PRESETS = [
-  { amount: 20, label: `20 ${BYN_SYMBOL}` },
-  { amount: 50, label: `50 ${BYN_SYMBOL}`, recommended: true },
-  { amount: 100, label: `100 ${BYN_SYMBOL}` },
+  { amount: 20 },
+  { amount: 50, recommended: true },
+  { amount: 100 },
 ];
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -37,7 +38,12 @@ export function DepositTopUpModal({ balance, onClose }: DepositTopUpModalProps) 
   }
 
   const recommendedLabel = PRESETS.find((p) => p.amount === selected && !isCustom)?.recommended
-    ? `${selected} ${BYN_SYMBOL} — рекомендуем для старта`
+    ? (
+        <>
+          {renderCurrencyText(formatPrice(selected, { hideZero: true }), { iconSize: "sm" })}{" "}
+          — рекомендуем для старта
+        </>
+      )
     : null;
 
   return (
@@ -97,7 +103,7 @@ export function DepositTopUpModal({ balance, onClose }: DepositTopUpModalProps) 
                       : "border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50",
                   )}
                 >
-                  {p.label}
+                  {renderCurrencyText(formatPrice(p.amount, { hideZero: true }), { iconSize: "sm" })}
                 </button>
               ))}
             </div>
@@ -108,7 +114,9 @@ export function DepositTopUpModal({ balance, onClose }: DepositTopUpModalProps) 
                 isCustom ? "border-stone-300 bg-white shadow-sm" : "border-stone-200 bg-stone-50",
               )}
             >
-              <span className="text-sm text-stone-400">{BYN_SYMBOL}</span>
+              <span className="text-sm text-stone-400">
+                {renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" })}
+              </span>
               <input
                 type="number"
                 min={1}

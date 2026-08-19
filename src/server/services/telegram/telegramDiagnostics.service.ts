@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getConfiguredPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { isProductionAppEnv } from "@/lib/config/productionEnvGuard";
 import { getTelegramConfig, type TelegramRuntimeEnvironment } from "@/server/config/telegram.config";
 import { TelegramChannel } from "@/server/services/telegram/TelegramChannel";
 
@@ -12,8 +14,8 @@ const NGROK_API_TIMEOUT_MS = 1_500;
  * Webhook URL check result.
  * - ok: webhook points at the expected origin + path
  * - mismatch: expected origin is known, webhook points elsewhere
- * - tunnel_not_found: DEV only — ngrok API on :4040 is unreachable
- * - unknown: PROD without NEXT_PUBLIC_APP_URL configured
+ * - tunnel_not_found: LOCAL only — ngrok API on :4040 is unreachable
+ * - unknown: no public URL and (PROD, or local without a tunnel)
  */
 export type TelegramWebhookUrlStatus =
   | { kind: "ok"; expectedOrigin: string }
@@ -24,6 +26,7 @@ export type TelegramWebhookUrlStatus =
 export type TelegramDiagnostics = {
   environment: TelegramRuntimeEnvironment;
   botUsername: string | null;
+  configuredBotUsername: string | null;
   botError: string | null;
   webhook: {
     url: string;
@@ -33,6 +36,7 @@ export type TelegramDiagnostics = {
   } | null;
   webhookError: string | null;
   secretConfigured: boolean;
+  expectedWebhookUrl: string | null;
   urlStatus: TelegramWebhookUrlStatus;
 };
 
@@ -63,31 +67,50 @@ async function findDevTunnelOrigin(): Promise<string | "tunnel_not_found"> {
   }
 }
 
-function resolveProdExpectedOrigin(): string | null {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (!appUrl) return null;
+function isLocalPublicHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "mamago.local" ||
+    host.endsWith(".local")
+  );
+}
+
+/**
+ * Expected webhook origin:
+ * - deployed DEV/STAGING/PROD: APP_PUBLIC_URL / NEXT_PUBLIC_APP_URL
+ * - LOCAL laptop: ngrok/cloudflared tunnel, not mamago.local
+ */
+export function resolveConfiguredWebhookOrigin(): string | null {
+  const configured = getConfiguredPublicAppUrl();
+  if (!configured) return null;
   try {
-    return new URL(appUrl).origin;
+    const url = new URL(configured);
+    if (isLocalPublicHostname(url.hostname)) return null;
+    return url.origin;
   } catch {
     return null;
   }
 }
 
+export async function resolveExpectedWebhookOrigin(): Promise<string | "tunnel_not_found" | null> {
+  const configuredOrigin = resolveConfiguredWebhookOrigin();
+  if (configuredOrigin) return configuredOrigin;
+  if (isProductionAppEnv()) return null;
+  return findDevTunnelOrigin();
+}
+
 async function resolveWebhookUrlStatus(
-  environment: TelegramRuntimeEnvironment,
+  _environment: TelegramRuntimeEnvironment,
   webhookUrl: string | null,
 ): Promise<TelegramWebhookUrlStatus> {
-  if (environment === "DEV") {
-    const tunnelOrigin = await findDevTunnelOrigin();
-    if (tunnelOrigin === "tunnel_not_found") return { kind: "tunnel_not_found" };
-    const matches = webhookUrl === `${tunnelOrigin}${TELEGRAM_WEBHOOK_PATH}`;
-    return { kind: matches ? "ok" : "mismatch", expectedOrigin: tunnelOrigin };
-  }
-
-  const expectedOrigin = resolveProdExpectedOrigin();
-  if (!expectedOrigin) return { kind: "unknown" };
-  const matches = webhookUrl === `${expectedOrigin}${TELEGRAM_WEBHOOK_PATH}`;
-  return { kind: matches ? "ok" : "mismatch", expectedOrigin };
+  const expected = await resolveExpectedWebhookOrigin();
+  if (expected === "tunnel_not_found") return { kind: "tunnel_not_found" };
+  if (!expected) return { kind: "unknown" };
+  const matches = webhookUrl === `${expected}${TELEGRAM_WEBHOOK_PATH}`;
+  return { kind: matches ? "ok" : "mismatch", expectedOrigin: expected };
 }
 
 export async function getTelegramDiagnostics(): Promise<TelegramDiagnostics> {
@@ -119,14 +142,20 @@ export async function getTelegramDiagnostics(): Promise<TelegramDiagnostics> {
   }
 
   const urlStatus = await resolveWebhookUrlStatus(config.environment, webhook?.url ?? null);
+  const expectedWebhookUrl =
+    urlStatus.kind === "ok" || urlStatus.kind === "mismatch"
+      ? `${urlStatus.expectedOrigin}${TELEGRAM_WEBHOOK_PATH}`
+      : null;
 
   return {
     environment: config.environment,
     botUsername,
+    configuredBotUsername: config.botUsername,
     botError,
     webhook,
     webhookError,
     secretConfigured: Boolean(config.webhookSecret),
+    expectedWebhookUrl,
     urlStatus,
   };
 }

@@ -10,6 +10,7 @@ import {
   buildCityPublicPath,
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
+import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -19,6 +20,7 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
@@ -28,6 +30,11 @@ import {
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { buildArticleJsonLd } from "@/lib/seo/schema/buildArticleJsonLd";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
+import {
+  findNextArticlePreviewInSection,
+  loadArticleContinuousContext,
+} from "@/lib/article/nextArticleInSection";
+import { buildContinuousArticleSeed } from "@/lib/article/buildContinuousArticleSeed";
 
 interface PageProps {
   params: Promise<{ city: string; slug: string }>;
@@ -48,11 +55,6 @@ export async function generateMetadata({ params }: PageProps) {
   if (!city) return {};
 
   const publicBase = getCanonicalPublicAppUrl();
-  const defaultCanonical = `${publicBase}${buildCityPublicPath({
-    citySlug: city.slug,
-    type: "article",
-    slug,
-  })}`;
 
   const mvp = await loadArticleMvpBySlugPublic(slug, city.id);
   if (!mvp) return {};
@@ -81,7 +83,13 @@ export async function generateMetadata({ params }: PageProps) {
 
   const title = article.seoTitle?.trim() || `${mvp.title} — mamaGo`;
   const description = article.seoDescription?.trim() || mvp.excerpt?.trim() || undefined;
-  const canonical = article.seoCanonicalUrl?.trim() || defaultCanonical;
+  const canonical = resolveArticleCanonicalUrl({
+    seoCanonicalUrl: article.seoCanonicalUrl,
+    slug,
+    geoScope: "CITY",
+    citySlug: city.slug,
+    publicBase,
+  });
   const noindex =
     article.noindex === true ||
     (article.seoRobots?.toLowerCase().includes("noindex") ?? false);
@@ -122,6 +130,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       updatedAt: true,
       seoCanonicalUrl: true,
       seoJsonLdOverride: true,
+      seoTitle: true,
     },
   });
   if (!articleRow) notFound();
@@ -163,7 +172,13 @@ export default async function CityArticlePage({ params }: PageProps) {
     articleRow.seoJsonLdOverride && typeof articleRow.seoJsonLdOverride === "object"
       ? (articleRow.seoJsonLdOverride as Record<string, unknown>)
       : buildArticleJsonLd({
-          canonicalUrl: articleRow.seoCanonicalUrl?.trim() || `${publicBase}${canonicalPath}`,
+          canonicalUrl: resolveArticleCanonicalUrl({
+            seoCanonicalUrl: articleRow.seoCanonicalUrl,
+            slug: articleRow.slug ?? slug,
+            geoScope: "CITY",
+            citySlug: city.slug,
+            publicBase,
+          }),
           headline: mvp.title,
           description: mvp.excerpt,
           image: mvp.heroUrl,
@@ -211,6 +226,83 @@ export default async function CityArticlePage({ params }: PageProps) {
     );
   }
 
+  const continuous = await loadArticleContinuousContext(mvp.id);
+  const journalHref = `/${city.slug}/blog`;
+  const articleView = (
+    <ArticleMvpView
+      title={mvp.title}
+      subtitle={mvp.subtitle}
+      excerpt={mvp.excerpt}
+      publishedAt={mvp.publishedAt}
+      blocks={mvp.blocks}
+      tags={mvp.tags}
+      categoryLabel={mvp.categoryLabel}
+      editHref={editHref}
+      citySlug={city.slug}
+      continuousVariant={continuous?.enabled ? "first" : "standalone"}
+      journalFooterHref={journalHref}
+      articleAriaLabel={mvp.title}
+      articleId={mvp.id}
+      articleHref={canonicalPath}
+      coverImageUrl={mvp.heroUrl}
+    />
+  );
+
+  if (
+    continuous?.enabled &&
+    continuous.section &&
+    continuous.geoScope === "CITY"
+  ) {
+    const nextPreview = await findNextArticlePreviewInSection({
+      currentArticleId: mvp.id,
+      sectionId: continuous.section.id,
+      cityId: city.id,
+      geoScope: "CITY",
+      excludeIds: [],
+    });
+    const seed = buildContinuousArticleSeed({
+      id: mvp.id,
+      title: mvp.title,
+      excerpt: mvp.excerpt,
+      subtitle: mvp.subtitle,
+      slug: articleRow.slug ?? slug,
+      publishedAt: mvp.publishedAt,
+      heroUrl: mvp.heroUrl,
+      heroAlt: mvp.heroAlt,
+      blocks: [],
+      categoryLabel: mvp.categoryLabel,
+      tags: mvp.tags,
+      section: continuous.section,
+      geoScope: "CITY",
+      cityId: city.id,
+      citySlug: city.slug,
+      documentTitle: articleRow.seoTitle?.trim() || `${mvp.title} — mamaGo`,
+    });
+    const { blocks: _blocks, ...seedWithoutBlocks } = seed;
+    void _blocks;
+
+    return (
+      <>
+        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <JsonLd
+          data={[schemaJsonLd, breadcrumbJsonLd].filter(
+            (item): item is Record<string, unknown> => Boolean(item),
+          )}
+        />
+        <ContinuousArticleReader
+          seed={seedWithoutBlocks}
+          citySlug={city.slug}
+          cityId={city.id}
+          geoScope="CITY"
+          section={continuous.section}
+          initialNextPreview={nextPreview.preview}
+          initialExhausted={nextPreview.exhausted}
+          firstArticleSlot={articleView}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
@@ -219,17 +311,7 @@ export default async function CityArticlePage({ params }: PageProps) {
           (item): item is Record<string, unknown> => Boolean(item),
         )}
       />
-      <ArticleMvpView
-        title={mvp.title}
-        subtitle={mvp.subtitle}
-        excerpt={mvp.excerpt}
-        publishedAt={mvp.publishedAt}
-        blocks={mvp.blocks}
-        tags={mvp.tags}
-        categoryLabel={mvp.categoryLabel}
-        editHref={editHref}
-        citySlug={city.slug}
-      />
+      {articleView}
     </>
   );
 }

@@ -35,6 +35,19 @@ export async function executePendingPostAuthAction(
       if (!res.ok) throw new Error("route_idea_save_failed");
       return;
     }
+
+    if (action.entityType === "article") {
+      const res = await fetch("/api/save/idea", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          articleId: action.entityId,
+        }),
+      });
+      if (!res.ok) throw new Error("idea_save_failed");
+      return;
+    }
   }
 
   if (action.kind === "save_plan") {
@@ -68,6 +81,22 @@ export async function executePendingPostAuthAction(
         }),
       });
       if (!res.ok) throw new Error("route_plan_save_failed");
+      return;
+    }
+
+    if (action.entityType === "article") {
+      const res = await fetch("/api/save/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          articleId: action.entityId,
+          date: action.plannedDate,
+          title: action.title,
+          coverImageUrl: action.coverImageUrl,
+        }),
+      });
+      if (!res.ok) throw new Error("plan_save_failed");
       return;
     }
   }

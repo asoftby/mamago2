@@ -333,11 +333,13 @@ export function DiscoveryFilters({
              age: applied.age,
              metro: applied.metro,
              district: applied.district,
-             nearby: false,
+          nearby: false,
+          adultOnly: applied.adultOnly,
              dateFrom: applied.dateFrom,
              dateTo: applied.dateTo,
              whenPreset: applied.whenPreset,
              format: applied.format,
+             free: applied.free,
           }}
           draft={applied}
           setDraft={setDraft}

@@ -73,14 +73,18 @@ export function partitionDiscoveryFeed(
   activities: ActivityMock[],
   budget?: number | null,
 ): DiscoveryFeedPartition {
+  const hasChildAgeContext = filters.age.some((age) => age !== "18+");
+  const eligibleActivities = hasChildAgeContext
+    ? activities.filter((activity) => activity.agePolicy !== "ADULT_ONLY")
+    : activities;
   const budgetFiltered =
     budget && budget > 0
-      ? activities.filter((a) => {
+      ? eligibleActivities.filter((a) => {
           const p = a.priceMin;
           if (p === undefined || p === null) return true; // цена не указана — показываем
           return p <= budget;
         })
-      : activities;
+      : eligibleActivities;
 
   const formatFiltered = budgetFiltered.filter((activity) =>
     activityMatchesFormat(activity, filters.format),

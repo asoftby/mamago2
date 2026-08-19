@@ -1,19 +1,30 @@
 import { z } from "zod";
 
+const financialAmountSchema = z.number().finite().positive().max(1_000_000).refine(
+  (value) => Number.isInteger(value * 100),
+  "Amount must have at most 2 decimal places",
+);
+const financialRequestKeySchema = z.string().trim().min(8).max(128);
+const bynCurrencySchema = z.literal("BYN");
+
 /**
  * Validation schemas for admin billing operations
  */
 
 export const creditDepositSchema = z.object({
   businessId: z.string().min(1, "Business ID is required"),
-  amount: z.number().positive("Amount must be positive"),
+  amount: financialAmountSchema,
+  currency: bynCurrencySchema,
+  idempotencyKey: financialRequestKeySchema,
   reason: z.string().min(1, "Reason is required"),
   note: z.string().optional(),
 });
 
 export const debitDepositSchema = z.object({
   businessId: z.string().min(1, "Business ID is required"),
-  amount: z.number().positive("Amount must be positive"),
+  amount: financialAmountSchema,
+  currency: bynCurrencySchema,
+  idempotencyKey: financialRequestKeySchema,
   reason: z.string().min(1, "Reason is required"),
   note: z.string().optional(),
   allowNegative: z.boolean().optional().default(false),
@@ -21,7 +32,9 @@ export const debitDepositSchema = z.object({
 
 export const refundTransactionSchema = z.object({
   transactionId: z.string().min(1, "Transaction ID is required"),
-  amount: z.number().positive("Amount must be positive"),
+  amount: financialAmountSchema,
+  currency: bynCurrencySchema,
+  idempotencyKey: financialRequestKeySchema,
   reason: z.string().min(1, "Reason is required"),
   note: z.string().optional(),
 });

@@ -60,7 +60,10 @@ import {
   type ContentEditorNav,
   type ContentEditorSurface,
 } from "@/lib/content-editor/types";
-import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
+import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
+import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
+import { resolveContentSuccessState } from "@/lib/content-success/resolver";
+import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 // Import step components
 import { Step1Type } from "./steps/Step1Type";
@@ -70,10 +73,19 @@ import { Step3Media } from "./steps/Step3Media";
 import { Step4Conditions } from "./steps/Step4Conditions";
 import { Step5Pricing } from "./steps/Step5Pricing";
 import { Step6Contacts } from "./steps/Step6Contacts";
+import { FaqStep } from "../shared/FaqStep";
 
 interface OfferWizardProps {
   mode: OfferWizardMode;
-  offer?: Offer;
+  offer?: Offer & {
+    place?: {
+      id: string;
+      title: string;
+      city?: {
+        slug: string;
+      } | null;
+    } | null;
+  };
   userId: string;
   userRole?: Role;
   business?: {
@@ -91,6 +103,7 @@ interface OfferWizardProps {
   returnTo?: string;
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
+  ctaStepEnabled?: boolean;
 }
 
 /** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
@@ -106,6 +119,142 @@ interface OfferWizardDraftData {
   currentStep: OfferWizardStepKey;
 }
 
+type OfferMutationErrorPayload = {
+  code?: string;
+  error?: string;
+  message?: string;
+  description?: string;
+  fieldErrors?: Record<string, string[] | undefined>;
+  formErrors?: string[];
+};
+
+const OFFER_API_FIELD_LABELS: Record<string, string> = {
+  "selectedPlace.id": "Место",
+  kind: "Тип предложения",
+  title: "Название",
+  shortDescription: "Краткое описание",
+  ageMinMonths: "Возраст от",
+  ageMaxMonths: "Возраст до",
+  coverImage: "Главное изображение",
+  videoUrl: "Видео",
+  singlePrice: "Цена",
+  pricingOptions: "Варианты цен",
+  ctaType: "Тип действия",
+  phone: "Телефон для связи",
+  website: "Ссылка",
+  contactPhone: "Контактный телефон",
+  contactPhone2: "Дополнительный телефон",
+  contactPhone3: "Дополнительный телефон",
+  contactWebsite: "Сайт",
+  faqItems: "FAQ",
+  wizardCompletedSteps: "Прогресс мастера",
+  productType: "Тип предложения",
+  requestedPlacements: "Сценарии размещения",
+  details: "Детали предложения",
+  category: "Категория услуги",
+  partyLocationType: "Формат проведения",
+  minChildren: "Минимум детей",
+  maxChildren: "Максимум детей",
+  occasions: "Подходящие праздники",
+  campProgramType: "Тип программы лагеря",
+  campSessions: "Смены лагеря",
+  campIncludedMeals: "Питание",
+};
+
+class OfferMutationError extends Error {
+  description?: string;
+
+  constructor(message: string, description?: string) {
+    super(message);
+    this.name = "OfferMutationError";
+    this.description = description;
+  }
+}
+
+function isOfferMutationErrorPayload(value: unknown): value is OfferMutationErrorPayload {
+  return Boolean(value) && typeof value === "object";
+}
+
+function humanizeOfferFieldPath(fieldPath: string): string {
+  const directMatch = OFFER_API_FIELD_LABELS[fieldPath];
+  if (directMatch) return directMatch;
+
+  const normalized = fieldPath.replace(/\.\d+/g, "");
+  const normalizedMatch = OFFER_API_FIELD_LABELS[normalized];
+  if (normalizedMatch) return normalizedMatch;
+
+  if (fieldPath.startsWith("pricingOptions.")) return "Варианты цен";
+  if (fieldPath.startsWith("campSessions.")) return "Смены лагеря";
+  if (fieldPath.startsWith("contactSocialLinks.")) return "Соцсети";
+  if (fieldPath.startsWith("faqItems.")) return "FAQ";
+  if (fieldPath.startsWith("wizardCompletedSteps.")) return "Прогресс мастера";
+
+  return fieldPath;
+}
+
+function describeOfferMutationError(errorData: OfferMutationErrorPayload): {
+  message: string;
+  description?: string;
+} {
+  const fieldEntry = Object.entries(errorData.fieldErrors ?? {}).find(
+    ([, messages]) => Array.isArray(messages) && messages.length > 0,
+  );
+
+  if (fieldEntry) {
+    const [fieldPath, messages] = fieldEntry;
+    return {
+      message: messages?.[0] || errorData.message || errorData.error || "Проверьте поля формы",
+      description: `Поле: ${humanizeOfferFieldPath(fieldPath)}`,
+    };
+  }
+
+  const formError = errorData.formErrors?.[0];
+  if (formError) {
+    return { message: formError };
+  }
+
+  return {
+    message: errorData.message || errorData.error || "Проверьте поля формы",
+  };
+}
+
+async function parseOfferMutationResponse<T>(
+  response: Response,
+  options: {
+    fallbackMessage: string;
+    operation: string;
+    payload?: unknown;
+  },
+): Promise<T> {
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (isOfferMutationErrorPayload(body) && body.code === "VALIDATION_ERROR") {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[OfferWizard] ${options.operation} validation error`, {
+          payload: options.payload,
+          response: body,
+          status: response.status,
+        });
+      }
+
+      const described = describeOfferMutationError(body);
+      throw new OfferMutationError(described.message, described.description);
+    }
+
+    if (isOfferMutationErrorPayload(body)) {
+      throw new OfferMutationError(
+        body.message || body.error || options.fallbackMessage,
+        typeof body.description === "string" ? body.description : undefined,
+      );
+    }
+
+    throw new OfferMutationError(options.fallbackMessage);
+  }
+
+  return body as T;
+}
+
 export function OfferWizard({
   mode,
   offer,
@@ -117,6 +266,7 @@ export function OfferWizard({
   contentEditorNav,
   returnTo,
   initialStepNumber,
+  ctaStepEnabled,
 }: OfferWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
@@ -125,6 +275,9 @@ export function OfferWizard({
     ...contentEditorNav,
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
+  const isPublishedEditMode = mode === "edit" && offer?.status === "PUBLISHED";
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   
   const [formData, setFormData] = useState<OfferFormData>(() => {
     if (mode === "edit" && offer) {
@@ -334,6 +487,21 @@ export function OfferWizard({
     [],
   );
 
+  const showSuccessModal = useCallback(
+    (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
+      const next = resolveContentSuccessState({
+        ...payload,
+        surface,
+        returnTo,
+        role: userRole,
+      });
+      if (!next) return;
+      setSuccessState(next);
+      setSuccessModalOpen(true);
+    },
+    [returnTo, surface, userRole],
+  );
+
   // Navigation by step key
   const handleNext = () => {
     // Шаг помечается completed только здесь — после успешной валидации по «Далее»
@@ -395,14 +563,12 @@ export function OfferWizard({
           body: JSON.stringify(payload),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          const errorMessage = errorData.message || errorData.error || "Failed to update draft";
-          throw new Error(errorMessage);
-        }
-
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
-        const saved = await response.json().catch(() => null);
+        const saved = await parseOfferMutationResponse<{ updatedAt?: string }>(response, {
+          fallbackMessage: "Failed to update draft",
+          operation: "update draft",
+          payload,
+        });
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
@@ -424,33 +590,53 @@ export function OfferWizard({
           body: JSON.stringify(createPayload),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          const errorMessage = errorData.message || errorData.error || "Failed to create draft";
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
+        const data = await parseOfferMutationResponse<{
+          id: string;
+          slug?: string | null;
+          place?: { city?: { slug?: string | null } | null } | null;
+        }>(response, {
+          fallbackMessage: "Failed to create draft",
+          operation: "create draft",
+          payload: createPayload,
+        });
         setOfferId(data.id);
         draft.markClean();
 
         if (onComplete) {
           onComplete(data.id);
         } else {
-          router.push(editorOfferEditHref(data.id));
+          router.replace(editorOfferEditHref(data.id));
         }
+        showSuccessModal({
+          kind: "offer",
+          outcome: "draft_saved",
+          id: data.id,
+          isEdit: false,
+        });
+        return;
       }
 
-      toast.success(
-        offerId
-          ? canDirectPublish && mode === "edit"
-            ? "Изменения опубликованы"
-            : "Изменения сохранены"
-          : "Черновик сохранён",
-      );
+      showSuccessModal({
+        kind: "offer",
+        outcome:
+          canDirectPublish && mode === "edit" && isPublishedEditMode
+            ? "changes_published"
+            : "draft_saved",
+        id: offerId!,
+        isEdit: true,
+        slug: offer?.slug ?? null,
+        citySlug: offer?.place?.city?.slug ?? null,
+        offerKind: formData.offerKind,
+        offerDurationType: formData.durationType,
+        offerCampProgramType: formData.campProgramType,
+      });
     } catch (error: unknown) {
       console.error("Save draft error:", error);
-      toast.error(error instanceof Error ? error.message : "Ошибка сохранения");
+      const description =
+        error instanceof OfferMutationError ? error.description : undefined;
+      toast.error(error instanceof Error ? error.message : "Ошибка сохранения", description
+        ? { description }
+        : undefined);
     } finally {
       setIsSaving(false);
     }
@@ -492,29 +678,30 @@ export function OfferWizard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(createPayload),
         });
-        
-        if (!createResponse.ok) {
-          const errorData = await createResponse.json();
-          const errorMessage = errorData.message || errorData.error || "Failed to create offer";
-          throw new Error(errorMessage);
-        }
-        
-        const createData = await createResponse.json();
+
+        const createData = await parseOfferMutationResponse<{
+          id: string;
+          slug?: string | null;
+          place?: { city?: { slug?: string | null } | null } | null;
+        }>(createResponse, {
+          fallbackMessage: "Failed to create offer",
+          operation: "create offer",
+          payload: createPayload,
+        });
         setOfferId(createData.id);
-        
-        toast.success(
-          finalStatus === "PUBLISHED"
-            ? "Предложение опубликовано"
-            : "Предложение отправлено на модерацию",
-        );
 
         draft.markClean();
-
-        if (onComplete) {
-          onComplete(createData.id);
-        } else {
-          router.push(afterSubmitDestination);
-        }
+        showSuccessModal({
+          kind: "offer",
+          outcome: finalStatus === "PUBLISHED" ? "published" : "submitted",
+          id: createData.id,
+          isEdit: false,
+          slug: createData.slug ?? null,
+          citySlug: createData.place?.city?.slug ?? null,
+          offerKind: formData.productType === "ONE_TIME_ACTIVITY" ? "EVENT" : formData.offerKind,
+          offerDurationType: formData.durationType,
+          offerCampProgramType: formData.campProgramType,
+        });
         return;
       }
 
@@ -528,34 +715,37 @@ export function OfferWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatePayload),
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.message || errorData.error || "Failed to submit offer";
-        throw new Error(errorMessage);
-      }
 
-      toast.success(
-        canDirectPublish
-          ? "Изменения опубликованы"
-          : "Предложение отправлено на модерацию",
-      );
+      await parseOfferMutationResponse(response, {
+        fallbackMessage: "Failed to submit offer",
+        operation: "submit offer",
+        payload: updatePayload,
+      });
 
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
-
-      if (onComplete) {
-        onComplete(offerId);
-      } else if (mode === "create") {
-        navigateToCompatibleHref(router, afterSubmitDestination);
-      } else if (returnTo) {
-        navigateToCompatibleHref(router, returnTo);
-      } else if (surface === "admin") {
-        navigateToCompatibleHref(router, nav.afterSubmitListPath);
-      }
+      showSuccessModal({
+        kind: "offer",
+        outcome: canDirectPublish
+          ? isPublishedEditMode
+            ? "changes_published"
+            : "published"
+          : "submitted",
+        id: offerId,
+        isEdit: mode === "edit",
+        slug: offer?.slug ?? null,
+        citySlug: offer?.place?.city?.slug ?? null,
+        offerKind: formData.offerKind,
+        offerDurationType: formData.durationType,
+        offerCampProgramType: formData.campProgramType,
+      });
     } catch (error: unknown) {
       console.error("Submit error:", error);
-      toast.error(error instanceof Error ? error.message : "Ошибка отправки");
+      const description =
+        error instanceof OfferMutationError ? error.description : undefined;
+      toast.error(error instanceof Error ? error.message : "Ошибка отправки", description
+        ? { description }
+        : undefined);
     } finally {
       setIsSubmitting(false);
     }
@@ -580,6 +770,7 @@ export function OfferWizard({
       data: formData,
       onChange: handleChange,
       isEditable,
+      ctaStepEnabled,
     };
     
     switch (currentStepKey) {
@@ -601,6 +792,14 @@ export function OfferWizard({
         return <Step5Pricing {...commonProps} />;
       case "contacts":
         return <Step6Contacts {...commonProps} />;
+      case "faq":
+        return (
+          <FaqStep
+            kind="offer"
+            value={formData.faqItems}
+            onChange={(faqItems) => handleChange({ faqItems })}
+          />
+        );
       default:
         return null;
     }
@@ -640,9 +839,10 @@ export function OfferWizard({
       isComplete: effective[idx],
       // Кликабельны: completed-шаги, текущий и первый незавершённый
       isDisabled:
+        !isPublishedEditMode &&
         !effective[idx] && idx + 1 !== currentStepNum && idx !== firstIncompleteIdx,
     }));
-  }, [completedSteps, formData, steps, currentStepNum]);
+  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps]);
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
   const actionLabels = useMemo(() => {
@@ -668,14 +868,15 @@ export function OfferWizard({
         isReviewStep ? businessFormCopy.reviewStepShortTitle : stepTitle,
       );
 
+  const displayTitle = resolveDraftTitle(
+    formData.title,
+    businessFormCopy.offer.createTitle,
+  );
+
   return (
     <FormWizardShell>
       <FormWizardHeader
-        title={
-          mode === "create"
-            ? businessFormCopy.offer.createTitle
-            : businessFormCopy.offer.editTitle(offer?.title)
-        }
+        title={displayTitle}
         subtitle={subtitle}
         trailing={
           <SaveIndicator
@@ -768,6 +969,12 @@ export function OfferWizard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ContentSuccessModal
+        open={successModalOpen}
+        onOpenChange={setSuccessModalOpen}
+        state={successState}
+      />
     </FormWizardShell>
   );
 }

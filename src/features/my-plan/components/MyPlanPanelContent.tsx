@@ -28,6 +28,10 @@ export function MyPlanPanelContent({
     selectedPlanDate,
     setSelectedPlanDate,
     planItemsByDate,
+    scenarioStatusByDate,
+    planSummary,
+    planCountsByDate,
+    serverConfirmedPlanDates,
     todayIso,
     markSlotSaved,
     clearSlotSaved,
@@ -100,6 +104,12 @@ export function MyPlanPanelContent({
       selectedDate={selectedPlanDate}
       onChangeDate={setSelectedPlanDate}
       planItemsByDate={planItemsByDate}
+      scenarioStatusByDate={scenarioStatusByDate}
+      nearestPlanDate={planSummary?.nearestDate ?? null}
+      nearestPlanCount={planSummary?.nearestCount ?? 0}
+      nearestPlanItems={planSummary?.nearestItems ?? []}
+      plannedCountByDate={planCountsByDate}
+      serverPlanSnapshotConfirmed={serverConfirmedPlanDates.includes(selectedPlanDate)}
       todayIso={todayIso}
       onAddItemToPlan={markSlotSaved}
       childrenList={children.map((c) => ({ id: c.id, name: c.name, birthDate: c.birthDate }))}

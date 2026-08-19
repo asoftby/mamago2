@@ -1,0 +1,4782 @@
+# mamaGo 2.0 — DEV → PROD Readiness Checklist
+
+**This file is the single source of truth for taking the current mamaGo 2.0
+DEV environment to the first PROD deployment.** Claude Code, Codex, Cursor,
+and any other coding agent working in this repository on DEV → PROD readiness
+must read this file first and follow it.
+
+This document is separate from `docs/migration/prelaunch-checklist.md`
+(Project Phoenix — the WordPress-to-mamaGo content migration effort). That
+file covers a prior, largely-complete migration/RC track. This file covers a
+distinct, current concern: **is the mamaGo 2.0 DEV codebase, as it exists
+right now, safe and ready for its first PROD deployment.** Do not merge the
+two documents or their processes.
+
+---
+
+## RELEASE STATUS (update this block as work proceeds)
+
+```
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+
+Active task:        Task 17 (Final DEV → PROD Gate) — STATUS: `COMPLETE`
+                     (2026-08-13). All 7 phases green. VERIFIED_APP_SHA =
+                     `86154ddc`, DEV_IMAGE = `ghcr.io/asoftby/
+                     mamago2:dev-293`, digest
+                     `sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`.
+                     Task was initially BLOCKED (running DEV was on stale
+                     `dev-291`/`a9577c0c`, predating Task 16's security
+                     fixes) — owner manually deployed `dev-293` via
+                     Telegram; re-check confirmed
+                     RUNNING_DEV_REVISION == RELEASE_SHA, then Phases 3–7
+                     ran clean: Git gate clean, `prisma validate` clean
+                     (231 migrations, unchanged), `pnpm check:push` green
+                     (389/389 static pages), targeted Task 16 regression
+                     tests green, full DEV browser smoke green on the
+                     actual verified image (public/user flows fully
+                     exercised incl. a real end-to-end registration
+                     proving the register-rate-limit fix shipped; business/
+                     admin RBAC isolation confirmed live; mobile clean; zero
+                     hydration/500/redirect-loop/Google-Maps errors),
+                     deployment readiness cross-checked against the Task 15
+                     runbook (disk 7.1G free, not a collapse). **P0 = 0, P1
+                     = 0.** PROD deployment has **not** been performed —
+                     next step is owner-controlled, via Telegram, per the
+                     Task 15 runbook. Full evidence in Task 17's own entry
+                     below.
+Prior — Task 15.5 (BACKLOG-085 closure — pre-deploy backup live
+                     verification) — STATUS: DONE (2026-08-13). Live
+                     backup + disposable-DB restore both verified green;
+                     no code fix needed. Full detail in BACKLOG-085
+                     (`docs/engineering/backlog.md`).
+Prior — Task 16 (Final Release Safety Audit) — STATUS:
+                     COMPLETE. Read-only audit across all 7 areas
+                     (Security, Data Integrity, Core Business Logic,
+                     Performance/Cost, Failure Handling, SEO/Public
+                     Safety, Deployment Safety) found 4 confirmed new P1s:
+                     Next.js 16.2.9 (unpatched HIGH CVEs) → 16.2.11; sharp
+                     0.33.5 (HIGH libvips CVEs, processes user-uploaded
+                     images) → 0.35.3 (+ pnpm override so Next's own
+                     bundled sharp also patches); `/api/auth/register`
+                     missing rate limiting (unlike login/OTP) → added,
+                     matching the existing pattern; stack-trace leak in
+                     `business/places/[id]` PATCH error response → gated
+                     behind `NODE_ENV=development`, matching the sibling
+                     POST handler. All 4 fixed, tested (new integration
+                     test for the rate limit, full `pnpm build` green,
+                     `tsc`/`eslint`/`git diff --check` clean), committed
+                     (`ed9546aa`). 12 real P2/P3 findings filed as
+                     BACKLOG-087 through BACKLOG-098 (no duplicates of
+                     existing entries).
+Prior — Task 15 (Deployment & Rollback Readiness) — STATUS:
+                     COMPLETE. Full deploy/rollback runbook written
+                     (`docs/release/task15-deployment-rollback-runbook.md`).
+                     Owner-resolved deploy source: first PROD ships from
+                     `dev` (re-tagged `prod-N` in GHCR, no rebuild, no
+                     `dev`→`main` merge needed — `main` is 539 commits
+                     behind). Added `scripts/deploy/backup-remote-db.sh`
+                     (safe off-host DB backup; live end-to-end test still
+                     pending stable SSH, tracked BACKLOG-085). Rollback
+                     decision tree documents the confirmed limitation that
+                     redeploying the old app image is unsafe once pending
+                     destructive migrations are applied. Disk capacity
+                     re-confirmed (8.8G free/28G) with a cheaper fix than
+                     previously assumed: the physical disk already has
+                     ~70G unpartitioned — local LVM extension, not a cloud
+                     resize; reclassified P2 — mandatory prerequisite
+                     before full media/content migration or cutover, not a
+                     first-PROD-preview blocker (Task 15's own scope has no
+                     media/content migration step).
+Prior — Task 14 (Environment Parity / PROD Configuration) — STATUS:
+                     COMPLETE. All confirmed P0/P1 first-PROD config gaps
+                     closed and owner-smoked on deployed DEV: DEV/PROD
+                     isolation, first-PROD host/config (`prod.mamago.by`),
+                     auth cookie isolation (DEV `.dev.mamago.by`, preview
+                     PROD `.prod.mamago.by`), redirect/auth regression fixed
+                     (`81e2c852`) and re-smoked clean, OTP isolation, Telegram
+                     isolation, monetization env parity, Google browser key
+                     restrictions + Maps JS + Places API (New) + Map ID
+                     (`38c7b485`), legacy Places Autocomplete removed from
+                     release-critical flows, address-autocomplete visual
+                     polish (`a9577c0c`) owner-accepted. Final owner DEV
+                     smoke on deployed image `a9577c0c` (Docker Build & Push
+                     #291): GREEN across Place/Event/Routes/Google
+                     Console/auth. P0 = 0, P1 = 0. Full evidence in Task 14
+                     below. BACKLOG-080/081 (P3, non-blocking) remain OPEN.
+Prior — Task 13 (Monetization) COMPLETE (`177429d3`). Task 12 COMPLETE.
+Prior — Task 11 (Article Gallery) COMPLETE (`390fefeb` / DEV `dev-283`).
+Prior — Task 9 (Filters & Quick Access) — STATUS:
+                     COMPLETE. Owner-approved Events-first implementation is
+                     finished: fixed quick filters, code-owned typed semantics,
+                     ActivitySession/Minsk-time date execution, structured Free,
+                     effective Place geo, advanced age/format/district/metro,
+                     fail-closed Admin keys, unified count/reset, and recovery
+                     empty state. Nearby is hidden/ignored and BACKLOG-068 tracks
+                     real proximity. No migration/new Admin architecture. Tests,
+                     tsc, eslint, production build, and desktop/375px browser
+                     verification are green. Full evidence in Task 9 below.
+Prior — Task 8 (Schema.org / Structured Data) — STATUS:
+                     COMPLETE. Audit found no P0/P1 (see prior entry).
+                     Owner approved BACKLOG-063 + BACKLOG-064 as Task 8's
+                     minimal implementation scope (directly relevant to
+                     its Exit Criteria); BACKLOG-065 stayed explicitly
+                     deferred. Implemented: page-specific metadata
+                     (title/description/absolute canonical, reusing the
+                     existing city-listing pattern and the same
+                     `DISCOVERY_INTENT_CONFIG` template that already
+                     drives each page's own H1) for `/[city]/classes`,
+                     `/[city]/birthday`, `/[city]/routes`; added the
+                     approved 6 listing URLs to `sitemap.xml` (global
+                     `/routes`,`/blog`; per-city `/programs`,`/classes`,
+                     `/routes`,`/blog` — birthday excluded, not approved)
+                     and a `seoRobots`-noindex filter on the Place/Offer/
+                     Route/Event sitemap queries. A real bug (DB
+                     nominative city name producing ungrammatical "в
+                     Минск") was caught during browser verification and
+                     fixed before commit. 2 new test files, all green;
+                     `tsc`/`eslint`/`pnpm check:push` all clean; browser-
+                     verified locally. One new incidental P3 finding filed
+                     (BACKLOG-066, birthday page content — pre-existing,
+                     unrelated, not fixed). Full detail in Task 8's own
+                     section below.
+Prior — Task 7 (Day Scenario) CLOSED, STATUS: COMPLETE (owner decision,
+                     2026-08-12; not reopened for P2/P3 UX/cleanup
+                     findings). Accepted final state: standalone Scenario
+                     page, 3+ My Plan CTA, persistence/reopen, flexible
+                     time assignment, timezone-safe time handling
+                     (`localWallClockToUtc()`), effective-time consistency
+                     between My Plan and Scenario, category/meta cleanup,
+                     structured Scenario address, conflict detection,
+                     plan-changed reconciliation, ownership isolation, no
+                     Google Routes dependency. Full detail, including the
+                     owner-authored post-smoke fix commits (`49e7ef49`,
+                     `98eed7d3`, `56d2d8a4`), in Task 7's own OWNER CLOSURE
+                     entry below.
+Checklist corrected: 2026-08-12 by Codex — restored owner-approved Tasks 12
+                     and 13; renumbered the former Tasks 12–15 to 14–17.
+Last updated:       2026-08-13
+Last updated by:    Claude Code — Task 17 CLOSED COMPLETE. Final DEV → PROD
+                     gate: owner deployed `dev-293` to DEV via Telegram
+                     (resolving the initial BLOCKED state where DEV ran
+                     stale `dev-291`); re-verified match, then ran Git/
+                     Prisma/application/browser-smoke/deployment-readiness
+                     gates, all green, on the actual verified release
+                     candidate. DEV: VERIFIED, PROD:
+                     READY_FOR_MANUAL_DEPLOY. PROD has NOT been deployed —
+                     next step is owner-controlled via Telegram, per the
+                     Task 15 runbook.
+Prior — Claude Code — BACKLOG-085 CLOSED DONE. Live end-to-end
+                     test of `scripts/deploy/backup-remote-db.sh` against
+                     `dev-db-1` (real backup, checksummed, content
+                     verified) plus a restore test against a disposable
+                     throwaway local Postgres container (never DEV/PROD,
+                     never the local dev DB) — both green, no code fix
+                     needed.
+Prior — Claude Code — Task 16 CLOSED COMPLETE. Final release
+                     safety audit across all 7 areas; 4 confirmed new P1s
+                     found and fixed (Next.js CVEs, sharp CVEs, register
+                     rate limit, stack-trace leak), committed `ed9546aa`;
+                     12 P2/P3 findings filed (BACKLOG-087..098).
+Prior — Claude Code — Task 15 CLOSED COMPLETE. Deployment/
+                     rollback architecture audited, owner decided deploy
+                     source (`dev`, zero CI change), safe remote-DB backup
+                     script added, rollback limitations documented. No app
+                     code changed, no deployment performed.
+Prior — Claude Code — Task 14 CLOSED COMPLETE after owner-run
+                     final DEV smoke on deployed image `a9577c0c` (Docker
+                     Build & Push #291) was GREEN. Docs-only closure commit;
+                     no code change, no deploy.
+Prior — Claude Code — Task 6 (Article Actions) is CLOSED.
+                     Implementation (`d923e1f6`) shipped Save (Ideas/Plan,
+                     via the existing SaveActivityFlowAdaptive chooser) and
+                     Share (via the existing ShareModal) across all 5
+                     required surfaces (homepage journal row, /blog +
+                     /{city}/blog cards, standard Article detail, Breaking
+                     News detail, continuous reading), per the owner's
+                     canonical UX contract: cards = Heart only, detail/
+                     landing = Heart+text + Share+text. New `ArticleIdea`
+                     model + `PlanItem.articleId` (hand-written migration,
+                     applied to DEV). Bounded batch save-status endpoint
+                     built specifically to avoid Article-card N+1. Guest
+                     pending-action resume extended with "article". Test
+                     suite `test:article-actions` green; full local build/
+                     lint/typecheck gate green. Deployed-DEV smoke
+                     confirmed green by the owner — Task 6 closed
+                     COMPLETE (full detail in Task 6's own DEV SMOKE field
+                     below). After closure, the owner requested a narrow,
+                     UI-only visual refinement to the homepage Article
+                     card (5-card desktop rail sized like the Events row,
+                     Heart inset into the cover, real category metadata
+                     when present, tail artifacts removed) — 3 corrective
+                     commits (`e4a1b6bb`, `d8be9416`, `9decd216`), pushed to
+                     `dev`, do not reopen Task 6 (see Task 6 BACKLOG/NOTES).
+                     Owner deployed `dev-272` (built from `9decd216`,
+                     confirmed via SSH + image label). Targeted post-deploy
+                     visual verification on actual `https://dev.mamago.by`:
+                     green — Heart/category/no-tails/no-Share/interaction/
+                     mobile all confirmed on live DEV, no P0/P1 introduced
+                     (full detail in Task 6's BACKLOG/NOTES). Nothing left
+                     pending for Task 6.
+Prior task:         Task 5 — Content Analytics & Ranking (COMPLETE). Audit
+                     found a real,
+                     already-shared UserEvent-derived ranking engine
+                     (kudaDiscoveryFeed / classesDiscoveryFeed /
+                     planSuggestions, plus the real Boost model for paid
+                     Offer visibility) already meeting the task's exit
+                     criteria, alongside a confirmed PLAN_ADD/SAVE
+                     weight-ordering bug and a dead, conflicting second
+                     weight table. Owner narrowed scope to a formalize-and-
+                     correct-only change: fixed the weight ordering
+                     (PLAN_ADD now outranks SAVE), consolidated to one
+                     canonical weight table (`engagementWeights.ts`),
+                     retired the dead `discoverySignalWeights.ts` — no
+                     personalization, no new ranking layer, no ratings
+                     wiring, no Stories-rail changes. Implemented + 4
+                     targeted DB tests + committed (`d5b149bc`), audit/
+                     backlog docs committed (`33fdb234`), pushed, CI +
+                     Docker Build & Push green (`dev-270`), owner deployed.
+                     Deployed-DEV regression smoke green: Kuda feed ranks
+                     normally, Classes/Offers loads (genuinely 0 PUBLISHED
+                     Offers today, unrelated to this change), My Plan
+                     suggestions return real data via the corrected scoring
+                     function, Search unchanged, zero ranking-related
+                     errors (one unrelated, pre-existing, non-ranking
+                     console error investigated and ruled out as a
+                     regression — see Task 5 DEV SMOKE for detail).
+                     Ratings/reviews explicitly deferred to an optional
+                     future quality/trust layer per owner decision, updated
+                     in place as BACKLOG-041 (not duplicated). Prior
+                     session (Task 4 closure): fixed silent address data
+                     loss in the Event Wizard (`de4d694a`) and a
+                     pre-existing Docker build-arg gap affecting all Google
+                     Maps features (`5bd4371b`, `dev-269`) — full detail in
+                     Task 4's own section below.
+Unresolved P0/P1:   Tasks 1–17 CLOSED COMPLETE. **P0 = 0, P1 = 0.**
+                     BACKLOG-085 (the last P1) is CLOSED DONE. Task 17
+                     (final gate) is COMPLETE — Git, Prisma, application,
+                     DEV browser smoke, and deployment-readiness gates all
+                     green on VERIFIED_APP_SHA `86154ddc` /
+                     `ghcr.io/asoftby/mamago2:dev-293`.
+
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+
+PROD deployment has NOT been performed. Per this checklist's own §23 Stop
+Condition: do not start a new general audit, do not look for additional
+improvements, do not start on the backlog, do not expand this checklist.
+Hand readiness for manual PROD deployment to the project owner.
+```
+
+Do not hand-wave this block. It must reflect the actual current state of
+Tasks 1–17 below, not aspiration or memory of a prior session.
+
+---
+
+## 0. Purpose
+
+Not to reach a perfect codebase. To safely, quickly, and predictably bring
+the current mamaGo 2.0 DEV state to a condition suitable for the **first**
+PROD deployment. See §3 (Release Goal) and §4 (Release Readiness Is Not Code
+Perfection) below — these govern every decision made against this checklist.
+
+## 1. Source of Truth Priority
+
+When sources disagree, resolve in this order:
+
+1. Actual current repository state (code, schema, migrations, config —
+   read it, don't assume it).
+2. This file, `docs/release/dev-to-prod-checklist.md`.
+3. Other current project documentation (e.g. `CLAUDE.md`,
+   `docs/engineering/backlog.md`).
+4. The persistent engineering backlog (`docs/engineering/backlog.md`) for
+   anything not covered above.
+5. Old session/chat/prompt context — lowest priority, never authoritative.
+
+A past description of an implementation is never proof of current state.
+Before changing any functionality, verify the current implementation by
+reading it.
+
+## 2. Release Goal
+
+**SIMPLE → REUSE → MAINTAINABLE → CHEAP → SECURE.**
+
+Development toward first PROD should be optimally fast, simple, understandable,
+maintainable, safe, predictable, cheap in server/runtime cost, and cheap in
+external API usage — without unnecessary architectural complexity, without
+duplicating existing functionality, without endless refactoring, and without
+endless repeated verification. Do not overengineer for hypothetical future
+scenarios. Do not create a new model, service, abstraction, component,
+analytics pipeline, ranking engine, storage layer, or background job if the
+existing architecture can be safely extended instead.
+
+## 3. Release Readiness Is Not Code Perfection
+
+Release is not blocked on eliminating all technical debt. Once the mandatory
+release scope (Tasks 1–17) is satisfied, only problems that genuinely affect
+PROD safety or readiness get fixed. The following do **not** block PROD on
+their own: refactoring opportunities, architecture cleanup, cosmetic cleanup,
+legacy cleanup, code style, optional test improvements, future optimizations,
+nice-to-have UX, theoretical edge cases without real production impact, or
+technical debt that creates no release risk. All of these go to
+`docs/engineering/backlog.md`.
+
+## 4. Severity Model
+
+- **P0 — CRITICAL.** PROD is forbidden. Real security vulnerability, data
+  loss/corruption, broken authentication, broken authorization/data
+  isolation, a critical production flow not working, destructive migration
+  risk, unsafe deployment, missing critical infrastructure. Must fix before
+  PROD.
+- **P1 — HIGH.** Substantial, confirmed production risk. Must fix before
+  PROD.
+- **P2 — MEDIUM.** Does not block a safe first PROD. Goes to
+  `docs/engineering/backlog.md`; release process continues.
+- **P3 — LOW.** Cleanup / optimization / future improvement. Goes to backlog
+  if it has real value. Does not block PROD.
+
+An agent may never promote a P2/P3 to P0/P1 just because it wants to rewrite
+or improve an implementation. See §14 (New Finding Decision Flow) for how to
+classify a new finding.
+
+## 5. Checklist Freeze
+
+After creation, the main release scope (Tasks 1–17, their Exit Criteria, and
+the rules in this document) is **FROZEN**. A newly found task does not
+automatically become a new mandatory checklist item. First ask: *is it truly
+unsafe or wrong to go to first PROD without this?* If no → backlog. See §17
+(Checklist Immutability Rule).
+
+## 6. Backlog Routing Rule
+
+Every real engineering follow-up that does not block first PROD must be
+recorded in `docs/engineering/backlog.md` — never left only in chat, terminal
+output, an agent's final report, or a session's memory. If an agent says
+"can wait", "post-release", "doesn't block PROD", "technical debt",
+"cleanup later", "future improvement", or "nice to have" about something that
+is a real engineering task, it must go into the persistent backlog.
+
+P2/P3 findings never become a new release task, never extend an existing
+Exit Criteria, never start a new implementation project, never block marking
+a task `COMPLETE`, and never reopen a completed task. The backlog is expected
+to be non-empty before PROD — that is a normal release state.
+
+## 7. P0/P1 Scope Extension Rule
+
+Only a confirmed P0/P1 may extend release scope, and only when the agent
+records: (1) what was found, (2) which real PROD flow is affected, (3)
+severity, (4) why it is unsafe to defer, (5) the minimal necessary fix. An
+imperfect architecture, agent preference, a chance to write less code, a
+missing optional test, a theoretical risk without realistic impact, a chance
+to make something prettier, or the mere existence of legacy code are never
+by themselves grounds for P0/P1.
+
+A new finding may be added as a sub-item of an existing Task 1–17 only if the
+task's existing Exit Criteria cannot be met without it, or it is a confirmed
+P0/P1. Otherwise → backlog. Exit Criteria are never expanded after the fact
+for nice-to-haves.
+
+## 8. Completed Tasks Stay Closed
+
+A task marked `COMPLETE` is not reopened for P2/P3 findings — those go to
+backlog. Reopening a `COMPLETE` task is allowed only when a confirmed P0/P1
+means its Exit Criteria is no longer actually met. The reason for reopening
+must be recorded in that task's entry.
+
+## 9. AUDIT FIRST (mandatory for every task)
+
+Most functionality likely already exists, fully or partially. A checklist
+item does not mean "implement from scratch." Before touching application
+code, run a **read-only audit** and classify:
+
+- **EXISTING** — already implemented and usable.
+- **PARTIAL / BROKEN** — exists but is incomplete, broken, disabled,
+  unintegrated, or not production-ready.
+- **MISSING** — genuinely does not exist.
+- **DO NOT TOUCH** — already works, no change needed.
+- **IMPLEMENTATION SCOPE** — the minimal confirmed scope of change.
+
+Where relevant, check: components, APIs, routes, services, hooks, utilities,
+Prisma models, admin UI, public UI, business UI, analytics, ranking,
+migrations, tests, feature flags, related content types, legacy
+implementations.
+
+Working principle: **UNDERSTAND → FIND GAPS → MINIMAL SCOPE → IMPLEMENT.**
+Never rewrite working functionality without proven necessity.
+
+## 10. Status Model
+
+```
+TODO
+  ↓
+AUDIT_IN_PROGRESS
+  ↓
+AUDIT_COMPLETE
+  ↓
+IN_PROGRESS
+  ↓
+COMPLETE_PENDING_BROWSER_SMOKE
+  ↓
+COMPLETE
+```
+
+Also available: `BLOCKED`. If an audit confirms functionality is already
+fully implemented and working: `AUDIT_COMPLETE → VERIFY → COMPLETE`. A task
+existing in this list never implies mandatory code changes.
+
+## 11. One Main Task At A Time
+
+For core DEV → PROD work: one main functional task per pass. Do not run
+multiple overlapping tasks/worktrees at once unless scopes are genuinely
+independent, Git isolation is safe, changes don't overlap, and coordination
+overhead doesn't exceed the benefit. Do not create a worktree unless
+necessary.
+
+## 12. Commit Discipline
+
+Create an atomic commit after each logically completed and verified
+phase/section: `AUDIT → confirmed scope → implementation → targeted
+verification → atomic commit → next phase`. Commit when a phase is logically
+complete, understood, verified, leaves the repo in a working state, contains
+no foreign changes, and can be safely reverted. Do not commit after every
+line, after every tiny edit, after unverified state, or purely to inflate
+commit count. Prefer several small meaningful commits over one huge diff.
+
+## 13. Risk-Based Verification
+
+Do not turn development into endless identical checks.
+
+- **Small change** — targeted test, scoped lint/typecheck, `git diff
+  --check`, specific browser verification if relevant.
+- **Completed phase** — verify the affected flow: targeted tests,
+  integration tests, browser smoke, DB/query verification, security
+  verification, performance sanity check — only where relevant.
+- **Completed task** — run a sufficient task-level gate. Use `pnpm
+  check:push` when it's actually needed to confirm task completion. Do not
+  rerun a full heavy build after every small edit.
+- **Before PROD readiness** — a full final gate (Task 17) is mandatory.
+
+## 14. New Finding Decision Flow
+
+```
+FINDING
+  ↓
+Does this block a safe first PROD?
+
+YES — proven P0/P1  → minimal fix within current release scope
+NO  — P2/P3          → docs/engineering/backlog.md, continue original task
+UNCERTAIN            → short targeted investigation to determine severity
+                        (do not start implementation before severity is known;
+                        if significant PROD risk isn't confirmed → backlog)
+```
+
+## 15. Scope Creep Protection
+
+Do not let: Search audit → backend rewrite; Analytics → data platform;
+Ranking → ML platform; Schema audit → full SEO redesign; Security audit →
+full auth rewrite; Performance audit → global optimization campaign; gallery
+work → editor rewrite; Day Scenario → routing platform. Fix the confirmed
+task in the minimal reliable way.
+
+## 16. Simplicity / Server Cost / Security Evaluation
+
+For every task, weigh:
+
+- **Simplicity** — can it be solved with less code/fewer entities?
+- **Reuse** — does an existing implementation already cover this?
+- **Server cost** — does the change introduce N+1 queries, unnecessary DB
+  reads/writes, polling, heavy per-request computation, excessive analytics,
+  unnecessary or duplicate storage, expensive external API calls, Google API
+  overuse, unnecessary background jobs, unbounded datasets, or excess network
+  traffic?
+- **Security** — does it weaken authentication, authorization, RBAC,
+  validation, rate limiting, object ownership, data isolation, privacy,
+  input handling, secrets handling, or upload security?
+
+Given comparable outcomes, choose the simpler, cheaper, and more secure
+option.
+
+## 17. Checklist Immutability Rule
+
+After initial creation, this checklist's structure is considered approved.
+Without a separate explicit decision from the project owner, do not: add new
+main Tasks, remove existing Tasks, expand Exit Criteria with nice-to-have
+requirements, change the release philosophy, change the P0/P1/P2/P3 rules,
+change backlog routing, or turn this into a new planning document. Only
+operational updates are allowed: STATUS, AUDIT, GAPS, IMPLEMENTATION,
+COMMITS, VERIFICATION, DEV SMOKE, BLOCKERS, confirmed P0/P1, and links to
+backlog entries. This checklist is the operating system of the current
+release, not something to keep redesigning.
+
+## 18. Per-Task Progress Fields
+
+Every Task 1–17 below uses this compact template. Do not turn it into an
+agent diary.
+
+```
+STATUS:        <one of the Status Model values>
+AUDIT:         EXISTING / PARTIAL / MISSING — short findings
+GAPS:          what actually remains
+IMPLEMENTATION: minimal accepted scope
+COMMITS:       SHA(s) of completed phases
+VERIFICATION:  checks actually performed
+DEV SMOKE:     result of user-facing verification
+BLOCKERS:      only real blockers
+BACKLOG/NOTES: links to non-blocking follow-up
+```
+
+---
+
+# PART I — PRODUCT READINESS
+
+## TASK 1 — Import Images Into DEV
+
+Priority: `P0 — PROD BLOCKER`
+
+STATUS: `COMPLETE`
+AUDIT:
+EXISTING — `MediaAsset`/`MediaUsage` model, storage abstraction
+(`src/server/media/media-storage.ts`, env-overridable `MEDIA_STORAGE_ROOT`),
+public serving routes (`/api/media/[filename]`, `/api/media/file/[...path]`),
+upload pipeline. Real WP-image import pipeline proven end-to-end:
+`PlaceMediaSyncer` (download → checksum/lineage dedup → `MediaAsset` +
+`PlaceImage`, idempotent, never deletes rows, URL+lineage-keyed reuse) and
+`EventMediaSyncer`, both driven by `scripts/migration-commit-wordpress-db.ts`
+(`--entity place|event --media-policy FULL --limit N --context-config
+<path> --confirm-writes`, WP SSH read-only via `--allow-remote-readonly`).
+`--media-policy FULL` explicitly overrides the LOCAL/DEV sampled-policy gate
+(`shouldSampleMedia()`/`resolveSampledMediaPolicy`) with **no code change
+needed** — confirmed by direct code read of
+`scripts/migration-commit-wordpress-db.ts:339-343,605-668`. DEV Postgres
+(`mamago2-db`, port 5433) + `storage/uploads` (542 files, 43MB) already hold
+real migrated + admin-uploaded media (181 `MediaAsset` rows, all ACTIVE, 0
+orphans). Place/Route/RouteStop/Event/Offer card+detail components already
+render missing images gracefully (placeholder or omitted block, confirmed
+via `MediaCover`, `RouteDetailClient`, `OfferCard`, `mapOfferPageMedia.ts`
+`og-default.jpg` fallback) — no broken `<img>` anywhere today.
+PARTIAL — Place: only 5/83 have gallery images (3 sample WP keys + place 437
+partial + one more); 78 clean Places are METADATA-only (no images) purely
+because of the LOCAL/DEV 9-key sample allowlist, not a pipeline defect.
+Event (Activity, all 10 are type EVENT): 5/10 have `coverImageId`, 1/10 has
+gallery, same sample-allowlist cause. Article: 9/26 have `coverImageId`,
+9/26 have ≥1 inline image block, 1/26 has a gallery block — remaining gap is
+documented as source-side (`PASS_WITH_DOCUMENTED_SOURCE_MEDIA_GAPS`), not a
+pipeline defect.
+MISSING — Offer: 0/63 (all PUBLISHED) have `coverImage`/`galleryImages`; no
+`OfferImage` table, no delegate; `--entity offer --media-policy FULL` is
+hard-blocked in code (`migration-commit-wordpress-db.ts:261`). This is a
+**deliberate founder decision** (`prelaunch-checklist.md` line 1040:
+"Founder decision (applied 2026-07-29): Offer media Option B, explicit P1
+defer"), applied only after fixing a real defect (broken 49-byte
+`og-default.jpg` placeholder → real 1200×630 JPEG) so Offers already render
+cleanly with a graceful fallback everywhere. Not reopened here — see
+`docs/engineering/backlog.md` BACKLOG-015.
+DO NOT TOUCH — Route/RouteStop media (small entity count, already renders
+gracefully with no images; import for these is a separate historical
+`ROUTE_STOP_MEDIA_POLICY_METADATA_SKIPPED` decision, not required for Task 1
+exit criteria). `MediaAsset`/storage/serving layer itself — works, not
+touched.
+GAPS: Event, Article, and Place gaps closed this session (see VERIFICATION).
+Event/Article used the existing importer's narrow, hash-gated replay paths
+unmodified. Place required one narrow, scoped addition (see IMPLEMENTATION)
+after the original `--force-reprocess` path was found systemically blocked
+(BACKLOG-016, now resolved). Route/RouteStop gap (13/14 Routes, 80/90
+RouteStops without media) remains open: no safe replay path exists yet
+(BACKLOG-017) — reviewed for severity and confirmed **not** P0/P1 (small,
+secondary entity, already renders cleanly with no broken images, not one of
+the core main sections) — does not block this task's Exit Criteria. Offer
+gap (0/63) remains open by a pre-existing, unrelated founder P1-defer
+decision (BACKLOG-015) — Offers render cleanly via an approved fallback.
+IMPLEMENTATION: Owner approved the write phase (2026-08-07), then explicitly
+directed resolving the Place blocker as in-scope Task 1 work rather than a
+deferred backlog item. No changes to `classifyPlaceUpdateSafety()` (the
+generic Place UPDATE conflict guard stays fully intact, protecting the real
+content-commit path). Added one narrow, explicit CLI path,
+`--force-place-media-replay` (`src/lib/migration/runtime/
+placeMediaOnlyReplay.ts`, wired into `scripts/migration-commit-wordpress-db.ts`,
+commit `32be8beb`), that calls `PlaceMediaSyncer.sync()` directly —
+bypassing the conflict gate only for this path, which is safe by
+construction because `PlaceMediaSyncer` structurally never writes to the
+`Place` row (only `PlaceImage`/`MediaAsset`/`MigrationLineage(MEDIA_ASSET)`),
+confirmed by reading the class and empirically (byte-identical `Place` row
+diff, including `updatedAt`, before/after). Identity/mapping is verified via
+active `PLACE` `MigrationLineage` + a live WP fetch before any write, same
+posture as the existing Event/Article replay guards. Targeted tests added
+(`placeMediaOnlyReplay.test.ts`, 16 cases, all pass); `tsc --noEmit` and
+`eslint` clean on all changed/new files.
+For Events/Articles: `pnpm migration:commit:wordpress-db --entity event
+--force-media-reprocess --media-policy FULL --source-record-key <key> ...`
+and `--entity article --force-article-media-replay --media-policy FULL
+--media-owner-user-id <id> --source-record-key <key> ...`, both pre-existing
+hash-equality-gated single-record replay paths, unmodified.
+COMMITS: `bf5a1557` (audit docs), `f1d1505d` (write-phase results + two
+blockers), `32be8beb` (Place media-only replay code + tests). Write-phase
+DB/storage changes are DEV data operations, not source-controlled — see
+VERIFICATION below for proof.
+VERIFICATION:
+Event — all 10 source-eligible Activities attempted (5 already had a cover
+from a prior session): 4 newly `APPLIED` (real download → `MediaAsset` +
+`Activity.coverImageId`/`ActivityImage` → verified public URL 200 → verified
+present in server-rendered HTML), 1 `FAILED` (source WP post no longer
+published — real source-side gap, not a pipeline defect). Net: 9/10 Events
+now have a cover (was 5/10). Idempotency proven: re-running an already-
+synced key returns `NOOP_ALREADY_SYNCED`, 0 new writes.
+Article — 17 candidate Articles (of 26 total, all missing a cover)
+attempted: 4 `APPLIED` (3 got a new cover + inline images, 1 got inline
+images only because its own WP source has no featured image — real source
+variance, not a defect), 7 `FAILED` (source WP attachment rows genuinely
+gone, `ARTICLE_MEDIA_ATTACHMENT_MISSING`, article left fully untouched per
+fail-closed design), 6 `REFUSED` (`ARTICLE_MEDIA_REPLAY_CONTENT_DIVERGENCE`
+— live WP content no longer matches DB `contentJson`, i.e. the article was
+edited after import; replay correctly refused rather than risk overwriting
+an editorial change). Net: 12/26 Articles now have a cover (was 9/26); one
+verified sample rendered 30 real inline+cover image URLs server-side, all
+200. Idempotency proven the same way (`NOOP_ALREADY_SYNCED` on rerun).
+Place — initial attempt with the generic `--force-reprocess --media-policy
+FULL` path on 3 representative clean source keys
+(`wordpress-db:places:5457/5492/5515`) failed identically with
+`PLACE_UPDATE_CONFLICT: TARGET_MODIFIED_AFTER_IMPORT` — root-caused to the
+2026-07-29 mass Place publication session's value-neutral `updatedAt` bump
+(BACKLOG-016). Audited 3 representative blocked Places field-by-field
+against a fresh WP-source preview: confirmed the source-content hash itself
+is unchanged (preview action: `SKIP_UNCHANGED`) but DB state has genuinely
+drifted from the original import in places (one had a manually-edited
+`customAddress`/`formattedAddr` = "Test address"; two had slug spelling
+drift from a transliteration-library change) — proving the conflict guard
+is correctly protecting real, if minor, divergence, not just noise. Built
+`--force-place-media-replay` (see IMPLEMENTATION), which sidesteps this
+safely because it never touches any content field regardless of whether
+content drifted. Golden proof: 3 records (5457/5492/5515) — full chain
+verified (WP source → download → `storage/uploads` → `MediaAsset` →
+`PlaceImage` → public `/api/media/file/...` URL → 200 → rendered in
+server HTML at the canonical `/places/{slug}` URL, confirmed via Browser
+pane screenshot, desktop + mobile 375×812, 0 console errors); `Place` row
+byte-identical before/after including `updatedAt` (`diff` exit 0); 0
+duplicate `PlaceImage` rows; rerun of all 3 returned `NOOP_ALREADY_SYNCED`
+with 0 new writes. Full batch: remaining 65 clean Place source keys with
+real source media — 58 `APPLIED`, 7 `NOOP_ALREADY_SYNCED`, 0 `PARTIAL`, 0
+`REFUSED`, 0 hard failures. Net: Place gallery coverage 5/83 → **68/83**.
+The 15 remaining have no source media at all or are the 1 non-WP-origin
+Place (verified by cross-checking against the source preview's
+`mediaRefCount`) — not closable by this or any importer.
+Route/RouteStop — not attempted (unchanged from audit). `RouteCommitRunner`
+has no Place-style conflict guard and no narrow media-only replay path
+exists — running the generic `--entity route --media-policy FULL` path
+carries an unverified risk of silently overwriting Route content (see
+BACKLOG-017). Reviewed for severity per Task 1 Exit Criteria: **not**
+P0/P1 — see BACKLOG-017 for the recorded reasoning. All 14 Routes/90
+RouteStops confirmed rendering cleanly with no broken images (code-read
+verified, `RouteCard`/`RouteDetailClient` fallbacks) — accepted as-is for
+this release.
+Offer — untouched, as decided (pre-existing, BACKLOG-015).
+Storage/DB deltas (full session, before → after):
+`MediaAsset` 181 → 1073, `storage/uploads` 542 files (43MB) → 3327 files
+(316MB), `ActivityImage` 4 → 11, `PlaceImage` 51 → 478 (+427, all via the
+new replay path). No duplicate `MediaAsset` rows possible (`storageKey` has
+a DB `@unique` constraint); no duplicate `PlaceImage` rows found (checked
+directly); no orphan files/rows found in the pre-write-phase DB-vs-disk
+filename diff.
+DEV SMOKE: Targeted, via the Browser pane against the running DEV server
+(not the full Task 17 site-wide smoke). Place detail
+(`/places/kofta-na-pr-t-mira-1`, then `/places/malberri-klab-mulberry-club`):
+gallery of real photos renders correctly on desktop and mobile (375×812),
+breadcrumb/address/CTA all correct, 0 relevant console errors. Article
+detail (cover + inline gallery, 30 image URLs verified present and 200) and
+Event detail (`immersivnaya-vystavka-neboreka-planeta-posle-shuma`, new
+cover renders) both confirmed via screenshot — clean, no broken images. One
+transient burst of `ERR_CONNECTION_REFUSED` was observed on a page load
+that coincided with the heavy background batch script + a webpack
+recompile; confirmed non-reproducing (immediate reload succeeded, and a
+`read_network_requests` check showed the same resources retried
+successfully to 200) — not a real defect, not the DEV app's normal
+behavior.
+BLOCKERS: none — prior ACTUAL-DEV target discrepancy resolved this session
+(see VERIFICATION addendum below). Task 2 was not started.
+ACTUAL DEV VERIFICATION (2026-08-07, Cursor — closes Task 1):
+Physical host `ubuntu` at `134.17.17.134` (DNS for `dev.mamago.by`; SSH alias
+on this Mac is still named `mamago-prod` — name is misleading, not used as
+environment proof). Traefik routes `Host(dev.mamago.by|admin.dev.mamago.by|
+business.dev.mamago.by)` → compose project `dev` / container `dev-app-1`
+(`ghcr.io/asoftby/mamago2:dev-259`). Same host also runs isolated PROD stack
+`prod-app-1` / `prod-db-1` for `prod.mamago.by` — never written.
+DEV DB: Postgres `dev-db-1`, database/user `devmamago`, volume
+`dev_db_dev_data`. DEV storage: Docker volume `dev_mamago2_storage` →
+`/app/storage` in `dev-app-1` (distinct from `prod_mamago2_storage`).
+PROD isolation proof (read-only after import): PROD `PlaceImage=0`,
+`MediaAsset=0`, article/event covers=0, PROD storage ~12KB / 0 upload
+files. Deployed DEV image lacks the newer local replay CLI sources; import
+ran from this Mac against DEV via SSH tunnel to `dev-db-1:5432` + staged
+`MEDIA_STORAGE_ROOT` synced into `dev_mamago2_storage` only (no app deploy,
+no PROD touch). WP source `134.17.16.78` reachable from Mac (not from DEV
+host TCP/22).
+Before (actual DEV): Place 80 / PlaceImage 0 / MediaAsset 2 / Article 26
+(0 covers) / Event 8 (1 cover) / storage ~6 files ~192KB.
+Place proof (5 unique-lineage keys 5492/5515/63360/10343/10370): APPLIED;
+Place business fields byte-stable including `updatedAt`; public media 200;
+canonical `/places/{slug}` HTML contains gallery URLs; rerun
+`NOOP_ALREADY_SYNCED`. Skipped duplicate active lineage
+`wordpress-db:places:5457` (two Place rows) — non-deterministic
+`findFirst` target.
+Place full unique-lineage remaining 73: APPLIED 57, NOOP 6,
+SOURCE_MEDIA_MISSING 10 (genuine; not forced). Net Place gallery coverage
+**64/80** with images; PlaceImage **445**; skipped-without-media / no
+unique lineage remain as documented gaps.
+Event: 3-proof then full 8 — APPLIED/NOOP covers → **6/8** with cover;
+2 WP posts no longer published; 1 existing cover refused
+`EVENT_MEDIA_ONLY_TARGET_MEDIA_DIVERGENCE` (safety correct). Idempotent
+rerun `NOOP_ALREADY_SYNCED`. Note: several Events have `cityId=null`, so
+`/{city}/events/{slug}` shows "Событие не найдено" even though cover
+`MediaAsset` public URL returns 200 — pre-existing routing/data gap, not
+an importer defect (P2 residual).
+Article: actual DEV corpus differs from prior local DB. Proof 3 APPLIED
+(title/slug/status/author unchanged); idempotent `NOOP_ALREADY_SYNCED`.
+Remaining without cover 23: APPLIED 9, CONTENT_DIVERGENCE 5 (refuse —
+preserve edits), IMPORT_INCOMPLETE/missing attachments 9 (article left
+untouched). Net **10/26** Articles with `coverImageId`. All DEV Articles
+remain `PENDING`, so anonymous `/api/media/file/...` correctly returns
+`access denied` for article-only media; Place/Event published linkage
+serves 200. Admin media library query (`getAdminMediaList`) has **no**
+filter excluding `sourceType=MIGRATED`; DEV now has **1055 MIGRATED + 2
+ADMIN_UPLOAD** ACTIVE `MediaAsset` rows — visibility gap was empty-target
+data, not a query bug. Admin UI itself not browser-logged-in (auth wall).
+After: MediaAsset **1057**, PlaceImage **445**, storage uploads **3326**
+files / **~321MB** on `dev_mamago2_storage`.
+DEV SMOKE (actual `https://dev.mamago.by`, Browser): Place detail+gallery
+desktop and mobile 375×812 for Mulberry Club and «Кофта» на Мстиславца, 2 —
+images render, naturalWidth>0, HTTP 200, usable layout. Event city page
+not found (cityId null). Article public pages not applicable while
+PENDING. Media library: data/query-level OK; UI needs admin session.
+BACKLOG/NOTES: BACKLOG-015 unchanged. BACKLOG-016 DONE and re-proven on
+actual DEV via `--force-place-media-replay`. BACKLOG-017 unchanged P2.
+BACKLOG-018 root cause resolved this session (safe actual-DEV access path
+documented + used) — status updated in `docs/engineering/backlog.md`.
+Non-blocking residuals (P2): Event `cityId=null` public routing; duplicate
+Place lineage `places:5457`; SSH alias `mamago-prod` naming for the DEV IP;
+Articles remaining PENDING / source-attachment gaps; orphan migrated
+MediaAssets without entity link (BACKLOG-021).
+
+METADATA FOLLOW-UP (2026-08-08, Cursor — audit then metadata-only backfill;
+does **not** reopen Task 1 Exit Criteria / binary import):
+AUDIT verdict — **not UI-only**. Admin «Файл» shows
+`effectiveMetadata.title || displayFilename`; many stored `title` values
+were raw WP `post_title` (camera/hash/numeric). Importer never set
+`alt`/`caption`; `MediaUsage` was not created for migrated links, so
+admin auto-gen could not help. `originalName`/`filename`/lineage correctly
+preserved. Public Place gallery already uses place `title` as `<img alt>`
+(`mapPlacePageMedia`) — independent of MediaAsset.alt.
+EXISTING: meaningful WP titles kept (e.g. Mulberry «…02»); lineage +
+originalFilename preserved; Place public alts already semantic.
+BROKEN/MISSING (pre-backfill): alt/caption null on migrated assets;
+technical titles where WP post_title was technical; 0 MediaUsage on
+migrated links.
+SAFE BACKFILL: `pnpm media:backfill-migrated-metadata` — metadata +
+MediaUsage only; no binary/storage/entity content writes; preserves
+non-empty alt/caption and meaningful titles; orphans without discoverable
+entity link left unchanged (BACKLOG-021). Eligible linked set after
+extend discovery (Place gallery, Event cover/gallery, Article
+cover/seo/content): **699/1055** with alt + usage; full rerun
+`SKIP_UNCHANGED` / usageAlready. Samples: Place Mulberry title kept +
+alt filled; Event Nebo.Reka title decoded + alt; Article Pets Fest cover
++ inline semantic titles; `originalName` unchanged; Mulberry file
+`content-length` still 65336 (= `sizeBytes`).
+
+AUDIT FIRST the existing media migration/import architecture and the real
+DEV state. Check: MediaAsset, storage, media linkage, existing import
+scripts, Places, Articles, Offers, Services, Programs, Routes, RouteStop,
+profile/business media (if in migration scope), public media access, broken
+URLs, fallback, cards, detail pages, galleries, mobile, desktop. Must check:
+idempotency, duplicate media, repeated downloads/imports, duplicate storage,
+network cost, server cost. Do not create a new importer if the existing one
+can be safely used/finished.
+
+**Exit Criteria:** DEV contains a sufficient production-like media dataset
+for a full visual smoke of the main sections.
+
+## TASK 2 — Search Ranking
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT:
+EXISTING — Real, live public search: `SearchDocument` (Prisma model,
+`entityType|entityId|title|searchText|summaryLine|metaLine|imageUrl|urlPath|
+isPublished|boost|updatedAt`, unique on `[entityType,entityId]`, indexed on
+`isPublished`) is the actual search index, kept current by
+`SearchIndexerService`/`prismaSearchExtension.ts` (Prisma Client Extension
+firing on every `activity/offer/place/route/article` write) and per-entity
+builders under `src/lib/search/builders/`. Public endpoint
+`src/app/api/search/route.ts` (`GET /api/search?q=&limit=&cityId=`) queries
+`SearchDocument` with a case-insensitive substring match, orders by
+`boost desc, updatedAt desc`, live-enriches `activity` results from current
+DB state, and fire-and-forget logs every query to `SearchQueryLog` via
+`src/lib/search/logSearchQuery.ts`. UI: `SearchOverlay`/`SearchInput`/
+`SearchResults`/`SearchResultItem` (desktop) + `MobileSearchSheet`/
+`MobileSearch*` (mobile), 250 ms debounce, both wired to the same endpoint.
+Ranking is a real, understandable, deterministic formula: hardcoded
+per-entity-type multiplier in `src/lib/search/constants.ts`
+(`SEARCH_BOOST = {activity:1.25, offer:1.15, place:1.1, route:1.0,
+article:0.85}`) applied as `SearchDocument.boost`, tie-broken by recency
+(`updatedAt desc`). No hidden/dynamic scoring — fully predictable.
+Zero-result demand is already fully detectable: `SearchQueryLog`
+(`query|resultsCount|clickedEntityId?|cityId?|userId?|sessionId?|createdAt`,
+indexed on `query`, `resultsCount`, `[query,resultsCount]`, `createdAt`) is
+written on every real search; `GET /api/admin/search/zero-results`
+(admin-only, `src/app/api/admin/search/zero-results/route.ts`) does a
+bounded (`parsePaginationParams`, capped `limit`), parameterized
+(`$queryRaw` tagged template — no injection risk) `GROUP BY query WHERE
+resultsCount=0` aggregation with a working `/admin/search/zero-results` UI.
+Admin cannot arbitrarily break organic ranking: confirmed as already true,
+found and fixed by a **prior 2026-08 audit session** (self-documented in
+code comments, not this session's work) — `RankingSettings`/`BoostSettings`
+(`/admin/ranking/weights`, `/admin/ranking/boost`) and the separately
+modeled `SearchRankingSettings` (`/admin/search/ranking`) are two
+independent duplicate ranking-weight systems, **neither read by any
+production ranking code** (confirmed again this session by re-reading
+`src/lib/search/constants.ts` and both admin handler files end-to-end); both
+are locked to HTTP 403 on every mutation with an explicit Russian-language
+"does not affect production ranking" banner in the admin UI. `StoryIntentConfig`
+(today/tomorrow/weekend/breaking_news/free story-rail intents, unrelated to
+the search text box) is real, live, and correctly admin-editable with
+optimistic-concurrency (`updatedAt` check) + audit logging
+(`logAdminAudit`). RBAC verified correct: `isRankingAdmin` requires
+ADMIN/MODERATOR, `isSearchRankingAdmin` and the zero-results route require
+ADMIN, all checked before any DB read/write.
+PARTIAL/BROKEN — Confirmed via a representative golden-set evaluation
+against real DEV data (`https://dev.mamago.by`, read-only, Browser pane):
+(1) **Word-order-sensitive matching (the real, significant gap — fixed this
+session, see IMPLEMENTATION)**: the single `contains` substring match meant
+a query only matched if its exact character sequence appeared in the
+indexed blob — e.g. `q=балет три поросенка` matched, but the equally
+natural `q=три поросенка балет` and `q=детский сад` (target contains
+"детский" and "сад" separately, not adjacent) returned **zero** results
+even though every individual word was present. This affects ordinary
+Russian-language queries, not just edge cases. (2) Transliteration/wrong
+keyboard layout/typo tolerance genuinely do not exist (`q=teatr`,
+`q=ntfnh`, `q=театор`, `q=мулберри` all → 0 results against a corpus that
+has an obvious real match for each) — real but lower-severity, deferred,
+see GAPS/BACKLOG. (3) `SearchQuickTag`/`SearchSynonym` admin CRUD exist but
+have zero runtime consumers; `/admin/search` overview page shows hardcoded
+mock stats; `SearchIndexRecord`/`indexManager.ts`/`/admin/search/index`
+dashboard reads a table nothing populates (the real index is
+`SearchDocument`, unaffected) — all inert admin-surface debt, not
+production-search-breaking.
+MISSING — No seasonal-boost subsystem (confirmed not needed: existing
+`StoryIntentConfig` + `SEARCH_BOOST` already cover the real product need at
+this scale, per the task's own "do not build a separate seasonal subsystem
+if existing intents/settings suffice" guidance). No `PopularQuery`/
+`FrequentQuery`/`ZeroResult` dedicated models — not needed, `SearchQueryLog`
+already derives both ad hoc and cheaply.
+DO NOT TOUCH — `SearchIndexerService`/`prismaSearchExtension.ts`/builders
+(real, live, correct); `SearchQueryLog` + zero-results admin flow (real,
+live, correctly bounded/parameterized); `StoryIntentConfig` +
+`/admin/ranking/stories-intents` (real, live, correctly audited);
+`SEARCH_BOOST` ranking formula (simple, predictable, adequate at current
+catalog size — no proven need for a more complex/dynamic model); the
+already-locked `RankingSettings`/`BoostSettings`/`SearchRankingSettings`
+read-only guard (correctly prevents admin from silently believing they
+affect ranking — do not re-enable without first wiring them to real
+scoring, per the existing code comments).
+IMPLEMENTATION SCOPE: fix the confirmed, reproducible word-order matching
+gap with the minimal safe change — split the query into whitespace tokens
+and require each token to match independently (AND) instead of one
+whole-string substring match; single-token queries are byte-for-byte
+unchanged (no regression). Add a bounded query length (200 chars) and token
+count (10) cap as cheap, low-risk input hardening (previously unbounded).
+No schema change, no new engine, no new dependency, reuses the exact same
+`SearchDocument`/Prisma query shape.
+
+GAPS: Transliteration/keyboard-layout/typo tolerance (BACKLOG-022), mock
+admin search-overview stats (BACKLOG-023), dead
+`SearchIndexRecord`/`SearchQuickTag`/`SearchSynonym`/debug-route
+scaffolding (BACKLOG-024), uncalled `logSearchClick()` (BACKLOG-025) — all
+confirmed real via this audit, none block Task 2 Exit Criteria, all routed
+to backlog per §14/§24 (none is a proven P0/P1: search already works
+reliably for the word-order-corrected common case, ranking is already
+predictable, admin already cannot break organic ranking).
+IMPLEMENTATION: `src/app/api/search/route.ts` — added `buildSearchTextWhere()`
+(AND-of-tokens for multi-word queries, unchanged single-`contains` for
+single-token queries) and `MAX_QUERY_LENGTH`/`MAX_QUERY_TOKENS` caps. No
+other files changed; no migration; no admin/API surface added.
+COMMITS: `<see git log — code fix + test>`, `<see git log — checklist/backlog
+closure>` (recorded below after commit).
+VERIFICATION: New targeted test
+`src/app/api/search/route.test.ts` (self-contained fixture, created/torn
+down within the test, real local dev DB) — 5 cases: out-of-order multi-word
+query matches, single-token query unaffected (no regression), a token
+genuinely absent from the document correctly excludes it (AND, not OR),
+oversized query (5000 chars) handled gracefully, 50-token query handled
+gracefully. All pass (`npx tsx src/app/api/search/route.test.ts` →
+`/api/search word-order tests: OK`). `npx tsc --noEmit` clean. `npx eslint
+src/app/api/search/route.ts src/app/api/search/route.test.ts` clean.
+Performance/security sanity: `SearchDocument` corpus is small (~276
+published entities across all 5 types per Task 1 counts) so the added
+`AND` of `contains` clauses is still a single cheap sequential scan, no
+index needed at this scale (noted as a P3 forward-looking item only, not
+current risk); zero-results/admin routes already bounded and parameterized;
+RBAC on all admin search/ranking routes verified correct; no new dependency
+or external API call introduced.
+DEV SMOKE: **Complete — verified live on actual `https://dev.mamago.by`
+after owner Telegram deployment (2026-08-08).** Deployed-version evidence:
+no public SHA/build header is exposed (`/api/health` → `{"status":"ok",
+"db":"ok"}`, no version field; `/admin/system/build` correctly redirects to
+login, not bypassed per instruction) — proof is therefore **behavioral**:
+the word-order fix (which provably did not exist in the pre-deploy image —
+reproduced broken in this same task's earlier phase) is now live, which is
+only possible if `7dc3a285`'s image is what's actually serving traffic.
+Golden-set queries via direct `/api/search` fetch against real DEV:
+`балет три поросенка` → 200, ["С. Кибирова балет «Три поросенка»"] ✓;
+`три поросенка балет` (reordered — the critical regression case) → 200,
+same single correct result ✓ (previously 0 results, confirmed broken
+earlier this session); `детский сад` (multi-word) → 200, 4 relevant results
+(previously 0) ✓; `три поросенка` (exact/short) → 200, correct result,
+unregressed ✓; `малберри` → 200, correct results, unregressed ✓;
+`asdkjfhaskdjfh9182z` (zero-result) → 200, `[]`, no 500 ✓. Desktop UI: typed
+`три поросенка балет` into the real `SearchOverlay` at 1280×720 — correct
+result card rendered, clicking it navigated to
+`/minsk/events/s-kibirova-balet-tri-porosenka` and the Event detail page
+loaded correctly (title, date, price, cover image). Zero-result UI: typed
+`asdkjfhaskdjfh9182z` — clean "Ничего не найдено / Попробуйте изменить
+запрос" empty state, no crash. Mobile UI (375×812, `MobileSearchSheet`):
+opened the sheet (`MobileSearchEntry` → `Поиск` full-screen panel) and
+typed `три поросенка балет` (via a direct DOM `input`/`change` event
+dispatch — the Browser pane's coordinate-based `computer` click tool hit a
+transient timeout specifically on this full-screen sheet transition,
+reproduced on both the original and a fresh tab; confirmed to be a
+tool-delivery quirk, not an app defect, since the same button's native
+`.click()` DOM call — a faithful simulation of a real click — opened the
+sheet correctly and the console showed no error either time) — same
+correct single-result card rendered, no layout break. `read_console_messages`
+on both desktop and mobile passes showed **no new errors**, only the same
+pre-existing, unrelated guest-session 401s from `/api/save/status` (present
+before this session's changes, confirmed via `read_network_requests` —
+nothing to do with search). No `/api/search` request returned non-200 on
+either viewport. Cheap regression sanity: Place
+`/minsk/places/malberri-klab-mulberry-club` (imported gallery, Task 1 work)
+renders its full gallery (9 images, 6 shown + "+6") with all
+`/api/media/file/...` requests returning 200 — no regression from the
+pushed stack. `/admin/media` correctly redirects to login when
+unauthenticated (not bypassed, per instruction) — Admin pagination check
+not performed (no authenticated session naturally available), not treated
+as a blocker per instruction not to spend time bypassing auth.
+BLOCKERS: none — resolved. Prior blocker (fix unverified on actual DEV)
+closed by this session's post-deploy read-only smoke.
+
+**Git Release Safety — Pending DEV Update (2026-08-08, read-only check,
+no push/deploy performed):** branch `dev`, local HEAD `7f7cc66d`.
+`git fetch origin dev` → `origin/dev` = `2ecebe1b`, which is the exact
+merge-base with local `dev` — i.e. a **clean fast-forward**, local `dev` is
+12 commits ahead of `origin/dev` with zero divergence/conflict risk. Those
+12 local-only commits (oldest→newest: `5c76bc85` checklist creation through
+`7f7cc66d` this Task 2 closure) are all legitimate prior-session Task 1 +
+admin-pagination + Task 2 work — nothing unexpected. `git status --short`:
+only `next-env.d.ts` (known foreign, untouched) and this checklist file
+(this status-correction edit) are modified; no untracked files. Confirmed
+`next-env.d.ts` is not present in either `68917508` or `7f7cc66d` (`git show
+--stat` on each). Task 2's own diff (`cfa5a536..7f7cc66d`) touches exactly
+4 files: `docs/engineering/backlog.md`, `docs/release/dev-to-prod-checklist.md`,
+`src/app/api/search/route.ts`, `src/app/api/search/route.test.ts` — no
+unexpected files. **Not pushed, not deployed** — per instruction, deployment
+is owner-controlled via Telegram; this agent does not push or deploy.
+BACKLOG/NOTES: BACKLOG-022 (transliteration/layout/typo — real but
+deferred, no proven necessity yet for new fuzzy-matching infrastructure),
+BACKLOG-024 (remaining dead search-adjacent scaffolding: `SearchIndexRecord`/
+`indexManager.ts`, `SearchQuickTag`/`SearchSynonym` still have no runtime
+consumer — now honestly disclosed in-UI instead of removed, see ADMIN
+SEARCH CORRECTIVE PHASE below), BACKLOG-025 (uncalled `logSearchClick`).
+BACKLOG-023 (mock admin stats) is **no longer deferred** — owner pulled it
+back into Task 2 scope, see below. Search click-through/CTR-as-a-ranking-
+signal work intentionally left for Task 5 (Content Analytics & Ranking) per
+this checklist's own task boundaries — not started here.
+
+ADMIN SEARCH CORRECTIVE PHASE (2026-08-08, Claude Code — owner reopened
+scope immediately before the deployed-DEV browser smoke; the runtime search
+fix itself, verified live on `dev.mamago.by` at `7dc3a285`, is NOT reverted
+or redone here):
+AUDIT — Full read of all six `/admin/search/*` tabs (Overview, Quick Tags,
+Synonyms, Zero Results, Index, Ranking) plus `SearchLayout.tsx`,
+`QuickTagModal.tsx`, `SynonymModal.tsx`, `src/types/search-ranking.ts`.
+Findings:
+(1) Overview (`src/app/admin/search/page.tsx`) — **fully mock**: hardcoded
+`stats` array (`"Searches Today": "12,847"` etc.), hardcoded fake
+`popularQueries` array with fabricated CTR percentages, and an explicit
+English "This is a mock dashboard... Backend integration... will be added
+in the next phase" banner. Confirmed zero connection to real
+`SearchQueryLog` data. English UI throughout.
+(2) Quick Tags / Synonyms — real CRUD against real `SearchQuickTag`/
+`SearchSynonym` tables (not mock data), but English UI throughout, and each
+had a **false behavioral claim**: Quick Tags labeled its preview "Preview
+(as shown to users)" when in fact `resolveVisiblePopularTags()` always
+returns `[]` in production (confirmed in Task 2's original audit,
+`popularSearchTags.ts`) — tags are never shown publicly today. Synonyms had
+an "How Synonyms Work" card asserting "the search engine will also include
+results for all its synonyms" — false; `/api/search/route.ts` does not
+consult `SearchSynonym` at all (confirmed again by re-reading the route).
+(3) Zero Results — real data (`SearchQueryLog` via
+`/api/admin/search/zero-results`, unchanged), English UI only.
+(4) Index — built entirely around `SearchIndexRecord`, which nothing in the
+live write path populates (confirmed again). With 0 rows, its "Index
+Health" calculation (`total>0 ? indexed/total : 100`) rendered a misleading
+**100%** "healthy" figure for an empty, disconnected table. English UI.
+(5) Ranking — already correctly locked read-only with an honest Russian
+disclosure banner from a prior 2026-08 audit session (unchanged, confirmed
+still accurate); only the surrounding labels (header, "Weight", boost
+level words, `RANKING_BOOSTS` label/description strings) were still
+English.
+GAPS CONFIRMED IN SCOPE: mock/fabricated Overview data (BACKLOG-023, now
+in-scope), false "already works" claims on Quick Tags/Synonyms, misleading
+100%-health Index display, English UI across all six tabs and both modals.
+IMPLEMENTATION (minimum safe correction — no new engine, no schema changes
+beyond one new read-only aggregation, no deletion of existing dead
+tables/CRUD):
+- New `computeSearchOverview()` (`src/server/services/search/
+  adminSearchOverviewHandlers.ts`) — real `SearchQueryLog` aggregates for a
+  7-day window: total queries, unique queries, zero-result queries, and a
+  top-10 "popular queries" list (`groupBy` + `orderBy: {_count}` — no raw
+  SQL needed). Deliberately reports **no CTR** field anywhere (click-
+  through isn't tracked — BACKLOG-025) rather than inventing one. New route
+  `GET /api/admin/search/overview` (`src/app/api/admin/search/overview/
+  route.ts`, ADMIN-only, same auth pattern as the sibling zero-results/
+  synonyms routes).
+- `src/app/admin/search/page.tsx` rewritten: removed all mock arrays and
+  the "mock dashboard" banner; renders the real 7-day stats, a real
+  popular-queries table (query/count/last-searched only — no fabricated
+  CTR/status columns), an honest "CTR — не отслеживается" tile instead of
+  a fake percentage, and a Russian info card stating what actually drives
+  ranking (the fixed `SEARCH_BOOST` constants).
+- Quick Tags / Synonyms pages: added an honest amber disclosure banner each
+  (matching the Ranking tab's existing pattern) stating the current
+  non-connected status; corrected "Preview (as shown to users)" →
+  "Предпросмотр (когда подключение появится)"; rewrote the false "How
+  Synonyms Work" claim into an accurate "Сейчас не влияет на живой поиск"
+  notice; full Russian localization of both pages and both modals
+  (`QuickTagModal.tsx`, `SynonymModal.tsx`).
+- Index page: added an honest amber disclosure explaining
+  `SearchIndexRecord` is not populated by the real indexing pipeline (the
+  real index is `SearchDocument`, managed automatically) and that 0
+  records / "—" health means "no data," not "everything indexed"; health
+  score now renders "—" instead of a misleading 100% when `total === 0`;
+  full Russian localization. Table/actions kept (not deleted) — inert but
+  harmless, matches the "do not delete legacy infrastructure without
+  necessity" principle; Task 2's own §7 guidance and the existing
+  `RankingSettings`/`BoostSettings` precedent (disclose + lock, don't
+  delete) was followed rather than removing the tab.
+- Ranking page + `src/types/search-ranking.ts`: translated remaining
+  English labels (header, "Weight", boost-level words, all six
+  `RANKING_BOOSTS` label/description strings) to Russian; the existing
+  read-only lock and its disclosure banner were untouched.
+- `SearchLayout.tsx` tab labels translated to Russian (Обзор / Быстрые
+  теги / Синонимы / Без результата / Индекс / Ранжирование).
+- Fixed three residual English fallback error strings that could reach the
+  admin ("Failed to save tag/synonym", "Action failed").
+DO NOT TOUCH: the runtime search fix (`src/app/api/search/route.ts`,
+`68917508`) — not modified, not reverted, its own test still passes
+unchanged (confirmed by rerun). `RankingSettings`/`BoostSettings`/
+`SearchRankingSettings` read-only lock — unchanged, still correctly
+prevents admin from affecting production ranking. `SearchQueryLog`/
+zero-results aggregation — unchanged, only reused (proven pattern) for the
+new overview endpoint.
+COMMITS: `<see git log — Admin Search corrective changes>` (recorded below
+after commit).
+VERIFICATION: New targeted test `src/server/services/search/
+adminSearchOverviewHandlers.test.ts` (self-contained fixture, real local
+dev DB) — 2 cases: real counts reflect actual `SearchQueryLog` rows (not
+fabricated), and no `ctr` field is ever present in the response (proving
+the "don't invent CTR" instruction is honored in code, not just prose).
+Both pass. `npx tsc --noEmit` clean across the whole repo. `npx eslint` on
+all changed/new admin-search files: 0 errors (6 pre-existing warnings,
+none introduced by this phase — unused-var/hook-dependency warnings
+predating this change, confirmed by diff). Grep sweep for remaining
+English UI copy across all six tabs + both modals: clean (only intentional
+`<code>` references to literal Prisma model names remain). Full `pnpm
+check:push` (`pnpm build`) — exit 0, "Compiled successfully in 2.8min".
+Re-ran `src/app/api/search/route.test.ts` (the word-order fix's own test)
+to confirm the runtime fix is untouched — still passes.
+DEV SMOKE (pre-deploy): Unauthenticated `GET /api/admin/search/overview` on
+the local dev server returned `401 {"success":false,"error":"Unauthorized"}`
+(not a 500), confirming the new route is wired correctly; `/admin/search`
+correctly redirected to `/auth` (login) for an unauthenticated session.
+
+DEV SMOKE (post-deploy, actual `admin.dev.mamago.by`, 2026-08-08 — closes
+Task 2): Admin Search corrective phase (`23e1b006`, `84114c10`) pushed
+(`7dc3a285..84114c10`), CI `success`, Docker Build & Push `success`, owner
+deployed via Telegram. Owner manually authenticated in the Browser pane at
+`admin.dev.mamago.by` (this session never saw/entered/stored any
+credential); once confirmed, ran a read-only smoke of all six tabs against
+that live authenticated session:
+- **Обзор** — no mock banner; real 7-day stats (46 queries / 34 unique / 21
+  zero-result, cross-checked against the Zero Results tab's own 21); real
+  popular-queries table showing this session's own actual test queries
+  ("три поросенка балет", "малберри", "детский сад", "ntfnh", "teatr" —
+  literal proof of real `SearchQueryLog` data, not fabrication); CTR tile
+  honestly reads "Не отслеживается" with an explanation, no fake percentage.
+- **Быстрые теги** — Russian; real CRUD (0 tags, real empty state "Быстрых
+  тегов пока нет"); honest amber disclosure that tags aren't yet shown
+  publicly, replacing the old false "Preview (as shown to users)" claim.
+- **Синонимы** — Russian; real CRUD (0 synonyms, real empty state); honest
+  amber "Сейчас не влияет на живой поиск" disclosure naming `/api/search`
+  directly, replacing the old false "How Synonyms Work" claim.
+- **Без результата** — Russian; real `SearchQueryLog` data (21 total / 17
+  unique, matching Overview), table rows are this session's actual test
+  queries including the transliteration/layout probes ("ntfnh", "teatr");
+  honest closing note that synonyms/quick tags aren't wired to live search.
+- **Индекс** — Russian; explicit disclosure that `SearchIndexRecord` isn't
+  the real index (`SearchDocument` is, updated automatically); health
+  correctly renders `—` (not a false 100%) with 0/0/0/0/0 stats and an
+  honest "Нет данных в этой таблице" state — no misleading "healthy"
+  claim on empty/dead data.
+- **Ранжирование** — Russian; existing read-only disclosure intact
+  ("Только для чтения... нигде не читаются production-кодом"); all six
+  boost cards render as static, non-interactive bars — no edit control
+  exists in the UI at all (matches the API's existing 403-on-mutation
+  lock, unchanged) — admin cannot mutate `RankingSettings`/`BoostSettings`.
+- **Cross-cutting**: tab navigation works across all six tabs; tables,
+  stat cards, and empty states all render correctly; verified again at a
+  375px mobile viewport (Overview, Quick Tags) — cards stack, tabs scroll
+  horizontally, no broken layout; `read_network_requests` confirmed every
+  `/api/admin/search/*` call returned 200 (`overview`, `index?page=1`,
+  `ranking`) — zero 500s; the only console error seen (`401`) was not from
+  any `/api/admin/search/*` endpoint on any of the six pages (unrelated,
+  pre-existing, not investigated further as out of Task 2 scope).
+No settings/data were modified during this smoke (read-only, per
+instruction) — did not click "Создать первый тег"/"Создать первый
+синоним" or attempt any mutation against the locked Ranking API.
+BLOCKERS: none. All six deployed Admin Search tabs passed.
+
+AUDIT FIRST existing Search / Ranking infrastructure: Search API, search
+ranking, search analytics, normalization, intents, transliteration, wrong
+keyboard layout, typo handling, frequent queries, seasonal queries,
+zero-result queries, admin controls, RankingSettings, BoostSettings,
+StoryIntentConfig or related models, existing tests. Do not create a new
+ranking engine without proven necessity. Ranking runtime must stay cheap and
+predictable.
+
+**Exit Criteria:** Search works reliably on real DEV data; ranking signals
+are understandable; an admin cannot arbitrarily break organic ranking.
+
+## TASK 3 — Publication Analytics
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT:
+EXISTING — A real, substantial, DB-backed first-party analytics system
+already exists, not just search-adjacent scaffolding. `UserEvent` (Prisma
+model: `userId?|sessionId?|eventType: UserEventType|entityType?|entityId?|
+vertical?|cityId?|meta: Json?|createdAt`, indexed on
+`[userId,createdAt]|[sessionId,createdAt]|[eventType,createdAt]|
+[entityType,entityId,createdAt]|[vertical,createdAt]|[cityId,createdAt]`) is
+the single event log, written via `trackUserEvent()`
+(`src/server/services/analytics/AnalyticsEventService.ts`, fire-and-forget,
+never throws) from a validated public endpoint (`POST /api/analytics/events`,
+zod-validated enum fields, meta capped 4096 bytes, no IP/UA stored — only
+optional `userId`/client-generated `sessionId`). `UserEventType` covers
+`PAGE_VIEW|CARD_VIEW|DETAIL_OPEN|SAVE|UNSAVE|PLAN_ADD|PLAN_REMOVE|CTA_CLICK|
+SEARCH_APPLY|FILTER_APPLY|BOOKING_*|FEEDBACK_LEFT`; `AnalyticsEntityType`
+covers all 5 target content types (`EVENT|PLACE|OFFER|ROUTE|ARTICLE`).
+**The critical Open/View signal already fires for real**: `AnalyticsDetailBeacon`
+(server component, writes `DETAIL_OPEN`) is wired into every one of the 5
+content types' real detail pages (confirmed by reading each: events, places,
+offers incl. programs, routes, articles incl. city-scoped blog) — the
+historical risk named in this task's own instructions ("View/Open event
+реально не эмитится") is **not** the case here; it was already fixed before
+this session. `CARD_VIEW` (listing impression, `AnalyticsCardViewTracker`,
+IntersectionObserver ≥35% visibility, fires once via a `useRef` guard — no
+double-count risk, including under React StrictMode double-invoke) is wired
+for Event and Route listing cards. `SAVE`/`PLAN_ADD` are tracked for
+Place/Event (`/api/save/idea`, `/api/save/plan`); `CTA_CLICK` is tracked for
+Event's plan/buy actions (`EventPageView.handlePlan/handleBuy`). Admin
+`/admin/analytics` is a real, 5-tab (Overview/Audience Segments/Behavior/
+Content Performance/Funnels), RBAC-gated (`requireRole([ADMIN,MODERATOR])`)
+dashboard suite — every tab fetches its own bounded/parameterized
+`/api/admin/analytics/*` endpoint backed by real `UserEvent`
+aggregation (`analyticsOverview/ContentPerformance/Funnels/Behavior/
+Segments.service.ts`); grep for mock/fake/placeholder markers across all 10
+admin-analytics components found nothing — **no mock data**, unlike the
+Search overview's pre-fix state in Task 2. Business-facing per-publication
+performance is real too, just not under a page named "Analytics":
+`/business/dashboard` (`getBusinessWorkspaceData`/`getPerformanceMetricsByEntity`,
+`src/server/services/business/businessWorkspace.service.ts`) shows a real
+"top publications" table (views/saves/planAdds/ctaClicks per Event/Offer)
+and `getBookingAnalytics(businessId)` shows real rolling-30-day booking
+stats — both **server-side scoped** (`OR:[{businessId},{ownerUserId}]` /
+`ownerBusinessId` directly in the Prisma `WHERE`, confirmed by reading the
+query code, not just the UI) — no cross-business data-isolation risk found.
+PARTIAL/BROKEN — Confirmed via direct code reads (not assumption):
+(1) **Offer `DETAIL_OPEN` events are tagged with the wrong `cityId`** —
+`src/app/(public)/[city]/offers/[section]/[slug]/page.tsx:249` passes
+`cityId={offer.placeId}` (a Place id) into `AnalyticsDetailBeacon`, not a
+real City id; every city-scoped admin-analytics filter/breakdown silently
+mis-buckets or drops real Offer view events. Isolated to this one file —
+Place's own beacon correctly uses `place.cityId`; the `programs/[slug]`
+Offer variant correctly passes `cityId={null}`. (2) **Phone/contact-reveal
+CTA — a signal category this task explicitly names — is completely
+untracked** despite being a real, live action: the shared `CallActionButton`
+(`src/components/shared/CallActionButton.tsx`, used by both Place's
+"Позвонить" button in two page variants — premium `PlaceSidebarCard.tsx`
+and marketplace `PlaceHero.tsx` — and Event's `EventDecisionPanel.tsx`) has
+no analytics call at all. (3) **Offer's primary CTA (book/call,
+`OfferPageView.handlePrimary`) fires zero analytics** — confirmed the real
+production render path (`[city]/offers/[section]/[slug]/page.tsx:259`) uses
+no `onPrimary` override, so this default handler is what actually runs; Offer
+already has `SAVE` tracked but not its main conversion action. (4) **Place's
+"Сайт"/Instagram link CTAs are untracked** — same shared-component pattern
+(`SidebarCardContactRow` in `src/components/shared/SidebarCard.tsx`, used by
+both Place variants) has no onClick hook. (5) Content Performance's derived
+"Open %" column reads as misleading 0% for Place/Offer/Article (no
+`CARD_VIEW`⇒`views` always 0 for those types) even though the raw `Opens`
+column (from `DETAIL_OPEN`) is real and correct — a cosmetic derived-metric
+issue, not a missing-data one (BACKLOG-026). (6) `Article.views` is a second,
+uncorrelated raw counter parallel to `UserEvent`, pre-existing, not read by
+any admin dashboard (BACKLOG-027). (7) `PAGE_VIEW`/`UNSAVE`/`PLAN_REMOVE`
+enum values defined, never emitted (BACKLOG-028). (8) No `SHARE` signal
+despite live Share UI on Route/Place/Article — would need a new enum value
++ hand-written migration, deferred (BACKLOG-029). (9) `/business/analytics`
+is a 14-line "Раздел в разработке" placeholder — explicitly allowed to
+defer per this task's own §18 guidance since `/business/dashboard` already
+covers real, correctly-scoped per-publication data (BACKLOG-030). (10)
+`/api/publication-stats/[entityId]` unconditionally returns
+`buildEmptyPublicationStats()` (self-documented in code: "реальный
+агрегатор ещё не подключён") behind a full, production-ready admin+business
+UI (period switcher, 8 sections) — an **honest empty state**, not fake data,
+so it does not violate the "no fake analytics" hard requirement; redundant
+with the already-working Content Performance dashboard (BACKLOG-031). (11)
+Zero test coverage existed anywhere in the analytics stack before this
+session (services, routes, components) — addressed minimally in
+IMPLEMENTATION/VERIFICATION below, not left to backlog, since Exit
+Criterion 11 requires "relevant tests green."
+MISSING — No dedicated event-warehouse/streaming infra (correctly not
+needed at this scale — `UserEvent` + on-the-fly aggregation is adequate,
+matches "do not build a data platform"). `CARD_VIEW` impressions for
+Place/Offer listings (BACKLOG-032, explicitly optional per this task's own
+"impression not automatically mandatory" guidance). `SAVE`/`PLAN_ADD` for
+Route (BACKLOG-033, small/secondary entity). Rate limiting on the ingestion
+endpoint (BACKLOG-034 — deliberately not added: the repo's only reusable
+limiter is Postgres-backed and would double the write cost of every
+analytics event, directly against this task's server-cost principle; not a
+proven abuse vector at current scale). Scheduled recompute of
+`UserBehaviorProfile.segmentKeys` for inactive users (BACKLOG-035, Task
+5-adjacent, out of Task 3's view/CTA measurement scope).
+DO NOT TOUCH — `UserEvent` schema/ingestion pipeline; `DETAIL_OPEN`/
+`CARD_VIEW`/`SAVE`/`PLAN_ADD` emitters that already work correctly;
+`UserBehaviorProfile`/`SegmentResolverService` aggregation internals; the
+entire `/admin/analytics` 5-tab dashboard suite and its 6 backing API
+routes (real, RBAC-correct, no mock data); `/business/dashboard`'s
+per-publication table and its server-side business scoping;
+`getBookingAnalytics`; `SearchQueryLog`/search analytics (Task 2, out of
+this task's boundary per §24 of this task's own instructions).
+IMPLEMENTATION SCOPE: (a) fix the confirmed Offer `cityId` correctness bug
+— one file, switch to the same `citySlug` fallback resolution already built
+into `trackUserEvent`/`resolveCityId`, zero schema change; (b) add
+`CTA_CLICK` tracking for the 3 confirmed live-but-untracked CTA categories
+(phone/contact-reveal, website link, Offer primary action) by adding a
+single optional `onClick` hook to the 2 already-shared, already-reused
+components (`CallActionButton`, `SidebarCardContactRow`) and wiring it from
+the 4 call sites that have the needed entity context in scope, plus one
+direct `postAnalyticsEvent` call in `OfferPageView.handlePrimary` matching
+the exact pattern already proven in `EventPageView.handlePlan/handleBuy`;
+(c) add critical tests per §29 (event ingestion validation, content-
+performance aggregation correctness including the cityId fix, business
+isolation). No schema/migration, no new model, no new dependency, no new
+analytics pipeline — 100% reuse of the existing `UserEvent`/`trackUserEvent`/
+`postAnalyticsEvent`/`CTA_CLICK` machinery.
+GAPS: All P1 gaps from IMPLEMENTATION SCOPE closed this session (see
+IMPLEMENTATION/VERIFICATION below). Remaining findings are P2/P3, routed to
+`docs/engineering/backlog.md` (BACKLOG-026 through BACKLOG-036) — none
+blocks Task 3's Exit Criteria, none reopens Task 1/2.
+IMPLEMENTATION: `AnalyticsDetailBeacon` on the Offer city-scoped detail page
+now passes `citySlug` instead of the wrong `cityId={offer.placeId}`
+(`src/app/(public)/[city]/offers/[section]/[slug]/page.tsx`). `CallActionButton`
+and `SidebarCardContactRow` (`src/components/shared/`) gained a backward-
+compatible optional `onClick` hook, wired from 4 call sites that already had
+the needed entity context: `PlacePhoneActions.tsx`/`PlaceSidebarCard.tsx`
+(premium Place), `PlaceHero.tsx` (marketplace Place, phone+website+
+Instagram), and `EventDecisionPanel.tsx` (Event phone CTA, the one gap in
+an otherwise-tracked Event CTA surface). `OfferPageView.handlePrimary`
+(Offer's main book/call CTA) now fires `CTA_CLICK` directly, matching
+`EventPageView.handleBuy`'s exact existing pattern. `PremiumPlacePage.tsx`
+threads `placeId` into `PlaceSidebarCard` (new required prop; only caller
+updated, confirmed via grep). No schema/migration, no new dependency.
+COMMITS: `8f3f9383` (fix: Offer cityId correctness), `7077f8f0` (feat:
+CTA_CLICK tracking for phone/website/Instagram/offer CTAs), `56c1727f`
+(chore: critical analytics tests).
+VERIFICATION: `npx tsc --noEmit` clean (whole repo). `npx eslint` on all
+9 changed/new application files: 0 errors (7 pre-existing warnings on
+unrelated lines, none introduced by this diff — confirmed by reading each
+warning's line against the diff). `git diff --check` clean. Full `pnpm
+check:push` (`pnpm build`) — exit 0, full route manifest compiled. 3 new
+targeted test files, all passing against the real local dev DB
+(`npx tsx <file>` per this repo's convention): `/api/analytics/events`
+ingestion validation (invalid eventType/oversized meta/malformed JSON all
+correctly rejected without writing a row); `analyticsContentPerformance`
+aggregation (written DETAIL_OPEN/CTA_CLICK/SAVE counts match exactly what
+the admin dashboard's real query returns; citySlug→cityId resolution,
+the same fallback the Offer cityId fix now depends on, proven end-to-end);
+business publication-performance isolation (`getPerformanceMetricsByEntity`
+never returns a foreign entity's metrics when not explicitly requested —
+the mechanism `getBusinessWorkspaceData`'s server-side businessId/
+ownerUserId scoping relies on). Controlled proof against the real local
+dev DB + running dev server (Place "«Молекула»", real published entity,
+via the Browser pane): baseline `DETAIL_OPEN=21, CTA_CLICK=0` → one fresh
+full-page reload → `DETAIL_OPEN=22` (exactly +1, confirming one open per
+real page load, no double-count) → clicked the newly-tracked "Позвонить"
+button (`ref_13`, real `tel:` link) → network tab showed
+`POST /api/analytics/events → 200` → DB confirmed `CTA_CLICK=1` with
+`meta: {source:"detail", targetAction:"call"}`, exactly matching the new
+code. (Mid-proof, the local Postgres/Docker daemon briefly became
+unresponsive — a host-level Docker Desktop hiccup, confirmed via
+`docker exec ... pg_isready` and even `docker inspect` timing out/erroring
+independent of this session's code; waited for recovery rather than
+treating it as a code defect; DB was healthy again within minutes and the
+proof completed cleanly.)
+DEV SMOKE: Not yet performed on actual `dev.mamago.by` — pending owner
+deployment per the standing DEPLOYMENT LOOP process (this agent does not
+deploy). Local dev-server + local dev-DB verification above stands in for
+the pre-deploy portion; the deployed-DEV portion (repeat the same
+open→CTA-click proof against `https://dev.mamago.by`, plus an authenticated
+`/admin/analytics` Content Performance check if the owner logs in) remains
+open.
+BLOCKERS: None code/logic-side. Deployment-dependent final smoke requires
+owner-controlled DEV deploy via Telegram (per standing process) before this
+task can move to `COMPLETE`.
+BACKLOG/NOTES: BACKLOG-026 (misleading 0% Open Rate for Place/Offer/Article
+in admin Content Performance — raw Opens/Saves/CTA numbers remain correct),
+BACKLOG-027 (`Article.views` parallel counter, pre-existing), BACKLOG-028
+(dead `PAGE_VIEW`/`UNSAVE`/`PLAN_REMOVE` enum values), BACKLOG-029 (no
+`SHARE` signal — needs new enum value/migration), BACKLOG-030
+(`/business/analytics` empty placeholder — explicitly deferrable per this
+task's own §18), BACKLOG-031 (`/api/publication-stats/[entityId]` honest-
+empty stub, redundant with the working Content Performance dashboard),
+BACKLOG-032 (`CARD_VIEW` impressions missing for Place/Offer listings —
+explicitly optional per this task's own guidance), BACKLOG-033 (Route
+`SAVE`/`PLAN_ADD` untracked), BACKLOG-034 (no rate limiting on the
+ingestion endpoint — deliberately not added, would double write cost),
+BACKLOG-035 (`recomputeAllBehaviorSegments()` has no scheduled caller),
+BACKLOG-036 (new Place CTA_CLICK events lack cityId — this session's own
+minor follow-up). None blocks Task 3's Exit Criteria.
+
+MVP PUBLICATION ANALYTICS DRILL-DOWN (2026-08-09, Claude Code — owner
+follow-up decision: complete Task 3 with a per-publication interaction
+report + comparable core impression metrics, then freeze analytics scope
+for MVP; `d2cfb23c` preserved, not deployed until this lands):
+IMPLEMENTATION — reused the existing `UserEvent` pipeline exclusively, no
+new analytics system: (1) new `getPublicationAnalyticsDetail()`
+(`analyticsContentPerformance.service.ts`) — a bounded aggregate query
+scoped to one `entityType`+`entityId`+period+optional city (indexed on
+`[entityType,entityId,createdAt]`), returning counts/rates/CTA breakdown
+only, never raw `UserEvent` rows/userId/sessionId/IP/UA; (2) new RBAC-gated
+route `GET /api/admin/analytics/content-performance/[entityType]/
+[entityId]` (`requireRole([ADMIN,MODERATOR])`, identical pattern to its 6
+sibling admin-analytics routes); (3) centralized Russian CTA
+`targetAction` → label mapping (`src/lib/analytics/
+ctaTargetActionLabels.ts`) — known values (`call/website/instagram/buy/
+plan/primary/book`) get real labels, unknown/future values degrade to a
+readable `Действие «…»` fallback, never raw JSON, never silently dropped;
+(4) new `PublicationAnalyticsDrawer`/`PublicationAnalyticsDetails`
+(`src/components/admin/analytics/`) reusing the exact same
+`ResponsiveOverlay` (desktop Dialog / mobile Sheet) + lazy-load-on-open
+pattern already proven by `PublicationStatsDrawer` — deliberately a new,
+separate, small drawer rather than extending the existing
+`PublicationStatsDrawer`/`/api/publication-stats` (per instruction: do not
+expand that parallel, still-stub feature); (5) `AdminAnalyticsContentPerformance.tsx`
+table rows are now clickable (row click + an explicit "Подробнее" button,
+`e.stopPropagation()`'d, for keyboard/screen-reader access) — existing
+sort/pagination untouched; (6) closed the confirmed BACKLOG-026 gap:
+`openRate`/`saveRate`/`planRate`/`clickRateVsOpens`/`clickRateVsPlans`
+are now `number | null` end-to-end (service, types, `pickBest`/
+`worstConverters`/`sortRows`/both comparison builders, the new detail
+endpoint) — `null` renders as `—`, never a fabricated `0.0%`; (7) audited
+real listing/card surfaces for Place/Offer/Article and wired the existing
+`AnalyticsCardViewTracker` onto every real one found for Offer
+(`[city]/programs/page.tsx`, homepage "Занятия" row) and Article (`/blog`
+journal index — featured + list, homepage "Статьи и обзоры" row);
+`listCityHomeArticles.ts` gained the article's own `id` (previously not
+even selected — a real gap this surfaced). Place confirmed to have **no**
+public listing/catalog surface at all (routing audit: `/[city]/places`
+has only `[slug]`, no listing page; no PlaceCard usage anywhere in
+`src/app/(public)`) — nothing legitimate exists to wire, not fabricated;
+recorded honestly rather than invented. Event/Route's own existing
+tracking untouched, per instruction.
+CTA TARGETACTION CATEGORIES FOUND (live grep of every `targetAction:`
+call site, cross-checked against real local DB data): `call` (phone
+reveal — Place/Event), `website`/`instagram` (Place), `buy` (Event ticket
+purchase), `plan` (Event "add to plan" CTA click), `primary` (Offer main
+booking/call CTA). `book` exists in code but is emitted on
+`BOOKING_CREATED`, not `CTA_CLICK` — confirmed via source read, does not
+pollute the CTA breakdown. Real historical data on a live article (24
+pre-existing `CTA_CLICK` rows from the continuous-reading tracker,
+predating `targetAction`) correctly bucketed to "Без указания действия"
+by the new grouping — proves the null/fallback path against real data,
+not just fixtures.
+API/QUERY COST: detail endpoint is 3 small queries (one indexed
+`groupBy`, one indexed raw `GROUP BY` for the CTA breakdown, one
+`loadAllEntityTitles` reuse) fired only when an admin opens a specific
+row (lazy-loaded, per instruction — no N+1 on the main table, no
+eager-loaded per-row detail). No new write path, no new high-frequency
+event — the only new writes are the same cheap, already-proven
+`CARD_VIEW` fire-once-per-exposure pattern, now reaching 2 more real
+surfaces.
+PRIVACY/RBAC: detail response shape contains no userId/sessionId/IP/UA/
+raw events (test-verified, see below); RBAC identical to the 6 existing
+sibling admin-analytics routes (ADMIN/MODERATOR only); no new public
+endpoint.
+CONTROLLED PROOF (local dev DB + running dev server, Browser pane,
+2026-08-09): real published article "Чем заняться на зимних каникулах"
+(`cms37q1ca0006ws27z75ug52h`) on real content — baseline `CARD_VIEW=4,
+DETAIL_OPEN=67, CTA_CLICK=24` → visited `/minsk/blog` (real featured-card
+exposure, ~60% viewport-visible, confirmed via DOM geometry read) →
+`CARD_VIEW=5` (exactly +1, correct `meta: {source:"listing",
+section:"journal", position:"featured"}`, correct resolved `cityId`) →
+opened the article detail page → `DETAIL_OPEN=68` (exactly +1). Cross-
+validation: called `getAnalyticsContentPerformance()` and
+`getPublicationAnalyticsDetail()` directly for the same entity/period —
+**numbers agreed exactly** (views/opens/ctaClicks all matched between the
+existing trusted Content Performance table and the new detail endpoint).
+No double-count observed on repeated navigation/HMR reloads during the
+session.
+TESTS: extended `analyticsContentPerformance.service.test.ts` (existing
+file from the earlier Task 3 phase) with 4 new cases, all passing against
+the real local dev DB: per-entity aggregate correctness (impressions/
+opens/saves/planAdds/ctaClicks + all 4 rates match hand-computed values);
+CTA targetAction grouping + unknown-value fallback (readable, non-JSON,
+not silently dropped) + null-action bucket; no-PII assertion (JSON-
+serialized response checked for absence of a planted fake sessionId, and
+for absence of `userId`/`sessionId`/`ip`/`userAgent`/`events` keys
+entirely); zero-denominator semantics (measured-zero `0` vs unmeasured
+`null`, both distinguished correctly). No dedicated route-level test for
+the new API route's RBAC, matching the harness limitation already
+documented for its 6 sibling routes (`getCurrentUser()`/`cookies()`
+throws outside a real Next.js request scope when invoked directly) —
+RBAC correctness instead rests on identical-pattern reuse, verified by
+direct source comparison. Re-ran all pre-existing analytics/search tests
+(ingestion, business isolation, search word-order) — no regressions.
+GATES: `npx tsc --noEmit` clean (whole repo, twice — before and after the
+final edits); `npx eslint` on all 14 changed/new files — 0 errors (3
+pre-existing `<img>`-vs-`<Image>` warnings, none introduced); `git diff
+--check` clean; full `pnpm build` — exit 0, "Compiled successfully in
+2.6min", full 386-page route manifest generated with no errors.
+BACKLOG: BACKLOG-026 marked RESOLVED. BACKLOG-032 marked PARTIALLY
+RESOLVED (Offer+Article done, Place blocked on a Place listing surface
+existing at all — not an analytics gap). No new scope taken on beyond
+this follow-up's explicit brief — Share, Business Analytics redesign,
+publication-stats parallel feature, Route save tracking, warehouse,
+cohorts, and exports all explicitly left alone, per instruction §16/§17.
+COMMITS: `f84e081c` (feat: aggregate service + API + nullable rates),
+`256e279a` (feat: admin drill-down UI), `588e21b1` (feat: impression
+tracking for Offer/Article listing surfaces), `f37937d8` (chore: tests).
+
+BUSINESS ANALYTICS MVP (2026-08-09, Claude Code — owner reopened Task 3
+before deployment: `/business/analytics` was still the "Раздел в
+разработке" placeholder; the earlier MVP drill-down follow-up above covered
+only Admin):
+IMPLEMENTATION — Moved `PublicationAnalyticsDrawer`/`PublicationAnalyticsDetails`
+from `components/admin/analytics` to the neutral `components/analytics`
+(alongside `AnalyticsDetailBeacon`/`AnalyticsCardViewTracker`) and added a
+`fetchBasePath` prop, so Admin and Business share the exact same drill-down
+report component/fetch/loading/error handling — no second implementation.
+Extended `getPerformanceMetricsByEntity()` (already powering the Dashboard's
+Top-5) with `opens` (`DETAIL_OPEN`, previously untracked there), an optional
+`places` param, and an optional `dateRange` filter — all additive, the
+Dashboard's own all-time call is unchanged. Added
+`getBusinessPublicationsPerformance()` (full list, not top-5, of a
+business's own Event/Offer/Place with real metrics, reusing the exact same
+ownership queries as `getBusinessWorkspaceData`). Publication types: Event
+and Offer per instruction; Place included too after confirming its
+ownership query is already identical/free (same `ownerBusinessId`/
+`createdByUserId` OR-pattern already used elsewhere in this same file) —
+no scope expansion. Article/Route excluded — businesses do not own them in
+the current model.
+OWNERSHIP (mandatory) — New `businessOwnsPublication()`
+(`src/server/services/business/businessAnalyticsAccess.ts`): every business
+analytics detail request re-verifies server-side, from the authenticated
+session's own business, that the client-supplied `entityId` actually
+belongs to that business, before any `UserEvent` aggregation runs. Mirrors
+the exact existing ownership rules (`canManageActivityById`-equivalent for
+Event; `src/app/api/business/offers/[id]/route.ts`'s
+`place.ownerBusinessId`/`createdByUserId` pattern for Offer; Place's own
+fields) rather than inventing new rules. Foreign or nonexistent publication
+→ 404, zero metric leakage (never a 200 with empty/zeroed data, which would
+itself confirm/deny existence).
+NEW ENDPOINTS — `GET /api/business/analytics/publications` (the business's
+own list, `getCurrentUser()`+`getMyBusiness()`, same pattern as
+`/api/business/bookings/analytics`); `GET /api/business/analytics/
+publications/[entityType]/[entityId]` (ownership-checked drill-down,
+reuses `getPublicationAnalyticsDetail()` — the exact same aggregate/CTA-
+label mapping already built for Admin — only after ownership passes).
+UI — `/business/analytics` (`src/app/business/(protected)/analytics/
+page.tsx`) replaced; `BusinessAnalyticsClient.tsx`: 5-option date range
+(same canonical ranges as Admin), row list with real Показы/Открытия/
+Сохранения/В план/Целевые действия, row click opens the shared drawer.
+Entirely Russian, no audience segmentation, no cross-business comparison,
+no new BI charts — aggregate counts only, matching the "answer 5 questions"
+brief. Dashboard's `TopPublicationList` gained one "Вся аналитика" link to
+`/business/analytics` — Dashboard itself otherwise untouched (still all-
+time Top-5, as before).
+PRIVACY — Same `getPublicationAnalyticsDetail()` shape as Admin: aggregate
+counts only, no `userId`/`sessionId`/`ip`/`userAgent`/raw event rows ever
+in the response (proven by the existing no-PII test, reused unmodified
+since the response shape is identical for both callers).
+TESTS — `businessAnalyticsAccess.test.ts` (new): real two-business fixture
+(separate owner/business/place/event/offer each) — own Event allowed, own
+Offer allowed, own Place allowed, foreign Event rejected, foreign Offer
+rejected, foreign Place rejected, nonexistent entityId rejected, Article/
+Route always rejected even when reusing a real id of a different type (no
+type-confusion leak). `businessWorkspace.service.test.ts` (extended):
+`opens` tracked correctly, `places` param honored, `dateRange` correctly
+excludes a year-old event from a 24h-scoped query. All existing analytics
+tests re-run — no regressions.
+GATES — `npx tsc --noEmit` clean (whole repo). `npx eslint` on all 12
+changed/new files — 0 errors, 0 new warnings. `git diff --check` clean.
+Full `pnpm build` — exit 0, "Compiled successfully in 106s", full route
+manifest generated including `/business/analytics`, `/api/business/
+analytics/publications`, `/api/business/analytics/publications/
+[entityType]/[entityId]` — no errors.
+BACKLOG — BACKLOG-030 → DONE.
+COMMITS: `ff2d54b8` (refactor: share drill-down UI), `1866b5b4` (feat:
+ownership-verified service + API), `51b5c9fe` (feat: Business Analytics
+MVP page), `18340b9e` (chore: ownership isolation tests).
+DEV SMOKE: **Complete — verified live on actual deployed DEV
+(`admin.dev.mamago.by`/`business.dev.mamago.by`/`dev.mamago.by`) at SHA
+`5bdb6be9`, 2026-08-09/10, owner pre-authenticated Admin + Business
+sessions in the Browser pane.**
+Admin — Content Performance tab: real table (8 entities, real titles,
+`Views/Opens/Saves/Plan/CTA` all real, e.g. Малберри Клаб `opens=9`,
+«Гранд Бублик» article `opens=11, ctaClicks=20`); `Open %` correctly
+renders `—` (not `0.0%`) for every Place row with `views=0` (6/8 rows) —
+the exact BACKLOG-026 behavior. "Подробнее" opened the shared drawer:
+correct title/type ("Место"/"Статья")/city ("Минск")/period
+(`11.07.2026 — 10.08.2026`); metrics tiles matched the table row exactly;
+Конверсия correctly split measured-zero (`0.0%`) from unmeasured
+(`—`, e.g. "Открытие / показ" for the zero-impression Place). CTA
+breakdown: «Гранд Бублик» (20 real clicks, all pre-existing continuous-
+reading events with no `targetAction`) rendered "Без указания действия:
+20" — honest, not fabricated, not dropped. No raw JSON/PII visible
+anywhere. Changed date range to "Today": table correctly re-scoped to 2
+entities; drill-down re-opened for the same Place showed the updated
+period (`09.08.2026 — 10.08.2026`) and updated counts — period change
+propagates correctly. Sorting by CTA column re-ordered the table
+correctly (descending CTA first).
+Business — `/business/analytics`: real page, not the placeholder; real
+list for the authenticated business — Place ("«Кофта» на пр-т Мира, 1»",
+PUBLISHED) and multiple Offers (DRAFT), each showing real Показы/
+Открытия/Сохранения/В план/Целевые действия; 5-option date range present
+and functional; drill-down opened (desktop) rendering the identical
+shared report format as Admin (title/"Место"/period/5 metrics/Конверсия
+with correct `—`/`0.0%` split/Целевые действия). Entirely Russian, no
+segmentation/cross-business data visible.
+Ownership isolation (required, confirmed live): captured a real foreign
+Place id from Admin's Content Performance
+(`PLACE/cmsddc3qw008amk0z2wphx36o`, Малберри Клаб — confirmed absent from
+the authenticated business's own list) and requested it directly against
+`GET https://business.dev.mamago.by/api/business/analytics/publications/
+PLACE/cmsddc3qw008amk0z2wphx36o` → **HTTP 404**, body
+`{"error":"Publication not found"}` — zero metric leakage. The same
+business's own Place (`cms7ajop1000lwsq2b1jggaww`) → HTTP 200 with real
+data, confirming the boundary is precise (not fail-open, not blanket
+rejection).
+Tracking sanity (live, real deployed writes): baseline for Малберри Клаб —
+`opens=9, ctaClicks=0`. Visited the real public place page
+(`dev.mamago.by/places/malberri-klab-mulberry-club`) → `DETAIL_OPEN` fired
+(`POST /api/analytics/events` → 200) → Admin table `opens` 9→10 (exactly
++1). Clicked the real "Позвонить" (tel:) link → `CTA_CLICK` fired (200) →
+Admin table `CTA` 0→1, `CTA/opens` 0%→10.0%; drill-down CTA breakdown
+showed **"Позвонили: 1"** — the correct centralized Russian label for a
+real `targetAction:"call"` event, live end-to-end on deployed DEV. Also
+visited `dev.mamago.by/minsk/blog` (the newly-wired Article listing) →
+a second `POST /api/analytics/events` fired 200 (`CARD_VIEW` impression).
+No duplicate/double-count observed on any repeated navigation.
+Desktop + mobile: Business Analytics confirmed clean at 375×812 (cards
+stack correctly, chips wrap, date-range pills wrap to 2 rows, no overflow,
+no layout breakage) — mobile drill-down *interaction* (opening the Sheet
+variant) could not be exercised due to a Browser-pane tool-level click
+timeout specific to the mobile-viewport touch emulation during this
+session (no app-side error: no console errors, no failed/5xx requests,
+page remained stable and responsive to screenshots throughout); the
+identical underlying component (`PublicationAnalyticsDrawer`/
+`ResponsiveOverlay`) was fully exercised and confirmed correct on desktop
+for both Admin and Business, and `ResponsiveOverlay`'s mobile-Sheet
+breakpoint is pre-existing, already-proven infrastructure (same one
+`PublicationStatsDrawer` already uses) — not new logic introduced by this
+task. Treated as a tool limitation, not an unverified app behavior.
+Console/API errors: zero console errors on any page visited. All
+`/api/admin/analytics/*` and `/api/business/analytics/*` requests
+returned 200 except the one intentional ownership-check 404. One
+unrelated `ERR_ABORTED` on a Next.js RSC prefetch during a rapid
+navigation (benign soft-navigation-abort pattern, not a real error, not
+analytics-specific).
+Separately, during this smoke session the owner discovered and fixed an
+unrelated DEV environment defect (`OTP_SECRET` not configured, blocking
+business-signup phone verification) — resolved for DEV, tracked as
+BACKLOG-037 with the PROD-side requirement flagged for Task 14
+(Environment Parity); did not block or require any Task 3 code change.
+BLOCKERS: none. All required Admin + Business Publication Analytics
+checks passed on deployed DEV.
+
+**TASK 3 — COMPLETE.** Deployed SHA: `5bdb6be9`. Publication Analytics
+(Admin + Business) is frozen for MVP — further analytics improvements go
+to `docs/engineering/backlog.md`, not back into this task. Task 4 not
+started. PROD untouched throughout (DEV-only OTP_SECRET fix on the shared
+host; no PROD deploy, no PROD data access, no PROD env changes).
+
+AUDIT FIRST existing analytics/tracking infrastructure: `/admin/analytics`,
+business analytics, analytics models, impressions, views, unique views, CTA,
+saves, My Ideas, My Plan, shares, ratings, reactions, content performance,
+retention, storage, abuse protection, existing tests. Core principle:
+collect only data actually used by the product, ranking, or business
+analytics. Do not build expensive granular tracking "just in case." Do not
+create a parallel analytics architecture.
+
+**Exit Criteria:** Publication effectiveness can be assessed via meaningful
+engagement data without excessive backend/storage load.
+
+## TASK 4 — Event Wizard Address Dropdown
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT: Traced full flow end-to-end (`EventLocationSearchInput` →
+`QuickPlaceCreate` → `Step2Location` → `EventFormData.pendingLocation` →
+`resolvePendingLocationOnPublish` (publish-time, in-transaction) → `Place`/
+`EventVenue` → edit hydration via `mapEventToFormData`). Google Places
+autocomplete UI itself (dropdown rendering, `gmp-select` wiring,
+`fetchFields`, debounce) was found fully functional — no dropdown-rendering
+or form-state bug. mamaGo-internal Place search (`PlaceSearchAutocomplete`)
+also fully functional. Compared against the reference implementation (Place
+Wizard's `PlaceLocationPicker`/`PlaceSearchInput`): Place Wizard persists
+immediately and calls `/api/geo/enrich-location` right after address
+selection; Event Wizard defers Place creation to publish time via
+`pendingLocation` and never called that enrichment endpoint.
+GAPS (root cause, proven not guessed): the human-readable address text and
+lat/lng survive correctly end-to-end for a new venue — but `googlePlaceId`
+and `addressJson` (Google address components) returned by the selection
+callback were silently dropped at two client-side type boundaries
+(`QuickPlaceCreate`'s `LocationData` interface, then
+`EventFormData.PendingLocation`), and `resolvePendingLocationOnPublish.ts`
+hardcoded `googlePlaceId: null`, `addressJson: Prisma.JsonNull`,
+`districtAutoId: null`, `metroAutoId: null` when creating the `Place` row —
+even though the data existed one layer up. Net effect: every new venue
+created through the Event Wizard permanently lost its Google place
+identity, structured address components, and auto district/metro (no
+crash, no visible blank field — the address text looked fine, which is why
+it went unnoticed).
+IMPLEMENTATION: (1) extended `PendingLocation` (both
+`src/components/business/wizard/event/types.ts` and the duplicate interface
+in `src/lib/business/resolvePendingLocationOnPublish.ts`) with optional
+`googlePlaceId`/`addressJson`/`districtAutoId`/`metroAutoId`/
+`metroAutoDistanceM`; (2) `QuickPlaceCreate.tsx` now calls the existing
+`/api/geo/enrich-location` endpoint (same one Place Wizard uses — reused,
+not reinvented) right after a Google address selection or map-pin
+confirmation, and carries `googlePlaceId`/`addressJson` plus the enriched
+city/district/metro through to `onPlaceCreated`; (3) `Step2Location.tsx`
+threads those fields into `pendingLocation`; (4)
+`resolvePendingLocationOnPublish.ts` now uses them when creating the new
+`Place` instead of hardcoded nulls, with a defensive validity check
+(district/metro id must still exist and belong to the resolved city at
+publish time, since selection and publish can be minutes apart) rather than
+trusting stale client-supplied ids blindly.
+COMMITS: `de4d694a` (fix: preserve googlePlaceId/addressJson/district/metro
+for Event Wizard new venues); `5a5b401b` (docs); `5bd4371b` (fix: pass
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/MAP_ID as Docker build-args — separate,
+DEV-smoke-discovered build-pipeline gap, see DEV SMOKE below). **Deployed
+SHA on actual DEV: `5bd4371b`** (`dev-app-1`, image `dev-269`).
+VERIFICATION: focused test `src/lib/business/resolvePendingLocationOnPublish.test.ts`
+(`pnpm test:event-wizard-pending-location`) — 5 scenarios: NEW_PLACE with
+full Google data persists googlePlaceId/addressJson/district/metro;
+PARSED_LOCATION (no Google data) keeps prior null behavior, no regression;
+stale/cross-city district/metro ids are dropped, not blindly trusted;
+EXISTING_PLACE mode unaffected (no Place created); empty/invalid selection
+does not create a corrupted Place. `npx tsc --noEmit` clean. Targeted
+ESLint on all changed files: 0 new warnings/errors (3 pre-existing unused-var
+warnings confirmed present at baseline `HEAD` `baba727c`, unrelated to this
+change). `git diff --check` clean. Full `pnpm check:push` (production
+build) green.
+DEV SMOKE: **Complete — verified live on actual `https://business.dev.mamago.by`
+(2026-08-10, real business account, real Minsk addresses via the real Google
+Places API, deployed image `dev-269` = SHA `5bd4371b`).**
+Mid-smoke discovery (separate from the app-code fix above, fixed the same
+session): typing a real address into the Event Wizard's Google field on DEV
+produced **no predictions at all** — console: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+is missing`. Verified this was NOT a Task 4 regression by reproducing the
+identical failure in the untouched Place Wizard (`PlaceSearchInput` — same
+error) and its map-pin fallback (blank map, same error) — proving every
+Google Maps feature was broken on every previously-built DEV/PROD image, not
+just the new code. Root cause: `Dockerfile`'s `RUN pnpm build:ci` never
+received `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`/`NEXT_PUBLIC_GOOGLE_MAP_ID` as
+build args — Next.js inlines `NEXT_PUBLIC_*` vars into the client bundle at
+`next build` time, not from the container's runtime env (which *did* have
+the var set, misleadingly). Fixed: `Dockerfile` (`ARG`/`ENV` for both vars
+in the builder stage) + `.github/workflows/docker.yml` (`build-args` now
+passes both from GitHub Actions repo secrets — same single key/map-id used
+for DEV and PROD builds, per explicit owner decision, no separate DEV/PROD
+Google credentials exist yet). Secrets `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` and
+`NEXT_PUBLIC_GOOGLE_MAP_ID` set from the existing local `.env.local` values
+(verified present/non-empty first, values never printed/logged). Committed
+`5bd4371b`, pushed, CI green (2m5s), Docker Build & Push green (15m46s,
+`dev-269`), owner redeployed `dev-app-1` → confirmed via
+`docker inspect` label `org.opencontainers.image.revision` = `5bd4371b`.
+Scenario A (existing Place) — created event, selected existing place "SREDA"
+from "Мои места", published. DB-verified: `Activity.placeId` →
+`cmsddc3ju006amk0zfwir8i83` (SREDA), `EventVenue` correctly linked.
+Scenario B (new Place via real Google address, "ул. Октябрьская 16, Минск")
+— after the build-pipeline fix, predictions appeared correctly; selected,
+saved, published. DB-verified on the actual `Place` row: `googlePlaceId`
+`ChIJxXMs2tHP20YRpDz2mLwDp0Q`, `locationSource` `GOOGLE`, `addressJson`
+populated, `districtAutoId`/`metroAutoId` resolved (Центральный / м.
+Пролетарская, 1006m), `cityId` (Минск), `lat`/`lng` correct — all
+previously would have been null/MANUAL. `EventVenue` correctly linked.
+Scenario C (edit hydration + address change) — reopened the published
+event, Step 2 correctly hydrated the just-created venue including
+district/metro; changed address to "ул. Немига 5, Минск", resaved,
+resubmitted. DB-verified: a **second** `Place` created with its own correct
+`googlePlaceId` (`ChIJAepu4evP20YRJJTmArTmwIA`), district (Центральный),
+metro (Немига, 474m), `cityId`; `Activity.placeId` and `EventVenue`
+correctly repointed to the new `Place`; the original "Октябрьская 16"
+`Place` left untouched (no orphan corruption).
+Scenario D (nonexistent address) — both the mamaGo-internal search
+("Место не найдено") and the Google field (empty predictions, no crash)
+showed a clear no-result state; "Сохранить место" stayed disabled
+throughout — no corrupted/partial Place could be saved.
+Console/network: confirmed **zero** console errors and zero non-200 network
+responses on a freshly-opened tab with the Google widget actively
+initialized (prior errors in the same long-lived tab were stale, from
+before the build-pipeline fix deployed — reproduced clean on a fresh tab to
+rule out stale-log false negatives).
+Layout: this session's browser pane rendered at a fixed native 424×808
+viewport throughout — narrow enough to double as an informal mobile/narrow
+sanity check; Step 2 Location rendered cleanly with no overflow/breakage at
+that width across all four scenarios.
+Cleanup: all DEV test records created during this smoke deleted after
+verification — 2 `Activity` rows, 2 `EventVenue` rows, 2 `Place` rows
+(the pre-existing "SREDA" place used for Scenario A was never modified or
+deleted, only referenced).
+LOCAL MANUAL PROOF (2026-08-10, real dev server + real business account +
+real Google Places API against Minsk addresses, local Postgres only — no
+DEV/PROD data touched): Scenario A (existing-Place edit hydration) —
+confirmed correct on wizard re-open. Scenario B (new venue via Google
+autocomplete, "ул. Притыцкого 12") — DB-verified: `Place.googlePlaceId`,
+`addressJson`, `locationSource=GOOGLE`, `districtAutoId` (Октябрьский),
+`metroAutoId` (Пушкинская, 1047m), `cityId`, `lat`/`lng` all correctly
+persisted (previously would all have been null/MANUAL). Scenario C (change
+address to "ул. Немига 5" on the same event, resubmit) — DB-verified: a
+second `Place` created with its own correct googlePlaceId/district
+(Центральный)/metro (Немига, 474m); `Activity.placeId` and `EventVenue`
+correctly repointed to the new Place; the original Place left untouched
+(no orphan corruption). Scenario D (nonexistent address/place name) — both
+the mamaGo-internal search and the Google address field show a clear
+"not found" state, "Сохранить место" stays disabled, no corrupted/partial
+Place can be saved. All test data (1 Activity, 1 EventVenue, 2 Place rows)
+deleted from local DB after verification.
+BLOCKERS: none. Task 4 exit criteria all met: address autocomplete works on
+actual DEV, new venue from Event Wizard stores correct location (including
+googlePlaceId/district/metro), existing venue flow remains correct,
+edit/reload round-trip is correct, no malformed/partial Place records were
+created in any scenario, focused tests green, full gate green, actual DEV
+smoke green after owner-controlled deploy, no unresolved P0/P1 in Task 4.
+BACKLOG/NOTES: the `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`/`MAP_ID` build-arg gap
+described above was fixed and deployed within this task, not deferred — it
+is not a backlog item. Three separate, smaller items remain deferred to
+`docs/engineering/backlog.md`
+(BACKLOG-038/039/040) — none block this task's exit criteria: (038, P2)
+`/api/geo/enrich-location`'s address-component fallback matcher reads the
+legacy `long_name` field shape and never matches the new
+`PlaceAutocompleteElement`'s `longText`/`shortText` shape (only affects the
+fallback path when centroid-based district/metro lookup misses — the
+primary path was proven working in both manual scenarios above); (039, P3)
+`EventLocationPicker.tsx` is dead code (zero importers), safe to delete;
+(040, P3) Place Wizard's `PlaceSearchInput.tsx` still uses the deprecated
+Google `Autocomplete` widget (already had its own tracked TODO) while Event
+Wizard now uses the modern `PlaceAutocompleteElement` — a drifted
+duplicate implementation worth unifying later.
+
+AUDIT FIRST and reproduce the current problem. Check: Event Wizard, Place
+selector, existing Place, new Place creation, autocomplete, Google Places
+integration, city context, debounce/search, normalization, coordinates,
+persistence, edit flow, tests. Find root cause first. Do not rewrite the
+address system without necessity.
+
+**Exit Criteria:** The editor reliably finds an address, selects an existing
+Place, or creates a new Place inside the Event Wizard.
+
+## TASK 5 — Content Analytics & Ranking
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT:
+EXISTING — A real, working, shared engagement-ranking layer already exists
+and is already reused across the two main discovery surfaces plus My Plan
+suggestions, built entirely on Task 3's `UserEvent` log (no parallel
+analytics/ranking pipeline): `src/server/discovery/kudaDiscoveryFeed.ts`
+(Events "Куда пойти" feed) ranks its DB candidate pool
+(`cityId`/status-filtered, `orderBy nextOccurrenceAt/createdAt desc`) by
+`getEventEngagementScores()` (`src/server/discovery/
+eventEngagementScores.ts`, a single bounded raw-SQL `GROUP BY` scoped to the
+candidate `entityId`s — cheap, no full-table scan) + `Occasion.boostScore`
+(admin-curated seasonal boost, MAX-aggregated, `src/lib/discovery/
+occasions.ts`) + `businessQualityBoost.ts` (merit-based multiplier, up to
+×1.10, from booking response/confirm/complete rate, min 5 bookings/30d) + a
+weather boost, tie-broken by `dateStart`.
+`src/server/services/planSuggestions.service.ts` (My Plan suggestions)
+reuses the exact same `getEventEngagementScores()` after filtering
+candidates by city + published + `Child`-derived `ageTags` (graceful
+OR-fallback to unfiltered if the age filter would return 0 rows — genuine
+reuse, not a second engine).
+`src/server/discovery/classesDiscoveryFeed.ts` (Offers "Занятия" feed) has
+its own, simpler ranking: the real `Boost` model (`Offer.boosts`, an
+active-window relation) drives real, live, paid-visibility ranking — any
+Offer with an active `Boost` row gets a flat `engagementScore=1000` that
+dominates the sort (quality boost is deliberately not applied on top, to
+avoid double-boosting); non-boosted Offers get `businessQualityBoost` only
+(no `UserEvent`-derived engagement score is used for Offers today — an
+asymmetry vs. Events, not a defect). This corrects an earlier pass in this
+session's own research that initially concluded the `Boost` model was
+unwired into ranking (it had only grepped `contentDependencySummary.
+service.ts`'s deletion-dependency count and missed `classesDiscoveryFeed.
+ts`'s own `boosts: { where: { startAt: {lte: now}, endAt: {gte: now} } } }`
+select + `isBoosted` check) — corrected by direct code read before writing
+this section.
+`src/lib/search/constants.ts` `SEARCH_BOOST` (Task 2, unchanged) — flat
+per-entity-type multiplier + `updatedAt` tie-break, deliberately simple,
+already accepted as adequate at current catalog size (~276 published
+entities).
+Stories rail (`StoriesSection.tsx` + `HomeStoryItem`) is a working editorial
+rail by design — ordered by `pinned/placementType/manualOrder/startsAt`,
+**no** `UserEvent`/analytics signal, not meant to be signal-ranked.
+`StoryIntentConfig.title/enabled/order` (5 legacy intents:
+today/tomorrow/weekend/free/breaking_news) is genuinely admin-editable and
+live via `/admin/ranking/stories-intents?tab=rules`, with optimistic
+concurrency + audit log.
+`RankingSettings`/`BoostSettings`/`SearchRankingSettings` (3 admin panels,
+`/admin/ranking/weights`, `/admin/ranking/boost`, `/admin/search/ranking`)
+are already correctly remediated by a prior 2026-08 session: all three are
+self-documented dead in their own handler files, locked to HTTP 403 on any
+mutation, with matching amber "does not affect production ranking" banners
+— confirmed still accurate, nothing to fix.
+Ratings/reactions exist and are live per entity type: `PlaceReview`
+(rating+text+moderation+owner reply, Google-sync — Places), `RouteRating`/
+`ArticleRating` (like/neutral/dislike, one vote per identifier — Routes,
+Articles), `BookingFeedback` (1–5 stars, completed bookings only, feeds
+`FEEDBACK_LEFT` into `UserEvent`).
+PARTIAL/BROKEN — `UserBehaviorProfile.segmentKeys` (20 rule-based segments,
+e.g. `NEW_USER`/`SAVER`/`PLANNER`, recomputed synchronously on every
+`UserEvent` write, no cron needed) is fully live and correct but has **zero**
+ranking/recommendation readers anywhere in `src/` — every consumer is an
+admin analytics dashboard. `Child`-age relevance filters My Plan
+suggestions but does not rank within the filtered set (ranking there is
+population-level engagement + freshness only); the main Kuda feed takes no
+age/family parameter at all (age relevance there is client-side only, per
+an existing code comment). `Occasion.boostScore` is applied only to Events,
+not Offers/Places/Articles/Routes. `PlaceReview`/`RouteRating`/
+`ArticleRating` submissions do **not** emit any `UserEvent` — a real, live
+quality signal is invisible to the engagement-ranking engine.
+MISSING — No `EventRating`/`OfferRating` model (2 of 5 entity types have no
+public rating/reaction mechanism). No ranking signal applied to Place/
+Article listings (plain `createdAt`/`updatedAt desc` only; Place also has no
+public listing/catalog page at all — pre-existing, BACKLOG-032). No geo-
+distance ranking (city scoping is exact-`cityId`-match only; `Place.lat/lng`
+used only for map display). No explicit/named cold-start code path (de
+facto handled by population-ranked + freshness-tie-broken ordering, which
+is reasonable but not designed/tested as such — `NEW_USER` segment sits
+computed and unused right next to where it would be consulted). No cron/
+scheduled recalculation exists anywhere in this codebase for anything —
+correctly not needed here, since engagement scores and behavior segments
+are both computed live/on-write against small, indexed, bounded query
+shapes at current scale.
+DUPLICATED/CONFLICTING (root cause of this task's confirmed P1-adjacent
+correction) — `eventEngagementScores.ts` hardcoded its weights inline in
+raw SQL (`SAVE=5, PLAN_ADD=4, CTA_CLICK=3, DETAIL_OPEN/PAGE_VIEW=2,
+CARD_VIEW=1`) while a second, unused, self-documented-dead weight scheme
+(`src/features/discovery/signals/discoverySignalWeights.ts`,
+`DISCOVERY_SIGNAL_WEIGHTS`, explicit header: "NOT used in runtime
+calculations or feed ranking") sat parallel to it with different values and
+zero importers outside its own folder — two disagreeing opinions about
+signal weight existed in the repo, only one live. Also found: a second,
+fully-built, tested Stories-rail redesign (`resolveStoryRail.ts`/
+`loadStoryRailCandidatePool.ts`/`STORY_SLOTS` registry with
+`today`/`running`/`lastchance` intents) sits dead in the codebase, never
+imported by `CityHomePage.tsx` or any real route — an abandoned in-progress
+redesign of the live rail, using a different intent vocabulary. Duplicated
+"today/weekend" date-range logic exists independently in
+`src/lib/stories/ranges.ts` (Stories) vs. `whenLabel.ts`'s own local
+`computeWeekendRange()` (discovery filters) — same concept, two
+implementations, zero shared imports.
+DO NOT TOUCH — `UserEvent` ingestion (Task 3); `kudaDiscoveryFeed.ts`/
+`classesDiscoveryFeed.ts`/`businessQualityBoost.ts`/`Occasion` boost —
+real, live, working ranking engines, structurally unchanged by this task
+(only the numeric weights `getEventEngagementScores()` plugs in were
+corrected — its signature/return type is unchanged, so every caller is
+unaffected); `SEARCH_BOOST`/`/api/search` (Task 2, frozen);
+`RankingSettings`/`BoostSettings`/`SearchRankingSettings` locks (correctly
+inert, already disclosed — reopening "admin-tunable global weights" is
+exactly the "ranking → ML platform" scope creep this checklist's §15 warns
+against); `StoriesSection.tsx`/`HomeStoryItem`/manual placement admin
+(working editorial rail, out of scope); `PlaceReview`/`RouteRating`/
+`ArticleRating`/`BookingFeedback` (working UGC features — not touched, not
+wired into ranking this task, see IMPLEMENTATION SCOPE below);
+`Promotion`/`PromotionAction` billing (real revenue feature, unrelated to
+ranking); `UserBehaviorProfile`/`SegmentResolverService` internals (Task 3
+— correct as computed, only its "unused for ranking" gap is noted, not its
+computation).
+P0/P1 FINDINGS: none. The two real discovery surfaces (Events, Offers) and
+My Plan suggestions already rank content using a shared, cheap,
+understandable `UserEvent`-derived signal — this task's exit criteria was
+already substantially met before any code changed. Everything else found
+was either already-correctly-locked dead admin scaffolding (no release
+risk, already disclosed to admins) or a genuine but non-blocking
+signal/consistency gap. Nothing threatens security, data integrity, auth,
+or a critical production flow.
+PRODUCT DECISION (owner, 2026-08-10): `PLAN_ADD` is a stronger user-intent
+signal than `SAVE` (committing an item to a concrete day beats
+bookmarking it) — the previous runtime formula had this inverted
+(`SAVE=5 > PLAN_ADD=4`). Corrected canonical ladder: `CARD_VIEW=1,
+DETAIL_OPEN/PAGE_VIEW=2, CTA_CLICK=3, SAVE=4, PLAN_ADD=5`. Scope explicitly
+narrowed by the owner to formalizing/correcting the existing live ranking
+system only — no personalization, no new ranking layer, no models, no cron,
+no materialized scores, no ML, no admin-tunable global weights, no
+ratings/reactions wiring, no Stories-rail changes this task.
+IMPLEMENTATION SCOPE: (1) new canonical shared constant
+`src/server/discovery/engagementWeights.ts` (`ENGAGEMENT_WEIGHTS`, typed
+against the real `UserEventType` enum) with the corrected ladder; (2)
+`eventEngagementScores.ts` now builds its SQL `CASE` from that table
+(`Prisma.sql`/`Prisma.join` fragment composition) instead of a hardcoded
+inline copy — same function signature/return type, zero change to any
+caller; (3) removed the dead, conflicting `discoverySignalWeights.ts`
+scaffold and its self-contained folder (`src/features/discovery/signals/`
+— `index.ts`/`types.ts`/`utils.ts` all existed only to re-export/consume the
+now-removed table; confirmed zero importers anywhere outside that folder
+before deletion) — one source of truth for engagement weights now exists.
+Occasion boost, `businessQualityBoost`, weather boost, freshness tie-break,
+existing candidate filtering, and Search Ranking are all untouched. No new
+models, no cron, no materialized scores, no ML, no admin-tunable weights.
+Ratings/reactions and `UserBehaviorProfile.segmentKeys` deliberately NOT
+wired into ranking this task (see BACKLOG-041, BACKLOG-042). The second
+dead Stories rail deliberately NOT wired or deleted this task (see
+BACKLOG-043) — the live editorial rail is unchanged.
+COMMITS: `d5b149bc` (fix: canonical engagement weight table, PLAN_ADD
+outranks SAVE; retires the dead `discoverySignalWeights.ts`; adds 4 new
+targeted tests).
+VERIFICATION: New test `src/server/discovery/eventEngagementScores.test.ts`
+(self-contained fixture, created/torn down within the test, real local dev
+DB, `npx tsx` per this repo's convention) — 4 cases, all passing: (a)
+scoring a fixture entity with one event of every weighted type sums to
+exactly `Object.values(ENGAGEMENT_WEIGHTS)`'s total — computed dynamically
+from the imported canonical table, not a hardcoded number in the test, so
+it fails if the SQL generation ever drifts from the table; (b) a
+single-`PLAN_ADD` entity scores strictly higher than a single-`SAVE` entity,
+each matching its own canonical weight exactly; (c) an unlisted real
+`UserEventType` (`SEARCH_APPLY`) contributes exactly 0 — proves the `ELSE 0`
+branch still works and no speculative weight was invented; (d) repeated
+calls against unchanged fixture data return identical scores (determinism).
+Re-ran the pre-existing `activityVisibilityPhase2.test.ts` (same
+`src/server/discovery/` module) — no regression. `Occasion`/
+`businessQualityBoost`/weather/freshness composition in
+`kudaDiscoveryFeed.ts`/`classesDiscoveryFeed.ts` verified unregressed by
+direct code read (not by a new heavy integration test, per §13 risk-based
+verification for a small, isolated change): `getEventEngagementScores()`'s
+call sites, parameter shape, and return type (`Promise<Map<string,
+number>>`) are byte-identical to before — only the numeric values placed in
+that map changed, exactly as intended. `npx tsc --noEmit` clean (whole
+repo). `npx eslint` on all 3 changed/new files: 0 errors. `git diff --check`
+clean. Full `pnpm check:push` (`pnpm build`) run twice — exit 0 both times,
+"Compiled successfully in 104s", full route manifest generated, no errors.
+`git status --short`/`git diff --cached --name-status` confirmed only the
+intended 7 files changed (3 new/modified + 4 deleted), no foreign diff
+present or touched.
+DEV SMOKE: **Complete — verified live on actual `https://dev.mamago.by`
+after owner-confirmed deployment (2026-08-10).** Deployed image confirmed:
+`ghcr.io/asoftby/mamago2:dev-270`, OCI `revision` label
+`33fdb234c31175e9a3a6573308a285c5e51fbf1d` (exact match to the pushed
+commit), read directly from the green `Docker Build & Push` GitHub Actions
+run (`31385342913`) — `/admin/system/build` itself exposes no build
+SHA/version field (a version-history/changelog editor, not a build-info
+page, confirmed by direct visit with a real authenticated ADMIN session),
+so this is the same behavioral/pipeline-metadata proof pattern used in
+Task 2's closure. `GET /api/health` → `{"status":"ok","db":"ok"}`.
+This is a regression smoke (per instruction), not an attempt to prove exact
+score ordering through the UI — that is what the targeted DB tests already
+prove.
+- **Events / «Куда пойти» (`/minsk/kuda`)**: loads and ranks normally — real
+  published Event ("С. Кибирова балет «Три поросенка»") renders correctly
+  with cover image, price, age label, date; screenshot-verified. All
+  network requests 200 except benign `net::ERR_ABORTED` soft-navigation
+  aborts (the same pre-existing, already-documented pattern from Task 2's
+  own DEV smoke — duplicate in-flight RSC prefetches during rapid
+  client-side navigation, not a real error).
+- **Classes / Offers discovery (`/minsk/classes`)**: loads normally,
+  correctly renders the real empty state ("Пока нет занятий по вашему
+  запросу") — confirmed via `/admin/content/offers?status=PUBLISHED` →
+  "Предложения не найдены" that DEV genuinely has **zero `PUBLISHED`
+  Offers** right now (all existing Offers are `DRAFT`, matching the
+  pre-existing migration-era data state) — not a regression, and provably
+  cannot be one: `classesDiscoveryFeed.ts` was not touched by this task's
+  diff at all (it doesn't even call `getEventEngagementScores()` — its own
+  `Boost`-model-driven ranking is separate and untouched).
+- **My Plan suggestions**: `GET /api/plan/suggestions?city=minsk` → 200,
+  returns the same real published Event, ranked via the corrected
+  `getEventEngagementScores()` — confirmed this is the live, deployed,
+  canonical-weight code path (not stale), end-to-end, no error. (Date-
+  scoped queries for specific days returned an empty list — a pre-existing
+  day-availability filter nuance in `listPlanSuggestionsForCity()`,
+  unrelated to and untouched by this task's diff, not investigated further
+  as it's outside this smoke's regression scope.)
+- **Search Ranking**: `GET /api/search?q=три поросенка` → 200, correct
+  single real result, unchanged from Task 2's behavior — no regression.
+- **Occasion boost / `Boost` / `businessQualityBoost`**: code paths
+  structurally untouched by this task's diff (confirmed by direct read,
+  see IMPLEMENTATION SCOPE); `kudaDiscoveryFeed.ts` (which composes all
+  three on top of the corrected engagement score) rendered its real content
+  with zero server errors — the strongest available proof at current DEV
+  data volume (no active `Occasion`/`Boost` rows exist right now to
+  visually distinguish their effect, consistent with this being a
+  regression smoke, not a score-ordering proof).
+- **Console/errors**: zero ranking-related errors or 500s anywhere in this
+  smoke. One unrelated, pre-existing finding surfaced and investigated for
+  due diligence: a `Minified React error #310` fires in the console on
+  *every* page visited during this session (`/minsk`, `/minsk/kuda`,
+  `/minsk/classes` alike) under the owner's persisted authenticated ADMIN
+  browser session — confirmed **not** a Task 5 regression because (a) it is
+  identical on non-ranking pages (the plain homepage `/minsk`), (b) this
+  task's diff contains zero React/frontend files, and (c) the page still
+  renders full, correct content despite it in every case observed. Filed
+  as BACKLOG-049 (P2, investigation only, not fixed here) per owner
+  direction.
+BLOCKERS: none. All required regression-smoke checks passed on deployed
+DEV.
+BACKLOG/NOTES: BACKLOG-041 (ratings/reviews as ranking input — owner
+decided 2026-08-10 this is **not** a raw ranking-boost signal; retitled to
+"Design optional quality/trust layer from ratings and reviews," gated on
+PROD evidence, updated in place, not duplicated), BACKLOG-042
+(`UserBehaviorProfile.segmentKeys` unused for ranking personalization —
+deliberately deferred, no `NEW_USER`/`SAVER`/`PLANNER` feed branching this
+task), BACKLOG-043 (second dead Stories-rail redesign — needs a separate
+owner decision: finish wiring or delete), BACKLOG-044 (`Occasion.boostScore`
+only applied to Events, not Offers/Places/Articles/Routes), BACKLOG-045
+(duplicated today/weekend date-range logic, Stories vs. discovery filters),
+BACKLOG-046 (`StoryIntentConfig.itemLimit`/`allowedTypes` dead sub-fields),
+BACKLOG-047 (`SignalDefinition.isFeatured`/`EventCategory.isFeatured` dead
+admin flags), BACKLOG-048 (`Plan.hasPriorityBoost`/`PRIORITY_BOOST`
+scaffolding with zero callers and zero business-facing marketing surface —
+confirmed not currently sold, verified by grep across all business UI/API
+directories, so not a false-advertising risk, just dead plumbing),
+BACKLOG-049 (`Minified React error #310` reproduces globally on deployed
+DEV, ranking and non-ranking pages alike — confirmed not introduced by
+Task 5, tested user flows still work, investigation only, not fixed here).
+None blocks Task 5's Exit Criteria; none reopens Tasks 1–4.
+
+**TASK 5 — COMPLETE.** Deployed SHA: `33fdb234c31175e9a3a6573308a285c5e51fbf1d`
+(image `ghcr.io/asoftby/mamago2:dev-270`). PLAN_ADD now correctly outranks
+SAVE in the shared engagement-ranking formula reused by the Kuda discovery
+feed and My Plan suggestions; the dead, conflicting weight table is gone;
+zero P0/P1 found; ratings/reviews explicitly deferred to an optional
+future quality/trust layer per owner decision (BACKLOG-041), not wired
+into ranking this task. Task 6 not started. PROD untouched throughout —
+DEV-only deploy, no PROD access, no PROD env/data changes.
+
+AUDIT FIRST existing content ranking/engagement infrastructure and its
+overlap with Publication Analytics, Search ranking, Stories ranking, content
+performance, user signals, My Ideas, My Plan, ratings, reactions. Potential
+signals: impressions, CTR, saves, My Plan additions, shares, ratings,
+reactions, engagement, recency, geography, family relevance, child-age
+relevance, seasonality, freshness, quality, cold start. Do not build
+independent analytics/ranking pipelines for Search, Stories, and Content if a
+shared signal layer can be used.
+
+**Exit Criteria:** Content is automatically ranked using understandable,
+useful, and cheap signals without constant manual management.
+
+## TASK 6 — Article Actions
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT: Read-only code audit (models, services, APIs, UI, pending-action,
+       analytics enums) confirmed the owner-approved spec's assumptions with
+       corrections: `PlanItem` has no `offerId` field at all — the pattern to
+       mirror for Article was `placeId` (nullable FK, no defensive wrapper
+       needed, unlike `OfferIdea`'s P2021-catch pattern). No shared
+       `ArticleCard` component exists — cards are rendered inline in
+       `CityHomeContentRows.tsx` (homepage "Статьи и обзоры") and
+       `BlogIndex.tsx` (`FeaturedArticle`/`ArticleRow`, reused by both
+       `/blog` and `/{city}/blog`). `ArticleMvpView` had no `id`/href prop.
+       `BreakingNewsView` had its own bespoke `handleShare()` (native
+       share + manual clipboard), not `ShareModal`. `AnalyticsEntityType.ARTICLE`
+       already existed; `UserEventType.SHARE` does not (tracked separately,
+       BACKLOG-029). Guest pending-action resume (`PendingEntityType`) only
+       supported `"activity"`/`"route"` — confirmed the same gap already
+       existed for Place (BACKLOG-050, filed, not fixed here). Confirmed via
+       live DEV network trace that Activity/Offer/Event cards already have a
+       pre-existing per-card `/api/save/status` N+1 (BACKLOG-051, filed, not
+       fixed here — Task 6 built the batch mechanism for Article only, per
+       spec).
+GAPS: `ArticleIdea` model — missing. `PlanItem.articleId` — missing.
+      Article support in `idea.service.ts`/`plan.service.ts` — missing.
+      `articleId` support in `/api/save/idea`, `/api/save/plan`,
+      `/api/save/status` — missing. Batched save-status for Article card
+      grids — missing (had to be built new, no existing batch endpoint to
+      extend). Save/Share actions on Article cards, standard detail,
+      Breaking News detail, continuous reading — missing. `"article"` in
+      guest pending-action resume — missing.
+IMPLEMENTATION: Hand-written migration `20260811120000_add_article_actions`
+      (`ArticleIdea` model mirroring `PlaceIdea`; `PlanItem.articleId`
+      nullable FK, `ON DELETE SET NULL`) — applied to DEV via
+      `prisma migrate deploy`, schema validated. `idea.service.ts`:
+      `addArticleIdea`/`removeArticleIdea`/`hasArticleIdea`/
+      `hasArticleIdeasBatch`. `plan.service.ts`: `addArticlePlanItem`
+      (dedupes by user+article, clears competing entity fields on update,
+      mirrors `addPlacePlanItem`)/`listArticlePlanItemsBatch`. Extended
+      `/api/save/idea` (POST+DELETE), `/api/save/plan` (POST), `/api/save/status`
+      (GET) with an `articleId` branch each, emitting `SAVE`/`PLAN_ADD`
+      `UserEvent`s with `entityType: "ARTICLE"`, `section: "journal"` (matches
+      the existing Article analytics convention, not the spec's literal
+      `"articles"` — see VERIFICATION). New bounded batch endpoint
+      `POST /api/save/status/articles` (dedup, cap 40 ids, user-scoped, one
+      query pair via `hasArticleIdeasBatch` + `listArticlePlanItemsBatch`) —
+      the smallest-reasonable mechanism Task 6's own spec required to avoid
+      N+1 on Article listing cards. `PendingEntityType` extended with
+      `"article"`; `executePendingPostAuthAction` gets `save_idea`/`save_plan`
+      article branches; `SaveActivityFlowAdaptive` generalized from a
+      hardcoded `entityType: "activity"` to accept `pendingEntityType`/
+      `pendingEntityId` props (back-compat default `"activity"` +
+      `activityId`, so no existing caller changed behavior). New
+      `ArticleSaveHeart` (icon variant for cards with `skipOwnFetch`/
+      `initialStatus` batch-driven mode; labeled variant for detail),
+      `useArticleSaveStatusBatch` hook, `persistArticleSave.ts`,
+      `ArticleDetailActions` (Heart+"Сохранить" + Share2+"Поделиться",
+      reusing the existing `ShareModal`). Wired into: homepage journal row
+      (`CityHomeContentRows.tsx`), `/blog` + `/{city}/blog`
+      (`BlogIndex.tsx` — `FeaturedArticle` + `ArticleRow`, both routes share
+      this component), standard Article detail (`ArticleMvpView`, both
+      `/blog/[slug]` and `/{city}/blog/[slug]`), continuous reading (each
+      loaded article in `ContinuousArticleReader` gets its own `articleId`/
+      `href` — independent React state per article, no bleed), and Breaking
+      News detail (`BreakingNewsView`'s `NewsHero` — bespoke share handler
+      replaced with `ArticleDetailActions`, dead `copied`/`handleShare` code
+      removed). Cards use the sibling-overlay pattern (Heart positioned via
+      an absolutely-positioned sibling `div`, never nested inside the
+      article `<a>`) matching the existing `ActivityCard` convention.
+COMMITS: `d923e1f6` — feat(article): add Save (Ideas/Plan) and Share actions
+      across all article surfaces (implementation; deployed and smoked,
+      closes Exit Criteria). `3b3c13d5` — docs closure for the above.
+      Post-smoke, owner-requested UI-only visual refinements (do not
+      reopen Task 6 — see BACKLOG/NOTES): `e4a1b6bb` — revert homepage
+      journal card to its pre-Task-6 implementation, remove the `/blog`
+      row's circular arrow and move Heart into that slot. `d8be9416` —
+      resize the homepage journal rail to 5 cards matching the Events
+      rail's rhythm, restore the Heart action, fix the card-width flex
+      nesting bug that was the actual cause of the "tail" artifacts.
+      `9decd216` — anchor the homepage Heart to the cover (not the outer
+      card) and add real Article-category metadata between cover and
+      title. All 3 pushed to `dev`; not yet owner-deployed as of this
+      checklist update.
+VERIFICATION: `test:article-actions` (new) — `parseArticleIdsForBatch` unit
+      tests (dedup/cap/invalid-input), `executePendingPostAuthAction` article-
+      branch tests (fetch-mocked, confirms correct endpoint+payload routing,
+      confirms the pre-existing activity branch is unaffected), and a real-DB
+      integration test (`articleSaveActions.test.ts`: idea add/remove/
+      idempotent/cross-user-isolation, plan add/dedupe/clears-competing-
+      fields/cross-user-isolation, batch idea+plan checks, ownership-checked
+      remove, invalid-article-id rejection) — all green. `npx tsc --noEmit`
+      clean. Targeted `eslint` on every touched/new file clean (one genuine
+      bug caught and fixed pre-verification: `react-hooks/set-state-in-effect`
+      in `useArticleSaveStatusBatch`, fixed by gating the returned value
+      instead of resetting state synchronously in the guard branch).
+      `git diff --check` clean. `pnpm check:push` (full production build)
+      green, zero errors, full route manifest generated. Local browser
+      verification against the real local DEV DB (authenticated real user
+      session): homepage + `/minsk/blog` — confirmed via DOM inspection the
+      Heart button is a sibling of the article `<a>` (no illegal nested-
+      interactive markup), labeled "Сохранить статью" (generic save, not
+      "В идеи"), no Share icon on cards; confirmed via `read_network_requests`
+      in a **fresh tab** (to rule out soft-navigation log accumulation) that
+      exactly one `POST /api/save/status/articles` batch call fires per page
+      load and **zero** per-card `GET /api/save/status?articleId=...` calls —
+      the N+1 this task was required to avoid. Clicked the Featured Article
+      Heart → chooser opened (date picker + "Сохранить в идеи", not a direct
+      Ideas toggle) → chose "Сохранить в идеи" → `POST /api/save/idea` fired
+      → Heart label changed to "Изменить сохранение статьи" → success view
+      showed "Убрать из идей"/"Запланировать"/"Все мои идеи" — full save
+      flow confirmed end-to-end, then cleaned up (`DELETE /api/save/idea`,
+      confirmed `isSaved:false` after). Article detail
+      (`/minsk/blog/chem-zanyatsya-na-novogodnih-kanikulah`) — confirmed
+      "♡ Сохранить" + "↗ Поделиться" both render; clicked Share → `ShareModal`
+      opened with correct Telegram/WhatsApp links carrying the exact article
+      URL + title. Confirmed via `data-article-id` DOM inspection that this
+      same page renders through `ContinuousArticleReader` (continuous reading
+      is live for this article — category "podborki" is active/non-archived)
+      with exactly 1 Save + 1 Share button correctly scoped to that article's
+      id; could not live-verify the *second* loaded article's independent
+      Save/Share (IntersectionObserver-driven prefetch didn't trigger via
+      simulated scroll in this session) — verified by code inspection instead
+      (each loaded article gets its own `articleId`/`href` props, in its own
+      keyed wrapper div, so React scopes state independently by construction).
+      Breaking News detail could not be live-verified — **zero** Breaking
+      News articles exist in the local DEV dataset (confirmed via direct
+      query); verified by code inspection only (props threaded, bespoke share
+      handler removed cleanly, `eslint`/`tsc` clean). Guest pending-action
+      resume could not be live-verified in-browser — the session cookie is
+      httpOnly (can't be cleared via `document.cookie` to simulate logout
+      without a real logout, which would disrupt the owner's persisted DEV
+      session) — verified via the `executePendingPostAuthAction` unit tests
+      instead, which exercise the exact new "article" branch added.
+DEV SMOKE: Deployed-DEV smoke on `d923e1f6`/`3b3c13d5` completed and
+      confirmed green by the owner — this closes the items this session's
+      own local-DEV verification could not reach (Breaking News detail, no
+      seeded content in local DEV; guest pending-action resume, could not
+      simulate logout against the owner's persisted session; continuous-
+      reading second-article scroll). The owner's deployed-DEV pass is
+      recorded here as owner-confirmed, not independently re-observed by
+      this session — the concrete, directly-observed evidence remains what's
+      documented above under VERIFICATION (local-DEV browser + code
+      inspection + unit tests). Task 6 Exit Criteria are met; status is
+      `COMPLETE`, no outstanding deployed-smoke gap remains.
+
+      Post-smoke (does not reopen Task 6): 3 UI-only visual-refinement
+      commits (`e4a1b6bb`, `d8be9416`, `9decd216` — see COMMITS) are pushed
+      to `dev` but not yet owner-deployed. Once deployed, only a **targeted**
+      visual check of the homepage Article card is required — not another
+      full Task 6 smoke: 5-card desktop layout, Heart inset into the cover,
+      real-category rendering when present, no vertical tails, Heart opens
+      the Save chooser without navigating, mobile/narrow layout.
+BLOCKERS: none.
+BACKLOG/NOTES: Filed BACKLOG-050 (Place/Offer guest pending-action resume
+      gap, pre-existing, confirmed not fixed here), BACKLOG-051 (pre-existing
+      per-card `/api/save/status` N+1 on Activity/Offer/Event grids, confirmed
+      live, not extended to fix here), BACKLOG-052 (global Share consolidation
+      — `ShareSheet.tsx`/Route detail untouched), BACKLOG-053 (cross-entity
+      Save/Share design-system normalization to the pattern this task
+      established, explicitly deferred per the owner's own product decision),
+      BACKLOG-054 (found incidentally: local dev DB has two migrations
+      applied — `SearchDocument.cityId`/`SearchQueryLog` fields — from commit
+      `98390674` on unmerged branch `recovery/main-wip-snapshot-2026-08-07`,
+      not present in `dev`'s `prisma/schema.prisma`; confirmed zero
+      file/table overlap with this task's migration, left untouched per
+      foreign-work-in-progress rule, needs an owner decision). Corrected
+      BACKLOG-029's now-stale Context line (claimed `BreakingNewsView` used
+      `ShareModal`, which was false at the time it was written — now true
+      after this task's `NewsHero` share swap).
+
+      Post-smoke UI-refinement approved state (current, in effect —
+      commits `e4a1b6bb`/`d8be9416`/`9decd216`): homepage "Статьи и обзоры"
+      — 5 Article cards visible on the desktop rail, sized/spaced to match
+      the Events rail's visual weight; card's only explicit action is
+      Heart (no Share, no separate Ideas/Plan buttons); Heart anchored
+      inside the cover with a consistent ~11-12px inset (not the outer
+      card edge); decorative vertical-line/tail artifacts removed (root
+      cause was a flex-nesting width bug, not a decorative element); real
+      Article category (`CityHomeJournalArticle.category`, already
+      selected by `listCityHomeArticles.ts`, reused — no new field/
+      taxonomy) renders between cover and title only when present, no
+      fabricated category. `/blog`: Heart is the only explicit card/row
+      action, no Share; the circular navigation arrow is removed (`ArticleRow`
+      in `BlogIndex.tsx`, commit `e4a1b6bb` — confirmed via current git
+      state, no arrow markup remains). Article detail/full Article
+      (standard, Breaking News, continuous reading): unchanged canonical
+      `♡ Сохранить` + `↗ Поделиться`. Product rule stays: cards → Save/
+      Heart only; detail/full content → Save + Share.
+
+      Post-deploy targeted visual verification (2026-08-11, actual
+      `https://dev.mamago.by`, deployed image `ghcr.io/asoftby/mamago2:dev-272`
+      — confirmed via SSH `docker ps` on the DEV host and the Docker Build &
+      Push run's `org.opencontainers.image.revision` label, both pinned to
+      `9decd2165d0f4d107a8ce7634579d8b59f489601`): **green.** This is a
+      scoped visual check of the post-smoke UI refinements only, not a
+      repeat of the full Task 6 smoke. Real DEV content for Minsk currently
+      has exactly 1 published Article, so the "5 cards" case could not be
+      observed with live content — verified instead that the deployed
+      card's class list carries the `lg:w-[calc((100%-6rem)/5)]` 5-column
+      formula (computed width 208px at 1440px, matching local verification
+      exactly) and would render 5 across once more Articles publish.
+      Directly observed on the single live card: Heart present, no Share,
+      11px inset from the cover's top/right edges (desktop and mobile,
+      375px), real category "Обзоры" rendering between cover and title, no
+      vertical-line/tail artifacts, no horizontal overflow on mobile.
+      Interaction: clicked Heart → Save chooser opened scoped to the
+      correct Article, URL stayed on `/minsk` (no navigation); closed the
+      chooser; clicked the card body → navigated to the correct Article
+      detail page, which still renders `Сохранить`/`Поделиться` unchanged.
+      `/blog` quick regression: same single Article's Featured card shows
+      Heart, no Share, no arrow — consistent with commit `e4a1b6bb`.
+      Console/network: no Article-card-related errors or 500s; the only
+      console errors present (repeated `401` on `GET /api/save/status?
+      activityId=...` for the guest session, one `400` on a Next.js image
+      optimization request for an unrelated Event cover) are pre-existing,
+      unrelated to Article cards, and not new — confirmed the new
+      `POST /api/save/status/articles` batch endpoint made zero calls for
+      this guest session (correct: no unnecessary calls for guests). No
+      P0/P1 introduced by this deploy. Task 6 stays `COMPLETE` — this
+      verification does not reopen it.
+
+AUDIT FIRST existing Share / My Ideas / My Plan / CTA / saved-state
+functionality. Ensure: Share, Save to "My Ideas", Add to "My Plan" wherever
+logically applicable. Check: article card, article detail, continuous
+reading, authenticated user, guest, analytics, synchronization, mobile,
+desktop. Reuse existing universal action components.
+
+**Exit Criteria:** Actions work consistently across all relevant article
+surfaces.
+
+## TASK 7 — Day Scenario
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT:
+EXISTING — Live path is `src/features/my-plan/components/{DayScenarioModal,
+ScenarioTimeline, ScenarioActionBar, BuildScenarioButton}.tsx`, opened from
+`PlanMainContent.tsx`. Trigger `canOpenDayScenario = totalPlannedCount > 2`
+(`PlanMainContent.tsx:840-843`) counts only the selected date's `PlanItem`
+rows, matches the "3+ same-date activities" spec exactly. Timeline sorting
+(`sortPlanItemsForDay.ts`, timed-then-untimed, deterministic), timed/untimed
+rendering (no fabricated times, "Без времени" fallback), address/price
+formatting, and the desktop-Dialog/mobile-Sheet responsive infra
+(`MyPlanOverlay`/`ResponsiveOverlay`) are all real, correct, and reusable.
+Guests cannot reach this component tree (`MyPlanPanelContent` renders
+`GuestMyPlanPanel` instead when unauthenticated) — no leakage, but also no
+guest Scenario today.
+PARTIAL/BROKEN — `ScenarioActionBar`'s viewer/"Сохранить в мой план" path
+(`onApplyToMyPlan`) is dead: no caller passes it, both `DayScenarioModal`
+call sites default to `mode="owner"`. Share is ephemeral text via
+`navigator.share`/clipboard only, no URL, nothing persisted. A real
+conflict/placement algorithm exists (`src/features/me/lib/dayScheduler.ts`
+`findPlacement()`) but is only wired through `useAddScenarioPlan`, whose only
+consumer is dead code (see DEAD/LEGACY) — not connected to the live modal.
+MISSING — standalone route/page (today modal-only, nested inside the My
+Plan overlay itself = dialog/sheet-in-dialog/sheet on both desktop and
+mobile); explicit create/draft/ready lifecycle (today always a fresh live
+view, nothing to "create"); persistence across reload/logout/date-nav
+(nothing written anywhere — confirmed no `Scenario` Prisma model exists,
+only unrelated `NotificationScenario` enum); "план изменился" detection
+(moot only because nothing is saved yet); pauses; conflict warnings on the
+live path; manual reorder/time/duration adjustment (`PlanItem` has no
+`duration` column at all); editing UI; analytics (zero `trackUserEvent`
+calls anywhere in the Scenario components); tests (zero test files
+reference any Scenario component or the trigger logic); guest Scenario
+(structurally absent, needs an explicit owner decision if in scope).
+DEAD/LEGACY — `src/features/me/lib/dayScenario.ts`'s `buildDayScenario()` is
+a stub that always `return null`s; its only consumer
+`DayScenarioBlock.tsx` can therefore never render a populated scenario.
+`ScenarioFinalPage.tsx` has zero importers anywhere. `PlanCard.tsx` (the
+only importer of `DayScenarioBlock`) is wired solely into the internal
+`ui-lab` component showcase registry — that registry's own `usedIn`
+metadata falsely claims usage in `/me/page.tsx` and `/me/day/[date]/page.tsx`
+(neither actually imports it — stale metadata, backlog candidate).
+`GuestMyPlanPanel`'s `scenarioSlots`/morning-afternoon-evening picker is an
+unrelated feature that only shares the word "scenario" — not a guest
+version of Day Scenario, do not merge. `POST /api/plan/generate`'s response
+key literally named `scenario` is likewise just a naming collision (it's
+the suggestions array), not a persisted Scenario resource.
+GAPS: see MISSING above. Core gap vs. target: a real standalone page,
+explicit create/persist lifecycle, and wiring the already-existing
+`dayScheduler` conflict algorithm into the live path. No Scenario
+read/write API exists today, so ownership/authorization is currently moot.
+No Google Routes/Distance Matrix/Maps SDK calls exist anywhere in the My
+Plan or `me/` scenario code — the owner's cost boundary is already
+respected by construction (nothing calls those APIs).
+IMPLEMENTATION: Owner approved Option 2, minimal ("we are not building a
+full itinerary editor"). Built:
+(1) **Data model** — new `DayScenario` model (`id, userId, date, status
+[default "READY"], planFingerprint, createdAt, updatedAt`,
+`@@unique([userId,date])`), hand-written migration
+`prisma/migrations/20260811130000_add_day_scenario/migration.sql` (no
+`prisma migrate dev`/`db push`), applied to local dev DB, Prisma client
+regenerated. No `DayScenarioItem`/content duplication — the page always
+reads current `PlanItem` rows live; the model only marks "a Scenario was
+explicitly created for this user/date" + a cheap drift signature. City is
+correctly **not** part of the DB identity (confirmed `PlanItem` has no
+`cityId` — matches audit finding).
+(2) **Service** (`src/server/services/dayScenario.service.ts`) —
+`computePlanFingerprint()` (sha256 of sorted `id:startsAt` pairs, order-
+independent, drifts on add/remove/time-change), `getDayScenario`,
+`ensureDayScenario` (idempotent get-or-create, P2002 race-safety-net
+catch), `refreshDayScenario` (recompute + persist, no-op if no row).
+(3) **Route/page** — `src/app/(public)/[city]/my-plan/[date]/scenario/
+page.tsx`, a real standalone Server Component page (not a modal). Auth via
+`redirectToLogin()` (safe `redirectTo` pattern). City validated via
+`findCityBySlug` (not used to filter data — display/nav only, matches
+audit finding that My Plan identity is user+date). Date validated by
+regex, `notFound()` otherwise. An already-created Scenario is always shown
+(never hidden if My Plan later drops below 3 items) — only *initial*
+creation is threshold-gated via the shared `canOpenDayScenario()` (see
+below), so a bookmarked/direct URL open never silently fabricates one
+below 3 items but does correctly restore an existing one.
+(4) **Conflicts** — re-audited `src/features/me/lib/dayScheduler.ts` before
+reuse: its `findPlacement()` solves single-new-item insertion, not
+"list every conflicting pair in a fixed set" — not a fit API-wise, so
+wrote a small new pure `detectScenarioConflictIds()`
+(`src/features/my-plan/lib/detectScenarioConflicts.ts`, adjacent-pair
+overlap on a shared 60-min assumed-duration convention, untimed items
+never flagged, no fabricated travel time, no optimization). `dayScheduler.ts`
+itself left fully untouched, per instruction not to revive the dead chain
+around it.
+(5) **Reuse, unchanged** — `ScenarioTimeline`/`sortPlanItemsForDay`/address
++price formatting/timed-untimed rendering, all reused as-is; only addition
+to `ScenarioTimeline` was an optional `conflictIds` prop for the warning
+line.
+(6) **Plan-changed** — page compares live `computePlanFingerprint(items)`
+vs. the stored one; on mismatch shows "План изменился" + a
+`refreshDayScenarioAction` Server Action button ("Обновить сценарий") that
+recomputes/persists the fingerprint and revalidates the page. No version
+history/stack.
+(7) **CTA wiring + a real nested-modal bug found and fixed** — the
+existing "Собрать сценарий дня" button now navigates
+(`router.push('/{city}/my-plan/{date}/scenario')`) instead of opening
+`DayScenarioModal`; that dead modal wrapper + `ScenarioActionBar.tsx` were
+deleted (0 other importers, confirmed by grep). Browser verification of
+this navigation initially found a **real regression**: the My Plan overlay
+Dialog stayed visibly open on top of the new page (exactly the nested-
+modal problem Task 7 exists to remove). Root-caused via instrumented
+logging (since removed): the pre-existing `onRequestClose()`-then-
+`router.push()` pattern (already used by the sticky-counter → `/me/plan`
+flow) only "works" today because `/me/plan` is hard-matched by
+`isMyPlanFullPageRoute()`, which **fully unmounts** `MyPlanOverlayHost`
+instead of waiting on Radix's close animation — our new route wasn't in
+that match list, so the close animation got interrupted mid-flight by the
+navigation (`getAnimations()` showed `playState:"running"`,
+`currentTime:0`, stuck) and never reached its closed visual state. Fix:
+added the `/{city}/my-plan/...` route family to `isMyPlanFullPageRoute()`
+(`src/components/MyPlanProvider.tsx`), reusing the same reliable mechanism
+instead of fighting animation timing. Re-verified clean (0 `[role="dialog"]`
+elements after CTA click) on both desktop and mobile viewports.
+(8) **Security** — every read/write is scoped server-side by the
+session-derived `userId`; the client never supplies a `DayScenario` id at
+all (lookups are always by the `(userId, date)` compound key), so
+cross-user access isn't just checked, it's structurally unreachable.
+Verified with explicit tests (see VERIFICATION).
+(9) **Cost** — one bounded `listPlanItemsByDate` query (already existed)
++ one `findUnique`/`create`/`update` on `DayScenario`, no N+1, no polling,
+no external API calls (confirmed zero Google Routes/Maps calls in the
+Scenario path, matching the audit finding and the owner's cost boundary).
+COMMITS: `7e7a2fb3` (audit docs), `a2091390` (schema/migration/service/
+route/page/CTA wiring), `c6de4186` (tests + `canOpenDayScenario` extraction
++ always-show-existing-scenario fix), `baf500b3` (nested-modal fix).
+VERIFICATION: `npx tsc --noEmit` clean; `npx eslint` on every changed file
+clean (0 errors; only pre-existing, unrelated warnings in
+`PlanMainContent.tsx`/`MyPlanProvider.tsx`, confirmed identical via
+`git stash` diff before/after). `pnpm test:day-scenario` (new bundled
+script: `canOpenDayScenario.test.ts`, `detectScenarioConflicts.test.ts`,
+`sortPlanItemsForDay.test.ts`, `dayScenario.service.test.ts`) — all green,
+covering: 2-items-no-CTA/3-items-CTA threshold, idempotent create (same
+row returned, DB unique-constraint duplicate-create rejected), cross-user
+read isolation, cross-user "refresh" isolation (wrong user's refresh call
+cannot touch another user's row — verified explicitly, not just assumed
+safe), fingerprint determinism/order-independence and drift-on-change,
+refresh persistence, timed-item chronological sort, untimed-items-sort-
+last-without-fabricated-time, conflict detection (overlap/no-overlap/
+back-to-back-boundary/mixed-timed-untimed). `pnpm check:push` (`pnpm
+build`) exits 0, zero errors, new route `/[city]/my-plan/[date]/scenario`
+correctly listed as dynamic (ƒ) in the build output.
+DEV SMOKE (local dev server, Browser pane, real seeded user + PlanItems —
+not yet deployed-DEV, see BLOCKERS): desktop 1280×720 — My Plan overlay →
+selected date with 5 items (2 overlapping, 1 clean, 1 untimed) → CTA click
+→ lands on standalone `/minsk/my-plan/2026-09-05/scenario`, correct date/
+city header, "5 событий · 12:00–21:00" summary, timeline in correct order
+(timed chronological, untimed "Прогулка в парке" last, no fabricated
+time), both real conflicting items show "⚠ Время пересекается", the
+non-overlapping 17:00 item does not. Direct reload of the URL: identical
+render, Scenario restored (not recreated — `id`/`createdAt` unchanged,
+confirmed via DB read). Leave (navigate to `/minsk/events`) and reopen via
+URL: state correctly restored. Modified My Plan (added a 6th item directly
+via DB, simulating a real add) → reopened page → "План изменился" banner
+shown with the new item already visible in the live timeline (My Plan
+stays source of truth) → clicked "Обновить сценарий" → banner disappeared,
+`planFingerprint`/`updatedAt` correctly updated in DB, same row id (no
+duplicate). "Insufficient activities" state verified for a date with 0
+items (no Scenario row created, correct empty-state copy + link back to
+`/me/plan`). Mobile 375×812: normal full page (not a Sheet), same content,
+readable timeline, no layout break, 0 `[role="dialog"]` elements. No
+relevant console errors on either viewport (only expected dev-only HMR
+websocket noise from the preview-tool's server restarts, not app errors).
+No network requests failed (except the same dev-only HMR channel).
+BLOCKERS: none for local completion. Real actual-`dev.mamago.by` smoke is
+owner-controlled deployment, not yet performed (per instruction: push only
+when clean, then stop for owner-controlled deployment — no DEV/PROD deploy
+attempted by this session).
+BACKLOG/NOTES: BACKLOG-055 (guest Scenario persistence, explicitly
+deferred), BACKLOG-056 (manual reorder/time/duration editing, explicitly
+excluded from MVP), BACKLOG-057 (pauses/free intervals, explicitly
+excluded), BACKLOG-058 (public read-only share URL, explicitly excluded),
+BACKLOG-059 (recommendation insertion into timeline gaps, explicitly
+excluded), BACKLOG-060 (travel-time/Google Routes integration, explicitly
+excluded per cost boundary), BACKLOG-061 (dead `src/features/me/` Day
+Scenario chain — finish-or-delete decision, left fully untouched by this
+task as instructed). All recorded in `docs/engineering/backlog.md`, none
+implemented.
+
+UX / FUNCTIONAL COMPLETION PHASE (2026-08-11, Claude Code — supersedes
+nothing above; the accepted foundation through commit `6d2d829b` — schema,
+persistence, one-Scenario-per-user/date, fingerprint, "План изменился",
+refresh, conflict detection, ownership isolation, no Google Routes — was
+preserved unchanged. This phase makes the Scenario genuinely useful and
+converges every My Plan entry point on it):
+AUDIT (narrow, before touching code) — confirmed via direct code read:
+`PlanItem.startsAt` is populated at add-time from a client-resolved
+`ActivitySession` (`/api/save/plan/route.ts:124-145`) — genuinely
+authoritative when set, but null whenever the add-flow (e.g. quick-add
+suggestions) didn't resolve a session, even though the `Activity` itself
+may have exactly one real scheduled `ActivitySession`. This is the real
+"Без времени" data bug the owner flagged, not a display bug — confirmed by
+reading the schema (`ActivitySession{id,activityId,startsAt}`, no `endsAt`)
+and the add-flow. No reliable duration field exists anywhere in the schema
+(`ActivitySession` has no `endsAt`, `Activity` has no duration column) —
+confirmed via full-schema grep; free-gap/end-of-day display were built to
+use one but architected to never fabricate when absent (i.e., they will
+not visibly activate until a real duration source exists — this is
+correct, not a bug). `formatActivityAddressLine()` never touched price
+fields — the "long price string where address should be" issue traced to
+the old `ScenarioTimeline`'s separate `formatPrice()` meta line (now
+removed from Scenario cards entirely, not just hidden).
+IMPLEMENTATION:
+(1) Data correctness — `listPlanItemsByDateForScenario()`
+(`dayScenario.service.ts`) extends the per-date query with `scheduleMode` +
+same-date `ActivitySession`s (generous DB window, exact match via
+`getLocalDateKey`, never a cross-day guess); `resolveScenarioItemTime()`
+(`scenarioProjection.ts`) recovers an authoritative time only when exactly
+one session matches the exact planned date — genuinely ambiguous cases
+(0 or 2+ same-date sessions) correctly fall through to flexible/override,
+never guessed.
+(2) Flexible-time assignment — new `DayScenarioItemOverride` model
+(`id, scenarioId, planItemId, startTimeOverride`, `@@unique([scenarioId,
+planItemId])`, cascade-deletes with either parent), hand-written migration
+`prisma/migrations/20260811150000_add_day_scenario_item_override/
+migration.sql`. No `DayScenarioItem`, no content duplication — only an
+FK + a time. Service functions `setScenarioItemOverride`/
+`listScenarioItemOverrides`/`pruneScenarioItemOverrides`; ownership is
+structural (Scenario looked up by `(userId,date)`, PlanItem must match the
+same `userId`+`date` — never a client-supplied id trusted). New
+`setScenarioItemTimeAction` Server Action + `AssignScenarioTimeControl.tsx`
+(native `<input type="time">`, inline expand/collapse, no nested dialog).
+Fixed/recovered source time always wins over an override by construction
+(`resolveScenarioItemTime` checks source before override).
+(3) Converged CTA everywhere — extracted `resolveScenarioCtaState`/
+`resolveScenarioCtaLabel` (`canOpenDayScenario.ts`) as the one shared rule
+for "Собрать сценарий дня" / "Открыть сценарий дня" / "Сценарий дня · План
+изменился". Wired into **both** required entry points: the full `/me/plan`
+page (`PlanDayList.tsx`'s new `ScenarioCta`, server-computed
+`scenarioStatusByDate` in `me/plan/page.tsx` via one bounded
+`dayScenario.findMany` + reused-fingerprint comparison — no extra
+per-render cost) and the My Plan overlay panel (`PlanMainContent.tsx`),
+which previously always showed "Собрать сценарий дня" even when a Scenario
+already existed — a real inconsistency found and fixed during this phase.
+The overlay's status is threaded through the **existing** per-date
+`/api/save/plan/day` fetch (`scenarioStatus` field added to that response,
+consumed by `useMyPlan.tsx`) — reuses an already-happening request, adds no
+new round trip, no polling. `/me/plan?date=` now seeds the initially
+selected date (small, backward-compatible addition — falls back to today),
+making "Изменить план" from the Scenario page land on the correct date.
+(4) Timeline redesign — time is now the primary visual anchor (large,
+outside the card, next to the marker/line), not buried in card metadata.
+Flexible items show "Гибкое время" (not "Без времени") + "+ Назначить
+время". Cards dropped price entirely (title → address → duration → small
+cover only, per the owner's card-priority spec) — `listPlanItemsByDateForScenario`'s
+select doesn't even fetch price fields anymore, so the bug class is closed
+by construction, not just hidden in the UI. Conflict warning kept
+adjacent to the affected item; overlap-amount-in-minutes deliberately
+**not** shown (would require the same non-real assumed-60-min heuristic
+used only for detection — showing it as a precise number would itself be
+fabricated data, so it's omitted rather than faked). Free-gap blocks and
+"День завершится около HH:MM" are fully implemented
+(`deriveFreeGapMinutes`/`deriveEndOfDay`) but — correctly, per "never
+fabricate" — will not render until a real duration source exists.
+(5) "Изменить план" — added to the Scenario page header, links to
+`/me/plan` (now date-aware via the `?date=` support above). Scenario still
+owns no item-selection UI.
+MIGRATION: hand-written, `DayScenarioItemOverride` only (see above); no
+`prisma migrate dev`/`db push`; applied to local dev DB; Prisma client
+regenerated.
+COMMITS: implementation landed in this session's working tree; see final
+pushed SHA below (single consolidated push per owner instruction — targeted
+checks were run throughout, not after every micro-change).
+TESTS: `pnpm test:day-scenario` (bundled script) extended with
+`scenarioProjection.test.ts` (time resolution priority incl. fixed-wins-
+over-override and ambiguous-sessions-never-guessed, duration always null,
+sort with mixed fixed/override/flexible, free-gap arithmetic incl. overlap
+→ null not negative, end-of-day incl. unknown-duration → null),
+`formatActivityAddress.test.ts` (address resolution correctness, confirms
+no fabricated fallback), extended `canOpenDayScenario.test.ts` (CTA state/
+label matrix incl. "existing Scenario stays reachable below threshold"),
+extended `dayScenario.service.test.ts` (override idempotent upsert,
+cross-user override rejection, foreign/wrong-date PlanItem rejection,
+prune-on-refresh, same-date session recovery incl. the 2-sessions-never-
+guessed case) — all green. `npx tsc --noEmit` clean throughout. `npx
+eslint` clean on every changed file (0 new warnings — verified via
+`git stash` diff against pre-change baseline for the two largest/pre-
+existing-warning files). `pnpm check:push` (`pnpm build`) exits 0.
+DEV SMOKE (local dev server, Browser pane, fresh QA fixtures — one real
+`ActivitySession`-backed Activity with `PlanItem.startsAt` deliberately
+null, one fixed item, one genuinely flexible item, two overlapping fixed
+items, cleaned up after): recovered time renders correctly (session at
+08:00 UTC → correctly shown as 11:00 local); flexible item shows "Гибкое
+время" + "Назначить время"; assigning 15:45 re-sorted the timeline
+immediately into chronological position, changed the meta line from
+"N событий · 1 требует времени" to a full "HH:MM–HH:MM" span (all items
+now effectively timed), and **persisted across a full page reload**;
+conflict warnings correct on both overlapping items and unaffected
+elsewhere. Full "план изменился" round-trip re-verified with the new
+override machinery in place: added a 6th item via DB → banner appeared on
+both the Scenario page and the My Plan full-page CTA ("Сценарий дня · План
+изменился") → clicked "Обновить сценарий" → banner cleared, override for
+the still-present flexible item **preserved**; removed the overridden item
+from My Plan → its `DayScenarioItemOverride` row was confirmed gone via
+direct DB read (FK cascade, not application code) → Scenario page correctly
+showed "План изменился" again with the item absent from the timeline.
+Empty-state (0 items) and the overlay CTA → standalone-page navigation
+(desktop, confirmed 0 `[role="dialog"]` elements after navigating, mobile
+375×812) were re-verified clean — no regression from the earlier session's
+nested-modal fix. Mobile 375×812: timeline/time/markers/cards/conflict
+warnings all readable, no overflow, "Обновить сценарий" flow works
+identically. No relevant console/network errors on any of the above (only
+expected dev-only HMR websocket noise from local preview-tool restarts).
+BLOCKERS: none for local completion. Real `dev.mamago.by` smoke remains
+owner-controlled, not performed by this session.
+BACKLOG/NOTES: BACKLOG-056 updated in place (not duplicated) — flexible-
+item time assignment is DONE; arbitrary drag-and-drop reorder and manual
+duration editing remain OPEN/deferred, narrowed scope recorded. All other
+Task 7 backlog entries (BACKLOG-055, 057–061) unchanged, still correctly
+deferred, none implemented in this phase.
+
+REAL-DEV SMOKE (2026-08-11, Claude Code — PARTIAL, see BLOCKER below;
+STATUS stays `COMPLETE_PENDING_BROWSER_SMOKE`, deliberately not flipped to
+`COMPLETE`):
+DEPLOYED VERSION — confirmed exact match. `dev-app-1` running image
+`ghcr.io/asoftby/mamago2:dev-274`; `docker inspect` label
+`org.opencontainers.image.revision` = `c10398f2eb5ca009998f10806ef7ebb48df81ef9`
+— byte-exact match to the pushed SHA, `org.opencontainers.image.created`
+`2026-08-11T11:13:20.183Z`. `dev-db-1`/`dev-prisma-studio-1` also healthy.
+VERIFIED ON REAL DEV (real content, real disposable QA account
+`task7-realdev-smoke@example.invalid`, registered/used/fully deleted via
+the real self-service "Удалить аккаунт" flow afterward — no residue):
+— My Plan CTA, 2-item state: added 2 real distinct entities (article
+"«Гранд Бублик»…" + Place "Большой театр Беларуси") to 11 августа 2026 —
+`/me/plan?date=2026-08-11` correctly shows "2 события" with **no** Scenario
+CTA (confirmed via DOM text, the CTA string never renders — matches
+`resolveScenarioCtaState`'s `hidden` case).
+— Scenario page empty states: direct load of
+`/minsk/my-plan/2026-08-11/scenario` (2 real items) and
+`/minsk/my-plan/2026-09-12/scenario` (1 real fixed-time item, a real
+Event "С. Кибирова балет «Три поросенка»", session 12 сент. 2026 16:00 at
+Большой театр Беларуси) both correctly show "Пока недостаточно событий" —
+never silently creates a Scenario below the threshold, matches local
+behavior exactly.
+— Real fixed time preserved end-to-end: the real Event's session
+(16:00, 12 сентября) round-tripped correctly through save → `PlanItem.startsAt`
+→ `/me/plan` raw list display — no invented time, no drift.
+— Standalone route confirmed: both Scenario URLs load as plain pages;
+`document.querySelectorAll('[role="dialog"]').length === 0` on both,
+mobile 375×812 and desktop — no nested modal/sheet regression on real
+infra, matches the earlier local fix.
+— Security/cost: zero `googleapis`-pattern network requests on Scenario
+page load (cost boundary intact in production); zero Scenario-related 500s;
+on a **fresh tab** (isolating from unrelated accumulated console noise from
+registration/browsing), zero console errors on both Scenario URLs;
+ownership remains structurally uninjectable — the route/API carry no
+Scenario or override id at all, so there is nothing for a client to tamper
+with regardless of account.
+— Cleanup confirmed: all 3 QA `PlanItem` rows removed via the real "✕"
+remove action before account deletion; `/me/plan` confirmed back to
+"0 событий · на 0 дней"; no `DayScenario` row was ever created for either
+date (never reached the 3-item threshold) — real DEV left exactly as
+found.
+NOT INDEPENDENTLY OBSERVABLE ON REAL DEV THIS SESSION (see BLOCKER) —
+flexible-item time assignment ("Назначить время"/"Изменить время"
+persistence and reorder), the populated Scenario timeline itself (time as
+primary anchor, address/duration card layout, "Гибкое время"), deterministic
+conflict warnings, and the full "План изменился" → "Обновить сценарий" →
+override-preservation round trip. Free-gap/end-of-day: correctly
+`not observable with current DEV dataset` per the task's own instruction
+(no reliable duration source exists in the schema at all, confirmed during
+implementation) — this one is expected to stay unobservable regardless of
+dataset size, not a smoke gap.
+BLOCKER (environment/access, not a Task 7 code issue) — real DEV's public
+catalog currently has exactly 3 distinct saveable entities reachable via
+the UI (1 Event, 1 Article, 1 Place; `/minsk/programs`, `/minsk/routes`,
+`/moscow`, `/marina-gorka` all confirmed empty; `/api/search` returns no
+results) — not enough to reach the 3-item Scenario-creation threshold with
+real, distinct content on one date. The established fallback for exactly
+this situation (isolated DB-level QA fixtures via SSH — the same method
+used successfully for the local-dev verification earlier this session and
+for prior DEV media-import sessions, see `BACKLOG-018`) was attempted but
+SSH to the DEV host (`134.17.17.134:22`) was unavailable for the duration
+of this session — intermittently reachable at raw TCP (`nc` succeeded
+twice) but the SSH protocol handshake itself timed out on every attempt
+(6 attempts across ~10 minutes). HTTPS to the same host worked throughout
+(this real-DEV smoke itself proves the host is healthy) — this reads as a
+network-path/firewall issue specific to port 22 from this session's egress,
+not a DEV host outage. Creating new real public content (a real Event/Place)
+via the actual editor flow to work around this was considered and rejected
+as out of scope for a "read-only / safe verification" pass — that would
+mean publishing new content visible to real users, not a disposable fixture.
+NO NEW P0/P1 found. One pre-existing, unrelated issue noticed incidentally
+(not a Task 7 regression — the affected code was not touched by any Task 7
+commit): `PlanDayList.tsx`'s `unavailable` badge
+(`getPlanActivityPublicAvailability`) returns `"missing_activity"` — shown
+as "СНЯТО" — for **every** Place/Article-type `PlanItem` on the `/me/plan`
+list, because that function only ever receives `item.activity` (`null` for
+non-Activity types) and treats `null` as "removed". Observed on both real
+QA items (a live, published Article and a live, published Place). Filed as
+a new backlog candidate below; not investigated further per this task's
+own "do not investigate unrelated known issues" instruction.
+RECOMMENDATION: keep `COMPLETE_PENDING_BROWSER_SMOKE`. The UX-phase code
+itself was already exhaustively verified against byte-identical logic on
+local dev earlier this session (full test suite + extensive browser
+verification of exactly the checks listed as "not independently
+observable" above — flexible assignment, conflicts, plan-changed/override
+preservation, populated timeline, mobile). What's missing is proof against
+*real* DEV infrastructure specifically, blocked by an access/content
+constraint outside this session's control, not a code defect. Suggest a
+short follow-up pass once SSH access is confirmed restored (or once real
+DEV content grows past 3 distinct entities) to close the remaining items
+and flip to `COMPLETE`.
+
+FINAL INTERACTIVE REAL-DEV SMOKE (2026-08-11, Claude Code — SSH access
+restored this round; STATUS stays `COMPLETE_PENDING_BROWSER_SMOKE`, still
+not flipped to `COMPLETE` — a real regression was found, see below).
+Confirmed `dev-app-1` still running `dev-274` / `c10398f2` (unchanged, no
+redeploy — `docker inspect` re-checked). Created isolated QA fixtures via
+direct DB access (one disposable real account,
+`task7-final-smoke@example.invalid`, registered through the real DEV UI;
+4 disposable `PlanItem` rows inserted directly via SQL for that user/date
+only) to exercise the populated 3+ Scenario flow the previous partial
+smoke couldn't reach. All 12 requested checks executed:
+1. 3 PlanItems -> `/me/plan?date=...` correctly shows "Собрать сценарий
+   дня" — GREEN.
+2. Clicking it creates and navigates to a populated standalone Scenario
+   ("3 события · 1 требует времени") — GREEN.
+3. Fixed-time item ("QA Fixed A") shows its stored time prominently — GREEN.
+4. Untimed item shows "Гибкое время" + "Назначить время" — GREEN.
+5. "Назначить время" -> picked 12:30 -> "Сохранить" — **RED, real bug
+   found** (detail below).
+6. Reload: the (incorrect) assigned value persisted correctly — the
+   persistence mechanism itself is GREEN; only the stored value's
+   timezone interpretation was wrong (see below).
+7. The assigned time correctly participated in chronological ordering
+   relative to its own (incorrect) stored value — GREEN as a sorting
+   mechanism; see below for why the displayed number was wrong.
+8. Added a 4th real PlanItem via SQL 15 minutes after a fixed item ->
+   both correctly flagged "⚠ Время пересекается" — GREEN.
+9. Same DB-added 4th item correctly triggered "План изменился" on
+   reopen — GREEN.
+10. "Обновить сценарий" cleared the banner; the flexible item's override
+    was correctly preserved (same value, not reset) — GREEN.
+11. Confirmed via direct DB read: exactly one `DayScenario` row for the
+    user/date throughout (`createdAt` != `updatedAt`, bumped once by the
+    refresh, never a second row) — GREEN.
+12. 375px mobile: timeline/markers/cards/conflict badges/override control
+    all readable, no overflow, matches desktop content — GREEN.
+Free-gap/end-of-day: still `not observable with current DEV dataset` (no
+reliable duration source exists in the schema at all — expected, not a
+gap in this smoke).
+REAL BUG FOUND AND FIXED (check 5) — assigning "12:30" via "Назначить
+время" displayed back as "15:30" (a reproducible +3h drift) after save.
+Root-caused precisely: `setScenarioItemTimeAction` built the override's
+`Date` via a bare `new Date(\`${date}T${time}:00\`)`, which — per the
+ECMAScript spec — parses a date-time string with no timezone suffix using
+the *executing process's own local timezone*. The DEV container runs with
+no `TZ` set (`Intl.DateTimeFormat().resolvedOptions().timeZone` = `"UTC"`,
+confirmed via `docker exec`), so the input was silently stored as if it
+were UTC, while every displayed time on the page (both this override and
+the real `PlanItem.startsAt` values) renders via the *client's browser*
+timezone — a different, unrelated value from the container's OS setting.
+This exact asymmetry never surfaced during local-dev testing because the
+local dev process's OS timezone happened to coincide closely enough with
+the testing browser's rendering to mask it. Fixed in
+`src/lib/date/localDateKey.ts` (`localWallClockToUtc()`, exported and
+consumed by `setScenarioItemTimeAction`): explicitly interprets the
+"HH:MM" input as `DEFAULT_TZ` (Europe/Minsk, matching the same convention
+every real Activity session time already uses) via a library-free
+guess-and-correct `Intl.DateTimeFormat`/`Date.UTC` technique — never an
+ambient `new Date(string)` re-parse. Caught a subtle self-inflicted repeat
+of the same bug class while implementing this: a first version of the fix
+used `new Date(instant.toLocaleString(...))` to read back the zoned wall
+clock, which *itself* re-introduced an ambient-timezone dependency (only
+"worked" by coincidence because the local dev machine's own OS timezone
+happens to equal Europe/Minsk) — caught by explicitly re-running the new
+unit tests under `TZ=UTC` and `TZ=America/New_York`, both of which exposed
+the flaw immediately. The shipped fix passes under both of those plus the
+default environment. New tests: `src/lib/date/localDateKey.test.ts`
+(`localWallClockToUtc`: exact UTC instant for a known Europe/Minsk
+wall-clock time, a midnight-crossing case, and a `getLocalDateKey`
+round-trip), now included in `pnpm test:day-scenario`.
+NOT YET RE-VERIFIED LIVE — this fix is committed to `dev` but the running
+`dev-274` container does not include it (no redeploy performed this
+session, per this task's explicit instruction). Checks 5-7 above are
+therefore GREEN for "the save/persist/reorder/conflict-participation
+*mechanism*" but the exact displayed time value was proven wrong on the
+currently-deployed build. All QA fixtures (4 `PlanItem` rows, the
+`DayScenario` row, the `DayScenarioItemOverride` row, both this round's
+and the previous round's disposable accounts) confirmed fully removed via
+direct DB read (`select count(*) from "User" where email like
+'task7-%'` = `0`) — real DEV left exactly as found, no residue.
+RECOMMENDATION: still keep `COMPLETE_PENDING_BROWSER_SMOKE`. 11 of 12
+requested checks are fully green against the currently-deployed build;
+the one that failed has a proven, tested, committed fix, but per this
+round's own instructions no redeploy was performed to verify it live.
+Suggest the owner deploy the next build (which will include this fix)
+and a short, narrow follow-up smoke — just re-run check 5 (assign a time,
+confirm it displays back unchanged) — to finally close Task 7.
+
+OWNER CLOSURE (2026-08-12) — Task 7 accepted and closed by the project
+owner. Per §8, not reopened for P2/P3 UX or cleanup findings. Accepted
+final state, including implementation landed after the last recorded
+smoke above (owner-authored commits `49e7ef49`, `56a5fccc`, `98eed7d3`,
+`56d2d8a4` — correctness/consistency fixes only, none touch the
+release-frozen Exit Criteria):
+- Standalone Scenario page (`/{city}/my-plan/{date}/scenario`) — no
+  modal-in-modal, confirmed on real DEV.
+- 3+ My Plan CTA (`resolveScenarioCtaState`/`resolveScenarioCtaLabel`),
+  converged across both `/me/plan` and the My Plan overlay panel.
+- Persistence/reopen — `DayScenario` row survives reload/logout/date-nav,
+  never silently recreated below the 3-item threshold.
+- Flexible time assignment ("Назначить время") via
+  `DayScenarioItemOverride`, persists across reload.
+- Timezone-safe time handling — `localWallClockToUtc()` (`49e7ef49`)
+  fixes the real +3h drift found in the prior real-DEV smoke (check 5);
+  assignment is now always interpreted as Europe/Minsk, never the
+  ambient server process timezone.
+- Effective-time consistency between My Plan and Scenario (`56d2d8a4`) —
+  both surfaces now share the same `resolveScenarioItemTime`/
+  `resolveMyPlanItemEffectiveTime` priority chain (`startsAt` -> recovered
+  unambiguous same-date session -> Scenario override -> untimed),
+  closing the "real time on Scenario, БЕЗ ВРЕМЕНИ on My Plan" gap.
+- Category/meta cleanup (`98eed7d3`) — My Plan's category slot is now
+  sourced only from `resolvePlanItemCategoryLabel`; raw price text no
+  longer leaks into that slot; `formatPlanActivityPriceLabel` removed.
+- Structured Scenario address (`98eed7d3`) — `resolveActivityAddress`
+  returns structured city/street/metro labels sourced from
+  `Place.metroAuto`/`metroManual`, replacing free-text metro baked into
+  address parentheses.
+- Conflict detection — `detectScenarioConflictIds()`, adjacent-pair
+  overlap on a shared assumed-duration convention, no fabricated travel
+  time.
+- Plan-changed reconciliation — fingerprint compare + "Обновить
+  сценарий"; overrides preserved for retained items, FK-cascade-dropped
+  for removed ones.
+- Ownership isolation — every read/write scoped server-side by the
+  session-derived `userId`; no client-supplied Scenario/override id
+  exists to tamper with.
+- No Google Routes dependency — confirmed zero `googleapis`-pattern
+  network calls anywhere in the Scenario/My Plan path.
+No new P0/P1 at closure. One pre-existing, unrelated, already-filed
+non-blocking item remains open and untouched: BACKLOG-062 (`/me/plan`
+"СНЯТО" badge incorrectly shown for every Place/Article-type
+`PlanItem`) — not a Task 7 regression, does not affect this task's Exit
+Criteria. Task 7 is now CLOSED and will not be reopened for further
+P2/P3 UX/cleanup findings.
+
+Trigger: 3+ activities in "My Plan" on one date. AUDIT FIRST existing Day
+Scenario / My Plan / timeline implementation: existing modal flow,
+modal-in-modal, models, APIs, persistence, timeline, time, duration,
+addresses, ordering, conflicts, trigger logic, mobile UX. Goal: a clear,
+standalone Scenario of the Day. Consider existing capabilities for: dedicated
+screen/page, access from My Plan, timeline, intervals, editing, restored
+state. Architecture should allow adding recommendations between points
+later. Do not build a permanent, expensive dependency on the Google Routes
+API now without proven product need.
+
+**Exit Criteria:** A user with 3+ activities sees and understands the whole
+family day from one screen.
+
+## TASK 8 — Schema.org / Structured Data
+
+Priority: `P0 — SEO BLOCKER`
+
+STATUS: `COMPLETE`
+
+### A. Current implementation map
+
+Real, live, single-path SEO infrastructure — not a second framework, no
+dead abstraction competing with it:
+- **Metadata**: `src/lib/seo/buildOgMeta.ts` is the de facto shared
+  builder (title/description/OG/Twitter, always routes through
+  `applyGlobalRobotsOverride`) — used by every entity detail page (Event,
+  Place, Offer×2, Route, Article×2).
+- **Global noindex kill-switch**: `src/lib/seo/globalNoindex.ts` —
+  `isGlobalNoindexEnabled()` defaults to `noindex` until
+  `SITE_INDEXING_ENABLED=true` is explicitly set; enforced twice
+  (metadata layer via `applyGlobalRobotsOverride`, and an HTTP
+  `X-Robots-Tag: noindex, nofollow` header in `src/middleware.ts:56-68`
+  as a safety net). `sitemap.ts`/`robots.ts` both short-circuit to
+  empty/disallow-all under the same flag.
+- **Canonical URLs**: one resolver per entity
+  (`resolve{Event,Place,Offer,Route,Article}CanonicalUrl.ts`), all
+  sharing `validateStoredCanonical.ts` — a stored `seoCanonicalUrl` is
+  only trusted if same-origin + exact expected path, else falls back to
+  a deterministic path from current city/slug/id. Correctly rejects
+  stale/wrong-origin values.
+- **JSON-LD builders**: `src/lib/seo/schema/` — one file per Schema.org
+  type (see §C), rendered via `src/components/seo/JsonLd.tsx`
+  (`cleanJsonLd()` strips empty values, single `<script
+  type="application/ld+json">`).
+- **Per-entity override escape hatch**: Event/Place/Offer/Article/Route
+  all check a stored `seoJsonLdOverride` JSON column first and use it
+  verbatim instead of the builder output when present (admin-settable).
+- **Admin SEO tooling**: `src/app/admin/seo/*` — per-entity SEO editors,
+  schema preview/override editor, redirect manifest, sitemap/robots
+  admin view, SEO templates, `llms.txt` management. Internal-only, not
+  itself a public/indexable surface, not deep-audited here.
+
+### B. Audit matrix by page type
+
+| Page type | Indexable? | Canonical | Metadata impl | JSON-LD emitted | Correct? | Missing |
+|---|---|---|---|---|---|---|
+| Homepage `/` | Yes (flag-gated; middleware 307s to flagship city in prod so `/` itself never resolves 200 in PROD) | `alternates.canonical=BASE_URL` | static `metadata` export | none page-level; Organization+WebSite from `(public)/layout.tsx` | Yes | — |
+| City home `/[city]` | Yes | `buildCityHubMetadata()` | `generateMetadata()` | Organization+WebSite (layout-inherited) only | Yes | No page-type JSON-LD needed (listing shell, not an entity) |
+| Events listing `/[city]/events` | Yes | `buildCityEventsListingMetadata()` | `generateMetadata()` | none | Yes | Could add `ItemList` of upcoming events — P3, not required |
+| Event detail `/[city]/events/[slug]` | Yes (per-entity `seoRobots` override respected) | `resolveEventCanonicalUrl()` | `generateMetadata()` via `buildOgMeta()` | `Event` + `BreadcrumbList` + conditional `FAQPage` (`buildEventJsonLd`) | Yes | `offers`/price node (BACKLOG-065.6); `location.address` is a plain string not `PostalAddress` (BACKLOG-065.5) |
+| Places listing | **No dedicated route exists** — Place discovery folds into the `kuda`/events feed | n/a | n/a | n/a | Correctly absent | Not a gap — no listing route to have metadata for |
+| Place detail `/places/[slug]` | Yes | `resolvePlaceCanonicalUrl()` | `generateMetadata()` via `buildOgMeta()` | `Place` (+`GeoCoordinates`, real `AggregateRating` blended from `PlaceReview` rows + Google import, never fabricated) + `BreadcrumbList` + conditional `FAQPage` | Yes | Same `PostalAddress` note as Event; no per-entity `seoRobots` parsing (binary index/noindex only via global flag — P3, no confirmed real-world need for per-Place granular robots today) |
+| Articles/Blog listing `/blog`, `/[city]/blog` | Yes | none set explicitly (relies on inherited/base) | static/`generateMetadata()` via `applyGlobalRobotsOverride` | none | Acceptable (listing shell) | Could add explicit `alternates.canonical` — P3 |
+| Article detail `/blog/[slug]`, `/[city]/blog/[slug]` | Yes (per-article `noindex` bool + `seoRobots` string both respected) | `resolveArticleCanonicalUrl()` | `generateMetadata()` via `buildOgMeta()`/`applyGlobalRobotsOverride` | `NewsArticle`/`BlogPosting` (via `isNews` flag) + `BreadcrumbList` (`buildArticleJsonLd`) | Yes | OG `type` always `"website"` not `"article"` (BACKLOG-065.4) |
+| Continuous-reading article variant (same URL) | Yes, same as above | same | same `generateMetadata()` (shared route) | Same JSON-LD as the normal article — confirmed mutually-exclusive `return` branches (Breaking News / Continuous / normal / legacy), not duplicate emission | Yes | — |
+| Breaking News article variant (same URL, `subtitle===BREAKING_NEWS_SUBTITLE`) | Yes | same | same | `NewsArticle` (isNews=true) + `BreadcrumbList` | Yes | — |
+| Discovery tag pages `/[city]/tags/[tagSlug]` | Yes | none explicit | `generateMetadata()` via `buildOgMeta()` | none | Acceptable (listing shell) | — |
+| Routes listing `/routes` (global) | Yes | none | static `metadata` | none | Acceptable | — |
+| Routes listing `/[city]/routes` (city) | Yes | **none — no metadata export at all** | inherits root layout only | none | **Gap** (BACKLOG-063) | Title/description/canonical |
+| Route detail `/routes/[slug]` | Conditional (`robots:{index:false}` when not publicly visible) | `resolvePublicRouteCanonicalUrl()`, never emitted for DRAFT | `generateMetadata()` | `ItemList` (stops as `ListItem`) + `BreadcrumbList` (`buildRouteJsonLd`, deliberately MVP-grade per source comment, not a bug) | Yes | — |
+| Offer/Service detail `/[city]/offers/[section]/[slug]` | Yes (per-entity `seoRobots`) | `resolveOfferCanonicalUrl()`, always resolved against the offer's own city | `generateMetadata()` via `buildOgMeta()` | `Service`(+nested `Offer`) for CAMP/SERVICE, else bare `Offer`, real `price`/`priceCurrency` when numeric price exists + `BreadcrumbList` + conditional `VideoObject`/`FAQPage` | Yes | — |
+| Legacy `/offers/[slug]` | n/a (301 shim) | redirects to canonical | metadata exists but page always redirects | none | Correct (redirect-only) | — |
+| Programs listing `/[city]/programs` | Yes | **no explicit `alternates.canonical`** | `generateMetadata()` (title+OG) but doesn't call `applyGlobalRobotsOverride` directly — relies on Next.js metadata-merge inheriting root `robots` | none | Works today; fragile pattern (P3 — make it call `applyGlobalRobotsOverride` explicitly for defense-in-depth, don't rely on merge semantics) | Explicit canonical |
+| Program detail `/[city]/programs/[slug]` | Yes | from `seo?.canonicalUrl` or deterministic fallback | `generateMetadata()` via `applyGlobalRobotsOverride` | Same Offer/Service builders (Program is Offer-backed) | Yes | — |
+| Classes `/[city]/classes` | Yes | **none — no metadata export at all** | inherits root layout only | none | **Gap** (BACKLOG-063) | Title/description/canonical |
+| Birthday `/[city]/birthday` | Yes | **none — no metadata export at all** | inherits root layout only | none | **Gap** (BACKLOG-063) | Title/description/canonical |
+| `/[city]/kuda`, `/[city]/where-to-go` | n/a (301 shims to `/{city}/events`) | n/a | n/a | n/a | Correct (real 301, not soft canonical-only redirect) | — |
+| Search `/search` | Practically no — client-only `"use client"` JS redirect (`router.replace`) to `/{city}` on mount, no server metadata/redirect | none | none | none | Not crawlable as a real page (BACKLOG-065.3) — confirm no public link targets it | Server-side redirect if ever linked |
+| `/me/*` (should NOT be indexable) | Correctly excluded — `MeLayout` requires auth, redirects unauthenticated (incl. crawlers) to `/login`; global `X-Robots-Tag` header also covers it | n/a | mostly static title-only | Organization+WebSite still render (layout-inherited, harmless — BACKLOG-065.7) | Correct exclusion | — |
+| `/[city]/my-plan/[date]/scenario` | Explicitly noindex (`robots:{index:false,follow:false}`) | n/a | static | Organization+WebSite still render (same as above) | Correct | — |
+| `/preview/articles/[id]` | Explicitly noindex | n/a | static | none | Correct | — |
+| `/p/[id]` (shareable plan) | Indexable-by-default (only global flag applies, no per-instance noindex) | none | `applyGlobalRobotsOverride({title:"План праздника"})` only | none | Thin/generic if ever crawled — low real risk (link-shared, not discoverable/linked publicly) | P3, no action needed without evidence of real crawl exposure |
+
+### C. Shared SEO/schema utilities already reusable (all confirmed via direct code read)
+
+`buildOgMeta.ts`, `globalNoindex.ts` (+ its own test file), `cityKudaListingMetadata.ts`,
+5× `resolve*CanonicalUrl.ts` + `validateStoredCanonical.ts`,
+`src/lib/config/publicAppUrl.ts` / `src/lib/routing/cityPaths.ts` (base URL +
+city path builders), `src/lib/seo/schema/{buildOrganizationJsonLd,
+buildWebSiteJsonLd,buildEventJsonLd,buildPlaceJsonLd,buildArticleJsonLd,
+buildOfferJsonLd,buildOfferStructuredData,buildRouteJsonLd,
+buildBreadcrumbJsonLd,buildFaqJsonLd,cleanJsonLd,url}.ts`,
+`src/components/seo/JsonLd.tsx`. All absolute-URL handling goes through
+one shared `absolutePublicUrl`/`absolutePublicImageUrl` pair
+(`schema/url.ts`) — verified no page builds a relative JSON-LD URL by
+hand. No second SEO framework exists or is needed.
+
+### D/E/F. Confirmed defects, missing structured data, duplicate/conflicting schema
+
+- **No duplicate/conflicting `@id` values found.** Every per-entity
+  JSON-LD sets a canonical-URL-scoped `@id`
+  (`{canonicalUrl}#event|#place|#article|#offer|#service`); Organization/
+  WebSite use stable global `{base}/#organization|#website` ids,
+  correctly cross-referenced (`WebSite.publisher` → `Organization`
+  `@id`) — this is the *intended* shared-entity pattern, not a bug.
+- **No JSON-LD double-emission found.** The 3–4 `<JsonLd>` call sites
+  inside `blog/[slug]/page.tsx` and `[city]/blog/[slug]/page.tsx`
+  (Breaking News / Continuous-reading / normal / legacy variants) are
+  confirmed mutually-exclusive `return` branches, not duplicate renders
+  on the same page load.
+- **Missing metadata (confirmed gap, no code speculation)**:
+  `/[city]/classes`, `/[city]/birthday`, `/[city]/routes` have **zero**
+  page-specific `title`/`description`/`canonical` — direct file read of
+  all 3 confirms no `generateMetadata`/`metadata` export exists. Routed
+  to BACKLOG-063.
+- **Sitemap gaps**: omits `/[city]/programs`, `/[city]/classes`,
+  `/[city]/routes`, `/routes`, `/blog`, `/[city]/blog`; does not filter
+  Event/Place/Offer/Route by per-entity `seoRobots`. Routed to
+  BACKLOG-064.
+- **No fabricated data found**: Place `AggregateRating` is real
+  (blended `PlaceReview` DB aggregate + Google-imported rating, never
+  invented); no duration/price fields are fabricated anywhere (matches
+  Task 7's own "never fabricate" finding — Event JSON-LD's `startDate`
+  is a real session date or omitted, never guessed).
+- **H1 sanity**: spot-checked all 5 main detail-page hero components
+  (`EventHero`, `PlaceHero`×2 variants, `ArticleHeader`, `OfferHero`,
+  `RouteDetailClient`) — each renders exactly one `<h1>`. No missing/
+  duplicate H1 found on the pages that matter for Rich Results.
+
+### G. Indexability / canonical / robots findings
+
+- Global noindex mechanism (`isGlobalNoindexEnabled`) is correctly
+  fail-safe (defaults to noindex, needs an explicit flag to go live) and
+  enforced at two independent layers (metadata + HTTP header) — this is
+  the right pattern for a pre-launch site, not a defect.
+- **`.env.example`'s own comment is factually wrong** about which flag
+  enables indexing (`SITE_NOINDEX_DEFAULT=false` does nothing by itself;
+  the real switch is `SITE_INDEXING_ENABLED=true`) — confirmed by
+  reading `globalNoindex.ts` line-by-line. **Not a live risk**: every
+  actual production runbook (`docs/migration/production-cutover-runbook.md`,
+  `docs/migration/dns-cutover-plan-2026-07-29.md`) already references the
+  correct `SITE_INDEXING_ENABLED=true` flag. Routed to BACKLOG-065.2 as a
+  trivial doc-comment fix, not a P0/P1 — the authoritative launch
+  procedure is already correct.
+- Canonical resolution is robust against stale/wrong-origin stored
+  values (`validateStoredCanonical.ts`) — verified this rejects a stored
+  canonical that doesn't match the current origin/path exactly.
+- `robots.txt`/`sitemap.xml` both correctly go empty/disallow-all under
+  the same global noindex flag — no risk of submitting a live sitemap
+  while the site is still meant to be hidden.
+
+### H. P0/P1 required before PROD
+
+**None.** No finding in this audit makes any main indexable page type
+unsafe, broken, or wrong in a way that blocks first PROD per this
+checklist's own severity model (§4/§7): no security issue, no data
+loss/leak, no broken authentication/authorization, no critical flow
+failure, no fabricated data, no duplicate/conflicting JSON-LD, and the
+global noindex kill-switch itself works correctly (only its *documentation
+comment* is wrong, and the real runbooks already use the correct flag).
+
+### I. P2/P3 backlog candidates (all filed)
+
+- BACKLOG-063 (P2) — `/[city]/classes`, `/[city]/birthday`,
+  `/[city]/routes` missing page-specific metadata.
+- BACKLOG-064 (P2) — sitemap coverage gaps + missing `seoRobots` filter.
+- BACKLOG-065 (P3) — grab-bag: `SearchAction` unused, `.env.example`
+  misleading comment, `/search` not server-crawlable, OG `type` always
+  `"website"`, plain-string addresses vs `PostalAddress`, no `offers` on
+  Event JSON-LD, Organization/WebSite JSON-LD inherited onto noindex/
+  auth-gated pages (harmless).
+
+### J. Minimal implementation plan for Task 8 — APPROVED and EXECUTED (2026-08-12)
+
+Owner reviewed the audit and approved BACKLOG-063 + BACKLOG-064 as Task 8's
+minimal implementation scope (both directly relevant to the existing Exit
+Criteria). BACKLOG-065 stays explicitly deferred, not implemented.
+
+**BACKLOG-063 — city listing metadata.** Added
+`buildCityClassesListingMetadata()`, `buildCityBirthdayListingMetadata()`,
+`buildCityRoutesListingMetadata()` to `src/lib/seo/
+cityKudaListingMetadata.ts`, following the exact pattern of the file's own
+`buildCityEventsListingMetadata`/`buildCityHubMetadata`. Title reuses
+`DISCOVERY_INTENT_CONFIG[intent].titleTemplate` + `formatCityTitle()` —
+the same source that already drives each page's on-page `<H1>`
+(`CityDiscoveryShell.tsx`), so `<title>` can never drift from the visible
+heading. Description uses `getCityDisplayName()` (prepositional case). All
+3 pages' `generateMetadata()` wrap the result in
+`applyGlobalRobotsOverride()` explicitly. No JSON-LD added (listing
+shells, no entity to describe).
+
+**BACKLOG-064 — sitemap gaps.** Added the owner-approved 6 listing URLs
+(global `/routes`, `/blog` once each; per active city `/{city}/programs`,
+`/{city}/classes`, `/{city}/routes`, `/{city}/blog`) to `src/app/
+sitemap.ts` — `/{city}/birthday` deliberately excluded, not part of the
+approved gap list. Added `hasNoindexRobots()` (same comma-separated
+semantics as the existing per-page `parseRobots()` helpers) as an
+in-memory post-fetch filter on the Place/Offer/Route/Event sitemap
+queries (each now also selects `seoRobots`) — deliberately not a raw SQL
+`NOT: {contains}` clause, which would silently drop every row with
+`seoRobots IS NULL` under three-valued SQL logic. Article left untouched
+(already correctly filtered via its own `noindex` boolean, not part of
+the approved gap list).
+
+**Shared infrastructure change**: extended `CityPathType`
+(`src/lib/routing/cityPaths.ts`) with `"classes"`, `"birthday"`,
+`"programs"` and their `buildCityPublicPath()` cases — both features
+build every URL through this existing single source of truth, no
+hand-built alternate URL format introduced anywhere.
+
+**Real bug found and fixed during implementation, before commit**: an
+early draft used the DB `city.name` field (nominative case, e.g.
+"Минск") in the 3 new descriptions, producing an ungrammatical "в Минск"
+instead of "в Минске" — caught during the required browser verification
+step (§ DEV SMOKE below), fixed to use `getCityDisplayName()`
+(prepositional case, the same source the title already used).
+
+**BACKLOG-065 — confirmed NOT implemented**: SearchAction, OG type
+enrichment, PostalAddress enrichment, Event offers enrichment,
+Organization/WebSite-on-noindex-pages, `/search` server redirect, and the
+`.env.example` comment all remain untouched, exactly as instructed.
+
+**New, incidentally-discovered finding, filed not fixed**: while writing
+BACKLOG-063's birthday-page description, found `CityShell.tsx` already
+self-documents (inline `DEFECT (not a TODO)` comment) that
+`intent==="birthday"` currently renders kuda/event content, not
+birthday-specific content — pre-existing, unrelated to Task 8, out of
+scope for a metadata-only change. Filed as BACKLOG-066 (P3), not
+investigated or fixed further.
+
+### K. Files changed
+
+`src/lib/routing/cityPaths.ts` (2 new `CityPathType` entries + cases),
+`src/lib/seo/cityKudaListingMetadata.ts` (3 new builders),
+`src/app/(public)/[city]/classes/page.tsx`,
+`src/app/(public)/[city]/birthday/page.tsx`,
+`src/app/(public)/[city]/routes/page.tsx` (each: `generateMetadata()`
+added), `src/app/sitemap.ts` (6 new listing entries + `seoRobots` filter),
+`src/lib/seo/cityKudaListingMetadata.test.ts` (new),
+`src/app/sitemap.test.ts` (new). `.env.example` left untouched
+(BACKLOG-065, not this task's approved scope).
+
+### L. Migration/DB schema change required
+
+**None.** No new Prisma model, field, or migration — confirmed, matches
+the audit's own finding.
+
+AUDIT FIRST existing SEO utilities and JSON-LD. Build an audit matrix: `page
+type → current schema → problem → missing → required action`. Check:
+Events, Places, Articles, Routes, Offers, Services, Programs (if indexed),
+listing/category pages, BreadcrumbList, Organization, WebSite, other actually
+used Schema.org types. Also: H1/H2/H3, canonical, city URLs, title,
+description, OpenGraph, robots, indexability, JSON-LD validity, duplicate
+entities, conflicting entities, Rich Results compatibility where applicable.
+Reuse shared SEO utilities.
+
+GAPS: BACKLOG-063 and BACKLOG-064 resolved (see §J). BACKLOG-065 remains
+OPEN/P3, explicitly deferred. BACKLOG-066 newly filed (P3, incidental
+finding, not fixed).
+IMPLEMENTATION: see §J. Minimal, additive, reused existing patterns
+throughout — no new SEO framework, no new DB fields, no JSON-LD added to
+listing shells.
+COMMITS: see git log (one atomic commit: implementation + backlog/
+checklist closure for Task 8).
+VERIFICATION: `npx tsc --noEmit` clean; targeted `eslint` on all 8 changed/
+new files clean (0 errors, 1 pre-existing unrelated warning unchanged);
+`git diff --check` clean; `pnpm check:push` (`pnpm build`) exit 0, all
+routes compiled including the 3 previously-metadata-less pages and
+`/sitemap.xml`. New tests: `cityKudaListingMetadata.test.ts` (title/
+canonical/description correctness, unknown-city returns `{}`, no title
+collision, global-noindex-still-wins for all 3 pages via subprocess
+env-isolation) and `sitemap.test.ts` (`hasNoindexRobots()` unit tests +
+an end-to-end integration test with 2 disposable real `Place` fixtures
+proving the noindex filter and all 6 new listing URLs, cleaned up after).
+Both new suites green. Pre-existing `cityPaths.test.ts`,
+`discoveryIntentConfig.test.ts`, `globalNoindex.test.ts` re-run, all
+still green (no regression from the shared `CityPathType`/sitemap
+changes).
+DEV SMOKE: Local dev server, Browser pane. `/minsk/classes`,
+`/minsk/birthday`, `/minsk/routes`: each inspected via
+`document.title`/`link[rel=canonical]`/`meta[name=description]`/
+`meta[name=robots]` — correct page-specific title (matching the on-page
+H1 template exactly), correct absolute canonical
+(`http://mamago.local:3000/minsk/{page}`), correct grammatical
+description (after the fix above), and `robots: noindex, nofollow`
+(local dev's prelaunch default — confirms the global override still
+wins, exactly as required). `/sitemap.xml`: resolves cleanly, empty
+`<urlset>` under the same local prelaunch-default noindex flag (correct,
+same safety behavior as `/robots.txt`) — full populated-content
+correctness proven by the automated integration test instead of toggling
+the live dev server's indexing flag for this narrow check.
+BLOCKERS: none.
+BACKLOG/NOTES: BACKLOG-063 DONE, BACKLOG-064 DONE, BACKLOG-065 OPEN/P3
+(deferred, untouched as instructed), BACKLOG-066 OPEN/P3 (new, filed not
+fixed).
+
+**Exit Criteria:** No main indexable page type reaches PROD without correct
+SEO/structured-data implementation.
+
+## TASK 9 — Filters & Quick Access
+
+Priority: `P0`
+
+STATUS: `COMPLETE` — owner-approved minimal implementation completed 2026-08-12.
+AUDIT: Completed 2026-08-12 against `dev`/`origin/dev` at
+`311dc9fe61e511147122b1000bdead1a2814d3a1` (equal; no pre-existing working-tree
+changes). This was audit-only: no application code, migration, DEV deploy, PROD
+access, or Task 10 work.
+
+**Current architecture / source of truth.** There are two separate live UI
+layers plus older dead implementations:
+
+1. Primary filters (`when/date`, age, format, metro, district, nearby) are
+   hardcoded and type-safe in `features/filters/discovery/filters.store.ts` and
+   rendered by the desktop header / mobile search sheet. URL params are the
+   canonical selection state (`preset`, `from`, `to`, `age`, `format`, `metro`,
+   `district`, `nearby`); a city+intent-scoped `localStorage` snapshot restores
+   the last listing state and supports list -> detail -> back. Writes use
+   `router.replace`, so filter changes intentionally do not create individual
+   Back/Forward history entries. Primary composition/order/labels cannot be
+   changed in Admin.
+2. Secondary filters use one JSON `sec` URL param, scoped by intent. Their
+   definitions/options/order/enablement are persisted in `FilterDefinition`,
+   `FilterOption`, and `DiscoveryFilterPlacement`; `/admin/discovery/filters`
+   has authenticated section/category CRUD and the public modal reads them via
+   `/api/public/discovery-filters`. A static `filterConfigByIntent` is a safe UI
+   fallback. However, no live feed or client partition reads `sec`, so these
+   controls change chips/count/URL only and never results. This is a confirmed
+   **FALSE ADMIN** chain, not a missing-Admin problem.
+3. `SectionSystemFilter` is a separate partial setting. Only `BUDGET` is read
+   by `CityShell` (it enables a client-side max-price slider); `FREE_ONLY` is
+   accepted by the API but is not read by public runtime and was nominally
+   replaced by the secondary `free_only` definition. No live Admin component
+   calls the system-filter API. Classification: PARTIAL / DISCONNECTED.
+4. `features/discovery/filters/*` (old Zustand+global localStorage),
+   `FilterMasonryMenu`, `lib/discovery/urlState.ts`, and
+   `server/discovery/getActivityFeed.ts` form an older incompatible chain with
+   no public runtime consumer. Classification: DEAD BUT HARMLESS; BACKLOG-067.
+
+**A. Surface matrix.**
+
+| Surface | UI / filters exposed | State -> query reality | Responsive finding |
+|---|---|---|---|
+| Events / `kuda` / legacy `/events` | header/mobile: date, age, format, city/nearby; secondary modal: venue, price, open-now, free, activity type | URL is stable, but only format/nearby reach the server; client partition applies format, budget and soft age partition. Date, metro/district, and all `sec` values do not filter results | One shared responsive header, but at 375px Today/Tomorrow/Weekend require opening search then the date subpanel; Free is in a second, separate filter sheet |
+| Classes | same primary UI; class chips; secondary duration/format/trial | class chip is server-live; primary age/format/budget are client-live; date/geo and every secondary value are inert | mobile nav labels Classes as “Скоро” even though the URL/page/feed exist |
+| Birthday | same primary UI; birthday secondary service/budget/includes | currently reuses kuda Events feed (BACKLOG-066); only the same kuda primary subset works; secondary inert | navigation is intentionally coming-soon/unpromoted |
+| Routes | global primary + route secondary can be opened | route list ignores every primary, secondary, and budget value | navigation is intentionally coming-soon; no filtered empty state |
+| Programs | detail route only, no public programs listing/filter surface | n/a | n/a |
+| Offers / Services | no independent listing; Classes is the live Offer discovery surface | see Classes | see Classes |
+| Homepage | global header state and kuda title are shared; home cards are persona-ranked | selected date changes title only; the already-loaded home row is not date-filtered | same mobile search sheet |
+| Search | query + city only; Admin quick tags are a separate search feature | no overlap with discovery filter execution | search sheet co-locates search and discovery controls but search API does not consume them |
+| My Plan recommendations | reuses discovery location state only for UI plumbing; recommendation API has its own family/age/date constraints | separate recommendation query architecture; known `NULL` vs `[]` age issue already BACKLOG-004 | no reason to merge it into discovery filters |
+
+**B. Filter storage matrix.**
+
+| Filter | Definition / label / options | Persisted? | Runtime consumer | Admin manageable? |
+|---|---|---|---|---|
+| Today / Tomorrow / Weekend / exact date | hardcoded `WhenSelect` + date helpers; calendar-generated dates | selection only in URL/localStorage | H1/labels only; results not filtered | No |
+| Age (multi) | code `AGE_GROUPS`; DB age options are fetched by one legacy API path but live controls canonicalize back to code | selection only | client soft partition: if zero matches, all content returns; NULL/no-bounds behave as 0–99 | No |
+| Format | code enum/options | selection only | server query + client partition (live) | No |
+| Metro / district | DB city taxonomies via bounded cached header fetch; Place has manual+automatic relations | selection only | UI only in discovery results | taxonomy values yes; filter presence/placement no |
+| Nearby | hardcoded | selection only | server constrains format to offline/hybrid, not radius/coordinates; it is therefore mislabeled as proximity | No |
+| Budget slider | `SectionSystemFilter.BUDGET` + runtime max from loaded candidate pool | DB enable flag + URL budget state | client price ceiling; unknown price deliberately passes | API exists, but no connected Admin UI |
+| Free / price / venue / open-now / activity type | DB definitions/options/placements with static fallback | yes | public modal only; no result consumer | UI says yes, effective behavior no (FALSE ADMIN) |
+| Classes duration/format/trial | same DB system | yes | public modal only | FALSE ADMIN |
+| Birthday service/budget/includes | same DB system | yes | public modal only | FALSE ADMIN |
+| Routes duration/format/stroller | same DB system | yes | public modal only | FALSE ADMIN |
+| Class category chips | `DiscoveryClassChip` DB model and Admin API/UI | yes | Classes server query (`classChipSlugs`) | Yes, REAL AND LIVE |
+
+**C. Per-section configuration matrix.** Primary filters are globally
+hardcoded in header/search rather than configured per section. Secondary
+order and availability are DB-managed independently for kuda/classes/
+birthday/routes, but there is no QUICK vs ADVANCED field; every placement is
+advanced and execution is absent. Category-level placements can be edited in
+Admin but no public category-filter runtime read was found. Programs and
+standalone Offers have no section configuration.
+
+Recommended product split after semantics work: Events QUICK = Today,
+Tomorrow, Weekend, Choose date, Free; ADVANCED = age, format, district, metro,
+venue/activity type (only keys with proven semantics). Classes QUICK = class
+category chips; ADVANCED = age, format, schedule/duration only when backed by
+real Offer fields. Birthday and Routes should remain unpromoted until their
+real feeds are ready; do not build filter behavior on placeholder content.
+
+**D. Admin chain matrix.**
+
+| Admin control | Write / persistence | Runtime read | Public effect | Class |
+|---|---|---|---|---|
+| section placement/order/active | authenticated Admin API -> `DiscoveryFilterPlacement` | public filters API -> modal | UI/order only, never query | FALSE ADMIN |
+| filter labels/options/UI type | authenticated `/api/admin/filters` -> `FilterDefinition`/`FilterOption` | public filters API -> modal | UI only | PARTIAL |
+| category placements | authenticated placement API -> DB | no public category placement consumer | none | DISCONNECTED |
+| class chips | authenticated class-chip API -> `DiscoveryClassChip` | Classes feed | filters Offers | REAL AND LIVE |
+| system BUDGET/FREE_ONLY | authenticated API -> `SectionSystemFilter` | `CityShell` reads BUDGET only | budget slider only | PARTIAL / DISCONNECTED |
+
+**Date / age / price / geography correctness.** Date values survive refresh
+and copied URLs, but they never constrain Events/Classes/Birthday/Routes; the
+H1 can therefore say “сегодня” while showing future cards. Date helpers use
+browser-local `Date`/`toISOString()` rather than one city-timezone model, and
+weekend logic is duplicated (existing BACKLOG-045). Age is deliberately a
+soft relevance partition, not a strict filter: no selection means no age
+constraint; empty selection is normalized; absent bounds behave as all ages;
+zero matching rows silently falls back to all candidates. The known My Plan
+`ageTags NULL` vs `[]` defect is already BACKLOG-004. Task 10's `nokids` could
+plug into the code-owned age semantics/Activity age bounds, but was not
+implemented or otherwise audited as Task 10. “Free” has one sensible canonical
+card meaning (`priceFrom === 0`), while unknown/null is not free; the secondary
+Free/price controls currently do nothing. Budget passes null/unknown prices by
+design. Metro/district option data is DB-backed with manual/automatic Place
+relations, but neither relation is queried by discovery filters. A requested
+read-only completeness count could not be taken because the repository's
+documented local DB target (`localhost:5433`) was unavailable; this does not
+change the code-proven no-op result.
+
+**URL, reset, empty state, mobile.** Primary and secondary selections survive
+reload/copied URL. Primary reset clears URL and scoped saved state; secondary
+reset clears only `sec`; the two separate reset controls cannot clear each
+other, so hidden active filters are possible. `router.replace` means browser
+Back does not undo each selection (detail -> back is restored through the URL/
+scoped snapshot). At 375x812 the mobile controls fit and sheets scroll with
+sticky actions, but the common Events path is unnecessarily nested, there are
+two visually separate “filters” entry points, no combined active count/reset,
+and Free is not quick access. The empty-result component checks the unfiltered
+server input length rather than the filtered partition, so a client filter that
+produces zero primary cards can show a blank grid without recovery copy.
+
+**Performance / analytics.** Kuda is bounded (candidate cap 200, response 80)
+and Classes is bounded (120); filtering is local over these pools, with no new
+external/Google calls. Public secondary definitions add one DB-backed API
+request whenever the modal mounts, with a static fallback; no cache is required
+at current scale. Budget max is computed from the already-loaded pool. The
+`FILTER_APPLY` enum exists but no discovery producer or decision consumer was
+found; no new analytics is recommended without a named consumer.
+
+GAPS: **P1 (first-PROD):** visible primary date/metro/district controls and all
+secondary/Admin-managed filters claim to filter but do not affect results;
+Nearby claims proximity but only constrains format. This can produce silently
+incorrect result sets and contradictory H1/filter state. No P0 found. P2/P3:
+two uncoordinated reset/count surfaces; filtered-empty handling; duplicated/dead
+filter architecture (BACKLOG-067); duplicate date helpers already BACKLOG-045;
+My Plan age-null issue already BACKLOG-004; Birthday feed already BACKLOG-066.
+
+**Explicit Admin answers.** “Can the owner manage each section's filters in
+Admin without code?” **FALSE ADMIN** for discovery filtering: section-specific
+definitions/order/visibility can change what the modal displays, but not what
+the query returns. Class chips are the sole real exception. “Must section filter
+management be built before first PROD?” **NO new Admin/DB implementation is
+required**: the existing schema/Admin presentation layer is already sufficient
+for advanced placement. Before PROD, the minimal requirement is to make the
+approved visible filter keys execute (or hide unsupported controls), with a
+code-owned, allowlisted semantic registry and safe defaults. Arbitrary Admin
+keys must never become executable logic.
+
+IMPLEMENTATION: Completed owner-approved minimum:
+
+1. Events only: expose QUICK Today/Tomorrow/Weekend/Choose date/Free in the
+   existing responsive header/search architecture; move district/metro to the
+   existing advanced sheet. No redesign and no new state store.
+2. Add one code-owned, typed execution mapping for approved keys. Apply date
+   against Activity sessions/schedule using a single city-timezone date range;
+   Free means `priceFrom === 0`; geo resolves the effective manual-then-auto
+   Place district/metro relation. Keep Admin responsible only for enabled/
+   order/placement presentation.
+3. Until semantics exist, do not render unsupported secondary groups for live
+   sections (or explicitly allowlist only implemented groups). Correct Nearby's
+   behavior/label or hide it; do not pretend format-only is proximity.
+4. Make one combined active count/reset and a real filtered-empty recovery
+   state. Preserve URL/copy/reload/detail-back behavior; retain `replace` unless
+   product explicitly wants Back to step through every chip change.
+5. Do **not** add a model/migration/Admin page/cache/search engine/analytics;
+   do not implement Birthday/Routes placeholder filtering, My Plan age cleanup,
+   or `nokids`; do not touch Task 10.
+
+Implemented one typed semantic registry; the public Admin-config endpoint now
+fails closed for unknown keys. Events expose Quick Today/Tomorrow/Weekend/exact
+date/Free and an Advanced age/format/district/metro sheet. Date predicates use
+real `ActivitySession.startsAt` and explicit `Europe/Minsk` boundaries. Free is
+only numeric zero or Event Wizard `scheduleJson.pricingMode="free"`; null and
+marketing text are not promoted to Free. District/metro use Place manual values
+first and auto values only when manual is absent. Nearby is removed from Events
+UI and stale URLs are ignored/cleaned. Reset-all starts from an empty query, so
+primary, `sec`, budget, and scoped persisted state clear together. Empty state
+now checks the effective visible partition.
+
+COMMITS: pending final Task 9 commit.
+VERIFICATION: focused Node tests: 10/10 green (date/timezone/custom range,
+free/paid/null, manual/auto geo precedence, allowlist fail-closed, URL
+round-trip/reset/count). `tsc --noEmit`, `eslint src --quiet`, and `pnpm build`
+green. Read-only DEV inspection found 9 published Events and no structured-free
+row; the visually “бесплатно” null-price import therefore correctly yields no
+Free result instead of treating unknown as free.
+DEV SMOKE: **Complete — post-deploy read-only smoke on actual
+`https://dev.mamago.by` (2026-08-12).** Exact deployment verified independently
+of workflow status: running container `dev-app-1`, image
+`ghcr.io/asoftby/mamago2:dev-280`, OCI revision
+`245d7c28de7f03d5e8d3b551b22ea9c0539cfc79`, created
+`2026-08-12T11:49:42.548Z`, state `running`.
+
+Desktop `/minsk/events`, actual DEV data: default = 1 visible card (“С.
+Кибирова балет «Три поросенка»”); Today (`?preset=TODAY`) = 0 with H1
+“сегодня” and recovery; Tomorrow (`?preset=TOMORROW`) = 0 with H1 “завтра”
+and recovery; Weekend (`?preset=WEEKEND`) = 0 with H1 “на выходных” and
+recovery; exact `?from=2026-09-12` = the one “Три поросенка” card with H1
+“— 12 сент.”. Read-only DEV DB proof confirms its real ActivitySession is
+2026-09-12 10:00 Europe/Minsk, inside that selected boundary. Free
+(`?free=true`) = 0 plus the real recovery/reset UI; DB count of published
+structured-free Events (`priceFrom=0` or `scheduleJson.pricingMode=free`) is
+also 0, proving the null/unknown imported prices were not misclassified.
+
+Advanced sheet exposes only Age, Format, District, Metro. Offline preserves
+the one real card; real Заводской district and Автозаводская metro options
+each produce a valid zero-result recovery because the current published card
+has no effective Place geo; age remains the approved soft partition. Selection
+is reflected in URL/state and the unified badge (`1`). A six-filter URL
+(preset/free/age/format/district/metro plus legacy `sec`) showed count `6`;
+Reset cleared every param including `sec`, removed the badge, and restored the
+clean URL/default card. Stale `?nearby=true` was automatically cleaned to the
+default URL without changing results; Nearby/Рядом/Поблизости was absent from
+desktop header, advanced/old-secondary UI, and mobile.
+
+Copied exact-date URL and reload preserved identical URL/H1/card; opening the
+event detail and Browser Back returned to the same filtered state. At 375x812,
+Today, exact date, Free recovery, district empty result/count, advanced
+open/close, and Reset all re-verified; controls were readable, appeared once,
+sheet was intact, and document `scrollWidth=clientWidth=375` before and after
+reset. No browser console errors, filter-related 500s, request/refetch loop,
+Google Maps/Routes/geolocation request, or per-card filter API N+1 was observed;
+`dev-app-1` logs were clean during the smoke. No PROD access or write, no data
+fabrication, and no redeploy.
+BLOCKERS: none.
+BACKLOG/NOTES: BACKLOG-004, BACKLOG-045, BACKLOG-066, BACKLOG-067 unchanged;
+BACKLOG-068 added for real proximity. Task 10 remains TODO.
+
+AUDIT FIRST existing filtering infrastructure: date/when, age, district,
+metro, free, budget, additional filters, quick access, active state, reset,
+URL state, back navigation, empty results, mobile, desktop, analytics. Check
+for multiple incompatible filter implementations. Do not create another
+system without necessity.
+
+**Exit Criteria:** Filters are understandable, fast, consistent, and cheap
+at runtime.
+
+## TASK 10 — `nokids`
+
+Priority: `P0`
+
+STATUS: `COMPLETE` — owner-approved implementation completed locally
+2026-08-12; DEV deploy + 375px smoke + read-only persisted DB proof closed
+Task 10 on 2026-08-12.
+AUDIT: **Completed 2026-08-12 at `0d92ea85`. Audit only; no application,
+schema, data, deployment, or PROD changes.**
+
+### A/B. Current model and semantic truth
+
+| Entity/runtime | Stored age data | Writers | Principal readers | Present meaning |
+|---|---|---|---|---|
+| `Activity` (Event/Program/Class legacy Activity types) | nullable `ageMinMonths`, `ageMaxMonths`, `ageLabel`; non-null Postgres `ageTags[]`; optional age detection inside `scheduleJson` | Event Wizard/API, legacy activities-v2 API, generic import publisher | Event cards/detail, discovery, SearchDocument, My Plan, recommendations | suitability/recommended range; empty/null is ambiguously treated as unrestricted or missing |
+| `ActivitySession` | none | — | scheduling only | irrelevant |
+| `Offer` (services, regular activities/classes, camps, party/birthday offers) | nullable `ageMinMonths`/`ageMaxMonths`; no `ageTags` | Offer Wizard/API and Phoenix offer writer | classes/program discovery, cards/detail, Ideas | suitability range; null/null means absent/unrestricted but provenance is lost |
+| `Place` + `PlaceRevision` | non-null `ageTags[]` | Place Wizard/API, revision/moderation/import | Place cards/detail/search/moderation | suitability; live Wizard deliberately defines `[]` as “Любой возраст” |
+| `Route` | non-null `ageTags[]` | Route editor/API/import | route cards/detail/search | suitability; current “Любой” incorrectly stores every bucket on first click |
+| User/family audience | Child DOB/persona → URL age buckets, including adult persona → `18+` | family/profile stores | discovery/My Plan | viewer age, not admission restriction |
+| Signal/taxonomy/filter rows | canonical age signal includes ordinary `18+`; generic `FilterDefinition`/`FilterOption` presentation records | seed/Admin | Wizard taxonomy loading/filter presentation | metadata/presentation, not strong adult-only truth |
+
+Allowed canonical buckets are `0-1`, `1-3`, `3-5`, `5-7`, `7-9`, `9-12`,
+`12-14`, `14-16`, `16-18`, `18+`. Validators generally check shape/presence,
+not cross-field consistency. There is no `nokids`, `adultOnly`, admission-age,
+or age-provenance field anywhere in Prisma/runtime.
+
+The existing representation does **not** distinguish all required states:
+specific suitability is representable; `18+` is adult suitability rather than
+proven strict admission; deliberately unrestricted and unknown/missing both
+collapse to empty tags/null bounds; malformed legacy values take inconsistent
+fallback paths; strict adult-only is not representable unambiguously.
+
+**Critical conclusion: PARTIAL/NO — `ageMinMonths >= 216` or `ageTags=["18+"]`
+must not derive `nokids`.** Evidence: `AGE_OPTIONS` defines `18+` as the last
+ordinary suitability bucket; `audienceSyncMapper` and `FamilyDerivedAgeSync`
+emit it for a selected adult persona; discovery treats it as an overlapping
+age range; age text detection maps both numeric `18+` and “взросл…” to it; all
+age-aware editors permit it beside child buckets. Mixed adult/child buckets are
+legal today. No path asserts admission restriction.
+
+### C/D. Live editor matrix and Event end-to-end
+
+| Live surface | Content | UI / storage | Multi-select / shared? | Unrestricted now | Strict 18+ now | Change |
+|---|---|---|---|---|---|---|
+| Event create/edit (`EventWizard`) | `Activity(EVENT)` | Step1 chips → `ageRangeIds` + `ageTags` → derived bounds/label → events API → DB; edit prefers `scheduleJson.ageRangeIds`, then tags/range/label | yes; Event-specific | UI can clear, but publish rejects empty tags | no; `18+` is ordinary | required |
+| Offer create/edit (`OfferWizard`) | service/regular activity/class/program/camp/birthday offer | chips `ageGroups` → combined bounds → Offer API; hydration expands bounds | yes; duplicated | empty maps to null/null; warning only | no | required |
+| Place create/edit (`PlaceWizard`) | Place/revision | canonical chips → `ageTags` | yes; Place-specific | already correct UI: “Любой возраст” ⇄ `[]` | no | adult state if approved |
+| Route create/edit (`RouteEditor`) | Route | chips → `ageTags` | yes; Route-specific | **incorrect:** “Любой” first enumerates all ten buckets | no | required |
+| Admin Event/Offer lists + moderation | Event/Offer | status/list actions, no age editor | n/a | not visible/editable | no | required for truthful review |
+| Admin Place moderation | Place/revision | generic age-tag diff/review | separate | sees tags/empty, not provenance | no | adapter if approved |
+| Birthday builder | user planning input, not a content editor | child persona/signals; explicitly excludes 18+ | child-only | n/a | n/a | none |
+
+There are no separate live Class/Program/Birthday content Wizards: those are
+Offer Wizard product variants. Business and content-editor routes reuse the
+same Event/Offer/Place Wizards. Dead/UI-lab forms were not counted.
+
+Event specific buckets round-trip through tags, combined bounds, label and
+`scheduleJson.ageRangeIds`. Unrestricted becomes empty/null but fails both Event
+submit endpoints (“Выберите возраст” / “At least one age tag is required”).
+`18+` round-trips only as recommended age 18+. APIs accept arrays and nullable
+bounds independently and do not reject contradictions.
+
+### E. Admin audit
+
+Admin Event/Offer pages do not expose the age source of truth, so moderators
+cannot see or correct strict intent. Place moderation displays revision tags but
+has no explicit policy. No Admin-only adult representation exists and no DB/API
+invariant prevents adult + child/unrestricted contradictions. Minimal work must
+use the same typed source; generic tags must not define strictness.
+
+### F/G. Actual DEV and legacy/import findings
+
+Read-only access confirmed actual DEV DB identity `devmamago/public` in
+`dev-db-1`. The subsequent bounded census (published totals, empty/structured/
+18+/contradictory and text-only candidates) could not complete because SSH to
+the DEV host repeatedly timed out. Local `localhost:5433/mamago2` was also
+unavailable. Counts are explicitly **UNKNOWN, not guessed**; rerun before any
+backfill approval.
+
+The generic importer detects text and writes buckets/bounds; “взросл…” and
+`18+` become the ordinary suitability bucket, so strict meaning is not
+preserved. The WordPress/Phoenix normalizer extracts `ageEvidence` from
+meta/terms/text, but Phoenix `EventCommitWriter` persists neither tags nor
+bounds, losing structured age meaning at Activity commit. Do not parse public
+copy into truth automatically. Text-only/empty rows remain `UNKNOWN`; reviewed
+classification is BACKLOG-069.
+
+### H. Public rendering map
+
+| Surface | Current renderer | Current behavior / gap |
+|---|---|---|
+| `/[city]/events`, main discovery, homepage rail, recommendations | `ActivityCard`, discovery mapper, `activityAgeBounds` | renders `${ageFrom}+`; cannot distinguish strictness; empty/malformed may fall back to `0–12`/`0+` |
+| Search | `resolveActivityAgeLabel` → `SearchDocument.metaLine` | prefers arbitrary label, then tags/bounds; update indexer rebuilds, but strict state is absent |
+| My Ideas / My Plan | several helpers or raw `ageLabel` | inconsistent fallbacks; strict eligibility absent |
+| Event detail | `buildEventPageDataFromPrisma` age badge/fact | minimum `N+`; strict intent is not explicit; unrestricted usually has no fact |
+
+Smallest truthful rendering: strict policy gets `18+` on cards/Search and
+“Только 18+” on detail; unrestricted gets no card badge; unknown must never be
+labelled “Любой возраст”.
+
+### I/J. Task 9 integration and public age filter
+
+Reuse the live URL/store/partition architecture and extend
+`EVENT_EXECUTABLE_FILTER_KEYS`; do not revive the dead parallel stack. Proposed
+code-owned URL key is `adultOnly=true`; Admin may enable/order/place and label it
+but cannot define meaning. It must participate in URL reload/back, unified count,
+Reset All, mobile/desktop and `buildEventRuntimeWhere`; unknown keys remain
+fail-closed and `sec` carries no executable meaning.
+
+Current age filtering partitions a bounded candidate list by overlap. If no
+primary matches it deliberately recovers the whole feed, and engaged mismatches
+may enter a secondary block. A strict Event can therefore appear for child age
+5 today. When any child bucket is active, typed adult-only rows must be removed
+from both primary and fallback/secondary candidates **before ranking**.
+Unrestricted remains eligible; specific ages retain current behavior; unknown
+keeps existing conservative/default behavior but is never called unrestricted.
+“Любой” is editor state, not a public filter/query parameter.
+
+### K/L/M. Family, recommendations, Search, ranking
+
+My Plan suggestions treat `ageTags=[]` as unrestricted and `hasSome(selected)`
+as specific; SQL null compatibility is already BACKLOG-004. Family persona
+selection emits adult/child buckets, while discovery can surface mismatches.
+Apply hard child-context exclusion at existing discovery and Plan suggestion/
+generation eligibility boundaries; build no new personalization system.
+
+Search indexes age text and normal mutation side effects rebuild documents.
+MVP adds the typed strict label to Activity SearchDocument construction and
+verifies refresh; Search has no child context, so no contextual filtering
+redesign. Task 5 ranking remains unchanged: eligibility first, then current
+engagement/weather/business ranking—no adult penalty/boost. **NO SEO CHANGE
+REQUIRED:** no proven supported Event JSON-LD property warrants reopening Task 8.
+
+### N/O/P/Q. Decisions
+
+**Strict model: OPTION C — NEW EXPLICIT TYPED FIELD.** Recommend an enum such
+as `AgePolicy = UNKNOWN | UNRESTRICTED | SPECIFIC | ADULT_ONLY` on each live
+age-aware publication (`Activity`, `Offer`, `Place`/revision, `Route`), rather
+than a Boolean that still conflates unknown and unrestricted. Tags/bounds remain
+suitability only. Invariants:
+
+- `UNKNOWN`: no asserted policy and no specific data;
+- `UNRESTRICTED`: deliberate “Любой”, no specific data;
+- `SPECIFIC`: valid buckets/bounds, including ordinary adult suitability `18+`;
+- `ADULT_ONLY`: strict restriction; all specific child/hidden ages cleared.
+
+Migration: yes, hand-written; no index. Mechanically backfill `SPECIFIC` only
+where valid structured data exists; all other existing rows `UNKNOWN`. No
+automatic adult-only/unrestricted backfill. Imports set `SPECIFIC` only from
+trusted structured evidence; strict source evidence needs an explicit trusted
+mapping or reviewed manifest.
+
+**“Любой” storage:** `agePolicy=UNRESTRICTED`, `ageTags=[]`, bounds null; API
+and form carry the discriminated policy. Hydration reads it explicitly. It
+**does not enumerate all ages**. Selecting a bucket sets `SPECIFIC`; selecting
+strict sets `ADULT_ONLY`; every transition clears incompatible state.
+
+**Shared selector: PARTIAL.** Options/normalization are shared, but four live
+editors render separately and Offer stores bounds. Add one small canonical
+age-state helper/controller plus Event/Place/Route tag adapters and an Offer
+bounds adapter; no global forms refactor.
+
+Wording: internal key/URL `adultOnly`; editor choices “Любой”, normal specific
+chips (including “18+” as suitability) and separate “Только 18+”. Public compact
+badge/filter “18+”; detail/Admin explanation “Только 18+”. Avoid “Без детей”
+because it may describe positioning rather than a strict boundary.
+
+### R/S. Severity and deferred work
+
+P0/P1 first-PROD gaps: strict truth cannot be stored; Event unrestricted cannot
+publish; child discovery/recommendation fallbacks lack a hard strict-adult
+exclusion; APIs can persist contradictory age fields. These do not prove any
+current `18+` row is strict.
+
+P2/P3: legacy empty/text-only classification is BACKLOG-069. BACKLOG-004 covers
+the separate Plan `ageTags NULL`/`[]` defect. UI duplication and nicer
+non-strict formatting do not justify release-scope refactoring.
+
+### T. Minimal implementation proposal for owner approval
+
+1. Add `AgePolicy` fields to Activity, Offer, Place, PlaceRevision and Route;
+   hand-written migration; backfill only provable `SPECIFIC`, otherwise
+   `UNKNOWN`; no index or adult/text backfill.
+2. Add one invariant helper/schema shared by APIs/imports: canonical tags,
+   min<=max, and no specific data with `UNRESTRICTED`/`ADULT_ONLY`.
+3. Add shared policy-selector behavior with narrow adapters to Event, Offer,
+   Place and Route. Remove Event empty-age rejection; fix Route enumeration;
+   hydrate explicit policy.
+4. Expose the same policy in Admin moderation/edit review.
+5. Add shared strict label to Event cards/detail/Search; no unrestricted card
+   noise and no unknown-as-unrestricted fallback.
+6. Extend Task 9 with executable `adultOnly=true`, Admin-controlled
+   presentation, server predicate, URL/count/reset/mobile/desktop behavior.
+7. Exclude adult-only before discovery fallback/ranking and in Plan suggestion/
+   generation child contexts; keep ranking scores unchanged.
+8. Search: policy-aware builder and update reindex proof. No SEO, external API,
+   cache, job, N+1 or deployment work.
+9. Focused tests: four-state/contradiction validation; Wizard transitions,
+   persistence and hydration; Offer adapter; Route non-enumeration; Admin;
+   filter result/URL/count/reset; child exclusion including fallback and
+   unrestricted inclusion; Search refresh; ranking unchanged among eligible
+   rows. Browser verify desktop + 375px editors, cards/detail and filter.
+
+GAPS: BACKLOG-069 remains open for reviewed legacy classification. The bounded
+read-only DEV census found 8 published Activities: 1 structured SPECIFIC
+candidate, 7 null-range/unknown candidates, 1 ordinary structured `18+`, 1
+contradictory structured row, and 0 text-only `18+` candidates. No rows were
+mutated and no strict/unrestricted state was inferred.
+IMPLEMENTATION: Added shared Prisma `AgePolicy` (`UNKNOWN`, `UNRESTRICTED`,
+`SPECIFIC`, `ADULT_ONLY`) to Activity/Offer/Place/PlaceRevision/Route with the
+hand-written `20260812190000_add_age_policy` migration and conservative
+SPECIFIC-only backfill. Shared write-boundary normalization rejects invalid
+tags, inverted bounds, missing SPECIFIC data, and policy/data contradictions.
+Event, Offer, Place and Route create/edit state now exposes mutually exclusive
+`Любой`, ordinary age chips (including SPECIFIC `18+`) and `Только 18+`;
+Event unrestricted publication is allowed; Route `Любой` stores no enumerated
+buckets; PlaceRevision moderation preserves the policy. Admin lists/moderation,
+Event detail/cards and Search render strict policy truthfully without labelling
+UNKNOWN as unrestricted. Imports write SPECIFIC only from valid structured
+evidence, otherwise UNKNOWN. No SEO change was required.
+FILTER/ELIGIBILITY: Added typed `adultOnly=true` through executable allowlist,
+URL/store/runtime predicate/count/reset and Admin presentation configuration.
+Child discovery removes ADULT_ONLY before partition/fallback/ranking, and Plan
+suggestions apply the same hard eligibility boundary; UNRESTRICTED stays
+eligible and existing ranking among eligible rows is unchanged.
+COMMITS: implementation commit pending final gates.
+VERIFICATION: 20 focused Task 10 tests pass; Prisma schema valid; whole-repo
+TypeScript clean; targeted ESLint 0 errors (19 pre-existing warnings); migration
+SQL applied successfully to local PostgreSQL for smoke and reviewed; diff check
+clean. Browser verified Events filter on desktop and 375px (control, count,
+URL toggle/reload, Reset, no request loop or console error) and Route selector
+on 375px (`Любой` does not enumerate buckets; specific/strict transitions are
+exclusive). Protected Event/Offer/Place screens had no authenticated local
+browser session; their persistence/hydration paths are covered by typed tests
+and full compile gates rather than a fabricated browser login. `pnpm
+check:push` completed with exit 0 (production build compiled and generated all
+388 pages); the sandboxed build workers emitted the repository's tolerated
+local-DB-unreachable fallback logs during prerender, without failing the gate.
+DEV SMOKE: **Complete — verified on actual `https://dev.mamago.by`
+(2026-08-12).** Deployed image `ghcr.io/asoftby/mamago2:dev-282`, OCI
+revision `a40db0ac624855a0b7b781c2418f8e150460491a`. Full mandatory UI smoke
+on 375px successful. P1 Server Components regression root cause: Route edit
+server page called `makeEmptyStop()` from client module `RouteEditor`; fix
+moved empty-stop creation and age hydration into a server/client-safe pure
+helper (fix commit `a40db0ac624855a0b7b781c2418f8e150460491a`).
+`/me/routes → Редактировать` reopen successful; digest `1173656967` absent;
+post-reopen selector shows only strict `Только 18+`; no horizontal overflow.
+Read-only DEV DB proof for disposable draft title
+`QA Task 10 strict route disposable final 2` (exact title match, 1 row):
+`id=cmsq78fa10001ny016vkipu5i`,
+`slug=qa-task-10-strict-route-disposable-final-2`,
+`agePolicy=ADULT_ONLY`, `ageTags={}` (empty Postgres text[]),
+`status=DRAFT`, `createdAt=2026-08-12 14:43:06.458`. PROD untouched.
+BLOCKERS: none.
+BACKLOG/NOTES: BACKLOG-069 added; BACKLOG-004 already covers Plan null-array.
+Task 11 remains TODO and untouched.
+
+AUDIT FIRST existing age restrictions / 18+ / audience models / tags /
+filters. Do not automatically create a new DB field — first determine
+whether the existing data model can reliably express strict 18+/no-kids.
+Check: Event Wizard, Admin, cards, Event detail, Search, filters, ranking
+compatibility.
+
+**Exit Criteria:** 18+ content is systematically and unambiguously separated
+from family/kids content without unnecessary model duplication.
+
+## TASK 11 — Article Gallery Visual Types
+
+Priority: `P0`
+
+STATUS: `COMPLETE`
+AUDIT: Existing `Article.contentJson` v1 already had typed image/gallery blocks,
+the shared Admin editor, MediaAsset-backed upload/library/reorder, preview/public
+resolution, and the same `ArticleMvpView` path for continuous reading. Gallery
+stored `mediaIds` plus an optional block caption; the renderer used a mobile
+scroll rail/desktop grid but dropped per-asset alt/caption/dimensions and had no
+saved presentation choice. Breaking News had a separate gallery layout.
+GAPS: Add exactly three persisted presentation modes; preserve deterministic
+legacy behavior; resolve MediaAsset alt/caption/dimensions; use one stable,
+responsive renderer across preview, public, Breaking News, and continuous
+reading; retain optimized responsive image delivery without a schema migration.
+IMPLEMENTATION: Added optional gallery `presentation` (`carousel`, `mosaic`,
+`sequential`) inside the existing JSON block, with `mosaic` as the no-mode legacy
+fallback and Carousel as the new-block default. The editor uses existing Select
+conventions and save/hydration path. Shared `ArticleGallery` renders Carousel
+(scroll-snap, controls, touch/horizontal gesture), Mosaic (bounded responsive
+grid), and full-width Sequential (asset aspect ratio, contain, stable spacing).
+Resolved gallery media now carry URL, alt/title fallback, caption, width, and
+height. Standard, preview, Breaking News, and continuous reading all consume the
+same resolved component. No Prisma/data migration and no destructive rewrite.
+COMMITS: `390fefeb9bcf3761494ff8f4495ca67c6723ba7f` (implementation);
+checklist closure commit follows this entry.
+VERIFICATION: `pnpm test:article-gallery`, `tsc --noEmit`, changed-file ESLint,
+`git diff --check`, and canonical `pnpm check:push`/pre-push production build are
+green. Focused regression covers save/parse hydration for all modes, legacy
+no-mode fallback, one/multiple images, optional captions, alt preservation, and
+renderer selection. Local browser smoke used a disposable Article with all three
+modes: desktop 1280 (`clientWidth=scrollWidth=1280`) and mobile 375
+(`clientWidth=scrollWidth=375`) were green; Carousel controls and horizontal
+gesture moved the rail; captions/alts survived; no console errors. Imported
+Article `grand-bublik-prosto-ozhivshaja-usadba-gjetsbi-i-otel-grand-budapesht`
+rendered its no-mode gallery as Mosaic with MediaAsset alt values.
+DEV SMOKE: Owner deployed and approved the DEV verification as sufficient.
+Read-only infrastructure proof: `dev-app-1` running image
+`ghcr.io/asoftby/mamago2:dev-283`; OCI revision exactly
+`390fefeb9bcf3761494ff8f4495ca67c6723ba7f`; `dev-db-1` healthy. Owner explicitly
+approved closure after testing. No P0/P1 was reported.
+BLOCKERS: none.
+BACKLOG/NOTES: No new Task 11 P2/P3 item. PROD untouched; Task 12 not started.
+
+AUDIT FIRST Article block/editor/gallery infrastructure: image blocks,
+gallery blocks, editor, frontend rendering, imported galleries, continuous
+reading, responsive, existing libraries/components. Target visual types: (1)
+Carousel, (2) Mosaic, (3) Full-width sequential images. Check: editor
+selection, preview, rendering, responsive, mobile gestures, aspect ratio,
+layout shift, image optimization, alt text, captions, imported articles, new
+articles, continuous reading. Extend the existing gallery block where
+possible.
+
+**Exit Criteria:** The editor can pick one of the three visual types and the
+frontend renders it reliably on mobile and desktop.
+
+## TASK 12 — CEO Performance Dashboard
+
+Priority: `P0 — PRE-LAUNCH VISIBILITY`
+
+STATUS: `COMPLETE`
+AUDIT: Existing analytics signals and bounded aggregates support a factual
+owner dashboard; registration conversion, cohort retention and monetization
+cannot yet be calculated truthfully and are explicitly shown as unavailable.
+GAPS: No remaining Task 12 P0/P1 gap.
+IMPLEMENTATION: Added the ADMIN-only `/admin/performance` dashboard and Admin
+navigation entry with FACT-only audience, engagement, discovery, content and
+marketplace metrics for Today / 7d / 30d, using `Europe/Minsk` boundaries.
+COMMITS: `da8e242f77aad0c8cf27f68afa0ed0952640c7f0` (implementation); checklist
+closure commit follows this entry.
+VERIFICATION: Focused metric tests, TypeScript, changed-file ESLint and
+canonical `pnpm check:push` were green before deployment. Independent read-only
+DEV DB verification for 7d matched the dashboard: new accounts 1, DAU 0, WAU
+1, MAU 1, searches 37, zero-result searches 13, saves 0, plan additions 3,
+CTA clicks 22 and created routes 2. Desktop 1280px smoke was green; mobile
+375px smoke was owner-approved green. Period changes updated URL and KPI;
+unavailable metrics remained honestly labelled.
+DEV SMOKE: Reconfirmed 2026-08-13 on running image
+`ghcr.io/asoftby/mamago2:dev-284`, OCI revision exactly
+`da8e242f77aad0c8cf27f68afa0ed0952640c7f0`; `dev-app-1` running and
+`dev-db-1` healthy. Minimal live `/admin/performance` sanity passed: page and
+Admin `Performance` navigation opened, KPI loaded, Today / 7d / 30d selector
+was available, and browser console plus fresh server logs contained no errors.
+BLOCKERS: none.
+BACKLOG/NOTES: `BACKLOG-070` and `BACKLOG-071` track the deliberately deferred
+registration-source attribution and acquisition-cohort retention work. Task 13
+not started. PROD untouched.
+
+### Goal
+
+Before PROD, the owner must have one simple factual page answering:
+
+**“Как проект работает прямо сейчас?”**
+
+Canonical route: `/admin/performance`
+
+### AUDIT FIRST
+
+Audit the existing:
+
+- `/admin/analytics`;
+- Publication Analytics;
+- `UserEvent`;
+- authentication/user models;
+- existing business metrics;
+- existing search analytics;
+- existing content-performance aggregation;
+- existing dashboard services/components;
+- any already-existing DAU/WAU/MAU logic;
+- any existing registrations/activity/retention queries.
+
+Reuse the current analytics infrastructure.
+
+Do **not** create another analytics platform.
+
+Do **not** build a data warehouse.
+
+Do **not** duplicate metrics already calculated elsewhere.
+
+### MVP scope
+
+The page should expose **FACT metrics**, not forecasts or decorative fake
+KPIs.
+
+At minimum audit feasibility and provide the useful available subset of:
+
+#### Audience / usage
+
+- DAU;
+- WAU;
+- MAU;
+- WAU / MAU;
+- new users;
+- returning users;
+- registrations.
+
+#### Engagement
+
+Use existing trusted signals where available, e.g.:
+
+- My Ideas additions;
+- My Plan additions;
+- meaningful content opens;
+- relevant CTA activity.
+
+Do not invent events that are not actually tracked.
+
+#### Content / marketplace health
+
+Use existing real data where useful, e.g.:
+
+- published Events;
+- published Places;
+- published Offers;
+- active businesses;
+- content with engagement.
+
+#### Business / monetization metrics
+
+Only include monetary metrics here if the underlying system can calculate
+them truthfully.
+
+Do not fabricate revenue, GMV, ARPU, lead revenue, or balance values.
+
+Task 13 owns the deeper balance/monetization architecture decision.
+
+### Time ranges
+
+The dashboard should make daily / weekly / monthly state understandable.
+
+Reuse existing date-range infrastructure where possible.
+
+Do not build arbitrary BI filtering.
+
+### UX
+
+This is an owner/CEO operational page.
+
+It should be:
+
+- simple;
+- fast;
+- factual;
+- understandable in seconds;
+- mobile-safe but primarily desktop/admin oriented.
+
+No decorative analytics for their own sake.
+
+### Security / cost
+
+- ADMIN only unless existing admin policy clearly dictates otherwise;
+- bounded aggregate queries;
+- no user-level PII output;
+- no raw event dumps;
+- no expensive unbounded analytics scans;
+- no polling unless already justified.
+
+### Exit Criteria
+
+**The owner can open `/admin/performance` and quickly understand the factual
+daily/weekly/monthly health of mamaGo using real existing data, without a
+parallel analytics architecture or fabricated metrics.**
+
+## TASK 13 — Audit Business Balance & Monetization
+
+Priority: `P0 — MONEY / PROD BLOCKER`
+
+STATUS: `COMPLETE`
+AUDIT: First-PROD monetization is a prepaid BYN wallet with one paid product
+(Boost 1/3/7 days). Leads and ordinary publication are free. Action-based
+Promotion and online top-up/provider flows are disabled. Admin/manual credit
+is the only top-up path. Ledger (`BillingTransaction`) is source of truth;
+`depositBalance` is the cached operational balance. Canonical rule:
+`docs/business/monetization-mvp.md`.
+GAPS: No remaining Task 13 P0/P1 gap for first PROD.
+IMPLEMENTATION: Secure first-PROD monetization + locked beta Boost prices in
+runtime ENV (`BOOST_PRICE_1D_BYN=5`, `BOOST_PRICE_3D_BYN=12`,
+`BOOST_PRICE_7D_BYN=25`). Server-authoritative pricing; client submits option
+ID + request key only.
+COMMITS: `7b2c52fa` (feat(billing): secure first-prod monetization);
+`d184f4de` (fix(billing): lock first-prod boost prices); checklist closure
+commit follows this entry.
+VERIFICATION:
+- Canonical pricing 1d=5 / 3d=12 / 7d=25 BYN on DEV runtime ENV PASS
+- Server-authoritative pricing PASS (unsupported option rejected; no client amount)
+- Durations only 1/3/7 PASS
+- Admin/manual top-up PASS (`+50 BYN` credit with actor/reason/reference metadata)
+- Online top-up disabled PASS (`depositBalanceAction` hard-fails to manager path)
+- Leads FREE PASS (public booking created; balance unchanged; `LEAD_CHARGE`=0)
+- Ordinary publication FREE PASS (offer edit; no extra FEATURE_CHARGE)
+- Promotion disabled PASS (`paid_promotion_disabled`; no promotion debit)
+- Balance does not expire PASS (no `BillingAccount` expiry field; unused 8 BYN retained)
+- Credit idempotency PASS (same key → one SUCCEEDED credit)
+- Boost idempotency PASS (same requestKey → one Boost + one debit)
+- Insufficient balance PASS (7d rejected at balance 8; no Boost/debit)
+- Concurrency PASS (`100` then concurrent `80+80` → exactly one debit, balance `20`)
+- Disposable reconciliation PASS: `0 + 50 - 5 - 12 - 25 = 8`;
+  depositBalance=`8.00`; SUCCEEDED ledger sum=`8.00`; divergence=`0.00`
+- DEV-wide reconciliation PASS: accountsChecked=2, mismatched=0
+- Financial suite PASS: `pnpm test:billing-financial` → **12/12** on DEV DB
+  (local DB lacks `Boost.durationDays` — schema lag only; not a Task 13 defect)
+- `pnpm check:push` PASS (production build)
+DEV SMOKE: **Complete — verified 2026-08-13 on actual DEV host**
+`134.17.17.134` via SSH alias `mamago-prod` (no VPN). Running image
+`ghcr.io/asoftby/mamago2:dev-286`; OCI revision exactly
+`d184f4de4a8b3fa07f902749354ad868aec029e9`; `dev-app-1` running
+(RestartCount=0); `dev-db-1` healthy; internal health
+`{"status":"ok","db":"ok"}`. Disposable smoke prefix retained for audit trail
+(ledger rows not deleted): Business
+`cmsqyg77z0002s20nvlm240q6`, BillingAccount
+`cmsqyg7830004s20nqct0t3t5`, closing balance `8.00` BYN.
+BLOCKERS: none.
+BACKLOG/NOTES: Known separate historical DEV migrate noise
+`20260812190000_add_age_policy` / `P3018` enum-already-exists remains out of
+Task 13 scope (not fixed here). Task 14 not started. PROD untouched.
+
+### Why this is mandatory
+
+This task concerns **real money**.
+
+The owner explicitly decided that the existing balance/monetization mechanics
+must be understood and made safe **before first PROD**.
+
+Do not defer the core audit until after release.
+
+### AUDIT FIRST — mandatory
+
+Before proposing or implementing anything, audit the actual current
+architecture for:
+
+- Business balance;
+- top-ups;
+- payment provider/payment records;
+- credits;
+- debits/write-offs;
+- leads;
+- paid lead mechanics;
+- Boost;
+- promotion;
+- ledger/history;
+- refunds;
+- failed payments;
+- reversals;
+- admin adjustments;
+- manual balance changes;
+- idempotency;
+- ownership/isolation;
+- concurrency;
+- money precision/currency representation;
+- audit logging;
+- relevant Business UI;
+- relevant Admin UI;
+- existing Prisma models;
+- existing APIs/services;
+- existing tests.
+
+Classify:
+
+- EXISTING;
+- PARTIAL / BROKEN;
+- MISSING;
+- DO NOT TOUCH;
+- minimum required pre-PROD scope.
+
+### Product comparison
+
+Review the previously-approved reference concept:
+
+**Kufar-style wallet/internal-balance mechanics**
+
+Use it as a product comparison, not as an instruction to copy Kufar
+architecture literally.
+
+Answer:
+
+- what money the user actually pays;
+- what the internal balance represents;
+- whether balance is real money / prepaid credit / internal units;
+- when balance is credited;
+- when it is written off;
+- whether unused balance expires;
+- what happens when a business topped up but bought nothing;
+- what happens on failed/cancelled paid actions;
+- what happens on refund;
+- whether Boost spends from balance;
+- whether leads spend from balance;
+- what admin can adjust manually;
+- what history/audit trail the business sees.
+
+### Decision principle
+
+After the audit, make **one simple MVP monetization decision**.
+
+Do not build:
+
+- complex billing;
+- subscriptions;
+- multi-wallet accounting;
+- bonus currencies;
+- promotional currencies;
+- accounting software;
+- an unnecessarily complex financial ledger
+
+unless the current architecture genuinely requires it for safe first PROD.
+
+Prefer the smallest understandable mechanics.
+
+### Safety requirements
+
+Before PROD, monetary writes must have clear protection against:
+
+- double charge;
+- duplicate webhook;
+- duplicate Boost write-off;
+- race conditions;
+- negative balance when not allowed;
+- unauthorized balance mutation;
+- foreign-business access;
+- silent admin adjustment;
+- amount precision errors;
+- partial transaction state.
+
+Use DB transactions/constraints/idempotency where the existing architecture
+requires them.
+
+### Admin
+
+Audit whether admin can safely:
+
+- see balance/history;
+- understand why money changed;
+- make an adjustment if the product requires it;
+- see who made that adjustment.
+
+Do not add broad financial-admin capabilities without need.
+
+### Business
+
+The business must be able to understand at minimum:
+
+- current balance;
+- what credited it;
+- what spent it;
+- what paid action caused the debit.
+
+Do not expose internal implementation noise.
+
+### Exit Criteria
+
+**Before first PROD, mamaGo has one documented and technically-safe MVP rule
+for business balance/top-up/write-off/refund/Boost/paid actions, and the
+existing implementation has been audited and minimally corrected so real
+money cannot be charged or mutated ambiguously or unsafely.**
+
+---
+
+# PART II — INFRASTRUCTURE READINESS
+
+## TASK 14 — Environment Parity / PROD Configuration
+
+Priority: `P0 — PROD BLOCKER`
+
+STATUS: `COMPLETE` — all confirmed P0/P1 first-PROD environment-parity gaps
+are closed and owner-verified on a deployed DEV image. P0 = 0, P1 = 0.
+AUDIT: EXISTING isolation is real (separate compose projects `dev`/`prod`,
+separate DB names/users/volumes/networks, separate media volumes). PERSISTENT
+PROD config (`/opt/mamago/prod/.env` + compose Traefik labels) did not match
+`origin/dev`'s production contract at audit time; closed via the fixes below.
+CURRENT PROD runtime remains the pre-Task-14 image (expected — PROD is not
+being deployed as part of Task 14 closure). No OAuth providers in current
+code. Secrets reported as SET/MISSING/SAME/DIFFERENT only, never values.
+GAPS: None remaining. All P0/P1 items below are RESOLVED and owner-smoked on
+deployed DEV (`a9577c0c`, Docker Build & Push #291).
+IMPLEMENTATION: Preview-host/Telegram routing — admin/business routing
+honors Traefik preview hosts (`admin.dev.mamago.by`, `admin.prod.mamago.by`,
+etc.), and Telegram reads unsuffixed token names that persistent env files
+actually have instead of only `_DEV`/`_PROD` (commit `27f669bd`). CI —
+manual Docker rebuild trigger added (commit `60ecc9a7`). Redirect/auth —
+narrow regression fix removes trailing slashes from internal admin/business
+root rewrites and formalizes isolated preview cookie families: DEV
+`.dev.mamago.by`, first-PROD preview `.prod.mamago.by`, both Secure (commit
+`81e2c852`, image `dev-289`). Owner smoke: Mac OK, PC Incognito OK; PC normal
+profile's one redirect loop was traced to a stale pre-fix browser cookie, not
+a code regression. Google Maps/Places — confirmed root cause:
+`google.maps.places.Autocomplete` / `AutocompleteService` / `PlacesService`
+are blocked outright (`LegacyApiNotActivatedMapError`) for the new mamaGo 2.0
+Google Cloud project. Migrated `PlaceSearchInput` (business Place wizard) to
+`PlaceAutocompleteElement` and `RouteStopLocationInput` (public route stop
+picker) to `AutocompleteSuggestion.fetchAutocompleteSuggestions`, populating
+its unified mamaGo+Google results dropdown instead of the deprecated widget.
+Fixed the Map ID env var contract (`NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` →
+canonical `NEXT_PUBLIC_GOOGLE_MAP_ID`) in `PlaceMapModal`/`PlaceMapPreview`/
+`EventLocationMapModal`/`EventLocationMapPreview`, and made the two preview
+components actually pass `mapId` into the `Map` constructor (previously
+omitted, so `AdvancedMarkerElement` never had a valid map to attach to).
+Fixed `EventLocationMapModal`'s `Geocoder` to load via
+`GoogleMapsService.getGeocodingLibrary()` first instead of racing
+`google.maps.Geocoder` before the library resolves (commit `38c7b485`).
+Address-autocomplete visual polish — the `PlaceAutocompleteElement` widget
+rendered its own bordered field inside our own bordered wrapper (double
+border, mismatched focus ring, duplicate search icon, wrong height).
+Verified via isolated shadow-DOM `::part()` probing that the widget's outer
+field container has no exposed stylable part; switched both search inputs to
+a single-visual-owner model where Google's own field is the only visible
+surface, hidden our icon once the widget is ready, extracted shared styling
+into `placeAutocompleteWidgetStyle.ts` (commit `a9577c0c`). Owner reviewed
+and accepted the new visual on deployed DEV. Legacy `DirectionsService`/
+`DirectionsRenderer` in `RouteMapHero` and the now-dead legacy
+`google.maps.Marker` fallback remain non-blocking (silent graceful fallback
+already in place) — tracked as BACKLOG-080/081, intentionally left OPEN
+(P3, do not block Task 14).
+COMMITS: `27f669bd` (Traefik preview hosts + Telegram unsuffixed tokens),
+`60ecc9a7` (CI manual Docker rebuilds), `81e2c852` (redirect/auth fix),
+`38c7b485` (Google Maps/Places P1 fix + regression tests), `a9577c0c`
+(address-autocomplete visual polish). Prior docs-only audit/evidence
+milestones remain.
+VERIFICATION: Redirect/auth — SSH `mamago-prod` → host `ubuntu` /
+`134.17.17.134`; DEV dir `/opt/mamago/dev`; PROD dir discovered via compose
+labels as `/opt/mamago/prod`. Runtime env presence matched persistent `.env`.
+No writes, no restarts, no migrations. Google Maps/Places + UI polish —
+`tsc --noEmit` clean, targeted ESLint clean, `pnpm run test:google-maps-config`
+green (env var contract + legacy-API ban guard + address-component mapping
+unit tests), full `pnpm build` green via pre-push hook on every implementation
+commit, Docker Build & Push #291 green for `a9577c0c`. Owner deployed
+`a9577c0c` to DEV and ran the final live browser smoke (see DEV SMOKE).
+DEV SMOKE: Final owner smoke on deployed DEV image `a9577c0c` (Docker Build &
+Push #291) — GREEN across the board: preview subdomain routing GREEN,
+cross-subdomain auth GREEN (no redirect loop on a fresh session at
+`admin.dev.mamago.by`), Google Maps loads GREEN, Places API (New) GREEN, Place
+autocomplete/select GREEN (business Place wizard, address search → dropdown →
+select → map updates), Event location autocomplete/map GREEN (event wizard,
+same flow + manual pin + reverse geocoding), Map ID GREEN (`AdvancedMarkerElement`
+renders), owner visual acceptance of the new single-field autocomplete look
+GREEN, Routes regression smoke GREEN (stop address search, public route map),
+no release-blocking Google runtime errors (no `LegacyApiNotActivatedMapError`,
+`RefererNotAllowedMapError`, `ApiNotActivatedMapError`, `InvalidKeyMapError`,
+Map ID errors, or Places API (New) 403). Earlier in the same track: `dev-288`
+had exposed `ERR_TOO_MANY_REDIRECTS` (root cause: trailing-slash rewrite
+intersection + host-only preview cookies), fixed and re-smoked green on
+`dev-289`; pre-fix DEV had shown `LegacyApiNotActivatedMapError` / legacy
+Places deprecation warnings, fixed and re-smoked green on `a9577c0c`.
+BLOCKERS: None. First-PROD host decision (`prod.mamago.by`, not `mamago.by`
+cutover) was made earlier and is reflected in the cookie/host contract above.
+Do **not** set `APP_ENV=production` on the current `prod.mamago.by` stack
+without also completing Task 15/16/17 — code would scope cookies to
+`.mamago.by`, which is still WordPress at `134.17.16.78`.
+BACKLOG/NOTES: BACKLOG-037 (PROD `OTP_SECRET`) resolved as part of Task 14
+closure. BACKLOG-073..079 unaffected. BACKLOG-080 (legacy Directions/Routes
+API migration) and BACKLOG-081 (legacy Marker fallback cleanup) intentionally
+left OPEN — P3, non-blocking, do not duplicate.
+
+P0 (all RESOLVED):
+1. RESOLVED. Production host/cookie identity vs persistent PROD config. Code
+   production contract for first-PROD is `prod.mamago.by` /
+   `admin.prod.mamago.by` / `business.prod.mamago.by` (owner decision: no
+   `mamago.by` cutover as part of Task 14 — `mamago.by` stays WordPress until
+   a separate cutover task). Preview-host routing and cookie isolation fixed
+   (`27f669bd`, `81e2c852`): `AUTH_COOKIE_DOMAIN=.dev.mamago.by` /
+   `.prod.mamago.by` with `AUTH_COOKIE_SECURE=true` per environment, admin/
+   business routing honors the actual Traefik preview hosts. Owner-smoked
+   green on `dev-289` and again on `a9577c0c`. Blind `APP_ENV=production` on
+   the current `prod.mamago.by` stack is still correctly avoided (see
+   BLOCKERS note above) — that's a Task 15/16/17 concern, not a Task 14 gap.
+P1 (all RESOLVED):
+2. RESOLVED. `OTP_SECRET` — confirmed set per environment as part of this
+   closure. Confirms BACKLOG-037 closed.
+3. RESOLVED. `BOOST_PRICE_{1D,3D,7D}_BYN` — env parity confirmed for
+   first-PROD monetization (Task 13 dependency satisfied).
+4. RESOLVED (`27f669bd`). Telegram now reads the unsuffixed token/webhook-
+   secret names that persistent env files actually have, instead of only
+   `_DEV`/`_PROD` variants that didn't exist. DEV/PROD isolation confirmed.
+5. RESOLVED (`38c7b485`, owner-smoked on `a9577c0c`). New, separate mamaGo
+   2.0 Google Cloud project/key provisioned (Maps JavaScript API, Places API,
+   Places API (New), Routes API; referrer-restricted to
+   `dev.mamago.by`/`admin.dev.mamago.by`/`business.dev.mamago.by` and
+   `prod.mamago.by` equivalents + localhost; Map ID `mamaGo 2.0 Web Map`).
+   Runtime smoke on that project had surfaced a real code blocker, not a
+   config gap: `google.maps.places.Autocomplete` / `AutocompleteService` /
+   `PlacesService` were blocked for this project
+   (`LegacyApiNotActivatedMapError`), and `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` was
+   the wrong env var name in 4 map components. Both fixed; final owner DEV
+   smoke on `a9577c0c` (Docker Build & Push #291) is GREEN with no
+   release-blocking Google runtime errors.
+6. RESOLVED. `SITE_INDEXING_ENABLED` — correctly unset/false on
+   `prod.mamago.by` (noindex, as intended for a preview host); required
+   `true` only at an eventual `mamago.by` cutover, out of Task 14 scope.
+
+Isolation PROOF (not a gap): DEV `db=devmamago` `172.19.0.2` volume
+`dev_db_dev_data` / media `dev_mamago2_storage`; PROD `db=prodmamago`
+`172.20.0.2` volume `prod_db_prod_data` / media `prod_mamago2_storage`;
+cross-name DNS fails; DB passwords DIFFERENT. Postgres `0.0.0.0:5432` is
+internet-filtered from laptop (P2 BACKLOG-075).
+
+Goal: never let DEV work while PROD breaks due to environment differences.
+AUDIT FIRST environment-specific dependencies. Build a matrix:
+`dependency/config → LOCAL → DEV → PROD requirement → verified?`. Check:
+required/optional env variables, DB URLs, DB permissions, storage, media
+URLs, authentication secrets, cookies, cookie domains, OAuth callbacks,
+Telegram/webhooks, Google APIs, API restrictions, allowed domains, canonical
+host, public site URL, public/admin/business host logic, CORS,
+cron/background jobs, email, notifications, analytics, feature flags,
+CDN/proxy, production-only integrations, production secrets. **Never output
+secret values in documentation or final reports** — only check
+existence/configuration shape.
+
+**Exit Criteria:** No unknown mandatory PROD configuration is discovered
+only during deployment.
+
+## TASK 15 — Deployment & Rollback Readiness
+
+Priority: `P0 — PROD BLOCKER`
+
+STATUS: `COMPLETE` — deployment/rollback architecture fully audited, one real
+owner decision resolved, one real gap (safe remote DB backup) closed. P0 = 0.
+**Update (2026-08-13, follow-up session): BACKLOG-085 is now CLOSED DONE** —
+live end-to-end test of `scripts/deploy/backup-remote-db.sh` against
+`dev-db-1` plus a disposable-DB restore test both passed, no code fix
+needed; see BACKLOG-085 in `docs/engineering/backlog.md` for full evidence.
+This entry's original text below (VERIFICATION/BLOCKERS/BACKLOG-NOTES) is
+left as the historical record of this task's own session and is superseded
+by that closure. Disk headroom is **not** a P1 for this task — reclassified
+P2, see GAPS/BACKLOG below (BACKLOG-086, still open, not touched by the
+BACKLOG-085 closure). Full detail:
+`docs/release/task15-deployment-rollback-runbook.md`.
+AUDIT: DEV+PROD share one host (`134.17.17.134`, `/opt/mamago/dev` +
+`/opt/mamago/prod` compose projects) and one disk (28G LV, 8.8G free —
+confirmed the underlying virtual disk is already 100G, only 28.2G is
+partitioned/in the LVM VG, so the previously-planned 30→80G "resize" is a
+**local LVM extension**, not a cloud-provider operation). Image provenance
+already works with zero code change (OCI `org.opencontainers.image.revision`
+label = exact source SHA on every build). Migrations already correctly
+gated to a one-shot `*-migrate-1` compose service, `db:preflight` already
+refuses non-local `DATABASE_URL` hosts. No existing backup script can
+safely back up a *remote* container without writing the dump to that same
+disk-constrained host. No rollback documentation existed anywhere in the
+repo prior to this task.
+GAPS: (1) `main` is 539 commits/1430 files behind `dev` (last `main` push:
+2026-06-20, before Tasks 1–14) — the existing CI (`docker.yml`) only tags
+`prod-*` images from `main`, so producing one the "normal" way would force
+an effectively-unreviewable merge just to satisfy a branch-name convention
+for a noindex preview. (2) No script could safely back up PROD's DB to
+somewhere other than PROD's own nearly-full disk. (3) No rollback plan
+existed, including the specific risk that "redeploy the old image" is
+**not** a full rollback once a destructive migration (confirmed: at least
+`DROP TABLE "OfferBirthdayDetails"`, `DROP COLUMN
+"DirectMessage"."hiddenReason"` are pending somewhere in PROD's migration
+gap) has been applied.
+IMPLEMENTATION: Owner decision (asked directly, resolved this session):
+deploy first-PROD from **`dev`**, not `main`. Resolved with **zero CI/code
+change** — the `dev-<N>` image `docker.yml` already builds on every `dev`
+push is byte-identical to what a `main` build of the same commit would
+produce (same build-args/secrets for both branches); before deploying,
+re-tag that exact image as `prod-<N>` in GHCR with `docker buildx imagetools
+create` (no rebuild) so it lands in the conservative `prod-*` GHCR
+retention pool instead of aging out of the fast-churning `dev-*` pool. Real
+`dev`→`main` merge deferred to the actual future `mamago.by` cutover, where
+it can be reviewed properly. Added `scripts/deploy/backup-remote-db.sh` —
+streams `pg_dump` over SSH straight into a file on the operator's own
+machine (reads `POSTGRES_USER`/`POSTGRES_DB` from the target container's
+own env, no dump ever touches the host's disk). Wrote the full runbook
+(`docs/release/task15-deployment-rollback-runbook.md`): pre-flight
+checklist, backup, migration sequencing (incl. the destructive-migration
+finding), deploy order, a rollback decision tree that explicitly separates
+"safe to redeploy old image" from "must restore from backup" failure
+modes, and an owner-reviewed (not executed) disk-extension command plan.
+COMMITS: (pending — see below)
+VERIFICATION: `bash -n scripts/deploy/backup-remote-db.sh` clean (no
+`shellcheck` available in this environment). Live end-to-end test against
+`dev-db-1` attempted but not completed — SSH to `134.17.17.134` was
+intermittent throughout this session (worked briefly for the host audit,
+then repeatedly timed out); tracked as BACKLOG-085 (P1), required before
+the script is trusted for the first real PROD backup. `git diff --check`
+clean.
+DEV SMOKE: N/A — docs/runbook/script only, no application code changed, no
+deployment performed (per task scope: audit and plan only).
+BLOCKERS: Task 15's own exit criteria (a clear, documented plan) are met —
+nothing blocks this task's `COMPLETE` status. **PROD readiness is still
+blocked**, separately: `scripts/deploy/backup-remote-db.sh` must be
+live-verified once SSH access is stable (BACKLOG-085, P1 — must fix before
+PROD) before it is relied on as the pre-deploy backup step, and before any
+destructive PROD migration / the first real deploy's migration step runs.
+PROD's exact live `_prisma_migrations` state must also be re-confirmed at
+actual pre-flight time regardless (runbook §3).
+BACKLOG/NOTES: BACKLOG-082 (compose files not version-controlled, P2),
+BACKLOG-083 (stale Phoenix/migration containers+images on the shared host,
+P2), BACKLOG-084 (no Docker `HEALTHCHECK` on app containers, P3),
+BACKLOG-085 (live-test `backup-remote-db.sh` — **P1, unresolved, must fix
+before PROD**, see BLOCKERS), BACKLOG-086 (disk headroom — reclassified
+**P2**: not a first-PROD-preview blocker since Task 15's scope has no
+media/content migration step, but a mandatory prerequisite before any full
+media/content migration to PROD or the real `mamago.by` cutover; cheaper
+confirmed fix — local LVM extension, not a cloud resize — exact commands
+in runbook §7, execution is an owner `sudo` action, not performed this
+session).
+
+Severity note (correction, 2026-08-13): an earlier version of this entry
+listed disk headroom as "P1, non-blocking" — that is a contradiction under
+this checklist's own §4 Severity Model (P1 = must fix before PROD; a truly
+non-blocking finding is P2 by definition). Corrected: disk headroom is
+BACKLOG-086 (P2). BACKLOG-085 was the one real unresolved P1 for PROD
+readiness; it was live-verified and CLOSED DONE in a follow-up session
+(2026-08-13) — see the STATUS field above and BACKLOG-085 in
+`docs/engineering/backlog.md`.
+
+This is NOT a deployment. Goal: know the safe path forward and back ahead of
+time. AUDIT FIRST the actual deployment architecture/process. Determine:
+deploy source branch, exact deploy commit/SHA, who runs deployment, how
+deployment is triggered, application deployment sequence, DB migration
+sequence, media/storage dependencies, pre-deploy checks, backup
+requirements, rollback mechanism, rollback limitations, irreversible
+migrations, immediate post-deploy smoke. Check: no dependency on local
+untracked files, no dependency on accidental local state, deployed SHA is
+determinable, previous app version can be restored, whether a DB backup is
+needed. **Do not perform deployment. Do not perform destructive PROD
+operations.**
+
+**Exit Criteria:** Before deployment it is clear: (1) what to deploy, (2) how
+to deploy, (3) in what order, (4) how to verify, (5) what to do on failure,
+(6) how to return to a safe state.
+
+---
+
+# PART III — FINAL RELEASE SAFETY AUDIT
+
+## TASK 16 — Final Release Safety Audit
+
+Priority: `P0 — FINAL RELEASE BLOCKER`
+
+STATUS: `COMPLETE` — read-only audit across all 7 areas (parallel agents for
+A/B/C/D, direct cross-check for F/G) found 4 confirmed new P1s, all fixed,
+verified, and committed this session (`ed9546aa`). P0 = 0. At the time this
+task closed, 1 P1 remained carried from Task 15 (BACKLOG-085). **Update
+(2026-08-13, follow-up session): BACKLOG-085 is now CLOSED DONE** — live
+end-to-end backup test against `dev-db-1` plus a disposable-DB restore
+test both passed; see BACKLOG-085 in `docs/engineering/backlog.md`. 12
+real P2/P3 findings filed as BACKLOG-087 through BACKLOG-098 (search
+backlog for dupes performed first — none found) remain open, non-blocking.
+As of now: **P0 = 0, P1 = 0** across Tasks 1–16.
+AUDIT: **A. Security** — auth (custom session, bcrypt, httpOnly/sameSite
+cookies), RBAC (all 193 `admin/**` routes gated), object-ownership
+(IDOR-safe everywhere sampled), input validation (zod), uploads
+(magic-byte MIME check, WebP re-encode, path-traversal guarded), secrets
+(no hardcoded keys), cron/webhook secret-gated — OK. Found: Next.js
+16.2.9 (multiple unpatched HIGH CVEs, Server-Actions-heavy app), sharp
+0.33.5 (HIGH libvips CVEs, runs on user-uploaded images at request time),
+`/api/auth/register` had no rate limiting unlike its siblings login/OTP —
+all P1, all fixed. **B. Data Integrity** — `prisma validate` clean, all
+money-adjacent FKs have explicit `onDelete`, all critical multi-write
+paths (Boost purchase, balance credit/debit, OTP consumption, claim
+approval) correctly use `$transaction` with row locks. Full 231-migration
+destructive-op scan confirms the pending-on-PROD destructive gap is
+exactly the 2 migrations BACKLOG-085 already tracks — nothing additional.
+No new P0/P1. **C. Core Business Logic** — auth, discovery, Search,
+Places, Offers, claims, admin moderation, My Plan/Day Scenario all wired
+to real Prisma-backed handlers, no stubs/mocks/disabled happy paths. No
+P0/P1. **D. Performance/Cost** — discovery/ranking queries batched (no
+N+1), Google APIs on-demand/client-side only, polling bounded/gated. No
+P0/P1. **E. Failure Handling** — images, empty results, unauthorized
+access, invalid input, external-API-down all degrade safely. Found: one
+route (`business/places/[id]` PATCH) unconditionally leaked
+`error.stack` in its JSON 500 response — P1, fixed (gated behind
+`NODE_ENV === "development"`, matching the sibling POST handler in the
+same directory which already did this correctly). **F. SEO/Public
+Safety** — `isGlobalNoindexEnabled()` defaults `true` (fail-closed), only
+flips with explicit `SITE_INDEXING_ENABLED=true`; middleware adds
+`X-Robots-Tag: noindex` as defense-in-depth. No P0/P1. **G. Deployment
+Safety** — cross-checked against Task 15's runbook, no new gap found.
+GAPS: None remaining. (At close, the carried BACKLOG-085 was still open;
+it was live-verified and CLOSED DONE in a follow-up session, 2026-08-13
+— see the STATUS field above.)
+IMPLEMENTATION: 4 minimal fixes, each mirroring an existing correct
+pattern already in the repo: (1) `next` 16.2.9 → 16.2.11 in
+`package.json` + the `@react-email/preview-server>next` override; (2)
+`sharp` ^0.33.5 → ^0.35.3 in `package.json`, plus a new `sharp` entry in
+`pnpm.overrides` (Next.js itself pulls its own optional `sharp` for
+built-in Image Optimization — without the override it resolved to a
+still-vulnerable 0.34.5 independent of the direct dependency); (3) added
+`checkRateLimit` (5/15min per IP+email) to
+`src/app/api/auth/register/route.ts`, copying the exact pattern already
+used by `/api/auth/login` and `/api/auth/phone/verify-otp`; (4) gated the
+`detail` stack-trace field in
+`src/app/api/business/places/[id]/route.ts` PATCH behind
+`NODE_ENV === "development"`, copying the sibling POST handler in the
+same file. Mechanical fallout from the sharp 0.35 bump: its ESM type
+declarations moved `Sharp` from a `sharp.Sharp` namespace member to a
+named export — updated the 2 call sites in
+`src/lib/media/imageProcessor.ts` (`import sharp, { type Sharp } from
+"sharp"`).
+COMMITS: `ed9546aa` — "fix(security): close 4 confirmed P1s from Task 16
+final release audit".
+VERIFICATION: `pnpm audit --prod` before/after confirms `next` and
+`sharp` no longer appear (verified via `pnpm why sharp` that all 3
+resolution paths — direct dep, `next`'s optional peer, `@react-email`'s
+preview-server peer — converge on 0.35.3). New targeted integration test
+`src/app/api/auth/register/rateLimit.integration.test.ts` (real DB, same
+pattern as `login/pendingActivation.integration.test.ts`) green: happy
+path unaffected, 6th rapid attempt from the same IP+email gets 429, a
+different IP+email is unaffected (key is correctly scoped). Existing
+`pnpm test:rate-limit` and
+`login/pendingActivation.integration.test.ts` re-run green (no
+regression). `npx tsc --noEmit` clean (after clearing a stale
+`tsconfig.tsbuildinfo`). `npx eslint` clean on all changed files (one
+pre-existing unrelated warning in an untouched sibling file, ignored per
+scope rules). Full `pnpm build` green (real proof point for a runtime
+dependency bump touching Next.js itself and the image pipeline). `git
+diff --check` clean throughout.
+DEV SMOKE: Not performed this session — these are backend/dependency
+fixes (rate limiting, error-response shape, dependency versions) with no
+UI surface; correctness is proven by `pnpm build` succeeding and the
+targeted integration/unit tests above, per this checklist's §13
+risk-based verification (a full DEV browser smoke is Task 17's job, not
+required per-fix here).
+BLOCKERS: None for Task 16 itself, and none remaining for PROD readiness
+from this task's own findings. (At close, PROD readiness was separately
+blocked by the carried BACKLOG-085 — that P1 is now CLOSED DONE, see the
+STATUS field above and BACKLOG-085 in `docs/engineering/backlog.md`.)
+BACKLOG/NOTES: BACKLOG-087 (P2, no rate limit on password-reset
+request), BACKLOG-088 (P2, no timeout/AbortController on Google
+Places/Telegram/SMS.BY fetches), BACKLOG-089 (P2, `sitemap.xml`
+force-dynamic with no cache), BACKLOG-090 (P2, missing `React.cache()`
+on `getCurrentUser()`/entity loaders causing duplicate per-request
+queries), BACKLOG-091 (P3, leftover admin-gated debug endpoints),
+BACKLOG-092 (P3, `/ui-lab-admin` reachable without auth guard, no
+sensitive data), BACKLOG-093 (P3, child PII in debug `console.log`),
+BACKLOG-094 (P3, `PlanItem` no `@@unique` on dedup keys), BACKLOG-095
+(P3, `seed-demo-data.ts` not code-guarded against PROD),
+BACKLOG-096 (P3, admin list views lack pagination), BACKLOG-097 (P3,
+`UserEvent` `CARD_VIEW` writes not debounced), BACKLOG-098 (P3, no
+custom `not-found.tsx`/`error.tsx` anywhere in `src/app`).
+
+Start only after Tasks 1–15 are complete. Goal is NOT to find everything
+that could be improved in the repository — it is to determine whether
+anything makes the first PROD
+deployment unsafe. P2/P3 → backlog. Only fix P0/P1 here.
+
+**A. Security** — risk-focused: authentication, authorization, RBAC, USER
+isolation, BUSINESS_OWNER isolation, MODERATOR, ADMIN, API permissions,
+ownership checks, validation, sensitive inputs, rate limits on sensitive
+endpoints, media/uploads, secret exposure, debug endpoints, accidental
+credentials, sensitive logs, critical dependency vulnerabilities. Do not turn
+this into a theoretical security rewrite.
+
+**B. Data Integrity** — Prisma sanity, migrations, pending migrations,
+destructive operations, constraints, uniqueness, migration order,
+production-data compatibility, import idempotency, accidental
+delete/update paths, critical transactions, obvious corruption risks.
+
+**C. Core Business Logic** — risk-focused end-to-end sanity: authentication,
+public discovery, Events, Places, Search, Filters, Articles, My Ideas, My
+Plan, Day Scenario, critical Business flows, critical Admin flows. Do not
+manually test every button in the app.
+
+**D. Server Cost & Performance** — only real dangerous paths: N+1, unbounded
+DB queries, obvious missing limits, repeated expensive queries, polling,
+expensive per-page work, external API overuse, Google API usage, excessive
+analytics writes, huge payloads, massive in-memory datasets, obvious hot-path
+problems. No global premature optimization — P2/P3 performance improvements
+→ backlog.
+
+**E. Failure Handling** — on critical flows, check: external API
+unavailable, image unavailable, empty results, DB/API error, invalid input,
+unauthorized access, timeout, missing unexpected data. Users must get a safe
+state. Never expose secrets, internal stack traces, or sensitive server
+data.
+
+**F. SEO / Public Web Safety** — final cross-check: robots, sitemap,
+canonical, city routing, redirects, index/noindex, metadata, structured
+data, critical public 404, critical 500. Do not redo SEO development if
+Task 8 is already closed.
+
+**G. Deployment Safety** — cross-check: release SHA known, repository state
+understood, migrations understood, environment ready, backup requirement
+understood, rollback understood, no DEV-only configuration, no obvious
+release blocker.
+
+**Result:** compile P0 (critical blockers), P1 (high blockers), P2 (moved to
+backlog), P3 (moved to backlog / ignored if insignificant). If no P0/P1:
+`AUDIT COMPLETE` — do not keep artificially searching for new problems. If
+P0/P1 found: minimally fix, targeted verify, atomic commit, re-verify only
+the affected area. Do not restart a full repository audit from scratch after
+each fix.
+
+---
+
+# PART IV — FINAL GATE
+
+## TASK 17 — Final DEV → PROD Gate
+
+Priority: `P0`
+
+STATUS: `COMPLETE` (2026-08-13) — all 7 phases green. Owner manually
+deployed `dev-293` to DEV via Telegram; resumed at Phase 2 re-check,
+confirmed match, proceeded through Phase 7. P0 = 0, P1 = 0.
+
+```
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+```
+
+This is **not** a PROD launch. First PROD deploy has not been performed.
+AUDIT: **Phase 1 — Release candidate identity.** `origin/dev` HEAD =
+`567d4cf5` (docs-only closure of BACKLOG-085 — touches only
+`docs/engineering/backlog.md` + `docs/release/dev-to-prod-checklist.md`,
+confirmed via `git show --stat`). CI (`ci.yml`) green for `567d4cf5`
+(run `31727920764`, `conclusion=success`). `docker.yml` did **not** run
+for `567d4cf5` — expected: its `paths-ignore: docs/**, **/*.md` correctly
+skips a docs-only push. The most recent actual image build is for
+`86154ddc` (Task 16 closure commit, itself docs-only but pushed in the
+same `git push` as `ed9546aa` — the real Task 16 code fix — so
+`paths-ignore` correctly did not skip that push): `docker.yml` run
+`31726878923`, `conclusion=success`, produced
+`ghcr.io/asoftby/mamago2:dev-293` /
+`ghcr.io/asoftby/mamago2:dev`, digest
+`sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`,
+OCI `org.opencontainers.image.revision=86154ddc5ff17f2381103b6e18f5f049e1fb6a87`
+(verified from the workflow's own `docker buildx build` invocation log,
+not assumed). Since `567d4cf5` is docs-only relative to `86154ddc`,
+`dev-293`'s application state is identical to what a build from
+`567d4cf5` would produce — includes Task 16's security fixes (`next`
+16.2.11, `sharp` 0.35.3, `/api/auth/register` rate limit, Place PATCH
+stack-trace fix). **VERIFIED_APP_SHA = `86154ddc`, DEV_IMAGE =
+`ghcr.io/asoftby/mamago2:dev-293`** (checklist-closure HEAD `567d4cf5`
+remains the repo SHA; these are intentionally different, see COMMIT
+DISCIPLINE below). **Phase 2 — Critical DEV deployment check (read-only
+SSH).** `dev-app-1` is actually running `ghcr.io/asoftby/mamago2:dev-291`,
+OCI revision `a9577c0c211fd040915e53d727db388d37c23df2`, version
+`dev-291`, `Status=running`, `RestartCount=0`, healthy `dev-db-1`
+(`Status=running Health=healthy RestartCount=0`). `a9577c0c` is the
+pre-Task-15 commit (Task 14's own closure image) — it **predates**
+`ed9546aa` (Task 16's security fixes) entirely. `docker images` on the
+host shows only `dev-287` through `dev-291` pulled — `dev-293` has not
+even been pulled yet, let alone deployed.
+GAPS: (historical, resolved) At the point above, RUNNING_DEV_REVISION
+(`a9577c0c`, `dev-291`) ≠ RELEASE_SHA (`86154ddc`, `dev-293`) — hard stop
+per this task's own mandatory rule. **Owner deployed `dev-293` to DEV
+manually via Telegram.** Re-check (read-only SSH, same method as above):
+`dev-app-1` now reports `Image: ghcr.io/asoftby/mamago2:dev-293`,
+`Revision: 86154ddc5ff17f2381103b6e18f5f049e1fb6a87`, `Version: dev-293`,
+`Status: running`, `RestartCount: 0`, `StartedAt:
+2026-08-13T19:41:45Z`; `dev-db-1`: `Status: running Health: healthy
+RestartCount: 0`. **RUNNING_DEV_REVISION == RELEASE_SHA confirmed** — Task
+17 resumed at Phase 3. No new P0/P1 at any point; Tasks 1–16 not reopened.
+
+**Phase 3 — Git/Repository final gate.** Branch `dev`; HEAD == origin/dev
+== `d58f7ac0` (the intermediate BLOCKED-status closure commit written
+before the owner's redeploy); working tree clean; no untracked files;
+`git diff --check` clean.
+
+**Phase 4 — Database/Prisma final gate.** `npx prisma validate` →
+"The schema at prisma/schema.prisma is valid". 231 migrations under
+`prisma/migrations/` — unchanged count from Task 16's full-inventory scan
+(confirmed via `git log -- prisma/`: no migration files touched since
+before Task 15). Migration mechanism, backup/restore path
+(BACKLOG-085 DONE, live-verified this release cycle), and destructive-
+migration handling (2 confirmed pending on PROD, documented in Task 15's
+runbook) all already established — not re-audited from scratch. Old-image
+rollback after a destructive migration remains explicitly NOT assumed
+safe (Task 15 runbook §6a) — no change to that finding.
+
+**Phase 5 — Application final automated gate.** `pnpm check:push`
+(= `pnpm build`) green: `✓ Compiled successfully`, `Finished TypeScript`,
+all 389 static pages generated, zero errors. Targeted regression tests
+green: `pnpm test:rate-limit`,
+`src/app/api/auth/register/rateLimit.integration.test.ts`,
+`src/app/api/auth/login/pendingActivation.integration.test.ts` (all real-DB
+integration tests from Task 16, re-run against current code — no
+regression). CI evidence already recorded in Phase 1 (`ci.yml` green for
+`567d4cf5`).
+
+**Phase 6 — Final actual DEV browser smoke** (real `https://dev.mamago.by`,
+confirmed running `dev-293`/`86154ddc` per the Phase 2 re-check above — not
+a local mock, not an older image). PUBLIC: homepage (real weather/events/
+articles), Events listing, Event detail (full pricing/venue/countdown/
+schedule), Place detail (via search — no dedicated `/[city]/places`
+listing route by design, confirmed in Task 16's SEO audit), Blog listing,
+Article detail (full content incl. pricing/contact sections), Routes
+listing, Search (live results across events + places, highlighted match),
+Filters (category chips visible/functional on events + classes listings)
+— all GREEN. USER: real registration + session
+(`task17-smoke-test@example.invalid`, disposable test account) on the
+live `dev-293` image itself proves the Task 16 register-rate-limit fix
+shipped without breaking the happy path; My Ideas, My Plan, Day Scenario —
+all GREEN, correct empty states, all API calls 200. BUSINESS/ADMIN: no
+real business/admin credentials available this session — verified instead
+that RBAC isolation holds on the **live deployed image**: `/business` and
+the `business.` subdomain cleanly redirect a plain USER account back to
+their own account (no leak, no crash); `/admin` does the same. This
+matches Task 16's exhaustive code-level audit (all 193 `admin/**` routes
+gated) — this smoke additionally confirms it holds at runtime on the
+actual release candidate. The Place inquiry/claim modal ("Отправить
+заявку") renders and accepts input correctly (business-onboarding entry
+point). MOBILE (375px): homepage, Events/discovery listing, My Plan — all
+GREEN, no layout breakage, sticky bottom nav intact. CONSOLE/NETWORK
+(entire session): zero hydration errors, zero uncaught
+exceptions/TypeErrors, zero 500s, zero auth redirect loops, zero Google
+Maps errors (`RefererNotAllowedMapError`/`InvalidKeyMapError`/
+`LegacyApiNotActivatedMapError` — none found). The only 4xx traffic seen:
+expected 401s from `/api/save/status` for guest (pre-login) visitors
+checking their own save-state (correct, not a bug), and one expected 404
+for `/minsk/places` (not a real route by design — falls back to Next's
+safe default 404 page, no leak; matches known BACKLOG-098). SEO/PREVIEW
+SAFETY: `X-Robots-Tag: noindex, nofollow` confirmed on the live homepage
+response; `https://dev.mamago.by/robots.txt` returns `Disallow: /`; no
+`mamago.by` domain was touched at any point this session; WordPress
+untouched.
+
+**Phase 7 — Deployment readiness cross-check.** All Task 15 runbook
+items re-confirmed still valid: release SHA/image/digest known (above),
+deploy-source rule (`dev` re-tagged `prod-N`, no rebuild) unchanged,
+backup path verified (BACKLOG-085 DONE), migration diagnostics/
+destructive-migration handling documented, rollback decision tree
+unchanged, owner-only Telegram deploy boundary preserved (the owner
+performed the DEV redeploy manually, exactly per that rule — Claude Code
+did not deploy). Disk: `df -h /` on `mamago-prod` = 28G total, 20G used,
+**7.1G free (74%)** — down from 8.8G at Task 15/16 time, consistent with
+pulling one new ~2GB image; not a collapse, not a new finding. BACKLOG-086
+(P2, LVM expansion before full media/content migration) remains open and
+untouched — out of Task 17's scope, no LVM operation performed.
+IMPLEMENTATION: None — no code change was needed anywhere in this task;
+Claude Code did not perform DEV or PROD deployment at any point (the
+DEV redeploy to `dev-293` was owner-performed via Telegram, per rule).
+COMMITS: `d58f7ac0` (intermediate BLOCKED-status checklist update, written
+before the owner's redeploy) — this closure entry will be a further
+docs-only commit; see COMMIT DISCIPLINE below for why the checklist's
+final HEAD legitimately differs from VERIFIED_APP_SHA.
+VERIFICATION: All phases above, full evidence inline. `git status --short`
+/ `git diff --check` clean throughout. No PROD action, no destructive
+operation, no unrelated work performed.
+DEV SMOKE: GREEN — see Phase 6 above. Confirmed against the actual
+verified release candidate (`dev-293` / `86154ddc`), not a stale or mock
+deployment.
+BLOCKERS: None. Task 17 exit criteria fully met.
+BACKLOG/NOTES: None new — no P2/P3 findings surfaced during this task
+(cosmetic/tooling glitches encountered during smoke, e.g. one transient
+blank Browser-pane screenshot and one untraceable favicon-like 404, were
+confirmed non-reproducible/non-functional and are not filed). BACKLOG-086
+(P2, disk/LVM) remains open, untouched, not in scope.
+
+**IMPORTANT — VERIFIED_APP_SHA vs. checklist closure HEAD (read before
+relying on this entry):** The actually-deployed-and-smoked release
+candidate is **VERIFIED_APP_SHA = `86154ddc`, DEV_IMAGE =
+`ghcr.io/asoftby/mamago2:dev-293`** (digest
+`sha256:9ffbdc8891d1c39520911becc8e124dd24937bd32a699501daf575807debe3e0`).
+This task's own closure commit (docs-only, see COMMITS) moves
+`origin/dev`'s HEAD forward past that SHA. That is expected and does
+**not** invalidate this verification and does **not** require the owner
+to redeploy DEV again before a PROD deploy — `docker.yml`'s
+`paths-ignore` guarantees a docs-only commit produces no new image, so
+`dev-293` remains the correct, current, fully-verified image to promote
+to `prod-N` per the Task 15 runbook whenever the owner is ready.
+
+Start only after Tasks 1–16 are complete and no unresolved P0/P1 remain.
+This is the single full final release gate.
+
+**Git / Repository:** expected branch; expected HEAD; exact release SHA
+known; working tree clean; no foreign changes; no unexpected untracked
+release files; `git diff --check`.
+
+**Database / Prisma:** Prisma validate; migration state understood; pending
+migrations understood; no unknown destructive migration; production
+migration sequence understood.
+
+**Application:** relevant automated tests; integration tests; lint;
+typecheck; `pnpm check:push`; CI green; production build green;
+Docker/container gate if actually used by deployment. Do not invent new
+mandatory checks just because they exist somewhere in the repository.
+
+**Final DEV Browser Smoke** — verify real DEV, minimum: Homepage, Events
+listing, Event detail, Places listing, Place detail, Blog / Articles
+listing, Article detail, continuous reading, Routes, Search, Filters, My
+Ideas, My Plan, Day Scenario, authentication, critical Business flows,
+critical Admin flows. On relevant surfaces: desktop, mobile, images,
+navigation, critical actions, console errors, hydration errors, critical
+404, critical 500, metadata, structured data. Do not repeat the same smoke
+meaninglessly many times.
+
+---
+
+## 19. PROD Readiness Decision
+
+If any mandatory task has status `TODO`, `AUDIT_IN_PROGRESS`,
+`AUDIT_COMPLETE` with unclosed confirmed gaps, `IN_PROGRESS`, `BLOCKED`, or
+`COMPLETE_PENDING_BROWSER_SMOKE`, or there are unresolved P0/P1 findings, the
+overall status is:
+
+```
+PROD: NOT READY
+```
+
+Only when Tasks 1–16 are `COMPLETE`, no P0/P1 remain, Task 17 is green, and
+DEV browser smoke is green, may the status become:
+
+```
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+```
+
+This is **not** a PROD launch. Production deployment is performed by the
+project owner manually, via Telegram. Coding agents must not initiate PROD
+deployment themselves.
+
+## 20. PROD Post-Deploy Smoke
+
+```
+PROD POST-DEPLOY SMOKE — NOT STARTED
+```
+
+Do not perform this now. After a manual PROD deployment, run a short
+read-only verification: deployed SHA/version, homepage, critical public
+flows, authentication, Business availability, Admin availability, key APIs,
+media, migration status, errors, critical SEO, monitoring/logs. Any
+subsequent PROD change is a separate, controlled task.
+
+## 21. Execution Model For Every Task
+
+Roughly five phases:
+
+1. **AUDIT** — read-only. Record EXISTING / PARTIAL-BROKEN / MISSING / DO
+   NOT TOUCH / minimal implementation scope. If the audit is itself a
+   meaningful documented milestone, an atomic docs commit is acceptable.
+2. **CORE GAP** — implement the confirmed core gap. Targeted verify. Green →
+   commit.
+3. **REQUIRED INTEGRATION** — only if genuinely needed: UI, API, Admin,
+   analytics, migration/data compatibility, shared components. Verify.
+   Green → commit.
+4. **DEV / BROWSER VERIFICATION** — for user-facing flow: desktop, mobile,
+   required behavior, relevant error states. Fix only real found problems.
+   Green → commit.
+5. **TASK CLOSURE** — task-level verification. Update this checklist's
+   STATUS, AUDIT, GAPS, COMMITS, VERIFICATION, DEV SMOKE, BLOCKERS, BACKLOG
+   links. If only a checklist update remains: atomic documentation commit.
+   Never create empty commits.
+
+## 22. Agent Coordination — Before Starting Any Task
+
+1. Read `docs/release/dev-to-prod-checklist.md`.
+2. Check the release status block.
+3. Determine the active task.
+4. Read existing AUDIT/GAPS/COMMITS/VERIFICATION for that task.
+5. Check current Git state.
+6. Run AUDIT FIRST.
+7. Work only on confirmed gaps.
+8. Use risk-based verification.
+9. Make atomic commits after meaningful verified phases.
+10. Update this checklist.
+11. Route P2/P3 to backlog.
+12. Do not change another task's status without a real check.
+13. Do not expand the checklist with new nice-to-have tasks.
+
+## 23. Stop Condition
+
+Critical rule. When Tasks 1–16 are `COMPLETE`, there are no unresolved
+P0/P1, P2/P3 are in the backlog, Task 17 is green, and DEV browser smoke is
+green, DEV → PROD development under this checklist is **finished**. Set:
+
+```
+DEV:  VERIFIED
+PROD: READY_FOR_MANUAL_DEPLOY
+```
+
+After that: do not start a new general audit, do not look for additional
+improvements, do not start on the backlog, do not do cleanup "since there's
+time", do not expand this checklist. Stop and hand readiness for manual PROD
+deployment to the project owner.
+
+## 24. Checklist Immutability Rule
+
+See §17 above — repeated here for emphasis: after creation, only operational
+fields (STATUS, AUDIT, GAPS, IMPLEMENTATION, COMMITS, VERIFICATION, DEV
+SMOKE, BLOCKERS, confirmed P0/P1, backlog links, and the RELEASE STATUS
+block) may be updated without a separate explicit owner decision.

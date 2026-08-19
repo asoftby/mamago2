@@ -162,7 +162,7 @@ export async function bulkReindex(entityType: SearchIndexEntityType): Promise<vo
 
       case "OFFER":
         const offers = await prisma.offer.findMany({
-          where: { status: "PUBLISHED" },
+          where: { status: "PUBLISHED", archivedAt: null, place: { archivedAt: null } },
           select: { id: true },
         });
         entityIds = offers.map((o) => o.id);

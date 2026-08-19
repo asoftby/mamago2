@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
+  hasArticleIdea,
   hasIdea,
   hasOfferIdea,
   hasOfferIdeaSupport,
@@ -20,12 +21,38 @@ export async function GET(request: NextRequest) {
     const activityId = searchParams.get("activityId");
     const offerId = searchParams.get("offerId");
     const placeId = searchParams.get("placeId");
+    const articleId = searchParams.get("articleId");
 
-    if (!activityId && !offerId && !placeId) {
+    if (!activityId && !offerId && !placeId && !articleId) {
       return NextResponse.json(
-        { error: "activityId, offerId or placeId is required" },
+        { error: "activityId, offerId, placeId or articleId is required" },
         { status: 400 }
       );
+    }
+
+    if (articleId) {
+      const isIdea = await hasArticleIdea(user.id, articleId);
+      const planItems = await prisma.planItem.findMany({
+        where: { userId: user.id, articleId },
+        select: { id: true, date: true, startsAt: true },
+        orderBy: { date: "asc" },
+      });
+      const planState = resolveIdeaPlanState(
+        planItems.map((item) => ({ id: item.id, date: item.date })),
+      );
+      const relevantPlanItem =
+        planItems.find((item) => item.id === planState.planItemId) ?? null;
+      const isSaved = isIdea || planItems.length > 0;
+
+      return NextResponse.json({
+        isSaved,
+        isIdea,
+        inPlan: planState.isPlanned,
+        planStatus: planState.planStatus,
+        planDate: planState.plannedDate ?? null,
+        planStartsAt: relevantPlanItem?.startsAt ?? null,
+        planItemId: planState.planItemId ?? null,
+      });
     }
 
     if (placeId) {

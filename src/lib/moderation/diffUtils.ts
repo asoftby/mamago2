@@ -211,8 +211,16 @@ export function formatValue(value: unknown, field?: string): string {
     }
     return value || "—";
   }
-  if (typeof value === "number") return value.toString();
+  if (typeof value === "number") {
+    if (field === "lat" || field === "lng") {
+      return value.toFixed(6);
+    }
+    return value.toString();
+  }
   if (typeof value === "boolean") return value ? "Да" : "Нет";
+  if (value instanceof Date) {
+    return value.toLocaleString("ru-RU");
+  }
   if (Array.isArray(value)) {
     if (value.length === 0) return "—";
     

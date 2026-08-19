@@ -185,7 +185,10 @@ export default function DiscoveryClassesAdminPage() {
             description="Добавьте первый чип, чтобы управлять верхней навигацией витрины /classes."
           />
         ) : (
-          <DiscoveryTaxonomyTable>
+          <DiscoveryTaxonomyTable
+            minWidthClassName="min-w-[880px]"
+            scrollLabel="Таблица чипов занятий, прокручивается по горизонтали"
+          >
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className={discoveryTh()}>Название</th>

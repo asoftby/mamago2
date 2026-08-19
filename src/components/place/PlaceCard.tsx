@@ -21,6 +21,16 @@ export type PlaceCardProps = {
   isSaved?: boolean;
   onSaveToggle?: (placeId: string) => void;
   className?: string;
+  /**
+   * The Place's own city slug — when provided, links to the city-scoped
+   * canonical (`/{citySlug}/places/{slug}`). Optional so existing callers
+   * without city data in scope keep compiling; they get the legacy
+   * `/places/{slug}` path, which still 301-redirects to the canonical
+   * (see `src/app/(public)/places/[slug]/page.tsx`), never a dead link.
+   * New callers with city data available should pass it — see
+   * BACKLOG-118.
+   */
+  citySlug?: string;
 };
 
 export function PlaceCard({
@@ -36,6 +46,7 @@ export function PlaceCard({
   isSaved = false,
   onSaveToggle,
   className,
+  citySlug,
 }: PlaceCardProps) {
   const handleSaveClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -180,7 +191,7 @@ export function PlaceCard({
 
   return (
     <Link
-      href={`/places/${slug}`}
+      href={citySlug ? `/${citySlug}/places/${slug}` : `/places/${slug}`}
       className={cn(
         "group block overflow-hidden rounded-lg border bg-card shadow-sm transition-all hover:shadow-md",
         variant === "network" && "w-full",

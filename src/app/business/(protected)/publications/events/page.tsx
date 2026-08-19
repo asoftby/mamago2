@@ -68,6 +68,11 @@ export default async function PublicationsEventsPage({
         select: {
           id: true,
           title: true,
+          city: {
+            select: {
+              slug: true,
+            },
+          },
         },
       },
       images: {

@@ -9,7 +9,11 @@ import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
+import { resolvePublicRouteCanonicalUrl } from "@/lib/seo/resolveRouteCanonicalUrl";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
+import { mapRouteStopPublicPhotos } from "@/lib/routes/mapRouteStopPublicPhotos";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canViewRoute } from "@/lib/routes/routeAccess";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -70,10 +74,15 @@ export async function generateMetadata({ params }: Props) {
     const db = await prisma.route.findUnique({
       where: { id: resolved.routeId },
       select: {
+        id: true,
         title: true,
         slug: true,
+        status: true,
+        visibility: true,
+        authorId: true,
         seoTitle: true,
         seoDescription: true,
+        seoCanonicalUrl: true,
         coverImageUrl: true,
         budgetLevel: true,
         _count: { select: { stops: true } },
@@ -91,7 +100,7 @@ export async function generateMetadata({ params }: Props) {
         },
       },
     });
-    if (db) {
+    if (db && canViewRoute(db, await getCurrentUser())) {
       const budgetSummary = summarizeRouteBudget(db.stops);
       const title = db.seoTitle?.trim() || `${db.title} — маршрут | mamaGo`;
       const description =
@@ -100,12 +109,28 @@ export async function generateMetadata({ params }: Props) {
       const image =
         db.coverImageUrl ??
         db.stops.find((s) => s.photoUrl)?.photoUrl;
-      return buildOgMeta({
-        title,
-        description,
-        image,
-        url: `${publicBase}/routes/${db.slug ?? slug}`,
+      const isPubliclyVisible = db.status === "PUBLISHED" && db.visibility === "PUBLIC";
+      const canonical = resolvePublicRouteCanonicalUrl({
+        seoCanonicalUrl: db.seoCanonicalUrl,
+        slug: db.slug,
+        id: db.id,
+        publicBase,
+        status: db.status,
+        visibility: db.visibility,
       });
+      return {
+        ...buildOgMeta({
+          title,
+          description,
+          image,
+          url: canonical ?? `${publicBase}/routes/${db.slug}`,
+          // UNLISTED («по ссылке») и любые непубличные превью не индексируем.
+          ...(!isPubliclyVisible ? { robots: { index: false, follow: false } } : {}),
+        }),
+        // Never emit a public canonical for a DRAFT/non-public Route —
+        // only a PUBLISHED + PUBLIC route gets a canonical link at all.
+        ...(canonical ? { alternates: { canonical } } : {}),
+      };
     }
   }
   return {};
@@ -126,6 +151,8 @@ export default async function RouteDetailPage({ params }: Props) {
         budgetLevel: true,
         coverImageUrl: true,
         authorId: true,
+        status: true,
+        visibility: true,
         cityId: true,
         seoJsonLdOverride: true,
         createdAt: true,
@@ -143,6 +170,10 @@ export default async function RouteDetailPage({ params }: Props) {
             customTitle: true,
             note: true,
             photoUrl: true,
+            images: {
+              orderBy: { sortOrder: "asc" as const },
+              select: { url: true, sortOrder: true },
+            },
             detectedCityName: true,
             priceType: true,
             priceMin: true,
@@ -164,6 +195,9 @@ export default async function RouteDetailPage({ params }: Props) {
       },
     });
     if (db) {
+      if (!canViewRoute(db, await getCurrentUser())) {
+        notFound();
+      }
       const budgetSummary = summarizeRouteBudget(db.stops);
       if (resolved.isRedirect) {
         permanentRedirect(`/routes/${db.slug}`);
@@ -195,6 +229,7 @@ export default async function RouteDetailPage({ params }: Props) {
           address: buildStopAddress(s.place, s.address, s.detectedCityName),
           note: s.note,
           photoUrl: s.photoUrl ?? "",
+          photos: mapRouteStopPublicPhotos({ photoUrl: s.photoUrl, images: s.images }),
           lat: s.lat ?? undefined,
           lng: s.lng ?? undefined,
         })),

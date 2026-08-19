@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { useMyPlan } from "../hooks/useMyPlan";
 import { cn } from "@/lib/utils";
-import { format, isTomorrow, parseISO } from "date-fns";
+import { format, isToday, isTomorrow, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
 interface MyPlanWidgetProps {
@@ -29,9 +29,9 @@ type WidgetState =
   | { kind: "loading" }
   | { kind: "unauthenticated" }
   | { kind: "empty" }
-  | { kind: "today"; count: number }
+  | { kind: "single"; dateStr: string; startsAt: Date | string | null }
   | { kind: "week"; count: number }
-  | { kind: "next"; dateStr: string; title: string | null };
+  | { kind: "next"; dateStr: string; title: string | null; count: number };
 
 function resolveWidgetState(input: {
   authLoading: boolean;
@@ -39,13 +39,23 @@ function resolveWidgetState(input: {
   todayCount: number;
   weekItemsCount: number;
   nextPlanItem: { date: string; item: { title: string | null } } | null;
+  nearestDate?: string | null;
+  nearestCount?: number;
+  nearestStartsAt?: Date | string | null;
 }): WidgetState {
   const { authLoading, isAuthenticated, todayCount, weekItemsCount, nextPlanItem } = input;
   if (authLoading) return { kind: "loading" };
   if (!isAuthenticated) return { kind: "unauthenticated" };
-  if (todayCount > 0) return { kind: "today", count: todayCount };
+  if (input.nearestCount === 1 && input.nearestDate) {
+    return { kind: "single", dateStr: input.nearestDate, startsAt: input.nearestStartsAt ?? null };
+  }
   if (weekItemsCount > 0) return { kind: "week", count: weekItemsCount };
-  if (nextPlanItem) return { kind: "next", dateStr: nextPlanItem.date, title: nextPlanItem.item.title };
+  if (nextPlanItem) return {
+    kind: "next",
+    dateStr: nextPlanItem.date,
+    title: nextPlanItem.item.title,
+    count: input.nearestCount ?? 1,
+  };
   return { kind: "empty" };
 }
 
@@ -54,9 +64,16 @@ function stateToText(state: WidgetState): { label: string; value: string; badge:
     case "loading": return { label: "Загрузка…", value: "", badge: null };
     case "unauthenticated": return { label: "Подберём активности", value: "под вас", badge: null };
     case "empty": return { label: "", value: "", badge: null };
-    case "today": return { label: "Сегодня:", value: pluralEvents(state.count), badge: state.count };
+    case "single": {
+      const date = parseISO(state.dateStr);
+      const day = isToday(date) ? "сегодня" : isTomorrow(date) ? "завтра" : format(date, "d MMMM", { locale: ru });
+      const time = state.startsAt
+        ? new Date(state.startsAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+        : null;
+      return { label: "Ближайшее:", value: `${day}${time ? ` в ${time}` : ""}`, badge: 1 };
+    }
     case "week": return { label: "На неделе:", value: pluralEvents(state.count), badge: state.count };
-    case "next": return { label: "Ближайшее:", value: formatNextDate(state.dateStr), badge: null };
+    case "next": return { label: "Ближайшее:", value: formatNextDate(state.dateStr), badge: state.count };
   }
 }
 
@@ -75,6 +92,7 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
     isLoading,
     isAuthenticated,
     planSummaryLoading,
+    planSummary,
   } = useMyPlan();
 
   const widgetState = useMemo(
@@ -85,12 +103,16 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
         todayCount,
         weekItemsCount,
         nextPlanItem,
+        nearestDate: planSummary?.nearestDate,
+        nearestCount: planSummary?.nearestCount,
+        nearestStartsAt: planSummary?.nearestItems[0]?.startsAt ?? null,
       }),
     [
       authLoading,
       isLoading,
       isAuthenticated,
       nextPlanItem,
+      planSummary,
       planSummaryLoading,
       todayCount,
       weekItemsCount,
@@ -98,7 +120,7 @@ export function MyPlanWidget({ onOpen }: MyPlanWidgetProps) {
   );
 
   const { label, value, badge } = stateToText(widgetState);
-  const hasItems = widgetState.kind === "today" || widgetState.kind === "week" || widgetState.kind === "next";
+  const hasItems = widgetState.kind === "single" || widgetState.kind === "week" || widgetState.kind === "next";
 
   const prevBadgeRef = useRef(badge);
   const [pulse, setPulse] = useState(false);

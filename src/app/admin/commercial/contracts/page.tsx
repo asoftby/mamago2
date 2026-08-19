@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { FileText, CheckCircle } from "lucide-react";
 import { CommercialToolbarFilterSelects } from "@/components/admin/commercial/CommercialToolbarFilterSelects";
+import { TableContainer } from "@/components/ui/table";
 import type { ContractStatus } from "@prisma/client";
 
 export default async function AdminContractsPage() {
@@ -108,7 +109,7 @@ export default async function AdminContractsPage() {
 
       {/* AdminPageContent */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        <TableContainer minWidthClassName="min-w-[900px]" scrollLabel="Таблица договоров, прокручивается по горизонтали">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -196,7 +197,7 @@ export default async function AdminContractsPage() {
               })}
             </tbody>
           </table>
-        </div>
+        </TableContainer>
       </div>
 
       {contracts.length === 0 && (

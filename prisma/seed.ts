@@ -204,20 +204,30 @@ const APPROVED_OCCASIONS: Array<{
   name: string;
   type: OccasionType;
   sortOrder: number;
+  /** Окно активности, YYYY-MM-DD, обе границы включительно (endsAt — до конца дня).
+   *  Выборка /api/occasions/active (getActiveOccasionsForEditor) требует
+   *  startsAt <= now <= endsAt; NULL-даты повод из подсказок исключают. */
+  startsAt: string;
+  endsAt: string;
+  boostScore: number;
 }> = [
-  { slug: "new-year", name: "Новый год", type: "HOLIDAY", sortOrder: 10 },
-  { slug: "womens-day", name: "8 марта", type: "HOLIDAY", sortOrder: 20 },
-  { slug: "maslenitsa", name: "Масленица", type: "HOLIDAY", sortOrder: 30 },
-  { slug: "easter", name: "Пасха", type: "HOLIDAY", sortOrder: 40 },
-  { slug: "halloween", name: "Хэллоуин", type: "HOLIDAY", sortOrder: 50 },
-  { slug: "childrens-day", name: "День защиты детей", type: "HOLIDAY", sortOrder: 60 },
-  { slug: "kupalle", name: "Купалье", type: "HOLIDAY", sortOrder: 70 },
-  { slug: "school-holidays", name: "Каникулы", type: "SEASON", sortOrder: 80 },
-  { slug: "back-to-school", name: "1 сентября", type: "EVENT", sortOrder: 90 },
-  { slug: "graduation", name: "Выпускной", type: "EVENT", sortOrder: 100 },
-  { slug: "summer-cinema", name: "Летние кинопросмотры", type: "SEASON", sortOrder: 110 },
-  { slug: "birthday", name: "День рождения", type: "FAMILY", sortOrder: 120 },
+  { slug: "new-year", name: "Новый год", type: "HOLIDAY", sortOrder: 10, startsAt: "2026-11-15", endsAt: "2027-01-15", boostScore: 0 },
+  { slug: "womens-day", name: "8 марта", type: "HOLIDAY", sortOrder: 20, startsAt: "2027-02-20", endsAt: "2027-03-08", boostScore: 0 },
+  { slug: "maslenitsa", name: "Масленица", type: "HOLIDAY", sortOrder: 30, startsAt: "2027-03-01", endsAt: "2027-03-14", boostScore: 0 },
+  { slug: "easter", name: "Пасха", type: "HOLIDAY", sortOrder: 40, startsAt: "2027-03-20", endsAt: "2027-05-02", boostScore: 0 },
+  { slug: "halloween", name: "Хэллоуин", type: "HOLIDAY", sortOrder: 50, startsAt: "2026-10-15", endsAt: "2026-11-01", boostScore: 0 },
+  { slug: "childrens-day", name: "День защиты детей", type: "HOLIDAY", sortOrder: 60, startsAt: "2027-05-20", endsAt: "2027-06-01", boostScore: 0 },
+  { slug: "kupalle", name: "Купалье", type: "HOLIDAY", sortOrder: 70, startsAt: "2026-06-20", endsAt: "2026-07-12", boostScore: 0 },
+  { slug: "school-holidays", name: "Каникулы", type: "SEASON", sortOrder: 80, startsAt: "2026-06-01", endsAt: "2026-08-31", boostScore: 0 },
+  { slug: "back-to-school", name: "1 сентября", type: "EVENT", sortOrder: 90, startsAt: "2026-08-10", endsAt: "2026-09-07", boostScore: 0 },
+  { slug: "graduation", name: "Выпускной", type: "EVENT", sortOrder: 100, startsAt: "2027-04-15", endsAt: "2027-06-15", boostScore: 0 },
+  { slug: "summer-cinema", name: "Летние кинопросмотры", type: "SEASON", sortOrder: 110, startsAt: "2026-06-01", endsAt: "2026-08-31", boostScore: 0 },
+  // Evergreen: NULL-даты исключаются выборкой, поэтому заведомо широкое окно.
+  { slug: "birthday", name: "День рождения", type: "FAMILY", sortOrder: 120, startsAt: "2026-01-01", endsAt: "2036-12-31", boostScore: 0 },
 ];
+
+const occasionStart = (d: string) => new Date(`${d}T00:00:00.000Z`);
+const occasionEnd = (d: string) => new Date(`${d}T23:59:59.999Z`);
 
 async function upsertFilter(
   slug: string,
@@ -293,11 +303,18 @@ async function main() {
   await upsertDomainSignal("domain-recommendation", "Рекомендации", "RECOMMENDATION", -1);
 
   // ═══ PROFILE DOMAIN ═══
+  // Canonical fine-grained ages — must stay in sync with src/lib/config/ages.ts AGE_OPTIONS.
   await upsertSignalWithDomain("age", "Возраст", "PROFILE", ["USER"], 1, [
-    { value: "0-3",  label: "0–3 года",  order: 1 },
-    { value: "3-5",  label: "3–5 лет",   order: 2 },
-    { value: "5-8",  label: "6–10 лет",  order: 3 },
-    { value: "8-12", label: "10+ лет",   order: 4 },
+    { value: "0-1",   label: "0–1 год",   order: 1 },
+    { value: "1-3",   label: "1–3 года",  order: 2 },
+    { value: "3-5",   label: "3–5 лет",   order: 3 },
+    { value: "5-7",   label: "5–7 лет",   order: 4 },
+    { value: "7-9",   label: "7–9 лет",   order: 5 },
+    { value: "9-12",  label: "9–12 лет",  order: 6 },
+    { value: "12-14", label: "12–14 лет", order: 7 },
+    { value: "14-16", label: "14–16 лет", order: 8 },
+    { value: "16-18", label: "16–18 лет", order: 9 },
+    { value: "18+",   label: "18+",       order: 10 },
   ]);
 
   await upsertSignalWithDomain("interests", "Интересы", "PROFILE", ["USER"], 2, [
@@ -611,77 +628,17 @@ async function main() {
     },
   });
 
-  console.log("  → Genres (by EventCategory)");
-  const kinoCat = await prisma.eventCategory.findFirst({
-    where: { parentId: null, slug: { in: ["kino", "cinema", "movie", "movies"] } },
-  });
-  const spektakliCat = await prisma.eventCategory.findFirst({
-    where: {
-      parentId: null,
-      slug: {
-        in: [
-          "spektakli",
-          "spectacle",
-          "teatr",
-          "theater",
-          "detskiy-teatr",
-          "detskiy-spektakl",
-        ],
-      },
-    },
-  });
+  // ── Place / Event Categories ──────────────────────────────────────────────
+  // Категории сидируются ДО жанров и program-флагов: иначе на свежей базе
+  // блоки ниже не находят корни (cinema и др.) и молча скипаются до второго прогона.
+  await seedPlaceCategories();
+  await seedEventCategories();
 
-  const kinoGenres: Array<{ slug: string; name: string; sortOrder: number }> = [
-    { slug: "animation", name: "Мультфильм", sortOrder: 10 },
-    { slug: "comedy", name: "Комедия", sortOrder: 20 },
-    { slug: "adventure", name: "Приключения", sortOrder: 30 },
-    { slug: "fantasy", name: "Фэнтези", sortOrder: 40 },
-    { slug: "family", name: "Семейный", sortOrder: 50 },
-  ];
-
-  const spektakliGenres: Array<{ slug: string; name: string; sortOrder: number }> = [
-    { slug: "puppet", name: "Кукольный", sortOrder: 10 },
-    { slug: "musical", name: "Музыкальный", sortOrder: 20 },
-    { slug: "interactive", name: "Интерактивный", sortOrder: 30 },
-    { slug: "immersive", name: "Иммерсивный", sortOrder: 40 },
-    { slug: "family-show", name: "Семейный", sortOrder: 50 },
-  ];
-
-  if (kinoCat) {
-    for (const g of kinoGenres) {
-      await prisma.genre.upsert({
-        where: { categoryId_slug: { categoryId: kinoCat.id, slug: g.slug } },
-        update: { name: g.name, sortOrder: g.sortOrder, isActive: true },
-        create: {
-          categoryId: kinoCat.id,
-          slug: g.slug,
-          name: g.name,
-          sortOrder: g.sortOrder,
-          isActive: true,
-        },
-      });
-    }
-  } else {
-    console.warn("   (skip kino genres: root category kino/cinema not found)");
-  }
-
-  if (spektakliCat) {
-    for (const g of spektakliGenres) {
-      await prisma.genre.upsert({
-        where: { categoryId_slug: { categoryId: spektakliCat.id, slug: g.slug } },
-        update: { name: g.name, sortOrder: g.sortOrder, isActive: true },
-        create: {
-          categoryId: spektakliCat.id,
-          slug: g.slug,
-          name: g.name,
-          sortOrder: g.sortOrder,
-          isActive: true,
-        },
-      });
-    }
-  } else {
-    console.warn("   (skip spektakli genres: root category not found)");
-  }
+  // Жанры EVENT-категорий (в т.ч. cinema и theatre) сидирует seedEventCategories()
+  // из prisma/seed/event-categories.ts — единый источник правды. Прежние блоки
+  // kinoCat/spektakliCat здесь дублировали его, а spektakliCat к тому же адресовал
+  // категорию несуществующими слагами (teatr/spektakli вместо theatre) и всегда
+  // скипался — удалены.
 
   console.log("  → EventCategory: program flags");
   const setFlagsBySlugs = async (
@@ -702,28 +659,29 @@ async function main() {
     });
   };
 
+  // Слаги ниже — фактические из prisma/seed/event-categories.ts (publicationType=EVENT).
+  // Прежние легаси-слаги (translit/ед. число: teatr, koncert, festival, vystavka,
+  // master-klass) в таксономии отсутствуют и молча скипались. Орфаны без категории
+  // (market/forum/quiz/lecture) удалены — добавить, когда появятся такие категории.
+
   // Containers: if selected as primary → show program block
-  await setFlagsBySlugs(["festival", "fest", "festivali", "festiv", "festivaly"], {
+  await setFlagsBySlugs(["festivals"], {
     supportsProgram: true,
     selectableInProgram: false,
   });
-  await setFlagsBySlugs(["market", "yarmarka", "bazaar"], {
-    supportsProgram: true,
-    selectableInProgram: false,
-  });
-  await setFlagsBySlugs(["forum"], { supportsProgram: true, selectableInProgram: false });
 
   // Allowed inside program
-  await setFlagsBySlugs(["kino", "cinema", "movie", "movies"], {
+  await setFlagsBySlugs(["cinema"], {
     supportsProgram: false,
     selectableInProgram: true,
   });
-  await setFlagsBySlugs(["vystavka", "exhibition"], { selectableInProgram: true });
-  await setFlagsBySlugs(["master-klass", "masterclass"], { selectableInProgram: true });
-  await setFlagsBySlugs(["kviz", "quiz"], { selectableInProgram: true });
-  await setFlagsBySlugs(["lekciya", "lecture"], { selectableInProgram: true });
-  await setFlagsBySlugs(["spektakli", "spectacle", "teatr", "theater"], { selectableInProgram: true });
-  await setFlagsBySlugs(["koncert", "concert"], { selectableInProgram: true });
+  await setFlagsBySlugs(["exhibitions"], { selectableInProgram: true });
+  await setFlagsBySlugs(["workshops"], { selectableInProgram: true });
+  await setFlagsBySlugs(["theatre"], { selectableInProgram: true });
+  await setFlagsBySlugs(["shows"], { selectableInProgram: true });
+
+  // Primary categories that show the «Что будет в программе» block
+  await setFlagsBySlugs(["excursions", "play-programs"], { supportsProgram: true });
 
   console.log("  → Occasions");
   for (const o of APPROVED_OCCASIONS) {
@@ -734,6 +692,9 @@ async function main() {
         type: o.type,
         sortOrder: o.sortOrder,
         isActive: true,
+        startsAt: occasionStart(o.startsAt),
+        endsAt: occasionEnd(o.endsAt),
+        boostScore: o.boostScore,
       },
       create: {
         slug: o.slug,
@@ -741,15 +702,12 @@ async function main() {
         type: o.type,
         sortOrder: o.sortOrder,
         isActive: true,
+        startsAt: occasionStart(o.startsAt),
+        endsAt: occasionEnd(o.endsAt),
+        boostScore: o.boostScore,
       },
     });
   }
-
-  // ── Place Categories ──────────────────────────────────────────────────────
-  await seedPlaceCategories();
-
-  // ── Event Categories ──────────────────────────────────────────────────────
-  await seedEventCategories();
 
   // ── Discovery Section Filters ─────────────────────────────────────────────
   // FilterDefinition + FilterOption + DiscoveryFilterPlacement per intent.

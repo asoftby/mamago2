@@ -6,6 +6,8 @@ import type { OpeningHoursWithRelations } from "@/server/services/openingHours/o
 import { normalizeVisitFormats } from "@/hooks/useVisitFormats";
 import { resolvePlaceLogoImage } from "@/lib/place/resolvePlaceLogoImage";
 import { parsePriceData } from "@/lib/priceItems";
+import { normalizePlacePhoneFields } from "@/lib/place/placePhones";
+import { normalizeFaqItems } from "@/lib/faq/faqItems";
 
 type PlaceWithRelations = Place & {
   images?: PrismaPlaceImage[];
@@ -20,6 +22,7 @@ export function mapPlaceToFormData(
   place: PlaceWithRelations
 ): PlaceFormData {
   const defaults = getDefaultFormData();
+  const phones = normalizePlacePhoneFields(place);
   
   return {
     ...defaults,
@@ -32,10 +35,11 @@ export function mapPlaceToFormData(
     
     // Step 1: Profile
     title: place.title,
-    category: place.category,
+    category: place.category ?? "",
     shortDesc: place.shortDesc,
     description: place.description,
     ageTags: place.ageTags || [],
+    agePolicy: place.agePolicy,
     visitFormats: normalizeVisitFormats(place.visitFormats || []),
     primaryCategoryId: place.primaryCategoryId ?? null,
     subcategoryIds: place.subcategories
@@ -67,8 +71,16 @@ export function mapPlaceToFormData(
     googleMapsUri: place.googleMapsUri,
     
     // Step 3: Contacts
-    phone: place.phone,
+    phone: phones.phone,
+    phoneLabel: phones.phoneLabel,
+    phone2: phones.phone2,
+    phone2Label: phones.phone2Label,
+    phone3: phones.phone3,
+    phone3Label: phones.phone3Label,
     website: place.website,
+    bookingEnabled: place.bookingEnabled,
+    bookingPhone: place.bookingPhone,
+    bookingNote: place.bookingNote,
     instagramHandle: place.instagramHandle,
     instagramUrl: place.instagramUrl,
     
@@ -76,6 +88,7 @@ export function mapPlaceToFormData(
     logoImageId: place.logoImageId,
     logoUrl: resolvePlaceLogoImage(place.images ?? [], place.logoImageId)?.url ?? null,
     images: place.images ? place.images.map(mapPrismaImageToFormImage) : [],
+    reelsUrl: place.reelsUrl,
     
     // Step 5: Opening Hours
     openingHoursId: place.openingHoursId,
@@ -83,6 +96,7 @@ export function mapPlaceToFormData(
 
     // Prices
     priceItems: parsePriceData(place.priceItems),
+    faqItems: normalizeFaqItems(place.faqItems),
 
     // Hierarchy
     placeKind: place.placeKind,
@@ -99,6 +113,8 @@ export function mapPlaceToFormData(
  * Map form data to Place payload for API submission
  */
 export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subcategoryIds?: string[] } {
+  const phones = normalizePlacePhoneFields(data);
+
   return {
     // Step 1: Profile
     title: data.title,
@@ -108,6 +124,7 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     shortDesc: data.shortDesc,
     description: data.description,
     ageTags: data.ageTags,
+    agePolicy: data.agePolicy,
     visitFormats: data.visitFormats,
     
     // Step 2: Location
@@ -131,18 +148,27 @@ export function buildPlacePayload(data: PlaceFormData): Partial<Place> & { subca
     googleMapsUri: data.googleMapsUri,
     
     // Step 3: Contacts
-    phone: data.phone,
+    phone: phones.phone,
+    phoneLabel: phones.phoneLabel,
+    phone2: phones.phone2,
+    phone2Label: phones.phone2Label,
+    phone3: phones.phone3,
+    phone3Label: phones.phone3Label,
     website: data.website,
+    // Intentionally excluded: booking compatibility fields remain read-only
+    // until the shared CTA step is connected to Place Wizard.
     instagramHandle: data.instagramHandle,
     instagramUrl: data.instagramUrl,
     
     // Step 4: Photos
     logoImageId: data.logoImageId,
-    
+    reelsUrl: data.reelsUrl,
+
     // Step 5: Opening Hours (handled separately via openingHoursData)
     // openingHoursId is set by backend after creating OpeningHours record
 
     priceItems: data.priceItems as unknown as Prisma.JsonValue,
+    faqItems: normalizeFaqItems(data.faqItems) as unknown as Prisma.JsonValue,
 
     // Hierarchy
     placeKind: data.placeKind,

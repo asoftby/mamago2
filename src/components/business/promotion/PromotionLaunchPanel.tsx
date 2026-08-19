@@ -262,7 +262,9 @@ export function PromotionLaunchPanel({
                       Рекомендуем
                     </span>
                   )}
-                  <span className="text-base font-semibold">{p.amount} {BYN_SYMBOL}</span>
+                  <span className="text-base font-semibold">
+                    {renderCurrencyText(formatPrice(p.amount, { hideZero: true }), { iconSize: "sm" })}
+                  </span>
                   <span
                     className={cn(
                       "text-[11px] leading-tight",
@@ -283,7 +285,9 @@ export function PromotionLaunchPanel({
                   isCustom ? "border-stone-900 bg-white shadow-sm" : "border-stone-200 bg-stone-50",
                 )}
               >
-                <span className="text-sm text-stone-400">{BYN_SYMBOL}</span>
+                <span className="text-sm text-stone-400">
+                  {renderCurrencyText(BYN_SYMBOL, { iconSize: "sm" })}
+                </span>
                 <input
                   type="number"
                   min={PROMOTION_MIN_BUDGET}

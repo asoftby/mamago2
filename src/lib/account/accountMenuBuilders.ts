@@ -3,6 +3,7 @@ import {
   CalendarCheck,
   Lightbulb,
   Map,
+  MessageCircle,
   Settings,
   Shield,
   UserCircle,
@@ -31,6 +32,7 @@ export function buildPublicSiteAccountModel(input: {
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
   onGoToPersonalBookings: () => void;
+  onGoToPersonalDirect: () => void;
   onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;
@@ -57,6 +59,7 @@ export function buildPublicSiteAccountModel(input: {
     onGoToPersonalIdeas,
     onGoToPersonalPlan,
     onGoToPersonalBookings,
+    onGoToPersonalDirect,
     onGoToPersonalRoutes,
     onGoToSettings,
     onGoToBusinessBilling,
@@ -117,6 +120,15 @@ export function buildPublicSiteAccountModel(input: {
         icon: CalendarCheck,
         onClick: () => {
           onGoToPersonalBookings();
+        },
+      },
+      {
+        key: "direct",
+        type: "button",
+        label: "Мои сообщения",
+        icon: MessageCircle,
+        onClick: () => {
+          onGoToPersonalDirect();
         },
       },
       {
@@ -323,6 +335,7 @@ export function buildBusinessAccountModel(input: {
   onGoToPersonalIdeas: () => void;
   onGoToPersonalPlan: () => void;
   onGoToPersonalBookings: () => void;
+  onGoToPersonalDirect: () => void;
   onGoToPersonalRoutes: () => void;
   onGoToSettings: () => void;
   onGoToBusinessDashboard: () => void;

@@ -8,6 +8,7 @@ type MetricMap = Record<
   string,
   {
     views: number;
+    opens: number;
     saves: number;
     planAdds: number;
     ctaClicks: number;
@@ -17,6 +18,7 @@ type MetricMap = Record<
 const PERFORMANCE_EVENT_TYPES: UserEventType[] = [
   "PAGE_VIEW",
   "CARD_VIEW",
+  "DETAIL_OPEN",
   "SAVE",
   "PLAN_ADD",
   "CTA_CLICK",
@@ -25,6 +27,7 @@ const PERFORMANCE_EVENT_TYPES: UserEventType[] = [
 function emptyMetrics(): MetricMap[string] {
   return {
     views: 0,
+    opens: 0,
     saves: 0,
     planAdds: 0,
     ctaClicks: 0,
@@ -78,11 +81,16 @@ export function getPeriodRange(period: DashboardPeriod): { from: Date; to: Date 
 export async function getPerformanceMetricsByEntity(params: {
   events: Array<{ id: string; title: string; updatedAt: Date; status: string }>;
   offers: Array<{ id: string; title: string; updatedAt: Date; status: string }>;
+  /** Optional — Place is not shown on the Dashboard's Top-5, but is a real, naturally-owned publication type for Business Analytics. */
+  places?: Array<{ id: string; title: string; updatedAt: Date; status: string }>;
+  /** Optional — Dashboard's Top-5 stays all-time (unchanged); Business Analytics passes this to match the selected period. */
+  dateRange?: { start: Date; end: Date };
 }) {
   const eventIds = params.events.map((item) => item.id);
   const offerIds = params.offers.map((item) => item.id);
+  const placeIds = (params.places ?? []).map((item) => item.id);
 
-  if (eventIds.length === 0 && offerIds.length === 0) {
+  if (eventIds.length === 0 && offerIds.length === 0 && placeIds.length === 0) {
     return new Map<string, MetricMap[string]>();
   }
 
@@ -90,6 +98,9 @@ export async function getPerformanceMetricsByEntity(params: {
     by: ["entityType", "entityId", "eventType"],
     where: {
       eventType: { in: PERFORMANCE_EVENT_TYPES },
+      ...(params.dateRange
+        ? { createdAt: { gte: params.dateRange.start, lte: params.dateRange.end } }
+        : {}),
       OR: [
         eventIds.length > 0
           ? {
@@ -101,6 +112,12 @@ export async function getPerformanceMetricsByEntity(params: {
           ? {
               entityType: AnalyticsEntityType.OFFER,
               entityId: { in: offerIds },
+            }
+          : undefined,
+        placeIds.length > 0
+          ? {
+              entityType: AnalyticsEntityType.PLACE,
+              entityId: { in: placeIds },
             }
           : undefined,
       ].filter(Boolean) as Array<{
@@ -123,6 +140,8 @@ export async function getPerformanceMetricsByEntity(params: {
 
     if (row.eventType === "PAGE_VIEW" || row.eventType === "CARD_VIEW") {
       current.views += count;
+    } else if (row.eventType === "DETAIL_OPEN") {
+      current.opens += count;
     } else if (row.eventType === "SAVE") {
       current.saves += count;
     } else if (row.eventType === "PLAN_ADD") {
@@ -177,6 +196,7 @@ export async function getBusinessWorkspaceData(params: {
     }),
     prisma.offer.findMany({
       where: {
+        archivedAt: null,
         place: {
           OR: [{ ownerBusinessId: params.businessId }, { createdByUserId: params.userId }],
         },
@@ -214,6 +234,7 @@ export async function getBusinessWorkspaceData(params: {
   }
 
   for (const offer of placeOffers) {
+    if (!offer.placeId) continue;
     const current = linkedPublicationsByPlace.get(offer.placeId);
     if (current) current.offers += 1;
   }
@@ -378,4 +399,81 @@ export async function getBusinessWorkspaceData(params: {
     billingSummary,
     recentTransactions: transactionWindow.slice(0, 8),
   };
+}
+
+export type BusinessPublicationRow = {
+  entityType: "EVENT" | "OFFER" | "PLACE";
+  entityId: string;
+  title: string;
+  status: string;
+  metrics: MetricMap[string];
+};
+
+/**
+ * Full list of a business's own publications with real aggregate metrics —
+ * Task 3 Business Analytics MVP (`/business/analytics`). Reuses the exact
+ * same ownership queries as `getBusinessWorkspaceData` (Event: businessId/
+ * ownerUserId on Activity; Offer: place.ownerBusinessId/createdByUserId;
+ * Place: ownerBusinessId/createdByUserId) and the same
+ * `getPerformanceMetricsByEntity` aggregation — not a parallel pipeline.
+ * Unlike the Dashboard's Top-5 preview, this returns the full list, not a
+ * top-N slice.
+ */
+export async function getBusinessPublicationsPerformance(params: {
+  userId: string;
+  businessId: string;
+  dateRange?: { start: Date; end: Date };
+}): Promise<BusinessPublicationRow[]> {
+  const [events, offers, places] = await Promise.all([
+    prisma.activity.findMany({
+      where: {
+        OR: [{ businessId: params.businessId }, { ownerUserId: params.userId }],
+        type: "EVENT",
+      },
+      select: { id: true, title: true, updatedAt: true, status: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.offer.findMany({
+      where: {
+        archivedAt: null,
+        place: {
+          OR: [{ ownerBusinessId: params.businessId }, { createdByUserId: params.userId }],
+        },
+      },
+      select: { id: true, title: true, updatedAt: true, status: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.place.findMany({
+      where: {
+        archivedAt: null,
+        OR: [{ ownerBusinessId: params.businessId }, { createdByUserId: params.userId }],
+      },
+      select: { id: true, title: true, updatedAt: true, status: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
+
+  const metricsByEntity = await getPerformanceMetricsByEntity({
+    events,
+    offers,
+    places,
+    dateRange: params.dateRange,
+  });
+
+  const toRow = (
+    entityType: BusinessPublicationRow["entityType"],
+    item: { id: string; title: string; status: string },
+  ): BusinessPublicationRow => ({
+    entityType,
+    entityId: item.id,
+    title: item.title,
+    status: item.status,
+    metrics: metricsByEntity.get(`${entityType}:${item.id}`) ?? emptyMetrics(),
+  });
+
+  return [
+    ...events.map((e) => toRow("EVENT", e)),
+    ...offers.map((o) => toRow("OFFER", o)),
+    ...places.map((p) => toRow("PLACE", p)),
+  ].sort((a, b) => b.metrics.ctaClicks - a.metrics.ctaClicks || b.metrics.opens - a.metrics.opens);
 }

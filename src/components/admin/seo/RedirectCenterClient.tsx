@@ -1,520 +1,315 @@
 "use client";
 
-import { useCallback, useId, useMemo, useState } from "react";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { Lock, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
+import { TableContainer } from "@/components/ui/table";
+import { AdminPagination, type AdminPaginationProps } from "@/components/admin/AdminPagination";
+import { buildAdminPageHref } from "@/lib/admin/pagination";
 import type {
-  AutomaticRedirectRule,
   ManualRedirect,
-  UnmatchedUrlRow,
-  AutoRedirectRuleType,
-  UnmatchedDetectedType,
-  UnmatchedRowStatus,
+  RedirectDisposition,
+  RedirectRule,
 } from "@/lib/admin/seo/redirectCenterTypes";
 
-const RULE_TYPE_LABEL: Record<AutoRedirectRuleType, string> = {
-  legacy_migration: "legacy migration",
-  preset_mapping: "preset mapping",
-  slug_normalization: "slug normalization",
-  category_mapping: "category mapping",
+const BASE_PATH = "/admin/seo/redirects";
+
+const DISPOSITION_LABEL: Record<RedirectDisposition, string> = {
+  EXACT_REDIRECT: "Exact",
+  VALID_HUB_REMAP: "Hub",
+  P1_START_OR_CONTAINS: "P1 (contains)",
+  INVALID_TARGET: "Needs review",
+  COLLISION: "Collision",
+  CHAIN: "Chain",
+  LOOP: "Loop",
 };
 
-const DETECTED_LABEL: Record<UnmatchedDetectedType, string> = {
-  event: "Event",
-  place: "Place",
-  category: "Category",
-  listing: "Listing",
-  unknown: "Unknown",
+const DISPOSITION_BADGE_CLASS: Record<RedirectDisposition, string> = {
+  EXACT_REDIRECT: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  VALID_HUB_REMAP: "border-blue-200 bg-blue-50 text-blue-900",
+  P1_START_OR_CONTAINS: "border-amber-200 bg-amber-50 text-amber-900",
+  INVALID_TARGET: "border-rose-200 bg-rose-50 text-rose-900",
+  COLLISION: "border-rose-300 bg-rose-100 text-rose-950",
+  CHAIN: "border-orange-200 bg-orange-50 text-orange-900",
+  LOOP: "border-red-300 bg-red-100 text-red-950",
 };
 
-const UNMATCHED_STATUS_LABEL: Record<UnmatchedRowStatus, string> = {
-  new: "Новый",
-  reviewed: "Проверен",
-  ignored: "Игнор",
-  resolved: "Решён",
-};
+const FILTER_OPTIONS: Array<{ value: RedirectDisposition | "ALL"; label: string }> = [
+  { value: "ALL", label: "Все" },
+  { value: "EXACT_REDIRECT", label: "Exact" },
+  { value: "VALID_HUB_REMAP", label: "Hub" },
+  { value: "P1_START_OR_CONTAINS", label: "P1 (contains)" },
+  { value: "INVALID_TARGET", label: "Needs review" },
+  { value: "COLLISION", label: "Collision" },
+  { value: "CHAIN", label: "Chain" },
+  { value: "LOOP", label: "Loop" },
+];
 
-function newId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+interface RedirectCenterSummary {
+  systemTotal: number;
+  manualCount: number;
+  counts: Record<RedirectDisposition, number>;
 }
 
 interface RedirectCenterClientProps {
-  initialAutomatic: AutomaticRedirectRule[];
-  initialManual: ManualRedirect[];
-  initialUnmatched: UnmatchedUrlRow[];
+  automatic: RedirectRule[];
+  automaticPagination: Omit<AdminPaginationProps, "basePath" | "params" | "className">;
+  manual: ManualRedirect[];
+  summary: RedirectCenterSummary;
+  currentSearch: string;
+  currentFilter: RedirectDisposition | "ALL";
+  currentParams: Record<string, string | string[] | undefined>;
 }
 
 export function RedirectCenterClient({
-  initialAutomatic,
-  initialManual,
-  initialUnmatched,
+  automatic,
+  automaticPagination,
+  manual: initialManual,
+  summary,
+  currentSearch,
+  currentFilter,
+  currentParams,
 }: RedirectCenterClientProps) {
   const [tab, setTab] = useState("automatic");
-  const [autoRules, setAutoRules] = useState(initialAutomatic);
-  const [manualRows, setManualRows] = useState(initialManual);
-  const [unmatchedRows, setUnmatchedRows] = useState(initialUnmatched);
+  const [searchDraft, setSearchDraft] = useState(currentSearch);
 
-  const [fromPath, setFromPath] = useState("");
-  const [toPath, setToPath] = useState("");
-  const [manualType, setManualType] = useState<"301" | "302">("301");
-  const [manualNote, setManualNote] = useState("");
+  const filterHref = (value: RedirectDisposition | "ALL") => {
+    const params = { ...currentParams, filter: value === "ALL" ? undefined : value, page: undefined };
+    return buildAdminPageHref(BASE_PATH, params, 1);
+  };
 
-  const formId = useId();
-
-  const toggleAuto = useCallback((id: string, enabled: boolean) => {
-    setAutoRules((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, enabled, status: enabled ? "active" : "paused" }
-          : r,
-      ),
-    );
-  }, []);
-
-  const addManual = useCallback(() => {
-    const from = fromPath.trim();
-    const to = toPath.trim();
-    if (!from || !to) return;
-    const row: ManualRedirect = {
-      id: newId("mr"),
-      from: from.startsWith("/") ? from : `/${from}`,
-      to: to.startsWith("/") ? to : `/${to}`,
-      redirectType: manualType,
-      note: manualNote.trim() || null,
-      status: "active",
-      updatedAt: new Date().toISOString(),
-    };
-    setManualRows((prev) => [row, ...prev]);
-    setFromPath("");
-    setToPath("");
-    setManualNote("");
-  }, [fromPath, toPath, manualType, manualNote]);
-
-  const unmatchedCount = useMemo(
-    () => unmatchedRows.filter((u) => u.status === "new").length,
-    [unmatchedRows],
-  );
-
-  const patchUnmatched = useCallback(
-    (id: string, patch: Partial<UnmatchedUrlRow>) => {
-      setUnmatchedRows((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-      );
-    },
-    [],
-  );
+  const collisionsChainsLoops =
+    summary.counts.COLLISION + summary.counts.CHAIN + summary.counts.LOOP;
 
   return (
     <div className="space-y-6">
       <SeoPageHeader
         title="Redirects"
-        subtitle="Управление системными и ручными редиректами, очередь несопоставленных legacy URL"
-        actions={
-          <Button
-            type="button"
-            className="shrink-0 gap-2"
-            onClick={() => {
-              setTab("manual");
-              document
-                .getElementById(formId)
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            Добавить редирект
-          </Button>
-        }
+        subtitle="Системные (миграционные) редиректы — read-only; ручные редиректы — в отдельной вкладке"
       />
 
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+        <SummaryCard label="System / Migration" value={summary.systemTotal} />
+        <SummaryCard label="Manual" value={summary.manualCount} />
+        <SummaryCard label="Exact" value={summary.counts.EXACT_REDIRECT} tone="emerald" />
+        <SummaryCard label="Hub" value={summary.counts.VALID_HUB_REMAP} tone="blue" />
+        <SummaryCard label="P1 (contains)" value={summary.counts.P1_START_OR_CONTAINS} tone="amber" />
+        <SummaryCard label="Needs review" value={summary.counts.INVALID_TARGET} tone="rose" />
+        <SummaryCard label="Collisions" value={summary.counts.COLLISION} tone="rose" />
+        <SummaryCard label="Loops / chains" value={collisionsChainsLoops - summary.counts.COLLISION} tone="rose" />
+      </div>
+
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-1 gap-1 p-1 sm:grid-cols-3">
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-1 p-1 sm:grid-cols-2">
           <TabsTrigger value="automatic" className="justify-center py-2.5">
-            Automatic
-            <span className="ml-1.5 text-xs text-muted-foreground">
-              ({autoRules.length})
-            </span>
+            System / Migration
+            <span className="ml-1.5 text-xs text-muted-foreground">({summary.systemTotal})</span>
           </TabsTrigger>
           <TabsTrigger value="manual" className="justify-center py-2.5">
             Manual
-            <span className="ml-1.5 text-xs text-muted-foreground">
-              ({manualRows.length})
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="unmatched" className="justify-center py-2.5">
-            Unmatched
-            {unmatchedCount > 0 ? (
-              <Badge variant="destructive" className="ml-2 text-[10px]">
-                {unmatchedCount}
-              </Badge>
-            ) : (
-              <span className="ml-1.5 text-xs text-muted-foreground">
-                ({unmatchedRows.length})
-              </span>
-            )}
+            <span className="ml-1.5 text-xs text-muted-foreground">({initialManual.length})</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="automatic" className="mt-6 space-y-3">
           <p className="text-sm text-gray-600">
-            Системные правила из миграций и конфигов. Редактирование записей
-            недоступно — только включение / отключение.
+            Источник — build-time migration manifest (scripts/data/wp-redirect-map.json,
+            893 строки), тот же, что использует runtime-конфигурация редиректов
+            (next.config.ts). Редактирование и удаление недоступны — только чтение.
           </p>
+
+          <form
+            method="get"
+            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+          >
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="text"
+                name="q"
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                placeholder="Поиск по source или destination…"
+                className="pl-8"
+              />
+            </div>
+            {currentFilter !== "ALL" ? <input type="hidden" name="filter" value={currentFilter} /> : null}
+            <Button type="submit" variant="outline">
+              Найти
+            </Button>
+          </form>
+
+          <div className="flex flex-wrap gap-1.5">
+            {FILTER_OPTIONS.map((opt) => (
+              <Link key={opt.value} href={filterHref(opt.value)} scroll={false}>
+                <Badge
+                  variant={currentFilter === opt.value ? "default" : "secondary"}
+                  className="cursor-pointer font-mono text-[11px]"
+                >
+                  {opt.label}
+                </Badge>
+              </Link>
+            ))}
+          </div>
+
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <TableContainer minWidthClassName="min-w-[900px]" scrollLabel="Таблица автоматических редиректов, прокручивается по горизонтали">
+              <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-slate-50/90">
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      From URL
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      To URL
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Rule type
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Source
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Last checked
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      On
-                    </th>
+                    <th className="px-4 py-3 font-semibold text-gray-800">Source URL</th>
+                    <th className="px-4 py-3 font-semibold text-gray-800">Destination URL</th>
+                    <th className="px-4 py-3 font-semibold text-gray-800">Status</th>
+                    <th className="px-4 py-3 font-semibold text-gray-800">Source type</th>
+                    <th className="px-4 py-3 font-semibold text-gray-800">Disposition</th>
+                    <th className="px-4 py-3 font-semibold text-gray-800">Validation</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {autoRules.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50/80">
-                      <td className="max-w-[200px] px-4 py-3 font-mono text-xs text-gray-800">
-                        <span className="break-all">{row.fromUrl}</span>
-                      </td>
-                      <td className="max-w-[200px] px-4 py-3 font-mono text-xs text-gray-800">
-                        <span className="break-all">{row.toUrl}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <Badge variant="secondary" className="font-mono text-[11px]">
-                          {RULE_TYPE_LABEL[row.ruleType]}
-                        </Badge>
-                      </td>
-                      <td className="max-w-[160px] px-4 py-3 font-mono text-xs text-gray-600">
-                        {row.source}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                        {row.status === "active" ? (
-                          <span className="text-emerald-700">active</span>
-                        ) : (
-                          <span className="text-amber-800">paused</span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                        {row.lastCheckedAt
-                          ? format(
-                              new Date(row.lastCheckedAt),
-                              "d MMM yyyy, HH:mm",
-                              { locale: ru },
-                            )
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-2">
-                        <Switch
-                          checked={row.enabled}
-                          onCheckedChange={(v) => toggleAuto(row.id, v)}
-                          aria-label={`Включить правило ${row.id}`}
-                        />
+                  {automatic.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                        Ничего не найдено по текущему поиску/фильтру.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    automatic.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50/80">
+                        <td className="max-w-[220px] px-4 py-3 font-mono text-xs text-gray-800">
+                          <span className="break-all">{row.fromUrl}</span>
+                        </td>
+                        <td className="max-w-[220px] px-4 py-3 font-mono text-xs text-gray-800">
+                          <span className="break-all">{row.toUrl}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700">301</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                            <Lock className="h-3 w-3" aria-hidden />
+                            Системный · Только чтение
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {row.disposition ? (
+                            <span
+                              className={cn(
+                                "rounded-md border px-2 py-0.5 text-xs font-medium",
+                                DISPOSITION_BADGE_CLASS[row.disposition],
+                              )}
+                            >
+                              {DISPOSITION_LABEL[row.disposition]}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                          {row.disposition === "INVALID_TARGET"
+                            ? "Needs review"
+                            : row.disposition === "COLLISION" ||
+                                row.disposition === "CHAIN" ||
+                                row.disposition === "LOOP"
+                              ? DISPOSITION_LABEL[row.disposition]
+                              : "OK"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           </div>
+
+          <AdminPagination
+            page={automaticPagination.page}
+            totalPages={automaticPagination.totalPages}
+            total={automaticPagination.total}
+            start={automaticPagination.start}
+            end={automaticPagination.end}
+            basePath={BASE_PATH}
+            params={currentParams}
+          />
         </TabsContent>
 
         <TabsContent value="manual" className="mt-6 space-y-6">
-          <div
-            id={formId}
-            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
-          >
-            <h2 className="text-base font-semibold text-gray-900">
-              Новый ручной редирект
-            </h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Путь относительно хоста; позже будет валидация коллизий и
-              приоритетов.
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`${formId}-from`}>From path</Label>
-                <Input
-                  id={`${formId}-from`}
-                  value={fromPath}
-                  onChange={(e) => setFromPath(e.target.value)}
-                  placeholder="/old/path"
-                  className="font-mono text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`${formId}-to`}>To path</Label>
-                <Input
-                  id={`${formId}-to`}
-                  value={toPath}
-                  onChange={(e) => setToPath(e.target.value)}
-                  placeholder="/minsk/kuda"
-                  className="font-mono text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Redirect type</Label>
-                <Select
-                  value={manualType}
-                  onValueChange={(v) => setManualType(v as "301" | "302")}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="301">301 Permanent</SelectItem>
-                    <SelectItem value="302">302 Temporary</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor={`${formId}-note`}>Note (optional)</Label>
-                <Textarea
-                  id={`${formId}-note`}
-                  value={manualNote}
-                  onChange={(e) => setManualNote(e.target.value)}
-                  placeholder="Зачем нужен редирект…"
-                  rows={2}
-                  className="resize-none text-sm"
-                />
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <Button type="button" onClick={addManual}>
-                Сохранить в список
-              </Button>
-            </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
+            Создание и изменение ручных правил пока недоступно: постоянное
+            backend-хранилище и create/update flow не подключены. Это P1, а не
+            фиктивное сохранение в браузере.
           </div>
 
           <div>
-            <h2 className="mb-3 text-base font-semibold text-gray-900">
-              Ручные правила
-            </h2>
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-slate-50/90">
-                      <th className="px-4 py-3 font-semibold text-gray-800">
-                        From
-                      </th>
-                      <th className="px-4 py-3 font-semibold text-gray-800">
-                        To
-                      </th>
-                      <th className="px-4 py-3 font-semibold text-gray-800">
-                        Type
-                      </th>
-                      <th className="px-4 py-3 font-semibold text-gray-800">
-                        Note
-                      </th>
-                      <th className="px-4 py-3 font-semibold text-gray-800">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 font-semibold text-gray-800">
-                        Updated
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {manualRows.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50/80">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-900">
-                          {row.from}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-900">
-                          {row.to}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                          {row.redirectType}
-                        </td>
-                        <td className="max-w-[200px] px-4 py-3 text-xs text-gray-600">
-                          {row.note ?? "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                          {row.status}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                          {format(new Date(row.updatedAt), "d MMM yyyy, HH:mm", {
-                            locale: ru,
-                          })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <h2 className="mb-3 text-base font-semibold text-gray-900">Ручные правила</h2>
+            {initialManual.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 px-4 py-8 text-center text-sm text-gray-500">
+                Ручных редиректов пока нет
               </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="unmatched" className="mt-6 space-y-3">
-          <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-950">
-            <strong className="font-semibold">Unmatched URLs</strong> — legacy
-            адреса без однозначного сопоставления. Используйте для миграции и
-            SEO-пресетов.
-          </div>
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-slate-50/90">
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Legacy URL
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Detected type
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Suggested target
-                    </th>
-                    <th className="px-4 py-3 font-semibold text-gray-800">
-                      Status
-                    </th>
-                    <th className="w-28 px-2 py-3 font-semibold text-gray-800">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {unmatchedRows.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50/80">
-                      <td className="max-w-[260px] px-4 py-3 font-mono text-xs text-gray-800">
-                        <span className="break-all">{row.legacyUrl}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                        {DETECTED_LABEL[row.detectedType]}
-                      </td>
-                      <td className="max-w-[220px] px-4 py-3 font-mono text-xs text-gray-600">
-                        {row.suggestedTarget ?? "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span
-                          className={cn(
-                            "rounded-md border px-2 py-0.5 text-xs font-medium",
-                            row.status === "new" &&
-                              "border-blue-200 bg-blue-50 text-blue-900",
-                            row.status === "reviewed" &&
-                              "border-gray-200 bg-gray-100 text-gray-800",
-                            row.status === "ignored" &&
-                              "border-gray-200 bg-gray-50 text-gray-600",
-                            row.status === "resolved" &&
-                              "border-emerald-200 bg-emerald-50 text-emerald-900",
-                          )}
-                        >
-                          {UNMATCHED_STATUS_LABEL[row.status]}
-                        </span>
-                      </td>
-                      <td className="px-1 py-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              aria-label="Действия"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52">
-                            <DropdownMenuItem
-                              className="cursor-pointer"
-                              onClick={() => {
-                                let from = row.legacyUrl;
-                                try {
-                                  if (/^https?:\/\//i.test(row.legacyUrl)) {
-                                    from = new URL(row.legacyUrl).pathname;
-                                  }
-                                } catch {
-                                  from = row.legacyUrl;
-                                }
-                                patchUnmatched(row.id, { status: "resolved" });
-                                const suggested = row.suggestedTarget;
-                                if (suggested) {
-                                  setManualRows((prev) => [
-                                    {
-                                      id: newId("mr"),
-                                      from,
-                                      to: suggested,
-                                      redirectType: "301",
-                                      note: `from unmatched ${row.id}`,
-                                      status: "active",
-                                      updatedAt: new Date().toISOString(),
-                                    },
-                                    ...prev,
-                                  ]);
-                                }
-                              }}
-                            >
-                              Create manual redirect
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer"
-                              onClick={() =>
-                                patchUnmatched(row.id, { status: "ignored" })
-                              }
-                            >
-                              Ignore
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer"
-                              onClick={() =>
-                                patchUnmatched(row.id, { status: "reviewed" })
-                              }
-                            >
-                              Mark reviewed
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <TableContainer minWidthClassName="min-w-[800px]" scrollLabel="Таблица ручных редиректов, прокручивается по горизонтали">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-slate-50/90">
+                        <th className="px-4 py-3 font-semibold text-gray-800">From</th>
+                        <th className="px-4 py-3 font-semibold text-gray-800">To</th>
+                        <th className="px-4 py-3 font-semibold text-gray-800">Type</th>
+                        <th className="px-4 py-3 font-semibold text-gray-800">Note</th>
+                        <th className="px-4 py-3 font-semibold text-gray-800">Status</th>
+                        <th className="px-4 py-3 font-semibold text-gray-800">Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {initialManual.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50/80">
+                          <td className="px-4 py-3 font-mono text-xs text-gray-900">{row.from}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-900">{row.to}</td>
+                          <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{row.redirectType}</td>
+                          <td className="max-w-[200px] px-4 py-3 text-xs text-gray-600">{row.note ?? "—"}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.status}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.updatedAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableContainer>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "emerald" | "blue" | "amber" | "rose";
+}) {
+  const toneClass =
+    tone === "emerald"
+      ? "text-emerald-700"
+      : tone === "blue"
+        ? "text-blue-700"
+        : tone === "amber"
+          ? "text-amber-700"
+          : tone === "rose"
+            ? "text-rose-700"
+            : "text-gray-900";
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 shadow-sm">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{label}</p>
+      <p className={cn("mt-0.5 text-xl font-semibold tabular-nums", toneClass)}>{value}</p>
     </div>
   );
 }
