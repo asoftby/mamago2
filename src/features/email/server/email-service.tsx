@@ -11,17 +11,14 @@ import {
 } from "../lib/email-links";
 import { EMAIL_SUBJECTS } from "../lib/email-subjects";
 import { getResendClient } from "./resend-client";
+import {
+  getDebugRedirectTo,
+  getEmailDeliveryConfigurationStatus,
+  getMissingResendEnvKeys,
+  isEmailEnabled,
+} from "./email-config";
 import { renderNotification } from "@/server/notifications/template-render.service";
 import { toPlainText } from "@/server/notifications/template-render-core";
-
-function isEmailEnabled(): boolean {
-  return process.env.EMAIL_ENABLED === "true";
-}
-
-function getDebugRedirectTo(): string | undefined {
-  const v = process.env.EMAIL_DEBUG_REDIRECT_TO?.trim();
-  return v || undefined;
-}
 
 function assertConfiguredForResend(): void {
   if (!process.env.RESEND_API_KEY?.trim()) {
@@ -49,28 +46,6 @@ function getReplyTo(): string {
     throw new Error("EMAIL_REPLY_TO не задан.");
   }
   return replyTo;
-}
-
-function getMissingResendEnvKeys(): string[] {
-  const missing: string[] = [];
-  if (!process.env.RESEND_API_KEY?.trim()) missing.push("RESEND_API_KEY");
-  if (!process.env.EMAIL_FROM?.trim()) missing.push("EMAIL_FROM");
-  if (!process.env.EMAIL_REPLY_TO?.trim()) missing.push("EMAIL_REPLY_TO");
-  return missing;
-}
-
-function getEmailDeliveryConfigurationStatus(): {
-  enabled: boolean;
-  configured: boolean;
-  missingKeys: string[];
-} {
-  const enabled = isEmailEnabled();
-  const missingKeys = getMissingResendEnvKeys();
-  return {
-    enabled,
-    configured: enabled && missingKeys.length === 0,
-    missingKeys,
-  };
 }
 
 type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification" | "business-invite";

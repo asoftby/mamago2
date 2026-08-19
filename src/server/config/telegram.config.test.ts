@@ -20,6 +20,7 @@ patchableModule._load = function (request: string, ...rest: unknown[]) {
 
 const ENV_KEYS = [
   "NODE_ENV",
+  "APP_ENV",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_BOT_TOKEN_DEV",
   "TELEGRAM_BOT_TOKEN_PROD",
@@ -66,11 +67,63 @@ function withEnv(
 }
 
 async function main() {
-  const { getTelegramConfig } = await import("./telegram.config");
+  const { getTelegramConfig, requiresTelegramWebhookSecret } = await import("./telegram.config");
+
+  withEnv(
+    {
+      NODE_ENV: "production",
+      APP_ENV: "dev",
+      TELEGRAM_BOT_TOKEN_DEV: "dev-token",
+      TELEGRAM_BOT_USERNAME_DEV: "@mamago_dev_bot",
+      TELEGRAM_BOT_TOKEN_PROD: "prod-token",
+      TELEGRAM_BOT_USERNAME_PROD: "@mamago_info_bot",
+    },
+    () => {
+      const config = getTelegramConfig();
+      assert.equal(config.environment, "DEV");
+      assert.equal(config.botToken, "dev-token");
+      assert.equal(config.botUsername, "mamago_dev_bot");
+      assert.equal(requiresTelegramWebhookSecret(), true);
+    },
+  );
+
+  withEnv(
+    {
+      NODE_ENV: "production",
+      APP_ENV: "staging",
+      TELEGRAM_BOT_TOKEN_DEV: "staging-dev-token",
+      TELEGRAM_BOT_USERNAME_DEV: "mamago_dev_bot",
+      TELEGRAM_BOT_TOKEN_PROD: "prod-token",
+      TELEGRAM_BOT_USERNAME_PROD: "mamago_info_bot",
+    },
+    () => {
+      const config = getTelegramConfig();
+      assert.equal(config.environment, "DEV");
+      assert.equal(config.botToken, "staging-dev-token");
+    },
+  );
+
+  withEnv(
+    {
+      NODE_ENV: "production",
+      APP_ENV: "production",
+      TELEGRAM_BOT_TOKEN_DEV: "dev-token",
+      TELEGRAM_BOT_USERNAME_DEV: "mamago_dev_bot",
+      TELEGRAM_BOT_TOKEN_PROD: "prod-token",
+      TELEGRAM_BOT_USERNAME_PROD: "mamago_info_bot",
+    },
+    () => {
+      const config = getTelegramConfig();
+      assert.equal(config.environment, "PROD");
+      assert.equal(config.botToken, "prod-token");
+      assert.equal(config.botUsername, "mamago_info_bot");
+    },
+  );
 
   withEnv(
     {
       NODE_ENV: "development",
+      APP_ENV: "local",
       TELEGRAM_BOT_TOKEN: "unsuffixed-dev-token",
       TELEGRAM_BOT_USERNAME: "@mamaGo_bot",
     },
@@ -79,12 +132,14 @@ async function main() {
       assert.equal(config.environment, "DEV");
       assert.equal(config.botToken, "unsuffixed-dev-token");
       assert.equal(config.botUsername, "mamaGo_bot");
+      assert.equal(requiresTelegramWebhookSecret(), false);
     },
   );
 
   withEnv(
     {
       NODE_ENV: "production",
+      APP_ENV: "production",
       TELEGRAM_BOT_TOKEN: "unsuffixed-prod-token",
       TELEGRAM_BOT_USERNAME: "mamaGo_bot",
     },
@@ -99,6 +154,7 @@ async function main() {
   withEnv(
     {
       NODE_ENV: "production",
+      APP_ENV: "production",
       TELEGRAM_BOT_TOKEN: "legacy-token",
       TELEGRAM_BOT_TOKEN_PROD: "preferred-prod-token",
       TELEGRAM_BOT_USERNAME: "legacy_bot",
@@ -114,6 +170,7 @@ async function main() {
   withEnv(
     {
       NODE_ENV: "production",
+      APP_ENV: "production",
       TELEGRAM_BOT_TOKEN_PROD: undefined,
       TELEGRAM_BOT_TOKEN: undefined,
     },

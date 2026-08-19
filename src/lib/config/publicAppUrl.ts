@@ -1,3 +1,5 @@
+import { isProductionAppEnv } from "@/lib/config/productionEnvGuard";
+
 const DEFAULT_DEV_PUBLIC_APP_URL = "http://mamago.local:3000";
 const DEFAULT_PROD_PUBLIC_APP_URL = "https://mamago.by";
 
@@ -16,9 +18,7 @@ export function getConfiguredPublicAppUrl(): string | null {
 export function getCanonicalPublicAppUrl(): string {
   return (
     getConfiguredPublicAppUrl() ||
-    (process.env.NODE_ENV === "production"
-      ? DEFAULT_PROD_PUBLIC_APP_URL
-      : DEFAULT_DEV_PUBLIC_APP_URL)
+    (isProductionAppEnv() ? DEFAULT_PROD_PUBLIC_APP_URL : DEFAULT_DEV_PUBLIC_APP_URL)
   );
 }
 

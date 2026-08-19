@@ -3411,3 +3411,45 @@ P3 — cleanup / polish / optional
   automatically instead of silently accumulating.
 - Source: Operations Center Step 6 (audit adapter + retention) ESLint
   validation-gate audit (2026-08-17)
+
+---
+
+## [BACKLOG-123] Telegram/Resend follow-ups after production-readiness audit
+
+- Status: OPEN
+- Priority: P2
+- Area: Telegram / Email
+- Added: 2026-08-19
+- Reason deferred: out of scope for the current audit/hardening pass. Code now
+  selects Telegram credentials via `APP_ENV` (not `NODE_ENV`). Remaining items
+  need owner action or a later PROD image deploy.
+- Context:
+  - PROD still has a leftover unsuffixed `TELEGRAM_BOT_TOKEN` / `@mamaGo_bot`
+    beside `TELEGRAM_BOT_TOKEN_PROD` / `@mamaGo_info_bot`. After `APP_ENV=production`
+    the unsuffixed bot is unused; decide whether to revoke it at BotFather.
+  - Neither DEV nor PROD had `TelegramConnection` rows at audit time, so a live
+    `/start link_` connect + notification delivery smoke could not be completed
+    without the owner opening the bot.
+  - Historical reports still mention `/api/telegram/webhook` (`docs/reports/*`);
+    live docs/scripts now point at `/api/bot/webhook`.
+  - DEV and PROD currently share one Resend API key fingerprint. Acceptable for
+    one verified domain; split keys later if billing/isolation is required.
+  - This audit's code fix is not deployed to PROD (explicitly out of scope).
+    PROD `.env` must keep `APP_ENV=production` before the next PROD image roll,
+    or Telegram would fall through to DEV credentials.
+  - `src/server/email/send-welcome-email.ts` (`resolveWelcomeCtaUrl`) still
+    catches a missing `APP_PUBLIC_URL`/`NEXT_PUBLIC_APP_URL` and falls back to
+    a hardcoded `https://mamago.by` CTA link, same anti-pattern this audit
+    removed from `activationEmailDelivery.ts`. Currently unreachable (both env
+    vars are configured in DEV/PROD per this audit), so left as-is rather than
+    changing welcome-email behavior without a product decision on what should
+    happen when the public URL is unset (skip send vs. use a documented
+    default) — not fixed in this task to keep scope narrow.
+- Current state: code + tests landed on `dev`; DEV runtime env/webhook updated
+  in the audit session; PROD image unchanged.
+- Dependencies: owner Telegram connect on `@mamago_dev_bot` and `@mamaGo_info_bot`;
+  next PROD deploy of this commit.
+- Acceptance criteria: owner-connected Telegram smoke SENT on both bots;
+  unsuffixed PROD token retired or documented as intentional; historical
+  webhook docs either archived or updated; PROD running the APP_ENV-aware image.
+- Source: Telegram Bot + Resend production-readiness audit (2026-08-19)

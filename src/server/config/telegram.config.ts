@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isLocalAppEnv, isProductionAppEnv } from "@/lib/config/productionEnvGuard";
+
 export type TelegramRuntimeEnvironment = "DEV" | "PROD";
 
 type TelegramConfig = {
@@ -10,7 +12,12 @@ type TelegramConfig = {
 };
 
 export function getTelegramRuntimeEnvironment(): TelegramRuntimeEnvironment {
-  return process.env.NODE_ENV === "production" ? "PROD" : "DEV";
+  return isProductionAppEnv() ? "PROD" : "DEV";
+}
+
+/** Webhook secret is required on every deployed host, optional only for local `next dev`. */
+export function requiresTelegramWebhookSecret(): boolean {
+  return !isLocalAppEnv();
 }
 
 function firstEnv(...names: string[]): string | null {

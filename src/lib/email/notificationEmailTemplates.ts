@@ -6,14 +6,13 @@
 
 import type { NotificationType } from "@prisma/client";
 import { resolveNotificationHref } from "@/lib/notifications/notificationRegistry";
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 
 interface EmailTemplate {
   subject: string;
   text: string;
   html?: string;
 }
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://mamago.by";
 
 export function buildNotificationEmailTemplate(
   type: NotificationType,
@@ -38,6 +37,7 @@ function buildCtaUrl(
   entityId?: string | null,
   ctaAction?: string | null,
 ): string | null {
+  const appUrl = getCanonicalPublicAppUrl();
   const href = resolveNotificationHref(type, {
     entityId: entityId ?? undefined,
     entityType: undefined,
@@ -45,17 +45,17 @@ function buildCtaUrl(
   });
 
   if (href) {
-    return href.startsWith("http") ? href : `${APP_URL}${href}`;
+    return href.startsWith("http") ? href : `${appUrl}${href}`;
   }
 
   if (type === "WELCOME" || type === "RECOMMENDATION") {
-    return `${APP_URL}/me/settings/notifications`;
+    return `${appUrl}/me/settings/notifications`;
   }
-  if (type === "REMINDER" || type === "PLAN_TOMORROW_DIGEST") return `${APP_URL}/me/plan`;
-  if (type === "SYSTEM") return `${APP_URL}/settings`;
+  if (type === "REMINDER" || type === "PLAN_TOMORROW_DIGEST") return `${appUrl}/me/plan`;
+  if (type === "SYSTEM") return `${appUrl}/settings`;
   if (type === "NEWS" || type === "ANNOUNCEMENT") return null;
 
-  return `${APP_URL}/business/dashboard`;
+  return `${appUrl}/business/dashboard`;
 }
 
 function buildHtml(title: string, body: string, ctaUrl: string | null): string {

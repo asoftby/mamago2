@@ -1,4 +1,5 @@
 import { resolveActivationEmailDelivery, type ActivationEmailEnvironment } from "./activationEmailGate";
+import { getConfiguredPublicAppUrl } from "@/lib/config/publicAppUrl";
 // Type-only: erased at compile time, so this never triggers email-service.tsx's
 // `import "server-only"` side effect for callers of this module (this file's
 // own tests run under plain tsx/Node, not Next's react-server condition).
@@ -27,12 +28,10 @@ async function defaultSender(params: Parameters<RawEmailSender>[0]): ReturnType<
 }
 
 function activationBaseUrl(): string | null {
-  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  if (!raw) return null;
-  return raw.replace(/\/+$/, "");
+  return getConfiguredPublicAppUrl();
 }
 
-/** `null` when NEXT_PUBLIC_APP_URL isn't configured — callers must treat that as "cannot deliver", never fall back to a guessed host. */
+/** `null` when APP_PUBLIC_URL / NEXT_PUBLIC_APP_URL isn't configured — callers must treat that as "cannot deliver", never fall back to a guessed host. */
 export function buildMigratedAccountActivationUrl(rawToken: string): string | null {
   const base = activationBaseUrl();
   if (!base) return null;
