@@ -139,6 +139,8 @@
     "search:reindex": "tsx scripts/search-reindex.ts",
     "media:backfill-migrated-metadata": "tsx scripts/backfill-migrated-media-metadata.ts",
     "test:media-metadata-backfill": "tsx src/lib/media/isTechnicalMediaTitle.test.ts && tsx src/lib/media/decideMigratedMediaMetadataPatch.test.ts",
+    "test:media-from-url-transport": "tsx src/server/modules/import/parsers/fetchHtml.test.ts && tsx src/lib/media/safeRemoteImageUrl.test.ts",
+    "test:media-from-url-family-by-live": "tsx src/server/modules/import/parsers/fetchBinaryFamilyBy.live.test.ts",
     "test:google-maps-config": "tsx src/services/googleMaps/googleMapsConfigContract.test.ts && tsx src/services/googleMaps/toLegacyAddressComponents.test.ts",
     "prepare": "husky",
     "check:push": "tsc --noEmit && pnpm build",
