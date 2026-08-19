@@ -83,8 +83,7 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
       if (!isContentEditDestination(url)) return;
       if (url.searchParams.has("returnTo")) return;
 
-      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      url.searchParams.set("returnTo", returnTo);
+      url.searchParams.set("returnTo", window.location.pathname);
       const nextHref = `${url.pathname}${url.search}${url.hash}`;
 
       // Keep modified-click / target=_blank semantics intact while still enriching the URL.
