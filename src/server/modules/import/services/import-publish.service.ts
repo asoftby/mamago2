@@ -446,7 +446,7 @@ async function createActivityFromImport(
           title: nd.venueName ?? null,
           addressLine: nd.addressText ?? null,
           cityId: cityId ?? null,
-          ...(venuePlace ? { place: { connect: { id: venuePlace.placeId } } : {}),
+          ...(venuePlace ? { place: { connect: { id: venuePlace.placeId } } } : {}),
         },
       })
     : Promise.resolve(null);
