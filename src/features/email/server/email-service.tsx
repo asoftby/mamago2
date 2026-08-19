@@ -9,6 +9,7 @@ import {
   buildPasswordResetUrl,
   buildVerifyEmailUrl,
 } from "../lib/email-links";
+import { resolveEmailCtaUrl } from "../lib/email-cta-url";
 import { EMAIL_SUBJECTS } from "../lib/email-subjects";
 import { getResendClient } from "./resend-client";
 import {
@@ -456,6 +457,7 @@ function TransactionalNotificationTemplate(props: {
   ctaLabel?: string | null;
   ctaUrl?: string | null;
 }) {
+  const ctaUrl = resolveEmailCtaUrl(props.ctaUrl);
   return (
     <html>
       <body
@@ -476,10 +478,10 @@ function TransactionalNotificationTemplate(props: {
         ) : (
           <p style={{ color: "#555", lineHeight: 1.6 }}>{props.body}</p>
         )}
-        {props.ctaUrl ? (
+        {ctaUrl ? (
           <p style={{ marginTop: 20 }}>
             <a
-              href={props.ctaUrl}
+              href={ctaUrl}
               style={{
                 display: "inline-block",
                 background: "#EF8759",

@@ -7,6 +7,7 @@
 import type { NotificationType } from "@prisma/client";
 import { resolveNotificationHref } from "@/lib/notifications/notificationRegistry";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { resolveEmailCtaUrl } from "@/features/email/lib/email-cta-url";
 
 interface EmailTemplate {
   subject: string;
@@ -45,7 +46,7 @@ function buildCtaUrl(
   });
 
   if (href) {
-    return href.startsWith("http") ? href : `${appUrl}${href}`;
+    return resolveEmailCtaUrl(href);
   }
 
   if (type === "WELCOME" || type === "RECOMMENDATION") {
