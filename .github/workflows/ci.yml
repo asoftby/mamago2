@@ -37,3 +37,6 @@ jobs:
         run: pnpm tsc --noEmit
         env:
           NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Imported media source privacy regression
+        run: pnpm exec tsx src/lib/media/importedMediaPrivacy.test.ts

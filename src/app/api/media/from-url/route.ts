@@ -2,6 +2,9 @@
  * POST /api/media/from-url
  * Скачивает изображение по публичному URL, прогоняет pipeline как /api/upload, создаёт MediaAsset.
  * Только по явному действию пользователя (импорт / редактор).
+ *
+ * Privacy boundary: source URL/hostname is internal provenance only. It must
+ * never influence public filenames/metadata or be returned by this endpoint.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +18,7 @@ import {
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
 import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
+import { buildNeutralImportedMediaIdentity } from "@/lib/media/importedMediaPrivacy";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { describeFetchError, fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 
@@ -89,10 +93,10 @@ export async function POST(req: NextRequest) {
     }
 
     const processedImageSet = await processImage(buf, mime, DEFAULT_IMAGE_CONFIG);
+    const mediaIdentity = buildNeutralImportedMediaIdentity(url);
 
-    const slug = `import-${url.hostname.replace(/[^a-z0-9]+/gi, "-").slice(0, 24)}`;
     const masterSaved = await writeRuntimeUpload(
-      generateProcessedFilename(`${slug}.jpg`),
+      generateProcessedFilename(mediaIdentity.seedFilename),
       processedImageSet.master.buffer,
     );
     const masterFilename = masterSaved.filename;
@@ -100,7 +104,10 @@ export async function POST(req: NextRequest) {
 
     for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
       if (sizeData) {
-        await writeRuntimeUpload(generateProcessedFilename(`${slug}.jpg`, sizeName), sizeData.buffer);
+        await writeRuntimeUpload(
+          generateProcessedFilename(mediaIdentity.seedFilename, sizeName),
+          sizeData.buffer,
+        );
       }
     }
 
@@ -113,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     const asset = await registerUploadedMedia({
       filename: masterFilename,
-      originalName: url.pathname.split("/").pop() || "import.jpg",
+      originalName: mediaIdentity.originalName,
       mimeType: "image/webp",
       sizeBytes: processedImageSet.master.size,
       width: processedImageSet.master.width,
@@ -122,7 +129,7 @@ export async function POST(req: NextRequest) {
       publicUrl: masterUrl,
       sourceType,
       uploadedById: user.id,
-      title: `Import: ${url.hostname}`,
+      title: mediaIdentity.title,
     });
 
     return NextResponse.json({
@@ -130,7 +137,6 @@ export async function POST(req: NextRequest) {
       publicUrl: asset.publicUrl,
       width: processedImageSet.master.width,
       height: processedImageSet.master.height,
-      sourceUrl: url.toString(),
     });
   } catch (e: unknown) {
     const httpStatus = errorHttpStatus(e);
