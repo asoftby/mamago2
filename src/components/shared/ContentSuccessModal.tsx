@@ -75,13 +75,15 @@ export function ContentSuccessModal({
               </Link>
             </Button>
           ) : null}
-          <Button
-            variant="outline"
-            className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
-            asChild
-          >
-            <Link href={state.listAction.href}>{state.listAction.label}</Link>
-          </Button>
+          {state.listAction ? (
+            <Button
+              variant="outline"
+              className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
+              asChild
+            >
+              <Link href={state.listAction.href}>{state.listAction.label}</Link>
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
