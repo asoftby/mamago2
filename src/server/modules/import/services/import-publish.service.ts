@@ -414,9 +414,18 @@ async function createActivityFromImport(
     emptyFields.push("placeId");
   }
 
+  // Never persist a remote source URL into Activity. Ingest/optimize first and
+  // only persist the local mamaGo media URL. If ingestion fails, the cover
+  // stays empty rather than leaking provenance publicly.
   if (fields.coverImageUrl) {
-    createData.coverImageUrl = fields.coverImageUrl;
-    appliedFields.push("coverImageUrl");
+    const imgResult = await optimizeImportedImage(fields.coverImageUrl, record.id, actorUserId);
+    if (imgResult.ok) {
+      createData.coverImageUrl = imgResult.publicUrl;
+      appliedFields.push("coverImageUrl");
+    } else {
+      emptyFields.push("coverImageUrl");
+      warnings.push(`cover image ingestion failed; remote source URL was not persisted: ${imgResult.error}`);
+    }
   } else if (nd.imageUrls.length > 0) {
     emptyFields.push("coverImageUrl (no HTTPS URL in import)");
   }
@@ -437,7 +446,7 @@ async function createActivityFromImport(
           title: nd.venueName ?? null,
           addressLine: nd.addressText ?? null,
           cityId: cityId ?? null,
-          ...(venuePlace ? { place: { connect: { id: venuePlace.placeId } } } : {}),
+          ...(venuePlace ? { place: { connect: { id: venuePlace.placeId } } : {}),
         },
       })
     : Promise.resolve(null);
@@ -457,24 +466,6 @@ async function createActivityFromImport(
   const activitySlug = activity.slug ?? (
     await prisma.activity.findUnique({ where: { id: activity.id }, select: { slug: true } })
   )?.slug ?? undefined;
-
-  // ── Оптимизация изображения — async, не блокирует ответ ──────────────────
-  if (fields.coverImageUrl) {
-    void (async () => {
-      const imgResult = await optimizeImportedImage(fields.coverImageUrl!, record.id, actorUserId);
-      if (imgResult.ok) {
-        // Обновляем coverImageUrl на локальный оптимизированный webp
-        await prisma.activity.update({
-          where: { id: activity.id },
-          data: { coverImageUrl: imgResult.publicUrl },
-        });
-        console.log(`[import-publish] image optimized for activity ${activity.id}: ${imgResult.publicUrl}`);
-      } else {
-        console.warn(`[import-publish] image optimization failed for activity ${activity.id}: ${imgResult.error}`);
-        // Оставляем исходный coverImageUrl — не падаем
-      }
-    })();
-  }
 
   await persistActivityApplyResult(record.id, activity.id, {
     appliedAt: new Date().toISOString(), appliedByUserId: actorUserId,
@@ -525,13 +516,39 @@ async function updateExistingActivityFromImport(
     existingActivity as unknown as Record<string, unknown>,
   );
 
+  // A remote cover is provenance, not a public Activity field. Pull it out of
+  // the generic update set before override filtering so the external URL can
+  // never be written even briefly.
+  const candidateUpdatesRecord = candidateUpdates as Record<string, unknown>;
+  const candidateRemoteCoverUrl =
+    typeof candidateUpdatesRecord.coverImageUrl === "string"
+      ? candidateUpdatesRecord.coverImageUrl
+      : null;
+  delete candidateUpdatesRecord.coverImageUrl;
+
   // ImportFieldOverride filter
   const overrides = await loadActivityFieldOverrides(targetActivityId);
   const { allowed, skipped: skippedByOverride } = applyOverrideFilter(
-    candidateUpdates as Record<string, unknown>,
+    candidateUpdatesRecord,
     overrides,
   );
-  const allSkipped = [...skippedNonDestructive, ...skippedByOverride];
+  const coverImportAllowed = Boolean(candidateRemoteCoverUrl) && isFieldAllowed("coverImageUrl", overrides);
+  const allSkipped = [
+    ...skippedNonDestructive,
+    ...skippedByOverride,
+    ...(candidateRemoteCoverUrl && !coverImportAllowed
+      ? ["coverImageUrl (blocked by field override)"]
+      : []),
+  ];
+
+  if (candidateRemoteCoverUrl && coverImportAllowed) {
+    const imgResult = await optimizeImportedImage(candidateRemoteCoverUrl, record.id, actorUserId);
+    if (imgResult.ok) {
+      (allowed as Record<string, unknown>).coverImageUrl = imgResult.publicUrl;
+    } else {
+      warnings.push(`cover image ingestion failed; remote source URL was not persisted: ${imgResult.error}`);
+    }
+  }
 
   // Если у activity нет placeId — попробовать найти venue Place
   if (!existingActivity.placeId && (nd.venueName || nd.addressText)) {
@@ -553,7 +570,10 @@ async function updateExistingActivityFromImport(
   const activitySlug = updatedActivity?.slug ?? undefined;
 
   const emptyFields = Object.keys(fields).filter(
-    (k) => !(k in candidateUpdates) && !skippedNonDestructive.some((s) => s.startsWith(k)),
+    (k) =>
+      !(k in candidateUpdatesRecord) &&
+      !skippedNonDestructive.some((s) => s.startsWith(k)) &&
+      !(k === "coverImageUrl" && "coverImageUrl" in allowed),
   );
 
   await persistActivityApplyResult(record.id, targetActivityId, {
