@@ -56,5 +56,5 @@ export type ResolvedContentSuccessState = {
   listAction: {
     label: string;
     href: string;
-  };
+  } | null;
 };
