@@ -15,6 +15,31 @@ import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 const MOBILE_MAIN_BOTTOM =
   "pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0";
 
+function isPublishedPublicSource(pathname: string): boolean {
+  return !(
+    pathname === "/preview" ||
+    pathname.startsWith("/preview/") ||
+    pathname === "/me" ||
+    pathname.startsWith("/me/")
+  );
+}
+
+function isContentEditDestination(url: URL): boolean {
+  if (/^\/editor\/(event|offer|place)\/[^/]+\/edit\/?$/.test(url.pathname)) {
+    return true;
+  }
+
+  if (/^\/admin\/content\/articles\/[^/]+\/edit\/?$/.test(url.pathname)) {
+    return true;
+  }
+
+  return (
+    url.pathname === "/admin/content/publications/new" &&
+    url.searchParams.get("type") === "news" &&
+    Boolean(url.searchParams.get("id"))
+  );
+}
+
 /**
  * Обёртка (public): нижний бар только там, где не страница публикации;
  * иначе убираем отступ под бар и сам бар.
@@ -34,6 +59,56 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
       }
     };
   }, [pathname]);
+
+  useEffect(() => {
+    function handleContentEditNavigation(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (!isPublishedPublicSource(window.location.pathname)) return;
+
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.hasAttribute("download")) return;
+
+      let url: URL;
+      try {
+        url = new URL(anchor.href, window.location.href);
+      } catch {
+        return;
+      }
+
+      if (url.origin !== window.location.origin) return;
+      if (!isContentEditDestination(url)) return;
+      if (url.searchParams.has("returnTo")) return;
+
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      url.searchParams.set("returnTo", returnTo);
+      const nextHref = `${url.pathname}${url.search}${url.hash}`;
+
+      // Keep modified-click / target=_blank semantics intact while still enriching the URL.
+      anchor.href = nextHref;
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        anchor.target === "_blank"
+      ) {
+        return;
+      }
+
+      // Use a document navigation because editor/admin routes may switch surfaces/subdomains.
+      event.preventDefault();
+      window.location.assign(nextHref);
+    }
+
+    document.addEventListener("click", handleContentEditNavigation, true);
+    return () => {
+      document.removeEventListener("click", handleContentEditNavigation, true);
+    };
+  }, []);
 
   return (
     <>
