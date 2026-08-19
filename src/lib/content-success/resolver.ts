@@ -10,9 +10,7 @@ import {
   editorOfferEditHref,
   editorPlaceEditHref,
 } from "@/lib/content-editor/types";
-import {
-  getAbsolutePlacePublicUrl,
-} from "@/lib/placePublicUrl";
+import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import {
   publicActivityPath,
@@ -34,6 +32,24 @@ import type {
 
 function isInternalReturnTo(value: string | null | undefined): value is string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
+}
+
+function resolveBrowserReturnTo(): string | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const value = new URLSearchParams(window.location.search).get("returnTo");
+    return isInternalReturnTo(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveEffectiveReturnTo(payload: ContentSuccessPayload): string | null {
+  if (isInternalReturnTo(payload.returnTo)) {
+    return payload.returnTo;
+  }
+  return resolveBrowserReturnTo();
 }
 
 function isPrivilegedContentRole(role: Role | null | undefined): boolean {
@@ -65,7 +81,10 @@ function resolveReturnToSurface(
   returnTo: string,
 ): "admin" | "business" | "onboarding" | "public" {
   const baseSurface = surfaceFromPathname(returnTo);
-  if (baseSurface === "business" && isOnboardingPath(returnTo.slice("/business".length) || "/")) {
+  if (
+    baseSurface === "business" &&
+    isOnboardingPath(returnTo.slice("/business".length) || "/")
+  ) {
     return "onboarding";
   }
   return baseSurface;
@@ -101,13 +120,20 @@ function guardListHrefForRole(payload: ContentSuccessPayload, href: string): str
 }
 
 export function resolveContentListHref(payload: ContentSuccessPayload): string {
-  if (isInternalReturnTo(payload.returnTo) && canUseReturnTo(payload, payload.returnTo)) {
-    return guardListHrefForRole(payload, payload.returnTo);
+  const returnTo = resolveEffectiveReturnTo(payload);
+  if (returnTo && canUseReturnTo(payload, returnTo)) {
+    return guardListHrefForRole(payload, returnTo);
   }
   return guardListHrefForRole(payload, defaultListHref(payload.kind, payload.surface));
 }
 
-function resolveEditHref(payload: ContentSuccessPayload): string | null {
+function appendReturnTo(href: string, returnTo: string | null): string {
+  if (!returnTo) return href;
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+function resolveBaseEditHref(payload: ContentSuccessPayload): string | null {
   if (payload.kind === "event") return editorEventEditHref(payload.id);
   if (payload.kind === "offer") return editorOfferEditHref(payload.id);
   if (payload.kind === "place") return editorPlaceEditHref(payload.id);
@@ -116,6 +142,12 @@ function resolveEditHref(payload: ContentSuccessPayload): string | null {
     return `/admin/content/publications/new?type=news&id=${encodeURIComponent(payload.id)}`;
   }
   return null;
+}
+
+function resolveEditHref(payload: ContentSuccessPayload): string | null {
+  const href = resolveBaseEditHref(payload);
+  if (!href) return null;
+  return appendReturnTo(href, resolveEffectiveReturnTo(payload));
 }
 
 function resolvePreviewHref(payload: ContentSuccessPayload): string | null {
@@ -179,19 +211,29 @@ export function resolveContentLinks(payload: ContentSuccessPayload): ResolvedCon
   };
 }
 
+function resolvePublicOriginReturnTo(payload: ContentSuccessPayload): string | null {
+  const returnTo = resolveEffectiveReturnTo(payload);
+  if (!returnTo) return null;
+  return resolveReturnToSurface(returnTo) === "public" ? returnTo : null;
+}
+
 function resolveDraftSavedTitle(payload: ContentSuccessPayload): string {
   void payload;
   return "Черновик сохранен";
 }
 
-function resolveDraftSavedDescription(payload: ContentSuccessPayload): string {
-  void payload;
-  return "Черновик сохранен. Можно продолжить редактирование или вернуться к списку.";
-}
-
-function resolveOpenAction(payload: ContentSuccessPayload, links: ResolvedContentLinks) {
+function resolveOpenAction(
+  payload: ContentSuccessPayload,
+  links: ResolvedContentLinks,
+  publicOriginReturnTo: string | null,
+) {
   if (payload.outcome === "draft_saved") {
-    return null;
+    if (!publicOriginReturnTo) return null;
+    return {
+      label: "Вернуться к публикации",
+      href: publicOriginReturnTo,
+      target: "_self" as const,
+    };
   }
 
   if (payload.outcome === "submitted") {
@@ -206,11 +248,12 @@ function resolveOpenAction(payload: ContentSuccessPayload, links: ResolvedConten
     };
   }
 
-  if (links.publicUrl) {
+  const publishedHref = links.publicUrl ?? publicOriginReturnTo;
+  if (publishedHref) {
     return {
       label: "Открыть публикацию",
-      href: links.publicUrl,
-      target: "_blank" as const,
+      href: publishedHref,
+      target: publicOriginReturnTo ? ("_self" as const) : ("_blank" as const),
     };
   }
 
@@ -225,21 +268,43 @@ function resolveOpenAction(payload: ContentSuccessPayload, links: ResolvedConten
   return null;
 }
 
-function resolveDescription(payload: ContentSuccessPayload, hasOpenAction: boolean): string {
+function resolveDescription(
+  payload: ContentSuccessPayload,
+  hasOpenAction: boolean,
+  fromPublicPage: boolean,
+): string {
   if (payload.outcome === "draft_saved") {
-    return resolveDraftSavedDescription(payload);
+    return fromPublicPage
+      ? "Черновик сохранен. Можно вернуться к публикации или продолжить редактирование."
+      : "Черновик сохранен. Можно продолжить редактирование или вернуться к списку.";
   }
 
   if (payload.outcome === "submitted") {
+    if (fromPublicPage) {
+      return hasOpenAction
+        ? "Публикация отправлена на модерацию. Можно открыть предпросмотр или продолжить редактирование."
+        : "Публикация отправлена на модерацию. Можно продолжить редактирование.";
+    }
     return hasOpenAction
       ? "Публикация отправлена на модерацию. Можно открыть предпросмотр, продолжить редактирование или вернуться к списку."
       : "Публикация отправлена на модерацию. Можно продолжить редактирование или вернуться к списку.";
   }
 
   if (payload.outcome === "changes_published") {
+    if (fromPublicPage) {
+      return hasOpenAction
+        ? "Изменения доступны пользователям. Можно открыть публикацию или продолжить редактирование."
+        : "Изменения доступны пользователям. Можно продолжить редактирование.";
+    }
     return hasOpenAction
       ? "Изменения доступны пользователям. Можно открыть публикацию, продолжить редактирование или вернуться к списку."
       : "Изменения доступны пользователям. Можно продолжить редактирование или вернуться к списку.";
+  }
+
+  if (fromPublicPage) {
+    return hasOpenAction
+      ? "Публикация доступна пользователям. Можно открыть публикацию или продолжить редактирование."
+      : "Публикация доступна пользователям. Можно продолжить редактирование.";
   }
 
   return hasOpenAction
@@ -251,23 +316,27 @@ export function resolveContentSuccessState(
   payload: ContentSuccessPayload,
 ): ResolvedContentSuccessState | null {
   const links = resolveContentLinks(payload);
-  const openAction = resolveOpenAction(payload, links);
+  const publicOriginReturnTo = resolvePublicOriginReturnTo(payload);
+  const fromPublicPage = publicOriginReturnTo != null;
+  const openAction = resolveOpenAction(payload, links, publicOriginReturnTo);
   const continueEditingAction = links.editUrl
     ? {
         label: "Продолжить редактирование",
         href: links.editUrl,
       }
     : null;
-  const listAction = {
-    label: "Вернуться к списку",
-    href: links.listUrl,
-  };
+  const listAction = fromPublicPage
+    ? null
+    : {
+        label: "Вернуться к списку",
+        href: links.listUrl,
+      };
 
   if (payload.outcome === "draft_saved") {
     return {
       title: resolveDraftSavedTitle(payload),
-      description: resolveDescription(payload, false),
-      openAction: null,
+      description: resolveDescription(payload, openAction != null, fromPublicPage),
+      openAction,
       continueEditingAction,
       listAction,
     };
@@ -276,7 +345,7 @@ export function resolveContentSuccessState(
   if (payload.outcome === "submitted") {
     return {
       title: "Отправлено на модерацию",
-      description: resolveDescription(payload, openAction != null),
+      description: resolveDescription(payload, openAction != null, fromPublicPage),
       openAction,
       continueEditingAction,
       listAction,
@@ -288,7 +357,7 @@ export function resolveContentSuccessState(
       payload.outcome === "changes_published"
         ? "Изменения опубликованы"
         : "Опубликовано",
-    description: resolveDescription(payload, openAction != null),
+    description: resolveDescription(payload, openAction != null, fromPublicPage),
     openAction,
     continueEditingAction,
     listAction,
