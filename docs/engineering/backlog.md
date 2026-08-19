@@ -3453,3 +3453,54 @@ P3 — cleanup / polish / optional
   unsuffixed PROD token retired or documented as intentional; historical
   webhook docs either archived or updated; PROD running the APP_ENV-aware image.
 - Source: Telegram Bot + Resend production-readiness audit (2026-08-19)
+
+---
+
+## [BACKLOG-124] Article REGION scope — deferred follow-ups
+
+- Status: OPEN
+- Priority: P3
+- Area: Articles / Admin / Discovery
+- Added: 2026-08-20
+- Reason deferred: out of scope for the REGION-scope pre-release task
+  (feat/article-region-scope, base caa4af21) — kept minimal per task
+  instructions; noted here instead of expanding scope silently.
+- Context:
+  - Admin publications index (`src/lib/article/listArticlesForPublicationsIndex.ts`,
+    `PublicationListRow.cityOrContext`) has no region label — a REGION
+    article shows `cityOrContext: "—"` in `/admin/content/publications`,
+    same as COUNTRY. Not a bug (nothing breaks), just no visual
+    distinction for editors browsing the list. Would need a
+    `regionSlug`/label field threaded through similarly to `citySlug`.
+  - "Continuous reading" (read-next-in-section on `/blog/[slug]` and
+    `/{city}/blog/[slug]`, `src/lib/article/nextArticleInSection.ts` +
+    `nextArticleInSectionQuery.ts` + `buildContinuousArticleSeed.ts`) only
+    activates when `continuous.geoScope === "COUNTRY"` (national route) or
+    `"CITY"` (city route). REGION articles safely fall back to the
+    `standalone` article view (verified: `loadArticleContinuousContext`
+    returns a normal `GeoScope | null`, no crash) — they just never get a
+    "next article" chain. Extending it means deciding what "next" means
+    for REGION (same region only? national pool?) — a product decision,
+    not a mechanical extension.
+  - Local/DEV DB had only one Belarusian oblast (`minskaya-oblast`) with
+    exactly one non-Minsk City linked to it (Марьина Горка) before this
+    task; the other 5 oblasts were added to `prisma/seed.ts` and applied
+    locally, but **no City row exists yet for Vitebskaya oblast** (or any
+    oblast besides Minsk). The owner's planned DEV smoke test ("REGION
+    article appears in the relevant city feed for a city in Vitebskaya
+    oblast") needs at least one real City with
+    `regionId = <vitebskaya-oblast id>` to exist on DEV first — either
+    seed one, or set `regionId` on an existing DEV city that's actually
+    in that oblast. Not done in this task: inventing city data (coords,
+    metro flags, etc.) beyond the region reference rows themselves was
+    judged out of the minimal-scope instruction.
+- Current state: REGION scope shipped (schema, validation, editor,
+  discovery for CITY/journal/tags surfaces); the three items above are
+  deliberately not addressed.
+- Dependencies: none blocking; (3) blocks a specific owner smoke-test
+  scenario until a Vitebsk-region city exists on DEV.
+- Acceptance criteria: (1) admin list shows a region label for REGION
+  articles; (2) continuous-reading has an explicit REGION policy decision
+  and implementation; (3) DEV has at least one City per Belarusian oblast
+  (or at minimum Vitebskaya) with `regionId` set.
+- Source: Article REGION geo scope feature (2026-08-20)
