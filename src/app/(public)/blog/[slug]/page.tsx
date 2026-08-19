@@ -1,5 +1,6 @@
 /**
- * /blog/[slug] — COUNTRY-scope articles only.
+ * /blog/[slug] — REGION- and COUNTRY-scope articles (they share this
+ * national URL namespace; cityId IS NULL for both).
  *
  * If the slug belongs to a CITY article (geoScope === CITY), issue a
  * 308 permanent redirect to /{city}/blog/{slug}.
@@ -86,7 +87,7 @@ async function resolveCityRedirect(slug: string): Promise<string | null> {
 }
 
 async function getArticle(slug: string): Promise<ArticleVm | null> {
-  // COUNTRY scope only: cityId IS NULL
+  // REGION/COUNTRY scope: cityId IS NULL
   const resolved = await findArticleBySlug(slug, null);
   if (resolved) {
     const a = await prisma.article.findUnique({
@@ -173,7 +174,7 @@ export async function generateMetadata({
   }
 
   const publicBase = getCanonicalPublicAppUrl();
-  // COUNTRY scope (cityId = null)
+  // REGION/COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const article = await prisma.article.findUnique({
@@ -314,7 +315,7 @@ export default async function ArticlePage({
 
   const user = await getCurrentUser();
   const canEditPublishedArticle = user?.role === "ADMIN" || user?.role === "MODERATOR";
-  // COUNTRY scope (cityId = null)
+  // REGION/COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const schemaArticle = await getArticleSchemaData(mvp.id);

@@ -531,7 +531,7 @@ export function NewsPublicationEditor({
     }
     setAuthorError(null);
     // Validate geo scope before publishing.
-    const geoValidation = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    const geoValidation = validateArticleGeoScope({ geoScope, cityId, regionId: null, strict: true });
     if (!geoValidation.ok) {
       setGeoScopeError(geoValidation.message);
       return;
@@ -606,7 +606,7 @@ export function NewsPublicationEditor({
     }
     setAuthorError(null);
     if (action === "publish") {
-      const geoValidation = validateArticleGeoScope({ geoScope, cityId, strict: true });
+      const geoValidation = validateArticleGeoScope({ geoScope, cityId, regionId: null, strict: true });
       if (!geoValidation.ok) {
         setGeoScopeError(geoValidation.message);
         return;

@@ -39,6 +39,7 @@ function toSnapshot(row: {
   categoryId: string | null;
   geoScope: GeoScope | null;
   cityId: string | null;
+  regionId: string | null;
   status: ContentStatus;
   publishedAt: Date | null;
   scheduledAt: Date | null;
@@ -72,6 +73,7 @@ function toSnapshot(row: {
     categoryId: row.categoryId,
     geoScope: row.geoScope,
     cityId: row.cityId,
+    regionId: row.regionId,
     status: row.status,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
@@ -114,6 +116,7 @@ const articleSelect = {
   seoRobots: true,
   geoScope: true,
   cityId: true,
+  regionId: true,
   categoryId: true,
   tags: {
     select: { id: true },
@@ -137,39 +140,43 @@ async function assertArticleCategoryValid(categoryId: string | null): Promise<vo
   }
 }
 
-function resolvedGeoScopeCityId(input: ArticleSaveInput): {
+function resolvedGeoScope(input: ArticleSaveInput): {
   geoScope: GeoScope | null | undefined;
   cityId: string | null | undefined;
+  regionId: string | null | undefined;
 } {
   if (input.geoScope === undefined) {
-    return { geoScope: undefined, cityId: undefined };
+    return { geoScope: undefined, cityId: undefined, regionId: undefined };
   }
   if (input.geoScope === null) {
-    return { geoScope: null, cityId: null };
+    return { geoScope: null, cityId: null, regionId: null };
   }
   if (input.geoScope === "COUNTRY") {
-    return { geoScope: "COUNTRY", cityId: null };
+    return { geoScope: "COUNTRY", cityId: null, regionId: null };
   }
-  return { geoScope: "CITY", cityId: input.cityId?.trim() || null };
+  if (input.geoScope === "REGION") {
+    return { geoScope: "REGION", cityId: null, regionId: input.regionId?.trim() || null };
+  }
+  return { geoScope: "CITY", cityId: input.cityId?.trim() || null, regionId: null };
 }
 
 async function applyArticleGeoScope(
   id: string,
   input: ArticleSaveInput,
-): Promise<{ geoScope: GeoScope | null; cityId: string | null } | null> {
-  const resolved = resolvedGeoScopeCityId(input);
+): Promise<{ geoScope: GeoScope | null; cityId: string | null; regionId: string | null } | null> {
+  const resolved = resolvedGeoScope(input);
   if (resolved.geoScope === undefined) return null;
   if (resolved.geoScope === null) {
     await prisma.$executeRaw(
       Prisma.sql`UPDATE "Article"
-        SET "geoScope" = NULL, "cityId" = NULL, "cityContext" = NULL
+        SET "geoScope" = NULL, "cityId" = NULL, "regionId" = NULL, "cityContext" = NULL
         WHERE id = ${id}`,
     );
-    return { geoScope: null, cityId: null };
+    return { geoScope: null, cityId: null, regionId: null };
   }
 
   let cityContext: string | null = input.cityContext;
-  if (resolved.geoScope === "COUNTRY") {
+  if (resolved.geoScope === "COUNTRY" || resolved.geoScope === "REGION") {
     cityContext = null;
   } else if (resolved.cityId) {
     const city = await prisma.city.findUnique({
@@ -183,19 +190,24 @@ async function applyArticleGeoScope(
     Prisma.sql`UPDATE "Article"
       SET "geoScope" = ${resolved.geoScope}::"GeoScope",
           "cityId" = ${resolved.cityId},
+          "regionId" = ${resolved.regionId},
           "cityContext" = ${cityContext}
       WHERE id = ${id}`,
   );
 
-  return { geoScope: resolved.geoScope, cityId: resolved.cityId ?? null };
+  return {
+    geoScope: resolved.geoScope,
+    cityId: resolved.cityId ?? null,
+    regionId: resolved.regionId ?? null,
+  };
 }
 
 async function fetchArticleGeoScope(
   id: string,
-): Promise<{ geoScope: GeoScope | null; cityId: string | null }> {
+): Promise<{ geoScope: GeoScope | null; cityId: string | null; regionId: string | null }> {
   const row = await prisma.article.findUnique({
     where: { id },
-    select: { geoScope: true, cityId: true },
+    select: { geoScope: true, cityId: true, regionId: true },
   });
   if (!row) throw new Error("Article not found");
   return row;
@@ -204,14 +216,15 @@ async function fetchArticleGeoScope(
 function assertGeoScopeValidForPublish(
   geoScope: GeoScope | null,
   cityId: string | null,
+  regionId: string | null,
 ): void {
-  const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+  const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict: true });
   if (!result.ok) throw new Error(result.message);
 }
 
 async function assertArticleGeoScopeValidForPublish(id: string): Promise<void> {
   const row = await fetchArticleGeoScope(id);
-  assertGeoScopeValidForPublish(row.geoScope, row.cityId);
+  assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
 }
 
 async function fetchArticleMvpEditorialColumns(id: string): Promise<{
@@ -336,13 +349,17 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
   const publishedAt = input.publishedAt ? new Date(input.publishedAt) : null;
   const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
   const seoOgImageResolved = coverUrl ?? null;
-  const resolvedGeo = resolvedGeoScopeCityId(input);
+  const resolvedGeo = resolvedGeoScope(input);
 
   if (isPublishLikeStatus(input.status)) {
     if (input.geoScope == null) {
       throw new Error(ARTICLE_GEO_SCOPE_MESSAGES.scopeRequired);
     }
-    assertGeoScopeValidForPublish(resolvedGeo.geoScope ?? null, resolvedGeo.cityId ?? null);
+    assertGeoScopeValidForPublish(
+      resolvedGeo.geoScope ?? null,
+      resolvedGeo.cityId ?? null,
+      resolvedGeo.regionId ?? null,
+    );
   }
   await assertArticleCategoryValid(input.categoryId);
 
@@ -401,18 +418,20 @@ export async function saveArticleDraft(
   input: ArticleSaveInput,
 ): Promise<ArticleEditorSnapshot> {
   const perf = createRequestPerf("save-article:service:update");
-  const resolvedGeo = resolvedGeoScopeCityId(input);
+  const resolvedGeo = resolvedGeoScope(input);
   const currentGeo = await fetchArticleGeoScope(id);
   const effectiveGeoScope =
     resolvedGeo.geoScope !== undefined ? resolvedGeo.geoScope : currentGeo.geoScope;
   const effectiveCityId =
     resolvedGeo.geoScope !== undefined ? (resolvedGeo.cityId ?? null) : currentGeo.cityId;
+  const effectiveRegionId =
+    resolvedGeo.geoScope !== undefined ? (resolvedGeo.regionId ?? null) : currentGeo.regionId;
 
   if (isPublishLikeStatus(input.status)) {
     if (input.geoScope == null) {
       throw new Error(ARTICLE_GEO_SCOPE_MESSAGES.scopeRequired);
     }
-    assertGeoScopeValidForPublish(effectiveGeoScope, effectiveCityId);
+    assertGeoScopeValidForPublish(effectiveGeoScope, effectiveCityId, effectiveRegionId);
   }
   await assertArticleCategoryValid(input.categoryId);
 

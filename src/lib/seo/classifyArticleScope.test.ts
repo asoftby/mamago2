@@ -10,6 +10,9 @@ assert.deepEqual(classifyArticleScope({ geoScope: "COUNTRY", cityId: "city-minsk
 
 assert.deepEqual(classifyArticleScope({ geoScope: "CITY", cityId: "city-minsk" }), { scope: "CITY", cityId: "city-minsk" });
 
+// REGION shares the national /blog/{slug} namespace with COUNTRY → also GLOBAL.
+assert.deepEqual(classifyArticleScope({ geoScope: "REGION", cityId: null }), { scope: "GLOBAL" });
+
 // CITY declared but no cityId (shouldn't happen — DB CHECK constraint — but
 // never crash, never guess a city).
 assert.deepEqual(classifyArticleScope({ geoScope: "CITY", cityId: null }), { scope: "UNKNOWN" });

@@ -65,6 +65,7 @@ export async function listCityHomeArticles(city: {
   id: string;
   slug: string;
   name: string;
+  regionId?: string | null;
 }): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
@@ -74,6 +75,8 @@ export async function listCityHomeArticles(city: {
       OR: [
         // CITY-scoped articles for this city
         { geoScope: "CITY", cityId: city.id },
+        // REGION-scoped articles relevant to this city's region
+        ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
         // Breaking news: country-scope articles shown on every city home
         { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" },
       ],

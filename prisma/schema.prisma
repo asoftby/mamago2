@@ -709,6 +709,7 @@ model Region {
   isActive  Boolean    @default(false)
   priority  Int        @default(0)
   cities    City[]
+  articles  Article[]  @relation("ArticleRegion")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -2683,10 +2684,13 @@ model Article {
   /// Отображаемое имя автора (если не привязан User)
   authorLabel        String?
   cityContext        String?
-  /// FK to the city this article belongs to (null = country-scope article)
+  /// FK to the city this article belongs to (null = non-CITY-scope article)
   cityId             String?
   city               City?                @relation("ArticleCity", fields: [cityId], references: [id], onDelete: SetNull)
-  /// CITY = local article served at /{city}/blog/{slug}; COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
+  /// FK to the region this article belongs to (null = non-REGION-scope article)
+  regionId           String?
+  region             Region?              @relation("ArticleRegion", fields: [regionId], references: [id], onDelete: SetNull)
+  /// CITY = local article at /{city}/blog/{slug}; REGION = regional article at /blog/{slug} (relevant to cities in that region); COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
   geoScope           GeoScope?
   expiresAt          DateTime?
   scheduledAt        DateTime?
@@ -2735,6 +2739,7 @@ model Article {
   @@index([authorUserId])
   @@index([coverImageId])
   @@index([cityId])
+  @@index([regionId])
   @@index([geoScope])
   @@index([relatedPlaceId])
   @@index([categoryId])
@@ -3294,6 +3299,7 @@ enum BusinessOperationalStatus {
 /// COUNTRY = national article, served at /blog/{slug}
 enum GeoScope {
   CITY
+  REGION
   COUNTRY
 }
 

@@ -19,7 +19,7 @@ interface PageProps {
 async function resolveCity(citySlug: string) {
   return findCityBySlug(citySlug.toLowerCase(), {
     isActive: true,
-    select: { id: true, slug: true, name: true },
+    select: { id: true, slug: true, name: true, regionId: true },
   });
 }
 

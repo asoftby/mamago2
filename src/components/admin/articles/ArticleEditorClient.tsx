@@ -84,6 +84,7 @@ function snapshotComparable(args: {
   tagIds: string[];
   geoScope: GeoScope | null;
   cityId: string;
+  regionId: string;
   content: ArticleContentPayload;
   status: ContentStatus;
   publishedAtLocal: string;
@@ -107,6 +108,7 @@ function applySnapshot(setters: {
   setTagIds: (v: string[]) => void;
   setGeoScope: (v: GeoScope | null) => void;
   setCityId: (v: string | null) => void;
+  setRegionId: (v: string | null) => void;
   setContent: (v: ArticleContentPayload) => void;
   setStatus: (v: ContentStatus) => void;
   setPublishedAtLocal: (v: string) => void;
@@ -127,6 +129,7 @@ function applySnapshot(setters: {
   setters.setTagIds(snap.tagIds);
   setters.setGeoScope(snap.geoScope ?? null);
   setters.setCityId(snap.cityId ?? null);
+  setters.setRegionId(snap.regionId ?? null);
   setters.setContent(snap.content);
   setters.setStatus(snap.status);
   setters.setPublishedAtLocal(toLocalDatetimeValue(snap.publishedAt));
@@ -174,7 +177,9 @@ export function ArticleEditorClient({
   const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
   const [geoScope, setGeoScope] = useState<GeoScope | null>(initial.geoScope ?? null);
   const [cityId, setCityId] = useState<string | null>(initial.cityId ?? null);
+  const [regionId, setRegionId] = useState<string | null>(initial.regionId ?? null);
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [regions, setRegions] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; label: string; slug: string }[]>([]);
   const [discoveryTags, setDiscoveryTags] = useState<
     { id: string; title: string; description: string | null; isActive: boolean }[]
@@ -206,6 +211,7 @@ export function ArticleEditorClient({
       tagIds: initial.tagIds,
       geoScope: initial.geoScope ?? null,
       cityId: initial.cityId ?? "",
+      regionId: initial.regionId ?? "",
       content: initial.content,
       status: initial.status,
       publishedAtLocal: toLocalDatetimeValue(initial.publishedAt),
@@ -230,6 +236,7 @@ export function ArticleEditorClient({
         tagIds,
         geoScope,
         cityId: cityId ?? "",
+        regionId: regionId ?? "",
         content,
         status,
         publishedAtLocal,
@@ -250,6 +257,7 @@ export function ArticleEditorClient({
       tagIds,
       geoScope,
       cityId,
+      regionId,
       content,
       status,
       publishedAtLocal,
@@ -278,11 +286,13 @@ export function ArticleEditorClient({
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
+        regions?: { id: string; name: string; slug: string }[];
         authors?: { id: string; label: string; email: string }[];
         categories?: { id: string; label: string; slug: string }[];
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
+      setRegions(data.regions ?? []);
       setCategories(data.categories ?? []);
 
       const selectedIds = initial.tagIds.join(",");
@@ -351,6 +361,7 @@ export function ArticleEditorClient({
       setTagIds,
       setGeoScope,
       setCityId,
+      setRegionId,
       setContent,
       setStatus,
       setPublishedAtLocal,
@@ -387,7 +398,7 @@ export function ArticleEditorClient({
   );
 
   const validateGeoScopeForPublish = useCallback((): boolean => {
-    const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict: true });
     if (!result.ok) {
       setGeoScopeError(result.message);
       setError(result.message);
@@ -396,7 +407,7 @@ export function ArticleEditorClient({
     }
     setGeoScopeError(null);
     return true;
-  }, [geoScope, cityId]);
+  }, [geoScope, cityId, regionId]);
 
   const payload = useMemo(
     () => ({
@@ -413,6 +424,7 @@ export function ArticleEditorClient({
       tagIds,
       geoScope,
       cityId,
+      regionId,
       status,
       publishedAt: fromLocalDatetimeValue(publishedAtLocal),
       scheduledAt: fromLocalDatetimeValue(scheduledAtLocal),
@@ -436,6 +448,7 @@ export function ArticleEditorClient({
       tagIds,
       geoScope,
       cityId,
+      regionId,
       status,
       publishedAtLocal,
       scheduledAtLocal,
@@ -448,9 +461,9 @@ export function ArticleEditorClient({
 
   useEffect(() => {
     if (!geoScopeError) return;
-    const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict: true });
     if (result.ok) setGeoScopeError(null);
-  }, [geoScope, cityId, geoScopeError]);
+  }, [geoScope, cityId, regionId, geoScopeError]);
 
   const persistComparableFromSnapshot = useCallback((snap: ArticleEditorSnapshot) => {
     savedComparableRef.current = snapshotComparable({
@@ -464,6 +477,7 @@ export function ArticleEditorClient({
       tagIds: snap.tagIds,
       geoScope: snap.geoScope ?? null,
       cityId: snap.cityId ?? "",
+      regionId: snap.regionId ?? "",
       content: snap.content,
       status: snap.status,
       publishedAtLocal: toLocalDatetimeValue(snap.publishedAt),
@@ -879,8 +893,8 @@ export function ArticleEditorClient({
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="article-geo-scope">Охват статьи</Label>
               <p className="text-xs text-muted-foreground">
-                Обязательно перед публикацией. Городская статья — в разделе города; национальная — на
-                /blog/&#123;slug&#125;.
+                Обязательно перед публикацией. Городская статья — в разделе города; региональная и
+                национальная — на /blog/&#123;slug&#125;.
               </p>
               {hydrated ? (
                 <Select
@@ -889,13 +903,20 @@ export function ArticleEditorClient({
                     if (v === "__unset__") {
                       setGeoScope(null);
                       setCityId(null);
+                      setRegionId(null);
                       setCityContext("");
                       return;
                     }
                     const scope = v as GeoScope;
                     setGeoScope(scope);
-                    if (scope === "COUNTRY") {
+                    if (scope === "CITY") {
+                      setRegionId(null);
+                    } else if (scope === "REGION") {
                       setCityId(null);
+                      setCityContext("");
+                    } else {
+                      setCityId(null);
+                      setRegionId(null);
                       setCityContext("");
                     }
                   }}
@@ -906,6 +927,7 @@ export function ArticleEditorClient({
                   <SelectContent>
                     <SelectItem value="__unset__">Не выбрано</SelectItem>
                     <SelectItem value="CITY">Городская (CITY)</SelectItem>
+                    <SelectItem value="REGION">Региональная (REGION)</SelectItem>
                     <SelectItem value="COUNTRY">Национальная (COUNTRY)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -951,6 +973,39 @@ export function ArticleEditorClient({
                 ) : (
                   <div
                     id="article-city"
+                    className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
+                    aria-hidden
+                  >
+                    …
+                  </div>
+                )}
+              </div>
+            ) : null}
+            {geoScope === "REGION" ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="article-region">Область</Label>
+                {hydrated ? (
+                  <Select
+                    value={regionId ?? "__none__"}
+                    onValueChange={(v) => {
+                      setRegionId(v === "__none__" ? null : v);
+                    }}
+                  >
+                    <SelectTrigger id="article-region" className="w-full">
+                      <SelectValue placeholder="Выберите область" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Не выбрана</SelectItem>
+                      {regions.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div
+                    id="article-region"
                     className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
                     aria-hidden
                   >

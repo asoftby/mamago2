@@ -16,7 +16,7 @@ type PageProps = {
 async function resolveCity(citySlug: string) {
   return findCityBySlug(citySlug.toLowerCase(), {
     isActive: true,
-    select: { id: true, slug: true, name: true },
+    select: { id: true, slug: true, name: true, regionId: true },
   });
 }
 
@@ -44,6 +44,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string) {
       OR: [
         { geoScope: "COUNTRY" },
         { geoScope: "CITY", cityId: city.id },
+        ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
       ],
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],

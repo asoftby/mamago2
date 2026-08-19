@@ -20,6 +20,7 @@ export type ArticleEditorSnapshot = {
   /** null in UI = охват ещё не выбран (черновик). */
   geoScope: GeoScope | null;
   cityId: string | null;
+  regionId: string | null;
   status: ContentStatus;
   publishedAt: string | null;
   scheduledAt: string | null;
@@ -53,6 +54,7 @@ export type ArticleSaveInput = {
   /** undefined = не менять в БД; null = охват не выбран. */
   geoScope?: GeoScope | null;
   cityId?: string | null;
+  regionId?: string | null;
   status: ContentStatus;
   publishedAt: string | null;
   scheduledAt: string | null;
