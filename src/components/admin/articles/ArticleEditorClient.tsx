@@ -575,7 +575,12 @@ export function ArticleEditorClient({
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
         else setLastSavedAt(Date.now());
         if (!opts?.silent) {
-          showArticleSuccess("draft_saved", next.id, next, true);
+          showArticleSuccess(
+            next.status === "PUBLISHED" ? "changes_published" : "draft_saved",
+            next.id,
+            next,
+            true,
+          );
         }
         router.refresh();
         return true;

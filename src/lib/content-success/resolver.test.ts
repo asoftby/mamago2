@@ -95,9 +95,10 @@ const publicPublished = resolveContentSuccessState({
   returnTo: "/minsk/offers/offer-1",
 });
 assert.ok(publicPublished);
+assert.equal(publicPublished.title, "Публикация обновлена");
 assert.equal(publicPublished.listAction, null);
 assert.deepEqual(publicPublished.openAction, {
-  label: "Открыть публикацию",
+  label: "Смотреть публикацию",
   href: "/minsk/offers/offer-1",
   target: "_self",
 });
@@ -107,7 +108,7 @@ assert.equal(
 );
 assert.equal(
   publicPublished.description,
-  "Изменения доступны пользователям. Можно открыть публикацию или продолжить редактирование.",
+  "Изменения доступны пользователям. Можно смотреть публикацию или продолжить редактирование.",
 );
 
 const publicDraft = resolveContentSuccessState({
