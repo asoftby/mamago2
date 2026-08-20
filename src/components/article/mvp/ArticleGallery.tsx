@@ -25,6 +25,13 @@ const WINDOW_SIZE = 3;
 /** Article body width used elsewhere in this renderer to calibrate `sizes`. */
 const ARTICLE_WIDTH_PX = 720;
 
+/**
+ * `.article-body img` (globals: width 100%, border-radius 1rem, margin 2em 0) is meant for the
+ * single-image block and outranks our Tailwind classes on specificity — inline styles are the
+ * only reliable way to opt this component's own images out of it.
+ */
+const RESET_ARTICLE_BODY_IMG_STYLE = { margin: 0, borderRadius: 0 } as const;
+
 function GalleryImg({
   image,
   sizes,
@@ -48,6 +55,7 @@ function GalleryImg({
       fill
       sizes={sizes}
       className={cn("object-cover", className)}
+      style={RESET_ARTICLE_BODY_IMG_STYLE}
       unoptimized={isAppMediaUrl(image.url)}
     />
   );
@@ -186,6 +194,7 @@ function ArticleGalleryLightbox({
             alt={current.alt ?? ""}
             aria-describedby={current.caption ? "article-gallery-lightbox-caption" : undefined}
             className="max-h-[80vh] w-auto max-w-[92vw] object-contain"
+            style={{ ...RESET_ARTICLE_BODY_IMG_STYLE, width: "auto" }}
           />
         ) : (
           <div className="flex h-64 w-64 items-center justify-center rounded-xl bg-white/10 text-sm text-white/70">
