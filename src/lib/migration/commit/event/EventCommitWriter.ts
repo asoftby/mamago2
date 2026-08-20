@@ -75,6 +75,7 @@ export class EventCommitWriter {
         organizerId: draft.organizerId,
         eventCategoryId: draft.eventCategoryId,
         scheduleMode: draft.scheduleMode,
+        schedulingKind: draft.schedulingKind,
         scheduleJson: draft.scheduleJson as unknown as Prisma.InputJsonValue,
         priceText: draft.priceText,
       },

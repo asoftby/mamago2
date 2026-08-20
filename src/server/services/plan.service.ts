@@ -52,6 +52,7 @@ export type PlanItemWithActivity = {
   planRouteSlug?: string | null;
   placeId?: string | null;
   planPlaceSlug?: string | null;
+  articleId?: string | null;
   date: string;
   startsAt: Date | null;
   title: string | null;

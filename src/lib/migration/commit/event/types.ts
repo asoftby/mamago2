@@ -62,6 +62,8 @@ export interface EventCreateDraft {
   eventCategoryId: string | null;
   /** A literal subset of Prisma's `ScheduleMode` — the only two modes `normalizeEvent()` ever produces. */
   scheduleMode: NormalizedEventScheduleDraft["mode"];
+  /** Import source has no explicit SLOT/WINDOW semantics; never infer it. */
+  schedulingKind: null;
   scheduleJson: NormalizedEventScheduleDraft;
   /** From `candidate.priceRaw`, verbatim — no parsing into `priceFrom`/`priceTo`, no `priceDetails` fabrication. */
   priceText: string | null;

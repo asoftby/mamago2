@@ -3,7 +3,15 @@ import { Prisma, type DayScenario, type DayScenarioItemOverride } from "@prisma/
 import { prisma } from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 
-type FingerprintSource = { id: string; startsAt: Date | null };
+export type FingerprintSource = {
+  id: string;
+  activityId?: string | null;
+  routeId?: string | null;
+  placeId?: string | null;
+  articleId?: string | null;
+  date?: string;
+  startsAt: Date | null;
+};
 
 const scenarioActivitySelect = {
   id: true,
@@ -13,6 +21,8 @@ const scenarioActivitySelect = {
   coverImageUrl: true,
   ageLabel: true,
   scheduleMode: true,
+  schedulingKind: true,
+  scheduleJson: true,
   place: {
     select: {
       shortAddress: true,
@@ -54,7 +64,7 @@ export type ScenarioPlanItem = {
     | (Prisma.ActivityGetPayload<{ select: typeof scenarioActivitySelect }> & {
         /** Sessions falling on this PlanItem's date — a generous DB window,
          * precisely filtered by `getLocalDateKey` below. */
-        sessions: { startsAt: Date }[];
+        sessions: { id: string; startsAt: Date }[];
       })
     | null;
 };
@@ -86,7 +96,7 @@ export async function listPlanItemsByDateForScenario(
           ...scenarioActivitySelect,
           sessions: {
             where: { startsAt: { gte: windowStart, lt: windowEnd } },
-            select: { startsAt: true },
+            select: { id: true, startsAt: true },
           },
         },
       },
@@ -157,11 +167,27 @@ export async function listActivitySessionsForPlanItems(
  * hash — just enough to answer "does My Plan still match what the
  * Scenario was built from".
  */
-export function computePlanFingerprint(items: FingerprintSource[]): string {
+export function computePlanFingerprint(
+  items: FingerprintSource[],
+  overrides: ReadonlyMap<string, Date> = new Map(),
+  acceptedConflictKeys: readonly string[] = [],
+): string {
   const parts = items
-    .map((item) => `${item.id}:${item.startsAt ? item.startsAt.toISOString() : ""}`)
+    .map((item) => JSON.stringify({
+      id: item.id,
+      activityId: item.activityId ?? null,
+      routeId: item.routeId ?? null,
+      placeId: item.placeId ?? null,
+      articleId: item.articleId ?? null,
+      date: item.date ?? null,
+      startsAt: item.startsAt?.toISOString() ?? null,
+      overrideStartsAt: overrides.get(item.id)?.toISOString() ?? null,
+    }))
     .sort();
-  return createHash("sha256").update(parts.join("|")).digest("hex").slice(0, 32);
+  return createHash("sha256")
+    .update(JSON.stringify({ items: parts, acceptedConflictKeys: [...acceptedConflictKeys].sort() }))
+    .digest("hex")
+    .slice(0, 32);
 }
 
 export function getDayScenario(userId: string, date: string): Promise<DayScenario | null> {
@@ -209,9 +235,13 @@ export async function refreshDayScenario(
   const existing = await getDayScenario(userId, date);
   if (!existing) return null;
 
+  const overrides = await listScenarioItemOverrides(existing.id);
+
   return prisma.dayScenario.update({
     where: { userId_date: { userId, date } },
-    data: { planFingerprint: computePlanFingerprint(items) },
+    data: {
+      planFingerprint: computePlanFingerprint(items, overrides, existing.acceptedConflictKeys),
+    },
   });
 }
 

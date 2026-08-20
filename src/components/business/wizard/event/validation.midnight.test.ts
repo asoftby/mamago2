@@ -79,4 +79,18 @@ function hasTimeOrderError(data: EventFormData): boolean {
   assert.equal(hasTimeOrderError(data), true);
 }
 
+// Explicit SLOT cannot be saved incomplete, while WINDOW/legacy UNKNOWN are
+// not reclassified or blocked by the SLOT-only completeness contract.
+{
+  const slot = withSchedule({ startTime: "12:00", endTime: "" });
+  slot.schedulingKind = "SLOT";
+  assert.ok(validateStep(5, slot).errors.some((error) => error.includes("события в конкретное время")));
+
+  const window = { ...slot, schedulingKind: "WINDOW" as const };
+  assert.ok(!validateStep(5, window).errors.some((error) => error.includes("события в конкретное время")));
+
+  const unknown = { ...slot, schedulingKind: null };
+  assert.ok(!validateStep(5, unknown).errors.some((error) => error.includes("события в конкретное время")));
+}
+
 console.log("validation.midnight tests: OK");

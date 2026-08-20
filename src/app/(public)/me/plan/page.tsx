@@ -60,28 +60,43 @@ export default async function PlanPage() {
   // own "План изменился" reconciliation).
   const dayScenarios = await prisma.dayScenario.findMany({
     where: { userId: user.id },
-    select: { id: true, date: true, planFingerprint: true },
+    select: { id: true, date: true, planFingerprint: true, acceptedConflictKeys: true },
   });
-  const itemsByDateForFingerprint = new Map<string, { id: string; startsAt: Date | null }[]>();
+  const scenarioOverridesByPlanItemId = await listScenarioItemOverridesForScenarios(
+    dayScenarios.map((s) => s.id),
+  );
+  const itemsByDateForFingerprint = new Map<string, Array<{
+    id: string;
+    activityId: string | null;
+    routeId?: string | null;
+    placeId?: string | null;
+    articleId?: string | null;
+    date: string;
+    startsAt: Date | null;
+  }>>();
   for (const item of planItems) {
     const list = itemsByDateForFingerprint.get(item.date) ?? [];
-    list.push({ id: item.id, startsAt: item.startsAt });
+    list.push({
+      id: item.id,
+      activityId: item.activityId,
+      routeId: item.routeId,
+      placeId: item.placeId,
+      articleId: item.articleId,
+      date: item.date,
+      startsAt: item.startsAt,
+    });
     itemsByDateForFingerprint.set(item.date, list);
   }
   const scenarioStatusByDate: Record<string, "ready" | "changed"> = {};
   for (const scenario of dayScenarios) {
     const currentItems = itemsByDateForFingerprint.get(scenario.date) ?? [];
     scenarioStatusByDate[scenario.date] =
-      computePlanFingerprint(currentItems) === scenario.planFingerprint ? "ready" : "changed";
+      computePlanFingerprint(currentItems, scenarioOverridesByPlanItemId, scenario.acceptedConflictKeys) === scenario.planFingerprint ? "ready" : "changed";
   }
 
   // Bounded, single-query lookup of Scenario-assigned times across every
   // date this user has a Scenario for — lets My Plan show the same
   // effective time as the Scenario without mutating PlanItem.startsAt.
-  const scenarioOverridesByPlanItemId = await listScenarioItemOverridesForScenarios(
-    dayScenarios.map((s) => s.id),
-  );
-
   // Only items without an authoritative startsAt can possibly need session
   // recovery (priority 1 already resolves the rest) — batch-loaded in one
   // query, grouped by activityId + local date, same tier Scenario uses.

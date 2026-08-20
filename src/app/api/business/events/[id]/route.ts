@@ -54,6 +54,7 @@ import {
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { validateSchedulingCompleteness } from "@/lib/event/schedulingCompleteness";
 
 /**
  * GET /api/business/events/[id]
@@ -213,6 +214,7 @@ export async function PATCH(
         agePolicy: true,
         ageTags: true,
         scheduleMode: true,
+        schedulingKind: true,
         priceFrom: true,
         priceTo: true,
         priceText: true,
@@ -355,6 +357,14 @@ export async function PATCH(
 
     const scheduleJsonDirty =
       stableJsonStringify(existing.scheduleJson) !== stableJsonStringify(nextScheduleJson);
+    const effectiveSchedulingKind =
+      body.schedulingKind === "SLOT" || body.schedulingKind === "WINDOW" || body.schedulingKind === null
+        ? body.schedulingKind
+        : existing.schedulingKind;
+    const schedulingError = validateSchedulingCompleteness(effectiveSchedulingKind, nextScheduleJson);
+    if (schedulingError) {
+      return NextResponse.json({ error: schedulingError, code: "INCOMPLETE_SLOT_SCHEDULE" }, { status: 400 });
+    }
     const nextScheduleFingerprint = eventSessionScheduleFingerprint(nextScheduleJson);
     const activitySessionsNeedResync =
       eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
@@ -502,6 +512,14 @@ export async function PATCH(
 
     if (body.scheduleMode !== undefined && body.scheduleMode !== existing.scheduleMode) {
       updateData.scheduleMode = body.scheduleMode;
+    }
+
+    if (
+      body.schedulingKind !== undefined &&
+      (body.schedulingKind === null || body.schedulingKind === "SLOT" || body.schedulingKind === "WINDOW") &&
+      body.schedulingKind !== existing.schedulingKind
+    ) {
+      updateData.schedulingKind = body.schedulingKind;
     }
 
     if (scheduleJsonDirty) {

@@ -269,6 +269,16 @@ function validateStep5(data: EventFormData): ValidationResult {
   // resolveScheduleItemTimeOrder for the canonical date+time interpretation.
   // endTime === startTime stays an error (not treated as a 24h event).
   const scheduleItems = Array.isArray(data.scheduleItems) ? data.scheduleItems : [];
+  if (data.schedulingKind === "SLOT") {
+    const hasValidDuration = Number.isInteger(data.durationMinutes) &&
+      (data.durationMinutes ?? 0) >= 1 && (data.durationMinutes ?? 0) <= 600;
+    const incompleteSlot = scheduleItems.some(
+      (item) => item.allDay || !item.startTime || (!item.endTime && !hasValidDuration),
+    );
+    if (incompleteSlot) {
+      errors.push("Для события в конкретное время укажите время начала и окончания или продолжительность");
+    }
+  }
   for (const item of scheduleItems) {
     const order = resolveScheduleItemTimeOrder(item);
     if (!order.isValid) {
