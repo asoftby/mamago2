@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -90,6 +91,10 @@ export function ContinuousArticleReader({
   const viewTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const analyticsRef = useRef(createContinuousAnalyticsTracker());
   const prefetchLockRef = useRef(false);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   useEffect(() => {
     stateRef.current = state;
