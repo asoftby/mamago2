@@ -21,6 +21,7 @@ import {
 } from "@/lib/business/syncEventActivitySessions";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
+import { collectEventScheduleTimeOrderErrors } from "@/lib/business/validateEventScheduleTimeOrder";
 
 /**
  * POST /api/business/events/[id]/submit
@@ -106,6 +107,8 @@ export async function POST(
     if (!existing.coverImageId) {
       errors.push("Загрузите главное изображение");
     }
+
+    errors.push(...collectEventScheduleTimeOrderErrors(existing.scheduleJson));
 
     perf.mark("validate-fields");
 

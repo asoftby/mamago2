@@ -6,6 +6,7 @@ import { isRichTextMeaningful, getRichTextLength } from "@/lib/richtext/utils";
 import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
 import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
 import { supportsDurationForCategorySlug } from "@/lib/business/eventCategoryDuration";
+import { resolveScheduleItemTimeOrder } from "@/lib/event/scheduleItemTimeOrder";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -261,8 +262,21 @@ function validateStep5(data: EventFormData): ValidationResult {
     if (!data.endTime) {
       errors.push("Укажите время окончания");
     }
-    if (data.startTime && data.endTime && data.startTime >= data.endTime) {
-      errors.push("Время окончания должно быть позже времени начала");
+  }
+
+  // Time order per date card: endTime < startTime means the event ends after
+  // midnight the next day (e.g. 20:00 → 02:00), not an error — see
+  // resolveScheduleItemTimeOrder for the canonical date+time interpretation.
+  // endTime === startTime stays an error (not treated as a 24h event).
+  const scheduleItems = Array.isArray(data.scheduleItems) ? data.scheduleItems : [];
+  for (const item of scheduleItems) {
+    const order = resolveScheduleItemTimeOrder(item);
+    if (!order.isValid) {
+      errors.push(
+        item.date
+          ? `Время окончания должно отличаться от времени начала (дата ${item.date})`
+          : "Время окончания должно отличаться от времени начала",
+      );
     }
   }
 
