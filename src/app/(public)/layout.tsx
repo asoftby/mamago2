@@ -8,6 +8,7 @@ import { getPublicSocialLinks } from "@/lib/site/publicSocialLinks";
 import { PublicLayoutBody } from "./PublicLayoutBody";
 import { HeaderDiscoveryFiltersProviderWrapper } from "./HeaderDiscoveryFiltersProviderWrapper";
 import { PublicationIntentProvider } from "@/contexts/PublicationIntentContext";
+import { ArticleGeoLabelProvider } from "@/contexts/ArticleGeoLabelContext";
 import { RefinementFiltersProvider } from "@/contexts/RefinementFiltersContext";
 import { RefinementFiltersModalGlobal } from "@/components/discovery/RefinementFiltersModalGlobal";
 import { ReloadProbe } from "@/components/dev/ReloadProbe";
@@ -37,24 +38,26 @@ export default function PublicGroupLayout({
       <RefinementFiltersProvider>
         <ReloadProbe />
         <PublicationIntentProvider>
-          <HeaderDiscoveryFiltersProviderWrapper>
-            <DiscoveryBudgetProvider>
-              <div className="flex min-h-screen flex-col bg-background">
-                <JsonLd data={[organizationJsonLd, webSiteJsonLd]} />
-                <SiteHeader />
+          <ArticleGeoLabelProvider>
+            <HeaderDiscoveryFiltersProviderWrapper>
+              <DiscoveryBudgetProvider>
+                <div className="flex min-h-screen flex-col bg-background">
+                  <JsonLd data={[organizationJsonLd, webSiteJsonLd]} />
+                  <SiteHeader />
 
-                <PublicLayoutBody>{children}</PublicLayoutBody>
-                <FamilyDerivedAgeSync />
-                <MyPlanProvider />
-                <BetaTip />
+                  <PublicLayoutBody>{children}</PublicLayoutBody>
+                  <FamilyDerivedAgeSync />
+                  <MyPlanProvider />
+                  <BetaTip />
 
-                {/* Global Refinement Modal */}
-                <Suspense fallback={null}>
-                  <RefinementFiltersModalGlobal />
-                </Suspense>
-              </div>
-            </DiscoveryBudgetProvider>
-          </HeaderDiscoveryFiltersProviderWrapper>
+                  {/* Global Refinement Modal */}
+                  <Suspense fallback={null}>
+                    <RefinementFiltersModalGlobal />
+                  </Suspense>
+                </div>
+              </DiscoveryBudgetProvider>
+            </HeaderDiscoveryFiltersProviderWrapper>
+          </ArticleGeoLabelProvider>
         </PublicationIntentProvider>
       </RefinementFiltersProvider>
     </PublicProviders>

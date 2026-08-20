@@ -36,6 +36,13 @@ interface MobileSearchEntryProps {
   currentIntent?: Intent | null;
   /** Хаб города: как в разделах, но только «Куда» и иконка MapPin */
   cityHubOnly?: boolean;
+  /**
+   * Явный geo-лейбл вместо вычисляемой городской фразы — для страниц без
+   * городского сегмента в URL (REGION/COUNTRY статья на /blog/{slug}),
+   * где `citySlug` — не настоящая геопривязка, а лишь предпочтение по
+   * умолчанию. См. ArticleGeoLabelContext.
+   */
+  locationLabelOverride?: string | null;
   /** На посадочной публикации — иконка раздела вместо MapPin при cityHubOnly */
   showSectionIcon?: boolean;
   /** Подсказка «тапни, чтобы выбрать» — только на главной города (`/{city}`) */
@@ -50,6 +57,7 @@ export function MobileSearchEntry({
   cityHubOnly = false,
   showSectionIcon = false,
   showTapToSelectHint = false,
+  locationLabelOverride = null,
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
@@ -93,7 +101,7 @@ export function MobileSearchEntry({
 
   // Build location text
   const getLocationText = () => {
-    const cityPhrase = getCityLocativePhrase(citySlug);
+    const cityPhrase = locationLabelOverride ?? getCityLocativePhrase(citySlug);
     const nearbyPart = applied.nearby ? "Поблизости" : null;
     
     let metroOrDistrictPart: string | null = null;

@@ -43,6 +43,8 @@ import {
   loadArticleContinuousContext,
 } from "@/lib/article/nextArticleInSection";
 import { buildContinuousArticleSeed } from "@/lib/article/buildContinuousArticleSeed";
+import { resolveArticleGeoHeaderLabel } from "@/lib/article/articleGeoHeaderLabel";
+import { ArticleGeoLabelSync } from "@/components/article/ArticleGeoLabelSync";
 
 /**
  * Redirect to canonical city-scoped URL if the article is CITY-scoped.
@@ -156,6 +158,8 @@ async function getArticleSchemaData(articleId: string) {
       seoCanonicalUrl: true,
       seoJsonLdOverride: true,
       seoTitle: true,
+      geoScope: true,
+      region: { select: { name: true } },
     },
   });
 }
@@ -321,6 +325,12 @@ export default async function ArticlePage({
     const schemaArticle = await getArticleSchemaData(mvp.id);
     const publicBase = getCanonicalPublicAppUrl();
     const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
+    /** Header geo context: REGION → article's region, COUNTRY (incl. Breaking News) → «Беларусь». Never the URL-fallback city. */
+    const articleGeoLabel = resolveArticleGeoHeaderLabel({
+      geoScope: schemaArticle?.geoScope ?? "COUNTRY",
+      cityName: null,
+      regionName: schemaArticle?.region?.name ?? null,
+    });
     const canonicalUrl = resolveArticleCanonicalUrl({
       seoCanonicalUrl: schemaArticle?.seoCanonicalUrl,
       slug: mvp.slug ?? slug,
@@ -369,6 +379,7 @@ export default async function ArticlePage({
       const related = await loadRelatedBreakingNews(mvp.id);
       return (
         <>
+          <ArticleGeoLabelSync label={articleGeoLabel} />
           <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
@@ -445,6 +456,7 @@ export default async function ArticlePage({
 
       return (
         <>
+          <ArticleGeoLabelSync label={articleGeoLabel} />
           <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
@@ -467,6 +479,7 @@ export default async function ArticlePage({
 
     return (
       <>
+        <ArticleGeoLabelSync label={articleGeoLabel} />
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
         <JsonLd
           data={[articleJsonLd, breadcrumbJsonLd].filter(

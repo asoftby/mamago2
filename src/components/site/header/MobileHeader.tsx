@@ -22,6 +22,7 @@ import {
 } from "@/lib/intent";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
@@ -49,6 +50,8 @@ export function MobileHeader() {
   const currentCity = getCityFromPath(pathname);
   const { citySlug } = useCity();
   const isCityHubRoute = isCityHubPath(pathname);
+  /** REGION/COUNTRY статья на /blog/{slug} — там нет городского сегмента, citySlug ниже — не настоящая геопривязка. */
+  const articleGeoLabel = useArticleGeoLabel();
 
   const displayCity = citySlug;
   /** На главной города (`/minsk`) в URL нет раздела — не подсвечиваем «Куда пойти». */
@@ -99,6 +102,7 @@ export function MobileHeader() {
                   onSearchClick={() => setIsSearchSheetOpen(true)}
                   citySlug={displayCity}
                   currentIntent={displayIntent}
+                  locationLabelOverride={articleGeoLabel}
                 />
               </div>
 
