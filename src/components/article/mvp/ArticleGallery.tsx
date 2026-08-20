@@ -20,8 +20,13 @@ export type ArticleGalleryImage = {
   height: number | null;
 };
 
-/** Максимум фотографий, видимых одновременно в основном ряду на desktop. */
-const WINDOW_SIZE = 3;
+/** Desktop shows fixed groups of this many photos at a time — 1-3, 4-6, 7-9, ... */
+const DESKTOP_GROUP_SIZE = 3;
+
+/** Which fixed group a photo belongs to — e.g. index 4 (photo 5) belongs to the 3-6 group. */
+export function desktopGroupStartForIndex(index: number, groupSize: number = DESKTOP_GROUP_SIZE): number {
+  return Math.floor(index / groupSize) * groupSize;
+}
 /** Article body width used elsewhere in this renderer to calibrate `sizes`. */
 const ARTICLE_WIDTH_PX = 720;
 
@@ -225,48 +230,45 @@ export function ArticleGallery({
   // `md:hidden` pair alone doesn't stop the browser from loading `display:none` images, so both
   // variants would otherwise download regardless of which one is visible.
   const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [windowStart, setWindowStart] = useState(0);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Three independent notions of "current photo" — kept separate on purpose:
+  // - desktopGroupStart: which fixed group of DESKTOP_GROUP_SIZE the desktop grid shows.
+  // - mobileIndex: the mobile slider's current photo (mobile behavior is unchanged).
+  // - lightboxIndex: null when closed; otherwise the absolute index the lightbox is showing.
+  const [desktopGroupStart, setDesktopGroupStart] = useState(0);
+  const [mobileIndex, setMobileIndex] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const thumbRailRef = useRef<HTMLDivElement>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
 
-  const windowSize = Math.min(WINDOW_SIZE, total);
-
-  // Keep the visible 3-wide window covering activeIndex, adjusted during render
-  // (not in an effect) per https://react.dev/learn/you-might-not-need-an-effect.
-  const [prevActiveIndexForWindow, setPrevActiveIndexForWindow] = useState(activeIndex);
-  if (activeIndex !== prevActiveIndexForWindow) {
-    setPrevActiveIndexForWindow(activeIndex);
-    setWindowStart((prev) => {
-      if (activeIndex < prev) return activeIndex;
-      if (activeIndex > prev + windowSize - 1) return activeIndex - windowSize + 1;
-      return prev;
-    });
-  }
-
   useEffect(() => {
     const rail = thumbRailRef.current;
     if (!rail) return;
-    const activeThumb = rail.querySelector<HTMLElement>(`[data-thumb-index="${activeIndex}"]`);
-    activeThumb?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
-  }, [activeIndex]);
+    const firstThumbOfGroup = rail.querySelector<HTMLElement>(`[data-thumb-index="${desktopGroupStart}"]`);
+    firstThumbOfGroup?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+  }, [desktopGroupStart]);
 
   if (total === 0) return null;
 
+  // Lightbox always browses the full collection; opening it from either breakpoint also parks
+  // the mobile slider at that photo, matching the mobile slider's own pre-existing behavior of
+  // picking up wherever the lightbox was left — desktop's group state is never touched by this.
   const openLightbox = (index: number, trigger: HTMLElement | null) => {
     lastTriggerRef.current = trigger;
-    setActiveIndex(index);
-    setLightboxOpen(true);
+    setLightboxIndex(index);
+    setMobileIndex(index);
   };
   const closeLightbox = () => {
-    setLightboxOpen(false);
+    setLightboxIndex(null);
     lastTriggerRef.current?.focus();
   };
-  const goPrev = () => setActiveIndex((i) => Math.max(0, i - 1));
-  const goNext = () => setActiveIndex((i) => Math.min(total - 1, i + 1));
+  const handleLightboxIndexChange = (index: number) => {
+    setLightboxIndex(index);
+    setMobileIndex(index);
+  };
+  const goMobilePrev = () => setMobileIndex((i) => Math.max(0, i - 1));
+  const goMobileNext = () => setMobileIndex((i) => Math.min(total - 1, i + 1));
 
   function handleMobileTouchStart(e: React.TouchEvent) {
     touchStartXRef.current = e.touches[0].clientX;
@@ -281,13 +283,14 @@ export function ArticleGallery({
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) goNext();
-    else goPrev();
+    if (dx < 0) goMobileNext();
+    else goMobilePrev();
   }
 
-  const windowImages = images.slice(windowStart, windowStart + windowSize);
-  const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / windowSize);
-  const activeImage = images[activeIndex];
+  const groupImages = images.slice(desktopGroupStart, desktopGroupStart + DESKTOP_GROUP_SIZE);
+  const groupSize = groupImages.length;
+  const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
+  const mobileImage = images[mobileIndex];
 
   return (
     <div className="not-prose my-8 min-w-0 md:my-10">
@@ -296,13 +299,13 @@ export function ArticleGallery({
         <div
           className={cn(
             "grid gap-3",
-            windowSize === 1 && "grid-cols-1",
-            windowSize === 2 && "grid-cols-2",
-            windowSize === 3 && "grid-cols-3",
+            groupSize === 1 && "grid-cols-1",
+            groupSize === 2 && "grid-cols-2",
+            groupSize === 3 && "grid-cols-3",
           )}
         >
-          {windowImages.map((image, i) => {
-            const idx = windowStart + i;
+          {groupImages.map((image, i) => {
+            const idx = desktopGroupStart + i;
             return (
               <button
                 key={image.id}
@@ -319,36 +322,42 @@ export function ArticleGallery({
           })}
         </div>
 
-        {total > WINDOW_SIZE ? (
+        {total > DESKTOP_GROUP_SIZE ? (
           <div
             ref={thumbRailRef}
             className="mt-3 flex gap-2 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="list"
             aria-label="Миниатюры изображений"
           >
-            {images.map((image, idx) => (
-              <button
-                key={image.id}
-                type="button"
-                data-thumb-index={idx}
-                onClick={() => setActiveIndex(idx)}
-                aria-label={`Показать фото ${idx + 1} из ${total}`}
-                aria-current={idx === activeIndex}
-                className={cn(
-                  "relative h-16 shrink-0 overflow-hidden rounded-md border-2 bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  idx === activeIndex ? "border-primary" : "border-transparent",
-                )}
-                style={{ aspectRatio: "9 / 12" }}
-              >
-                {isDesktop ? <GalleryImg image={image} sizes="64px" /> : null}
-              </button>
-            ))}
+            {images.map((image, idx) => {
+              const isInCurrentGroup = idx >= desktopGroupStart && idx < desktopGroupStart + DESKTOP_GROUP_SIZE;
+              return (
+                <button
+                  key={image.id}
+                  type="button"
+                  data-thumb-index={idx}
+                  onClick={() => {
+                    const nextGroupStart = desktopGroupStartForIndex(idx);
+                    setDesktopGroupStart(nextGroupStart);
+                  }}
+                  aria-label={`Показать фото ${idx + 1} из ${total}`}
+                  aria-current={isInCurrentGroup}
+                  className={cn(
+                    "relative h-16 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/20 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isInCurrentGroup ? "opacity-100" : "opacity-50 hover:opacity-80",
+                  )}
+                  style={{ aspectRatio: "9 / 12" }}
+                >
+                  {isDesktop ? <GalleryImg image={image} sizes="64px" /> : null}
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </div>
 
       {/* Mobile: single-image slider */}
-      {activeImage ? (
+      {mobileImage ? (
         <div className="md:hidden">
           <div
             className="relative aspect-[9/12] w-full overflow-hidden rounded-xl bg-muted/20"
@@ -357,17 +366,17 @@ export function ArticleGallery({
           >
             <button
               type="button"
-              onClick={(e) => openLightbox(activeIndex, e.currentTarget)}
-              aria-label={`Открыть фото ${activeIndex + 1} из ${total}`}
+              onClick={(e) => openLightbox(mobileIndex, e.currentTarget)}
+              aria-label={`Открыть фото ${mobileIndex + 1} из ${total}`}
               className="absolute inset-0"
             >
-              {!isDesktop ? <GalleryImg image={activeImage} sizes="100vw" /> : null}
+              {!isDesktop ? <GalleryImg image={mobileImage} sizes="100vw" /> : null}
             </button>
 
-            {total > 1 && activeIndex > 0 ? (
+            {total > 1 && mobileIndex > 0 ? (
               <button
                 type="button"
-                onClick={goPrev}
+                onClick={goMobilePrev}
                 aria-label="Предыдущее изображение"
                 className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
@@ -375,10 +384,10 @@ export function ArticleGallery({
               </button>
             ) : null}
 
-            {total > 1 && activeIndex < total - 1 ? (
+            {total > 1 && mobileIndex < total - 1 ? (
               <button
                 type="button"
-                onClick={goNext}
+                onClick={goMobileNext}
                 aria-label="Следующее изображение"
                 className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
@@ -388,7 +397,7 @@ export function ArticleGallery({
 
             {total > 1 ? (
               <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
-                {activeIndex + 1} / {total}
+                {mobileIndex + 1} / {total}
               </div>
             ) : null}
           </div>
@@ -397,8 +406,8 @@ export function ArticleGallery({
 
       {caption ? <p className="mt-3 px-1 text-center text-sm text-muted-foreground">{caption}</p> : null}
 
-      {lightboxOpen ? (
-        <ArticleGalleryLightbox images={images} index={activeIndex} onIndexChange={setActiveIndex} onClose={closeLightbox} />
+      {lightboxIndex !== null ? (
+        <ArticleGalleryLightbox images={images} index={lightboxIndex} onIndexChange={handleLightboxIndexChange} onClose={closeLightbox} />
       ) : null}
     </div>
   );
