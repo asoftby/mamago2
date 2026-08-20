@@ -16,11 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  LEGACY_ARTICLE_GALLERY_PRESENTATION,
-  type ArticleBlockMvp,
-  newBlock,
-} from "@/lib/publications/articleMvp";
+import { type ArticleBlockMvp, newBlock } from "@/lib/publications/articleMvp";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
@@ -335,26 +331,6 @@ export function ArticleBlocksMvpEditor({
       )}
       {block.type === "gallery" && (
         <>
-          <div className="space-y-1 max-w-sm">
-            <Label className="text-xs text-muted-foreground">Вид галереи</Label>
-            {hydrated ? (
-              <Select
-                value={block.presentation ?? LEGACY_ARTICLE_GALLERY_PRESENTATION}
-                onValueChange={(presentation: "carousel" | "mosaic" | "sequential") =>
-                  updateAt(i, { ...block, presentation })
-                }
-              >
-                <SelectTrigger aria-label="Вид галереи"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="carousel">Карусель</SelectItem>
-                  <SelectItem value="mosaic">Мозаика</SelectItem>
-                  <SelectItem value="sequential">На всю ширину по порядку</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <SelectSkeleton className="w-full" />
-            )}
-          </div>
           <ArticleEditorGalleryField
             showHeading={false}
             value={block.mediaIds}
