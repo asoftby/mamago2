@@ -237,17 +237,9 @@ export function ArticleGallery({
   const [desktopGroupStart, setDesktopGroupStart] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const thumbRailRef = useRef<HTMLDivElement>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const rail = thumbRailRef.current;
-    if (!rail) return;
-    const firstThumbOfGroup = rail.querySelector<HTMLElement>(`[data-thumb-index="${desktopGroupStart}"]`);
-    firstThumbOfGroup?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
-  }, [desktopGroupStart]);
 
   if (total === 0) return null;
 
@@ -324,7 +316,6 @@ export function ArticleGallery({
 
         {total > DESKTOP_GROUP_SIZE ? (
           <div
-            ref={thumbRailRef}
             className="mt-3 flex gap-2 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="list"
             aria-label="Миниатюры изображений"

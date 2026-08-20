@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ArticleGallery, desktopGroupStartForIndex, type ArticleGalleryImage } from "./ArticleGallery";
 import {
@@ -21,6 +22,15 @@ function makeImages(count: number): ArticleGalleryImage[] {
 
 function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
+}
+
+// Regression guard: mounting or changing a gallery group must never move the document viewport.
+// Browser coverage below the unit layer verifies the resulting scrollY behavior on the real page.
+{
+  const componentSource = readFileSync(new URL("./ArticleGallery.tsx", import.meta.url), "utf8");
+  assert.ok(!componentSource.includes("scrollIntoView"), "gallery never uses scrollIntoView");
+  assert.ok(!componentSource.includes("window.scrollTo"), "gallery never scrolls the window with scrollTo");
+  assert.ok(!componentSource.includes("window.scrollBy"), "gallery never scrolls the window with scrollBy");
 }
 
 // Block schema / editor persistence is untouched by the redesign — presentation is still stored.
