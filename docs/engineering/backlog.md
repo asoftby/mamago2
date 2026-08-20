@@ -3504,3 +3504,62 @@ P3 — cleanup / polish / optional
   and implementation; (3) DEV has at least one City per Belarusian oblast
   (or at minimum Vitebskaya) with `regionId` set.
 - Source: Article REGION geo scope feature (2026-08-20)
+
+## [BACKLOG-125] Full LOCAL/GitHub/DEV/PROD sync audit (2026-08-20) — findings
+
+- Status: OPEN
+- Priority: P2
+- Area: Git / Environment / Process
+- Added: 2026-08-20
+- Reason deferred: audit found no broken state requiring immediate action —
+  LOCAL/origin/dev/DEV are exactly in sync and PROD is stable on a known-good
+  past commit; remaining items are owner-decision/process gaps, not defects.
+- Context:
+  - LOCAL `dev` HEAD `09f0fa9e` == `origin/dev` HEAD (0 ahead/0 behind,
+    verified via `git fetch --all` + `git rev-list --left-right --count`).
+  - Live DEV (`https://dev.mamago.by/api/health`) confirmed
+    `buildId=dev-329`, `gitSha=09f0fa9ec75c18c37c928b9b5963b97153b9f9c5` —
+    exact match to LOCAL/origin/dev HEAD.
+  - Live PROD (`https://prod.mamago.by/api/health`) confirmed
+    `buildId=dev-326`, `gitSha=caa4af2171359d865fd05127704db5a428fb496a`
+    (`fix(media): remove import source leakage`) — 3 commits behind current
+    `dev` (missing: `23902410` content-success popup fix, `4f21400a`/
+    `c33bf016`/`22b9af44` Article REGION geo scope, `09f0fa9e` public header
+    REGION/COUNTRY fix). This is the expected immutable-promotion lag (PROD
+    is only promoted deliberately, not on every dev push per
+    `.github/workflows/docker.yml`) — not a defect. Confirmed no drift: the
+    PROD `gitSha` is a real ancestor commit on `origin/dev`, not an
+    off-branch hotfix.
+  - **SSH to the app host (`mamago-prod` alias → `134.17.17.134`) times out
+    from this Claude Code sandbox environment** (both normal and
+    `dangerouslyDisableSandbox` mode) — outbound TCP/22 appears blocked at
+    the network level even though HTTPS (git fetch, `gh`, `curl` to
+    `*.mamago.by`) works fine. This means `docker diff`/container-filesystem
+    verification (catching a hand-edited-in-container hotfix that wouldn't
+    show up in `gitSha`/build labels) **cannot be performed from this kind
+    of session** — only from a shell with real SSH egress to that host.
+    Prior sessions document the same host's SSH as intermittently flaky
+    (see `docs/release/dev-to-prod-checklist.md` line ~2697), so this may be
+    session/network-specific rather than a host-side problem; worth
+    confirming next time SSH is available.
+  - Stale local branches/worktrees noise: 137 local branches exist, 28 have
+    tips unreachable from any `origin/*` ref. Nearly all of these are
+    **already tracked** — see BACKLOG-001 through BACKLOG-014 (worktree/
+    branch hygiene cleanup, 2026-08-07 audit), which as of this session's
+    fresh check still accurately describe the current state (e.g.
+    `mamago2-admin-pagination` is still dirty with the same ~50-file
+    pagination WIP BACKLOG-003 describes; `mamago2-rate-limit`,
+    `mamago2-wp-legacy`, `mamago2-phoenix-checklist` still clean/unmerged as
+    BACKLOG-010/011/012 describe). None of those items were re-litigated
+    here — do not duplicate, just re-confirmed still OPEN and still
+    accurate 13 days later.
+- Current state: no changes made to any branch, worktree, or environment
+  during this audit (read-only throughout, per explicit instruction).
+- Dependencies: none blocking day-to-day `dev` work.
+- Acceptance criteria: (1) owner decides if/when to promote `dev` HEAD to
+  PROD (or confirms current PROD lag is fine); (2) next session with real
+  SSH access to `mamago-prod` runs `docker diff` on both `dev-app-1` and
+  `prod-app-1` to close the one verification gap this audit could not
+  reach; (3) BACKLOG-001–014 eventually get their owner-decision merges/
+  drops so the branch/worktree count stops growing.
+- Source: full LOCAL↔GitHub↔DEV↔PROD audit, user-requested (2026-08-20)
