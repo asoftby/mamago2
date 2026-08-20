@@ -1755,3 +1755,38 @@ timed out from the operator Mac (HTTP https://mamago.by still 200).
 Fresh `migration:scope:wordpress-db` inventory was therefore not
 written. Re-run the scope CLI before the owner-controlled import.
 ```
+
+```text
+Phase: PHOENIX INITIAL PROD IMPORT + QA/GAP AUDIT — PARTIAL, STOPPED
+2026-08-14, branch dev. No new full import during QA. No freeze/DNS/
+indexing/publish/redirect apply/cutover.
+
+Initial FULL import (earlier same day): Users 574 CREATE + 1 privileged
+collision (WP user 1 vs existing ADMIN); Places 81 PENDING; Offers 58
+DRAFT (28 source-ineligible OFFER_PLACE_RELATION_MISSING, not a second
+population); Routes 14 DRAFT/PRIVATE; Events 7 PENDING + 1
+MISSING_SCHEDULE (64586, no event_date meta; 64588 imported under the
+same title); Articles 40 PENDING / 77 blocked (55 Web Story, 19
+Elementor-only, 3 both); Reviews 20 PUBLISHED on PENDING places (5
+skipped: WP places 9860/12431/35822 status unpublished). MediaAsset
+1551 MIGRATED, MediaUsage 0, SearchDocument 0. Redirects VALIDATE 893,
+not applied.
+
+QA (read-only WP + PROD DB; admin UI not logged in). Source drift vs
+2026-08-14T10:44:34.208Z: 0. Eligible media 3656; missing 2105 of which
+1497 blocked-article-exclusive, 507 extra route-stop images, 79 imported
+article inline, 22 place, 1 offer. Storage 9534 files = 4766 real webp
++ 4767 AppleDouble `._*` from Mac tar (BACKLOG-110).
+
+Cutover completeness P1 until owner exclusion or importer work:
+77 articles, event 64586, route covers, business/profile images
+(BACKLOG-108), redirect manifest rebuild. Offers 28 and reviews 5 are
+source-ineligible unless owner expands scope. New P2/P3: BACKLOG-109
+(MediaUsage), 110 (AppleDouble), 111 (DEFAULT_LIMIT=100).
+
+Next single action: owner decisions on article conversion (A/B/C),
+event 64586 exclude-vs-fix-in-WP, offer 28 exclusion, route extra
+images/covers, privileged collision keep-ADMIN, then implement only
+approved importer extensions before final rerun. Do not rerun Phoenix
+until that approval.
+```
