@@ -43,18 +43,10 @@ export const ntSomic = localFont({
  * globals.css), used across ~60 files (weather hero, `.font-display`/
  * `.font-display-italic`, place/article editorial surfaces, etc).
  *
- * Loaded locally (Source Serif Pro, already present in
- * public/fonts/sourceserifpro/, full Cyrillic coverage confirmed in the
- * Regular/Bold faces) instead of Google Fonts' PT Serif, to remove a
- * remote fetch from `next build` — Docker builds have no route to
- * fonts.gstatic.com, which previously failed Docker Build & Push outright.
- *
- * Only normal-style faces are registered on purpose: this source's italic
- * files (`-It`, `-BoldIt`) ship with zero Cyrillic glyphs, so registering
- * them would silently drop Cyrillic text in `.font-display-italic` to a
- * different fallback font mid-heading. Browsers synthesize a readable
- * "faux italic" from the normal face instead when `font-style: italic` is
- * requested, keeping one consistent face across both scripts.
+ * Loaded locally to keep Docker builds independent from fonts.gstatic.com.
+ * Existing Source Serif Pro faces remain the normal editorial style, while
+ * every italic request resolves to the real PT Serif italic face (including
+ * Cyrillic) instead of a browser-generated slant of the surrounding font.
  */
 export const ptSerif = localFont({
   src: [
@@ -67,6 +59,16 @@ export const ptSerif = localFont({
       path: "../../public/fonts/sourceserifpro/SourceSerifPro-Bold.ttf",
       weight: "700",
       style: "normal",
+    },
+    {
+      path: "../../public/fonts/PT_Serif-Web-Italic.ttf",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "../../public/fonts/PT_Serif-Web-BoldItalic.ttf",
+      weight: "700",
+      style: "italic",
     },
   ],
   variable: "--font-pt-serif",
