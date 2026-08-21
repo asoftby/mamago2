@@ -59,8 +59,8 @@ export type RenderPolicy = {
 
 export const DEFAULT_RENDER_POLICY: RenderPolicy = {
   maxSlots: 6,
-  /** Proposed for today+running; Phase 4 may add 1–2 more contextual. */
-  minSlotsToRender: 2,
+  /** One honest collection is useful; do not hide the whole rail. */
+  minSlotsToRender: 1,
 };
 
 /** Default minItems for registry slots (today overrides to 1). */

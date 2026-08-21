@@ -12,6 +12,7 @@ import { OpeningHoursSection } from "./_sections/OpeningHoursSection";
 import { DateTimePickerSection } from "./_sections/DateTimePickerSection";
 import { LiquidNotificationsSection } from "./_sections/LiquidNotificationsSection";
 import { OfferPageSection } from "./_sections/OfferPageSection";
+import { SaveModalSection } from "./_sections/SaveModalSection";
 import Link from "next/link";
 
 export default function UiLabPage() {
@@ -59,6 +60,7 @@ export default function UiLabPage() {
           <DateTimePickerSection />
           <LiquidNotificationsSection />
           <OfferPageSection />
+          <SaveModalSection />
         </div>
       </div>
     </div>

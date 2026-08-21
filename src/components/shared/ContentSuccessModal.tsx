@@ -65,11 +65,18 @@ export function ContentSuccessModal({
           {state.openAction && openHref ? (
             <PrimaryButton className="w-full" asChild>
               {state.openAction.target === "_blank" ? (
-                <a href={openHref} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={openHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => onOpenChange(false)}
+                >
                   {state.openAction.label}
                 </a>
               ) : (
-                <Link href={openHref}>{state.openAction.label}</Link>
+                <Link href={openHref} onClick={() => onOpenChange(false)}>
+                  {state.openAction.label}
+                </Link>
               )}
             </PrimaryButton>
           ) : null}
@@ -79,7 +86,9 @@ export function ContentSuccessModal({
               className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
               asChild
             >
-              <Link href={editHref}>{state.continueEditingAction.label}</Link>
+              <Link href={editHref} onClick={() => onOpenChange(false)}>
+                {state.continueEditingAction.label}
+              </Link>
             </Button>
           ) : null}
           {state.listAction && listHref ? (
@@ -88,7 +97,9 @@ export function ContentSuccessModal({
               className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
               asChild
             >
-              <Link href={listHref}>{state.listAction.label}</Link>
+              <Link href={listHref} onClick={() => onOpenChange(false)}>
+                {state.listAction.label}
+              </Link>
             </Button>
           ) : null}
         </DialogFooter>

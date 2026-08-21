@@ -17,6 +17,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import type { PromotionPeriod } from "@/server/services/promotion/boostPerformance.service";
+import { PromotionResultsSection } from "./PromotionResultsSection";
 
 export type PublicationMetrics = {
   views: number;
@@ -31,6 +33,8 @@ interface PublicationStatisticsDialogProps {
   title: string;
   entityLabel: string;
   metrics?: PublicationMetrics | null;
+  promotionPeriods?: PromotionPeriod[];
+  repeatPromotionHref?: string;
 }
 
 const ZERO_METRICS: PublicationMetrics = {
@@ -40,37 +44,12 @@ const ZERO_METRICS: PublicationMetrics = {
   ctaClicks: 0,
 };
 
-const ACTION_LABELS = [
-  "Купить билет",
-  "Перейти на сайт",
-  "Instagram",
-  "Telegram",
-  "WhatsApp",
-  "Позвонить",
-  "Маршрут",
-  "Запись",
-];
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
 function percent(value: number) {
   return `${value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%`;
-}
-
-function actionBreakdown(total: number) {
-  if (total <= 0) return ACTION_LABELS.map((label) => ({ label, value: 0 }));
-  const weights = [0.24, 0.2, 0.13, 0.11, 0.09, 0.08, 0.08, 0.07];
-  let used = 0;
-  return ACTION_LABELS.map((label, index) => {
-    const value =
-      index === ACTION_LABELS.length - 1
-        ? Math.max(total - used, 0)
-        : Math.round(total * weights[index]);
-    used += value;
-    return { label, value };
-  });
 }
 
 function MetricCard({
@@ -98,42 +77,17 @@ function MetricCard({
   );
 }
 
-function MiniBar({ label, value, max }: { label: string; value: number; max: number }) {
-  const width = max > 0 ? Math.max((value / max) * 100, value > 0 ? 8 : 0) : 0;
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-stone-600">{label}</span>
-        <span className="font-medium tabular-nums text-stone-950">{formatNumber(value)}</span>
-      </div>
-      <div className="h-2 rounded-full bg-stone-100">
-        <div
-          className="h-2 rounded-full bg-stone-900 transition-all"
-          style={{ width: `${width}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 export function PublicationStatisticsDialog({
   open,
   onOpenChange,
   title,
   entityLabel,
   metrics,
+  promotionPeriods = [],
+  repeatPromotionHref,
 }: PublicationStatisticsDialogProps) {
   const data = metrics ?? ZERO_METRICS;
   const ctr = data.views > 0 ? (data.ctaClicks / data.views) * 100 : 0;
-  const actions = actionBreakdown(data.ctaClicks);
-  const maxAction = Math.max(...actions.map((item) => item.value), 1);
-  const dynamics = [
-    { label: "Сегодня", value: Math.round(data.views * 0.08) },
-    { label: "7 дней", value: Math.round(data.views * 0.42) },
-    { label: "30 дней", value: data.views },
-  ];
-  const maxDynamic = Math.max(...dynamics.map((item) => item.value), 1);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[88vh] overflow-y-auto rounded-[28px] border-stone-200 bg-stone-50 p-0 sm:max-w-4xl">
@@ -170,7 +124,7 @@ export function PublicationStatisticsDialog({
                 label="Добавили в план"
                 value={formatNumber(data.planAdds)}
                 icon={CalendarDays}
-                hint="Сильный intent"
+                hint="Сейчас в планах пользователей"
               />
               <MetricCard
                 label="Действия"
@@ -187,29 +141,10 @@ export function PublicationStatisticsDialog({
             </div>
           </section>
 
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-              <h3 className="mb-4 text-sm font-semibold text-stone-500">
-                Действия пользователей
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {actions.map((item) => (
-                  <MiniBar key={item.label} label={item.label} value={item.value} max={maxAction} />
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-              <h3 className="mb-4 text-sm font-semibold text-stone-500">
-                Динамика
-              </h3>
-              <div className="space-y-4">
-                {dynamics.map((item) => (
-                  <MiniBar key={item.label} label={item.label} value={item.value} max={maxDynamic} />
-                ))}
-              </div>
-            </section>
-          </div>
+          <PromotionResultsSection
+            periods={promotionPeriods}
+            repeatPromotionHref={repeatPromotionHref}
+          />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">

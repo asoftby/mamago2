@@ -18,10 +18,10 @@ import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 
 const DEFAULT_INTENTS = [
   { intent: "today",        title: "Сегодня",       order: 0, allowedTypes: ["events"] },
-  { intent: "tomorrow",     title: "Завтра",        order: 1, allowedTypes: ["events"] },
-  { intent: "weekend",      title: "Выходные",      order: 2, allowedTypes: ["events"] },
-  { intent: "breaking_news", title: "Breaking news", order: 3, allowedTypes: ["articles"] },
-  { intent: "free",         title: "Бесплатно",      order: 4, allowedTypes: ["events"] },
+  { intent: "running",      title: "Идёт сейчас",  order: 1, allowedTypes: ["events"] },
+  { intent: "free",         title: "Бесплатно",      order: 2, allowedTypes: ["events", "offers"] },
+  { intent: "lastchance",   title: "Успеть",          order: 3, allowedTypes: ["offers"] },
+  { intent: "breaking_news", title: "Breaking news", order: 4, allowedTypes: ["articles"] },
 ];
 const ACTIVE_STORY_INTENTS = DEFAULT_INTENTS.map((item) => item.intent);
 

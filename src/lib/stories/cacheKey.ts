@@ -22,6 +22,10 @@ export function storyRailSlotContentCacheKey(input: {
   return `stories:rail:slot:v2:${input.cityId}:${input.slotId}:${input.dateKey}:${input.ongoingPolicy}`;
 }
 
+export function storyRailCityCacheTag(cityId: string): string {
+  return `stories:canonical:${cityId}`;
+}
+
 /** Seconds until next local midnight in `timeZone` (min 60). */
 export function secondsUntilNextZonedMidnight(now: Date, timeZone: string): number {
   const todayKey = zonedDateKey(now, timeZone);

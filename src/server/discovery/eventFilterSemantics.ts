@@ -86,11 +86,25 @@ export function buildFreeEventWhere(): Prisma.ActivityWhereInput {
   };
 }
 
+function normalizedFreeText(priceText: string | null | undefined): boolean {
+  const text = (priceText ?? "").trim().toLowerCase();
+  return text === "бесплатно" || text === "free";
+}
+
+/**
+ * Single canonical check for "is this Activity free" — used by both the
+ * public discovery free-filter and the HomeStoryItem projection sync.
+ * Free when priceFrom=0, scheduleJson.pricingMode="free", or priceText
+ * normalizes to "бесплатно"/"free" (the wizard clears priceFrom on the
+ * free pricing mode, so priceFrom alone under-detects legit free events).
+ */
 export function isStructuredFreeEvent(input: {
   priceFrom: number | null;
+  priceText?: string | null;
   scheduleJson?: unknown;
 }): boolean {
   if (input.priceFrom === 0) return true;
+  if (normalizedFreeText(input.priceText)) return true;
   if (!input.scheduleJson || typeof input.scheduleJson !== "object") return false;
   return (input.scheduleJson as { pricingMode?: unknown }).pricingMode === "free";
 }

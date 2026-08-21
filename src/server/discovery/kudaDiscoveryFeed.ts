@@ -7,7 +7,7 @@ import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpa
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
-import { getBusinessQualityBoostMap, applyBusinessQualityBoost } from "@/server/services/ranking/businessQualityBoost";
+import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
 import {
   getWeatherRankingBoost,
   type HomeWeatherScenario,
@@ -38,8 +38,9 @@ export async function getKudaDiscoveryFeed(
 ): Promise<ActivityMock[]> {
   /** Больше кандидатов в ответе — клиент ранжирует по возрасту + показывает второй слой по engagement. */
   const take = options?.take ?? 80;
+  const now = new Date();
   const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
-  const pub = getPublicListingActivityWhere();
+  const pub = getPublicListingActivityWhere(now);
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
 
   const where: Prisma.ActivityWhereInput = {
@@ -80,6 +81,10 @@ export async function getKudaDiscoveryFeed(
       eventCategory: { select: { nameRu: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
+      boosts: {
+        where: { startAt: { lte: now }, endAt: { gt: now } },
+        select: { id: true },
+      },
     },
   });
 
@@ -121,8 +126,13 @@ export async function getKudaDiscoveryFeed(
 
   const cards = rows.map((a) => {
     const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
+    const isBoosted = a.boosts.length > 0;
     const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
-    const finalEngagement = applyBusinessQualityBoost(baseEngagement, qualityMultiplier);
+    const finalEngagement = applyActivePublicationBoost(
+      baseEngagement,
+      isBoosted,
+      qualityMultiplier,
+    );
 
     return mapDiscoveryEventToActivityMock(a, {
       ownerFirst: Boolean(currentUserId && a.ownerUserId === currentUserId),

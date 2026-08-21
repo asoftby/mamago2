@@ -13,6 +13,8 @@ export type SaveFlowContainerProps = {
   title?: string;
   /** Фиксирует высоту Dialog чтобы не прыгала при смене фаз */
   fixedHeight?: boolean;
+  /** false — фаза сама рендерит свою (inline) кнопку закрытия, контейнерная не нужна */
+  showCloseButton?: boolean;
 };
 
 /**
@@ -30,6 +32,7 @@ export function SaveFlowContainer({
   children,
   title = "Сохранить активность",
   fixedHeight = false,
+  showCloseButton = true,
 }: SaveFlowContainerProps) {
   const isDesktop = useMediaQuery("(min-width: 640px)");
   const [mounted, setMounted] = React.useState(false);
@@ -45,9 +48,9 @@ export function SaveFlowContainer({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200"
-          showCloseButton={false}
+          showCloseButton={showCloseButton}
           aria-describedby={undefined}
-          style={{ background: "#F6F2EA" }}
+          style={{ background: "#FFFFFF" }}
         >
           <DialogHeader className="sr-only">
             <DialogTitle>{title}</DialogTitle>
@@ -63,11 +66,11 @@ export function SaveFlowContainer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        showCloseButton={false}
+        showCloseButton={showCloseButton}
         className={cn(
           "fixed inset-x-0 bottom-0 flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t p-0 shadow-2xl",
         )}
-        style={{ background: "#F6F2EA", borderTopColor: "rgba(20,18,16,.10)" }}
+        style={{ background: "#FFFFFF", borderTopColor: "rgba(20,18,16,.10)" }}
       >
         <div className="flex shrink-0 justify-center pb-1 pt-3">
           <div className="h-1 w-10 rounded-full" style={{ background: "rgba(20,18,16,.18)" }} />

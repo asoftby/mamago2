@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -15,8 +16,10 @@ import { DashboardPeriodSwitcher } from "@/components/business/dashboard/Dashboa
 import { DashboardOnboarding } from "@/components/business/dashboard/DashboardOnboarding";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
+import { DailyFreeBoostCard } from "@/components/business/dashboard/DailyFreeBoostCard";
 import { TableContainer } from "@/components/ui/table";
 import type { DashboardPeriod } from "@/server/services/business/businessWorkspace.service";
+import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,6 +39,23 @@ export type DashboardData = {
   activePromotionCount: number;
   totalPublications: number;
   pausedPromotionCount: number;
+  dailyFreeBoost: {
+    availableToday: boolean;
+    candidates: Array<{
+      id: string;
+      title: string;
+      publicationType: "EVENT" | "OFFER";
+    }>;
+    boost: null | {
+      id: string;
+      publicationId: string;
+      publicationType: "EVENT" | "OFFER";
+      publicationTitle: string;
+      startAt: string;
+      endAt: string;
+      metrics: { views: number; saves: number; ctaClicks: number };
+    };
+  };
   // Inbox preview
   inboxPreview: Array<{
     id: string;
@@ -200,12 +220,26 @@ function PublicationsCard({
 
   return (
     <BusinessSurfaceCard className="flex flex-col gap-4 p-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Публикации и продвижение</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">
+        {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled
+          ? "Публикации и продвижение"
+          : "Публикации"}
+      </p>
 
       {noPublications ? (
         <div>
           <p className="text-2xl font-semibold text-stone-400">Нет публикаций</p>
           <p className="mt-2 text-sm text-stone-500">Создайте первую публикацию, чтобы начать получать спрос</p>
+        </div>
+      ) : !BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled ? (
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold tracking-tight text-stone-950">{totalPublications}</span>
+            <span className="text-sm text-stone-500">публикаций</span>
+          </div>
+          <p className="text-sm text-stone-500">
+            Следите за просмотрами, сохранениями и обращениями ниже.
+          </p>
         </div>
       ) : noPromotion ? (
         <div className="space-y-2">
@@ -233,7 +267,7 @@ function PublicationsCard({
         </div>
       )}
 
-      <Link
+      {(noPublications || BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled) && <Link
         href={noPublications ? newPublicationHref : promotionHref}
         className="mt-auto inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 hover:border-stone-300 self-start"
       >
@@ -242,7 +276,7 @@ function PublicationsCard({
           : noPromotion
             ? "Promotion недоступен"
             : "История Promotion"}
-      </Link>
+      </Link>}
     </BusinessSurfaceCard>
   );
 }
@@ -335,6 +369,14 @@ function PublicationsSection({
   items: DashboardData["topPublications"];
   publicationsHref: string;
 }) {
+  const hasEvents = items.some((item) => item.type === "event");
+  const hasOffers = items.some((item) => item.type === "offer");
+  const actionColumnLabel = hasEvents && hasOffers
+    ? "В план / Лиды"
+    : hasEvents
+      ? "Добавили в план"
+      : "Лиды";
+
   return (
     <BusinessSurfaceCard className="p-6">
       <div className="mb-4 flex items-center justify-between">
@@ -358,14 +400,14 @@ function PublicationsSection({
           </Link>
         </div>
       ) : (
-        <TableContainer minWidthClassName="min-w-[520px]" scrollLabel="Таблица публикаций, прокручивается по горизонтали">
+        <TableContainer minWidthClassName="min-w-[760px]" scrollLabel="Таблица публикаций, прокручивается по горизонтали">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-stone-100">
                 <th className="pb-3 text-left text-xs font-medium text-stone-400">Название</th>
-                <th className="pb-3 text-right text-xs font-medium text-stone-400">Просмотры</th>
-                <th className="pb-3 text-right text-xs font-medium text-stone-400">Лиды</th>
-                <th className="pb-3 text-right text-xs font-medium text-stone-400">Сохранения</th>
+                <th className="w-36 pb-3 text-center text-xs font-medium text-stone-400">Просмотры</th>
+                <th className="w-36 pb-3 text-center text-xs font-medium text-stone-400">{actionColumnLabel}</th>
+                <th className="w-36 pb-3 text-center text-xs font-medium text-stone-400">Сохранения</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-50">
@@ -379,12 +421,12 @@ function PublicationsSection({
                       {pub.type === "event" ? "Событие" : "Предложение"}
                     </p>
                   </td>
-                  <td className="py-3 text-right tabular-nums text-stone-600">{pub.metrics.views}</td>
-                  <td className="py-3 text-right tabular-nums font-medium text-stone-800">
-                    {pub.metrics.ctaClicks}
+                  <td className="w-36 py-3 text-center tabular-nums text-stone-600">{pub.metrics.views}</td>
+                  <td className="w-36 py-3 text-center tabular-nums font-medium text-stone-800">
+                    {pub.type === "event" ? pub.metrics.planAdds : pub.metrics.ctaClicks}
                   </td>
-                  <td className="py-3 text-right tabular-nums text-stone-600">
-                    {pub.metrics.saves + pub.metrics.planAdds}
+                  <td className="w-36 py-3 text-center tabular-nums text-stone-600">
+                    {pub.metrics.saves}
                   </td>
                 </tr>
               ))}
@@ -405,6 +447,26 @@ interface DashboardClientProps {
 
 export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function updatePeriod(nextPeriod: DashboardPeriod) {
+    setPeriod(nextPeriod);
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("period", nextPeriod);
+    query.delete("from");
+    query.delete("to");
+    router.replace(`${pathname}?${query.toString()}`, { scroll: false });
+  }
+
+  function updateCustomRange(from: Date, to: Date) {
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("period", "custom");
+    query.set("from", from.toLocaleDateString("en-CA"));
+    query.set("to", to.toLocaleDateString("en-CA"));
+    router.replace(`${pathname}?${query.toString()}`, { scroll: false });
+  }
 
   // No publications → onboarding screen
   const isOnboarding = data.totalPublications === 0;
@@ -429,25 +491,32 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
 
           {/* Mobile-only: Balance + actions first */}
           <div className="lg:hidden space-y-3">
-            <BalancePanel
+            {BUSINESS_DASHBOARD_MVP.businessBalanceUiEnabled && <BalancePanel
               balance={data.depositBalance}
               periodSpend={data.periodSpend}
               lowBalanceThreshold={data.lowBalanceThreshold}
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
-            />
+            />}
             <DashboardActionStack
               promotionHref={data.hrefs.promotion}
               hasPublications={data.totalPublications > 0}
             />
-            <BusinessReputationBlock />
+            {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
+              <DailyFreeBoostCard data={data.dailyFreeBoost} />
+            )}
+            {BUSINESS_DASHBOARD_MVP.businessReputationUiEnabled && <BusinessReputationBlock />}
           </div>
 
           {/* Inbox — full width, above KPI cards, reduced height */}
           <InboxPreviewBlock items={data.inboxPreview} bookingsHref={data.hrefs.bookings} />
 
           {/* Period switcher — below inbox, above KPI cards */}
-          <DashboardPeriodSwitcher value={period} onChange={setPeriod} />
+          <DashboardPeriodSwitcher
+            value={period}
+            onChange={updatePeriod}
+            onCustomRange={updateCustomRange}
+          />
 
           {/* KPI row — 2 cards */}
           <section className="grid gap-4 sm:grid-cols-2">
@@ -478,18 +547,21 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
         {/* ── RIGHT: sticky Balance panel + actions (desktop only) ──────── */}
         <div className="hidden lg:block w-[300px] shrink-0 border-l border-stone-200/70 pl-6">
           <div className="sticky top-6 space-y-3">
-            <BalancePanel
+            {BUSINESS_DASHBOARD_MVP.businessBalanceUiEnabled && <BalancePanel
               balance={data.depositBalance}
               periodSpend={data.periodSpend}
               lowBalanceThreshold={data.lowBalanceThreshold}
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
-            />
+            />}
             <DashboardActionStack
               promotionHref={data.hrefs.promotion}
               hasPublications={data.totalPublications > 0}
             />
-            <BusinessReputationBlock />
+            {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
+              <DailyFreeBoostCard data={data.dailyFreeBoost} />
+            )}
+            {BUSINESS_DASHBOARD_MVP.businessReputationUiEnabled && <BusinessReputationBlock />}
           </div>
         </div>
 

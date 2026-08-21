@@ -3563,3 +3563,43 @@ P3 — cleanup / polish / optional
   reach; (3) BACKLOG-001–014 eventually get their owner-decision merges/
   drops so the branch/worktree count stops growing.
 - Source: full LOCAL↔GitHub↔DEV↔PROD audit, user-requested (2026-08-20)
+
+## [BACKLOG-126] /me/ideas page doesn't surface Article/Place/Offer ideas
+
+- Status: OPEN
+- Priority: P2
+- Area: My Ideas / Save
+- Added: 2026-08-21
+- Reason deferred: found while manually verifying the Article save-modal
+  "ideaOnly" change (Article can now only save to `ArticleIdea`, never a
+  dated `PlanItem`); the `/me/ideas` page and its data source only ever
+  queried the Activity/Event `Idea` model, never `ArticleIdea`/`PlaceIdea`/
+  `OfferIdea`. Fixing the Ideas page's data-fetching is out of scope for the
+  save-modal task (which only touched the save UI/API, not the Ideas list),
+  so it's recorded here instead of silently expanded into scope.
+- Context: confirmed by grepping `src/app/(public)/me/ideas/` and
+  `src/app/api/ideas` for `ArticleIdea`/`articleIdea` — zero hits. Manually
+  verified end-to-end: registered a throwaway test user
+  (`save-modal-test-2026@example.invalid`), saved a real article
+  (`cms37q1ca0006ws27z75ug52h`) via the Save modal's "Сохранить в идеи"
+  action, confirmed via `/api/save/status?articleId=...` that
+  `isIdea: true, inPlan: false, planDate: null` and via a direct Prisma
+  query that exactly one `ArticleIdea` row exists (no `PlanItem` row at
+  all) — the save itself is correct. But `/me/ideas` still rendered
+  "0 идей" / "Пока нет сохранённых идей" for that same user immediately
+  after.
+- Current state: `ArticleIdea` (and, per the same code-path, presumably
+  `PlaceIdea`/`OfferIdea` too — not separately re-verified here) rows are
+  written correctly and idempotently, and correctly excluded from any
+  dated `PlanItem`/"Мой план" view. They are simply invisible on the
+  dedicated "Мои идеи" list page. This predates the Article-save-modal
+  ideaOnly change — it is a pre-existing gap in the Ideas page's data
+  source, not a regression introduced by that change.
+- Dependencies: none blocking the Article save-modal work itself.
+- Acceptance criteria: `/me/ideas` (and its backing API route) queries
+  `ArticleIdea`/`PlaceIdea`/`OfferIdea` alongside the Activity `Idea` model
+  and renders them with appropriate per-type cards/links; a saved
+  Article/Place/Offer idea shows up there and can be removed from that page
+  too.
+- Source: manual QA during Article save-modal ideaOnly implementation
+  (2026-08-21)

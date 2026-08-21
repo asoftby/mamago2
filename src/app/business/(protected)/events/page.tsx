@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { ActivityType } from "@prisma/client";
+import { ActivityType, PromotionPublicationType, PromotionStatus } from "@prisma/client";
 import {
   businessEventListViewWhere,
   excludeGhostEventDrafts,
@@ -13,6 +13,8 @@ import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { getPerformanceMetricsByEntity } from "@/server/services/business/businessWorkspace.service";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { countPlanUsersByActivity } from "@/server/services/plan.service";
+import { getPromotionPerformanceByActivityIds } from "@/server/services/promotion/boostPerformance.service";
 
 interface SearchParams {
   view?: "active" | "archived" | "archive";
@@ -64,6 +66,11 @@ export default async function EventsPage({
       ...excludeGhostEventDrafts(),
     },
     include: {
+      coverImage: {
+        select: {
+          publicUrl: true,
+        },
+      },
       place: {
         select: {
           id: true,
@@ -76,25 +83,57 @@ export default async function EventsPage({
     },
     orderBy: { createdAt: "desc" },
   });
-  const metricsByEntity = await getPerformanceMetricsByEntity({
-    events: activities.map((activity) => ({
-      id: activity.id,
-      title: activity.title,
-      updatedAt: activity.createdAt,
-      status: activity.status,
-    })),
-    offers: [],
-  });
+  const now = new Date();
+  const [metricsByEntity, planUsersByActivity, activePromotions, promotionPerformanceByActivity] = await Promise.all([
+    getPerformanceMetricsByEntity({
+      events: activities.map((activity) => ({
+        id: activity.id,
+        title: activity.title,
+        updatedAt: activity.createdAt,
+        status: activity.status,
+      })),
+      offers: [],
+    }),
+    countPlanUsersByActivity(activities.map((activity) => activity.id)),
+    activities.length === 0
+      ? Promise.resolve([])
+      : prisma.promotion.findMany({
+          where: {
+            businessId: business.id,
+            publicationType: PromotionPublicationType.EVENT,
+            publicationId: { in: activities.map((activity) => activity.id) },
+            status: PromotionStatus.ACTIVE,
+          },
+          select: { publicationId: true },
+        }),
+    getPromotionPerformanceByActivityIds(
+      activities.map((activity) => activity.id),
+      now,
+    ),
+  ]);
 
-  const activitiesWithMetrics = activities.map((activity) => ({
-    ...activity,
-    metrics: metricsByEntity.get(`EVENT:${activity.id}`) ?? {
-      views: 0,
-      saves: 0,
-      planAdds: 0,
-      ctaClicks: 0,
-    },
-  }));
+  const activePromotionIds = new Set(activePromotions.map((promotion) => promotion.publicationId));
+
+  const activitiesWithMetrics = activities
+    .map((activity) => {
+      const promotionPerformance = promotionPerformanceByActivity.get(activity.id) ?? null;
+      return {
+        ...activity,
+        isPromoted:
+          activePromotionIds.has(activity.id) || promotionPerformance?.isPromoted === true,
+        promotionPerformance,
+        metrics: {
+      ...(metricsByEntity.get(`EVENT:${activity.id}`) ?? {
+        views: 0,
+        saves: 0,
+        planAdds: 0,
+        ctaClicks: 0,
+      }),
+          planAdds: planUsersByActivity.get(activity.id) ?? 0,
+        },
+      };
+    })
+    .sort((a, b) => Number(b.isPromoted) - Number(a.isPromoted));
 
   return (
     <div className="space-y-6">

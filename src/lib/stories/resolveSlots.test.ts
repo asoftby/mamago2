@@ -37,6 +37,7 @@ function ctxAt(dateKey: string, time = "12:00"): ResolveContext {
 const FULL_COUNTS: SlotCounts = {
   today: Math.max(TODAY_SLOT_MIN_ITEMS, DEFAULT_SLOT_MIN_ITEMS),
   running: DEFAULT_SLOT_MIN_ITEMS,
+  free: 1,
   lastchance: DEFAULT_SLOT_MIN_ITEMS,
 };
 
@@ -49,13 +50,13 @@ function idsOf(ctx: ResolveContext, counts: SlotCounts = FULL_COUNTS): string[] 
 {
   assert.deepEqual(
     STORY_SLOTS.map((s) => s.id),
-    ["today", "running", "lastchance"],
+    ["today", "running", "free", "lastchance"],
   );
   assert.ok(DEFERRED_STORY_SLOT_IDS.includes("newplaces"));
   assert.equal(STORY_SLOTS.find((s) => s.id === "today")?.kind, "temporal");
   assert.equal(STORY_SLOTS.find((s) => s.id === "running")?.kind, "contextual");
   assert.equal(STORY_SLOTS.find((s) => s.id === "lastchance")?.kind, "contextual");
-  assert.equal(DEFAULT_RENDER_POLICY.minSlotsToRender, 2);
+  assert.equal(DEFAULT_RENDER_POLICY.minSlotsToRender, 1);
   console.log("registry shape: OK");
 }
 
@@ -103,7 +104,7 @@ function idsOf(ctx: ResolveContext, counts: SlotCounts = FULL_COUNTS): string[] 
     const got = idsOf(ctxAt(date));
     assert.deepEqual(
       got,
-      ["today", "running"],
+      ["today", "running", "free"],
       `${day} ${date}: expected [today, running], got [${got.join(", ")}]`,
     );
   }
@@ -123,7 +124,7 @@ function idsOf(ctx: ResolveContext, counts: SlotCounts = FULL_COUNTS): string[] 
   );
   assert.deepEqual(
     withFlag.map((s) => s.id),
-    ["today", "running", "lastchance"],
+    ["today", "running", "free", "lastchance"],
   );
   console.log("lastchance condition: OK");
 }
@@ -186,6 +187,7 @@ function idsOf(ctx: ResolveContext, counts: SlotCounts = FULL_COUNTS): string[] 
   const counts: SlotCounts = {
     today: 0,
     running: 4,
+    free: 0,
     lastchance: 0,
   };
   const resolved = resolveSlots(STORY_SLOTS, ctxAt("2026-07-27"), counts);
@@ -200,10 +202,10 @@ function idsOf(ctx: ResolveContext, counts: SlotCounts = FULL_COUNTS): string[] 
 
 {
   const both = resolveSlots(STORY_SLOTS, ctxAt("2026-07-27"), FULL_COUNTS);
-  assert.equal(both.length, 2);
+  assert.equal(both.length, 3);
   assert.deepEqual(
     applyRenderPolicy(both, DEFAULT_RENDER_POLICY).map((s) => s.id),
-    ["today", "running"],
+    ["today", "running", "free"],
   );
 
   const onlyRunning = resolveSlots(STORY_SLOTS, ctxAt("2026-07-27"), {
@@ -211,7 +213,7 @@ function idsOf(ctx: ResolveContext, counts: SlotCounts = FULL_COUNTS): string[] 
     running: 4,
   });
   assert.equal(onlyRunning.length, 1);
-  assert.deepEqual(applyRenderPolicy(onlyRunning, DEFAULT_RENDER_POLICY), []);
+  assert.deepEqual(applyRenderPolicy(onlyRunning, DEFAULT_RENDER_POLICY).map((s) => s.id), ["running"]);
   assert.deepEqual(
     applyRenderPolicy(onlyRunning, { maxSlots: 6, minSlotsToRender: 1 }).map(
       (s) => s.id,

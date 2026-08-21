@@ -87,6 +87,42 @@ async function testForeignEntityMetricsAreNotReturned() {
   }
 }
 
+async function testEventMetricsKeepPlanAddsAndSavesSeparateAndRespectPeriod() {
+  await cleanup();
+  try {
+    const now = new Date();
+    const outsideRange = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    await trackUserEvent({ eventType: "PLAN_ADD", entityType: "EVENT", entityId: MY_EVENT_ID });
+    await trackUserEvent({ eventType: "SAVE", entityType: "EVENT", entityId: MY_EVENT_ID });
+    await trackUserEvent({ eventType: "CTA_CLICK", entityType: "EVENT", entityId: MY_EVENT_ID });
+    await prisma.userEvent.create({
+      data: {
+        eventType: "PLAN_ADD",
+        entityType: "EVENT",
+        entityId: MY_EVENT_ID,
+        createdAt: outsideRange,
+      },
+    });
+
+    const metrics = await getPerformanceMetricsByEntity({
+      events: [{ id: MY_EVENT_ID, title: "My event", updatedAt: now, status: "PUBLISHED" }],
+      offers: [],
+      dateRange: {
+        start: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+        end: new Date(now.getTime() + 60 * 1000),
+      },
+    });
+    const eventMetrics = metrics.get(`EVENT:${MY_EVENT_ID}`);
+
+    assert.equal(eventMetrics?.planAdds, 1, "only in-period PLAN_ADD events count");
+    assert.equal(eventMetrics?.saves, 1, "SAVE remains separate from PLAN_ADD");
+    assert.equal(eventMetrics?.ctaClicks, 1, "CTA clicks remain available for non-event lead semantics");
+  } finally {
+    await cleanup();
+  }
+}
+
 const MY_PLACE_ID = "test-fixture-business-isolation-my-place";
 
 async function cleanupPlaceAndDateRange() {
@@ -137,6 +173,7 @@ async function testOpensAndPlacesAndDateRange() {
 
 async function main() {
   await testForeignEntityMetricsAreNotReturned();
+  await testEventMetricsKeepPlanAddsAndSavesSeparateAndRespectPeriod();
   await testOpensAndPlacesAndDateRange();
   console.log("business publication-performance isolation tests: OK");
   process.exit(0);

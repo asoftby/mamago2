@@ -160,9 +160,12 @@ export async function getBusinessWorkspaceData(params: {
   userId: string;
   businessId: string;
   period?: DashboardPeriod;
+  dateRange?: { start: Date; end: Date };
 }) {
   const period = params.period ?? "week";
-  const { from: periodFrom, to: periodTo } = getPeriodRange(period);
+  const presetRange = getPeriodRange(period);
+  const periodFrom = params.dateRange?.start ?? presetRange.from;
+  const periodTo = params.dateRange?.end ?? presetRange.to;
   const currentMonthStart = monthStart();
 
   const [billingSummary, places, events, placeOffers, promotionSummary] = await Promise.all([
@@ -216,6 +219,7 @@ export async function getBusinessWorkspaceData(params: {
   const metricsByEntity = await getPerformanceMetricsByEntity({
     events,
     offers: placeOffers,
+    dateRange: { start: periodFrom, end: periodTo },
   });
 
   const linkedPublicationsByPlace = new Map<

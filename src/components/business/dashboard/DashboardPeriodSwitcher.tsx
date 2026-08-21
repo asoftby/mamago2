@@ -47,7 +47,7 @@ function CustomRangePicker({
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full z-50 mt-2 w-[320px] rounded-2xl border border-stone-200 bg-white p-4 shadow-xl"
+      className="absolute left-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-2rem))] rounded-2xl border border-stone-200 bg-white p-4 shadow-xl sm:w-[624px]"
     >
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-stone-400">
         Выберите период
@@ -59,6 +59,8 @@ function CustomRangePicker({
         onChange={handleDayClick}
         rangeStart={from}
         rangeEnd={to ?? undefined}
+        numberOfMonths={2}
+        collapseToOneMonthOnMobile
       />
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-stone-100 pt-3">
         <p className="text-xs text-stone-400">
@@ -119,7 +121,7 @@ export function DashboardPeriodSwitcher({
           onClick={() => handlePreset(p.value)}
           className={cn(
             "rounded-xl px-3 py-1.5 text-sm font-medium transition-all",
-            activePeriod === p.value
+            !pickerOpen && activePeriod === p.value
               ? "bg-stone-900 text-white shadow-sm"
               : "text-stone-500 hover:bg-stone-100 hover:text-stone-800",
           )}
@@ -133,7 +135,7 @@ export function DashboardPeriodSwitcher({
         onClick={() => setPickerOpen((v) => !v)}
         className={cn(
           "inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm font-medium transition-all",
-          activePeriod === "custom"
+          pickerOpen || activePeriod === "custom"
             ? "bg-stone-900 text-white shadow-sm"
             : "text-stone-500 hover:bg-stone-100 hover:text-stone-800",
         )}

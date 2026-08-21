@@ -7,6 +7,7 @@ import {
 import {
   storyRailCountsCacheKey,
   storyRailSlotContentCacheKey,
+  storyRailCityCacheTag,
   secondsUntilNextZonedMidnight,
 } from "@/lib/stories/cacheKey";
 import { getCityTimeZone } from "@/lib/stories/getCityTimeZone";
@@ -125,9 +126,9 @@ export async function buildStoryRailData(input: {
     dateKey,
     ongoingPolicy,
   });
-  const revalidate = secondsUntilNextZonedMidnight(now, timeZone);
+  const revalidate = Math.min(300, secondsUntilNextZonedMidnight(now, timeZone));
 
-  return unstable_cache(run, [cacheKey], { revalidate })();
+  return unstable_cache(run, [cacheKey], { revalidate, tags: [storyRailCityCacheTag(input.cityId)] })();
 }
 
 /**
@@ -176,6 +177,6 @@ export async function loadStorySlotContent(input: {
     dateKey,
     ongoingPolicy,
   });
-  const revalidate = secondsUntilNextZonedMidnight(now, timeZone);
-  return unstable_cache(run, [cacheKey], { revalidate })();
+  const revalidate = Math.min(300, secondsUntilNextZonedMidnight(now, timeZone));
+  return unstable_cache(run, [cacheKey], { revalidate, tags: [storyRailCityCacheTag(input.cityId)] })();
 }

@@ -94,15 +94,15 @@ export function StoryModalActionCard({
         </p>
       ) : null}
 
-      {/* ── Price ── */}
+      {/* ── Spacer ── */}
+      <div className="flex-1 min-h-[16px]" />
+
+      {/* ── Price — anchored immediately above CTA ── */}
       {item.price && (
-        <p className="text-[17px] font-semibold text-neutral-900 mb-1">
+        <p className="mb-3 text-[17px] font-semibold text-neutral-900">
           {item.price}
         </p>
       )}
-
-      {/* ── Spacer ── */}
-      <div className="flex-1 min-h-[16px]" />
 
       {item.href ? (
         <Link

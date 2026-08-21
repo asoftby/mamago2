@@ -6,7 +6,6 @@ import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { StoryModalVisual } from "./StoryModalVisual";
 import { StoryModalActionCard } from "./StoryModalActionCard";
 import type { StoryCollection } from "../types/story";
-import { isSeen } from "../lib/seen";
 
 interface StoryModalProps {
   activeStory: StoryCollection;
@@ -27,12 +26,9 @@ interface StoryModalProps {
 
 export function StoryModal({
   activeStory,
-  activeStoryIndex,
   activeItemIndex,
-  totalStories,
   progressKey,
   paused,
-  seenOfferIds,
   seenGroupStart,
   onNext,
   onPrev,
@@ -144,7 +140,6 @@ export function StoryModal({
             "md:w-[52%] md:h-full",
             // Mobile: top area
             "max-md:h-[52vw] max-md:min-h-[220px] max-md:max-h-[300px]",
-            isSeen(currentItem, seenOfferIds) && "opacity-60",
           )}
         >
           <StoryModalVisual

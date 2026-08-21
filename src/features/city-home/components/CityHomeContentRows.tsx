@@ -305,7 +305,7 @@ export function CityHomeJournalSection({
           >
             <Link
               href={a.href}
-              className="block rounded-2xl border border-neutral-200 bg-white p-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors group"
+              className="block rounded-2xl bg-white p-3 hover:bg-neutral-50/80 transition-colors group"
             >
               <div
                 className={cn(
@@ -326,16 +326,19 @@ export function CityHomeJournalSection({
                   />
                 )}
               </div>
-              {a.category && (
-                <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-                  {a.category.name}
+              <div className="mb-1.5 flex items-center gap-2">
+                {a.category && (
+                  <p className="min-w-0 truncate font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
+                    {a.category.name}
+                  </p>
+                )}
+                <p className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
+                  <span aria-hidden="true">~</span>
+                  {a.readTime} мин.
                 </p>
-              )}
+              </div>
               <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
                 {a.title}
-              </p>
-              <p className="mt-3 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-                {a.readTime} мин. чтения
               </p>
             </Link>
           </AnalyticsCardViewTracker>

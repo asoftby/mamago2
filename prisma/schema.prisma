@@ -896,6 +896,7 @@ model Activity {
   bookingCapacityPerSlot Int?
   bookingRequests        BookingRequest[]
   directThreads          DirectThread[]
+  boosts                 Boost[]
 
   @@unique([cityId, slug])
   @@index([placeId])
@@ -1045,6 +1046,7 @@ model Business {
   accessRequests          BusinessAccessRequest[]
   directThreads           DirectThread[]
   directRiskSignals       DirectRiskSignal[]
+  boosts                  Boost[]
 
   @@index([ownerUserId])
   @@index([status])
@@ -2227,20 +2229,29 @@ model OfferSlugHistory {
 
 model Boost {
   id                   String              @id @default(cuid())
-  offerId              String
+  offerId              String?
+  activityId           String?
+  businessId           String?
   startAt              DateTime
   endAt                DateTime
+  isFreeDaily          Boolean             @default(false)
+  freeDailyDateKey     String?
   durationDays         Int?
   price                Decimal?            @db.Decimal(10, 2)
   currency             String?
   purchaseRequestKey   String?             @unique
   billingTransactionId String?             @unique
   createdAt            DateTime            @default(now())
-  offer                Offer               @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  offer                Offer?              @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  activity             Activity?           @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  business             Business?           @relation(fields: [businessId], references: [id], onDelete: Cascade)
   billingTransaction   BillingTransaction? @relation(fields: [billingTransactionId], references: [id], onDelete: Restrict)
 
   @@index([offerId])
+  @@index([activityId])
+  @@index([businessId, createdAt])
   @@index([startAt, endAt])
+  @@unique([businessId, freeDailyDateKey])
 }
 
 model BillingAccount {

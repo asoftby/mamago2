@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/formatters/format-price";
 import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpTrigger";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import type { DashboardData } from "./DashboardClient";
+import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 
 // ── Value cards ───────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
       {/* Hero */}
       <BusinessSurfaceCard className="px-8 py-10 text-center">
         <h2 className="text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">
-          Создайте первое объявление
+          Создайте первую публикацию
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-stone-500">
           Добавьте публикацию, чтобы пользователи увидели ваш бизнес и вы начали получать обращения
@@ -54,7 +55,7 @@ export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
                 onClick={onClick}
                 className="w-full rounded-2xl bg-stone-900 px-8 py-3.5 text-sm font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98] sm:w-auto"
               >
-                Создать объявление
+                Создать публикацию
               </button>
             )}
           />
@@ -77,6 +78,7 @@ export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
       </div>
 
       {/* Balance — secondary, neutral tone */}
+      {BUSINESS_DASHBOARD_MVP.businessBalanceUiEnabled && (
       <BusinessSurfaceCard className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Баланс</p>
@@ -96,6 +98,7 @@ export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
           className="w-full sm:w-auto sm:shrink-0"
         />
       </BusinessSurfaceCard>
+      )}
 
     </div>
   );

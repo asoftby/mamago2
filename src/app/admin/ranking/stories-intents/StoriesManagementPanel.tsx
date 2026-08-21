@@ -2,10 +2,11 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { getCityTimeZone } from "@/lib/stories/getCityTimeZone";
 import { zonedDateKey, zonedDayRange } from "@/lib/stories/ranges";
-import { addOfferOccurrenceAction, editStoryItemAction } from "@/app/admin/content/stories/actions";
+import { addOfferOccurrenceAction, editCanonicalStoryAction, editStoryItemAction } from "@/app/admin/content/stories/actions";
 import { getWeekDays, getWeekStart } from "@/features/my-plan/lib/weekCalendar";
 import { AdminStoryDateScale } from "./AdminStoryDateScale";
 import { MAX_HOME_STORY_ITEMS_PER_DATE } from "@/server/stories/homeStoryItems";
+import { loadPublicStoryCollections } from "@/server/stories/loadPublicStoryCollections";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,9 @@ export async function StoriesManagementPanel({ searchParams }: Props) {
   const weekDays = getWeekDays(getWeekStart(date));
   const weekRange = zonedDayRange(weekDays[0]!, 7, timeZone);
   const now = new Date();
-  const [items, candidates, dateCountRows] = await Promise.all([
+  const previewNow = date === today ? now : new Date(range.start.getTime() + 12 * 60 * 60 * 1000);
+  const citySlug = cities.find((city) => city.id === cityId)?.slug ?? "minsk";
+  const [items, candidates, dateCountRows, actualCollections] = await Promise.all([
     prisma.homeStoryItem.findMany({
       where: { cityId, storyDate: range.start },
       orderBy: [{ pinned: "desc" }, { manualOrder: { sort: "asc", nulls: "last" } }, { startsAt: "asc" }],
@@ -56,6 +59,7 @@ export async function StoriesManagementPanel({ searchParams }: Props) {
       orderBy: { storyDate: "asc" },
       take: 7,
     }),
+    loadPublicStoryCollections({ cityId, citySlug, now: previewNow, bypassCache: true }),
   ]);
   const dateCounts = Object.fromEntries(weekDays.map((key) => [key, 0]));
   for (const row of dateCountRows) {
@@ -83,7 +87,11 @@ export async function StoriesManagementPanel({ searchParams }: Props) {
       <AdminStoryDateScale selectedDate={date} counts={dateCounts} />
     </header>
 
-    <section className="space-y-3"><h2 className="text-lg font-semibold">Показываются в Stories</h2>
+    <section className="space-y-3"><h2 className="text-lg font-semibold">Фактический canonical rail</h2><p className="text-sm text-gray-500">Этот состав собран тем же Stories 2.0 pipeline, который использует главная.</p>
+      {actualCollections.length === 0 ? <div className="rounded-xl border border-dashed p-6 text-gray-500">Новый rail пуст.</div> : <div className="grid gap-3 md:grid-cols-2">{actualCollections.map((collection) => <article key={collection.id} className="rounded-xl border bg-white p-3"><div className="font-semibold">{collection.title} · {collection.items.length}</div><ol className="mt-2 space-y-2 text-sm">{collection.items.map((item) => <li key={item.id} className="flex items-center justify-between gap-2"><span><span className="font-mono text-xs text-gray-400">{item.id}</span> · {item.title}</span><form action={editCanonicalStoryAction} className="flex shrink-0 gap-1"><input type="hidden" name="stableId" value={item.id}/><input type="hidden" name="cityId" value={cityId}/><input type="hidden" name="date" value={date}/><button name="action" value="up" className="rounded border px-2">↑</button><button name="action" value="down" className="rounded border px-2">↓</button><button name="action" value="pin" className="rounded border px-2">Закрепить</button><button name="action" value="exclude" className="rounded border px-2 text-red-600">Исключить</button></form></li>)}</ol></article>)}</div>}
+    </section>
+
+    <section className="space-y-3"><h2 className="text-lg font-semibold">Редакторские placements</h2>
       {shown.length === 0 ? <div className="rounded-xl border border-dashed p-6 text-gray-500">На эту дату в Stories ничего не показывается. Выберите другую дату на шкале или добавьте активность из кандидатов.</div> :
         <div className="grid gap-3">{shown.map((item, index) => <article key={item.id} className="flex gap-3 rounded-xl border bg-white p-3">
           <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">{item.coverUrlSnapshot ? <img src={item.coverUrlSnapshot} alt="" className="h-full w-full object-cover" /> : null}</div>

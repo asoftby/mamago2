@@ -41,6 +41,13 @@ test("free requires explicit structured free state", () => {
   assert.equal(isStructuredFreeEvent({ priceFrom: null }), false);
 });
 
+test("free also detects the wizard's free priceText, case/whitespace-insensitively", () => {
+  assert.equal(isStructuredFreeEvent({ priceFrom: null, priceText: "Бесплатно" }), true);
+  assert.equal(isStructuredFreeEvent({ priceFrom: null, priceText: "  free  " }), true);
+  assert.equal(isStructuredFreeEvent({ priceFrom: null, priceText: "от 10 руб" }), false);
+  assert.equal(isStructuredFreeEvent({ priceFrom: 25, priceText: "25 руб" }), false);
+});
+
 test("resolved date range becomes an ActivitySession inclusion predicate", () => {
   const dateRange = resolveEventDateRange({ from: "2026-09-12" });
   const where = buildEventRuntimeWhere({ dateRange, free: false, districtId: null, metroId: null, adultOnly: false });

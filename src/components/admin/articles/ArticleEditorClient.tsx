@@ -34,6 +34,7 @@ import {
   STATUS_LABEL,
   statusBadgeClass,
 } from "@/components/admin/articles/PublicationPanel";
+import { ArticleEditorStickyBar } from "@/components/admin/articles/ArticleEditorStickyBar";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
 import { validateArticleGeoScope } from "@/lib/article/articleGeoScopeValidation";
@@ -271,6 +272,17 @@ export function ArticleEditorClient({
 
   const dirty = currentComparable !== savedComparableRef.current;
   const displayTitle = resolveDraftTitle(title, "Новая статья");
+
+  /**
+   * Sticky bottom bar показывается только после первого реального
+   * пользовательского изменения в этой сессии редактирования — не при
+   * первичной гидратации/normalization. После появления остаётся видимой
+   * даже когда `dirty` снова становится false (после успешного сохранения).
+   */
+  const [everDirty, setEverDirty] = useState(false);
+  useEffect(() => {
+    if (dirty) setEverDirty(true);
+  }, [dirty]);
 
   const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange } = useUnsavedChangesNavigationGuard(dirty);
 
@@ -785,8 +797,27 @@ export function ArticleEditorClient({
     return null;
   })();
 
+  /** Статус для sticky bottom bar — те же state-переменные, что и выше, без отдельной autosave-логики. */
+  const stickyStatus: "dirty" | "saving" | "saved" | "error" = error
+    ? "error"
+    : saving
+      ? "saving"
+      : dirty
+        ? "dirty"
+        : "saved";
+  const stickyStatusLabel = error
+    ? "Не удалось сохранить"
+    : saving
+      ? "Сохранение…"
+      : dirty
+        ? "Изменения не сохранены"
+        : lastSavedAt != null
+          ? `Сохранено ${formatDistanceToNow(lastSavedAt, { addSuffix: true, locale: ru })}`
+          : "Изменения сохранены";
+
   return (
-    <div className="p-6 md:p-4 space-y-8 max-w-4xl">
+    <>
+    <div className={cn("p-6 md:p-4 space-y-8 max-w-4xl", everDirty && "pb-28 md:pb-24")}>
       <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
@@ -1157,5 +1188,18 @@ export function ArticleEditorClient({
         state={successState}
       />
     </div>
+
+    {everDirty ? (
+      <ArticleEditorStickyBar
+        status={stickyStatus}
+        statusLabel={stickyStatusLabel}
+        onSave={() => void save()}
+        saveDisabled={actionsBusy || !dirty}
+        saving={saving}
+        previewHref={hasPersistedId ? `/preview/articles/${initial.id}` : null}
+        publicUrl={publicUrl}
+      />
+    ) : null}
+    </>
   );
 }

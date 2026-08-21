@@ -185,6 +185,7 @@ export function ArticleSaveHeart({
         scenario={{
           kind: "quickdate",
           title: articleTitle,
+          ideaOnly: true,
         }}
         source={source}
         onPersist={handlePersist}

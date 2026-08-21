@@ -35,6 +35,9 @@ import {
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { publicActivityPath, toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
+import { activityTypeLabelRu } from "@/lib/activity/activityTypeLabelsRu";
+import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
+import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
 interface Activity {
   id: string;
@@ -46,6 +49,10 @@ interface Activity {
   } | null;
   title: string;
   shortDesc: string;
+  coverImageUrl?: string | null;
+  coverImage?: {
+    publicUrl: string | null;
+  } | null;
   scheduleMode: ScheduleMode;
   priceFrom: number | null;
   priceTo: number | null;
@@ -64,6 +71,8 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  isPromoted?: boolean;
+  promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
     views: number;
     saves: number;
@@ -129,7 +138,11 @@ export function EventCardHorizontal({
   const [isArchiving, setIsArchiving] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
 
-  const coverImage = activity.images[0];
+  const coverImageUrl =
+    activity.coverImage?.publicUrl ??
+    activity.coverImageUrl ??
+    activity.images[0]?.url ??
+    null;
   const currentSearch = searchParams.toString();
   const returnTo = `${pathname}${currentSearch ? `?${currentSearch}` : ""}`;
   const publicEventHref =
@@ -178,37 +191,65 @@ export function EventCardHorizontal({
   const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
   const createdLine = `Создано: ${format(new Date(activity.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
+  const latestPromotion = activity.promotionPerformance?.latestPeriod ?? null;
+  const viewPromotionProof = latestPromotion
+    ? latestPromotion.comparison.viewsMultiplier != null
+      ? `×${latestPromotion.comparison.viewsMultiplier.toLocaleString("ru-RU", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })} во время промо`
+      : latestPromotion.metrics.views > 0
+        ? `${latestPromotion.metrics.views.toLocaleString("ru-RU")} за время промо`
+        : null
+    : null;
+  const planPromotionProof = latestPromotion
+    ? latestPromotion.comparison.planAddsPercentChange != null
+      ? `+${Math.round(latestPromotion.comparison.planAddsPercentChange)}% к предыдущему периоду`
+      : latestPromotion.metrics.planAdds > 0
+        ? `${latestPromotion.metrics.planAdds.toLocaleString("ru-RU")} за время промо`
+        : null
+    : null;
   const cardMetrics = activity.metrics
     ? {
         views: activity.metrics.views,
         saves: activity.metrics.saves,
         planAdds: activity.metrics.planAdds,
         ctaClicks: activity.metrics.ctaClicks,
+        viewsDelta: viewPromotionProof,
+        planAddsDelta: planPromotionProof,
       }
     : null;
 
   const statusRow = (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium",
-        contentStatusPublicationPillClass(activity.status),
-      )}
-    >
-      {statusMeta.label}
-    </span>
+    <div className="flex flex-wrap items-center gap-2">
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium",
+          contentStatusPublicationPillClass(activity.status),
+        )}
+      >
+        {statusMeta.label}
+      </span>
+      {activity.isPromoted ? (
+        <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950 shadow-[0_1px_0_rgba(251,191,36,0.18)]">
+          <Zap className="mr-1.5 h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500 motion-safe:animate-[pulse_1.8s_ease-in-out_infinite] motion-reduce:animate-none" />
+          Продвигается
+        </span>
+      ) : null}
+    </div>
   );
 
   return (
     <>
       <BusinessPublicationCard
         type="event"
-        imageUrl={coverImage?.url ?? null}
+        imageUrl={coverImageUrl}
         imageAlt={activity.title}
         placeholderIcon={Calendar}
         title={activity.title}
         typeChip={
           <BusinessChip tone="muted" size="compact">
-            Event
+            {activityTypeLabelRu(activity.type)}
           </BusinessChip>
         }
         subtitle={buildEventSubtitle(activity)}
@@ -250,7 +291,7 @@ export function EventCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            <Link
+            {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
               href={buildPromotionLaunchHref({
                 publicationType: "EVENT",
                 publicationId: activity.id,
@@ -262,7 +303,7 @@ export function EventCardHorizontal({
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Promotion выключен
-            </Link>
+            </Link>}
 
             {onArchive && canArchiveEvent ? (
               <button
@@ -311,6 +352,8 @@ export function EventCardHorizontal({
         title={activity.title}
         entityLabel="события"
         metrics={activity.metrics}
+        promotionPeriods={activity.promotionPerformance?.periods}
+        repeatPromotionHref="/dashboard"
       />
     </>
   );

@@ -4,15 +4,40 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { VerificationBanner } from "@/components/business/VerificationBanner";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
-import { getBusinessWorkspaceData } from "@/server/services/business/businessWorkspace.service";
+import {
+  getBusinessWorkspaceData,
+  type DashboardPeriod,
+} from "@/server/services/business/businessWorkspace.service";
 import { DashboardClient } from "@/components/business/dashboard/DashboardClient";
 import type { DashboardData } from "@/components/business/dashboard/DashboardClient";
+import { getDailyFreeBoostDashboardData } from "@/server/services/promotion/dailyFreeBoost.service";
 
 type BusinessVerificationStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
 
-export default async function BusinessDashboardPage() {
+const DASHBOARD_PERIODS = new Set(["today", "yesterday", "week", "month", "quarter"]);
+
+function parseDateRange(from?: string, to?: string) {
+  if (!from || !to) return undefined;
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T23:59:59.999`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return undefined;
+  return { start, end };
+}
+
+export default async function BusinessDashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ period?: string; from?: string; to?: string }>;
+}) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
+  const query = (await searchParams) ?? {};
+  const selectedPeriod = DASHBOARD_PERIODS.has(query.period ?? "")
+    ? (query.period as DashboardPeriod)
+    : "week";
+  const customDateRange = query.period === "custom"
+    ? parseDateRange(query.from, query.to)
+    : undefined;
 
   if (!user) {
     redirect(
@@ -39,7 +64,12 @@ export default async function BusinessDashboardPage() {
   const workspace = await getBusinessWorkspaceData({
     userId: user.id,
     businessId: business.id,
-    period: "week",
+    period: selectedPeriod,
+    dateRange: customDateRange,
+  });
+  const dailyFreeBoost = await getDailyFreeBoostDashboardData({
+    userId: user.id,
+    businessId: business.id,
   });
 
   const verificationStatus = business.verificationStatus as BusinessVerificationStatus;
@@ -109,6 +139,17 @@ export default async function BusinessDashboardPage() {
     activePromotionCount: workspace.activePromotionCount,
     totalPublications,
     pausedPromotionCount: 0,
+    dailyFreeBoost: {
+      availableToday: dailyFreeBoost.availableToday,
+      candidates: dailyFreeBoost.candidates,
+      boost: dailyFreeBoost.boost
+        ? {
+            ...dailyFreeBoost.boost,
+            startAt: dailyFreeBoost.boost.startAt.toISOString(),
+            endAt: dailyFreeBoost.boost.endAt.toISOString(),
+          }
+        : null,
+    },
     inboxPreview: workspace.inboxPreview.map((n) => ({
       ...n,
       createdAt: n.createdAt.toISOString(),
@@ -134,7 +175,7 @@ export default async function BusinessDashboardPage() {
         reviewNote={business.reviewNote}
         compact
       />
-      <DashboardClient data={dashboardData} defaultPeriod="week" />
+      <DashboardClient data={dashboardData} defaultPeriod={selectedPeriod} />
     </div>
   );
 }

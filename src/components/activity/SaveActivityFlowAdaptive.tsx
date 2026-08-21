@@ -110,6 +110,7 @@ export function SaveActivityFlowAdaptive({
 }: SaveActivityFlowAdaptiveProps) {
   const router = useRouter();
   const isMobile = !useMediaQuery("(min-width: 640px)");
+  const isIdeaOnly = scenario.kind === "quickdate" && scenario.ideaOnly === true;
   const [phase, setPhase] = React.useState<Phase>("select");
   const [pending, setPending] = React.useState<SaveToPlanResult | null>(null);
 
@@ -277,7 +278,11 @@ export function SaveActivityFlowAdaptive({
     <div
       className={cn(
         "flex flex-col",
-        phase === "auth" || phase === "completion" ? "h-full" : "min-h-[420px]",
+        phase === "auth" || phase === "completion"
+          ? "h-full"
+          : isIdeaOnly
+            ? "min-h-[300px]"
+            : "min-h-[420px]",
       )}
     >
       {phase === "select" && (
@@ -365,8 +370,9 @@ export function SaveActivityFlowAdaptive({
     <SaveFlowContainer
       open={open}
       onOpenChange={onOpenChange}
-      title="Сохранить активность"
+      title={isIdeaOnly ? "Сохранить статью" : "Сохранить активность"}
       fixedHeight={phase === "auth" || phase === "completion"}
+      showCloseButton={phase !== "auth" && phase !== "completion"}
     >
       {body}
     </SaveFlowContainer>

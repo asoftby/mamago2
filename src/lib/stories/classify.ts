@@ -25,6 +25,7 @@ export type RawActivitySession = {
   coverMediaAssetId: string | null;
   /** Parent Activity class from full session span (not union-local). */
   parentClass: ActivityParentClass;
+  isFree?: boolean;
 };
 
 export type RawActivityOccurrence = {
@@ -36,6 +37,7 @@ export type RawActivityOccurrence = {
   /** True when this activity already contributed a session in the union window. */
   hasSessionInUnion: boolean;
   parentClass: ActivityParentClass;
+  isFree?: boolean;
 };
 
 export type RawOfferSession = {
@@ -45,6 +47,7 @@ export type RawOfferSession = {
   title: string;
   placeId: string | null;
   coverMediaAssetId: string | null;
+  isFree?: boolean;
 };
 
 export type RawOngoingOffer = {
@@ -56,6 +59,7 @@ export type RawOngoingOffer = {
   coverMediaAssetId: string | null;
   /** Offers that already have OfferSession rows are not window. */
   hasSessions: boolean;
+  isFree?: boolean;
 };
 
 export type StoryRailCandidatePool = {
@@ -209,7 +213,9 @@ export function breakdownForSlot(
   const items =
     slot.id === "running"
       ? classifyRunningItems(pool, slot.range)
-      : classifyItemsForRange(pool, slot.range, ongoingPolicy);
+      : slot.id === "free"
+        ? classifyFreeItems(pool, slot.range, ongoingPolicy)
+        : classifyItemsForRange(pool, slot.range, ongoingPolicy);
 
   let point = 0;
   let serial = 0;
@@ -227,6 +233,24 @@ export function breakdownForSlot(
     itemIds: items.map((i) => i.id),
     items,
   };
+}
+
+/** Canonical free semantics: structured priceFrom=0, carried by pool rows. */
+export function classifyFreeItems(
+  pool: StoryRailCandidatePool,
+  range: DateRange,
+  ongoingPolicy: OngoingTemporalPolicy,
+): StoryRailItem[] {
+  return classifyItemsForRange(
+    {
+      activitySessions: pool.activitySessions.filter((row) => row.isFree),
+      activityOrphans: pool.activityOrphans.filter((row) => row.isFree),
+      offerSessions: pool.offerSessions.filter((row) => row.isFree),
+      ongoingOffers: pool.ongoingOffers.filter((row) => row.isFree),
+    },
+    range,
+    ongoingPolicy,
+  );
 }
 
 export function countsFromBreakdowns(
