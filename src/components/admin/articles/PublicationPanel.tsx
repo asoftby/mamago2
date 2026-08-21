@@ -20,6 +20,7 @@ import {
   type PublicationGeoScopeCity,
 } from "@/components/admin/publications/PublicationGeoScopeField";
 import { useHydrated } from "@/hooks/use-hydrated";
+import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 import { cn } from "@/lib/utils";
 import { resolveArticlePublicationActionPolicy } from "./articlePublicationActionPolicy";
 
@@ -165,12 +166,13 @@ export function PublicationPanel({
   onGeoScopeErrorClear,
 }: PublicationPanelProps) {
   const hydrated = useHydrated();
+  const resolvedPublicUrl = hydrated && publicUrl ? sameOriginUrl(publicUrl) : publicUrl;
   const showGeoScopeField = onGeoScopeChange != null;
   const actionPolicy = resolveArticlePublicationActionPolicy({
     status,
     canModerate,
     hasUnsavedChanges,
-    hasPublicUrl: publicUrl != null,
+    hasPublicUrl: resolvedPublicUrl != null,
   });
 
   const metaParts: string[] = [];
@@ -351,14 +353,14 @@ export function PublicationPanel({
               </Button>
             )}
 
-            {actionPolicy.showPublicLink && publicUrl != null ? (
+            {actionPolicy.showPublicLink && resolvedPublicUrl != null ? (
               <Button
                 type="button"
                 variant="outline"
                 className="text-muted-foreground hover:text-foreground"
                 asChild
               >
-                <Link href={publicUrl} target="_blank" rel="noopener noreferrer">
+                <Link href={resolvedPublicUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />
                   Открыть на сайте
                 </Link>

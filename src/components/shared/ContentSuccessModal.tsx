@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Button } from "@/components/ui/button";
+import { useHydrated } from "@/hooks/use-hydrated";
+import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 import type { ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 type ContentSuccessModalProps = {
@@ -25,9 +27,20 @@ export function ContentSuccessModal({
   onOpenChange,
   state,
 }: ContentSuccessModalProps) {
+  const hydrated = useHydrated();
+
   if (!state) {
     return null;
   }
+
+  const openHref =
+    hydrated && state.openAction ? sameOriginUrl(state.openAction.href) : state.openAction?.href;
+  const editHref =
+    hydrated && state.continueEditingAction
+      ? sameOriginUrl(state.continueEditingAction.href)
+      : state.continueEditingAction?.href;
+  const listHref =
+    hydrated && state.listAction ? sameOriginUrl(state.listAction.href) : state.listAction?.href;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -49,39 +62,33 @@ export function ContentSuccessModal({
           </div>
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          {state.openAction ? (
+          {state.openAction && openHref ? (
             <PrimaryButton className="w-full" asChild>
               {state.openAction.target === "_blank" ? (
-                <a
-                  href={state.openAction.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <a href={openHref} target="_blank" rel="noopener noreferrer">
                   {state.openAction.label}
                 </a>
               ) : (
-                <Link href={state.openAction.href}>{state.openAction.label}</Link>
+                <Link href={openHref}>{state.openAction.label}</Link>
               )}
             </PrimaryButton>
           ) : null}
-          {state.continueEditingAction ? (
+          {state.continueEditingAction && editHref ? (
             <Button
               variant="secondary"
               className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
               asChild
             >
-              <Link href={state.continueEditingAction.href}>
-                {state.continueEditingAction.label}
-              </Link>
+              <Link href={editHref}>{state.continueEditingAction.label}</Link>
             </Button>
           ) : null}
-          {state.listAction ? (
+          {state.listAction && listHref ? (
             <Button
               variant="outline"
               className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
               asChild
             >
-              <Link href={state.listAction.href}>{state.listAction.label}</Link>
+              <Link href={listHref}>{state.listAction.label}</Link>
             </Button>
           ) : null}
         </DialogFooter>

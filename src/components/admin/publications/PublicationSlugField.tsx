@@ -2,6 +2,8 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useHydrated } from "@/hooks/use-hydrated";
+import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 
 export type PublicationSlugFieldProps = {
   slug: string;
@@ -35,6 +37,9 @@ export function PublicationSlugField({
   id = "publication-slug",
 }: PublicationSlugFieldProps) {
   void slug; // parent holds the raw state; display uses previewSlug
+  void slugHistorySupported;
+  const hydrated = useHydrated();
+  const displayPreviewUrl = hydrated && previewUrl ? sameOriginUrl(previewUrl) : previewUrl;
 
   const helperText = isSlugPinned
     ? "Slug закреплён. Изменяйте его только если понимаете SEO-последствия."
@@ -56,7 +61,7 @@ export function PublicationSlugField({
 
       <p className="text-xs text-gray-500 break-all">
         <span className="font-medium text-gray-700">Публичный URL: </span>
-        {previewUrl ?? "—"}
+        {displayPreviewUrl ?? "—"}
       </p>
 
       {showPublishedSlugWarning ? (
