@@ -188,9 +188,11 @@ function EmbedBlockEditor({
 export function ArticleBlocksMvpEditor({
   blocks,
   onChange,
+  authorUserId,
 }: {
   blocks: ArticleBlockMvp[];
   onChange: (next: ArticleBlockMvp[]) => void;
+  authorUserId?: string | null;
 }) {
   const hydrated = useHydrated();
 
@@ -312,6 +314,7 @@ export function ArticleBlocksMvpEditor({
           <ArticleEditorCoverField
             showHeading={false}
             value={block.mediaId}
+            authorUserId={authorUserId}
             uploadButtonLabel="Загрузить изображение"
             successUploadMessage="Изображение загружено"
             successPickMessage="Изображение выбрано"
@@ -334,6 +337,7 @@ export function ArticleBlocksMvpEditor({
           <ArticleEditorGalleryField
             showHeading={false}
             value={block.mediaIds}
+            authorUserId={authorUserId}
             onChange={(ids) => updateAt(i, { ...block, mediaIds: ids })}
           />
           <Input

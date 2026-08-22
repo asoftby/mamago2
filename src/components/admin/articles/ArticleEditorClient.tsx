@@ -919,6 +919,7 @@ export function ArticleEditorClient({
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
+            authorUserId={authorUserId}
             onChange={(id, previewUrl) => {
               setCoverImageId(id);
               setCoverImagePreviewUrl(previewUrl ?? "");
@@ -1067,6 +1068,7 @@ export function ArticleEditorClient({
           <ArticleBlocksMvpEditor
             blocks={content.blocks}
             onChange={(blocks) => setContent((prev) => ({ ...prev, blocks }))}
+            authorUserId={authorUserId}
           />
         </CardContent>
       </Card>

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
+import type { MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
 import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
 import { MAX_IMAGE_FILES } from "@/lib/uploads/uploadConfig";
 import type { OfferFormData } from "../types";
@@ -84,8 +85,16 @@ async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[
   return uploaded;
 }
 
-async function loadBusinessMediaLibrary(): Promise<MediaUploadItem[]> {
-  const response = await fetch("/api/business/media-picker?limit=48", {
+async function loadBusinessMediaLibraryPage({
+  cursor,
+  limit,
+}: {
+  cursor: string | null;
+  limit: number;
+}): Promise<MediaLibraryPage<MediaUploadItem>> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  const response = await fetch(`/api/business/media-picker?${params.toString()}`, {
     credentials: "include",
   });
 
@@ -93,16 +102,24 @@ async function loadBusinessMediaLibrary(): Promise<MediaUploadItem[]> {
     throw new Error("Не удалось загрузить медиатеку");
   }
 
-  const data = (await response.json()) as { items?: BusinessPickerItem[] };
+  const data = (await response.json()) as {
+    items?: BusinessPickerItem[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  };
 
-  return (data.items ?? [])
-    .filter((item): item is BusinessPickerItem & { publicUrl: string } => Boolean(item.publicUrl))
-    .map((item) => ({
-      id: item.publicUrl,
-      url: item.publicUrl,
-      alt: item.alt,
-      title: item.title,
-    }));
+  return {
+    items: (data.items ?? [])
+      .filter((item): item is BusinessPickerItem & { publicUrl: string } => Boolean(item.publicUrl))
+      .map((item) => ({
+        id: item.publicUrl,
+        url: item.publicUrl,
+        alt: item.alt,
+        title: item.title,
+      })),
+    nextCursor: data.nextCursor ?? null,
+    hasMore: Boolean(data.hasMore),
+  };
 }
 
 export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
@@ -165,7 +182,7 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
         allowMediaLibrary
         allowUpload
         onUploadFiles={uploadFilesToPublicMedia}
-        loadMediaLibraryItems={loadBusinessMediaLibrary}
+        loadMediaLibraryPage={loadBusinessMediaLibraryPage}
         mediaLibraryDescription="Выберите одно изображение из вашей медиатеки или загрузите новый файл."
       />
 
@@ -180,7 +197,7 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
         allowMediaLibrary
         allowUpload
         onUploadFiles={uploadFilesToPublicMedia}
-        loadMediaLibraryItems={loadBusinessMediaLibrary}
+        loadMediaLibraryPage={loadBusinessMediaLibraryPage}
         mediaLibraryDescription="Выберите несколько изображений из медиатеки или загрузите новые файлы."
       />
 

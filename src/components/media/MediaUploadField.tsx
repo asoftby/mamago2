@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,6 +29,9 @@ import {
   getFileTooLargeMessage,
   getUploadHintText,
 } from "@/lib/uploads/uploadConfig";
+import { useMediaLibraryPager, type MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
+import { useMediaLibraryScrollSentinel } from "@/components/media/useMediaLibraryScrollSentinel";
+import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
 
 export type MediaUploadMode = "single" | "multiple";
 
@@ -57,7 +60,11 @@ export interface MediaUploadFieldProps {
   allowMediaLibrary?: boolean;
   allowUpload?: boolean;
   onUploadFiles?: (files: File[]) => Promise<MediaUploadItem[]>;
-  loadMediaLibraryItems?: () => Promise<MediaUploadItem[]>;
+  loadMediaLibraryPage?: (args: { cursor: string | null; limit: number }) => Promise<MediaLibraryPage<MediaUploadItem>>;
+  /** Page size for infinite scroll in the library dialog (default 24). */
+  libraryPageSize?: number;
+  /** Owner identity of the library (e.g. article authorUserId). Changing it resets items/selection and refetches. */
+  libraryOwnerKey?: string | null;
   mediaLibraryTitle?: string;
   mediaLibraryDescription?: string;
   singleEmptyHint?: string;
@@ -123,7 +130,9 @@ export function MediaUploadField({
   allowMediaLibrary = true,
   allowUpload = true,
   onUploadFiles,
-  loadMediaLibraryItems,
+  loadMediaLibraryPage,
+  libraryPageSize = MEDIA_PICKER_PAGE_SIZE,
+  libraryOwnerKey = null,
   mediaLibraryTitle = "Выбрать из медиатеки",
   mediaLibraryDescription,
   singleEmptyHint = "Выберите главное изображение из медиатеки или загрузите файл",
@@ -140,16 +149,30 @@ export function MediaUploadField({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [libraryItems, setLibraryItems] = useState<MediaUploadItem[]>([]);
   const [librarySelection, setLibrarySelection] = useState<Set<string>>(() => new Set());
   const [uploading, setUploading] = useState(false);
+  const libraryScrollRef = useRef<HTMLDivElement | null>(null);
+  const librarySentinelRef = useRef<HTMLDivElement | null>(null);
+  const libraryOpenRef = useRef(libraryOpen);
+
+  const {
+    items: libraryItems,
+    loadingInitial: libraryLoading,
+    loadingMore: libraryLoadingMore,
+    hasMore: libraryHasMore,
+    loadInitial: loadLibraryInitial,
+    loadMore: loadLibraryMore,
+  } = useMediaLibraryPager<MediaUploadItem>({
+    pageSize: libraryPageSize,
+    loadPage: loadMediaLibraryPage,
+    ownerKey: libraryOwnerKey,
+  });
 
   const effectiveMaxFiles = mode === "single" ? 1 : Math.max(1, maxFiles ?? MAX_IMAGE_FILES);
   const effectiveMaxSizeMb = maxSizeMb ?? MAX_IMAGE_FILE_SIZE_MB;
   const emptyHint = mode === "single" ? singleEmptyHint : multipleEmptyHint;
   const canUpload = allowUpload && !disabled && typeof onUploadFiles === "function";
-  const canOpenLibrary = allowMediaLibrary && !disabled && typeof loadMediaLibraryItems === "function";
+  const canOpenLibrary = allowMediaLibrary && !disabled && typeof loadMediaLibraryPage === "function";
 
   const commitItems = (nextItems: MediaUploadItem[]) => {
     if (mode === "single") {
@@ -230,16 +253,18 @@ export function MediaUploadField({
     if (!canOpenLibrary) return;
     setLibraryOpen(true);
     setLibrarySelection(new Set());
-    setLibraryLoading(true);
     try {
-      const nextItems = await loadMediaLibraryItems();
-      setLibraryItems(nextItems.filter((item) => item?.id && item?.url));
+      await loadLibraryInitial();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
-    } finally {
-      setLibraryLoading(false);
     }
   };
+
+  const handleLoadMore = useCallback(() => {
+    void loadLibraryMore().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+    });
+  }, [loadLibraryMore]);
 
   const currentIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
 
@@ -303,6 +328,31 @@ export function MediaUploadField({
       setLibrarySelection(new Set());
     }
   }, [libraryOpen]);
+
+  useEffect(() => {
+    libraryOpenRef.current = libraryOpen;
+  }, [libraryOpen]);
+
+  useEffect(() => {
+    setLibrarySelection(new Set());
+    if (libraryOpenRef.current) {
+      void loadLibraryInitial().catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+      });
+    }
+    // Owner switch (e.g. article author changed) must never mix libraries — the
+    // pager itself resets on libraryOwnerKey too; this only refetches if the
+    // dialog is already open, so the visible grid doesn't stall on stale data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraryOwnerKey]);
+
+  useMediaLibraryScrollSentinel({
+    active: libraryOpen,
+    hasMore: libraryHasMore,
+    onLoadMore: handleLoadMore,
+    sentinelRef: librarySentinelRef,
+    rootRef: libraryScrollRef,
+  });
 
   const actionButtons = (
     <div className="flex flex-wrap items-center gap-2">
@@ -493,7 +543,7 @@ export function MediaUploadField({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
+          <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
             {libraryLoading ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -549,6 +599,11 @@ export function MediaUploadField({
                 })}
               </div>
             )}
+            {libraryHasMore ? (
+              <div ref={librarySentinelRef} className="flex justify-center py-4">
+                {libraryLoadingMore ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
+              </div>
+            ) : null}
           </div>
 
           {mode === "multiple" ? (

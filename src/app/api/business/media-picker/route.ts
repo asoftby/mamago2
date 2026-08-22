@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
-import prisma from "@/lib/prisma";
-import { MediaAssetKind, MediaAssetStatus } from "@prisma/client";
+import { queryMediaPickerPage } from "@/lib/media/mediaPickerQuery";
+import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
 
 /**
- * Недавние изображения текущего пользователя — для выбора в визарде до первого сохранения события.
+ * Медиатека текущего пользователя (курсорная пагинация) — для визарда события/предложения.
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -13,28 +13,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const limit = Math.min(60, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") || "36", 10)));
+  const { searchParams } = req.nextUrl;
+  const cursor = searchParams.get("cursor")?.trim() || null;
+  const rawLimit = parseInt(searchParams.get("limit") ?? "", 10);
+  const limit = Number.isFinite(rawLimit) ? rawLimit : MEDIA_PICKER_PAGE_SIZE;
 
-  const items = await prisma.mediaAsset.findMany({
-    where: {
-      kind: MediaAssetKind.IMAGE,
-      status: MediaAssetStatus.ACTIVE,
-      publicUrl: { not: null },
-      uploadedById: user.id,
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      publicUrl: true,
-      alt: true,
-      title: true,
-      sourceType: true,
-    },
-  });
+  const page = await queryMediaPickerPage({ uploadedById: user.id, cursor, limit });
 
   return NextResponse.json({
-    items: items.map((i) => ({
+    items: page.items.map((i) => ({
       id: i.id,
       publicUrl: i.publicUrl,
       alt: i.alt,
@@ -43,5 +30,7 @@ export async function GET(req: NextRequest) {
       fromEntity: false,
       showImportBadge: false,
     })),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
   });
 }

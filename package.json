@@ -142,6 +142,7 @@
     "search:reindex": "tsx scripts/search-reindex.ts",
     "media:backfill-migrated-metadata": "tsx scripts/backfill-migrated-media-metadata.ts",
     "test:media-metadata-backfill": "tsx src/lib/media/isTechnicalMediaTitle.test.ts && tsx src/lib/media/decideMigratedMediaMetadataPatch.test.ts",
+    "test:media-picker-pagination": "tsx src/lib/media/mediaPickerQuery.test.ts && tsx src/components/media/useMediaLibraryPager.test.ts && tsx src/app/api/admin/articles/media-picker/route.test.ts && tsx src/app/api/business/media-picker/route.test.ts && NODE_OPTIONS=--conditions=react-server tsx src/lib/uploads/resolveUploadOwner.test.ts",
     "test:media-from-url-transport": "tsx src/server/modules/import/parsers/fetchHtml.test.ts && tsx src/lib/media/safeRemoteImageUrl.test.ts",
     "test:media-from-url-family-by-live": "tsx src/server/modules/import/parsers/fetchBinaryFamilyBy.live.test.ts",
     "test:google-maps-config": "tsx src/services/googleMaps/googleMapsConfigContract.test.ts && tsx src/services/googleMaps/toLegacyAddressComponents.test.ts",

@@ -3603,3 +3603,79 @@ P3 — cleanup / polish / optional
   too.
 - Source: manual QA during Article save-modal ideaOnly implementation
   (2026-08-21)
+
+## [BACKLOG-127] Admin-only upload-as-author override for article media
+
+- Status: DONE (2026-08-22)
+- Priority: P3
+- Area: Admin / Media
+- Added: 2026-08-22
+- Renumbered: originally filed as "BACKLOG-004", which collided with the
+  pre-existing `recovery/plan-suggestions-age-tags-null` entry at that ID —
+  renumbered to the next free id (127) when closing, per backlog rule 5
+  (closed entries are kept, not deleted).
+- Reason deferred (original): `POST /api/upload` (`src/app/api/upload/route.ts`)
+  always set `uploadedById: user.id` (the requesting user's own id) — there
+  was no mechanism to attribute an upload to another user. Deferred at the
+  time because it touches the shared upload endpoint used by every upload
+  flow in the app, not just the article editor.
+- Context: an ADMIN/MODERATOR editing another user's article could already
+  *browse and pick* that author's existing media (fixed earlier the same
+  day via `authorUserId` scoping on `/api/admin/articles/media-picker`),
+  but uploading a *new* file from within that same editor landed in the
+  editor's own library, not the article author's — so the freshly uploaded
+  image would not show up next time the author (or another editor) opened
+  that article's picker.
+- Resolution: `POST /api/upload` (`src/app/api/upload/route.ts`) accepts two
+  optional form fields, `ownerUserId` and `uploadContext`. Resolution is
+  centralized in `resolveUploadOwnerUserId()`
+  (`src/lib/uploads/resolveUploadOwner.ts`), deliberately narrower than the
+  first draft of this fix (which let any ADMIN/MODERATOR override the owner
+  for *any* `/api/upload` call — flagged as too broad on review and tightened
+  before commit): the override is a no-op when `ownerUserId` is omitted or
+  equal to the requester's own id (the case for every non-article upload
+  flow); otherwise it requires **both** `uploadContext === "ADMIN_ARTICLE"`
+  (a closed literal union, not a free-form string — a typo/garbage value
+  fails closed to `null`) **and** the requester's role being ADMIN/MODERATOR,
+  checked as two independent gates — neither is silently downgraded, each
+  throws `UploadOwnerOverrideError("FORBIDDEN")` on its own. A dangling
+  target id throws `UploadOwnerOverrideError("OWNER_NOT_FOUND")` rather than
+  surfacing a raw FK-constraint error. Considered (per the task's own
+  guidance) splitting this into a separate `/api/admin/articles/upload`
+  endpoint reusing the existing processing/storage pipeline, but the
+  pipeline (preflight, dedup, sharp processing, storage write, DB
+  registration, response shaping) is ~180 lines of sequential logic in one
+  handler with no extracted reusable core — duplicating a second route
+  around it, or refactoring the whole pipeline into a shared function, was
+  judged unjustified duplication/risk for a P3 fix; the explicit
+  `uploadContext=ADMIN_ARTICLE` gate on the single existing endpoint was the
+  allowed fallback and adds zero duplication. Plain `/api/upload` callers
+  (business wizard, avatar, etc.) never send either field, so
+  `uploadedById = user.id` unconditionally, byte-for-byte unchanged. The
+  resolved id (not the requester's) is used for both the per-owner
+  content-hash dedup lookup (`findOwnedMediaByContentHash`) and
+  `registerUploadedMedia`'s `uploadedById`, so a duplicate re-upload for
+  author A dedups against A's library, never the admin's.
+  `uploadClient.ts`'s `uploadMediaFile()` grew matching `ownerUserId`/
+  `uploadContext` options, both appended only when set.
+  `ArticleEditorCoverField`/`ArticleEditorGalleryField`'s `uploadFiles` pass
+  `{ ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE" }` only when
+  `authorUserId` is set (new/no-author-yet articles keep uploading to the
+  current admin's own library, unchanged).
+- Verification: `src/lib/uploads/resolveUploadOwner.test.ts` — no-op cases;
+  USER + ownerUserId → `FORBIDDEN` (including with a forged
+  `uploadContext=ADMIN_ARTICLE`, proving context alone isn't enough);
+  BUSINESS_OWNER + ownerUserId → `FORBIDDEN` (same, including forged
+  context); ADMIN (and separately MODERATOR) + ownerUserId **without** the
+  `ADMIN_ARTICLE` context → `FORBIDDEN` (proving role alone isn't enough —
+  this is the scenario the narrowing fixed); ADMIN + ownerUserId +
+  `ADMIN_ARTICLE` context targeting a nonexistent user → `OWNER_NOT_FOUND`;
+  ADMIN (and MODERATOR) + `ADMIN_ARTICLE` + real author A → resolves to A;
+  and the full acceptance scenario end-to-end against a real DB: ADMIN B
+  resolves+registers a `MediaAsset` for author A in the `ADMIN_ARTICLE`
+  context, asserts `uploadedById === authorA` (not adminB), asserts the
+  asset appears in author A's `queryMediaPickerPage` page and never in
+  admin B's.
+- Source: engineering audit + implementation during media-picker
+  infinite-scroll work (see `mediaPickerQuery.ts` / `MediaUploadField.tsx` /
+  `ArticleEditorCoverField.tsx` / `resolveUploadOwner.ts` changes)

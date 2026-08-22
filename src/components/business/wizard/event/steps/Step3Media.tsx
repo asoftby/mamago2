@@ -24,6 +24,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { EventFormData } from "../types";
 import { MediaDropzone, type MediaDropzoneHandle } from "./MediaDropzone";
+import { useMediaLibraryPager, type MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
+import { useMediaLibraryScrollSentinel } from "@/components/media/useMediaLibraryScrollSentinel";
+import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
 import {
   DndContext,
   closestCenter,
@@ -283,9 +286,11 @@ export function Step3Media({
   const [mediaStatus, setMediaStatus] = useState<MediaStatus>("empty");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMode, setPickerMode] = useState<"cover" | "gallery">("cover");
-  const [pickerLoading, setPickerLoading] = useState(false);
-  const [pickerItems, setPickerItems] = useState<PickerItem[]>([]);
   const [pickerSelection, setPickerSelection] = useState<Set<string>>(() => new Set());
+  const [entityPickerItems, setEntityPickerItems] = useState<PickerItem[]>([]);
+  const [entityPickerLoading, setEntityPickerLoading] = useState(false);
+  const pickerScrollRef = useRef<HTMLDivElement | null>(null);
+  const pickerSentinelRef = useRef<HTMLDivElement | null>(null);
   const [isApplyingImportedCover, setIsApplyingImportedCover] = useState(false);
   const [applyingImportedGalleryUrls, setApplyingImportedGalleryUrls] = useState<string[]>([]);
   const [selectedImportedUrl, setSelectedImportedUrl] = useState<string | null>(null);
@@ -473,46 +478,83 @@ export function Step3Media({
     }
   };
 
-  const loadPicker = useCallback(async () => {
-    setPickerLoading(true);
+  const loadGeneralMediaPage = useCallback(
+    async ({ cursor, limit }: { cursor: string | null; limit: number }): Promise<MediaLibraryPage<PickerItem>> => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor) params.set("cursor", cursor);
+      const response = await fetch(`/api/business/media-picker?${params.toString()}`, { credentials: "include" });
+      if (!response.ok) {
+        throw new Error("Не удалось загрузить медиатеку");
+      }
+      const data = (await response.json()) as { items?: PickerItem[]; nextCursor: string | null; hasMore: boolean };
+      return {
+        items: (data.items ?? []).filter((item) => item.publicUrl),
+        nextCursor: data.nextCursor ?? null,
+        hasMore: Boolean(data.hasMore),
+      };
+    },
+    [],
+  );
+
+  const generalPager = useMediaLibraryPager<PickerItem>({
+    pageSize: MEDIA_PICKER_PAGE_SIZE,
+    loadPage: loadGeneralMediaPage,
+  });
+
+  // Media already linked to this event (usages, cover, gallery) — a small
+  // bounded set, so it's loaded once (not paginated) and pinned first.
+  const loadEntityMedia = useCallback(async () => {
+    if (!eventId) {
+      setEntityPickerItems([]);
+      return;
+    }
+    setEntityPickerLoading(true);
     try {
-      const requests = [
-        fetch("/api/business/media-picker?limit=48", { credentials: "include" }),
-      ];
-      if (eventId) {
-        requests.push(fetch(`/api/business/events/${eventId}/media-library`, { credentials: "include" }));
+      const response = await fetch(`/api/business/events/${eventId}/media-library`, { credentials: "include" });
+      if (response.ok) {
+        const data = (await response.json()) as { items: PickerItem[] };
+        setEntityPickerItems((data.items ?? []).filter((item) => item.publicUrl));
+      } else {
+        setEntityPickerItems([]);
       }
-
-      const responses = await Promise.all(requests);
-      const itemsMap = new Map<string, PickerItem>();
-
-      if (responses[0]?.ok) {
-        const data = (await responses[0].json()) as { items: PickerItem[] };
-        for (const item of data.items ?? []) {
-          if (item.publicUrl) itemsMap.set(item.id, item);
-        }
-      }
-
-      if (responses[1]?.ok) {
-        const data = (await responses[1].json()) as { items: PickerItem[] };
-        for (const item of data.items ?? []) {
-          if (item.publicUrl && !itemsMap.has(item.id)) {
-            itemsMap.set(item.id, item);
-          }
-        }
-      }
-
-      setPickerItems([...itemsMap.values()]);
+    } catch {
+      setEntityPickerItems([]);
     } finally {
-      setPickerLoading(false);
+      setEntityPickerLoading(false);
     }
   }, [eventId]);
+
+  const pickerItems = useMemo(() => {
+    const seen = new Set(entityPickerItems.map((item) => item.id));
+    const generalOnly = generalPager.items.filter((item) => !seen.has(item.id));
+    return [...entityPickerItems, ...generalOnly];
+  }, [entityPickerItems, generalPager.items]);
+
+  const pickerLoading = entityPickerLoading || generalPager.loadingInitial;
+
+  const loadGeneralMediaMore = generalPager.loadMore;
+  const handlePickerLoadMore = useCallback(() => {
+    void loadGeneralMediaMore().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+    });
+  }, [loadGeneralMediaMore]);
+
+  useMediaLibraryScrollSentinel({
+    active: pickerOpen,
+    hasMore: generalPager.hasMore,
+    onLoadMore: handlePickerLoadMore,
+    sentinelRef: pickerSentinelRef,
+    rootRef: pickerScrollRef,
+  });
 
   const openPicker = (mode: "cover" | "gallery") => {
     setPickerMode(mode);
     setPickerSelection(new Set());
     setPickerOpen(true);
-    void loadPicker();
+    void loadEntityMedia();
+    void generalPager.loadInitial().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+    });
   };
 
   const togglePickerSelection = (item: PickerItem) => {
@@ -1142,7 +1184,7 @@ export function Step3Media({
               В этом окне объединены изображения из внутренней медиатеки и уже связанных с событием media assets.
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-2">
+          <div ref={pickerScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-2">
             {pickerLoading ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1187,6 +1229,11 @@ export function Step3Media({
                 })}
               </div>
             )}
+            {generalPager.hasMore ? (
+              <div ref={pickerSentinelRef} className="flex justify-center py-4">
+                {generalPager.loadingMore ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
+              </div>
+            ) : null}
           </div>
           <DialogFooter className="border-t px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => setPickerOpen(false)}>

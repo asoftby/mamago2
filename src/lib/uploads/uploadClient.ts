@@ -1,11 +1,19 @@
 import { normalizeUploadResponse } from "./normalizeUploadResponse";
 import type { UploadErrorResponse, UploadedMedia } from "./uploadTypes";
+import type { UploadContext } from "./resolveUploadOwner";
 
 type UploadMediaFileOptions = {
   endpoint?: "/api/upload" | "/api/upload/wizard" | string;
   wizardSessionId?: string;
   draftEntityId?: string;
   draftEntityType?: string;
+  /**
+   * Admin/moderator-only: attribute the upload to another user's media
+   * library. The server only honors this alongside a matching
+   * `uploadContext` — sending one without the other is always rejected.
+   */
+  ownerUserId?: string;
+  uploadContext?: UploadContext;
   onProgress?: never;
 };
 
@@ -25,6 +33,12 @@ export async function uploadMediaFile(
   }
   if (options?.draftEntityType) {
     formData.append("draftEntityType", options.draftEntityType);
+  }
+  if (options?.ownerUserId) {
+    formData.append("ownerUserId", options.ownerUserId);
+  }
+  if (options?.uploadContext) {
+    formData.append("uploadContext", options.uploadContext);
   }
 
   const response = await fetch(endpoint, {
