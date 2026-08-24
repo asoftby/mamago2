@@ -93,6 +93,7 @@
     "migration:events:sessions-resync": "tsx scripts/migration-event-sessions-resync.ts",
     "migration:preview:offer-snapshot": "tsx scripts/migration-preview-offer-snapshot.ts",
     "migration:preview:offer-remediation": "tsx scripts/migration-preview-offer-remediation.ts",
+    "pricing:backfill:preview": "tsx scripts/preview-publication-price-backfill.ts",
     "migration:route-review": "tsx scripts/migration-route-review.ts",
     "migration:apply-route-review": "tsx scripts/migration-apply-route-review.ts",
     "migration:phoenix-release": "tsx scripts/migration-phoenix-release.ts",
