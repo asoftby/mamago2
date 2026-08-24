@@ -1,5 +1,5 @@
  
-import { useMemo, useCallback, useEffect, useSyncExternalStore } from "react";
+import { useMemo, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   useSearchParams,
   useRouter,
@@ -61,6 +61,24 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.free
     && !f.adultOnly
   );
+}
+
+export function discoveryFiltersEqual(a: DiscoveryFilters, b: DiscoveryFilters): boolean {
+  if (
+    a.dateFrom !== b.dateFrom ||
+    a.dateTo !== b.dateTo ||
+    a.whenPreset !== b.whenPreset ||
+    a.format !== b.format ||
+    a.metro !== b.metro ||
+    a.district !== b.district ||
+    a.nearby !== b.nearby ||
+    a.free !== b.free ||
+    a.adultOnly !== b.adultOnly ||
+    a.age.length !== b.age.length
+  ) {
+    return false;
+  }
+  return [...a.age].sort().join("\0") === [...b.age].sort().join("\0");
 }
 
 const SESSION_PREFIX = "mmg.discovery.filtersByScope.v1";
@@ -143,8 +161,23 @@ function hasDiscoveryFilterParamsInUrl(
   );
 }
 
-function hasAnyUrlParams(searchParams: ReadonlyURLSearchParams): boolean {
-  return Array.from(searchParams.keys()).length > 0;
+/**
+ * Основной канал трафика приходит с utm-метками (Instagram) — они не влияют
+ * на выдачу, поэтому не должны блокировать восстановление фильтров из
+ * localStorage при возврате на страницу листинга без явных discovery-параметров.
+ */
+const TRACKING_PARAM_PREFIXES = ["utm_"];
+const TRACKING_PARAM_KEYS = new Set(["gclid", "fbclid", "yclid"]);
+
+function isTrackingParamKey(key: string): boolean {
+  return (
+    TRACKING_PARAM_KEYS.has(key) ||
+    TRACKING_PARAM_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+export function hasAnyNonTrackingUrlParams(searchParams: ReadonlyURLSearchParams): boolean {
+  return Array.from(searchParams.keys()).some((key) => !isTrackingParamKey(key));
 }
 
 export type OpenKey = "date" | "age" | "metro" | "district" | null;
@@ -319,6 +352,21 @@ export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number
   );
 }
 
+/**
+ * Групп, которыми владеет модалка «Фильтры»: {ages (вкл. 18+), format,
+ * area+metro, price}. Даты/city намеренно не считаются — они видны на
+ * экране отдельно, и клики по ряду быстрых чипсов (Сегодня/Завтра/Выходные)
+ * не должны зажигать badge на иконке модалки.
+ */
+export function getModalFilterCount(filters: DiscoveryFilters): number {
+  return (
+    (filters.age.length > 0 || filters.adultOnly ? 1 : 0) +
+    (filters.format ? 1 : 0) +
+    (filters.metro || filters.district ? 1 : 0) +
+    (filters.free ? 1 : 0)
+  );
+}
+
 export function useDiscoveryFilters() {
   const router = useRouter();
   const pathname = usePathname();
@@ -345,7 +393,7 @@ export function useDiscoveryFilters() {
   );
 
   /** На страницах публикаций без query — подставляем последние фильтры этого раздела из sessionStorage */
-  const applied = useMemo(() => {
+  const resolvedApplied = useMemo(() => {
     if (!isDiscoveryFiltersEmpty(appliedFromUrl)) {
       return appliedFromUrl;
     }
@@ -368,6 +416,31 @@ export function useDiscoveryFilters() {
     return appliedFromUrl;
   }, [appliedFromUrl, hasMounted, publicationIntent, cityForSession, pathname]);
 
+  /**
+   * Живые фильтры (чипсы, десктопный попап) пишут в URL напрямую — без
+   * дебаунса три быстрых клика подряд дают три router.replace и три
+   * перезапроса выдачи. optimisticFilters — то, что уже видно в UI сразу
+   * по клику; сама запись в URL уезжает с задержкой (см. patchFilters).
+   * Как только appliedFromUrl догоняет предсказанное значение, оверлей
+   * молча перестаёт использоваться (без setState в эффекте — сравнение
+   * прямо при рендере, react-hooks/set-state-in-effect).
+   */
+  const [optimisticFilters, setOptimisticFilters] = useState<DiscoveryFilters | null>(null);
+  const writeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
+    };
+  }, []);
+
+  const applied = useMemo(() => {
+    if (optimisticFilters && !discoveryFiltersEqual(optimisticFilters, appliedFromUrl)) {
+      return optimisticFilters;
+    }
+    return resolvedApplied;
+  }, [optimisticFilters, appliedFromUrl, resolvedApplied]);
+
   /** Сохраняем фильтры раздела при просмотре списка discovery */
   useEffect(() => {
     const intent = getIntentFromPath(pathname);
@@ -382,9 +455,11 @@ export function useDiscoveryFilters() {
     const intent = getIntentFromPath(pathname);
     if (!intent || !cityForSession) return;
     if (!isDiscoveryListingPath(pathname)) return;
-    // Any query params in the URL take precedence over local storage.
-    // This keeps shared links stable even when they carry non-filter params.
-    if (hasAnyUrlParams(searchParams)) {
+    // Any non-tracking query params in the URL take precedence over local
+    // storage — keeps shared links stable even when they carry non-filter
+    // params. utm/gclid/fbclid/yclid are exempt: the main traffic channel
+    // (Instagram) always arrives with utm_*, and it never affects results.
+    if (hasAnyNonTrackingUrlParams(searchParams)) {
       return;
     }
     if (hasDiscoveryFilterParamsInUrl(searchParams)) return;
@@ -410,8 +485,13 @@ export function useDiscoveryFilters() {
   const patchFilters = useCallback(
     (patch: Partial<DiscoveryFilters>) => {
       const next = mergeDiscoveryPatch(applied, patch);
-      writeAppliedToUrl(router, pathname, searchParams, next, "replace");
-      stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
+      setOptimisticFilters(next);
+      if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
+      writeTimerRef.current = setTimeout(() => {
+        writeTimerRef.current = null;
+        writeAppliedToUrl(router, pathname, searchParams, next, "replace");
+        stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
+      }, 150);
     },
     [router, pathname, searchParams, applied, cityForSession],
   );
@@ -420,9 +500,14 @@ export function useDiscoveryFilters() {
     () => ({
       /** @deprecated Кнопки Go больше нет — оставлено для совместимости */
       apply: () => {},
-      /** Немедленная запись в URL (реактивные фильтры) */
+      /** Немедленная запись в URL (реактивные фильтры), с дебаунсом 150мс */
       setDraft: patchFilters,
       resetAll: () => {
+        if (writeTimerRef.current) {
+          clearTimeout(writeTimerRef.current);
+          writeTimerRef.current = null;
+        }
+        setOptimisticFilters(defaultFilters);
         clearSessionForCurrentRoute();
         writeAppliedToUrl(
           router,
@@ -433,12 +518,17 @@ export function useDiscoveryFilters() {
         );
       },
       resetKey: (key: keyof DiscoveryFilters) => {
+        if (writeTimerRef.current) {
+          clearTimeout(writeTimerRef.current);
+          writeTimerRef.current = null;
+        }
         const base = applied;
         const next = { ...base, [key]: defaultFilters[key] };
         if (key === "dateFrom" || key === "dateTo") {
           next.dateFrom = null;
           next.dateTo = null;
         }
+        setOptimisticFilters(next);
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
         stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
       },
@@ -447,7 +537,12 @@ export function useDiscoveryFilters() {
         next: DiscoveryFilters,
         pathnameOverride?: string,
       ) => {
+        if (writeTimerRef.current) {
+          clearTimeout(writeTimerRef.current);
+          writeTimerRef.current = null;
+        }
         const path = pathnameOverride ?? pathname;
+        setOptimisticFilters(next);
         const empty = new URLSearchParams();
         writeAppliedToUrl(
           router,
