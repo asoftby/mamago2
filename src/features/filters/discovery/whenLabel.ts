@@ -1,9 +1,19 @@
-import { format, addDays } from "date-fns";
+import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { type WhenPreset } from "./filters.store";
+import { computePresetRange, todayKeyIn, type QuickFilterPreset } from "./quickFilterPresets";
 
 function fmtDay(d: Date): string {
   return format(d, "d MMM", { locale: ru }); // e.g., "5 мар."
+}
+
+function dateKeyToNoon(dateKey: string): Date {
+  return new Date(`${dateKey}T12:00:00`);
+}
+
+function presetRangeFromNow(preset: QuickFilterPreset, now: Date): { from: Date; to: Date } {
+  const { from, to } = computePresetRange(preset, todayKeyIn(now));
+  return { from: dateKeyToNoon(from), to: dateKeyToNoon(to) };
 }
 
 function fmtWeekendRange(start: Date, end: Date): string {
@@ -16,37 +26,35 @@ function fmtWeekendRange(start: Date, end: Date): string {
   return `${fmtDay(start)} – ${fmtDay(end)}`;
 }
 
-function computeWeekendRange(base: Date): { sat: Date; sun: Date } {
-  // Weekend = Sat/Sun of текущей недели:
-  // day: 0 Sun .. 6 Sat
-  const day = base.getDay();
-  // find next Saturday (including today if Saturday)
-  const daysToSat = day === 0 ? 6 : (6 - day);
-  const sat = addDays(base, daysToSat);
-  const sun = addDays(sat, 1);
-  return { sat, sun };
-}
-
 export function whenLabel(filters: {
   whenPreset: WhenPreset;
   dateFrom: string | null;
   dateTo: string | null;
 }): string {
   const dot = " • ";
-  
+
+  /**
+   * Раньше TODAY/TOMORROW/WEEKEND здесь считались через `new Date()` +
+   * `base.getDay()` в таймзоне хоста, а не Europe/Minsk — и с неверным
+   * крайним случаем для воскресенья (прыгал на следующие выходные вместо
+   * оставшегося дня этих). Из-за этого лейбл над пилюлей мог показывать не
+   * тот диапазон, что реально уходит в выдачу через resolveEventDateRange()
+   * на сервере. Теперь оба места считают от одних и тех же civil-date
+   * функций (quickFilterPresets.ts), различается только формат результата.
+   */
   if (filters.whenPreset === "TODAY") {
-    const d = new Date();
-    return `Сегодня${dot}${fmtDay(d)}`;
+    const { from } = presetRangeFromNow("TODAY", new Date());
+    return `Сегодня${dot}${fmtDay(from)}`;
   }
-  
+
   if (filters.whenPreset === "TOMORROW") {
-    const d = addDays(new Date(), 1);
-    return `Завтра${dot}${fmtDay(d)}`;
+    const { from } = presetRangeFromNow("TOMORROW", new Date());
+    return `Завтра${dot}${fmtDay(from)}`;
   }
-  
+
   if (filters.whenPreset === "WEEKEND") {
-    const { sat, sun } = computeWeekendRange(new Date());
-    return `Эти выходные${dot}${fmtWeekendRange(sat, sun)}`;
+    const { from, to } = presetRangeFromNow("WEEKEND", new Date());
+    return `Эти выходные${dot}${fmtWeekendRange(from, to)}`;
   }
   
   // fallback to dateFrom/dateTo (YYYY-MM-DD strings)
