@@ -5,6 +5,7 @@ import {
   getDiscoveryFilterActiveCount,
   getModalFilterCount,
   hasAnyNonTrackingUrlParams,
+  optimisticFiltersSettled,
   parseAppliedFromUrl,
   serializeAppliedToSearchParams,
 } from "./filters.store";
@@ -69,6 +70,11 @@ test("hydration gate still blocks when a real filter param rides along with utm_
   assert.equal(hasAnyNonTrackingUrlParams(params as never), true);
 });
 
+test("hydration gate does NOT block on Instagram share ids (igshid/igsh) or ymclid/msclkid/_openstat", () => {
+  const params = new URLSearchParams("igshid=abc&igsh=def&ymclid=ghi&msclkid=jkl&_openstat=mno");
+  assert.equal(hasAnyNonTrackingUrlParams(params as never), false);
+});
+
 // --- E: badge on the "Фильтры" icon must ignore date/whenPreset groups ---
 
 test("getModalFilterCount ignores whenPreset — quick-chip clicks must not light up the modal badge", () => {
@@ -99,4 +105,28 @@ test("getModalFilterCount folds adultOnly into the age group (A2: chip lives in 
   assert.equal(getModalFilterCount(withAdultOnly), 1);
   const withBoth = { ...defaultFilters, age: ["18+"], adultOnly: true };
   assert.equal(getModalFilterCount(withBoth), 1);
+});
+
+test("getModalFilterCount counts 1 when only 18+ is selected and nothing else", () => {
+  // Exact scenario flagged in review: adultOnly alone must not fall through the condition.
+  assert.equal(getModalFilterCount({ ...defaultFilters, adultOnly: true }), 1);
+});
+
+// --- Overlay must not get stuck on CSV order (age has no canonical click order) ---
+
+test("optimisticFiltersSettled ignores age array order — clicking 5-7 then 3-5 still settles against a 3-5,5-7 URL", () => {
+  const optimisticFromClickOrder = { ...defaultFilters, age: ["5-7", "3-5"] };
+  const appliedFromUrl = { ...defaultFilters, age: ["3-5", "5-7"] };
+  assert.equal(optimisticFiltersSettled(optimisticFromClickOrder, appliedFromUrl), true);
+});
+
+test("optimisticFiltersSettled is false while a real difference remains (not just reordered)", () => {
+  const optimistic = { ...defaultFilters, age: ["3-5"] };
+  const appliedFromUrl = { ...defaultFilters, age: ["3-5", "5-7"] };
+  assert.equal(optimisticFiltersSettled(optimistic, appliedFromUrl), false);
+});
+
+test("optimisticFiltersSettled: identical filters settle", () => {
+  const filters = { ...defaultFilters, free: true, metro: "metro-1" };
+  assert.equal(optimisticFiltersSettled(filters, { ...filters }), true);
 });

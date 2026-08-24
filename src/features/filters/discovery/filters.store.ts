@@ -81,6 +81,36 @@ export function discoveryFiltersEqual(a: DiscoveryFilters, b: DiscoveryFilters):
   return [...a.age].sort().join("\0") === [...b.age].sort().join("\0");
 }
 
+/**
+ * Оптимистичное предсказание считается «догнанным» URL-состоянием, если
+ * оно эквивалентно после прогона через ту же serialize→parse функцию,
+ * которой пишем реальный URL — а не через сырое структурное сравнение.
+ * Иначе порядок CSV (контракт параметров нормализует порядок age по
+ * справочнику) может развести предсказание и appliedFromUrl навсегда:
+ * кликнули «5–7» потом «3–5» → оверлей держит ['5-7','3-5'], а в URL
+ * канонически уедет ['3-5','5-7'] — без канонизации оба сравнения не
+ * совпали бы никогда, и applied завис бы на устаревшем предсказании
+ * до перезагрузки страницы. discoveryFiltersEqual само по себе уже
+ * не зависит от порядка (сортирует age), но канонизация через реальный
+ * serializer защищает и от будущих изменений нормализации (legacy id,
+ * дедуп и т.п.), не только от порядка.
+ */
+export function optimisticFiltersSettled(
+  optimistic: DiscoveryFilters,
+  appliedFromUrl: DiscoveryFilters,
+): boolean {
+  const canonicalOptimistic = parseAppliedFromUrl(
+    serializeAppliedToSearchParams(
+      new URLSearchParams(),
+      optimistic,
+    ) as unknown as ReadonlyURLSearchParams,
+  );
+  return discoveryFiltersEqual(canonicalOptimistic, appliedFromUrl);
+}
+
+/** Дебаунс живой записи в URL (чипсы/десктопный попап) — см. optimisticFilters. */
+export const WRITE_DEBOUNCE_MS = 150;
+
 const SESSION_PREFIX = "mmg.discovery.filtersByScope.v1";
 
 function discoverySessionKey(city: string, intent: Intent): string {
@@ -167,7 +197,17 @@ function hasDiscoveryFilterParamsInUrl(
  * localStorage при возврате на страницу листинга без явных discovery-параметров.
  */
 const TRACKING_PARAM_PREFIXES = ["utm_"];
-const TRACKING_PARAM_KEYS = new Set(["gclid", "fbclid", "yclid"]);
+/** igshid/igsh — Instagram (основной канал трафика, Татьяна); остальные — стандартные click-id. */
+const TRACKING_PARAM_KEYS = new Set([
+  "gclid",
+  "fbclid",
+  "yclid",
+  "ymclid",
+  "msclkid",
+  "igshid",
+  "igsh",
+  "_openstat",
+]);
 
 function isTrackingParamKey(key: string): boolean {
   return (
@@ -421,21 +461,84 @@ export function useDiscoveryFilters() {
    * дебаунса три быстрых клика подряд дают три router.replace и три
    * перезапроса выдачи. optimisticFilters — то, что уже видно в UI сразу
    * по клику; сама запись в URL уезжает с задержкой (см. patchFilters).
-   * Как только appliedFromUrl догоняет предсказанное значение, оверлей
-   * молча перестаёт использоваться (без setState в эффекте — сравнение
-   * прямо при рендере, react-hooks/set-state-in-effect).
+   * Снимается через optimisticFiltersSettled() прямо при рендере (без
+   * setState в эффекте — react-hooks/set-state-in-effect), плюс аварийно
+   * по таймеру ниже, если что-то всё же разошлось.
    */
   const [optimisticFilters, setOptimisticFilters] = useState<DiscoveryFilters | null>(null);
   const writeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlayFailsafeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingWriteRef = useRef<{
+    next: DiscoveryFilters;
+    pathname: string;
+    searchParams: ReadonlyURLSearchParams;
+    cityForSession: string;
+  } | null>(null);
+
+  const clearOverlayFailsafe = useCallback(() => {
+    if (overlayFailsafeTimerRef.current) {
+      clearTimeout(overlayFailsafeTimerRef.current);
+      overlayFailsafeTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Страховка на случай, если оверлей всё же не снялся сам (например,
+   * appliedFromUrl не догнал предсказание по неучтённой причине) — сбросить
+   * безусловно через 2× дебаунса после реальной записи. Оверлей должен
+   * самоизлечиваться, а не требовать F5.
+   */
+  const scheduleOverlayFailsafe = useCallback(() => {
+    clearOverlayFailsafe();
+    overlayFailsafeTimerRef.current = setTimeout(() => {
+      overlayFailsafeTimerRef.current = null;
+      setOptimisticFilters(null);
+    }, WRITE_DEBOUNCE_MS * 2);
+  }, [clearOverlayFailsafe]);
 
   useEffect(() => {
     return () => {
-      if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
+      if (writeTimerRef.current) {
+        clearTimeout(writeTimerRef.current);
+        writeTimerRef.current = null;
+      }
+      if (overlayFailsafeTimerRef.current) {
+        clearTimeout(overlayFailsafeTimerRef.current);
+        overlayFailsafeTimerRef.current = null;
+      }
+      const pending = pendingWriteRef.current;
+      if (!pending) return;
+      pendingWriteRef.current = null;
+      /**
+       * Компонент размонтировался раньше, чем сработал дебаунс — типично:
+       * кликнули чип, тут же тапнули карточку события. router.replace()
+       * здесь опасен: гонка с уже стартовавшим переходом на карточку может
+       * откатить навигацию обратно на листинг. Пишем историю напрямую, без
+       * транзишена Next, + сохраняем в сессию — чтобы «назад» с карточки и
+       * restore-из-localStorage видели реально кликнутый фильтр, а не
+       * теряли его молча (что originally срисовывалось: фильтр пропадал и
+       * из URL, и из localStorage, потому что сейв там завязан на appliedFromUrl).
+       */
+      const intent = getIntentFromPath(pending.pathname);
+      if (
+        intent &&
+        pending.cityForSession &&
+        isDiscoveryListingPath(pending.pathname) &&
+        !isDiscoveryFiltersEmpty(pending.next)
+      ) {
+        saveDiscoveryFiltersSession(pending.cityForSession, intent, pending.next);
+      }
+      if (typeof window !== "undefined") {
+        const params = serializeAppliedToSearchParams(pending.searchParams, pending.next);
+        const qs = params.toString();
+        const url = qs ? `${pending.pathname}?${qs}` : pending.pathname;
+        window.history.replaceState(window.history.state, "", url);
+      }
     };
   }, []);
 
   const applied = useMemo(() => {
-    if (optimisticFilters && !discoveryFiltersEqual(optimisticFilters, appliedFromUrl)) {
+    if (optimisticFilters && !optimisticFiltersSettled(optimisticFilters, appliedFromUrl)) {
       return optimisticFilters;
     }
     return resolvedApplied;
@@ -485,15 +588,19 @@ export function useDiscoveryFilters() {
   const patchFilters = useCallback(
     (patch: Partial<DiscoveryFilters>) => {
       const next = mergeDiscoveryPatch(applied, patch);
+      clearOverlayFailsafe();
       setOptimisticFilters(next);
       if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
+      pendingWriteRef.current = { next, pathname, searchParams, cityForSession };
       writeTimerRef.current = setTimeout(() => {
         writeTimerRef.current = null;
+        pendingWriteRef.current = null;
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
         stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
-      }, 150);
+        scheduleOverlayFailsafe();
+      }, WRITE_DEBOUNCE_MS);
     },
-    [router, pathname, searchParams, applied, cityForSession],
+    [router, pathname, searchParams, applied, cityForSession, clearOverlayFailsafe, scheduleOverlayFailsafe],
   );
 
   const actions = useMemo(
@@ -507,6 +614,8 @@ export function useDiscoveryFilters() {
           clearTimeout(writeTimerRef.current);
           writeTimerRef.current = null;
         }
+        pendingWriteRef.current = null;
+        clearOverlayFailsafe();
         setOptimisticFilters(defaultFilters);
         clearSessionForCurrentRoute();
         writeAppliedToUrl(
@@ -516,12 +625,15 @@ export function useDiscoveryFilters() {
           defaultFilters,
           "replace",
         );
+        scheduleOverlayFailsafe();
       },
       resetKey: (key: keyof DiscoveryFilters) => {
         if (writeTimerRef.current) {
           clearTimeout(writeTimerRef.current);
           writeTimerRef.current = null;
         }
+        pendingWriteRef.current = null;
+        clearOverlayFailsafe();
         const base = applied;
         const next = { ...base, [key]: defaultFilters[key] };
         if (key === "dateFrom" || key === "dateTo") {
@@ -531,6 +643,7 @@ export function useDiscoveryFilters() {
         setOptimisticFilters(next);
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
         stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
+        scheduleOverlayFailsafe();
       },
       /** Одна замена URL: полное состояние фильтров + при необходимости другой pathname (моб. шит «Готово»). */
       commitFilters: (
@@ -541,6 +654,8 @@ export function useDiscoveryFilters() {
           clearTimeout(writeTimerRef.current);
           writeTimerRef.current = null;
         }
+        pendingWriteRef.current = null;
+        clearOverlayFailsafe();
         const path = pathnameOverride ?? pathname;
         setOptimisticFilters(next);
         const empty = new URLSearchParams();
@@ -552,6 +667,7 @@ export function useDiscoveryFilters() {
           "replace",
         );
         stripAgeFromStoredDiscoverySession(cityForSession, path, next);
+        scheduleOverlayFailsafe();
       },
       /** Закрыть панель без отката URL */
       close: () => {},
@@ -564,6 +680,8 @@ export function useDiscoveryFilters() {
       patchFilters,
       clearSessionForCurrentRoute,
       cityForSession,
+      clearOverlayFailsafe,
+      scheduleOverlayFailsafe,
     ],
   );
 
