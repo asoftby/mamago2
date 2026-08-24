@@ -1,6 +1,6 @@
 /** Strictly read-only historical pricing recovery audit. */
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import prisma from "../src/lib/prisma";
 import {
@@ -15,11 +15,16 @@ import { getCampSessionPriceValues } from "../src/lib/offers/campPricing";
 type EntityName = "Activity" | "Offer" | "Place";
 type Classification = "AUTO_SAFE" | "RECOVERABLE" | "MANUAL_REVIEW" | "NONE";
 type Evidence = { source: string; path: string; value: unknown; interpretation?: NormalizedPriceRange };
-type AuditRow = { entity: EntityName; id: string; classification: Classification; proposed: NormalizedPriceRange; reason: string; evidence: Evidence[] };
+type AuditRow = { entity: EntityName; id: string; slug: string; classification: Classification; current: Record<string, unknown>; proposed: NormalizedPriceRange; reason: string; links: { local: string; admin: string }; evidence: Evidence[] };
 const PRICE_KEY = /price|pricing|cost|average.?check|тариф|цен/i;
 
 function snapshotRootArg(): string | null {
   const index = process.argv.indexOf("--snapshot-root");
+  return index >= 0 ? process.argv[index + 1] ?? null : null;
+}
+
+function optionArg(name: string): string | null {
+  const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] ?? null : null;
 }
 
@@ -89,18 +94,41 @@ function uniqueInterpretations(evidence: Evidence[]): NormalizedPriceRange[] {
   return [...values.values()];
 }
 
-function classify(entity: EntityName, id: string, current: PriceNormalizationResult, evidence: Evidence[]): AuditRow {
+function classify(entity: EntityName, id: string, slug: string, currentFields: Record<string, unknown>, current: PriceNormalizationResult, evidence: Evidence[]): AuditRow {
+  const editorType = entity.toLowerCase() === "activity" ? "event" : entity.toLowerCase();
+  const admin = `/editor/${editorType}/${id}/edit`;
+  const links = { local: `http://localhost:3000${admin}`, admin };
   if (current.mode !== "UNKNOWN" && current.conflict == null) {
-    return { entity, id, classification: "AUTO_SAFE", proposed: current, reason: `authoritative-${current.source.toLowerCase()}`, evidence };
+    return { entity, id, slug, classification: "AUTO_SAFE", current: currentFields, proposed: current, reason: `authoritative-${current.source.toLowerCase()}`, links, evidence };
   }
   const candidates = uniqueInterpretations(evidence);
   if (candidates.length === 1) {
-    return { entity, id, classification: "RECOVERABLE", proposed: candidates[0], reason: "single-unambiguous-historical-interpretation", evidence };
+    return { entity, id, slug, classification: "RECOVERABLE", current: currentFields, proposed: candidates[0], reason: "single-unambiguous-historical-interpretation", links, evidence };
   }
   if (entity === "Place" && evidence.length === 1 && evidence[0]?.source === "current.place") {
-    return { entity, id, classification: "NONE", proposed: normalizePublicationPrice({ mode: "NONE" }), reason: "place-has-no-own-price-evidence", evidence };
+    return { entity, id, slug, classification: "NONE", current: currentFields, proposed: normalizePublicationPrice({ mode: "NONE" }), reason: "place-has-no-own-price-evidence", links, evidence };
   }
-  return { entity, id, classification: "MANUAL_REVIEW", proposed: normalizePublicationPrice({ mode: "UNKNOWN" }), reason: candidates.length > 1 ? "conflicting-historical-interpretations" : current.conflict ?? "no-provable-price-intent", evidence };
+  return { entity, id, slug, classification: "MANUAL_REVIEW", current: currentFields, proposed: normalizePublicationPrice({ mode: "UNKNOWN" }), reason: candidates.length > 1 ? "conflicting-historical-interpretations" : current.conflict ?? "no-provable-price-intent", links, evidence };
+}
+
+function csvCell(value: unknown): string {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function writeManualReviewArtifacts(rows: AuditRow[], csvPath: string | null, markdownPath: string | null) {
+  const manual = rows.filter((row) => row.classification === "MANUAL_REVIEW");
+  if (csvPath) {
+    mkdirSync(dirname(csvPath), { recursive: true });
+    const header = ["entity", "id", "slug", "current_price_fields", "evidence", "proposed_mode", "proposed_min", "proposed_max", "reason", "local_link", "admin_link"];
+    const lines = manual.map((row) => [row.entity, row.id, row.slug, JSON.stringify(row.current), JSON.stringify(row.evidence), row.proposed.mode, row.proposed.min, row.proposed.max, row.reason, row.links.local, row.links.admin].map(csvCell).join(","));
+    writeFileSync(csvPath, `${header.map(csvCell).join(",")}\n${lines.join("\n")}\n`);
+  }
+  if (markdownPath) {
+    mkdirSync(dirname(markdownPath), { recursive: true });
+    const counts = (["Activity", "Offer", "Place"] as EntityName[]).map((entity) => `- ${entity}: ${manual.filter((row) => row.entity === entity).length}`).join("\n");
+    const examples = manual.slice(0, 12).map((row) => `- ${row.entity} \`${row.id}\` (\`${row.slug}\`): ${row.reason}; proposed \`${row.proposed.mode}\`; [editor](${row.links.admin})`).join("\n");
+    writeFileSync(markdownPath, `# Pricing manual review\n\nGenerated from the read-only pricing recovery preview. Total: ${manual.length}.\n\n## Counts\n\n${counts}\n\n## Sample queue\n\n${examples}\n`);
+  }
 }
 
 function currentEvidence(source: string, value: unknown, projection: PriceNormalizationResult): Evidence {
@@ -129,9 +157,9 @@ function summarize(rows: AuditRow[]) {
 
 async function main() {
   const [activities, offers, places, lineage, imported, adminAudits, placeRevisionCount] = await Promise.all([
-    prisma.activity.findMany({ select: { id: true, priceFrom: true, priceTo: true, priceText: true, priceItems: true, scheduleJson: true } }),
-    prisma.offer.findMany({ select: { id: true, priceFrom: true, priceText: true, campSessions: true } }),
-    prisma.place.findMany({ select: { id: true, priceItems: true } }),
+    prisma.activity.findMany({ select: { id: true, slug: true, priceFrom: true, priceTo: true, currency: true, priceMode: true, priceText: true, priceItems: true, scheduleJson: true } }),
+    prisma.offer.findMany({ select: { id: true, slug: true, priceFrom: true, priceTo: true, currency: true, priceMode: true, priceText: true, priceItems: true, campSessions: true } }),
+    prisma.place.findMany({ select: { id: true, slug: true, priceFrom: true, priceTo: true, currency: true, priceMode: true, priceItems: true } }),
     prisma.migrationLineage.findMany({ where: { targetType: { in: ["ACTIVITY", "OFFER", "PLACE"] }, targetId: { not: null } }, select: { targetType: true, targetId: true, sourceRecordKey: true, record: { select: { rawPayload: true, normalizedPayload: true, planSummary: true, validationSummary: true } } } }),
     prisma.importedRecord.findMany({ where: { OR: [{ publishedActivityId: { not: null } }, { publishedPlaceId: { not: null } }] }, select: { publishedActivityId: true, publishedPlaceId: true, rawPayload: true, rawText: true, normalizedData: true, reviewDecision: true, applyResult: true } }),
     prisma.adminAuditLog.findMany({ where: { entityType: { in: ["Activity", "Offer", "Place", "ACTIVITY", "OFFER", "PLACE"] } }, select: { entityType: true, entityId: true, before: true, after: true, metadata: true, createdAt: true } }),
@@ -184,10 +212,11 @@ async function main() {
     }
   }
 
-  const activityRows = activities.map((row) => { const current = activityProjection(row); return classify("Activity", row.id, current, [currentEvidence("current.activity", row, current), ...(historical.get(`ACTIVITY:${row.id}`) ?? [])]); });
-  const offerRows = offers.map((row) => { const current = offerProjection(row); return classify("Offer", row.id, current, [currentEvidence("current.offer", row, current), ...(historical.get(`OFFER:${row.id}`) ?? [])]); });
-  const placeRows = places.map((row) => { const current = normalizePublicationPrice({ priceItems: row.priceItems }); return classify("Place", row.id, current, [currentEvidence("current.place", row, current), ...(historical.get(`PLACE:${row.id}`) ?? [])]); });
+  const activityRows = activities.map((row) => { const current = activityProjection(row); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceText: row.priceText, priceItems: row.priceItems }; return classify("Activity", row.id, row.slug, fields, current, [currentEvidence("current.activity", row, current), ...(historical.get(`ACTIVITY:${row.id}`) ?? [])]); });
+  const offerRows = offers.map((row) => { const current = offerProjection(row); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceText: row.priceText, priceItems: row.priceItems }; return classify("Offer", row.id, row.slug, fields, current, [currentEvidence("current.offer", row, current), ...(historical.get(`OFFER:${row.id}`) ?? [])]); });
+  const placeRows = places.map((row) => { const current = normalizePublicationPrice({ priceItems: row.priceItems }); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceItems: row.priceItems }; return classify("Place", row.id, row.slug, fields, current, [currentEvidence("current.place", row, current), ...(historical.get(`PLACE:${row.id}`) ?? [])]); });
   const rows = [...activityRows, ...offerRows, ...placeRows];
+  writeManualReviewArtifacts(rows, optionArg("--manual-review-csv"), optionArg("--manual-review-md"));
   console.log(JSON.stringify({
     generatedAt: new Date().toISOString(), readOnly: true,
     sourceAvailability: { migrationLineage: lineage.length, importedRecords: imported.length, adminAuditLogs: adminAudits.length, placeRevisions: placeRevisionCount, placeRevisionHasPriceFields: false, snapshotRoot, snapshotRecordsMatched: snapshotRecordCount },
