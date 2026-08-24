@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import React from "react";
+import { PERMANENT_NOINDEX_ROBOTS } from "@/lib/seo/indexingPolicy";
+
+export const metadata: Metadata = {
+  robots: PERMANENT_NOINDEX_ROBOTS,
+};
 
 /**
  * Вход, регистрация, восстановление пароля — без сайтового хедера, футера и мобильной навигации.
