@@ -1,4 +1,4 @@
-import { ActivityFormat, type Prisma } from "@prisma/client";
+import { ActivityFormat, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
@@ -63,6 +63,24 @@ type GetClassesDiscoveryFeedOptions = {
   chipSlug?: string | null;
   chipTitleBySlug?: Map<string, string>;
 };
+
+type CanonicalOfferPrice = {
+  priceMode: PublicationPriceMode;
+  priceFrom: number | null;
+  priceTo: number | null;
+  currency: string;
+};
+
+export function projectCanonicalOfferPrice(
+  offer: CanonicalOfferPrice,
+): Pick<ActivityMock, "priceMode" | "priceMin" | "priceMax" | "currency"> {
+  return {
+    priceMode: offer.priceMode,
+    priceMin: offer.priceFrom ?? undefined,
+    priceMax: offer.priceTo ?? undefined,
+    currency: offer.currency as ActivityMock["currency"],
+  };
+}
 
 export async function getClassesDiscoveryFeed(
   cityId: string,
@@ -157,8 +175,7 @@ export async function getClassesDiscoveryFeed(
       image: offer.coverImage ?? "",
       ageFrom,
       ageTo,
-      priceMin: offer.priceFrom ?? undefined,
-      currency: "BYN",
+      ...projectCanonicalOfferPrice(offer),
       dateStart,
       dateEnd,
       format: ActivityFormat.OFFLINE,
@@ -219,7 +236,10 @@ async function runQuery({ publicWhereParts, cityId, chipSlug, now, skipChipSlugs
       coverImage: true,
       ageMinMonths: true,
       ageMaxMonths: true,
+      priceMode: true,
       priceFrom: true,
+      priceTo: true,
+      currency: true,
       dateFrom: true,
       dateTo: true,
       campSessions: true,
