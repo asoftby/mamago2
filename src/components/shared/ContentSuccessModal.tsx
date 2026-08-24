@@ -14,6 +14,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
+import { normalizeTargetPathForSurface } from "@/lib/routing/surface";
 import type { ResolvedContentSuccessState } from "@/lib/content-success/types";
 
 type ContentSuccessModalProps = {
@@ -21,6 +22,42 @@ type ContentSuccessModalProps = {
   onOpenChange: (open: boolean) => void;
   state: ResolvedContentSuccessState | null;
 };
+
+/**
+ * `editHref` совпадает с текущим адресом редактора почти всегда (мы уже на
+ * этой странице после save). Реальная навигация по <Link> в этом случае —
+ * лишний anchor-click, который перехватывается capture-listener'ом
+ * useUnsavedChangesNavigationGuard (см. use-unsaved-changes-navigation-guard.ts)
+ * и открывает leave-confirmation поверх ещё не закрытой success modal.
+ * Когда href действительно совпадает с текущей страницей — просто закрываем
+ * модалку без навигации; иначе (например, если вызывающий код не успел сам
+ * переключить URL) навигация по-прежнему выполняется.
+ *
+ * Ссылки редактора статьи зашиты с префиксом `/admin/...` (resolver.ts), а
+ * на host-routed поддомене `admin.*` реальный адрес браузера этот префикс
+ * уже не несёт (см. ADMIN_PATH_PREFIX / stripSurfacePrefix в
+ * lib/routing/surface.ts) — поэтому сравнивать пути нужно после
+ * normalizeTargetPathForSurface("admin", …) с обеих сторон, иначе живой
+ * поддомен всегда считает страницы разными и модалка снова навигирует по
+ * живой <Link>, которую перехватывает guard.
+ */
+function isCurrentLocation(href: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const target = new URL(href, window.location.origin);
+    const targetPath = normalizeTargetPathForSurface(
+      "admin",
+      `${target.pathname}${target.search}`,
+    );
+    const currentPath = normalizeTargetPathForSurface(
+      "admin",
+      `${window.location.pathname}${window.location.search}`,
+    );
+    return targetPath === currentPath;
+  } catch {
+    return false;
+  }
+}
 
 export function ContentSuccessModal({
   open,
@@ -41,6 +78,7 @@ export function ContentSuccessModal({
       : state.continueEditingAction?.href;
   const listHref =
     hydrated && state.listAction ? sameOriginUrl(state.listAction.href) : state.listAction?.href;
+  const continueEditingIsCurrentPage = Boolean(hydrated && editHref && isCurrentLocation(editHref));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,15 +119,26 @@ export function ContentSuccessModal({
             </PrimaryButton>
           ) : null}
           {state.continueEditingAction && editHref ? (
-            <Button
-              variant="secondary"
-              className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
-              asChild
-            >
-              <Link href={editHref} onClick={() => onOpenChange(false)}>
+            continueEditingIsCurrentPage ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
+                onClick={() => onOpenChange(false)}
+              >
                 {state.continueEditingAction.label}
-              </Link>
-            </Button>
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                className="h-auto w-full rounded-[16px] py-[14px] font-semibold"
+                asChild
+              >
+                <Link href={editHref} onClick={() => onOpenChange(false)}>
+                  {state.continueEditingAction.label}
+                </Link>
+              </Button>
+            )
           ) : null}
           {state.listAction && listHref ? (
             <Button

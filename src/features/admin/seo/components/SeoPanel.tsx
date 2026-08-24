@@ -167,10 +167,20 @@ export function SeoPanel({
     () => truncateSeoText(normalizePlainText(fallbackDescription), SEO_DESCRIPTION_LIMIT),
     [fallbackDescription],
   );
-  const normalizedPublicUrl = useMemo(() => {
-    const raw = normalizeUrl(publicUrl);
-    return hydrated && raw ? sameOriginUrl(raw) : raw;
-  }, [hydrated, publicUrl]);
+  /**
+   * `publicUrl` приходит от вызывающего кода уже с канонического origin
+   * (resolveSeoPublicBase() / NEXT_PUBLIC_APP_URL — тот же источник, что и
+   * серверный syncArticleCanonical()/absoluteBase()), а НЕ с origin текущей
+   * admin-страницы. Раньше здесь стоял sameOriginUrl(raw), перебазировавший
+   * значение на window.location.origin — из-за этого canonical URL
+   * «наследовал» admin/dev origin (admin.mamago.local, localhost:XXXX) и
+   * никогда не совпадал с тем, что реально сохраняет сервер, что держало
+   * dirty=true даже сразу после успешного save. Origin-ребейз для
+   * отображения (кликабельная ссылка в Google-снippet превью на dev) —
+   * отдельно, ниже, через effectiveCanonical/snippetFallbackUrl; в form
+   * state он попадать не должен.
+   */
+  const normalizedPublicUrl = useMemo(() => normalizeUrl(publicUrl), [publicUrl]);
 
   const previousAutoTitleRef = useRef(normalizedFallbackTitle);
   const previousAutoDescriptionRef = useRef(normalizedFallbackDescription);
@@ -221,16 +231,6 @@ export function SeoPanel({
     }
     previousAutoCanonicalRef.current = normalizedPublicUrl;
   }, [canonicalUrl, disableAutoFill, hydrated, normalizedPublicUrl, onCanonicalUrlChange]);
-
-  useEffect(() => {
-    if (!hydrated || !normalizedPublicUrl) return;
-    const current = canonicalUrl.trim();
-    if (!current || !samePathAndSearch(current, normalizedPublicUrl)) return;
-    const rebased = sameOriginUrl(current);
-    if (rebased !== current) {
-      onCanonicalUrlChange(rebased);
-    }
-  }, [canonicalUrl, hydrated, normalizedPublicUrl, onCanonicalUrlChange]);
 
   const effectiveTitle = seoTitle.trim() || normalizedFallbackTitle || "Заголовок материала — mamaGo";
   const effectiveDescription =

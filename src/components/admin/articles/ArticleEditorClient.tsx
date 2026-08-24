@@ -58,46 +58,12 @@ import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
 import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
 import { resolveContentSuccessState } from "@/lib/content-success/resolver";
 import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
-
-
-function toLocalDatetimeValue(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromLocalDatetimeValue(v: string): string | null {
-  const t = v.trim();
-  if (!t) return null;
-  const d = new Date(t);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function snapshotComparable(args: {
-  title: string;
-  slug: string;
-  coverImageId: string;
-  authorUserId: string | null;
-  authorLabel: string;
-  cityContext: string;
-  categoryId: string;
-  tagIds: string[];
-  geoScope: GeoScope | null;
-  cityId: string;
-  regionId: string;
-  content: ArticleContentPayload;
-  status: ContentStatus;
-  publishedAtLocal: string;
-  scheduledAtLocal: string;
-  seoTitle: string;
-  seoDescription: string;
-  seoCanonicalUrl: string;
-  noindex: boolean;
-}): string {
-  return JSON.stringify(args);
-}
+import {
+  buildEditorComparable,
+  buildSavedComparable,
+  fromLocalDatetimeValue,
+  toLocalDatetimeValue,
+} from "@/lib/article/articleEditorComparable";
 
 function applySnapshot(setters: {
   setTitle: (v: string) => void;
@@ -214,44 +180,22 @@ export function ArticleEditorClient({
     blocks: content.blocks,
   });
 
-  const savedComparableRef = useRef(
-    snapshotComparable({
-      title: initial.title,
-      slug: initial.slug ?? "",
-      coverImageId: initial.coverImageId ?? "",
-      authorUserId: initial.authorUserId ?? null,
-      authorLabel: initial.authorLabel ?? "",
-      cityContext: initial.cityContext ?? "",
-      categoryId: initial.categoryId ?? "",
-      tagIds: initial.tagIds,
-      geoScope: initial.geoScope ?? null,
-      cityId: initial.cityId ?? "",
-      regionId: initial.regionId ?? "",
-      content: initial.content,
-      status: initial.status,
-      publishedAtLocal: toLocalDatetimeValue(initial.publishedAt),
-      scheduledAtLocal: toLocalDatetimeValue(initial.scheduledAt),
-      seoTitle: initial.seoTitle ?? "",
-      seoDescription: initial.seoDescription ?? "",
-      seoCanonicalUrl: initial.seoCanonicalUrl ?? "",
-      noindex: initial.noindex,
-    }),
-  );
+  const savedComparableRef = useRef(buildSavedComparable(initial));
 
   const currentComparable = useMemo(
     () =>
-      snapshotComparable({
+      buildEditorComparable({
         title,
         slug,
         coverImageId,
         authorUserId,
         authorLabel,
         cityContext,
-        categoryId: categoryId ?? "",
+        categoryId,
         tagIds,
         geoScope,
-        cityId: cityId ?? "",
-        regionId: regionId ?? "",
+        cityId,
+        regionId,
         content,
         status,
         publishedAtLocal,
@@ -492,27 +436,7 @@ export function ArticleEditorClient({
   }, [geoScope, cityId, regionId, geoScopeError]);
 
   const persistComparableFromSnapshot = useCallback((snap: ArticleEditorSnapshot) => {
-    savedComparableRef.current = snapshotComparable({
-      title: snap.title,
-      slug: snap.slug ?? "",
-      coverImageId: snap.coverImageId ?? "",
-      authorUserId: snap.authorUserId ?? "",
-      authorLabel: snap.authorLabel ?? "",
-      cityContext: snap.cityContext ?? "",
-      categoryId: snap.categoryId ?? "",
-      tagIds: snap.tagIds,
-      geoScope: snap.geoScope ?? null,
-      cityId: snap.cityId ?? "",
-      regionId: snap.regionId ?? "",
-      content: snap.content,
-      status: snap.status,
-      publishedAtLocal: toLocalDatetimeValue(snap.publishedAt),
-      scheduledAtLocal: toLocalDatetimeValue(snap.scheduledAt),
-      seoTitle: snap.seoTitle ?? "",
-      seoDescription: snap.seoDescription ?? "",
-      seoCanonicalUrl: snap.seoCanonicalUrl ?? "",
-      noindex: snap.noindex,
-    });
+    savedComparableRef.current = buildSavedComparable(snap);
   }, []);
 
   const showArticleSuccess = useCallback(
