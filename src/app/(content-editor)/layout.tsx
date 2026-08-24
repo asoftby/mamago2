@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import React from "react";
 import { EditorProviders } from "@/components/providers/EditorProviders";
+import { PERMANENT_NOINDEX_ROBOTS } from "@/lib/seo/indexingPolicy";
+
+export const metadata: Metadata = {
+  robots: PERMANENT_NOINDEX_ROBOTS,
+};
 
 /**
  * Isolated editor shell — no business dashboard sidebar, no site marketing chrome.
