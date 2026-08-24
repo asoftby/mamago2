@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { Chip } from "@/components/ui/Chip";
 import { ChipsRow } from "@/components/ui/chips-row";
 import { EventDateRangePicker } from "./EventDateRangePicker";
 import { useDiscoveryFilters, type WhenPreset } from "@/features/filters/discovery/filters.store";
