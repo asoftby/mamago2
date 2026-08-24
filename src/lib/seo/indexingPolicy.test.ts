@@ -18,6 +18,7 @@ for (const pathname of [
   "/u/token",
   "/routes/new",
   "/routes/family-day/edit",
+  "/minsk/birthday",
   "/minsk/birthday/make",
   "/ui-lab",
   "/__filters-demo",
