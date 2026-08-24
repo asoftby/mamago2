@@ -181,12 +181,20 @@ function currentEvidence(source: string, value: unknown, projection: PriceNormal
   return { source, path: "$", value: compact(value), ...(projection.mode !== "UNKNOWN" ? { interpretation: projection } : {}) };
 }
 
-function activityProjection(row: { priceFrom: number | null; priceTo: number | null; priceText: string | null; priceItems: unknown; scheduleJson: unknown }) {
+function persistedProjection(row: { priceMode: PublicationPriceMode; priceFrom: number | null; priceTo: number | null }) {
+  return row.priceMode === "UNKNOWN" ? null : normalizePublicationPrice({ mode: row.priceMode, min: row.priceFrom, max: row.priceTo });
+}
+
+function activityProjection(row: { priceMode: PublicationPriceMode; priceFrom: number | null; priceTo: number | null; priceText: string | null; priceItems: unknown; scheduleJson: unknown }) {
+  const persisted = persistedProjection(row);
+  if (persisted) return persisted;
   const schedule = row.scheduleJson && typeof row.scheduleJson === "object" ? row.scheduleJson as Record<string, unknown> : {};
   return normalizePublicationPrice({ mode: schedule.pricingMode as "free" | "fixed" | "from" | undefined, min: row.priceFrom, max: row.priceTo, priceItems: row.priceItems, priceText: row.priceText });
 }
 
-function offerProjection(row: { priceFrom: number | null; priceText: string | null; campSessions: unknown }) {
+function offerProjection(row: { priceMode: PublicationPriceMode; priceFrom: number | null; priceTo: number | null; priceText: string | null; campSessions: unknown }) {
+  const persisted = persistedProjection(row);
+  if (persisted) return persisted;
   const campValues = getCampSessionPriceValues(row.campSessions);
   if (campValues.length > 0) return normalizePublicationPrice({ priceItems: campValues.map((price) => ({ price })) });
   const text = parseSafeLegacyPriceText(row.priceText);
@@ -266,7 +274,7 @@ async function main() {
 
   const activityRows = activities.map((row) => { const current = activityProjection(row); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceText: row.priceText, priceItems: row.priceItems }; return classify("Activity", row.id, row.slug, fields, current, [currentEvidence("current.activity", row, current), ...(historical.get(`ACTIVITY:${row.id}`) ?? [])]); });
   const offerRows = offers.map((row) => { const current = offerProjection(row); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceText: row.priceText, priceItems: row.priceItems }; return classify("Offer", row.id, row.slug, fields, current, [currentEvidence("current.offer", row, current), ...(historical.get(`OFFER:${row.id}`) ?? [])]); });
-  const placeRows = places.map((row) => { const current = normalizePublicationPrice({ priceItems: row.priceItems }); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceItems: row.priceItems }; return classify("Place", row.id, row.slug, fields, current, [currentEvidence("current.place", row, current), ...(historical.get(`PLACE:${row.id}`) ?? [])]); });
+  const placeRows = places.map((row) => { const current = persistedProjection(row) ?? normalizePublicationPrice({ priceItems: row.priceItems }); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceItems: row.priceItems }; return classify("Place", row.id, row.slug, fields, current, [currentEvidence("current.place", row, current), ...(historical.get(`PLACE:${row.id}`) ?? [])]); });
   const rows = [...activityRows, ...offerRows, ...placeRows];
   writeManualReviewArtifacts(rows, optionArg("--manual-review-csv"), optionArg("--manual-review-md"));
   const output = {
