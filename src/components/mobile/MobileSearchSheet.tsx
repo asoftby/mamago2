@@ -41,6 +41,7 @@ import {
 } from "@/lib/family/familyAgeMode";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
 import { MobileSearch } from "@/components/mobile/MobileSearch";
+import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import type { SearchResultItem } from "@/lib/search/types";
 
 /** Единый для всех разделов: пользователь хотя бы раз открыл и закрыл поиск в этой вкладке браузера */
@@ -1016,13 +1017,11 @@ export function MobileSearchSheet({
               Пропустить
             </button>
           ) : showLeftReset ? (
-            <button
-              type="button"
+            <MobileOverlayResetAction
               onClick={handleResetAll}
-              className="shrink-0 rounded-xl px-3 py-3.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200"
             >
               Сбросить
-            </button>
+            </MobileOverlayResetAction>
           ) : (
             <div className="w-[5.5rem] shrink-0" aria-hidden />
           )}
