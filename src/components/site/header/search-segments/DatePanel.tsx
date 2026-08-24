@@ -116,7 +116,7 @@ export function DatePanel({ onClose, applied, actions, embedded = false }: DateP
   const quickOptions = [
     { id: "today", label: "Сегодня", value: "today" },
     { id: "tomorrow", label: "Завтра", value: "tomorrow" },
-    { id: "weekend", label: "На выходных", value: "weekend" },
+    { id: "weekend", label: "Выходные", value: "weekend" },
   ];
 
   return (

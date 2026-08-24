@@ -21,8 +21,8 @@ export function EventQuickFilters() {
   }, [actions, applied.nearby]);
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
-      <ChipsRow className="contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
+    <div className="flex items-center gap-3 overflow-x-auto scroll-smooth pb-3 pt-2 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
+      <ChipsRow className="contents [&>div]:contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
       <EventDateRangePicker applied={applied} onApply={actions.setDraft} />
     </div>
   );
