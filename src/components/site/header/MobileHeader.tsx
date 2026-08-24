@@ -28,6 +28,7 @@ import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
+import { MOBILE_DISCOVERY_EDGE_PADDING } from "@/components/mobile/mobile-control-geometry";
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
@@ -92,7 +93,7 @@ export function MobileHeader() {
         )}
       >
         <div className="mx-auto w-full">
-          <div className="px-4 pt-4 pb-4">
+          <div className={cn(MOBILE_DISCOVERY_EDGE_PADDING, "pb-4 pt-4")}>
             <div className="flex min-w-0 items-center gap-3">
               <div className="min-w-0 flex-1">
                 <MobileSearchEntry

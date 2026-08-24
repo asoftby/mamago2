@@ -18,6 +18,11 @@ import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/us
 import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 import { shouldHideMobileBottomNav } from "@/lib/intent";
 import { cn } from "@/lib/utils";
+import {
+  MOBILE_DISCOVERY_BOTTOM_OFFSET,
+  MOBILE_DISCOVERY_EDGE_MARGIN,
+  MOBILE_DISCOVERY_SHELL_RADIUS,
+} from "@/components/mobile/mobile-control-geometry";
 
 export type MobileBottomNavProps = {
   /** true — в pill «Мой план» скрыть строку про пустой план (подключить из API) */
@@ -82,10 +87,12 @@ export function MobileBottomNav({
     >
       <div
         className={cn(
-          "pointer-events-auto mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))]",
+          "pointer-events-auto",
+          MOBILE_DISCOVERY_BOTTOM_OFFSET,
+          MOBILE_DISCOVERY_EDGE_MARGIN,
         )}
       >
-        <div className="flex items-center gap-1.5 rounded-[28px] border border-[#EBEBEB] bg-[#F6F2EA] p-2 pl-2 pr-2 shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
+        <div className={cn("flex items-center gap-3 border border-[#EBEBEB] bg-[#F6F2EA] p-2 shadow-[0_4px_20px_rgba(0,0,0,0.08)]", MOBILE_DISCOVERY_SHELL_RADIUS)}>
           <NavIconButton
             href={homeHref}
             isActive={isHomeActive}

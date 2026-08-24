@@ -68,7 +68,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const calendar = (months: 1 | 2, defaultMonth?: Date) => (
     <Calendar value={fromKey(draft.from)} rangeStart={fromKey(draft.from)} rangeEnd={fromKey(draft.to)} onChange={select} disablePast numberOfMonths={months} defaultMonth={defaultMonth} size="compact" density={density} />
   );
-  const trigger = <Chip active={Boolean(applied.dateFrom)} className="h-10 shrink-0 gap-2"><CalendarDays className="h-4 w-4" />{label}</Chip>;
+  const trigger = <Chip active={Boolean(applied.dateFrom)} className="h-11 shrink-0 gap-2 px-5"><CalendarDays className="h-4 w-4" />{label}</Chip>;
 
   if (!mobile) return (
     <Popover open={open} onOpenChange={setOpen}>

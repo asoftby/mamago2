@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { cn } from "@/lib/utils";
+import {
+  MOBILE_DISCOVERY_FIELD_CHROME,
+  MOBILE_DISCOVERY_FIELD_GEOMETRY,
+} from "@/components/mobile/mobile-control-geometry";
 
 export type PlanPillNavButtonProps = {
   href: string;
@@ -55,11 +59,13 @@ export function PlanPillNavButton({
       aria-current={isActive ? "page" : undefined}
       aria-describedby={showEmptyHint ? emptyHintId : undefined}
       className={cn(
-        "relative flex h-[52px] min-w-0 flex-1 items-center rounded-full px-5 py-0",
+        "relative flex min-w-0 flex-1 items-center",
+        MOBILE_DISCOVERY_FIELD_GEOMETRY,
         "border transition-all duration-200 ease-out will-change-transform cursor-pointer touch-manipulation",
         chrome === "dark"
           ? cn(
-              "border-gray-200 bg-white shadow-sm active:scale-[0.98]",
+              MOBILE_DISCOVERY_FIELD_CHROME,
+              "active:scale-[0.98]",
               isActive && "border-[#EF8759]/40",
             )
           : cn(
