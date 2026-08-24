@@ -89,7 +89,7 @@ export const AGE_OPTIONS: readonly AgeOption[] = [
   ageRow("12-14", "12–14 лет", "12–14", 7, 12, 14, 144, 168),
   ageRow("14-16", "14–16 лет", "14–16", 8, 14, 16, 168, 192),
   ageRow("16-18", "16–18 лет", "16–18", 9, 16, 18, 192, 216),
-  ageRow("18+", "18+", "18+", 10, 18, null, 216, null, true),
+  ageRow("18+", "#nokids", "#nokids", 10, 18, null, 216, null, true),
 ] as const;
 
 /**

@@ -3692,3 +3692,16 @@ P3 — cleanup / polish / optional
 - Dependencies: product/data decision for session duration vs activity-level interval, schema migration adding an authoritative end boundary (or an explicit guarantee that multiday events materialize one session per active day), importer/wizard backfill rules.
 - Acceptance criteria: authoritative interval semantics are documented; schema/materialization and backfill are implemented; shared overlap predicate matches `start < filterEnd AND end >= filterStart`; density expands an interval into each intersecting Minsk day; fixtures cover an event starting before TODAY and remaining active today, plus month/year boundaries.
 - Source: discovery filters completion audit, base `961f8bae`, 2026-08-24
+
+## [BACKLOG-129] Normalize event prices for executable discovery ranges
+
+- Status: BLOCKED
+- Priority: P1
+- Area: Discovery / Events / Pricing data model
+- Added: 2026-08-24
+- Reason deferred: `priceFrom`/`priceTo` are not authoritative across the event wizard, tariff `priceItems`, and imported text prices; exposing a range slider or histogram now would silently omit or misclassify events.
+- Context: the discovery filter sheet currently exposes the executable “Бесплатно” predicate. Owner-review requested a min/max price control only if the stored data could support honest filtering and distribution counts.
+- Current state: the wizard writes the primary fixed/from price into `priceFrom` and writes tariff rows independently to JSON `priceItems`; free events may be represented by `scheduleJson.pricingMode = "free"` and/or a zero price; import performs best-effort parsing of `priceText`; no executable `priceMin`/`priceMax` predicate or price-distribution endpoint exists.
+- Dependencies: product semantics for “от”, tariff minima/maxima, session-specific prices and currency conversion; an authoritative numeric projection such as `effectivePriceMin`/`effectivePriceMax` (or a strict replacement contract for `priceFrom`/`priceTo`); writer and importer updates.
+- Acceptance criteria: explicit free status remains independent from paid ranges; all write paths populate an authoritative BYN numeric min/max projection; a migration/backfill derives safe values from structured pricing modes and `priceItems`, reports coverage, and quarantines unparseable text for manual review; list/count/distribution use one shared executable predicate; fixtures cover free, fixed, from, ranged, multi-tariff, imported, and unknown prices; the range UI is enabled only after measured coverage is accepted.
+- Source: event discovery filter owner-review audit, base `a01101c0`, 2026-08-24

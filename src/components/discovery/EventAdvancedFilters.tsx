@@ -6,6 +6,8 @@ import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.
 import { defaultFilters, serializeAppliedToSearchParams, useDiscoveryFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
+import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
 
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
   const { applied, actions } = useDiscoveryFilters();
@@ -23,12 +25,12 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   }, [draft, citySlug]);
 
   const toggleAge = (value: string) => patch({ age: draft.age.includes(value) ? draft.age.filter((item) => item !== value) : [...draft.age, value] });
-  const selectClass = "h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm";
+  const selectClass = "h-11 w-full appearance-none rounded-xl border border-neutral-200 bg-white pl-3 pr-9 text-sm";
   return (
     <div className="space-y-6 pb-1">
-      <fieldset><legend className="mb-1 text-sm font-semibold">Возраст <span className="font-normal text-muted-foreground">· общий профиль</span></legend><p className="mb-3 text-xs text-muted-foreground">Настройка синхронизирована с возрастом в шапке.</p><div className="flex flex-wrap gap-2">{AGE_GROUPS.map((g) => <Chip key={g.value} active={draft.age.includes(g.value)} onClick={() => toggleAge(g.value)}>{g.label}</Chip>)}</div></fieldset>
-      <fieldset><legend className="mb-2 text-sm font-semibold">Формат</legend><div className="flex flex-wrap gap-2">{([['OFFLINE','Офлайн'],['ONLINE','Онлайн'],['HYBRID','Гибрид']] as const).map(([value,label]) => <Chip key={value} active={draft.format === value} onClick={() => patch({ format: draft.format === value ? null : value })}>{label}</Chip>)}</div></fieldset>
-      <fieldset><legend className="mb-2 text-sm font-semibold">Где в городе</legend><div className="grid gap-3 sm:grid-cols-2"><label><span className="sr-only">Район</span><select className={selectClass} disabled={loading} value={draft.district ?? ""} onChange={(e) => patch({ district: e.target.value || null })}><option value="">Любой район</option>{options.districts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label><label><span className="sr-only">Метро</span><select className={selectClass} disabled={loading} value={draft.metro ?? ""} onChange={(e) => patch({ metro: e.target.value || null })}><option value="">Любое метро</option>{options.metros.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label></div></fieldset>
+      <fieldset className="space-y-2"><legend className="text-sm font-semibold">Возраст <span className="font-normal text-muted-foreground">· общий профиль</span></legend><div className="flex flex-wrap gap-2">{AGE_GROUPS.map((g) => <Chip key={g.value} active={draft.age.includes(g.value)} onClick={() => toggleAge(g.value)}>{g.label}</Chip>)}</div></fieldset>
+      <fieldset><legend className="mb-2 text-sm font-semibold">Формат</legend><div className="flex flex-wrap gap-2">{ACTIVITY_FORMAT_OPTIONS.map(({ value, label }) => <Chip key={value} active={draft.format === value} onClick={() => patch({ format: draft.format === value ? null : value })}>{label}</Chip>)}</div></fieldset>
+      <fieldset><legend className="mb-2 text-sm font-semibold">Где в городе</legend><div className="grid gap-3 sm:grid-cols-2">{([{ label: "Район", value: draft.district, options: options.districts, onChange: (value: string | null) => patch({ district: value }), placeholder: "Любой район" }, { label: "Метро", value: draft.metro, options: options.metros, onChange: (value: string | null) => patch({ metro: value }), placeholder: "Любое метро" }] as const).map((control) => <label key={control.label} className="relative block"><span className="sr-only">{control.label}</span><select className={selectClass} disabled={loading} value={control.value ?? ""} onChange={(e) => control.onChange(e.target.value || null)}><option value="">{control.placeholder}</option>{control.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select><ChevronDown aria-hidden="true" className="pointer-events-none absolute right-[10px] top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /></label>)}</div></fieldset>
       <fieldset><legend className="mb-2 text-sm font-semibold">Цена</legend><div className="flex gap-2"><Chip active={!draft.free} onClick={() => patch({ free: false })}>Любая</Chip><Chip active={draft.free} onClick={() => patch({ free: true })}>Бесплатно</Chip></div></fieldset>
       <div className="sticky bottom-0 flex items-center justify-between border-t bg-white pt-4"><button type="button" className="text-sm font-semibold underline" onClick={() => setDraft({ ...defaultFilters, age: [] })}>Сбросить всё</button><Button className="rounded-full px-6" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>Показать {count ?? "…"} событий</Button></div>
     </div>

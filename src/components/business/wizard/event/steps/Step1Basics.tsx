@@ -632,7 +632,7 @@ export function Step1Basics({
   });
   ageItems.push({
     id: "adult-only",
-    label: "Только 18+",
+    label: "#nokids",
     active: data.agePolicy === AgePolicy.ADULT_ONLY,
     disabled: !isEditable || loading,
     onClick: () => {

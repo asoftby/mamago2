@@ -22,7 +22,7 @@ export const AGE_RANGES: AgeRange[] = [
   { id: "12-14", label: "12–14 лет", minMonths: 144, maxMonths: 168 },
   { id: "14-16", label: "14–16 лет", minMonths: 168, maxMonths: 192 },
   { id: "16-18", label: "16–18 лет", minMonths: 192, maxMonths: 216 },
-  { id: "18+", label: "18+", minMonths: 216, maxMonths: null },
+  { id: "18+", label: "#nokids", minMonths: 216, maxMonths: null },
 ];
 
 /**

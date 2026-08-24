@@ -95,7 +95,7 @@ export const AGE_GROUPS: AgeGroup[] = [
     maxMonths: 216,
   },
   {
-    label: "18+",
+    label: "#nokids",
     value: "18+",
     min: 18,
     max: null,

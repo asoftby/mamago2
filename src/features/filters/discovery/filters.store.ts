@@ -726,7 +726,7 @@ export function useDiscoveryFilters() {
         : filters.format === "ONLINE"
           ? "Онлайн"
           : filters.format === "HYBRID"
-            ? "Гибрид"
+            ? "Микс"
             : "Формат";
 
     const metroLabel = filters.metro || "Метро";
