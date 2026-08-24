@@ -1,4 +1,4 @@
-import { formatPrice, formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import type { ActivityCardItem } from "../types";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -37,15 +37,7 @@ function formatAgeLabel(record: Record<string, unknown>): string | null {
 }
 
 function formatPriceLabel(record: Record<string, unknown>): string | null {
-  const direct = getNestedString(record, ["priceLabel", "priceText"]);
-  if (direct) return normalizeUiCurrencyText(direct);
-
-  const priceFrom = asNumber(record.priceFrom);
-  if (priceFrom == null) return null;
-  if (priceFrom === 0) return "Бесплатно";
-  const priceTo = asNumber(record.priceTo);
-  const useFrom = priceTo == null || priceTo !== priceFrom;
-  return useFrom ? formatPriceFrom(priceFrom, { hideZero: true }) : formatPrice(priceFrom, { hideZero: true });
+  return formatPublicCardPrice({ priceMode: asString(record.priceMode) as never, priceFrom: asNumber(record.priceFrom), priceTo: asNumber(record.priceTo), currency: asString(record.currency) });
 }
 
 function formatDateLabel(record: Record<string, unknown>): string | null {

@@ -12,7 +12,7 @@ import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { ActivityMock } from "@/types/activity";
@@ -189,12 +189,7 @@ export function CityHomeClassesSection({
           const ageLabel =
             activity.ageFrom != null ? `${activity.ageFrom}+` : undefined;
           const dateLabel = [ageLabel, dateRange].filter(Boolean).join(" · ");
-          const priceLabel =
-            activity.priceMin === 0
-              ? "бесплатно"
-              : activity.priceMin != null
-                ? formatPriceFrom(activity.priceMin)
-                : undefined;
+          const priceLabel = formatPublicCardPrice({ priceMode: activity.priceMode, priceFrom: activity.priceMin, priceTo: activity.priceMax, currency: activity.currency }) ?? undefined;
           return (
             <div key={activity.id} className={cardShell}>
               <AnalyticsCardViewTracker

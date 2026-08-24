@@ -1,6 +1,7 @@
 import type { ActivityFormat } from "@prisma/client";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
-import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
+import type { PublicationPriceMode } from "@prisma/client";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { ActivityMock } from "@/types/activity";
@@ -22,21 +23,13 @@ type EventListingSource = {
   priceMin?: number | null;
   priceMax?: number | null;
   priceListUsesOt?: boolean | null;
+  priceMode?: PublicationPriceMode | null;
 };
 
 function buildPriceLabel(
-  source: Pick<EventListingSource, "priceMin" | "priceMax" | "priceListUsesOt">,
+  source: Pick<EventListingSource, "priceMin" | "priceMax" | "priceMode">,
 ): string | undefined {
-  if (source.priceMin === 0) return "бесплатно";
-  if (source.priceMin == null) return undefined;
-  const useOt =
-    source.priceListUsesOt ??
-    !(
-      source.priceMax != null &&
-      source.priceMin != null &&
-      source.priceMin === source.priceMax
-    );
-  return useOt ? formatPriceFrom(source.priceMin) : formatPrice(source.priceMin);
+  return formatPublicCardPrice({ priceMode: source.priceMode, priceFrom: source.priceMin, priceTo: source.priceMax }) ?? undefined;
 }
 
 function buildCategoryLabel(
@@ -99,5 +92,6 @@ export function activityMockToEventCard(
     priceMin: activity.priceMin ?? null,
     priceMax: activity.priceMax ?? null,
     priceListUsesOt: activity.priceListUsesOt ?? null,
+    priceMode: activity.priceMode ?? null,
   });
 }

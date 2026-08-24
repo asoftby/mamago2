@@ -12,7 +12,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import type { ActivityMock } from "@/types/activity";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
-// NOTE: formatRuShortDayMonthRange, formatPriceFrom, getActivityFormatLabel, publicActivityPath
+// NOTE: formatRuShortDayMonthRange, getActivityFormatLabel, publicActivityPath
 // are still used by the OfferCard branch below — do not remove.
 
 type DiscoveryActivitiesGridProps = {
@@ -111,11 +111,7 @@ export function DiscoveryActivitiesGrid({
             .filter(Boolean)
             .join(" · ") || undefined}
           priceLabel={
-            activity.priceMin === 0
-              ? "бесплатно"
-              : activity.priceMin != null
-                ? formatPriceFrom(activity.priceMin)
-                : undefined
+            formatPublicCardPrice({ priceMode: activity.priceMode, priceFrom: activity.priceMin, priceTo: activity.priceMax, currency: activity.currency }) ?? undefined
           }
           saveDateISO={activity.dateStart ?? null}
           saveDateEndISO={activity.dateEnd ?? null}
