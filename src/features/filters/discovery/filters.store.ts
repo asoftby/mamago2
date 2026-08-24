@@ -513,11 +513,13 @@ export function useDiscoveryFilters() {
        * Компонент размонтировался раньше, чем сработал дебаунс — типично:
        * кликнули чип, тут же тапнули карточку события. router.replace()
        * здесь опасен: гонка с уже стартовавшим переходом на карточку может
-       * откатить навигацию обратно на листинг. Пишем историю напрямую, без
-       * транзишена Next, + сохраняем в сессию — чтобы «назад» с карточки и
-       * restore-из-localStorage видели реально кликнутый фильтр, а не
-       * теряли его молча (что originally срисовывалось: фильтр пропадал и
-       * из URL, и из localStorage, потому что сейв там завязан на appliedFromUrl).
+       * откатить навигацию обратно на листинг. Спасает именно сейв в
+       * localStorage — вернувшись на чистый листинг, гидратация его
+       * подхватит. history.replaceState — best-effort бонус (нормально
+       * закрыть таб / уйти вне SPA-навигации), но к моменту, когда этот
+       * cleanup реально выполняется, React (и Next) уже мог закоммитить
+       * переход на URL карточки; переписывать в этот момент чужой URL
+       * нельзя — получим адрес карточки с фильтрами листинга в query.
        */
       const intent = getIntentFromPath(pending.pathname);
       if (
@@ -528,7 +530,7 @@ export function useDiscoveryFilters() {
       ) {
         saveDiscoveryFiltersSession(pending.cityForSession, intent, pending.next);
       }
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined" && window.location.pathname === pending.pathname) {
         const params = serializeAppliedToSearchParams(pending.searchParams, pending.next);
         const qs = params.toString();
         const url = qs ? `${pending.pathname}?${qs}` : pending.pathname;
