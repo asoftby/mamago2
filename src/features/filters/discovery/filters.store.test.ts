@@ -6,9 +6,18 @@ import {
   getModalFilterCount,
   hasAnyNonTrackingUrlParams,
   optimisticFiltersSettled,
+  shouldClearStoredDiscoveryState,
   parseAppliedFromUrl,
   serializeAppliedToSearchParams,
 } from "./filters.store";
+
+test("explicitly clearing the final filter invalidates stored discovery state", () => {
+  assert.equal(shouldClearStoredDiscoveryState(defaultFilters), true);
+  assert.equal(
+    shouldClearStoredDiscoveryState({ ...defaultFilters, free: true }),
+    false,
+  );
+});
 
 test("event filters survive URL serialization and parsing", () => {
   const filters = {

@@ -158,6 +158,10 @@ function clearDiscoveryFiltersSession(city: string, intent: Intent): void {
   }
 }
 
+export function shouldClearStoredDiscoveryState(filters: DiscoveryFilters): boolean {
+  return isDiscoveryFiltersEmpty(filters);
+}
+
 /** Чтобы эффект «восстановить из session» не подставлял старый age после «Для всех» / сброса возраста. */
 function stripAgeFromStoredDiscoverySession(
   cityForSession: string,
@@ -598,11 +602,12 @@ export function useDiscoveryFilters() {
         writeTimerRef.current = null;
         pendingWriteRef.current = null;
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
+        if (shouldClearStoredDiscoveryState(next)) clearSessionForCurrentRoute();
         stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
         scheduleOverlayFailsafe();
       }, WRITE_DEBOUNCE_MS);
     },
-    [router, pathname, searchParams, applied, cityForSession, clearOverlayFailsafe, scheduleOverlayFailsafe],
+    [router, pathname, searchParams, applied, cityForSession, clearOverlayFailsafe, scheduleOverlayFailsafe, clearSessionForCurrentRoute],
   );
 
   const actions = useMemo(
@@ -644,6 +649,7 @@ export function useDiscoveryFilters() {
         }
         setOptimisticFilters(next);
         writeAppliedToUrl(router, pathname, searchParams, next, "replace");
+        if (shouldClearStoredDiscoveryState(next)) clearSessionForCurrentRoute();
         stripAgeFromStoredDiscoverySession(cityForSession, pathname, next);
         scheduleOverlayFailsafe();
       },
@@ -668,6 +674,7 @@ export function useDiscoveryFilters() {
           next,
           "replace",
         );
+        if (shouldClearStoredDiscoveryState(next)) clearSessionForCurrentRoute();
         stripAgeFromStoredDiscoverySession(cityForSession, path, next);
         scheduleOverlayFailsafe();
       },
