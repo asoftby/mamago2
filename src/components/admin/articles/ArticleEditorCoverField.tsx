@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import type { MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
+import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 
 type PickerItem = {
   id: string;
@@ -21,6 +22,7 @@ export function ArticleEditorCoverField({
   uploadButtonLabel = "Загрузить обложку",
   successUploadMessage = "Обложка загружена",
   successPickMessage = "Обложка выбрана",
+  articleMediaSource,
 }: {
   value: string;
   onChange: (mediaId: string, previewUrl: string | null) => void;
@@ -31,6 +33,8 @@ export function ArticleEditorCoverField({
   uploadButtonLabel?: string;
   successUploadMessage?: string;
   successPickMessage?: string;
+  /** «Фото этой статьи» — первая вкладка picker'а. Без него picker остаётся одноисточниковым. */
+  articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
   const mediaId = value.trim();
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState<string | null>(initialPreviewUrl ?? null);
@@ -140,6 +144,15 @@ export function ArticleEditorCoverField({
       librarySelectSuccessMessage={successPickMessage}
       mediaLibraryDescription="Недавно загруженные изображения. Полный список — в разделе «Медиатека»."
       singleEmptyHint="Выберите главное изображение из медиатеки или загрузите файл"
+      articleLibrary={
+        articleMediaSource
+          ? {
+              items: articleMediaSource.items,
+              loading: articleMediaSource.loading,
+              load: articleMediaSource.load,
+            }
+          : undefined
+      }
     />
   );
 }

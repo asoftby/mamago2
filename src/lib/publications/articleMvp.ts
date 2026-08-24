@@ -135,6 +135,60 @@ export function deriveArticleExcerptFromContent(
   return text;
 }
 
+/** Где именно внутри статьи используется конкретный MediaAsset — для «Фото этой статьи» в picker'е. */
+export const ArticleMediaUsageKindSchema = z.enum(["cover", "seo", "image-block", "gallery-block"]);
+export type ArticleMediaUsageKind = z.infer<typeof ArticleMediaUsageKindSchema>;
+
+export type ArticleMediaUsageEntry = { mediaId: string; usage: ArticleMediaUsageKind[] };
+
+/**
+ * Все MediaAsset.id, на которые ссылается статья (обложка, legacy SEO-картинка,
+ * image/gallery блоки), с дедупликацией и списком мест использования на каждый id.
+ * Owner-agnostic: намеренно не трогает `uploadedById` — задача picker'а показать
+ * «Фото этой статьи» независимо от того, кому исторически принадлежит файл
+ * (важно для migrated/legacy статей, где uploadedById=ADMIN).
+ * Порядок: id встречи первого usage (cover → seo → блоки по порядку).
+ * Единый source of truth и для сервера (API), и для клиента (draft-статья без id) — см. п.16 тикета.
+ */
+export function extractArticleMediaUsage(input: {
+  coverImageId?: string | null;
+  seoImageId?: string | null;
+  blocks?: ArticleBlockMvp[] | null;
+}): ArticleMediaUsageEntry[] {
+  const order: string[] = [];
+  const usageByMedia = new Map<string, Set<ArticleMediaUsageKind>>();
+
+  const add = (mediaId: string | null | undefined, kind: ArticleMediaUsageKind) => {
+    const id = mediaId?.trim();
+    if (!id) return;
+    if (!usageByMedia.has(id)) {
+      usageByMedia.set(id, new Set());
+      order.push(id);
+    }
+    usageByMedia.get(id)!.add(kind);
+  };
+
+  add(input.coverImageId, "cover");
+  add(input.seoImageId, "seo");
+  for (const block of input.blocks ?? []) {
+    if (block.type === "image") add(block.mediaId, "image-block");
+    if (block.type === "gallery") {
+      for (const mediaId of block.mediaIds) add(mediaId, "gallery-block");
+    }
+  }
+
+  return order.map((mediaId) => ({ mediaId, usage: [...usageByMedia.get(mediaId)!] }));
+}
+
+/** Уникальный список media id, используемых статьёй — без usage-детализации. */
+export function extractArticleMediaIds(input: {
+  coverImageId?: string | null;
+  seoImageId?: string | null;
+  blocks?: ArticleBlockMvp[] | null;
+}): string[] {
+  return extractArticleMediaUsage(input).map((entry) => entry.mediaId);
+}
+
 export function newBlock(
   type: ArticleBlockMvp["type"],
   id: () => string = () => randomId(),

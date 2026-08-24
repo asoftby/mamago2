@@ -29,6 +29,7 @@ import {
 } from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
+import { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 import {
   PublicationPanel,
   STATUS_LABEL,
@@ -199,6 +200,19 @@ export function ArticleEditorClient({
 
   /** Запись в БД ещё не создана — только после первого «Сохранить» / «Опубликовать». */
   const hasPersistedId = Boolean(initial.id?.trim());
+
+  /**
+   * «Фото этой статьи» — общий источник для всех image/gallery picker'ов на
+   * странице (обложка + каждый блок). Persisted-статья читает сервер
+   * (/api/admin/articles/[id]/media, актуальный сохранённый contentJson);
+   * ещё не сохранённая — тот же extractArticleMediaUsage прямо по текущему
+   * editor state, без временной записи в БД ради picker'а.
+   */
+  const articleMediaSource = useArticleMediaSource({
+    articleId: hasPersistedId ? initial.id : null,
+    coverImageId,
+    blocks: content.blocks,
+  });
 
   const savedComparableRef = useRef(
     snapshotComparable({
@@ -924,6 +938,7 @@ export function ArticleEditorClient({
               setCoverImageId(id);
               setCoverImagePreviewUrl(previewUrl ?? "");
             }}
+            articleMediaSource={articleMediaSource}
           />
 
           <div className="grid gap-5 sm:grid-cols-2">
@@ -1069,6 +1084,7 @@ export function ArticleEditorClient({
             blocks={content.blocks}
             onChange={(blocks) => setContent((prev) => ({ ...prev, blocks }))}
             authorUserId={authorUserId}
+            articleMediaSource={articleMediaSource}
           />
         </CardContent>
       </Card>

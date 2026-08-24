@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import type { MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
+import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 
 type PickerItem = {
   id: string;
@@ -17,12 +18,15 @@ export function ArticleEditorGalleryField({
   onChange,
   authorUserId,
   showHeading = true,
+  articleMediaSource,
 }: {
   value: string[];
   onChange: (ids: string[]) => void;
   /** Медиатека статьи = медиатека этого автора; без него сервер берёт медиатеку текущего пользователя. */
   authorUserId?: string | null;
   showHeading?: boolean;
+  /** «Фото этой статьи» — первая вкладка picker'а. Без него picker остаётся одноисточниковым. */
+  articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
   const [loadedPreviewById, setLoadedPreviewById] = useState<Record<string, string>>({});
   const ids = useMemo(() => value.filter((id) => id.trim()), [value]);
@@ -158,6 +162,16 @@ export function ArticleEditorGalleryField({
       librarySelectSuccessMessage="Добавлено в галерею"
       mediaLibraryDescription="Кликните по превью, чтобы отметить несколько изображений, затем добавьте их в галерею."
       multipleEmptyHint="Можно взять изображения из медиатеки или загрузить файлы"
+      addSelectedButtonLabel="Добавить в галерею"
+      articleLibrary={
+        articleMediaSource
+          ? {
+              items: articleMediaSource.items,
+              loading: articleMediaSource.loading,
+              load: articleMediaSource.load,
+            }
+          : undefined
+      }
     />
   );
 }
