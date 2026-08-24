@@ -74,7 +74,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   if (!mobile) return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align="start" className="w-[650px] p-5">{calendar(2)}<div className="mt-3 flex items-center justify-between gap-4"><p className="text-xs text-muted-foreground">Первый клик выбирает один день; второй завершает диапазон.</p><Button size="sm" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Применить</Button></div></PopoverContent>
+      <PopoverContent align="start" className="w-[650px] p-5">{calendar(2)}<div className="mt-3 flex items-center justify-between gap-4"><MobileOverlayResetAction disabled={!draft.from} onClick={() => dispatch({ type: "reset" })} /><Button size="sm" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Применить</Button></div></PopoverContent>
     </Popover>
   );
 
@@ -85,7 +85,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
         <div className="sticky top-0 z-10 border-b bg-white px-5 py-4"><SheetTitle>Выберите даты</SheetTitle><div className="mt-1 text-sm text-muted-foreground">{draft.from ? `${draft.from}${draft.to && draft.to !== draft.from ? ` — ${draft.to}` : ""}` : "Диапазон не выбран"}</div></div>
         <div className="flex gap-2 overflow-x-auto px-4 py-3">{(["TODAY", "TOMORROW", "WEEKEND"] as const).map((p) => <Chip key={p} onClick={() => applyPreset(p)}>{p === "TODAY" ? "Сегодня" : p === "TOMORROW" ? "Завтра" : "Выходные"}</Chip>)}</div>
         <div className="flex-1 space-y-8 overflow-y-auto px-4 pb-28">{Array.from({ length: 4 }, (_, i) => <div key={i}>{calendar(1, new Date(new Date().getFullYear(), new Date().getMonth() + i, 1))}</div>)}</div>
-        <div className="sticky bottom-0 border-t bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><div className="flex items-center gap-3"><MobileOverlayResetAction onClick={() => dispatch({ type: "reset" })} /><div className="min-w-0 flex-1" /><Button className="min-w-[10rem] shrink-0 rounded-full" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Показать {resultCount ?? "…"} событий</Button></div></div>
+        <div className="sticky bottom-0 border-t bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><div className="flex items-center gap-3"><MobileOverlayResetAction disabled={!draft.from} onClick={() => dispatch({ type: "reset" })} /><div className="min-w-0 flex-1" /><Button className="min-w-[10rem] shrink-0 rounded-full" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Показать {resultCount ?? "…"} событий</Button></div></div>
       </SheetContent>
     </Sheet>
   );

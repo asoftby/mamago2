@@ -19,3 +19,10 @@ test("same-day second tap completes the single-day range", () => {
   assert.deepEqual(tap(tap(emptyDateRangeDraft, today), today), { from: today, to: today, selectingEnd: false });
 });
 test("past dates are ignored", () => assert.deepEqual(tap(emptyDateRangeDraft, "2026-08-23"), emptyDateRangeDraft));
+test("reset clears a selected range back to the empty draft", () => {
+  const selected = tap(tap(emptyDateRangeDraft, today), "2026-08-27");
+  assert.deepEqual(dateRangeReducer(selected, { type: "reset" }), emptyDateRangeDraft);
+});
+test("reset on an already-empty draft is a no-op", () => {
+  assert.deepEqual(dateRangeReducer(emptyDateRangeDraft, { type: "reset" }), emptyDateRangeDraft);
+});
