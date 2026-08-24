@@ -1,12 +1,19 @@
 import { permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
-import { buildCityPublicPath } from "@/lib/routing/cityPaths";
+import {
+  buildAbsoluteCanonicalUrl,
+  buildCityPublicPath,
+} from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
+import { listNationalBlogArticles } from "@/server/article/listCityHomeArticles";
 import { BlogIndex } from "./BlogIndex";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "Журнал — mamaGo",
   description: "Идеи для прогулок, маршруты и советы для семей с детьми",
+  alternates: {
+    canonical: buildAbsoluteCanonicalUrl("/blog"),
+  },
 });
 
 export default async function BlogPage({
@@ -27,9 +34,11 @@ export default async function BlogPage({
     );
   }
 
+  const articles = await listNationalBlogArticles();
+
   return (
     <main>
-      <BlogIndex articles={[]} />
+      <BlogIndex articles={articles} />
     </main>
   );
 }
