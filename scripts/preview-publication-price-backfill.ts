@@ -14,8 +14,8 @@ import { getCampSessionPriceValues } from "../src/lib/offers/campPricing";
 
 type EntityName = "Activity" | "Offer" | "Place";
 type Classification = "AUTO_SAFE" | "RECOVERABLE" | "MANUAL_REVIEW" | "NONE";
-type Evidence = { source: string; path: string; value: unknown; interpretation?: NormalizedPriceRange };
-type AuditRow = { entity: EntityName; id: string; slug: string; classification: Classification; current: Record<string, unknown>; proposed: NormalizedPriceRange; reason: string; links: { local: string; admin: string }; evidence: Evidence[] };
+type Evidence = { source: string; path: string; value: unknown; interpretation?: NormalizedPriceRange; interpretationRule?: string };
+type AuditRow = { entity: EntityName; id: string; slug: string | null; classification: Classification; coverageExcluded: boolean; coverageExclusionReason: string | null; current: Record<string, unknown>; proposed: NormalizedPriceRange; reason: string; links: { local: string; admin: string }; evidence: Evidence[] };
 const PRICE_KEY = /price|pricing|cost|average.?check|тариф|цен/i;
 
 function snapshotRootArg(): string | null {
@@ -39,6 +39,30 @@ export function parseTariffCurrencyAmounts(value: string): NormalizedPriceRange 
   const min = Math.min(...values);
   const max = Math.max(...values);
   return { mode: min === 0 && max === 0 ? "FREE" : min === max ? "EXACT" : "RANGE", min, max, currency: "BYN" };
+}
+
+export function parseDeterministicLegacyPriceText(value: string): { price: NormalizedPriceRange; rule: string } | null {
+  const withoutFormerPrices = value.replace(/<del\b[^>]*>[\s\S]*?<\/del>/gi, " ");
+  const text = withoutFormerPrices.replace(/<[^>]+>/g, " ").replace(/&(?:nbsp|ndash|mdash);/gi, " ").replace(/\s+/g, " ").trim();
+  if (!text || /акци|ранн\w* бронир|при бронировании до|цена действ\w* до|скидк/i.test(text)) return null;
+  if (/^(?:вход\s+)?бесплатн(?:о|ый)\s*[.!]?$/i.test(text)) return { price: { mode: "FREE", min: 0, max: 0, currency: "BYN" }, rule: "TEXT_EXPLICIT_FREE" };
+
+  const currency = "(?:BYN|Br|Б|руб(?:\\.|ля|лей)?|р\\.?)";
+  const amount = "((?:\\d{1,3}(?:[\\s\\u00a0]\\d{3})+|\\d+)(?:[.,]\\d{1,2})?)";
+  const matches = [...text.matchAll(new RegExp(`${amount}\\s*${currency}(?=$|[\\s.,;:!?)/<])`, "giu"))];
+  const range = parseTariffCurrencyAmounts(withoutFormerPrices);
+  if (range) return { price: range, rule: "TEXT_CURRENT_TARIFF_RANGE" };
+  const from = matches.length === 1 ? text.match(new RegExp(`(?:^|[^а-яё])от\\s+${amount}\\s*${currency}(?=$|[\\s.,;:!?)/<])`, "iu")) : null;
+  if (from) {
+    const min = Number(from[1].replace(/[\s\u00a0]/g, "").replace(",", "."));
+    return { price: { mode: "FROM", min, max: null, currency: "BYN" }, rule: "TEXT_EXPLICIT_FROM" };
+  }
+
+  if (matches.length !== 1) return null;
+  const unitContext = /(?:руб\.?|byn|br|р\.?)\s*[/]\s*(?:(?:\d+(?:[.,]\d+)?\s*)?(?:чел|час|месяц|мес))|(?:руб\.?|byn|br|р\.?)\s*[-–—]\s*\d+(?:[.,]\d+)?\s*(?:час|мин|дн|занят)|(?:^|[^а-яё])(?:за|на)\s+\d+(?:[.,]\d+)?\s*(?:час|мин|дн|занят)|\(\s*\d+(?:[.,]\d+)?(?:\s*[-–—]\s*\d+(?:[.,]\d+)?)?\s*час|аренд\w*\s+(?:пространства|комнаты)|(?:^|[^а-яё])пакет(?:$|[^а-яё])|любой день/i.test(text);
+  if (!unitContext && !/<del\b/i.test(value)) return null;
+  const exact = Number(matches[0][1].replace(/[\s\u00a0]/g, "").replace(",", "."));
+  return { price: { mode: "EXACT", min: exact, max: exact, currency: "BYN" }, rule: /<del\b/i.test(value) ? "TEXT_CURRENT_EXACT_FORMER_MARKUP_IGNORED" : "TEXT_CURRENT_EXACT_WITH_UNIT" };
 }
 
 function compact(value: unknown): unknown {
@@ -66,8 +90,8 @@ function collectEvidence(value: unknown, source: string, path = "$", inheritedRe
   if (typeof value === "string") {
     if (!inheritedRelevant) return [];
     const parsed = parseSafeLegacyPriceText(value);
-    const tariffRange = parsed.mode === "UNKNOWN" ? parseTariffCurrencyAmounts(value) : null;
-    return [{ source, path, value: compact(value), ...(parsed.mode !== "UNKNOWN" ? { interpretation: parsed } : tariffRange ? { interpretation: tariffRange } : {}) }];
+    const deterministic = parsed.mode === "UNKNOWN" ? parseDeterministicLegacyPriceText(value) : null;
+    return [{ source, path, value: compact(value), ...(parsed.mode !== "UNKNOWN" ? { interpretation: parsed, interpretationRule: "TEXT_STRICT_LEGACY" } : deterministic ? { interpretation: deterministic.price, interpretationRule: deterministic.rule } : {}) }];
   }
   if (typeof value !== "object") return inheritedRelevant ? [{ source, path, value }] : [];
   const direct = explicitProjection(value);
@@ -94,21 +118,24 @@ function uniqueInterpretations(evidence: Evidence[]): NormalizedPriceRange[] {
   return [...values.values()];
 }
 
-function classify(entity: EntityName, id: string, slug: string, currentFields: Record<string, unknown>, current: PriceNormalizationResult, evidence: Evidence[]): AuditRow {
+function classify(entity: EntityName, id: string, slug: string | null, currentFields: Record<string, unknown>, current: PriceNormalizationResult, evidence: Evidence[]): AuditRow {
   const editorType = entity.toLowerCase() === "activity" ? "event" : entity.toLowerCase();
   const admin = `/editor/${editorType}/${id}/edit`;
   const links = { local: `http://localhost:3000${admin}`, admin };
+  const coverageExcluded = slug?.startsWith("local-test-") ?? false;
+  const common = { entity, id, slug, coverageExcluded, coverageExclusionReason: coverageExcluded ? "local-test-fixture" : null, current: currentFields, links, evidence };
   if (current.mode !== "UNKNOWN" && current.conflict == null) {
-    return { entity, id, slug, classification: "AUTO_SAFE", current: currentFields, proposed: current, reason: `authoritative-${current.source.toLowerCase()}`, links, evidence };
+    return { ...common, classification: "AUTO_SAFE", proposed: current, reason: `authoritative-${current.source.toLowerCase()}` };
   }
   const candidates = uniqueInterpretations(evidence);
   if (candidates.length === 1) {
-    return { entity, id, slug, classification: "RECOVERABLE", current: currentFields, proposed: candidates[0], reason: "single-unambiguous-historical-interpretation", links, evidence };
+    const rule = evidence.find((item) => item.interpretationRule && item.interpretation && `${item.interpretation.mode}:${item.interpretation.min}:${item.interpretation.max}` === `${candidates[0].mode}:${candidates[0].min}:${candidates[0].max}`)?.interpretationRule;
+    return { ...common, classification: "RECOVERABLE", proposed: candidates[0], reason: rule ? `deterministic-text:${rule}` : "single-unambiguous-historical-interpretation" };
   }
   if (entity === "Place" && evidence.length === 1 && evidence[0]?.source === "current.place") {
-    return { entity, id, slug, classification: "NONE", current: currentFields, proposed: normalizePublicationPrice({ mode: "NONE" }), reason: "place-has-no-own-price-evidence", links, evidence };
+    return { ...common, classification: "NONE", proposed: normalizePublicationPrice({ mode: "NONE" }), reason: "place-has-no-own-price-evidence" };
   }
-  return { entity, id, slug, classification: "MANUAL_REVIEW", current: currentFields, proposed: normalizePublicationPrice({ mode: "UNKNOWN" }), reason: candidates.length > 1 ? "conflicting-historical-interpretations" : current.conflict ?? "no-provable-price-intent", links, evidence };
+  return { ...common, classification: "MANUAL_REVIEW", proposed: normalizePublicationPrice({ mode: "UNKNOWN" }), reason: candidates.length > 1 ? "conflicting-historical-interpretations" : current.conflict ?? "no-provable-price-intent" };
 }
 
 function csvCell(value: unknown): string {
@@ -129,6 +156,25 @@ function writeManualReviewArtifacts(rows: AuditRow[], csvPath: string | null, ma
     const examples = manual.slice(0, 12).map((row) => `- ${row.entity} \`${row.id}\` (\`${row.slug}\`): ${row.reason}; proposed \`${row.proposed.mode}\`; [editor](${row.links.admin})`).join("\n");
     writeFileSync(markdownPath, `# Pricing manual review\n\nGenerated from the read-only pricing recovery preview. Total: ${manual.length}.\n\n## Counts\n\n${counts}\n\n## Sample queue\n\n${examples}\n`);
   }
+}
+
+function writeComparisonArtifact(output: { coverage: unknown; rows: AuditRow[] }, baselinePath: string | null, reportPath: string | null) {
+  if (!baselinePath || !reportPath) return;
+  const baseline = JSON.parse(readFileSync(baselinePath, "utf8")) as { coverage: unknown; rows: AuditRow[] };
+  const beforeByKey = new Map(baseline.rows.map((row) => [`${row.entity}:${row.id}`, row]));
+  const reclassified = output.rows.flatMap((after) => {
+    const before = beforeByKey.get(`${after.entity}:${after.id}`);
+    if (!before || (before.classification === after.classification && JSON.stringify(before.proposed) === JSON.stringify(after.proposed))) return [];
+    const rule = after.reason.startsWith("deterministic-text:")
+      ? after.reason.slice("deterministic-text:".length)
+      : after.classification === "MANUAL_REVIEW" && after.evidence.some((item) => /акци|при бронировании до|ранн\w* бронир/i.test(String(item.value)))
+        ? "TEXT_DATE_SENSITIVE_PROMOTION"
+        : after.reason;
+    return [{ entity: after.entity, id: after.id, slug: after.slug, before: { classification: before.classification, proposed: before.proposed }, after: { classification: after.classification, proposed: after.proposed }, rule, evidence: after.evidence.filter((item) => item.interpretationRule || /акци|при бронировании до|ранн\w* бронир/i.test(String(item.value))) }];
+  });
+  const report = { generatedAt: new Date().toISOString(), readOnly: true, oldCoverage: baseline.coverage, newCoverage: output.coverage, reclassified, remainingManualReview: output.rows.filter((row) => row.classification === "MANUAL_REVIEW") };
+  mkdirSync(dirname(reportPath), { recursive: true });
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 }
 
 function currentEvidence(source: string, value: unknown, projection: PriceNormalizationResult): Evidence {
@@ -153,6 +199,12 @@ function summarize(rows: AuditRow[]) {
   const modes: Record<PublicationPriceMode, number> = { FREE: 0, EXACT: 0, FROM: 0, RANGE: 0, NONE: 0, UNKNOWN: 0 };
   rows.forEach((row) => { classifications[row.classification] += 1; modes[row.proposed.mode] += 1; });
   return { total: rows.length, classifications, proposedModes: modes };
+}
+
+function productReadiness(rows: AuditRow[]) {
+  const included = rows.filter((row) => !row.coverageExcluded);
+  const unknown = included.filter((row) => row.proposed.mode === "UNKNOWN").length;
+  return { total: included.length, excludedFixtures: rows.length - included.length, unknown, unknownPercentage: Number(((unknown / included.length) * 100).toFixed(2)) };
 }
 
 async function main() {
@@ -217,12 +269,14 @@ async function main() {
   const placeRows = places.map((row) => { const current = normalizePublicationPrice({ priceItems: row.priceItems }); const fields = { priceFrom: row.priceFrom, priceTo: row.priceTo, currency: row.currency, priceMode: row.priceMode, priceItems: row.priceItems }; return classify("Place", row.id, row.slug, fields, current, [currentEvidence("current.place", row, current), ...(historical.get(`PLACE:${row.id}`) ?? [])]); });
   const rows = [...activityRows, ...offerRows, ...placeRows];
   writeManualReviewArtifacts(rows, optionArg("--manual-review-csv"), optionArg("--manual-review-md"));
-  console.log(JSON.stringify({
+  const output = {
     generatedAt: new Date().toISOString(), readOnly: true,
     sourceAvailability: { migrationLineage: lineage.length, importedRecords: imported.length, adminAuditLogs: adminAudits.length, placeRevisions: placeRevisionCount, placeRevisionHasPriceFields: false, snapshotRoot, snapshotRecordsMatched: snapshotRecordCount },
-    coverage: { Activity: summarize(activityRows), Offer: summarize(offerRows), Place: summarize(placeRows), all: summarize(rows) },
+    coverage: { Activity: summarize(activityRows), Offer: summarize(offerRows), Place: summarize(placeRows), all: summarize(rows), productOnly: productReadiness(rows) },
     rows,
-  }, null, 2));
+  };
+  writeComparisonArtifact(output, optionArg("--comparison-baseline"), optionArg("--comparison-report"));
+  console.log(JSON.stringify(output, null, 2));
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
