@@ -25,6 +25,8 @@ export interface CalendarProps {
   numberOfMonths?: 1 | 2;
   /** Keep a two-month calendar compact on small screens by hiding its second month. */
   collapseToOneMonthOnMobile?: boolean;
+  /** Event counts keyed by YYYY-MM-DD; rendered as intensity dots. */
+  density?: Record<string, number>;
 }
 
 export function Calendar({
@@ -44,6 +46,7 @@ export function Calendar({
   size = "default",
   numberOfMonths = 1,
   collapseToOneMonthOnMobile = false,
+  density = {},
 }: CalendarProps) {
   const compact = size === "compact";
   const now = React.useMemo(() => new Date(), []);
@@ -286,6 +289,8 @@ export function Calendar({
           const inRange = isInRange(day, displayMonth, displayYear);
           const rangeStartDay = isRangeStart(day, displayMonth, displayYear);
           const rangeEndDay = isRangeEnd(day, displayMonth, displayYear);
+          const dateKey = `${displayYear}-${String(displayMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const dayDensity = density[dateKey] ?? 0;
 
           return (
             <button
@@ -306,7 +311,8 @@ export function Calendar({
               onClick={() => handleDateClick(day, displayMonth, displayYear)}
               disabled={disabled || dateDisabled}
             >
-              {day}
+              <span>{day}</span>
+              {dayDensity > 0 ? <span aria-label={`${dayDensity} событий`} className={cn("mx-auto mt-0.5 block rounded-full bg-current", dayDensity > 8 ? "h-1.5 w-1.5" : dayDensity > 2 ? "h-1 w-1" : "h-0.5 w-0.5")} /> : null}
             </button>
           );
         })}
