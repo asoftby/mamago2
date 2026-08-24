@@ -20,6 +20,19 @@ export function normalizePriceSliderValue(value: string, domainMax: number): num
   return numericValue >= domainMax ? null : numericValue;
 }
 
+export function priceSliderValueFromPosition(clientX: number, left: number, width: number, domainMax: number, step: number): number {
+  const ratio = Math.min(1, Math.max(0, (clientX - left) / width));
+  return Math.min(domainMax, Math.max(0, Math.round((ratio * domainMax) / step) * step));
+}
+
+export function priceSliderValueFromKey(key: string, current: number, domainMax: number, step: number): number | undefined {
+  if (key === "Home") return 0;
+  if (key === "End") return domainMax;
+  if (key === "ArrowLeft" || key === "ArrowDown") return Math.max(0, current - step);
+  if (key === "ArrowRight" || key === "ArrowUp") return Math.min(domainMax, current + step);
+  return undefined;
+}
+
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
   const { applied, actions } = useDiscoveryFilters();
   const { options, loading } = useDiscoveryFilterOptions(citySlug);
@@ -33,6 +46,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
       free: false,
       priceMax: normalizePriceSliderValue(value, distribution.max!),
     });
+  };
+  const updatePriceMaxFromPointer = (event: React.PointerEvent<HTMLInputElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const value = priceSliderValueFromPosition(event.clientX, rect.left, rect.width, distribution.max!, distribution.step ?? 1);
+    updatePriceMax(String(value));
   };
 
   React.useEffect(() => {
@@ -62,7 +80,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
       <fieldset className="space-y-2"><legend className="text-sm font-semibold">Возраст <span className="font-normal text-muted-foreground">· общий профиль</span></legend><div className="flex flex-wrap gap-2">{AGE_GROUPS.map((g) => <Chip key={g.value} active={draft.age.includes(g.value)} onClick={() => toggleAge(g.value)}>{g.label}</Chip>)}</div></fieldset>
       <fieldset><legend className="mb-2 text-sm font-semibold">Формат</legend><div className="flex flex-wrap gap-2">{ACTIVITY_FORMAT_OPTIONS.map(({ value, label }) => <Chip key={value} active={draft.format === value} onClick={() => patch({ format: draft.format === value ? null : value })}>{label}</Chip>)}</div></fieldset>
       <fieldset><legend className="mb-2 text-sm font-semibold">Где в городе</legend><div className="grid gap-3 sm:grid-cols-2">{([{ label: "Район", value: draft.district, options: options.districts, onChange: (value: string | null) => patch({ district: value }), placeholder: "Любой район" }, { label: "Метро", value: draft.metro, options: options.metros, onChange: (value: string | null) => patch({ metro: value }), placeholder: "Любое метро" }] as const).map((control) => <label key={control.label} className="relative block"><span className="sr-only">{control.label}</span><select className={selectClass} disabled={loading} value={control.value ?? ""} onChange={(e) => control.onChange(e.target.value || null)}><option value="">{control.placeholder}</option>{control.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select><ChevronDown aria-hidden="true" className="pointer-events-none absolute right-[10px] top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /></label>)}</div></fieldset>
-      <fieldset className="space-y-4"><legend className="text-sm font-semibold">Цена</legend><Chip active={draft.free} onClick={() => patch({ free: !draft.free, priceMax: null })}>Бесплатно</Chip>{!draft.free && distribution.max != null && <div className="space-y-3"><div className="flex items-center justify-between gap-3 text-sm"><span>Цена начинается до</span><strong>{renderPriceWithIcon(formatPrice(draft.priceMax ?? distribution.max, { hideZero: true }))}</strong></div><div className="flex h-10 items-end gap-1" aria-hidden>{distribution.buckets.map((bucket, index) => { const peak = Math.max(1, ...distribution.buckets.map((item) => item.count)); return <span key={`${bucket.from}-${bucket.to}-${index}`} className="min-w-0 flex-1 rounded-t bg-primary/25" style={{ height: `${Math.max(3, (bucket.count / peak) * 100)}%` }} />; })}</div><input aria-label="Цена начинается до" className="h-10 w-full accent-primary" type="range" min={0} max={distribution.max} step={distribution.step ?? 1} value={draft.priceMax ?? distribution.max} onInput={(event) => updatePriceMax(event.currentTarget.value)} /></div>}</fieldset>
+      <fieldset className="space-y-4"><legend className="text-sm font-semibold">Цена</legend><Chip active={draft.free} onClick={() => patch({ free: !draft.free, priceMax: null })}>Бесплатно</Chip>{!draft.free && distribution.max != null && <div className="space-y-3"><div className="flex items-center justify-between gap-3 text-sm"><span>Цена начинается до</span><strong>{renderPriceWithIcon(formatPrice(draft.priceMax ?? distribution.max, { hideZero: true }))}</strong></div><div className="flex h-10 items-end gap-1" aria-hidden>{distribution.buckets.map((bucket, index) => { const peak = Math.max(1, ...distribution.buckets.map((item) => item.count)); return <span key={`${bucket.from}-${bucket.to}-${index}`} className="min-w-0 flex-1 rounded-t bg-primary/25" style={{ height: `${Math.max(3, (bucket.count / peak) * 100)}%` }} />; })}</div><input aria-label="Цена начинается до" className="h-10 w-full accent-primary" type="range" min={0} max={distribution.max} step={distribution.step ?? 1} value={draft.priceMax ?? distribution.max} onInput={(event) => updatePriceMax(event.currentTarget.value)} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); updatePriceMaxFromPointer(event); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) updatePriceMaxFromPointer(event); }} onKeyDown={(event) => { const value = priceSliderValueFromKey(event.key, draft.priceMax ?? distribution.max!, distribution.max!, distribution.step ?? 1); if (value == null) return; event.preventDefault(); updatePriceMax(String(value)); }} /></div>}</fieldset>
       <div className="sticky bottom-0 flex items-center justify-between border-t bg-white pt-4"><MobileOverlayResetAction className="lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent" onClick={() => setDraft({ ...defaultFilters, age: [], categories: [], genres: [] })}>Сбросить всё</MobileOverlayResetAction><Button className="rounded-full px-6" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>Показать {count ?? "…"} событий</Button></div>
     </div>
   );
