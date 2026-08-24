@@ -1,0 +1,14 @@
+{
+  "readOnly": true,
+  "ownerApproved": true,
+  "rows": [
+    { "entity": "Offer", "id": "cmrwh34h40006ws8a7xo94o1c", "classification": "RECOVERABLE", "proposed": { "mode": "EXACT", "min": 750, "max": 750, "currency": "BYN" } },
+    { "entity": "Offer", "id": "cmrwh35780006ws8hglv7npyy", "classification": "RECOVERABLE", "proposed": { "mode": "EXACT", "min": 800, "max": 800, "currency": "BYN" } },
+    { "entity": "Offer", "id": "cmrwh3a9m0006wsam75f7tsdu", "classification": "RECOVERABLE", "proposed": { "mode": "EXACT", "min": 380, "max": 380, "currency": "BYN" } },
+    { "entity": "Place", "id": "cmrq83p27007qwswv9l4prtir", "classification": "RECOVERABLE", "proposed": { "mode": "EXACT", "min": 150, "max": 150, "currency": "BYN" } },
+    { "entity": "Place", "id": "cmrq83p2l0089wswvxl8ks2ac", "classification": "RECOVERABLE", "proposed": { "mode": "RANGE", "min": 22, "max": 4340, "currency": "BYN" } },
+    { "entity": "Place", "id": "cmrq83p3l009uwswvzex11pcj", "classification": "RECOVERABLE", "proposed": { "mode": "RANGE", "min": 6, "max": 1200, "currency": "BYN" } },
+    { "entity": "Place", "id": "cmrq83p9j00j6wswvd0p7zygh", "classification": "RECOVERABLE", "proposed": { "mode": "RANGE", "min": 35, "max": 55, "currency": "BYN" } },
+    { "entity": "Place", "id": "cmrq83pch00nawswvm7fghwyh", "classification": "RECOVERABLE", "proposed": { "mode": "RANGE", "min": 29, "max": 55, "currency": "BYN" } }
+  ]
+}

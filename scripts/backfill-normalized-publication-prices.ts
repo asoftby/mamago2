@@ -79,7 +79,9 @@ async function main() {
   if (preview.readOnly !== true || !Array.isArray(preview.rows)) throw new Error("Invalid read-only preview artifact");
   const plan = planBackfill(preview.rows, await loadCurrent());
   const counts = summarize(plan);
-  if (plan.length !== 135) throw new Error(`Approved writable count is 135, got ${plan.length}`);
+  const expectedCount = Number(flagValue("--expected-count") ?? "135");
+  if (!Number.isInteger(expectedCount) || expectedCount < 1) throw new Error("--expected-count must be a positive integer");
+  if (plan.length !== expectedCount) throw new Error(`Approved writable count is ${expectedCount}, got ${plan.length}`);
   if (counts.CONFLICT > 0) {
     console.log(JSON.stringify({ mode: "STOPPED", counts, conflicts: plan.filter((item) => item.action === "CONFLICT") }, null, 2));
     process.exitCode = 2;
