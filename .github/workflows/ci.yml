@@ -46,6 +46,7 @@ jobs:
           pnpm exec tsx src/lib/routing/legacyProdPreviewRedirect.test.ts
           pnpm exec tsx src/lib/routing/subdomainMiddleware.test.ts
           pnpm exec tsx scripts/verify-prelaunch-seo.test.ts
+          pnpm exec tsx scripts/verify-indexing-release.test.ts
 
       - name: Imported media source privacy regression
         run: pnpm exec tsx src/lib/media/importedMediaPrivacy.test.ts
