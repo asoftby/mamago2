@@ -31,6 +31,7 @@ const PERMANENT_NOINDEX_PREFIXES = [
 ] as const;
 
 const ROUTE_EDITOR_PATTERN = /^\/routes\/(?:new|[^/]+\/edit)(?:\/|$)/u;
+const BIRTHDAY_LISTING_PATTERN = /^\/[^/]+\/birthday$/u;
 const BIRTHDAY_BUILDER_PATTERN = /^\/[^/]+\/birthday\/make(?:\/|$)/u;
 
 export function isPermanentlyNoindexPath(pathname: string): boolean {
@@ -44,7 +45,11 @@ export function isPermanentlyNoindexPath(pathname: string): boolean {
     return true;
   }
 
-  return ROUTE_EDITOR_PATTERN.test(normalized) || BIRTHDAY_BUILDER_PATTERN.test(normalized);
+  return (
+    ROUTE_EDITOR_PATTERN.test(normalized) ||
+    BIRTHDAY_LISTING_PATTERN.test(normalized) ||
+    BIRTHDAY_BUILDER_PATTERN.test(normalized)
+  );
 }
 
 export function isPermanentlyNoindexSurface(surface: string): boolean {
