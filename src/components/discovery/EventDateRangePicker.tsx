@@ -22,6 +22,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const [open, setOpen] = React.useState(false);
   const [draft, dispatch] = React.useReducer(dateRangeReducer, emptyDateRangeDraft);
   const [density, setDensity] = React.useState<Record<string, number>>({});
+  const [resultCount, setResultCount] = React.useState<number | null>(null);
   const today = todayKeyIn(new Date());
   const city = useOptionalCity()?.citySlug ?? "minsk";
 
@@ -37,6 +38,15 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
     fetch(`/api/calendar/density?${params}`, { signal: controller.signal }).then((r) => r.ok ? r.json() : {}).then(setDensity).catch(() => {});
     return () => controller.abort();
   }, [open, applied, city, today]);
+  React.useEffect(() => {
+    if (!open || !draft.from) { setResultCount(null); return; }
+    const controller = new AbortController();
+    const candidate = { ...applied, whenPreset: null, dateFrom: draft.from, dateTo: draft.to };
+    const params = serializeAppliedToSearchParams(new URLSearchParams(), candidate);
+    params.set("city", city);
+    const timer = setTimeout(() => fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal }).then((r) => r.ok ? r.json() : null).then((data) => setResultCount(data?.count ?? null)).catch(() => {}), 150);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [open, draft.from, draft.to, applied, city]);
 
   const select = (date: Date | null) => {
     if (!date) return;
@@ -74,7 +84,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
         <div className="sticky top-0 z-10 border-b bg-white px-5 py-4"><SheetTitle>Выберите даты</SheetTitle><div className="mt-1 text-sm text-muted-foreground">{draft.from ? `${draft.from}${draft.to && draft.to !== draft.from ? ` — ${draft.to}` : ""}` : "Диапазон не выбран"}</div><button className="mt-2 text-sm underline" onClick={() => dispatch({ type: "reset" })}>Сбросить</button></div>
         <div className="flex gap-2 overflow-x-auto px-4 py-3">{(["TODAY", "TOMORROW", "WEEKEND"] as const).map((p) => <Chip key={p} onClick={() => applyPreset(p)}>{p === "TODAY" ? "Сегодня" : p === "TOMORROW" ? "Завтра" : "Выходные"}</Chip>)}</div>
         <div className="flex-1 space-y-8 overflow-y-auto px-4 pb-28">{Array.from({ length: 4 }, (_, i) => <div key={i}>{calendar(1, new Date(new Date().getFullYear(), new Date().getMonth() + i, 1))}</div>)}</div>
-        <div className="sticky bottom-0 border-t bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><Button className="w-full rounded-full" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Показать события</Button></div>
+        <div className="sticky bottom-0 border-t bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"><Button className="w-full rounded-full" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Показать {resultCount ?? "…"} событий</Button></div>
       </SheetContent>
     </Sheet>
   );

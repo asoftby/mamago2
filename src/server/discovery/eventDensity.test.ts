@@ -9,5 +9,5 @@ test("density omits empty days and counts each intersecting session day", () => 
     { startsAt: new Date("2026-08-30T09:00:00+03:00") },
   ]);
   assert.deepEqual(result, { "2026-08-29": 2, "2026-08-30": 1 });
-  assert.equal(result["2026-08-31"], undefined);
+  assert.equal(Object.hasOwn(result, "2026-08-31"), false);
 });
