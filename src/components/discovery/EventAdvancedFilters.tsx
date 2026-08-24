@@ -1,75 +1,36 @@
 "use client";
 
+import * as React from "react";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
-import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { defaultFilters, serializeAppliedToSearchParams, useDiscoveryFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { Chip } from "@/components/ui/Chip";
+import { Button } from "@/components/ui/button";
 
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
   const { applied, actions } = useDiscoveryFilters();
   const { options, loading } = useDiscoveryFilterOptions(citySlug);
+  const [draft, setDraft] = React.useState<DiscoveryFilters>(() => ({ ...applied, age: [...applied.age] }));
+  const [count, setCount] = React.useState<number | null>(null);
+  const patch = (next: Partial<DiscoveryFilters>) => setDraft((current) => ({ ...current, ...next }));
 
-  const toggleAge = (value: string) => {
-    const age = applied.age.includes(value)
-      ? applied.age.filter((item) => item !== value)
-      : [...applied.age, value];
-    actions.setDraft({ age });
-  };
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
+    params.set("city", citySlug);
+    const timer = setTimeout(() => fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal }).then((r) => r.ok ? r.json() : null).then((data) => setCount(data?.count ?? null)).catch(() => {}), 150);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [draft, citySlug]);
 
+  const toggleAge = (value: string) => patch({ age: draft.age.includes(value) ? draft.age.filter((item) => item !== value) : [...draft.age, value] });
+  const selectClass = "h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm";
   return (
     <div className="space-y-6 pb-1">
-      <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-neutral-900">Возраст</legend>
-        <div className="flex flex-wrap gap-2">
-          {AGE_GROUPS.map((group) => (
-            <button key={group.value} type="button" aria-pressed={applied.age.includes(group.value)} onClick={() => toggleAge(group.value)} className={applied.age.includes(group.value) ? "rounded-full bg-neutral-900 px-3 py-2 text-sm text-white" : "rounded-full border border-neutral-200 px-3 py-2 text-sm text-neutral-700"}>
-              {group.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      <button
-        type="button"
-        role="switch"
-        aria-checked={applied.adultOnly}
-        onClick={() => actions.setDraft({ adultOnly: !applied.adultOnly })}
-        className="flex w-full items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-900"
-      >
-        <span>Только 18+</span>
-        <span
-          aria-hidden="true"
-          className={`relative h-6 w-11 rounded-full transition-colors ${
-            applied.adultOnly ? "bg-neutral-900" : "bg-neutral-200"
-          }`}
-        >
-          <span
-            className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
-              applied.adultOnly ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </span>
-      </button>
-
-      <FilterSelect label="Формат" value={applied.format ?? ""} onChange={(value) => actions.setDraft({ format: (value || null) as typeof applied.format })} options={[{ value: "OFFLINE", label: "Офлайн" }, { value: "ONLINE", label: "Онлайн" }, { value: "HYBRID", label: "Гибрид" }]} />
-      <FilterSelect label="Район" value={applied.district ?? ""} onChange={(value) => actions.setDraft({ district: value || null })} options={options.districts} disabled={loading} />
-      <FilterSelect label="Метро" value={applied.metro ?? ""} onChange={(value) => actions.setDraft({ metro: value || null })} options={options.metros} disabled={loading} />
-
-      <div className="flex items-center justify-between border-t border-neutral-200 pt-4">
-        <button type="button" className="text-sm font-semibold text-neutral-600 underline underline-offset-2" onClick={() => actions.resetAll()}>Сбросить всё</button>
-        <button type="button" className="rounded-lg bg-neutral-900 px-8 py-3 text-sm font-semibold text-white" onClick={onApply}>Готово</button>
-      </div>
+      <fieldset><legend className="mb-1 text-sm font-semibold">Возраст <span className="font-normal text-muted-foreground">· общий профиль</span></legend><p className="mb-3 text-xs text-muted-foreground">Настройка синхронизирована с возрастом в шапке.</p><div className="flex flex-wrap gap-2">{AGE_GROUPS.map((g) => <Chip key={g.value} active={draft.age.includes(g.value)} onClick={() => toggleAge(g.value)}>{g.label}</Chip>)}</div></fieldset>
+      <fieldset><legend className="mb-2 text-sm font-semibold">Формат</legend><div className="flex flex-wrap gap-2">{([['OFFLINE','Офлайн'],['ONLINE','Онлайн'],['HYBRID','Гибрид']] as const).map(([value,label]) => <Chip key={value} active={draft.format === value} onClick={() => patch({ format: draft.format === value ? null : value })}>{label}</Chip>)}</div></fieldset>
+      <fieldset><legend className="mb-2 text-sm font-semibold">Где в городе</legend><div className="grid gap-3 sm:grid-cols-2"><label><span className="sr-only">Район</span><select className={selectClass} disabled={loading} value={draft.district ?? ""} onChange={(e) => patch({ district: e.target.value || null })}><option value="">Любой район</option>{options.districts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label><label><span className="sr-only">Метро</span><select className={selectClass} disabled={loading} value={draft.metro ?? ""} onChange={(e) => patch({ metro: e.target.value || null })}><option value="">Любое метро</option>{options.metros.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></label></div></fieldset>
+      <fieldset><legend className="mb-2 text-sm font-semibold">Цена</legend><div className="flex gap-2"><Chip active={!draft.free} onClick={() => patch({ free: false })}>Любая</Chip><Chip active={draft.free} onClick={() => patch({ free: true })}>Бесплатно</Chip></div></fieldset>
+      <div className="sticky bottom-0 flex items-center justify-between border-t bg-white pt-4"><button type="button" className="text-sm font-semibold underline" onClick={() => setDraft({ ...defaultFilters, age: [] })}>Сбросить всё</button><Button className="rounded-full px-6" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>Показать {count ?? "…"} событий</Button></div>
     </div>
-  );
-}
-
-function FilterSelect({ label, value, onChange, options, disabled = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; disabled?: boolean }) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-semibold text-neutral-900">{label}</span>
-      <select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-900 disabled:opacity-50">
-        <option value="">Не выбрано</option>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
   );
 }

@@ -16,6 +16,15 @@ import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
 
+export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters }) {
+  const now = new Date();
+  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
+  const pub = getPublicListingActivityWhere(now);
+  const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
+  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), activityInAnyOfCitiesWhere(expandedCityIds), ...buildEventRuntimeWhere(options.eventFilters), ...pubParts] };
+  return { where, primaryCityId };
+}
+
 /**
  * Опубликованные события (EVENT) в городе для ленты «Куда пойти».
  * События текущего пользователя — выше остальных.
@@ -39,29 +48,14 @@ export async function getKudaDiscoveryFeed(
   /** Больше кандидатов в ответе — клиент ранжирует по возрасту + показывает второй слой по engagement. */
   const take = options?.take ?? 80;
   const now = new Date();
-  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
-  const pub = getPublicListingActivityWhere(now);
-  const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
-
-  const where: Prisma.ActivityWhereInput = {
-    AND: [
-      { type: ActivityType.EVENT },
-      ...(options?.format
-        ? [{ format: options.format }]
-        : options?.nearby
-          ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }]
-          : []),
-      activityInAnyOfCitiesWhere(expandedCityIds),
-      ...buildEventRuntimeWhere(options?.eventFilters ?? {
+  const runtimeFilters = options?.eventFilters ?? {
         dateRange: null,
         free: false,
         districtId: null,
         metroId: null,
         adultOnly: false,
-      }),
-      ...pubParts,
-    ],
-  };
+      };
+  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters });
 
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
   const GALLERY_FOR_COVER = 40;
@@ -159,4 +153,13 @@ export async function getKudaDiscoveryFeed(
   });
 
   return cards.slice(0, take);
+}
+
+export async function countKudaDiscoveryEvents(
+  cityId: string,
+  citySlug: string,
+  options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters },
+): Promise<number> {
+  const { where } = await buildKudaDiscoveryWhere(cityId, citySlug, options);
+  return prisma.activity.count({ where });
 }
