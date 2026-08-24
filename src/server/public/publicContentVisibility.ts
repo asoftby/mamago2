@@ -20,6 +20,7 @@ function publicListingActivityStatusWhere(): Prisma.ActivityWhereInput {
         ContentStatus.PENDING,
         ContentStatus.NEEDS_REVISION,
         ContentStatus.REJECTED,
+        ContentStatus.ARCHIVED,
         ContentStatus.DELETED,
       ],
     },
