@@ -95,6 +95,14 @@ export interface MediaUploadFieldProps {
   authorLibraryTabLabel?: string;
   /** Footer CTA label for `mode="multiple"`; the selected count is appended automatically. */
   addSelectedButtonLabel?: string;
+  /**
+   * Opt-in label for an already-selected library tile (accent border + ✓ badge +
+   * hover title). Omitting it (the default for every consumer except the article
+   * gallery) keeps the original generic "Уже выбрано" dimmed-tile treatment —
+   * this text names a specific destination (e.g. "Уже в галерее"), so it must
+   * never be assumed correct for a single-image field like a cover picker.
+   */
+  alreadyAddedLabel?: string;
 }
 
 function normalizeItems(mode: MediaUploadMode, value: MediaUploadValue): MediaUploadItem[] {
@@ -133,6 +141,51 @@ function reorderItems(items: MediaUploadItem[], index: number, direction: -1 | 1
   return next;
 }
 
+export type MediaTileState = "already-added" | "selected" | "available";
+
+/**
+ * Состояние плитки в диалоге медиатеки, по стабильному id (не url/filename).
+ * `currentIds` — id, уже находящиеся в текущем значении поля (галерея/обложка),
+ * то есть live draft-состояние формы, а не снапшот с сервера.
+ */
+export function getMediaTileState(
+  itemId: string,
+  currentIds: ReadonlySet<string>,
+  pendingSelection: ReadonlySet<string>,
+): MediaTileState {
+  if (currentIds.has(itemId)) return "already-added";
+  if (pendingSelection.has(itemId)) return "selected";
+  return "available";
+}
+
+/**
+ * Добавляет к текущим items только те `selectedIds`, которых там ещё нет —
+ * id, уже присутствующий в `currentItems`, никогда не добавляется повторно,
+ * даже если случайно оказался в selectedIds (защита на случай гонки состояний,
+ * а не только на клике — сам клик по already-added плитке уже блокируется
+ * отдельно, до попадания id в selection). `candidateSource` может содержать
+ * один и тот же id из разных источников (таб «Фото этой статьи» + таб
+ * «Медиатека автора») — такой id учитывается один раз.
+ */
+export function mergeNewLibrarySelection(
+  currentItems: MediaUploadItem[],
+  candidateSource: MediaUploadItem[],
+  selectedIds: ReadonlySet<string>,
+  maxFiles: number,
+): MediaUploadItem[] {
+  const existingIds = new Set(currentItems.map((item) => item.id));
+  const seenSelected = new Set<string>();
+  const merged = [...currentItems];
+  for (const item of candidateSource) {
+    if (!selectedIds.has(item.id) || seenSelected.has(item.id)) continue;
+    seenSelected.add(item.id);
+    if (existingIds.has(item.id)) continue;
+    merged.push(item);
+    existingIds.add(item.id);
+  }
+  return merged.slice(0, maxFiles);
+}
+
 export function MediaUploadField({
   label,
   description,
@@ -166,6 +219,7 @@ export function MediaUploadField({
   articleLibrary,
   authorLibraryTabLabel = "Медиатека автора",
   addSelectedButtonLabel = "Добавить выбранные",
+  alreadyAddedLabel,
 }: MediaUploadFieldProps) {
   const items = useMemo(() => normalizeItems(mode, value), [mode, value]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -326,29 +380,18 @@ export function MediaUploadField({
 
   const addSelectedLibraryItems = () => {
     const combinedSource = [...(articleLibrary?.items ?? []), ...libraryItems];
-    const seenSelected = new Set<string>();
-    const selected: MediaUploadItem[] = [];
-    for (const item of combinedSource) {
-      if (!librarySelection.has(item.id) || seenSelected.has(item.id)) continue;
-      selected.push(item);
-      seenSelected.add(item.id);
-    }
-    if (selected.length === 0) {
+    const hasSelection = combinedSource.some((item) => librarySelection.has(item.id));
+    if (!hasSelection) {
       toast.message("Отметьте изображения галочками");
       return;
     }
-    const existingIds = new Set(items.map((item) => item.id));
-    const merged = [...items];
-    for (const item of selected) {
-      if (existingIds.has(item.id)) continue;
-      merged.push(item);
-      existingIds.add(item.id);
-    }
-    commitItems(merged.slice(0, effectiveMaxFiles));
+    const merged = mergeNewLibrarySelection(items, combinedSource, librarySelection, effectiveMaxFiles);
+    const addedCount = merged.length - items.length;
+    commitItems(merged);
     setLibraryOpen(false);
     if (librarySelectSuccessMessage) {
       toast.success(
-        selected.length === 1 ? librarySelectSuccessMessage : `${librarySelectSuccessMessage}: ${selected.length}`,
+        addedCount === 1 ? librarySelectSuccessMessage : `${librarySelectSuccessMessage}: ${addedCount}`,
       );
     }
   };
@@ -401,18 +444,29 @@ export function MediaUploadField({
   });
 
   const renderMediaTile = (item: MediaUploadItem) => {
-    const alreadySelected = currentIds.has(item.id);
-    const isPending = librarySelection.has(item.id);
+    const tileState = getMediaTileState(item.id, currentIds, librarySelection);
+    const alreadySelected = tileState === "already-added";
+    const isPending = tileState === "selected";
     const disabledTile = disabled || alreadySelected;
+    // The accent ✓ treatment (and its "already in X" title) is opt-in per consumer
+    // via `alreadyAddedLabel` — without it, an already-selected tile keeps the
+    // original generic dimmed style below, so this never mislabels a single-image
+    // field (e.g. a cover picker) as "already in gallery".
+    const showAccentAlready = alreadySelected && Boolean(alreadyAddedLabel);
 
     return (
       <button
         key={item.id}
         type="button"
         disabled={disabledTile}
+        title={showAccentAlready ? alreadyAddedLabel : undefined}
         className={cn(
           "group relative overflow-hidden rounded-2xl border bg-muted text-left transition focus:outline-none focus:ring-2 focus:ring-primary",
-          disabledTile ? "cursor-not-allowed border-border opacity-45" : "border-gray-200 hover:border-primary/40",
+          showAccentAlready
+            ? "cursor-not-allowed border-[#EF8759]"
+            : disabledTile
+              ? "cursor-not-allowed border-border opacity-45"
+              : "border-gray-200 hover:border-primary/40",
           isPending && "ring-2 ring-primary ring-offset-2",
         )}
         onClick={() => {
@@ -430,7 +484,14 @@ export function MediaUploadField({
           className="aspect-square w-full object-cover transition group-hover:scale-[1.02]"
         />
         <div className="absolute inset-0 flex items-start justify-end p-2">
-          {alreadySelected ? (
+          {showAccentAlready ? (
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EF8759] text-white shadow-sm"
+              aria-hidden="true"
+            >
+              <Check className="h-4 w-4" />
+            </span>
+          ) : alreadySelected ? (
             <span className="rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white">
               Уже выбрано
             </span>

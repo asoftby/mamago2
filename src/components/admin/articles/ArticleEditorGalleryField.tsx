@@ -163,6 +163,7 @@ export function ArticleEditorGalleryField({
       mediaLibraryDescription="Кликните по превью, чтобы отметить несколько изображений, затем добавьте их в галерею."
       multipleEmptyHint="Можно взять изображения из медиатеки или загрузить файлы"
       addSelectedButtonLabel="Добавить в галерею"
+      alreadyAddedLabel="Уже в галерее"
       articleLibrary={
         articleMediaSource
           ? {
