@@ -6,12 +6,16 @@ import { Plus } from "lucide-react";
 import type { Metadata } from "next";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
+import { buildAbsoluteCanonicalUrl } from "@/lib/routing/cityPaths";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { mapRouteStopPublicPhotos } from "@/lib/routes/mapRouteStopPublicPhotos";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "Маршруты — mamaGo",
   description: "Готовые семейные маршруты по городу. Сохраняйте, делитесь, добавляйте в план.",
+  alternates: {
+    canonical: buildAbsoluteCanonicalUrl("/routes"),
+  },
 });
 
 export const dynamic = "force-dynamic";
