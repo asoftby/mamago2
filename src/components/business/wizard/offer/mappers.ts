@@ -886,7 +886,7 @@ export function mapOfferToFormData(offer: {
   promotionDetails?: string | null;
   promotionalOffer?: string | null;
   priceFrom: number | null;
-  priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "UNKNOWN";
+  priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN";
   priceItems?: unknown;
   priceText: string | null;
   ageMinMonths: number | null;

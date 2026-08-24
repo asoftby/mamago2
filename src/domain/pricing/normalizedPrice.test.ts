@@ -8,6 +8,7 @@ test("normalizes explicit free, exact, from and range modes", () => {
   assert.equal(normalizePublicationPrice({ mode: "EXACT", min: 0 }).mode, "FREE");
   assert.equal(normalizePublicationPrice({ mode: "FROM", min: 30 }).max, null);
   assert.deepEqual(normalizePublicationPrice({ mode: "RANGE", min: 30, max: 120 }).mode, "RANGE");
+  assert.deepEqual(normalizePublicationPrice({ mode: "NONE" }), { mode: "NONE", min: null, max: null, currency: "BYN", source: "NONE", conflict: null });
 });
 
 test("structured tariffs are authoritative and ignore invalid entries", () => {

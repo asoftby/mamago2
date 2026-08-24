@@ -1,4 +1,4 @@
-export const PUBLICATION_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE", "UNKNOWN"] as const;
+export const PUBLICATION_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE", "NONE", "UNKNOWN"] as const;
 
 export type PublicationPriceMode = (typeof PUBLICATION_PRICE_MODES)[number];
 
@@ -73,7 +73,7 @@ export function parseSafeLegacyPriceText(value: unknown): PriceNormalizationResu
 }
 
 export function normalizePublicationPrice(input: {
-  mode?: PublicationPriceMode | "free" | "fixed" | "from" | "single" | "multiple" | null;
+  mode?: PublicationPriceMode | "free" | "fixed" | "from" | "single" | "multiple" | "none" | null;
   min?: unknown;
   max?: unknown;
   priceItems?: unknown;
@@ -88,6 +88,7 @@ export function normalizePublicationPrice(input: {
   }
 
   const rawMode = typeof input.mode === "string" ? input.mode.toUpperCase() : "";
+  if (rawMode === "NONE") return result("NONE", null, null, "NONE");
   if (rawMode === "FREE") return result("FREE", 0, 0, "NUMERIC");
   const min = finiteNonNegative(input.min);
   const max = finiteNonNegative(input.max);

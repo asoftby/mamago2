@@ -3842,6 +3842,7 @@ enum PublicationPriceMode {
   EXACT
   FROM
   RANGE
+  NONE
   UNKNOWN
 }
 
