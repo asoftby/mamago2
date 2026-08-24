@@ -2,11 +2,14 @@ import { HomeStoryPlacementType, HomeStorySourceType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { applyRenderPolicy } from "@/lib/stories/renderPolicy";
 import { seededShuffle, storySlotShuffleSeed } from "@/lib/stories/shuffle";
+import { zonedDateKey } from "@/lib/stories/ranges";
 import type { StoryRailItem } from "@/lib/stories/items";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
 import { buildActivityPublicPath } from "@/lib/public/publicVerticalResolver";
-import { resolveActivityAgeLabel } from "@/lib/search/metaLines";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { activityAddressLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
+import { formatAgeTagsCompact } from "@/lib/config/ages";
+import { formatPrice } from "@/lib/formatters/format-price";
+import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import type { StoryCollection, StoryIntent, StoryItem } from "@/features/stories/types/story";
 import { listBreakingNewsArticles } from "@/features/stories/lib/listBreakingNews";
 import { buildStoryRailData } from "./resolveStoryRail";
@@ -33,6 +36,67 @@ function formatPeriod(input: { start: Date; end: Date; timeZone: string }): stri
   return start === end ? start : `${start} — ${end}`;
 }
 
+/** Canonical price label: routes both `priceFrom` and free-text `priceText` through the shared BYN formatter. */
+function resolvePriceLabel(priceFrom: number | null | undefined, priceText: string | null | undefined): string | undefined {
+  if (priceFrom === 0) return "Бесплатно";
+  const text = plain(priceText);
+  if (text) {
+    const formatted = formatPrice(text, { hideZero: true });
+    if (formatted) return formatted;
+  }
+  if (priceFrom != null) {
+    const formatted = formatPrice(priceFrom, { hideZero: true });
+    if (formatted) return formatted;
+  }
+  return undefined;
+}
+
+function formatTimeHM(date: Date, timeZone: string): string {
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone });
+}
+
+/**
+ * Real-time label for the "running" eyebrow. Reuses {@link resolveScenarioScheduling}
+ * (My Plan's canonical start/end resolver — handles exact scheduleItems,
+ * durationMinutes and midnight rollover) against the same session `at` the
+ * rail already selected as this activity's current occurrence. Never
+ * fabricates an end time: with no reliable end, falls back to the plain
+ * static label.
+ */
+function resolveRunningEyebrow(input: {
+  now: Date;
+  sessionStart: Date;
+  activity: { schedulingKind: "SLOT" | "WINDOW" | null; scheduleJson: unknown };
+  timeZone: string;
+}): string {
+  const { now, sessionStart, activity, timeZone } = input;
+  if (sessionStart.getTime() <= 0) return "Идёт сейчас";
+
+  const scheduling = resolveScenarioScheduling({
+    activity,
+    timing: { effectiveStartsAt: sessionStart, isFlexible: false, timeSource: "fixed" },
+  });
+  const end = scheduling.endsAt;
+  const isRunning = now.getTime() >= sessionStart.getTime() && (end == null || now.getTime() < end.getTime());
+  if (isRunning) {
+    return end ? `Идёт сейчас · до ${formatTimeHM(end, timeZone)}` : "Идёт сейчас";
+  }
+  if (now.getTime() < sessionStart.getTime()) {
+    const sameDay = zonedDateKey(sessionStart, timeZone) === zonedDateKey(now, timeZone);
+    const dayLabel = sameDay
+      ? "Сегодня"
+      : sessionStart.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone });
+    const timeLabel = end
+      ? `${formatTimeHM(sessionStart, timeZone)}–${formatTimeHM(end, timeZone)}`
+      : formatTimeHM(sessionStart, timeZone);
+    return `${dayLabel} · ${timeLabel}`;
+  }
+  // Start has passed but no reliable end time was found — the rail still
+  // classifies this as running; keep the honest static fallback instead of
+  // guessing when it ends.
+  return "Идёт сейчас";
+}
+
 /**
  * Public Stories 2.0 read model. Canonical content is loaded once by the rail
  * engine; HomeStoryItem participates only as placement metadata. Snapshot
@@ -45,11 +109,13 @@ export async function loadPublicStoryCollections(input: {
   bypassCache?: boolean;
 }): Promise<StoryCollection[]> {
   const now = input.now ?? new Date();
-  const [rail, configs, breakingNews] = await Promise.all([
+  const [rail, configs, breakingNews, city] = await Promise.all([
     buildStoryRailData({ cityId: input.cityId, now, bypassCache: input.bypassCache }),
     getPublicStoryIntentConfigs(),
     listBreakingNewsArticles(input.citySlug).catch(() => []),
+    prisma.city.findUnique({ where: { id: input.cityId }, select: { name: true } }),
   ]);
+  const cityName = city?.name ?? null;
   const configByIntent = new Map(configs.map((row) => [row.intent, row]));
   console.log("[DEBUG-free] rail.resolved ids:", rail.resolved.map((s) => s.id));
   console.log("[DEBUG-free] free stat items:", rail.stats.find((s) => s.slot.id === "free")?.breakdown.items.length);
@@ -131,7 +197,7 @@ export async function loadPublicStoryCollections(input: {
   const placeIds = [...new Set(allItems.map((row) => row.placeId).filter((id): id is string => Boolean(id)))];
   const mediaIds = [...new Set(allItems.map((row) => row.coverMediaAssetId).filter((id): id is string => Boolean(id)))];
   const [activities, offers, places, media, activitySessions] = await Promise.all([
-    activityIds.length ? prisma.activity.findMany({ where: { id: { in: activityIds }, status: "PUBLISHED" }, select: { id: true, slug: true, type: true, title: true, description: true, shortDesc: true, coverImageUrl: true, priceFrom: true, priceText: true, currency: true, agePolicy: true, ageLabel: true, ageTags: true, ageMinMonths: true, ageMaxMonths: true, venue: { select: { title: true, addressLine: true } } } }) : [],
+    activityIds.length ? prisma.activity.findMany({ where: { id: { in: activityIds }, status: "PUBLISHED" }, select: { id: true, slug: true, type: true, title: true, description: true, shortDesc: true, coverImageUrl: true, priceFrom: true, priceText: true, currency: true, agePolicy: true, ageLabel: true, ageTags: true, ageMinMonths: true, ageMaxMonths: true, schedulingKind: true, scheduleJson: true, venue: { select: { title: true, addressLine: true } } } }) : [],
     offerIds.length ? prisma.offer.findMany({ where: { id: { in: offerIds }, status: "PUBLISHED" }, select: { id: true, slug: true, title: true, description: true, coverImage: true, priceFrom: true, priceText: true, dateFrom: true, dateTo: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true } }) : [],
     placeIds.length ? prisma.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, title: true, displayAddress: true, formattedAddr: true, customAddress: true } }) : [],
     mediaIds.length ? prisma.mediaAsset.findMany({ where: { id: { in: mediaIds } }, select: { id: true, publicUrl: true } }) : [],
@@ -159,11 +225,25 @@ export async function loadPublicStoryCollections(input: {
       const activityDatetime = row.timeClass === "serial" && period
         ? formatPeriod({ ...period, timeZone: rail.timeZone })
         : datetime;
-      const age = resolveActivityAgeLabel(entity) ?? undefined;
-      const price = entity.priceFrom === 0
-        ? "Бесплатно"
-        : plain(entity.priceText) ?? (entity.priceFrom != null ? formatPriceFrom(entity.priceFrom) : undefined);
-      return { id: row.id, offerId: row.id, type: "event", title: entity.title, eyebrow: intent === "free" ? "бесплатно" : intent === "running" ? "идёт сейчас" : "сегодня", description: plain(entity.shortDesc, entity.description), image: mediaById.get(row.coverMediaAssetId ?? "") ?? entity.coverImageUrl ?? "", location: entity.venue?.addressLine ?? place?.displayAddress ?? place?.formattedAddr ?? place?.customAddress ?? entity.venue?.title ?? place?.title, datetime: activityDatetime, age, price, href: buildActivityPublicPath(input.citySlug, entity.slug ?? entity.id, entity.type) };
+      const age = entity.agePolicy === "ADULT_ONLY"
+        ? "18+"
+        : formatAgeTagsCompact(entity.ageTags) ?? resolveActivityAgeLabel(entity) ?? undefined;
+      const price = resolvePriceLabel(entity.priceFrom, entity.priceText);
+      const eyebrow = intent === "free"
+        ? "бесплатно"
+        : intent === "running"
+          ? resolveRunningEyebrow({ now, sessionStart: at, activity: entity, timeZone: rail.timeZone })
+          : "сегодня";
+      const location = activityAddressLine({
+        venueTitle: entity.venue?.title,
+        venueAddressLine: entity.venue?.addressLine,
+        placeTitle: place?.title,
+        placeFormattedAddr: place?.formattedAddr,
+        placeDisplayAddress: place?.displayAddress,
+        placeCustomAddress: place?.customAddress,
+        cityName,
+      }) ?? undefined;
+      return { id: row.id, offerId: row.id, type: "event", title: entity.title, eyebrow, description: plain(entity.shortDesc, entity.description), image: mediaById.get(row.coverMediaAssetId ?? "") ?? entity.coverImageUrl ?? "", location, datetime: activityDatetime, age, price, href: buildActivityPublicPath(input.citySlug, entity.slug ?? entity.id, entity.type) };
     }
     const entity = offerById.get(row.entityId);
     if (!entity) return null;
@@ -171,8 +251,15 @@ export async function loadPublicStoryCollections(input: {
       ? formatPeriod({ start: entity.dateFrom ?? entity.dateTo!, end: entity.dateTo ?? entity.dateFrom!, timeZone: rail.timeZone })
       : datetime;
     const age = resolveActivityAgeLabel({ agePolicy: entity.agePolicy, ageMinMonths: entity.ageMinMonths, ageMaxMonths: entity.ageMaxMonths }) ?? undefined;
-    const price = entity.priceFrom === 0 ? "Бесплатно" : plain(entity.priceText) ?? (entity.priceFrom != null ? formatPriceFrom(entity.priceFrom) : undefined);
-    return { id: row.id, offerId: row.id, type: "offer", title: entity.title, eyebrow: intent === "free" ? "бесплатно" : "предложение", description: plain(entity.description), image: mediaById.get(row.coverMediaAssetId ?? "") ?? entity.coverImage ?? "", location: place?.displayAddress ?? place?.formattedAddr ?? place?.customAddress ?? place?.title, datetime: offerDatetime, age, price, href: `/${input.citySlug}/offers/${entity.slug ?? entity.id}` };
+    const price = resolvePriceLabel(entity.priceFrom, entity.priceText);
+    const location = activityAddressLine({
+      placeTitle: place?.title,
+      placeFormattedAddr: place?.formattedAddr,
+      placeDisplayAddress: place?.displayAddress,
+      placeCustomAddress: place?.customAddress,
+      cityName,
+    }) ?? undefined;
+    return { id: row.id, offerId: row.id, type: "offer", title: entity.title, eyebrow: intent === "free" ? "бесплатно" : "предложение", description: plain(entity.description), image: mediaById.get(row.coverMediaAssetId ?? "") ?? entity.coverImage ?? "", location, datetime: offerDatetime, age, price, href: `/${input.citySlug}/offers/${entity.slug ?? entity.id}` };
   };
 
   const collections: StoryCollection[] = [];
