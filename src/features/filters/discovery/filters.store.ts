@@ -23,6 +23,8 @@ export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 
 /** Primary discovery filters — источник правды: URL (searchParams) */
 export type DiscoveryFilters = {
+  categories: string[];
+  genres: string[];
   dateFrom: string | null;
   dateTo: string | null;
   whenPreset: WhenPreset;
@@ -32,10 +34,13 @@ export type DiscoveryFilters = {
   district: string | null;
   nearby: boolean;
   free: boolean;
+  priceMax: number | null;
   adultOnly: boolean;
 };
 
 export const defaultFilters: DiscoveryFilters = {
+  categories: [],
+  genres: [],
   dateFrom: null,
   dateTo: null,
   whenPreset: null,
@@ -45,12 +50,15 @@ export const defaultFilters: DiscoveryFilters = {
   district: null,
   nearby: false,
   free: false,
+  priceMax: null,
   adultOnly: false,
 };
 
 export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
   return (
     !f.dateFrom &&
+    f.categories.length === 0 &&
+    f.genres.length === 0 &&
     !f.dateTo &&
     !f.whenPreset &&
     f.age.length === 0 &&
@@ -58,7 +66,8 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.metro &&
     !f.district &&
     !f.nearby &&
-    !f.free
+    !f.free &&
+    f.priceMax == null
     && !f.adultOnly
   );
 }
@@ -73,12 +82,17 @@ export function discoveryFiltersEqual(a: DiscoveryFilters, b: DiscoveryFilters):
     a.district !== b.district ||
     a.nearby !== b.nearby ||
     a.free !== b.free ||
+    a.priceMax !== b.priceMax ||
     a.adultOnly !== b.adultOnly ||
-    a.age.length !== b.age.length
+    a.age.length !== b.age.length ||
+    a.categories.length !== b.categories.length ||
+    a.genres.length !== b.genres.length
   ) {
     return false;
   }
-  return [...a.age].sort().join("\0") === [...b.age].sort().join("\0");
+  return [...a.age].sort().join("\0") === [...b.age].sort().join("\0") &&
+    [...a.categories].sort().join("\0") === [...b.categories].sort().join("\0") &&
+    [...a.genres].sort().join("\0") === [...b.genres].sort().join("\0");
 }
 
 /**
@@ -138,15 +152,20 @@ function loadDiscoveryFiltersSession(
   try {
     const raw = localStorage.getItem(discoverySessionKey(city, intent));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<DiscoveryFilters>;
-    return {
-      ...defaultFilters,
-      ...parsed,
-      age: Array.isArray(parsed.age) ? parsed.age : [],
-    };
+    return normalizeStoredDiscoveryFilters(JSON.parse(raw) as Partial<DiscoveryFilters>);
   } catch {
     return null;
   }
+}
+
+export function normalizeStoredDiscoveryFilters(parsed: Partial<DiscoveryFilters>): DiscoveryFilters {
+  return {
+    ...defaultFilters,
+    ...parsed,
+    age: Array.isArray(parsed.age) ? parsed.age : [],
+    categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+    genres: Array.isArray(parsed.genres) ? parsed.genres : [],
+  };
 }
 
 function clearDiscoveryFiltersSession(city: string, intent: Intent): void {
@@ -186,12 +205,15 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("when") ||
     searchParams.get("preset") ||
     searchParams.get("age") ||
+    searchParams.get("category") ||
+    searchParams.get("genre") ||
     searchParams.get("format") ||
     searchParams.get("metro") ||
     searchParams.get("district") ||
     searchParams.get("nearby") === "true" ||
-    searchParams.get("free") === "true"
-    || searchParams.get("adultOnly") === "true"
+    searchParams.get("free") === "true" ||
+    searchParams.get("priceMax") ||
+    searchParams.get("adultOnly") === "true"
   );
 }
 
@@ -275,6 +297,8 @@ export function parseAppliedFromUrl(
   }
 
   const ageRaw = searchParams.get("age")?.split(",").filter(Boolean) || [];
+  const categories = searchParams.get("category")?.split(",").filter(Boolean) || [];
+  const genres = searchParams.get("genre")?.split(",").filter(Boolean) || [];
 
   const legacyAgeMap: Record<string, string> = {
     "0+": "0-1",
@@ -300,6 +324,9 @@ export function parseAppliedFromUrl(
 
   const nearby = searchParams.get("nearby") === "true";
   const free = searchParams.get("free") === "true";
+  const priceMaxRaw = searchParams.get("priceMax");
+  const parsedPriceMax = priceMaxRaw == null ? NaN : Number(priceMaxRaw);
+  const priceMax = !free && Number.isFinite(parsedPriceMax) && parsedPriceMax >= 0 ? parsedPriceMax : null;
   const adultOnly = searchParams.get("adultOnly") === "true";
 
   const presetParam = searchParams.get("preset");
@@ -313,6 +340,8 @@ export function parseAppliedFromUrl(
   }
 
   return {
+    categories: [...new Set(categories)],
+    genres: [...new Set(genres)],
     dateFrom: dFrom || null,
     dateTo: dTo || null,
     whenPreset,
@@ -322,6 +351,7 @@ export function parseAppliedFromUrl(
     district,
     nearby,
     free,
+    priceMax,
     adultOnly,
   };
 }
@@ -362,6 +392,11 @@ export function serializeAppliedToSearchParams(
   if (next.age.length > 0) params.set("age", next.age.join(","));
   else params.delete("age");
 
+  if (next.categories.length > 0) params.set("category", next.categories.join(","));
+  else params.delete("category");
+  if (next.genres.length > 0) params.set("genre", next.genres.join(","));
+  else params.delete("genre");
+
   const formatQuery = serializeActivityFormatQuery(next.format);
   if (formatQuery) params.set("format", formatQuery);
   else params.delete("format");
@@ -377,6 +412,8 @@ export function serializeAppliedToSearchParams(
 
   if (next.free) params.set("free", "true");
   else params.delete("free");
+  if (!next.free && next.priceMax != null) params.set("priceMax", String(next.priceMax));
+  else params.delete("priceMax");
   if (next.adultOnly) params.set("adultOnly", "true");
   else params.delete("adultOnly");
 
@@ -386,12 +423,14 @@ export function serializeAppliedToSearchParams(
 export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number {
   return (
     (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
+    (filters.categories.length > 0 ? 1 : 0) +
+    (filters.genres.length > 0 ? 1 : 0) +
     (filters.age.length > 0 ? 1 : 0) +
     (filters.format ? 1 : 0) +
     (filters.metro ? 1 : 0) +
     (filters.district ? 1 : 0) +
     (filters.nearby ? 1 : 0) +
-    (filters.free ? 1 : 0)
+    (filters.free || filters.priceMax != null ? 1 : 0)
     + (filters.adultOnly ? 1 : 0)
   );
 }
@@ -404,10 +443,12 @@ export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number
  */
 export function getModalFilterCount(filters: DiscoveryFilters): number {
   return (
+    (filters.categories.length > 0 ? 1 : 0) +
+    (filters.genres.length > 0 ? 1 : 0) +
     (filters.age.length > 0 || filters.adultOnly ? 1 : 0) +
     (filters.format ? 1 : 0) +
     (filters.metro || filters.district ? 1 : 0) +
-    (filters.free ? 1 : 0)
+    (filters.free || filters.priceMax != null ? 1 : 0)
   );
 }
 
@@ -699,6 +740,8 @@ export function useDiscoveryFilters() {
 
     const isDirty =
       !!filters.dateFrom ||
+      filters.categories.length > 0 ||
+      filters.genres.length > 0 ||
       !!filters.dateTo ||
       !!filters.whenPreset ||
       filters.age.length > 0 ||
@@ -707,6 +750,7 @@ export function useDiscoveryFilters() {
       !!filters.district ||
       filters.nearby ||
       filters.free ||
+      filters.priceMax != null ||
       filters.adultOnly;
 
     const activeCount = getDiscoveryFilterActiveCount(filters);

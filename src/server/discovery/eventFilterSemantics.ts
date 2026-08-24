@@ -47,8 +47,11 @@ export function resolveEventDateRange(
 }
 
 export type EventRuntimeFilters = {
+  categorySlugs?: string[];
+  genreSlugs?: string[];
   dateRange: DateRange | null;
   free: boolean;
+  priceMax?: number | null;
   districtId: string | null;
   metroId: string | null;
   adultOnly: boolean;
@@ -78,12 +81,19 @@ export function buildEffectivePlaceMetroWhere(metroId: string): Prisma.PlaceWher
  * Null/unset price without the explicit pricing mode is not free.
  */
 export function buildFreeEventWhere(): Prisma.ActivityWhereInput {
-  return {
-    OR: [
-      { priceFrom: 0 },
-      { scheduleJson: { path: ["pricingMode"], equals: "free" } },
-    ],
-  };
+  return { priceMode: "FREE" };
+}
+
+const NUMERIC_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE"] as const;
+
+export function matchesCanonicalStartingPrice(
+  input: { priceMode: string; priceFrom: number | null },
+  priceMax: number | null,
+): boolean {
+  if (priceMax == null) return true;
+  return NUMERIC_PRICE_MODES.includes(input.priceMode as (typeof NUMERIC_PRICE_MODES)[number])
+    && input.priceFrom != null
+    && input.priceFrom <= priceMax;
 }
 
 function normalizedFreeText(priceText: string | null | undefined): boolean {
@@ -111,6 +121,14 @@ export function isStructuredFreeEvent(input: {
 
 export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.ActivityWhereInput[] {
   const parts: Prisma.ActivityWhereInput[] = [];
+  const categorySlugs = filters.categorySlugs ?? [];
+  const genreSlugs = filters.genreSlugs ?? [];
+  if (categorySlugs.length > 0) {
+    parts.push({ eventCategory: { is: { slug: { in: categorySlugs } } } });
+  }
+  if (genreSlugs.length > 0) {
+    parts.push({ genreSlugs: { hasSome: genreSlugs } });
+  }
   if (filters.dateRange) {
     parts.push({
       sessions: {
@@ -121,6 +139,9 @@ export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.Act
     });
   }
   if (filters.free) parts.push(buildFreeEventWhere());
+  else if (filters.priceMax != null) {
+    parts.push({ priceMode: { in: [...NUMERIC_PRICE_MODES] }, priceFrom: { lte: filters.priceMax } });
+  }
   if (filters.districtId) {
     parts.push({ place: { is: buildEffectivePlaceDistrictWhere(filters.districtId) } });
   }

@@ -330,6 +330,8 @@ export function DiscoveryFilters({
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           filters={{
+             categories: applied.categories,
+             genres: applied.genres,
              age: applied.age,
              metro: applied.metro,
              district: applied.district,
@@ -340,6 +342,7 @@ export function DiscoveryFilters({
              whenPreset: applied.whenPreset,
              format: applied.format,
              free: applied.free,
+             priceMax: applied.priceMax,
           }}
           draft={applied}
           setDraft={setDraft}

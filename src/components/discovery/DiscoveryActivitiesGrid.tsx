@@ -9,7 +9,6 @@ import {
   type DiscoveryFilters,
 } from "@/features/filters/discovery/filters.store";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
@@ -38,11 +37,14 @@ function filtersSignature(f: DiscoveryFilters): string {
     dt: f.dateTo,
     wp: f.whenPreset,
     age: f.age,
+    categories: f.categories,
+    genres: f.genres,
     format: f.format,
     metro: f.metro,
     district: f.district,
     nearby: f.nearby,
     free: f.free,
+    priceMax: f.priceMax,
     adultOnly: f.adultOnly,
   });
 }
@@ -71,11 +73,9 @@ export function DiscoveryActivitiesGrid({
   const debounced = useDebouncedValue(applied, 400);
   const isPending = filtersSignature(applied) !== filtersSignature(debounced);
 
-  const { budget } = useBudgetFilter();
-
   const { primary, secondary, secondaryHeading } = useMemo(
-    () => partitionDiscoveryFeed(debounced, activities, budget),
-    [debounced, activities, budget],
+    () => partitionDiscoveryFeed(debounced, activities),
+    [debounced, activities],
   );
 
   const renderCard = (activity: (typeof activities)[number]) => (

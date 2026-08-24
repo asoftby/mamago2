@@ -17,7 +17,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { city: citySlug } = await params;
   const query = await searchParams;
-  const discoveryKeys = new Set(["preset", "from", "to", "dateFrom", "dateTo", "when", "age", "format", "metro", "district", "nearby", "free", "adultOnly"]);
+  const discoveryKeys = new Set(["preset", "from", "to", "dateFrom", "dateTo", "when", "age", "category", "genre", "format", "metro", "district", "nearby", "free", "priceMax", "adultOnly"]);
   const isFiltered = Object.keys(query).some((key) => discoveryKeys.has(key));
   const metadata = await buildCityEventsListingMetadata(citySlug);
   if (isFiltered) metadata.robots = { index: false, follow: true };

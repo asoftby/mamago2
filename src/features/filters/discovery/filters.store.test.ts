@@ -6,6 +6,7 @@ import {
   getModalFilterCount,
   hasAnyNonTrackingUrlParams,
   optimisticFiltersSettled,
+  normalizeStoredDiscoveryFilters,
   shouldClearStoredDiscoveryState,
   parseAppliedFromUrl,
   serializeAppliedToSearchParams,
@@ -24,6 +25,8 @@ test("event filters survive URL serialization and parsing", () => {
     ...defaultFilters,
     whenPreset: "WEEKEND" as const,
     age: ["3-5"],
+    categories: ["theatre", "workshops"],
+    genres: ["puppet", "musical"],
     format: "OFFLINE" as const,
     district: "central",
     metro: "metro-1",
@@ -31,7 +34,9 @@ test("event filters survive URL serialization and parsing", () => {
   };
   const params = serializeAppliedToSearchParams(new URLSearchParams(), filters);
   assert.deepEqual(parseAppliedFromUrl(params as never), filters);
-  assert.equal(getDiscoveryFilterActiveCount(filters), 6);
+  assert.equal(getDiscoveryFilterActiveCount(filters), 8);
+  assert.equal(params.get("category"), "theatre,workshops");
+  assert.equal(params.get("genre"), "puppet,musical");
 });
 
 test("reset serialization from an empty base clears primary, secondary, and budget", () => {
@@ -48,6 +53,32 @@ test("adultOnly round-trips and contributes to unified active count", () => {
   assert.deepEqual(parseAppliedFromUrl(params as never), filters);
   assert.equal(params.get("adultOnly"), "true");
   assert.equal(getDiscoveryFilterActiveCount(filters), 1);
+});
+
+test("priceMax round-trips, preserves tracking params, and resets canonically", () => {
+  const base = new URLSearchParams("utm_source=instagram&gclid=click&priceMax=90");
+  const constrained = { ...defaultFilters, priceMax: 50 };
+  const params = serializeAppliedToSearchParams(base, constrained);
+  assert.equal(params.get("priceMax"), "50");
+  assert.equal(params.get("utm_source"), "instagram");
+  assert.equal(params.get("gclid"), "click");
+  assert.deepEqual(parseAppliedFromUrl(params as never), constrained);
+
+  const reset = serializeAppliedToSearchParams(params, defaultFilters);
+  assert.equal(reset.get("priceMax"), null);
+  assert.equal(reset.get("utm_source"), "instagram");
+});
+
+test("free normalizes numeric price off and price remains one badge group", () => {
+  const params = serializeAppliedToSearchParams(
+    new URLSearchParams(),
+    { ...defaultFilters, free: true, priceMax: 50 },
+  );
+  assert.equal(params.get("free"), "true");
+  assert.equal(params.get("priceMax"), null);
+  assert.equal(parseAppliedFromUrl(new URLSearchParams("free=true&priceMax=50") as never).priceMax, null);
+  assert.equal(getModalFilterCount({ ...defaultFilters, priceMax: 50 }), 1);
+  assert.equal(getModalFilterCount({ ...defaultFilters, free: true, priceMax: 50 }), 1);
 });
 
 // --- C3: localStorage hydration gate must ignore tracking params ---
@@ -119,6 +150,23 @@ test("getModalFilterCount folds adultOnly into the age group (A2: chip lives in 
 test("getModalFilterCount counts 1 when only 18+ is selected and nothing else", () => {
   // Exact scenario flagged in review: adultOnly alone must not fall through the condition.
   assert.equal(getModalFilterCount({ ...defaultFilters, adultOnly: true }), 1);
+});
+
+test("category and genre each count as one modal filter dimension", () => {
+  assert.equal(getModalFilterCount({ ...defaultFilters, categories: ["theatre", "workshops"], genres: ["puppet"] }), 2);
+});
+
+test("category and genre deep links parse as deduplicated multi-select values", () => {
+  const parsed = parseAppliedFromUrl(new URLSearchParams("category=theatre,workshops,theatre&genre=puppet,musical,puppet") as never);
+  assert.deepEqual(parsed.categories, ["theatre", "workshops"]);
+  assert.deepEqual(parsed.genres, ["puppet", "musical"]);
+});
+
+test("session restore preserves category and genre multi-select state", () => {
+  const restored = normalizeStoredDiscoveryFilters({ categories: ["theatre", "workshops"], genres: ["puppet"] });
+  assert.deepEqual(restored.categories, ["theatre", "workshops"]);
+  assert.deepEqual(restored.genres, ["puppet"]);
+  assert.deepEqual(normalizeStoredDiscoveryFilters({ free: true }).categories, []);
 });
 
 // --- Overlay must not get stuck on CSV order (age has no canonical click order) ---

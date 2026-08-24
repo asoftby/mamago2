@@ -84,6 +84,8 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
     };
     const eventFilters = intent === "kuda"
       ? {
+          categorySlugs: scalar("category")?.split(",").filter(Boolean) ?? [],
+          genreSlugs: scalar("genre")?.split(",").filter(Boolean) ?? [],
           dateRange: resolveEventDateRange({
             preset:
               scalar("preset") === "TODAY" ||
@@ -95,6 +97,7 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
             to: scalar("to") ?? scalar("dateTo") ?? null,
           }),
           free: scalar("free") === "true",
+          priceMax: scalar("free") === "true" || scalar("priceMax") == null ? null : (() => { const value = Number(scalar("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),
           districtId: scalar("district") ?? null,
           metroId: scalar("metro") ?? null,
           adultOnly: scalar("adultOnly") === "true",

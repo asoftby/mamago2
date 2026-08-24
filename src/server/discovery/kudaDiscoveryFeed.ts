@@ -49,8 +49,11 @@ export async function getKudaDiscoveryFeed(
   const take = options?.take ?? 80;
   const now = new Date();
   const runtimeFilters = options?.eventFilters ?? {
+        categorySlugs: [],
+        genreSlugs: [],
         dateRange: null,
         free: false,
+        priceMax: null,
         districtId: null,
         metroId: null,
         adultOnly: false,
