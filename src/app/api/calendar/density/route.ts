@@ -14,7 +14,16 @@ export async function GET(request: NextRequest) {
   if (!window) return NextResponse.json({ error: "INVALID_WINDOW" }, { status: 400 });
   const { where } = await buildKudaDiscoveryWhere(city.id, city.slug, {
     format: parseActivityFormatQuery(p.get("format")),
-    eventFilters: { dateRange: null, free: p.get("free") === "true", districtId: p.get("district"), metroId: p.get("metro"), adultOnly: p.get("adultOnly") === "true" },
+    eventFilters: {
+      categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
+      genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
+      dateRange: null,
+      free: p.get("free") === "true",
+      priceMax: null,
+      districtId: p.get("district"),
+      metroId: p.get("metro"),
+      adultOnly: p.get("adultOnly") === "true",
+    },
   });
   const sessions = await prisma.activitySession.findMany({ where: { startsAt: { gte: window.start, lt: window.end }, activity: { is: where } }, select: { startsAt: true } });
   return NextResponse.json(countEventSessionsByDay(sessions));
