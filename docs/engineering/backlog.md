@@ -3679,3 +3679,16 @@ P3 — cleanup / polish / optional
 - Source: engineering audit + implementation during media-picker
   infinite-scroll work (see `mediaPickerQuery.ts` / `MediaUploadField.tsx` /
   `ArticleEditorCoverField.tsx` / `resolveUploadOwner.ts` changes)
+
+## [BACKLOG-128] Model event intervals for discovery date overlap and density
+
+- Status: BLOCKED
+- Priority: P1
+- Area: Discovery / Events / Data model
+- Added: 2026-08-24
+- Reason deferred: the current `ActivitySession` model contains `startsAt` only; there is no authoritative per-session `endsAt`, so interval overlap and expansion of one multiday session across every intersecting calendar day cannot be implemented without inventing semantics or changing the materialization contract.
+- Context: discovery filters and `/api/calendar/density` now share the executable Activity/session predicates and Minsk timezone policy. They correctly count materialized session days, but cannot infer an event interval that the schema does not store.
+- Current state: `buildEventRuntimeWhere` matches sessions whose `startsAt` is inside the selected half-open window. Density replaces applied dates with its visible-month window and groups matching materialized sessions by Minsk date.
+- Dependencies: product/data decision for session duration vs activity-level interval, schema migration adding an authoritative end boundary (or an explicit guarantee that multiday events materialize one session per active day), importer/wizard backfill rules.
+- Acceptance criteria: authoritative interval semantics are documented; schema/materialization and backfill are implemented; shared overlap predicate matches `start < filterEnd AND end >= filterStart`; density expands an interval into each intersecting Minsk day; fixtures cover an event starting before TODAY and remaining active today, plus month/year boundaries.
+- Source: discovery filters completion audit, base `961f8bae`, 2026-08-24
