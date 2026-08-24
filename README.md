@@ -39,7 +39,9 @@ pnpm bootstrap:admin   # optional: first admin user
 Environment for production launch:
 
 - `APP_ENV=production`
-- `SITE_NOINDEX_DEFAULT=false` (required — `true` blocks search indexing)
+- `SITE_INDEXING_ENABLED=true` only after the production SEO smoke/crawl is clean
+- `SITE_NOINDEX_FORCE=false` (`true` is the emergency kill switch and always blocks indexing)
+- `SITE_NOINDEX_DEFAULT=false` may be kept explicit, but it does not open indexing by itself
 - Rotate any secrets that were ever committed to git (e.g. Telegram bot token via BotFather)
 
 If cities are missing after migrate, `/` shows a setup notice instead of redirecting to a 404 city page.

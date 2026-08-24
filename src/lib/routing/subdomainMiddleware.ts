@@ -6,6 +6,9 @@ export type MiddlewareDecision =
   | { kind: "rewrite"; pathname: string }
   | { kind: "redirect"; location: string };
 
+const LEGACY_PROD_PREVIEW_HOST = "prod.mamago.by";
+const PRIMARY_PUBLIC_ORIGIN = "https://mamago.by";
+
 function isHost(host: string, prefixes: string[]): boolean {
   return prefixes.some((prefix) => host.startsWith(prefix));
 }
@@ -73,6 +76,24 @@ function stripSubdomainPrefix(host: string): string {
 
 export function getPublicBaseFromHost(host: string, protocol: string): string {
   return `${protocol}//${stripSubdomainPrefix(host)}`;
+}
+
+/**
+ * After the apex cutover, prod.mamago.by is a legacy preview hostname.
+ * Public HTML must have one crawlable origin, so canonicalize this host with
+ * a permanent redirect. API routes are intentionally excluded by middleware
+ * before this helper is consulted, preserving deployment/health probes.
+ */
+export function resolveLegacyProdPreviewRedirect(params: {
+  host: string;
+  pathname: string;
+  search: string;
+}): string | null {
+  const hostname = params.host.split(":")[0]?.toLowerCase() ?? "";
+  if (hostname !== LEGACY_PROD_PREVIEW_HOST) return null;
+
+  const pathname = params.pathname === "/" ? "/minsk" : params.pathname;
+  return `${PRIMARY_PUBLIC_ORIGIN}${pathname}${params.search}`;
 }
 
 function buildPublicLocation(params: {
