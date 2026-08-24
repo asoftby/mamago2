@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { resolveSubdomainMiddlewareDecision } from "@/lib/routing/subdomainMiddleware";
+import {
+  resolveLegacyProdPreviewRedirect,
+  resolveSubdomainMiddlewareDecision,
+} from "@/lib/routing/subdomainMiddleware";
 import { isDevLocalHost, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
 import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
+import {
+  isPermanentlyNoindexPath,
+  isPermanentlyNoindexSurface,
+} from "@/lib/seo/indexingPolicy";
 import {
   REQUEST_PATHNAME_HEADER,
   REQUEST_SEARCH_HEADER,
@@ -53,20 +60,27 @@ function rewriteWithRequestPath(request: NextRequest, url: URL): NextResponse {
   });
 }
 
-function applyGlobalNoindexHeader(
+function applyRobotsHeader(
   response: NextResponse,
   params: {
     pathname: string;
+    surface: string;
   },
 ): NextResponse {
-  if (!isGlobalNoindexEnabled() || shouldBypassSeoHeader(params.pathname)) {
+  if (shouldBypassSeoHeader(params.pathname)) {
     return response;
   }
 
-  response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  if (
+    isGlobalNoindexEnabled() ||
+    isPermanentlyNoindexSurface(params.surface) ||
+    isPermanentlyNoindexPath(params.pathname)
+  ) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+
   return response;
 }
-
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -87,6 +101,23 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get("host") || "";
   const url = request.nextUrl;
   const hostname = host.split(":")[0]?.toLowerCase() ?? "";
+
+  // ── Legacy PROD preview host canonicalization (301) ─────────────────────
+  // The public production origin is now mamago.by. Keep prod.mamago.by only
+  // for non-HTML infrastructure probes (/api is already hard-exited above).
+  // Combine host + trailing-slash canonicalization into one hop where possible.
+  const legacyProdRedirect = resolveLegacyProdPreviewRedirect({
+    host,
+    pathname,
+    search: url.search,
+  });
+  if (legacyProdRedirect && (request.method === "GET" || request.method === "HEAD")) {
+    const redirectUrl = new URL(legacyProdRedirect);
+    if (pathname.endsWith("/") && !shouldSkipTrailingSlashRedirect(pathname)) {
+      redirectUrl.pathname = removeTrailingSlash(redirectUrl.pathname);
+    }
+    return NextResponse.redirect(redirectUrl, { status: 301 });
+  }
 
   // ── Trailing-slash canonical redirect (301) ──────────────────────────────
   // Runs before subdomain/surface logic so SEO crawlers always land on the
@@ -152,8 +183,9 @@ export function middleware(request: NextRequest) {
   if (decision.kind === "rewrite") {
     url.pathname = decision.pathname;
     url.search = search;
-    return applyGlobalNoindexHeader(rewriteWithRequestPath(request, url), {
+    return applyRobotsHeader(rewriteWithRequestPath(request, url), {
       pathname,
+      surface,
     });
   }
 
@@ -162,8 +194,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return applyGlobalNoindexHeader(nextWithRequestPath(request), {
+  return applyRobotsHeader(nextWithRequestPath(request), {
     pathname,
+    surface,
   });
 }
 
