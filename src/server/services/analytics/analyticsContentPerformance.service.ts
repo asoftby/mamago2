@@ -19,27 +19,14 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import {
+  CANONICAL_CARD_IMPRESSION_SQL,
+  CANONICAL_CTA_CLICK_SQL,
+  canonicalMetricRowToCounts,
+  canonicalMetricSelectSql,
+  type CanonicalMetricRow,
+} from "@/server/services/analytics/analyticsMetricSql";
 import { labelForCtaTargetAction } from "@/lib/analytics/ctaTargetActionLabels";
-
-/** Contract v1: a content impression is a real content CARD_VIEW, not an inner article CTA impression. */
-const CANONICAL_CARD_IMPRESSION_SQL = Prisma.sql`
-  e."eventType" = 'CARD_VIEW'
-  AND COALESCE(e."meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
-`;
-
-/** Contract v1: reading/rating transport events do not belong to the conversion CTA KPI. */
-const CANONICAL_CTA_CLICK_SQL = Prisma.sql`
-  e."eventType" = 'CTA_CLICK'
-  AND COALESCE(e."meta"->>'articleEvent', '') NOT IN (
-    'article_read_25',
-    'article_read_50',
-    'article_read_75',
-    'article_complete',
-    'next_article_loaded',
-    'article_section_exhausted',
-    'article_rating_submitted'
-  )
-`;
 
 type AggRow = {
   entity_type: string;
@@ -61,14 +48,6 @@ type MetaRow = {
 type VerticalAggRow = {
   vertical: string;
   views: bigint;
-  opens: bigint;
-  saves: bigint;
-  plan_adds: bigint;
-  cta_clicks: bigint;
-};
-
-type PublicationMetricRow = {
-  impressions: bigint;
   opens: bigint;
   saves: bigint;
   plan_adds: bigint;
@@ -125,7 +104,10 @@ function rowToEntity(
   };
 }
 
-function toTopItem(r: ContentPerformanceEntityRow, primary: number): ContentPerformanceTopItem {
+function toTopItem(
+  r: ContentPerformanceEntityRow,
+  primary: number,
+): ContentPerformanceTopItem {
   return {
     entityType: r.entityType,
     entityId: r.entityId,
@@ -165,7 +147,6 @@ function sortRows(
     if (k === "title") {
       return mult * a.title.localeCompare(b.title, "en");
     }
-    // null (unmeasured rate) sorts as lowest, never as if it were a real 0.
     const va = (a[k as keyof ContentPerformanceEntityRow] as number | null) ?? -1;
     const vb = (b[k as keyof ContentPerformanceEntityRow] as number | null) ?? -1;
     return mult * (va - vb);
@@ -303,7 +284,13 @@ export async function getAnalyticsContentPerformance(
   };
 
   const worstConverters = [...allRows]
-    .filter((r) => r.views >= 35 && r.opens >= 5 && r.saveRate != null && r.saveRate < 0.12)
+    .filter(
+      (r) =>
+        r.views >= 35 &&
+        r.opens >= 5 &&
+        r.saveRate != null &&
+        r.saveRate < 0.12,
+    )
     .sort((a, b) => b.views - a.views)
     .slice(0, 8);
 
@@ -349,7 +336,7 @@ function buildEntityTypeComparison(
     { views: number; opens: number; saves: number; planAdds: number; cta: number }
   > = {};
   for (const r of rows) {
-    if (!by[r.entityType])
+    if (!by[r.entityType]) {
       by[r.entityType] = {
         views: 0,
         opens: 0,
@@ -357,6 +344,7 @@ function buildEntityTypeComparison(
         planAdds: 0,
         cta: 0,
       };
+    }
     const x = by[r.entityType]!;
     x.views += r.views;
     x.opens += r.opens;
@@ -458,13 +446,9 @@ function emptyResult(
 }
 
 /**
- * Per-publication drill-down (Task 3 MVP follow-up). Bounded aggregate query
- * scoped to one entityType+entityId, reusing the same UserEvent pipeline —
- * not a new analytics system. Respects the caller's dateRange/city filter
- * (the same period selected in Content Performance), not segment/childAgeBand
- * (not meaningful when already looking at one specific publication).
- * Returns aggregate counts only — never individual UserEvent rows, no
- * userId/sessionId/IP/UA in the result shape.
+ * Per-publication aggregate drill-down. Uses the same canonical UserEvent
+ * contract as every other first-party performance surface and returns only
+ * aggregates — never raw user/session/IP/UA rows.
  */
 export async function getPublicationAnalyticsDetail(params: {
   entityType: AnalyticsEntityType;
@@ -482,14 +466,10 @@ export async function getPublicationAnalyticsDetail(params: {
     ...(cityId ? { cityId } : {}),
   };
 
+  const metricSelect = canonicalMetricSelectSql();
   const [metricRows, ctaRows, titles, latestEvent] = await Promise.all([
-    prisma.$queryRaw<PublicationMetricRow[]>`
-      SELECT
-        COUNT(*) FILTER (WHERE ${CANONICAL_CARD_IMPRESSION_SQL})::bigint AS impressions,
-        COUNT(*) FILTER (WHERE e."eventType" = 'DETAIL_OPEN')::bigint AS opens,
-        COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
-        COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS plan_adds,
-        COUNT(*) FILTER (WHERE ${CANONICAL_CTA_CLICK_SQL})::bigint AS cta_clicks
+    prisma.$queryRaw<CanonicalMetricRow[]>`
+      SELECT ${metricSelect}
       FROM "UserEvent" e
       WHERE e."entityType" = ${entityType}::"AnalyticsEntityType"
         AND e."entityId" = ${entityId}
@@ -517,12 +497,12 @@ export async function getPublicationAnalyticsDetail(params: {
     }),
   ]);
 
-  const metrics = metricRows[0];
-  const impressions = toNum(metrics?.impressions);
-  const opens = toNum(metrics?.opens);
-  const saves = toNum(metrics?.saves);
-  const planAdds = toNum(metrics?.plan_adds);
-  const ctaClicks = toNum(metrics?.cta_clicks);
+  const metrics = canonicalMetricRowToCounts(metricRows[0]);
+  const impressions = metrics.impressions;
+  const opens = metrics.opens;
+  const saves = metrics.saves;
+  const planAdds = metrics.planAdds;
+  const ctaClicks = metrics.ctaClicks;
 
   const cityName = latestEvent?.cityId
     ? ((await prisma.city.findUnique({
