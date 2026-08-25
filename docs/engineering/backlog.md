@@ -3705,3 +3705,16 @@ P3 — cleanup / polish / optional
 - Dependencies: product semantics for “от”, tariff minima/maxima, session-specific prices and currency conversion; an authoritative numeric projection such as `effectivePriceMin`/`effectivePriceMax` (or a strict replacement contract for `priceFrom`/`priceTo`); writer and importer updates.
 - Acceptance criteria: explicit free status remains independent from paid ranges; all write paths populate an authoritative BYN numeric min/max projection; a migration/backfill derives safe values from structured pricing modes and `priceItems`, reports coverage, and quarantines unparseable text for manual review; list/count/distribution use one shared executable predicate; fixtures cover free, fixed, from, ranged, multi-tariff, imported, and unknown prices; the range UI is enabled only after measured coverage is accepted.
 - Source: event discovery filter owner-review audit, base `a01101c0`, 2026-08-24
+
+## [BACKLOG-130] Batch /api/save/status for Event/Place/Offer card grids
+
+- Status: OPEN
+- Priority: P2
+- Area: Save / Discovery / Performance
+- Added: 2026-08-25
+- Reason deferred: fixing this is a bounded batch-endpoint feature (schema, N new API route, wiring into 3 different card components), out of scope for the guest-401/duplicate-request bugfix that motivated this audit; that fix only needed to stop guest and duplicate requests, not eliminate legitimate authenticated N+1.
+- Context: `SaveHeart` (used by `EventCard`, `OfferCard`, `ActivityCard`) has no batch path — every card on a list page does its own `GET /api/save/status` on mount. For an authenticated user viewing e.g. 20 event cards, that's 20 individual requests. `ArticleSaveHeart` already solved the same problem for article grids via `useArticleSaveStatusBatch` + `POST /api/save/status/articles` + `skipOwnFetch`/`initialStatus` props (see `src/features/save/useArticleSaveStatusBatch.ts`, `src/app/api/save/status/articles/route.ts`) — that pattern is the template to replicate, not a new design.
+- Current state: `PlaceSaveHeart` has no batch path either (no grid currently renders many `PlaceSaveHeart` at once, so lower urgency there). `EventCard`/`OfferCard`/`ActivityCard` grids (e.g. city home rows, discovery listing, activity listing) each mount `SaveHeart` directly with per-card fetch, now correctly guarded against guest/duplicate requests but still N+1 for authenticated users.
+- Dependencies: none blocking; needs a batch status endpoint keyed by activityId/offerId (mirroring the article one, which already handles idea+plan state per entity) and a `useSaveStatusBatch`-style hook, then wiring the owning grid components to pass `initialStatus`/`skipOwnFetch`-equivalent props into `SaveHeart`.
+- Acceptance criteria: authenticated card grids for events/offers/activities issue one batched status request per page instead of one per card; `SaveHeart`'s own-fetch path remains for standalone (non-grid) usage; guest behavior (no request at all) is unaffected.
+- Source: `/api/save/status` guest-401/duplicate-request audit, base `772bdc1f`, 2026-08-25

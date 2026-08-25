@@ -138,6 +138,7 @@
     "test:article-content-media-linkage": "tsx src/server/media/articleContentMediaLinkage.test.ts",
     "test:event-wizard-pending-location": "tsx src/lib/business/resolvePendingLocationOnPublish.test.ts",
     "test:article-actions": "tsx src/lib/save/parseArticleIdsForBatch.test.ts && tsx src/lib/post-auth/executePendingAction.test.ts && tsx src/server/services/articleSaveActions.test.ts && tsx src/features/save/persistArticleSave.test.ts && tsx src/components/activity/SaveToPlanModal.test.tsx",
+    "test:save-status": "tsx src/features/save/saveStatusFetchGuard.test.ts && tsx src/features/save/saveStatusFetchGuardWiring.test.ts && tsx src/app/api/save/status/route.test.ts",
     "test:article-gallery": "tsx src/components/article/mvp/ArticleGallery.test.tsx",
     "test:article-editor-dirty-state": "tsx src/lib/article/articleEditorComparable.test.ts",
     "test:article-media-picker": "tsx src/lib/publications/articleMvp.test.ts && tsx src/lib/article/articleMediaLibrary.test.ts && tsx \"src/app/api/admin/articles/[id]/media/route.test.ts\" && tsx src/components/admin/articles/ArticleBlocksMvpEditor.test.ts",

@@ -9,6 +9,7 @@ import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
 type SaveHeartProps = {
   activityId: string;
@@ -72,7 +73,7 @@ export function SaveHeart({
   const normalizedEventPlanDateISO = normalizePlanDateISO(eventPlanDateISO);
 
   const checkSaveStatus = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
       setSaveStatus({
         isIdea: false,
         inPlan: false,
@@ -113,7 +114,7 @@ export function SaveHeart({
       hasOpenedOnceRef.current = true;
       return;
     }
-    if (!hasOpenedOnceRef.current) return;
+    if (!shouldRefetchAfterFlowClose({ flowOpen, hasOpenedOnce: hasOpenedOnceRef.current })) return;
     void checkSaveStatus();
   }, [flowOpen, checkSaveStatus]);
 

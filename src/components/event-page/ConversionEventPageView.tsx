@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
 import { toast } from "@/lib/toast";
 import {
@@ -33,6 +33,7 @@ import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
 /**
  * Конверсионная страница события (mamaGo 2.0).
@@ -71,6 +72,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
   const [planDateChooserOpen, setPlanDateChooserOpen] = useState(false);
   const [isPrimaryLoading, setIsPrimaryLoading] = useState(false);
   const [isSecondaryLoading, setIsSecondaryLoading] = useState(false);
+  const hasOpenedSaveModalOnceRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<{
     isIdea: boolean;
     inPlan: boolean;
@@ -142,6 +144,16 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
   }, [availablePlanDates, data.title, planSessionsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
+      setSaveStatus({
+        isIdea: false,
+        inPlan: false,
+        planDate: null,
+        planStartsAt: null,
+        planItemId: null,
+      });
+      return;
+    }
     try {
       const res = await fetch(`/api/save/status?activityId=${data.id}`);
       if (!res.ok) return;
@@ -156,14 +168,21 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     } catch {
       // ignore
     }
-  }, [data.id]);
+  }, [data.id, isAuthenticated]);
 
   useEffect(() => {
     void loadSaveStatus();
   }, [loadSaveStatus]);
 
+  // Статус обновляется только после закрытия модалки, и только если пользователь
+  // реально открывал её — эффект выше уже загрузил статус на монтировании,
+  // без этой проверки здесь случился бы дублирующийся GET сразу на первом рендере.
   useEffect(() => {
-    if (saveModalOpen) return;
+    if (saveModalOpen) {
+      hasOpenedSaveModalOnceRef.current = true;
+      return;
+    }
+    if (!shouldRefetchAfterFlowClose({ flowOpen: saveModalOpen, hasOpenedOnce: hasOpenedSaveModalOnceRef.current })) return;
     void loadSaveStatus();
   }, [saveModalOpen, loadSaveStatus]);
 

@@ -21,6 +21,7 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 import { LocationBlock } from "@/components/shared/LocationBlock";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
@@ -337,6 +338,7 @@ export function EventPageView({
   const [planDateChooserOpen, setPlanDateChooserOpen] = useState(false);
   const [isPrimaryLoading, setIsPrimaryLoading] = useState(false);
   const [isSecondaryLoading, setIsSecondaryLoading] = useState(false);
+  const hasOpenedSaveModalOnceRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<{
     isIdea: boolean;
     inPlan: boolean;
@@ -415,6 +417,16 @@ export function EventPageView({
   }, [availablePlanDates, data.title, planSessionsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
+      setSaveStatus({
+        isIdea: false,
+        inPlan: false,
+        planDate: null,
+        planStartsAt: null,
+        planItemId: null,
+      });
+      return;
+    }
     try {
       const res = await fetch(`/api/save/status?activityId=${data.id}`);
       if (!res.ok) return;
@@ -429,13 +441,18 @@ export function EventPageView({
     } catch {
       // ignore
     }
-  }, [data.id]);
+  }, [data.id, isAuthenticated]);
 
   useEffect(() => { void loadSaveStatus(); }, [loadSaveStatus]);
-  // Статус обновляется только после закрытия модалки, чтобы не вызывать
-  // перерисовку с новым состоянием пока модалка ещё открыта (задвоение).
+  // Статус обновляется только после закрытия модалки, и только если пользователь
+  // реально открывал её — эффект выше уже загрузил статус на монтировании,
+  // без этой проверки здесь случился бы дублирующийся GET сразу на первом рендере.
   useEffect(() => {
-    if (saveModalOpen) return;
+    if (saveModalOpen) {
+      hasOpenedSaveModalOnceRef.current = true;
+      return;
+    }
+    if (!shouldRefetchAfterFlowClose({ flowOpen: saveModalOpen, hasOpenedOnce: hasOpenedSaveModalOnceRef.current })) return;
     void loadSaveStatus();
   }, [saveModalOpen, loadSaveStatus]);
 
