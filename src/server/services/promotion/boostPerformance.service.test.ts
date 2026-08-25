@@ -10,7 +10,7 @@ let activityId = "";
 
 async function recordEvents(
   createdAt: Date,
-  events: Array<"CARD_VIEW" | "SAVE" | "PLAN_ADD" | "CTA_CLICK">,
+  events: Array<"CARD_VIEW" | "DETAIL_OPEN" | "SAVE" | "PLAN_ADD" | "CTA_CLICK">,
 ) {
   await prisma.userEvent.createMany({
     data: events.map((eventType) => ({
@@ -64,7 +64,7 @@ test.before(async () => {
     ],
   });
 
-  await recordEvents(new Date("2026-08-09T12:00:00.000Z"), ["CARD_VIEW", "CARD_VIEW", "PLAN_ADD"]);
+  await recordEvents(new Date("2026-08-09T12:00:00.000Z"), ["CARD_VIEW", "CARD_VIEW", "DETAIL_OPEN", "PLAN_ADD"]);
   await recordEvents(new Date("2026-08-11T12:00:00.000Z"), [
     "CARD_VIEW",
     "CARD_VIEW",
@@ -72,6 +72,8 @@ test.before(async () => {
     "CARD_VIEW",
     "CARD_VIEW",
     "CARD_VIEW",
+    "DETAIL_OPEN",
+    "DETAIL_OPEN",
     "SAVE",
     "SAVE",
     "PLAN_ADD",
@@ -79,11 +81,13 @@ test.before(async () => {
     "PLAN_ADD",
     "CTA_CLICK",
   ]);
-  await recordEvents(new Date("2026-08-21T07:00:00.000Z"), ["CARD_VIEW"]);
+  await recordEvents(new Date("2026-08-21T07:00:00.000Z"), ["CARD_VIEW", "DETAIL_OPEN"]);
   await recordEvents(new Date("2026-08-21T10:00:00.000Z"), [
     "CARD_VIEW",
     "CARD_VIEW",
     "CARD_VIEW",
+    "DETAIL_OPEN",
+    "DETAIL_OPEN",
     "PLAN_ADD",
   ]);
 });
@@ -97,7 +101,7 @@ test.after(async () => {
   await prisma.$disconnect();
 });
 
-test("returns sorted Boost history with per-period metrics and an equal preceding baseline", async () => {
+test("returns sorted Boost history with separated impressions/opens and an equal preceding baseline", async () => {
   const result = await getPromotionPerformanceByActivityIds(
     [activityId],
     new Date("2026-08-21T12:00:00.000Z"),
@@ -111,18 +115,22 @@ test("returns sorted Boost history with per-period metrics and an equal precedin
   const [active, completed] = performance.periods;
   assert.equal(active?.isActive, true);
   assert.equal(active?.metrics.views, 3);
+  assert.equal(active?.metrics.opens, 2);
   assert.equal(active?.metrics.planAdds, 1);
   assert.equal(active?.baselineMetrics.views, 1);
+  assert.equal(active?.baselineMetrics.opens, 1);
   assert.equal(active?.baselineMetrics.planAdds, 0);
   assert.equal(active?.comparison.viewsMultiplier, 3);
   assert.equal(active?.comparison.planAddsPercentChange, null);
 
   assert.equal(completed?.isActive, false);
   assert.equal(completed?.metrics.views, 6);
+  assert.equal(completed?.metrics.opens, 2);
   assert.equal(completed?.metrics.saves, 2);
   assert.equal(completed?.metrics.planAdds, 3);
   assert.equal(completed?.metrics.ctaClicks, 1);
   assert.equal(completed?.baselineMetrics.views, 2);
+  assert.equal(completed?.baselineMetrics.opens, 1);
   assert.equal(completed?.baselineMetrics.planAdds, 1);
   assert.equal(completed?.comparison.viewsMultiplier, 3);
   assert.equal(completed?.comparison.planAddsPercentChange, 200);
