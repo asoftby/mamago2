@@ -1,8 +1,6 @@
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
-import Link from "next/link";
 import type { Metadata } from "next";
-import { permanentRedirect } from "next/navigation";
-import { Container } from "@/components/ui/Container";
+import { notFound, permanentRedirect } from "next/navigation";
 import { EventPageView } from "@/components/event-page";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
 import { ContentStatus } from "@prisma/client";
@@ -74,9 +72,8 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
     if (canonicalPath && canonicalPath !== `/${city}/events/${slugOrId}`) {
       permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
     }
+    notFound();
   }
-
-  if (!fromDb) return {};
 
   const publicBase = getCanonicalPublicAppUrl();
   const canonical = resolveEventCanonicalUrl({
@@ -229,12 +226,5 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
   }
 
-  return (
-    <Container className="pt-20 text-center">
-      <h1 className="text-2xl font-bold">Событие не найдено</h1>
-      <Link href={`/${city}`} className="mt-4 block text-primary hover:underline">
-        На главную
-      </Link>
-    </Container>
-  );
+  notFound();
 }

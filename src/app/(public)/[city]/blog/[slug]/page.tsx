@@ -52,12 +52,12 @@ async function resolveCity(citySlug: string) {
 export async function generateMetadata({ params }: PageProps) {
   const { city: cityParam, slug } = await params;
   const city = await resolveCity(cityParam);
-  if (!city) return {};
+  if (!city) notFound();
 
   const publicBase = getCanonicalPublicAppUrl();
 
   const mvp = await loadArticleMvpBySlugPublic(slug, city.id);
-  if (!mvp) return {};
+  if (!mvp) notFound();
 
   const article = await prisma.article.findUnique({
     where: { id: mvp.id },
@@ -74,7 +74,7 @@ export async function generateMetadata({ params }: PageProps) {
       noindex: true,
     },
   });
-  if (!article) return {};
+  if (!article) notFound();
 
   // If geoScope is COUNTRY, redirect to national URL
   if (article.geoScope === "COUNTRY") {
