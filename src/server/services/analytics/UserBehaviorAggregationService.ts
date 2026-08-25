@@ -28,10 +28,10 @@ export type BehaviorAggregationInput = {
   createdAt?: Date;
 };
 
-function asJsonInput(map: Record<string, number>): Prisma.InputJsonValue | undefined {
-  return Object.keys(map).length > 0
-    ? (map as Prisma.InputJsonValue)
-    : undefined;
+function asJsonInput(map: Record<string, number>): Prisma.InputJsonValue {
+  // Always persist an object, including {}, so rebuild/apply paths can clear
+  // historical polluted keys instead of `undefined` silently preserving them.
+  return map as Prisma.InputJsonValue;
 }
 
 function snapshotForSegments(snapshot: BehaviorProfileSnapshot) {
@@ -85,7 +85,7 @@ export async function applyUserBehaviorEvent(
 
     await prisma.$transaction(async (tx) => {
       // Serialize the derived profile read→reduce→write sequence for this user.
-      await tx.$executeRaw`
+      await tx.$queryRaw<unknown[]>`
         SELECT pg_advisory_xact_lock(hashtext(${`behavior-profile:${userId}`})::bigint)
       `;
 
@@ -107,7 +107,7 @@ export async function applyUserBehaviorEvent(
       const preferredCategories = asJsonInput(next.preferredCategories);
       const planningBuckets = next.planningBuckets as Prisma.InputJsonValue;
 
-      const absoluteData = {
+      const updateData: Prisma.UserBehaviorProfileUncheckedUpdateInput = {
         totalViews: next.totalViews,
         totalOpens: next.totalOpens,
         totalSaves: next.totalSaves,
@@ -122,15 +122,30 @@ export async function applyUserBehaviorEvent(
         preferredCategories,
         planningBuckets,
         segmentKeys,
-      } satisfies Prisma.UserBehaviorProfileUncheckedUpdateInput;
+      };
+
+      const createData: Prisma.UserBehaviorProfileUncheckedCreateInput = {
+        userId,
+        totalViews: next.totalViews,
+        totalOpens: next.totalOpens,
+        totalSaves: next.totalSaves,
+        totalPlanAdds: next.totalPlanAdds,
+        totalCtaClicks: next.totalCtaClicks,
+        firstSeenAt: next.firstSeenAt,
+        lastSeenAt: next.lastSeenAt,
+        weekendShare: next.weekendShare,
+        sameDayPlanningShare: next.sameDayPlanningShare,
+        advancePlanningShare: next.advancePlanningShare,
+        preferredVerticals,
+        preferredCategories,
+        planningBuckets,
+        segmentKeys,
+      };
 
       await tx.userBehaviorProfile.upsert({
         where: { userId },
-        create: {
-          userId,
-          ...absoluteData,
-        },
-        update: absoluteData,
+        create: createData,
+        update: updateData,
       });
     });
 
