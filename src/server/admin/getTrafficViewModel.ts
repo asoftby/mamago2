@@ -13,7 +13,10 @@
  *     in the window — the SAME identity `audience.dau`/`wau`/`mau` and
  *     /admin/performance's `trackedVisitors` now use, so
  *     `uniqueVisitorsToday` and `audience.dau` agree for the same window.
- *     "Page views" stays a plain row count, not role-filtered.
+ *     "Page views" uses the SAME canonical eligibility as visitors —
+ *     ADMIN/MODERATOR-linked sessions contribute 0 to both, so
+ *     views/visitor stays meaningful even on internal-only-traffic days
+ *     (never a raw-row count of purely internal browsing).
  *   - "Region distribution" (`regions`) remains a GAP. The trusted-IP
  *     question is now resolved: the live Traefik contract is verified
  *     (`forwardedHeaders.trustedIPs` empty, no CDN in front — only
@@ -62,20 +65,6 @@ export const EMPTY_TRAFFIC_VIEW_MODEL: TrafficViewModel = {
   regions: null,
 };
 
-interface CountRow {
-  count: bigint;
-}
-
-async function countPageViews(prisma: PrismaClient, start: Date, end: Date): Promise<number> {
-  const rows = await prisma.$queryRaw<CountRow[]>`
-    SELECT COUNT(*)::bigint AS count
-    FROM "UserEvent"
-    WHERE "createdAt" >= ${start} AND "createdAt" < ${end}
-      AND "eventType" = 'PAGE_VIEW'
-  `;
-  return Number(rows[0]?.count ?? 0);
-}
-
 function computePageViewsPerVisitor(pageViews: number, uniqueVisitors: number): number | null {
   if (uniqueVisitors <= 0) return null;
   return Math.round((pageViews / uniqueVisitors) * 10) / 10;
@@ -84,14 +73,14 @@ function computePageViewsPerVisitor(pageViews: number, uniqueVisitors: number): 
 export async function getTrafficViewModel(prisma: PrismaClient, now: Date): Promise<TrafficViewModel> {
   const window = resolveElapsedTodayVsYesterday(now);
 
-  const [audienceToday, audienceYesterday, pageViewsToday, pageViewsYesterday] = await Promise.all([
+  const [audienceToday, audienceYesterday] = await Promise.all([
     computeCanonicalAudience(prisma, window.todayStart, window.todayEnd),
     computeCanonicalAudience(prisma, window.yesterdayStart, window.yesterdayEnd),
-    countPageViews(prisma, window.todayStart, window.todayEnd),
-    countPageViews(prisma, window.yesterdayStart, window.yesterdayEnd),
   ]);
   const uniqueVisitorsToday = audienceToday.visitors;
   const uniqueVisitorsYesterday = audienceYesterday.visitors;
+  const pageViewsToday = audienceToday.pageViews;
+  const pageViewsYesterday = audienceYesterday.pageViews;
 
   return {
     uniqueVisitorsToday,

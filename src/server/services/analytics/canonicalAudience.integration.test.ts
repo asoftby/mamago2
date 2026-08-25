@@ -228,6 +228,146 @@ async function main(): Promise<void> {
       assert.ok(mauCount >= wauCount, "case 18: MAU >= WAU");
     }
 
+    // --- Product page views: SAME eligibility contract as visitors ---
+    // (§ align product page views with canonical audience exclusions)
+
+    // pv1. anonymous A, 3 PAGE_VIEW => visitors 1, pageViews 3
+    {
+      const w = win(14);
+      for (let i = 0; i < 3; i += 1) {
+        await pageView({ at: new Date(w.start.getTime() + i * 1000), sessionId: sid("pv1-A") });
+      }
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 1, "pv1: anonymous A => 1 visitor");
+      assert.equal(r.pageViews, 3, "pv1: all 3 anonymous PAGE_VIEW rows are eligible");
+    }
+
+    // pv2. USER U, session A, 3 PAGE_VIEW => visitors 1, pageViews 3
+    {
+      const w = win(15);
+      for (let i = 0; i < 3; i += 1) {
+        await pageView({ at: new Date(w.start.getTime() + i * 1000), sessionId: sid("pv2-A"), userId: userU });
+      }
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 1, "pv2: USER U => 1 visitor");
+      assert.equal(r.pageViews, 3, "pv2: all 3 authenticated PAGE_VIEW rows are eligible");
+    }
+
+    // pv3. anonymous A then login USER U => visitors 1, ALL rows in A count
+    // (2 pre-login anonymous rows + 1 post-login authenticated row = 3 eligible page views)
+    {
+      const w = win(16);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: sid("pv3-A") });
+      await pageView({ at: new Date(w.start.getTime() + 2000), sessionId: sid("pv3-A") });
+      await pageView({ at: new Date(w.start.getTime() + 3000), sessionId: sid("pv3-A"), userId: userU });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 1, "pv3: anon-then-login => 1 visitor");
+      assert.equal(r.pageViews, 3, "pv3: pre-login anonymous rows count too — they're that visitor's journey");
+    }
+
+    // pv4. ADMIN only => visitors 0, pageViews 0
+    {
+      const w = win(17);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: sid("pv4-admin"), userId: userAdmin });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 0, "pv4: ADMIN-only => 0 visitors");
+      assert.equal(r.pageViews, 0, "pv4: ADMIN-only => 0 product page views");
+    }
+
+    // pv5. anonymous A then login ADMIN => visitors 0, pageViews 0
+    // INCLUDING the pre-login anonymous-looking row — the whole session is tainted.
+    {
+      const w = win(18);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: sid("pv5-A") });
+      await pageView({ at: new Date(w.start.getTime() + 2000), sessionId: sid("pv5-A"), userId: userAdmin });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 0, "pv5: anon-then-ADMIN-login => 0 visitors");
+      assert.equal(r.pageViews, 0, "pv5: pre-login row on an ADMIN-tainted session must also be excluded");
+    }
+
+    // pv6. MODERATOR — same as pv5
+    {
+      const w = win(19);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: sid("pv6-A") });
+      await pageView({ at: new Date(w.start.getTime() + 2000), sessionId: sid("pv6-A"), userId: userModerator });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 0, "pv6: anon-then-MODERATOR-login => 0 visitors");
+      assert.equal(r.pageViews, 0, "pv6: pre-login row on a MODERATOR-tainted session must also be excluded");
+    }
+
+    // pv7. BUSINESS_OWNER public browsing => visitors 1, pageViews counted normally
+    {
+      const w = win(20);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: sid("pv7-biz"), userId: userBusiness });
+      await pageView({ at: new Date(w.start.getTime() + 2000), sessionId: sid("pv7-biz"), userId: userBusiness });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 1, "pv7: BUSINESS_OWNER => 1 visitor");
+      assert.equal(r.pageViews, 2, "pv7: BUSINESS_OWNER page views count normally");
+    }
+
+    // pv8. eligible anonymous A + ADMIN session B => totals contain only A
+    {
+      const w = win(21);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: sid("pv8-A") });
+      await pageView({ at: new Date(w.start.getTime() + 2000), sessionId: sid("pv8-A") });
+      await pageView({ at: new Date(w.start.getTime() + 3000), sessionId: sid("pv8-B"), userId: userAdmin });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 1, "pv8: only session A is an eligible visitor");
+      assert.equal(r.pageViews, 2, "pv8: only session A's 2 rows are eligible page views");
+    }
+
+    // pv9. null userId + null sessionId PAGE_VIEW => no visitor, no product page view
+    {
+      const w = win(22);
+      await pageView({ at: new Date(w.start.getTime() + 1000), sessionId: null, userId: null });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 0, "pv9: both IDs null => no visitor");
+      assert.equal(r.pageViews, 0, "pv9: both IDs null => no product page view");
+    }
+
+    // pv10. CARD_VIEW/SAVE => no audience/page-view contribution
+    {
+      const w = win(23);
+      await nonPageView("CARD_VIEW", { at: new Date(w.start.getTime() + 1000), sessionId: sid("pv10-A") });
+      await nonPageView("SAVE", { at: new Date(w.start.getTime() + 2000), sessionId: sid("pv10-A") });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 0, "pv10: no PAGE_VIEW => 0 visitors");
+      assert.equal(r.pageViews, 0, "pv10: no PAGE_VIEW => 0 product page views");
+    }
+
+    // pv11. Traffic DAU == canonical visitors — already proven end-to-end by
+    // case 16 above (getTrafficViewModel + collectAudienceDau on the same
+    // fixture/window); not duplicated here.
+
+    // pv12. viewsPerVisitor = canonical product pageViews / canonical visitors,
+    // proven end-to-end via the real getTrafficViewModel entry point: 1
+    // eligible USER visitor with 3 eligible page views + 1 ADMIN session
+    // (2 more raw rows, all ineligible) => pageViews must stay 3, not 5.
+    {
+      const now12 = new Date(Date.UTC(2020, 5, 20, 15, 0, 0));
+      const dayStart12 = new Date(Date.UTC(2020, 5, 19, 21, 0, 0)); // 00:00 Europe/Minsk
+      await pageView({ at: new Date(dayStart12.getTime() + 1000), sessionId: sid("pv12-user"), userId: userU });
+      await pageView({ at: new Date(dayStart12.getTime() + 2000), sessionId: sid("pv12-user"), userId: userU });
+      await pageView({ at: new Date(dayStart12.getTime() + 3000), sessionId: sid("pv12-user"), userId: userU });
+      await pageView({ at: new Date(dayStart12.getTime() + 4000), sessionId: sid("pv12-admin"), userId: userAdmin });
+      await pageView({ at: new Date(dayStart12.getTime() + 5000), sessionId: sid("pv12-admin"), userId: userAdmin });
+      const traffic = await getTrafficViewModel(prisma, now12);
+      assert.equal(traffic.uniqueVisitorsToday, 1, "pv12: 1 eligible visitor (ADMIN excluded)");
+      assert.equal(traffic.pageViewsToday, 3, "pv12: only the eligible visitor's 3 page views count");
+      assert.equal(traffic.pageViewsPerVisitor, 3, "pv12: viewsPerVisitor = 3 eligible pageViews / 1 eligible visitor");
+    }
+
+    // pv13. zero visitors + internal-only traffic => pageViews 0, viewsPerVisitor null
+    {
+      const now13 = new Date(Date.UTC(2020, 5, 21, 15, 0, 0));
+      const dayStart13 = new Date(Date.UTC(2020, 5, 20, 21, 0, 0)); // 00:00 Europe/Minsk
+      await pageView({ at: new Date(dayStart13.getTime() + 1000), sessionId: sid("pv13-admin"), userId: userAdmin });
+      const traffic = await getTrafficViewModel(prisma, now13);
+      assert.equal(traffic.uniqueVisitorsToday, 0, "pv13: internal-only traffic => 0 visitors");
+      assert.equal(traffic.pageViewsToday, 0, "pv13: internal-only traffic => 0 product page views");
+      assert.equal(traffic.pageViewsPerVisitor, null, "pv13: 0-visitor guard => null, never Infinity/NaN");
+    }
+
     console.log("canonicalAudience.integration.test.ts: OK");
   } finally {
     await prisma.userEvent.deleteMany({
