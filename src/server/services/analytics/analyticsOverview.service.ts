@@ -2,14 +2,13 @@ import type {
   AnalyticsEntityType,
   AnalyticsVertical,
   Prisma,
-  UserEventType,
 } from "@prisma/client";
+import { Prisma as PrismaRuntime } from "@prisma/client";
 import {
   eachDayOfInterval,
   endOfDay,
   min as minDate,
   startOfDay,
-  subDays,
 } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import type {
@@ -20,6 +19,11 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import {
+  analyticsEventWhereSql,
+  applyAnalyticsUserFilter,
+  resolveAnalyticsAllowedUserIds,
+} from "@/server/services/analytics/analyticsQueryHelpers";
 
 function buildBaseWhere(
   start: Date,
@@ -61,45 +65,80 @@ function buildBaseWhere(
   return where;
 }
 
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
+type CanonicalMetricRow = {
+  views: bigint;
+  opens: bigint;
+  saves: bigint;
+  plan_adds: bigint;
+  cta_clicks: bigint;
+};
 
-async function countByType(
-  base: Prisma.UserEventWhereInput,
-  types: UserEventType | UserEventType[],
-): Promise<number> {
-  const t = Array.isArray(types) ? { in: types } : types;
-  return prisma.userEvent.count({
-    where: { ...base, eventType: t },
-  });
+async function getCanonicalMetrics(whereSql: Prisma.Sql): Promise<{
+  views: number;
+  opens: number;
+  saves: number;
+  planAdds: number;
+  ctaClicks: number;
+}> {
+  const rows = await prisma.$queryRaw<CanonicalMetricRow[]>(PrismaRuntime.sql`
+    SELECT
+      COUNT(*) FILTER (
+        WHERE e."eventType" = 'CARD_VIEW'
+          AND COALESCE(e."meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
+      )::bigint AS views,
+      COUNT(*) FILTER (WHERE e."eventType" = 'DETAIL_OPEN')::bigint AS opens,
+      COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
+      COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS plan_adds,
+      COUNT(*) FILTER (
+        WHERE e."eventType" = 'CTA_CLICK'
+          AND COALESCE(e."meta"->>'articleEvent', '') NOT IN (
+            'article_read_25',
+            'article_read_50',
+            'article_read_75',
+            'article_complete',
+            'next_article_loaded',
+            'article_section_exhausted',
+            'article_rating_submitted'
+          )
+      )::bigint AS cta_clicks
+    FROM "UserEvent" e
+    WHERE ${whereSql}
+  `);
+  const row = rows[0];
+  return {
+    views: Number(row?.views ?? 0),
+    opens: Number(row?.opens ?? 0),
+    saves: Number(row?.saves ?? 0),
+    planAdds: Number(row?.plan_adds ?? 0),
+    ctaClicks: Number(row?.cta_clicks ?? 0),
+  };
 }
 
 /**
  * Агрегированные метрики для вкладки Analytics → Overview.
+ * Contract v1: views = canonical content CARD_VIEW impressions only;
+ * PAGE_VIEW stays in traffic analytics, and article read/rating transport
+ * events never inflate CTA conversion metrics.
  */
 export async function getAnalyticsOverview(
   filters: AnalyticsOverviewFilters,
 ): Promise<AnalyticsOverviewResult> {
   const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
   const cityId = await resolveCityIdFromSlug(filters.city);
-  const base = buildBaseWhere(start, end, filters, cityId);
+  const allowed = await resolveAnalyticsAllowedUserIds(filters);
+  const baseUnfiltered = buildBaseWhere(start, end, filters, cityId);
+  const base = applyAnalyticsUserFilter(baseUnfiltered, allowed);
+  const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed);
 
   const [
-    views,
-    opens,
-    saves,
-    planAdds,
-    ctaClicks,
+    canonical,
     activeUserRows,
     sessionRows,
     profilesActiveInRange,
     topVerticalRows,
     topEntityRows,
   ] = await Promise.all([
-    countByType(base, VIEW_TYPES),
-    countByType(base, "DETAIL_OPEN"),
-    countByType(base, "SAVE"),
-    countByType(base, "PLAN_ADD"),
-    countByType(base, "CTA_CLICK"),
+    getCanonicalMetrics(wsql),
     prisma.userEvent.groupBy({
       by: ["userId"],
       where: { ...base, userId: { not: null } },
@@ -108,11 +147,14 @@ export async function getAnalyticsOverview(
       by: ["sessionId"],
       where: { ...base, sessionId: { not: null } },
     }),
-    prisma.userBehaviorProfile.count({
-      where: {
-        lastSeenAt: { gte: start, lte: end },
-      },
-    }),
+    allowed && allowed.size === 0
+      ? Promise.resolve(0)
+      : prisma.userBehaviorProfile.count({
+          where: {
+            lastSeenAt: { gte: start, lte: end },
+            ...(allowed ? { userId: { in: [...allowed] } } : {}),
+          },
+        }),
     prisma.userEvent.groupBy({
       by: ["vertical"],
       where: { ...base, vertical: { not: null } },
@@ -133,6 +175,7 @@ export async function getAnalyticsOverview(
     }),
   ]);
 
+  const { views, opens, saves, planAdds, ctaClicks } = canonical;
   const activeUsers = activeUserRows.length;
   const sessions = sessionRows.length;
 
@@ -146,7 +189,7 @@ export async function getAnalyticsOverview(
   const funnel = [
     {
       key: "view" as const,
-      label: "Views",
+      label: "Impressions",
       count: views,
       percentOfTop: 100,
     },
@@ -198,23 +241,13 @@ export async function getAnalyticsOverview(
     cappedDays.map(async (d) => {
       const ds = startOfDay(d);
       const de = minDate([endOfDay(ds), end]);
-      const dayWhere: Prisma.UserEventWhereInput = {
-        ...base,
-        createdAt: { gte: ds, lte: de },
-      };
-      const [v, o] = await Promise.all([
-        prisma.userEvent.count({
-          where: { ...dayWhere, eventType: { in: VIEW_TYPES } },
-        }),
-        prisma.userEvent.count({
-          where: { ...dayWhere, eventType: "DETAIL_OPEN" },
-        }),
-      ]);
+      const daySql = analyticsEventWhereSql(ds, de, filters, cityId, allowed);
+      const day = await getCanonicalMetrics(daySql);
       return {
         day: ds.toLocaleDateString("en-CA", { month: "short", day: "numeric" }),
         date: ds.toISOString().slice(0, 10),
-        views: v,
-        opens: o,
+        views: day.views,
+        opens: day.opens,
       };
     }),
   );
