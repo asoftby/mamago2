@@ -9,6 +9,7 @@ import {
   isArticleReadingPseudoCta,
   isCanonicalCtaClick,
   isCardImpression,
+  isNonContentCardImpression,
 } from "./metricSemantics";
 
 function main() {
@@ -22,6 +23,24 @@ function main() {
   assert.equal(isCardImpression("PAGE_VIEW"), false);
 
   assert.equal(
+    isNonContentCardImpression({ articleEvent: "article_telegram_cta_impression" }),
+    true,
+  );
+  assert.equal(
+    behaviorCounterDelta("CARD_VIEW", {
+      articleEvent: "article_telegram_cta_impression",
+    }).views,
+    0,
+    "an impression of the Telegram CTA block is not a content-card impression",
+  );
+  assert.equal(
+    isCardImpression("CARD_VIEW", {
+      articleEvent: "article_telegram_cta_impression",
+    }),
+    false,
+  );
+
+  assert.equal(
     isArticleReadingPseudoCta({ articleEvent: "article_read_50" }),
     true,
   );
@@ -29,6 +48,11 @@ function main() {
     behaviorCounterDelta("CTA_CLICK", { articleEvent: "article_complete" }).cta,
     0,
     "article reading milestones transported as CTA_CLICK must not increment CTA KPI",
+  );
+  assert.equal(
+    behaviorCounterDelta("CTA_CLICK", { articleEvent: "article_rating_submitted" }).cta,
+    0,
+    "article rating is a product interaction, not a conversion CTA",
   );
   assert.equal(
     isCanonicalCtaClick("CTA_CLICK", { articleEvent: "article_telegram_cta_click" }),
