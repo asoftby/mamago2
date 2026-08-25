@@ -63,8 +63,12 @@ function ensureYm(): NonNullable<AnalyticsWindow["ym"]> {
   return w.ym;
 }
 
+type GoogleDisableWindow = Window & {
+  [key: `ga-disable-${string}`]: boolean | undefined;
+};
+
 function setGoogleDisabled(measurementId: string, disabled: boolean): void {
-  const w = window as Window & Record<string, unknown>;
+  const w = window as unknown as GoogleDisableWindow;
   w[`ga-disable-${measurementId}`] = disabled;
 }
 
