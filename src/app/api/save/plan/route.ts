@@ -76,29 +76,41 @@ export async function POST(request: NextRequest) {
     let planItem;
 
     if (placeId) {
+      const existing = await prisma.planItem.findFirst({
+        where: { userId: user.id, placeId },
+        select: { id: true },
+      });
+
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,
       });
 
-      const place = await prisma.place.findUnique({
-        where: { id: placeId },
-        select: { cityId: true },
-      });
-      const sessionRowId = await getSessionRowIdFromCookies();
-      void trackUserEvent({
-        userId: user.id,
-        sessionId: sessionRowId,
-        eventType: "PLAN_ADD",
-        entityType: "PLACE",
-        entityId: placeId,
-        vertical: "CITY",
-        cityId: place?.cityId ?? null,
-        meta: { source: "detail", section: "places", targetAction: "plan" },
-      });
+      if (!existing) {
+        const place = await prisma.place.findUnique({
+          where: { id: placeId },
+          select: { cityId: true },
+        });
+        const sessionRowId = await getSessionRowIdFromCookies();
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_ADD",
+          entityType: "PLACE",
+          entityId: placeId,
+          vertical: "CITY",
+          cityId: place?.cityId ?? null,
+          meta: { source: "detail", section: "places", targetAction: "plan" },
+        });
+      }
     }
     // Handle route
     else if (routeId) {
+      const existing = await prisma.planItem.findFirst({
+        where: { userId: user.id, routeId },
+        select: { id: true },
+      });
+
       planItem = await addRoutePlanItem(
         user.id,
         routeId,
@@ -106,6 +118,24 @@ export async function POST(request: NextRequest) {
         planRouteSlug ?? null,
         { title: title ?? null, coverImageUrl: coverImageUrl ?? null }
       );
+
+      if (!existing) {
+        const persisted = await prisma.planItem.findUnique({
+          where: { id: planItem.id },
+          select: { routeId: true },
+        });
+        if (persisted?.routeId) {
+          const sessionRowId = await getSessionRowIdFromCookies();
+          void trackUserEvent({
+            userId: user.id,
+            sessionId: sessionRowId,
+            eventType: "PLAN_ADD",
+            entityType: "ROUTE",
+            entityId: persisted.routeId,
+            meta: { source: "detail", section: "routes", targetAction: "plan" },
+          });
+        }
+      }
     }
     // Handle activity
     else if (activityId) {
@@ -196,7 +226,58 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const existing = await prisma.planItem.findFirst({
+      where: { id: planItemId, userId: user.id },
+      select: {
+        activityId: true,
+        routeId: true,
+        placeId: true,
+      },
+    });
+
     await removePlanItem(user.id, planItemId);
+
+    if (existing) {
+      const sessionRowId = await getSessionRowIdFromCookies();
+
+      if (existing.activityId) {
+        const cityId = await getActivityCityIdForAnalytics(existing.activityId);
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_REMOVE",
+          entityType: "EVENT",
+          entityId: existing.activityId,
+          vertical: "CITY",
+          cityId,
+          meta: { source: "plan", section: "afisha", targetAction: "plan" },
+        });
+      } else if (existing.placeId) {
+        const place = await prisma.place.findUnique({
+          where: { id: existing.placeId },
+          select: { cityId: true },
+        });
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_REMOVE",
+          entityType: "PLACE",
+          entityId: existing.placeId,
+          vertical: "CITY",
+          cityId: place?.cityId ?? null,
+          meta: { source: "plan", section: "places", targetAction: "plan" },
+        });
+      } else if (existing.routeId) {
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_REMOVE",
+          entityType: "ROUTE",
+          entityId: existing.routeId,
+          meta: { source: "plan", section: "routes", targetAction: "plan" },
+        });
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
