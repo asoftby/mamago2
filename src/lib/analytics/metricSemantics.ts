@@ -6,13 +6,18 @@ export type BehaviorCounterDelta = {
   cta: number;
 };
 
-const ARTICLE_READING_PSEUDO_CTA_EVENTS = new Set([
+const ARTICLE_NON_CTA_EVENTS = new Set([
   "article_read_25",
   "article_read_50",
   "article_read_75",
   "article_complete",
   "next_article_loaded",
   "article_section_exhausted",
+  "article_rating_submitted",
+]);
+
+const ARTICLE_NON_CONTENT_CARD_IMPRESSIONS = new Set([
+  "article_telegram_cta_impression",
 ]);
 
 function asMetaRecord(meta: unknown): Record<string, unknown> | null {
@@ -20,16 +25,34 @@ function asMetaRecord(meta: unknown): Record<string, unknown> | null {
   return meta as Record<string, unknown>;
 }
 
+function getArticleEvent(meta: unknown): string | null {
+  const articleEvent = asMetaRecord(meta)?.articleEvent;
+  return typeof articleEvent === "string" && articleEvent.trim()
+    ? articleEvent.trim()
+    : null;
+}
+
 /**
- * Legacy continuous-reading milestones are transported as CTA_CLICK today,
- * but they are reading telemetry rather than user CTA activations.
+ * Legacy article interactions can be transported as CTA_CLICK today, but only
+ * intentional conversion/navigation CTA activations belong in the CTA KPI.
  */
-export function isArticleReadingPseudoCta(meta: unknown): boolean {
-  const record = asMetaRecord(meta);
-  const articleEvent = record?.articleEvent;
+export function isArticleNonCtaInteraction(meta: unknown): boolean {
+  const articleEvent = getArticleEvent(meta);
+  return articleEvent != null && ARTICLE_NON_CTA_EVENTS.has(articleEvent);
+}
+
+/** Backward-compatible semantic alias used by existing tests/callers. */
+export const isArticleReadingPseudoCta = isArticleNonCtaInteraction;
+
+/**
+ * Some article UI blocks use CARD_VIEW as a transport event for their own
+ * impression. Those must not inflate content-card impression metrics.
+ */
+export function isNonContentCardImpression(meta: unknown): boolean {
+  const articleEvent = getArticleEvent(meta);
   return (
-    typeof articleEvent === "string" &&
-    ARTICLE_READING_PSEUDO_CTA_EVENTS.has(articleEvent)
+    articleEvent != null &&
+    ARTICLE_NON_CONTENT_CARD_IMPRESSIONS.has(articleEvent)
   );
 }
 
@@ -48,7 +71,7 @@ export function getAnalyticsCategoryKey(meta: unknown): string | null {
   return null;
 }
 
-/** Contract v1: product "views" in legacy profile/report fields mean card impressions only. */
+/** Contract v1: product "views" in legacy profile/report fields mean content card impressions only. */
 export function behaviorCounterDelta(
   eventType: string,
   meta?: unknown,
@@ -57,7 +80,13 @@ export function behaviorCounterDelta(
     case "PAGE_VIEW":
       return { views: 0, opens: 0, saves: 0, planAdds: 0, cta: 0 };
     case "CARD_VIEW":
-      return { views: 1, opens: 0, saves: 0, planAdds: 0, cta: 0 };
+      return {
+        views: isNonContentCardImpression(meta) ? 0 : 1,
+        opens: 0,
+        saves: 0,
+        planAdds: 0,
+        cta: 0,
+      };
     case "DETAIL_OPEN":
       return { views: 0, opens: 1, saves: 0, planAdds: 0, cta: 0 };
     case "SAVE":
@@ -70,7 +99,7 @@ export function behaviorCounterDelta(
         opens: 0,
         saves: 0,
         planAdds: 0,
-        cta: isArticleReadingPseudoCta(meta) ? 0 : 1,
+        cta: isArticleNonCtaInteraction(meta) ? 0 : 1,
       };
     default:
       return { views: 0, opens: 0, saves: 0, planAdds: 0, cta: 0 };
@@ -78,9 +107,9 @@ export function behaviorCounterDelta(
 }
 
 export function isCanonicalCtaClick(eventType: string, meta?: unknown): boolean {
-  return eventType === "CTA_CLICK" && !isArticleReadingPseudoCta(meta);
+  return eventType === "CTA_CLICK" && !isArticleNonCtaInteraction(meta);
 }
 
-export function isCardImpression(eventType: string): boolean {
-  return eventType === "CARD_VIEW";
+export function isCardImpression(eventType: string, meta?: unknown): boolean {
+  return eventType === "CARD_VIEW" && !isNonContentCardImpression(meta);
 }
