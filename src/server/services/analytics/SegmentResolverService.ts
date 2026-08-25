@@ -59,6 +59,11 @@ function topKey(map: Record<string, number>, ignore = "_none"): string | null {
 
 /**
  * Вычисляет сегменты пользователя по агрегатам профиля и контексту аккаунта.
+ *
+ * `PRICE_SENSITIVE` deliberately has no resolver rule in Contract v1: the old
+ * rule inferred it from preferredCategories === OFFER, but OFFER is an entity
+ * type, not a taxonomy/price signal. The catalog key remains for historical
+ * compatibility until a real deal/price-intent signal is designed.
  */
 export function resolveSegments(
   profile: Pick<
@@ -183,11 +188,6 @@ export function resolveSegments(
   }
   if (ctx.leisureFormatSlug === "leisure-format-outdoor") {
     keys.add("PREFERS_OUTDOOR");
-  }
-
-  const cats = asCountMap(profile.preferredCategories);
-  if (topKey(cats) === "OFFER" && views >= 8) {
-    keys.add("PRICE_SENSITIVE");
   }
 
   return Array.from(keys).sort();
