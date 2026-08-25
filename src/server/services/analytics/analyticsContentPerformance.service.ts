@@ -1,4 +1,4 @@
-import { Prisma, type AnalyticsEntityType, type UserEventType } from "@prisma/client";
+import { Prisma, type AnalyticsEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
 import type {
@@ -12,8 +12,6 @@ import type {
 } from "@/lib/analytics/analyticsContentPerformanceTypes";
 import {
   analyticsEventWhereSql,
-  applyAnalyticsUserFilter,
-  buildAnalyticsBaseEventWhere,
   loadAllEntityTitles,
   resolveAnalyticsAllowedUserIds,
 } from "@/server/services/analytics/analyticsQueryHelpers";
@@ -23,7 +21,25 @@ import {
 } from "@/server/services/analytics/analyticsDateRange";
 import { labelForCtaTargetAction } from "@/lib/analytics/ctaTargetActionLabels";
 
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
+/** Contract v1: a content impression is a real content CARD_VIEW, not an inner article CTA impression. */
+const CANONICAL_CARD_IMPRESSION_SQL = Prisma.sql`
+  e."eventType" = 'CARD_VIEW'
+  AND COALESCE(e."meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
+`;
+
+/** Contract v1: reading/rating transport events do not belong to the conversion CTA KPI. */
+const CANONICAL_CTA_CLICK_SQL = Prisma.sql`
+  e."eventType" = 'CTA_CLICK'
+  AND COALESCE(e."meta"->>'articleEvent', '') NOT IN (
+    'article_read_25',
+    'article_read_50',
+    'article_read_75',
+    'article_complete',
+    'next_article_loaded',
+    'article_section_exhausted',
+    'article_rating_submitted'
+  )
+`;
 
 type AggRow = {
   entity_type: string;
@@ -42,7 +58,24 @@ type MetaRow = {
   cityId: string | null;
 };
 
-function toNum(b: bigint | undefined): number {
+type VerticalAggRow = {
+  vertical: string;
+  views: bigint;
+  opens: bigint;
+  saves: bigint;
+  plan_adds: bigint;
+  cta_clicks: bigint;
+};
+
+type PublicationMetricRow = {
+  impressions: bigint;
+  opens: bigint;
+  saves: bigint;
+  plan_adds: bigint;
+  cta_clicks: bigint;
+};
+
+function toNum(b: bigint | null | undefined): number {
   return Number(b ?? BigInt(0));
 }
 
@@ -161,8 +194,6 @@ export async function getAnalyticsContentPerformance(
     return emptyResult(start, end, page, pageSize, sortKey, sortDir);
   }
 
-  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
-  const where = applyAnalyticsUserFilter(baseWhere, allowed);
   const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed);
 
   const [aggRows, metaRows] = await Promise.all([
@@ -170,20 +201,20 @@ export async function getAnalyticsContentPerformance(
       SELECT
         e."entityType"::text AS entity_type,
         e."entityId"::text AS entity_id,
-        SUM(CASE WHEN e."eventType" IN ('PAGE_VIEW','CARD_VIEW') THEN 1 ELSE 0 END)::bigint AS views,
+        SUM(CASE WHEN ${CANONICAL_CARD_IMPRESSION_SQL} THEN 1 ELSE 0 END)::bigint AS views,
         SUM(CASE WHEN e."eventType" = 'DETAIL_OPEN' THEN 1 ELSE 0 END)::bigint AS opens,
         SUM(CASE WHEN e."eventType" = 'SAVE' THEN 1 ELSE 0 END)::bigint AS saves,
         SUM(CASE WHEN e."eventType" = 'PLAN_ADD' THEN 1 ELSE 0 END)::bigint AS plan_adds,
-        SUM(CASE WHEN e."eventType" = 'CTA_CLICK' THEN 1 ELSE 0 END)::bigint AS cta_clicks
+        SUM(CASE WHEN ${CANONICAL_CTA_CLICK_SQL} THEN 1 ELSE 0 END)::bigint AS cta_clicks
       FROM "UserEvent" e
       WHERE ${wsql}
         AND e."entityId" IS NOT NULL
         AND e."entityType" IS NOT NULL
       GROUP BY e."entityType", e."entityId"
       HAVING
-        SUM(CASE WHEN e."eventType" IN ('PAGE_VIEW','CARD_VIEW') THEN 1 ELSE 0 END)
+        SUM(CASE WHEN ${CANONICAL_CARD_IMPRESSION_SQL} THEN 1 ELSE 0 END)
         + SUM(CASE WHEN e."eventType" = 'DETAIL_OPEN' THEN 1 ELSE 0 END) > 0
-      ORDER BY SUM(CASE WHEN e."eventType" IN ('PAGE_VIEW','CARD_VIEW') THEN 1 ELSE 0 END) DESC
+      ORDER BY SUM(CASE WHEN ${CANONICAL_CARD_IMPRESSION_SQL} THEN 1 ELSE 0 END) DESC
       LIMIT 400
     `,
     prisma.$queryRaw<MetaRow[]>`
@@ -277,7 +308,7 @@ export async function getAnalyticsContentPerformance(
     .slice(0, 8);
 
   const entityTypeComparison = buildEntityTypeComparison(allRows);
-  const verticalComparison = await buildVerticalComparison(where);
+  const verticalComparison = await buildVerticalComparison(wsql);
 
   return {
     range: { start: start.toISOString(), end: end.toISOString() },
@@ -355,53 +386,42 @@ function buildEntityTypeComparison(
 }
 
 async function buildVerticalComparison(
-  where: Prisma.UserEventWhereInput,
+  wsql: Prisma.Sql,
 ): Promise<ContentPerformanceComparisonRow[]> {
-  const types: UserEventType[] = [
-    ...VIEW_TYPES,
-    "DETAIL_OPEN",
-    "SAVE",
-    "PLAN_ADD",
-    "CTA_CLICK",
-  ];
-  const rows = await prisma.userEvent.groupBy({
-    by: ["vertical", "eventType"],
-    where: {
-      ...where,
-      vertical: { not: null },
-      eventType: { in: types },
-    },
-    _count: { _all: true },
-  });
-  const byVert: Record<
-    string,
-    { views: number; opens: number; saves: number; planAdds: number; cta: number }
-  > = {};
-  for (const r of rows) {
-    const v = r.vertical ?? "";
-    if (!byVert[v])
-      byVert[v] = { views: 0, opens: 0, saves: 0, planAdds: 0, cta: 0 };
-    const c = r._count._all;
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW")
-      byVert[v].views += c;
-    if (r.eventType === "DETAIL_OPEN") byVert[v].opens += c;
-    if (r.eventType === "SAVE") byVert[v].saves += c;
-    if (r.eventType === "PLAN_ADD") byVert[v].planAdds += c;
-    if (r.eventType === "CTA_CLICK") byVert[v].cta += c;
-  }
-  return Object.entries(byVert)
-    .map(([key, m]) => ({
-      key,
-      label: key,
-      views: m.views,
-      opens: m.opens,
-      saves: m.saves,
-      planAdds: m.planAdds,
-      ctaClicks: m.cta,
-      saveRate: rate(m.saves, m.opens),
-      planRate: rate(m.planAdds, m.saves),
-      clickRateVsOpens: rate(m.cta, m.opens),
-    }))
+  const rows = await prisma.$queryRaw<VerticalAggRow[]>`
+    SELECT
+      e."vertical"::text AS vertical,
+      SUM(CASE WHEN ${CANONICAL_CARD_IMPRESSION_SQL} THEN 1 ELSE 0 END)::bigint AS views,
+      SUM(CASE WHEN e."eventType" = 'DETAIL_OPEN' THEN 1 ELSE 0 END)::bigint AS opens,
+      SUM(CASE WHEN e."eventType" = 'SAVE' THEN 1 ELSE 0 END)::bigint AS saves,
+      SUM(CASE WHEN e."eventType" = 'PLAN_ADD' THEN 1 ELSE 0 END)::bigint AS plan_adds,
+      SUM(CASE WHEN ${CANONICAL_CTA_CLICK_SQL} THEN 1 ELSE 0 END)::bigint AS cta_clicks
+    FROM "UserEvent" e
+    WHERE ${wsql}
+      AND e."vertical" IS NOT NULL
+    GROUP BY e."vertical"
+  `;
+
+  return rows
+    .map((r) => {
+      const views = toNum(r.views);
+      const opens = toNum(r.opens);
+      const saves = toNum(r.saves);
+      const planAdds = toNum(r.plan_adds);
+      const ctaClicks = toNum(r.cta_clicks);
+      return {
+        key: r.vertical,
+        label: r.vertical,
+        views,
+        opens,
+        saves,
+        planAdds,
+        ctaClicks,
+        saveRate: rate(saves, opens),
+        planRate: rate(planAdds, saves),
+        clickRateVsOpens: rate(ctaClicks, opens),
+      };
+    })
     .sort((a, b) => b.views - a.views);
 }
 
@@ -462,21 +482,30 @@ export async function getPublicationAnalyticsDetail(params: {
     ...(cityId ? { cityId } : {}),
   };
 
-  const [countRows, ctaRows, titles, latestEvent] = await Promise.all([
-    prisma.userEvent.groupBy({
-      by: ["eventType"],
-      where: baseWhere,
-      _count: { _all: true },
-    }),
+  const [metricRows, ctaRows, titles, latestEvent] = await Promise.all([
+    prisma.$queryRaw<PublicationMetricRow[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE ${CANONICAL_CARD_IMPRESSION_SQL})::bigint AS impressions,
+        COUNT(*) FILTER (WHERE e."eventType" = 'DETAIL_OPEN')::bigint AS opens,
+        COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
+        COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS plan_adds,
+        COUNT(*) FILTER (WHERE ${CANONICAL_CTA_CLICK_SQL})::bigint AS cta_clicks
+      FROM "UserEvent" e
+      WHERE e."entityType" = ${entityType}::"AnalyticsEntityType"
+        AND e."entityId" = ${entityId}
+        AND e."createdAt" >= ${start}
+        AND e."createdAt" <= ${end}
+        ${cityId ? Prisma.sql`AND e."cityId" = ${cityId}` : Prisma.empty}
+    `,
     prisma.$queryRaw<Array<{ action: string; cnt: bigint }>>`
-      SELECT COALESCE(meta->>'targetAction', '') AS action, COUNT(*)::bigint AS cnt
-      FROM "UserEvent"
-      WHERE "entityType" = ${entityType}::"AnalyticsEntityType"
-        AND "entityId" = ${entityId}
-        AND "eventType" = 'CTA_CLICK'
-        AND "createdAt" >= ${start}
-        AND "createdAt" <= ${end}
-        ${cityId ? Prisma.sql`AND "cityId" = ${cityId}` : Prisma.empty}
+      SELECT COALESCE(e."meta"->>'targetAction', '') AS action, COUNT(*)::bigint AS cnt
+      FROM "UserEvent" e
+      WHERE e."entityType" = ${entityType}::"AnalyticsEntityType"
+        AND e."entityId" = ${entityId}
+        AND ${CANONICAL_CTA_CLICK_SQL}
+        AND e."createdAt" >= ${start}
+        AND e."createdAt" <= ${end}
+        ${cityId ? Prisma.sql`AND e."cityId" = ${cityId}` : Prisma.empty}
       GROUP BY action
       ORDER BY cnt DESC
     `,
@@ -488,19 +517,12 @@ export async function getPublicationAnalyticsDetail(params: {
     }),
   ]);
 
-  let impressions = 0;
-  let opens = 0;
-  let saves = 0;
-  let planAdds = 0;
-  let ctaClicks = 0;
-  for (const r of countRows) {
-    const c = r._count._all;
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW") impressions += c;
-    else if (r.eventType === "DETAIL_OPEN") opens += c;
-    else if (r.eventType === "SAVE") saves += c;
-    else if (r.eventType === "PLAN_ADD") planAdds += c;
-    else if (r.eventType === "CTA_CLICK") ctaClicks += c;
-  }
+  const metrics = metricRows[0];
+  const impressions = toNum(metrics?.impressions);
+  const opens = toNum(metrics?.opens);
+  const saves = toNum(metrics?.saves);
+  const planAdds = toNum(metrics?.plan_adds);
+  const ctaClicks = toNum(metrics?.cta_clicks);
 
   const cityName = latestEvent?.cityId
     ? ((await prisma.city.findUnique({
