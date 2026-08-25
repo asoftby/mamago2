@@ -11,6 +11,7 @@ type PickerItem = {
   publicUrl: string | null;
   alt: string | null;
   title: string | null;
+  isUsed: boolean;
 };
 
 export function ArticleEditorGalleryField({
@@ -129,6 +130,7 @@ export function ArticleEditorGalleryField({
           url: item.publicUrl,
           alt: item.alt,
           title: item.title,
+          isUsed: item.isUsed,
         })),
       nextCursor: data.nextCursor ?? null,
       hasMore: Boolean(data.hasMore),
@@ -163,7 +165,8 @@ export function ArticleEditorGalleryField({
       mediaLibraryDescription="Кликните по превью, чтобы отметить несколько изображений, затем добавьте их в галерею."
       multipleEmptyHint="Можно взять изображения из медиатеки или загрузить файлы"
       addSelectedButtonLabel="Добавить в галерею"
-      alreadyAddedLabel="Уже в галерее"
+      usedIds={articleMediaSource?.usedIds}
+      usageLabel="Используется"
       articleLibrary={
         articleMediaSource
           ? {

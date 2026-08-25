@@ -5,7 +5,7 @@
  * Run: set -a; source .env; set +a; npx tsx src/lib/media/mediaPickerQuery.test.ts
  */
 import assert from "node:assert/strict";
-import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
+import { MediaAssetKind, MediaAssetStatus, MediaEntityType, MediaSourceType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { queryMediaPickerPage } from "./mediaPickerQuery";
 import { MEDIA_PICKER_PAGE_SIZE } from "./mediaPickerConstants";
@@ -50,6 +50,7 @@ async function createAsset(uploadedById: string, index: number, createdAt: Date)
 
 async function cleanup() {
   if (createdMediaIds.length > 0) {
+    await prisma.mediaUsage.deleteMany({ where: { mediaId: { in: createdMediaIds } } });
     await prisma.mediaAsset.deleteMany({ where: { id: { in: createdMediaIds } } });
   }
   if (createdUserIds.length > 0) {
@@ -70,6 +71,9 @@ async function main() {
       assetIdsOldestFirst.push(id);
     }
     const assetIdsNewestFirst = [...assetIdsOldestFirst].reverse();
+    await prisma.mediaUsage.create({
+      data: { mediaId: assetIdsNewestFirst[0], entityType: MediaEntityType.ARTICLE, entityId: `test-${runId}`, field: "image-block" },
+    });
 
     // Owner B's own asset must never leak into owner A's pages.
     await createAsset(ownerB, 0, new Date(base + 999_000));
@@ -88,6 +92,8 @@ async function main() {
       page1.items.every((i) => i.publicUrl && i.publicUrl.includes(runId)),
       "every returned item must belong to this test run",
     );
+    assert.equal(page1.items[0].isUsed, true, "persisted usage must be returned with the picker page");
+    assert.ok(page1.items.slice(1).every((item) => item.isUsed === false));
 
     // --- Scenario: second page via cursor returns the remainder, hasMore=false ---
     const page2 = await queryMediaPickerPage({ uploadedById: ownerA, cursor: page1.nextCursor });

@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       alt: i.alt,
       title: i.title,
       sourceType: i.sourceType,
+      isUsed: i.isUsed,
       fromEntity: false,
       showImportBadge: false,
     })),

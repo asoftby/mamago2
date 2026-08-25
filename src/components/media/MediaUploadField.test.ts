@@ -13,6 +13,15 @@ function item(id: string, overrides: Partial<MediaUploadItem> = {}): MediaUpload
   return { id, url: `https://example.invalid/${id}.jpg`, alt: null, title: null, ...overrides };
 }
 
+// Used in another block remains selectable; pending selection wins visually.
+{
+  const usedIds = new Set(["shared"]);
+  assert.equal(getMediaTileState("shared", new Set(), new Set(), usedIds.has("shared")), "used-elsewhere");
+  assert.equal(getMediaTileState("shared", new Set(), new Set(["shared"]), usedIds.has("shared")), "pending-selection");
+  const merged = mergeNewLibrarySelection([], [item("shared")], new Set(["shared"]), 24);
+  assert.deepEqual(merged.map((entry) => entry.id), ["shared"]);
+}
+
 // 1. Photo not in gallery → available for selection.
 {
   const currentIds = new Set(["a"]);
@@ -23,18 +32,18 @@ function item(id: string, overrides: Partial<MediaUploadItem> = {}): MediaUpload
 // 2. Photo already in gallery → "already-added", regardless of pending selection.
 {
   const currentIds = new Set(["a"]);
-  assert.equal(getMediaTileState("a", currentIds, new Set()), "already-added");
+  assert.equal(getMediaTileState("a", currentIds, new Set()), "selected-in-current-field");
   // Even if somehow present in pendingSelection too, already-added takes priority.
-  assert.equal(getMediaTileState("a", currentIds, new Set(["a"])), "already-added");
+  assert.equal(getMediaTileState("a", currentIds, new Set(["a"])), "selected-in-current-field");
 }
 
 // 3. Multiple photos: some already added, some newly selected — each resolves independently.
 {
   const currentIds = new Set(["existing-1", "existing-2"]);
   const pending = new Set(["new-1"]);
-  assert.equal(getMediaTileState("existing-1", currentIds, pending), "already-added");
-  assert.equal(getMediaTileState("existing-2", currentIds, pending), "already-added");
-  assert.equal(getMediaTileState("new-1", currentIds, pending), "selected");
+  assert.equal(getMediaTileState("existing-1", currentIds, pending, true), "selected-in-current-field");
+  assert.equal(getMediaTileState("existing-2", currentIds, pending), "selected-in-current-field");
+  assert.equal(getMediaTileState("new-1", currentIds, pending), "pending-selection");
   assert.equal(getMediaTileState("new-2", currentIds, pending), "available");
 }
 
@@ -81,7 +90,7 @@ function item(id: string, overrides: Partial<MediaUploadItem> = {}): MediaUpload
 
   // And getMediaTileState is consistent for the same id regardless of which tab renders it.
   const currentIds = new Set(merged.map((i) => i.id));
-  assert.equal(getMediaTileState("shared-1", currentIds, new Set()), "already-added");
+  assert.equal(getMediaTileState("shared-1", currentIds, new Set()), "selected-in-current-field");
 }
 
 // 6. Draft: after adding a photo, currentIds reflects the live draft gallery
@@ -94,14 +103,14 @@ function item(id: string, overrides: Partial<MediaUploadItem> = {}): MediaUpload
 
   // Simulate: user added "b" to the draft gallery via the dialog.
   draftIds = new Set([...draftIds, "b"]);
-  assert.equal(getMediaTileState("b", draftIds, new Set()), "already-added");
+  assert.equal(getMediaTileState("b", draftIds, new Set()), "selected-in-current-field");
 }
 
 // 7. Draft removal: after removing a photo from the draft gallery, it becomes
 //    available again on next open.
 {
   let draftIds = new Set(["a", "b"]);
-  assert.equal(getMediaTileState("b", draftIds, new Set()), "already-added");
+  assert.equal(getMediaTileState("b", draftIds, new Set()), "selected-in-current-field");
 
   // Simulate: user removed "b" from the draft gallery.
   draftIds = new Set([...draftIds].filter((id) => id !== "b"));
@@ -117,22 +126,14 @@ function item(id: string, overrides: Partial<MediaUploadItem> = {}): MediaUpload
   assert.equal(merged.length, 2);
 }
 
-// Regression guards: the "already in gallery" accent state (✓ badge, accent border,
-// title) is opt-in per consumer via `alreadyAddedLabel`, never a hardcoded default —
-// so a shared-component change for the article gallery can't silently mislabel an
-// already-selected tile in a single-image cover field or the business wizard.
+// Usage awareness is opt-in; without usedIds persisted metadata is ignored and
+// the generic component retains its old selected/available behavior.
 {
   const source = readFileSync(new URL("./MediaUploadField.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(
-    source,
-    /title=\{alreadySelected \? "/,
-    "the already-added title must come from the alreadyAddedLabel prop, not a hardcoded string",
-  );
-  assert.match(
-    source,
-    /showAccentAlready = alreadySelected && Boolean\(alreadyAddedLabel\)/,
-    "accent treatment must stay gated on the opt-in alreadyAddedLabel prop",
-  );
+  assert.match(source, /const usageAware = usedIds !== undefined/);
+  assert.equal(getMediaTileState("used", new Set(), new Set(), true), "used-elsewhere");
+  assert.equal(getMediaTileState("used", new Set(), new Set()), "available");
+  assert.equal(getMediaTileState("used", new Set(), new Set(["used"]), true), "pending-selection");
 }
 {
   const galleryFieldSource = readFileSync(
@@ -141,8 +142,8 @@ function item(id: string, overrides: Partial<MediaUploadItem> = {}): MediaUpload
   );
   assert.match(
     galleryFieldSource,
-    /alreadyAddedLabel="Уже в галерее"/,
-    "the article gallery field is the one consumer that opts into the accent already-added state",
+    /usedIds=\{articleMediaSource\?\.usedIds\}/,
+    "article gallery must opt into live usage awareness",
   );
 }
 for (const [path, label] of [
@@ -150,7 +151,7 @@ for (const [path, label] of [
   ["../business/wizard/offer/steps/Step3Media.tsx", "business offer wizard (not the article gallery)"],
 ] as const) {
   const source = readFileSync(new URL(path, import.meta.url), "utf8");
-  assert.doesNotMatch(source, /alreadyAddedLabel=/, `${label} must not opt into the "Уже в галерее" accent state`);
+  assert.doesNotMatch(source, /alreadyAddedLabel=/, `${label} must not use the removed destination-specific contract`);
 }
 
 console.log("MediaUploadField.test.ts: OK");

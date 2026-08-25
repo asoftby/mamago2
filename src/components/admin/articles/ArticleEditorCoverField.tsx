@@ -11,6 +11,7 @@ type PickerItem = {
   publicUrl: string | null;
   alt: string | null;
   title: string | null;
+  isUsed: boolean;
 };
 
 export function ArticleEditorCoverField({
@@ -118,6 +119,7 @@ export function ArticleEditorCoverField({
           url: item.publicUrl,
           alt: item.alt,
           title: item.title,
+          isUsed: item.isUsed,
         })),
       nextCursor: data.nextCursor ?? null,
       hasMore: Boolean(data.hasMore),
@@ -144,6 +146,8 @@ export function ArticleEditorCoverField({
       librarySelectSuccessMessage={successPickMessage}
       mediaLibraryDescription="Недавно загруженные изображения. Полный список — в разделе «Медиатека»."
       singleEmptyHint="Выберите главное изображение из медиатеки или загрузите файл"
+      usedIds={articleMediaSource?.usedIds}
+      usageLabel="Используется"
       articleLibrary={
         articleMediaSource
           ? {

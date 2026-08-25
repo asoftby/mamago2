@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
@@ -26,6 +26,7 @@ type BusinessPickerItem = {
   publicUrl: string | null;
   alt: string | null;
   title: string | null;
+  isUsed?: boolean;
 };
 
 async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[]> {
@@ -75,7 +76,7 @@ async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[
     }
 
     uploaded.push({
-      id: url,
+      id: typeof payload.mediaId === "string" && payload.mediaId ? payload.mediaId : url,
       url,
       title: file.name,
       alt: null,
@@ -112,10 +113,11 @@ async function loadBusinessMediaLibraryPage({
     items: (data.items ?? [])
       .filter((item): item is BusinessPickerItem & { publicUrl: string } => Boolean(item.publicUrl))
       .map((item) => ({
-        id: item.publicUrl,
+        id: item.id,
         url: item.publicUrl,
         alt: item.alt,
         title: item.title,
+        isUsed: item.isUsed,
       })),
     nextCursor: data.nextCursor ?? null,
     hasMore: Boolean(data.hasMore),
@@ -123,9 +125,23 @@ async function loadBusinessMediaLibraryPage({
 }
 
 export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
+  const [mediaIdByUrl, setMediaIdByUrl] = useState<Record<string, string>>({});
+
+  const loadMediaLibraryPage = useCallback(async (args: { cursor: string | null; limit: number }) => {
+    const page = await loadBusinessMediaLibraryPage(args);
+    setMediaIdByUrl((prev) => {
+      const next = { ...prev };
+      for (const item of page.items) next[item.url] = item.id;
+      return next;
+    });
+    return page;
+  }, []);
+
   const handleCoverChange = useCallback(
     (value: MediaUploadItem | MediaUploadItem[] | null) => {
-      const nextCover = value && !Array.isArray(value) ? value.url : null;
+      const item = value && !Array.isArray(value) ? value : null;
+      if (item) setMediaIdByUrl((prev) => ({ ...prev, [item.url]: item.id }));
+      const nextCover = item?.url ?? null;
       onChange({ coverImage: nextCover });
     },
     [onChange],
@@ -133,7 +149,9 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
 
   const handleGalleryChange = useCallback(
     (value: MediaUploadItem | MediaUploadItem[] | null) => {
-      const nextGallery = Array.isArray(value) ? value.map((item) => item.url) : [];
+      const items = Array.isArray(value) ? value : [];
+      setMediaIdByUrl((prev) => ({ ...prev, ...Object.fromEntries(items.map((item) => [item.url, item.id])) }));
+      const nextGallery = items.map((item) => item.url);
       onChange({ gallery: nextGallery });
     },
     [onChange],
@@ -148,7 +166,7 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
 
   const coverValue = data.coverImage
     ? {
-        id: data.coverImage,
+        id: mediaIdByUrl[data.coverImage] ?? data.coverImage,
         url: data.coverImage,
         alt: null,
         title: "Главное изображение",
@@ -156,11 +174,15 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
     : null;
 
   const galleryValue = data.gallery.map((url) => ({
-    id: url,
+    id: mediaIdByUrl[url] ?? url,
     url,
     alt: null,
     title: "Изображение галереи",
   }));
+  const usedIds = useMemo(
+    () => new Set([coverValue?.id, ...galleryValue.map((item) => item.id)].filter((id): id is string => Boolean(id))),
+    [coverValue?.id, galleryValue],
+  );
 
   return (
     <div className="space-y-8">
@@ -182,8 +204,9 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
         allowMediaLibrary
         allowUpload
         onUploadFiles={uploadFilesToPublicMedia}
-        loadMediaLibraryPage={loadBusinessMediaLibraryPage}
+        loadMediaLibraryPage={loadMediaLibraryPage}
         mediaLibraryDescription="Выберите одно изображение из вашей медиатеки или загрузите новый файл."
+        usedIds={usedIds}
       />
 
       <MediaUploadField
@@ -197,8 +220,9 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
         allowMediaLibrary
         allowUpload
         onUploadFiles={uploadFilesToPublicMedia}
-        loadMediaLibraryPage={loadBusinessMediaLibraryPage}
+        loadMediaLibraryPage={loadMediaLibraryPage}
         mediaLibraryDescription="Выберите несколько изображений из медиатеки или загрузите новые файлы."
+        usedIds={usedIds}
       />
 
       <div className="space-y-2">

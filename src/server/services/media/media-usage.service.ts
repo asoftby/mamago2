@@ -11,6 +11,7 @@ import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { extractArticleMediaUsage, parseArticleContentJson } from "@/lib/publications/articleMvp";
 
 function mediaUsageDedupKey(u: {
   entityType: MediaEntityType;
@@ -726,16 +727,16 @@ export async function syncArticleMediaUsage(articleId: string) {
   const mediaIds = new Set<string>();
   const usageRecords: Array<{ mediaId: string; field: string }> = [];
 
-  // Cover image (proper relation)
-  if (article.coverImageId) {
-    mediaIds.add(article.coverImageId);
-    usageRecords.push({ mediaId: article.coverImageId, field: "coverImageId" });
-  }
-
-  // SEO image (proper relation)
-  if (article.seoImageId) {
-    mediaIds.add(article.seoImageId);
-    usageRecords.push({ mediaId: article.seoImageId, field: "seoImageId" });
+  const content = parseArticleContentJson(article.contentJson);
+  for (const entry of extractArticleMediaUsage({
+    coverImageId: article.coverImageId,
+    seoImageId: article.seoImageId,
+    blocks: content.blocks,
+  })) {
+    mediaIds.add(entry.mediaId);
+    for (const kind of entry.usage) {
+      usageRecords.push({ mediaId: entry.mediaId, field: kind });
+    }
   }
 
   // Remove old usage records for this article

@@ -8,6 +8,7 @@ export type MediaPickerAsset = {
   alt: string | null;
   title: string | null;
   sourceType: MediaSourceType;
+  isUsed: boolean;
 };
 
 export type MediaPickerPage = {
@@ -49,9 +50,19 @@ export async function queryMediaPickerPage(params: {
 
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
+  // One batch query for the whole page. MediaUsage is the canonical registry
+  // populated by Article/Event/Place/Offer/Route save flows.
+  const usedRows = items.length
+    ? await prisma.mediaUsage.findMany({
+        where: { mediaId: { in: items.map((item) => item.id) } },
+        distinct: ["mediaId"],
+        select: { mediaId: true },
+      })
+    : [];
+  const usedIds = new Set(usedRows.map((row) => row.mediaId));
 
   return {
-    items,
+    items: items.map((item) => ({ ...item, isUsed: usedIds.has(item.id) })),
     nextCursor: hasMore ? items[items.length - 1].id : null,
     hasMore,
   };

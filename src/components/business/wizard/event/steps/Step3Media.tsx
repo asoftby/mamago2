@@ -72,6 +72,7 @@ type PickerItem = {
   title: string | null;
   fromEntity?: boolean;
   showImportBadge?: boolean;
+  isUsed?: boolean;
 };
 
 type NormalizedMediaImage = {
@@ -1198,7 +1199,10 @@ export function Step3Media({
                 {pickerItems.map((item) => {
                   const selected = pickerSelection.has(item.id);
                   const normalized = normalizeMediaImage(item);
-                  const interactive = Boolean(normalized);
+                  const currentFieldIds = pickerMode === "cover" ? new Set([data.coverImage].filter(Boolean)) : new Set(data.gallery);
+                  const selectedInCurrentField = currentFieldIds.has(item.id);
+                  const usedElsewhere = !selectedInCurrentField && (item.isUsed === true || item.fromEntity === true);
+                  const interactive = Boolean(normalized) && !selectedInCurrentField;
                   return (
                     <button
                       key={item.id}
@@ -1206,7 +1210,8 @@ export function Step3Media({
                       disabled={!interactive}
                       className={cn(
                         "group relative aspect-square overflow-hidden rounded-lg border bg-muted focus:outline-none focus:ring-2 focus:ring-primary",
-                        selected && interactive ? "ring-2 ring-primary ring-offset-2" : "border-border",
+                        usedElsewhere || selectedInCurrentField ? "border-[#EF8759]" : "border-border",
+                        selected && interactive && "ring-2 ring-primary ring-offset-2",
                         !interactive && "cursor-not-allowed opacity-40",
                       )}
                       onClick={() => togglePickerSelection(item)}
@@ -1220,8 +1225,14 @@ export function Step3Media({
                           <Check className="h-8 w-8 text-primary" />
                         </div>
                       ) : null}
+                      {selectedInCurrentField || usedElsewhere ? (
+                        <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-[#EF8759] px-2 py-1 text-[11px] font-medium text-white shadow-sm">
+                          <Check className="h-3.5 w-3.5" />
+                          {selectedInCurrentField ? "Уже выбрано" : "Используется"}
+                        </span>
+                      ) : null}
                       <div className="absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5">
-                        {item.fromEntity ? <MediaSourceBadge label="У события" /> : null}
+                        {item.fromEntity ? <MediaSourceBadge label="Используется" /> : null}
                         {item.showImportBadge ? <ImportBadge /> : null}
                       </div>
                     </button>

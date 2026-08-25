@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   extractArticleMediaUsage,
   type ArticleBlockMvp,
@@ -57,6 +57,8 @@ export function useArticleMediaSource(params: {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const requestIdRef = useRef(0);
+  const liveUsage = useMemo(() => extractArticleMediaUsage({ coverImageId, blocks }), [coverImageId, blocks]);
+  const usedIds = useMemo(() => new Set(liveUsage.map((entry) => entry.mediaId)), [liveUsage]);
 
   const load = useCallback(async () => {
     const requestId = ++requestIdRef.current;
@@ -69,19 +71,23 @@ export function useArticleMediaSource(params: {
         if (!res.ok) throw new Error("Не удалось загрузить изображения статьи");
         const data = (await res.json()) as { items: ArticleMediaItem[] };
         if (requestId !== requestIdRef.current) return;
-        setItems(
-          data.items.map((item) => ({
+        const persisted = data.items.map((item) => ({
             id: item.id,
             url: item.publicUrl,
             alt: item.alt,
             title: item.title,
             usage: item.usage,
-          })),
-        );
+          }));
+        const persistedIds = new Set(persisted.map((item) => item.id));
+        const draftOnly = await Promise.all(liveUsage.filter((entry) => !persistedIds.has(entry.mediaId)).map(async (entry) => {
+          const asset = await resolveMediaPreview(entry.mediaId);
+          return asset?.publicUrl ? { id: asset.id, url: asset.publicUrl, alt: asset.alt, title: asset.title, usage: entry.usage } : null;
+        }));
+        if (requestId !== requestIdRef.current) return;
+        setItems([...persisted, ...draftOnly.filter((item): item is ArticleMediaLibraryItem => item !== null)]);
       } else {
-        const entries = extractArticleMediaUsage({ coverImageId, blocks });
         const resolved = await Promise.all(
-          entries.map(async (entry) => {
+          liveUsage.map(async (entry) => {
             const asset = await resolveMediaPreview(entry.mediaId);
             if (!asset?.publicUrl) return null;
             const item: ArticleMediaLibraryItem = {
@@ -101,7 +107,7 @@ export function useArticleMediaSource(params: {
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [articleId, coverImageId, blocks]);
+  }, [articleId, liveUsage]);
 
-  return { items, loading, loaded, load };
+  return { items, loading, loaded, load, usedIds };
 }
