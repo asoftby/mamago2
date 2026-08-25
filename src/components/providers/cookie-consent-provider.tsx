@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { initCookieConsent } from "@/lib/cookies/consent-manager";
 import { AnalyticsLoader } from "@/components/analytics/analytics-loader";
 import { MarketingLoader } from "@/components/analytics/marketing-loader";
+import type { ExternalAnalyticsConfig } from "@/lib/analytics/externalAnalyticsTypes";
 
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import "@/styles/cookie-consent-mamago.css";
@@ -18,8 +19,10 @@ const TEMP_DISABLE_COOKIE_CONSENT = false;
 
 export function CookieConsentProvider({
   children,
+  externalAnalytics,
 }: {
   children: React.ReactNode;
+  externalAnalytics: ExternalAnalyticsConfig;
 }) {
   useEffect(() => {
     if (TEMP_DISABLE_COOKIE_CONSENT) return;
@@ -32,8 +35,7 @@ export function CookieConsentProvider({
   return (
     <>
       {children}
-      {/* TODO: restore cookie consent after fixing real injected root/selectors on mobile Safari. */}
-      <AnalyticsLoader />
+      <AnalyticsLoader config={externalAnalytics} />
       <MarketingLoader />
     </>
   );
