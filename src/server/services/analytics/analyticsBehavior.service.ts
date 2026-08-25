@@ -1,9 +1,4 @@
-import {
-  Prisma,
-  type AnalyticsEntityType,
-  type AnalyticsVertical,
-  type UserEventType,
-} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
 import type {
@@ -14,203 +9,23 @@ import type {
   BehaviorNamedBreakdown,
   BehaviorTimeBucket,
 } from "@/lib/analytics/analyticsBehaviorTypes";
+import { isCardImpression } from "@/lib/analytics/metricSemantics";
 import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
-
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
-
-function entityMap(): Record<string, AnalyticsEntityType> {
-  return {
-    event: "EVENT",
-    place: "PLACE",
-    offer: "OFFER",
-    route: "ROUTE",
-    article: "ARTICLE",
-  };
-}
-
-function verticalMap(): Record<string, AnalyticsVertical> {
-  return {
-    city: "CITY",
-    travel: "TRAVEL",
-    birthday: "BIRTHDAY",
-    education: "EDUCATION",
-    weekend: "WEEKEND",
-    seasonal: "SEASONAL",
-  };
-}
-
-function ageYearsFromBirth(birth: Date): number {
-  const now = new Date();
-  let y = now.getFullYear() - birth.getFullYear();
-  const m = now.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) y--;
-  return y;
-}
-
-function bandFromAgeYears(age: number): string {
-  if (age < 0) return "unknown";
-  if (age < 3) return "0-3";
-  if (age < 6) return "3-6";
-  if (age < 10) return "6-10";
-  return "10+";
-}
-
-async function youngestChildBandByUser(): Promise<Map<string, string>> {
-  const rows = await prisma.$queryRaw<Array<{ parentId: string; youngest: Date }>>`
-    SELECT c."parentId", MAX(c."birthDate") AS youngest
-    FROM "Child" c
-    WHERE c."birthDate" IS NOT NULL
-    GROUP BY c."parentId"
-  `;
-  const map = new Map<string, string>();
-  for (const r of rows) {
-    const age = ageYearsFromBirth(r.youngest);
-    map.set(r.parentId, bandFromAgeYears(age));
-  }
-  return map;
-}
-
-async function userIdsInSegment(segmentKey: string): Promise<Set<string>> {
-  const rows = await prisma.userBehaviorProfile.findMany({
-    where: { segmentKeys: { has: segmentKey } },
-    select: { userId: true },
-  });
-  return new Set(rows.map((r) => r.userId));
-}
-
-function intersect<T>(a: Set<T>, b: Set<T>): Set<T> {
-  const out = new Set<T>();
-  for (const x of a) {
-    if (b.has(x)) out.add(x);
-  }
-  return out;
-}
-
-async function resolveAllowedUserIds(
-  filters: AnalyticsOverviewFilters,
-): Promise<Set<string> | null> {
-  let seg: Set<string> | null = null;
-  let age: Set<string> | null = null;
-
-  if (filters.segment?.trim()) {
-    seg = await userIdsInSegment(filters.segment.trim());
-  }
-
-  const band = filters.childAgeBand?.trim();
-  if (band && band !== "all") {
-    const yb = await youngestChildBandByUser();
-    age = new Set<string>();
-    for (const [uid, b] of yb) {
-      if (b === band) age.add(uid);
-    }
-  }
-
-  if (seg && age) return intersect(seg, age);
-  if (seg) return seg;
-  if (age) return age;
-  return null;
-}
-
-function buildBaseEventWhere(
-  start: Date,
-  end: Date,
-  filters: AnalyticsOverviewFilters,
-  cityId: string | null,
-): Prisma.UserEventWhereInput {
-  const w: Prisma.UserEventWhereInput = {
-    createdAt: { gte: start, lte: end },
-  };
-  if (cityId) w.cityId = cityId;
-  if (filters.entity && filters.entity !== "all") {
-    const em = entityMap()[filters.entity];
-    if (em) w.entityType = em;
-  }
-  if (filters.vertical && filters.vertical !== "all") {
-    const vm = verticalMap()[filters.vertical];
-    if (vm) w.vertical = vm;
-  }
-  return w;
-}
-
-function applyUserFilter(
-  w: Prisma.UserEventWhereInput,
-  allowed: Set<string> | null,
-): Prisma.UserEventWhereInput {
-  if (!allowed) return w;
-  if (allowed.size === 0) {
-    return { ...w, userId: { in: [] } };
-  }
-  return {
-    ...w,
-    userId: { in: [...allowed] },
-  };
-}
-
-/** SQL-фрагмент AND … для сырых запросов (дублирует buildBaseEventWhere + user filter). */
-function eventWhereSql(
-  start: Date,
-  end: Date,
-  filters: AnalyticsOverviewFilters,
-  cityId: string | null,
-  allowed: Set<string> | null,
-): Prisma.Sql {
-  const parts: Prisma.Sql[] = [
-    Prisma.sql`e."createdAt" >= ${start}`,
-    Prisma.sql`e."createdAt" <= ${end}`,
-  ];
-  if (cityId) parts.push(Prisma.sql`e."cityId" = ${cityId}`);
-  if (filters.entity && filters.entity !== "all") {
-    const et = entityMap()[filters.entity];
-    if (et) parts.push(Prisma.sql`e."entityType" = ${et}::"AnalyticsEntityType"`);
-  }
-  if (filters.vertical && filters.vertical !== "all") {
-    const v = verticalMap()[filters.vertical];
-    if (v) parts.push(Prisma.sql`e."vertical" = ${v}::"AnalyticsVertical"`);
-  }
-  if (allowed) {
-    if (allowed.size === 0) return Prisma.sql`FALSE`;
-    const ids = [...allowed];
-    parts.push(Prisma.sql`e."userId" IN (${Prisma.join(ids)})`);
-  }
-  if (parts.length === 0) return Prisma.sql`TRUE`;
-  let acc = parts[0]!;
-  for (let i = 1; i < parts.length; i++) {
-    acc = Prisma.sql`${acc} AND ${parts[i]!}`;
-  }
-  return acc;
-}
-
-async function loadEntityTitles(
-  items: Array<{ entityType: string; entityId: string }>,
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  const eventIds = items
-    .filter((i) => i.entityType === "EVENT")
-    .map((i) => i.entityId);
-  const placeIds = items
-    .filter((i) => i.entityType === "PLACE")
-    .map((i) => i.entityId);
-  const [acts, places] = await Promise.all([
-    eventIds.length
-      ? prisma.activity.findMany({
-          where: { id: { in: eventIds } },
-          select: { id: true, title: true },
-        })
-      : [],
-    placeIds.length
-      ? prisma.place.findMany({
-          where: { id: { in: placeIds } },
-          select: { id: true, title: true },
-        })
-      : [],
-  ]);
-  for (const a of acts) map.set(`EVENT:${a.id}`, a.title);
-  for (const p of places) map.set(`PLACE:${p.id}`, p.title);
-  return map;
-}
+import {
+  analyticsEventWhereSql,
+  applyAnalyticsUserFilter,
+  buildAnalyticsBaseEventWhere,
+  loadAllEntityTitles,
+  resolveAnalyticsAllowedUserIds,
+  youngestChildBandByUser,
+} from "@/server/services/analytics/analyticsQueryHelpers";
+import {
+  CANONICAL_CARD_IMPRESSION_SQL,
+  CANONICAL_CTA_CLICK_SQL,
+} from "@/server/services/analytics/analyticsMetricSql";
 
 function formatGroupKey(slug: string): string {
   const s = slug.toLowerCase();
@@ -251,15 +66,15 @@ export async function getAnalyticsBehavior(
 ): Promise<AnalyticsBehaviorResult> {
   const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
   const cityId = await resolveCityIdFromSlug(filters.city);
-  const allowed = await resolveAllowedUserIds(filters);
+  const allowed = await resolveAnalyticsAllowedUserIds(filters);
 
   if (allowed && allowed.size === 0) {
     return emptyBehaviorResult(start, end);
   }
 
-  const baseWhere = buildBaseEventWhere(start, end, filters, cityId);
-  const where = applyUserFilter(baseWhere, allowed);
-  const wsql = eventWhereSql(start, end, filters, cityId, allowed);
+  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
+  const where = applyAnalyticsUserFilter(baseWhere, allowed);
+  const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed);
 
   const [
     timeRows,
@@ -275,7 +90,7 @@ export async function getAnalyticsBehavior(
     planningProfileStats(where),
     prisma.userEvent.count({ where: { ...where, eventType: "PLAN_ADD" } }),
     countPlanAddsNextDay(wsql),
-    entityFunnelAggregates(where),
+    entityFunnelAggregates(wsql),
     prisma.userEvent.findMany({
       where: { ...where, userId: { not: null } },
       select: { userId: true },
@@ -293,7 +108,7 @@ export async function getAnalyticsBehavior(
     ]);
 
   const interactionGaps = await buildInteractionGaps(gapAgg);
-  const vertMetrics = await verticalMetrics(where);
+  const vertMetrics = await verticalMetrics(wsql);
 
   const nextDayShare =
     planAddsTotal > 0 ? planAddsNextDay / planAddsTotal : null;
@@ -421,6 +236,9 @@ async function planningProfileStats(where: Prisma.UserEventWhereInput): Promise<
       weekendShare: true,
     },
   });
+  if (profiles.length === 0) {
+    return { avgSame: 0, avgAdvance: 0, avgWeekend: 0 };
+  }
   const n = profiles.length;
   const avgSame =
     profiles.reduce((a, p) => a + p.sameDayPlanningShare, 0) / n;
@@ -440,47 +258,21 @@ type GapRow = {
   ctas: bigint;
 };
 
-async function entityFunnelAggregates(
-  where: Prisma.UserEventWhereInput,
-): Promise<GapRow[]> {
-  const raw = await prisma.$queryRaw<GapRow[]>`
+async function entityFunnelAggregates(wsql: Prisma.Sql): Promise<GapRow[]> {
+  return prisma.$queryRaw<GapRow[]>`
     SELECT
       e."entityType"::text AS "entityType",
       e."entityId"::text AS "entityId",
       SUM(CASE WHEN e."eventType" = 'DETAIL_OPEN' THEN 1 ELSE 0 END)::bigint AS opens,
       SUM(CASE WHEN e."eventType" = 'SAVE' THEN 1 ELSE 0 END)::bigint AS saves,
       SUM(CASE WHEN e."eventType" = 'PLAN_ADD' THEN 1 ELSE 0 END)::bigint AS plans,
-      SUM(CASE WHEN e."eventType" = 'CTA_CLICK' THEN 1 ELSE 0 END)::bigint AS ctas
+      SUM(CASE WHEN ${CANONICAL_CTA_CLICK_SQL} THEN 1 ELSE 0 END)::bigint AS ctas
     FROM "UserEvent" e
-    WHERE ${eventWhereSqlFromPrismaWhere(where)}
+    WHERE ${wsql}
       AND e."entityId" IS NOT NULL
       AND e."entityType" IS NOT NULL
     GROUP BY e."entityType", e."entityId"
   `;
-  return raw;
-}
-
-/** Только для raw: восстанавливает условия из объекта where (ограниченный набор полей). */
-function eventWhereSqlFromPrismaWhere(where: Prisma.UserEventWhereInput): Prisma.Sql {
-  const w = where as Record<string, unknown>;
-  const parts: Prisma.Sql[] = [];
-  const ca = w.createdAt as { gte?: Date; lte?: Date } | undefined;
-  if (ca?.gte) parts.push(Prisma.sql`e."createdAt" >= ${ca.gte}`);
-  if (ca?.lte) parts.push(Prisma.sql`e."createdAt" <= ${ca.lte}`);
-  if (w.cityId) parts.push(Prisma.sql`e."cityId" = ${w.cityId as string}`);
-  if (w.entityType) parts.push(Prisma.sql`e."entityType" = ${w.entityType}::"AnalyticsEntityType"`);
-  if (w.vertical) parts.push(Prisma.sql`e."vertical" = ${w.vertical}::"AnalyticsVertical"`);
-  if (w.userId && typeof w.userId === "object" && "in" in (w.userId as object)) {
-    const inp = w.userId as { in: string[] };
-    if (inp.in.length === 0) return Prisma.sql`FALSE`;
-    parts.push(Prisma.sql`e."userId" IN (${Prisma.join(inp.in)})`);
-  }
-  if (parts.length === 0) return Prisma.sql`TRUE`;
-  let acc = parts[0]!;
-  for (let i = 1; i < parts.length; i++) {
-    acc = Prisma.sql`${acc} AND ${parts[i]!}`;
-  }
-  return acc;
 }
 
 async function buildInteractionGaps(rows: GapRow[]): Promise<{
@@ -525,7 +317,7 @@ async function buildInteractionGaps(rows: GapRow[]): Promise<{
     entityType: x.entityType,
     entityId: x.entityId,
   }));
-  const titles = await loadEntityTitles(allKeys);
+  const titles = await loadAllEntityTitles(allKeys);
 
   const toGap = (
     list: typeof withRates,
@@ -568,7 +360,7 @@ async function ageBandStats(
   const bandMap = await youngestChildBandByUser();
   const events = await prisma.userEvent.findMany({
     where: { ...where, userId: { not: null } },
-    select: { userId: true, eventType: true },
+    select: { userId: true, eventType: true, meta: true },
   });
   const acc: Record<string, { views: number; saves: number; planAdds: number }> =
     {
@@ -582,7 +374,7 @@ async function ageBandStats(
     const uid = e.userId!;
     const band = bandMap.get(uid) ?? "unknown";
     const b = acc[band] ?? acc.unknown;
-    if (e.eventType === "PAGE_VIEW" || e.eventType === "CARD_VIEW") b.views += 1;
+    if (isCardImpression(e.eventType, e.meta)) b.views += 1;
     if (e.eventType === "SAVE") b.saves += 1;
     if (e.eventType === "PLAN_ADD") b.planAdds += 1;
   }
@@ -607,15 +399,16 @@ async function categoryFromProfiles(
       totalPlanAdds: true,
     },
   });
-  const catMap: Record<string, { v: number; s: number; p: number }> = {};
+  const legacyEntityKeys = new Set(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
+  const catMap: Record<string, { v: number }> = {};
   for (const p of profiles) {
     const raw = p.preferredCategories;
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
     for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
-      if (k === "_none") continue;
+      if (k === "_none" || legacyEntityKeys.has(k)) continue;
       const weight = typeof val === "number" ? val : Number(val);
       if (!Number.isFinite(weight) || weight <= 0) continue;
-      if (!catMap[k]) catMap[k] = { v: 0, s: 0, p: 0 };
+      if (!catMap[k]) catMap[k] = { v: 0 };
       catMap[k].v += weight;
     }
   }
@@ -712,46 +505,37 @@ async function signalsFormatFromUsers(
 }
 
 async function verticalMetrics(
-  where: Prisma.UserEventWhereInput,
+  wsql: Prisma.Sql,
 ): Promise<BehaviorNamedBreakdown[]> {
-  const types: UserEventType[] = [
-    ...VIEW_TYPES,
-    "SAVE",
-    "PLAN_ADD",
-    "CTA_CLICK",
-  ];
-  const rows = await prisma.userEvent.groupBy({
-    by: ["vertical", "eventType"],
-    where: {
-      ...where,
-      vertical: { not: null },
-      eventType: { in: types },
-    },
-    _count: { _all: true },
-  });
-  const byVert: Record<
-    string,
-    { views: number; saves: number; planAdds: number; cta: number }
-  > = {};
-  for (const r of rows) {
-    const v = r.vertical ?? "";
-    if (!byVert[v])
-      byVert[v] = { views: 0, saves: 0, planAdds: 0, cta: 0 };
-    const c = r._count._all;
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW")
-      byVert[v].views += c;
-    if (r.eventType === "SAVE") byVert[v].saves += c;
-    if (r.eventType === "PLAN_ADD") byVert[v].planAdds += c;
-    if (r.eventType === "CTA_CLICK") byVert[v].cta += c;
-  }
-  return Object.entries(byVert)
-    .map(([key, m]) => ({
-      key,
-      label: key,
-      views: m.views,
-      saves: m.saves,
-      planAdds: m.planAdds,
-      ctaClicks: m.cta,
+  const rows = await prisma.$queryRaw<
+    Array<{
+      vertical: string;
+      views: bigint;
+      saves: bigint;
+      plan_adds: bigint;
+      cta_clicks: bigint;
+    }>
+  >`
+    SELECT
+      e."vertical"::text AS vertical,
+      COUNT(*) FILTER (WHERE ${CANONICAL_CARD_IMPRESSION_SQL})::bigint AS views,
+      COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
+      COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS plan_adds,
+      COUNT(*) FILTER (WHERE ${CANONICAL_CTA_CLICK_SQL})::bigint AS cta_clicks
+    FROM "UserEvent" e
+    WHERE ${wsql}
+      AND e."vertical" IS NOT NULL
+    GROUP BY e."vertical"
+  `;
+
+  return rows
+    .map((r) => ({
+      key: r.vertical,
+      label: r.vertical,
+      views: Number(r.views),
+      saves: Number(r.saves),
+      planAdds: Number(r.plan_adds),
+      ctaClicks: Number(r.cta_clicks),
     }))
     .sort((a, b) => b.views - a.views);
 }
