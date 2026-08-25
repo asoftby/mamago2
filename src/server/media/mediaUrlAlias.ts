@@ -16,11 +16,19 @@ export function normalizeMediaAliasPath(input: string): string | null {
   return normalizeMediaStorageRelativePath(relative);
 }
 
+/**
+ * Canonical redirect target for a legacy alias.
+ * Always a same-origin relative media path (`/api/media/file/...`).
+ * External / non-media publicUrl values are refused (no open redirect).
+ */
 export function canonicalAliasDestination(alias: MediaAliasWithAsset): string | null {
   const current = alias.media.publicUrl?.trim();
-  const currentPath = current ? normalizeMediaAliasPath(current) : null;
-  if (!current || !currentPath || currentPath === alias.legacyPath) return null;
-  return current;
+  if (!current) return null;
+  const currentPath = normalizeMediaAliasPath(current);
+  if (!currentPath || currentPath === alias.legacyPath) return null;
+  // Rebuild from the normalized storage-relative path so a stale absolute or
+  // host-qualified publicUrl can never escape into Location.
+  return `/api/media/file/${currentPath}`;
 }
 
 export function decideMediaAliasRedirect(input: {
@@ -31,4 +39,17 @@ export function decideMediaAliasRedirect(input: {
   const destination = canonicalAliasDestination(input.alias);
   if (!destination || !input.canServe || !input.canonicalFileExists) return { status: 404 };
   return { status: 308, destination };
+}
+
+/** Relative 308 — never absolute (avoids request.url / 0.0.0.0:3000 bind origin). */
+export function mediaAliasRedirectResponse(destination: string): Response {
+  if (!destination.startsWith("/api/media/file/") || destination.includes("://") || destination.includes("\\")) {
+    throw new Error(`Refusing non-relative media alias destination: ${destination}`);
+  }
+  return new Response(null, {
+    status: 308,
+    headers: {
+      Location: destination,
+    },
+  });
 }

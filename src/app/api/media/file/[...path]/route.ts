@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import {
   canonicalAliasDestination,
   decideMediaAliasRedirect,
+  mediaAliasRedirectResponse,
   normalizeMediaAliasPath,
 } from "@/server/media/mediaUrlAlias";
 import {
@@ -87,7 +88,9 @@ export async function GET(
             headers: { "Content-Type": "application/json" },
           });
         }
-        return NextResponse.redirect(new URL(decision.destination, _request.url), 308);
+        // Relative Location only — never absolute from request.url (bind host
+        // is 0.0.0.0:3000 behind Traefik and breaks external clients/crawlers).
+        return mediaAliasRedirectResponse(decision.destination);
       }
     }
 
