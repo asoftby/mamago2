@@ -18,8 +18,8 @@ function buildQuery(filters: AnalyticsOverviewFilters): string {
   return q.toString();
 }
 
-function formatPct(x: number): string {
-  return `${(x * 100).toFixed(1)}%`;
+function formatPct(x: number | null): string {
+  return x == null ? "—" : `${(x * 100).toFixed(1)}%`;
 }
 
 function formatRangeLabel(isoStart: string, isoEnd: string): string {
@@ -145,7 +145,10 @@ export function AdminAnalyticsOverview({
             label="Sessions"
             value={data.sessions.toLocaleString()}
           />
-          <KpiCard label="Views" value={data.views.toLocaleString()} />
+          <KpiCard
+            label="Card impressions"
+            value={data.views.toLocaleString()}
+          />
           <KpiCard label="Opens" value={data.opens.toLocaleString()} />
           <KpiCard label="Saves" value={data.saves.toLocaleString()} />
           <KpiCard
@@ -160,19 +163,19 @@ export function AdminAnalyticsOverview({
             <p className="text-xs text-gray-600">Conversion rates</p>
             <dl className="mt-2 space-y-1.5 text-sm">
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Save rate</dt>
+                <dt className="text-gray-500">Save / open</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.saveRate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Plan rate</dt>
+                <dt className="text-gray-500">Plan / save</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.planRate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Click rate</dt>
+                <dt className="text-gray-500">CTA / open</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.clickRate)}
                 </dd>
@@ -210,14 +213,14 @@ export function AdminAnalyticsOverview({
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <h3 className="mb-4 text-sm font-semibold text-gray-900">
-            Views & opens (daily)
+            Card impressions & opens (daily)
           </h3>
           <div className="flex h-[180px] items-end justify-between gap-1 rounded-xl bg-muted/20 px-2 pb-1 pt-2">
             {data.dailySeries.map((d) => (
               <div
                 key={d.date}
                 className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                title={`${d.date}: views ${d.views}, opens ${d.opens}`}
+                title={`${d.date}: impressions ${d.views}, opens ${d.opens}`}
               >
                 <div className="flex h-[140px] w-full items-end justify-center gap-0.5">
                   <div
@@ -242,7 +245,7 @@ export function AdminAnalyticsOverview({
           <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-600">
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-sm bg-primary/60" />
-              Views
+              Card impressions
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-sm bg-amber-500/70" />
