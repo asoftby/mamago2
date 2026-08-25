@@ -2,13 +2,16 @@ import { AnalyticsEntityType, UserEventType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 export type PromotionPeriodMetrics = {
+  /** Legacy field name kept for compatibility; Contract v1 meaning = CARD_VIEW impressions only. */
   views: number;
+  opens: number;
   saves: number;
   planAdds: number;
   ctaClicks: number;
 };
 
 export type PromotionPeriodComparison = {
+  /** Legacy field name kept for compatibility; compares CARD_VIEW impressions. */
   viewsMultiplier: number | null;
   planAddsPercentChange: number | null;
 };
@@ -34,15 +37,15 @@ export type ActivityPromotionPerformance = {
 };
 
 const TRACKED_EVENT_TYPES: UserEventType[] = [
-  UserEventType.PAGE_VIEW,
   UserEventType.CARD_VIEW,
+  UserEventType.DETAIL_OPEN,
   UserEventType.SAVE,
   UserEventType.PLAN_ADD,
   UserEventType.CTA_CLICK,
 ];
 
 function emptyMetrics(): PromotionPeriodMetrics {
-  return { views: 0, saves: 0, planAdds: 0, ctaClicks: 0 };
+  return { views: 0, opens: 0, saves: 0, planAdds: 0, ctaClicks: 0 };
 }
 
 async function getActivityMetricsForRange(params: {
@@ -66,8 +69,10 @@ async function getActivityMetricsForRange(params: {
   const metrics = emptyMetrics();
   for (const row of rows) {
     const count = row._count._all;
-    if (row.eventType === UserEventType.PAGE_VIEW || row.eventType === UserEventType.CARD_VIEW) {
+    if (row.eventType === UserEventType.CARD_VIEW) {
       metrics.views += count;
+    } else if (row.eventType === UserEventType.DETAIL_OPEN) {
+      metrics.opens += count;
     } else if (row.eventType === UserEventType.SAVE) {
       metrics.saves += count;
     } else if (row.eventType === UserEventType.PLAN_ADD) {
@@ -95,6 +100,9 @@ function multiplier(value: number, baseline: number): number | null {
  * from timestamped UserEvent rows, while the comparison window has the same
  * duration immediately preceding the period. This is a comparison, not causal
  * attribution.
+ *
+ * Contract v1 separates CARD_VIEW impressions from DETAIL_OPEN. PAGE_VIEW is
+ * traffic telemetry and never contributes to publication Boost performance.
  */
 export async function getPromotionPerformanceByActivityIds(
   activityIds: string[],
