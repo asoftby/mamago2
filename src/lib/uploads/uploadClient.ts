@@ -14,6 +14,8 @@ type UploadMediaFileOptions = {
    */
   ownerUserId?: string;
   uploadContext?: UploadContext;
+  /** Persisted server-side context. Labels/slugs are deliberately never accepted from the client. */
+  contextEntityId?: string;
   onProgress?: never;
 };
 
@@ -39,6 +41,9 @@ export async function uploadMediaFile(
   }
   if (options?.uploadContext) {
     formData.append("uploadContext", options.uploadContext);
+  }
+  if (options?.contextEntityId) {
+    formData.append("contextEntityId", options.contextEntityId);
   }
 
   const response = await fetch(endpoint, {

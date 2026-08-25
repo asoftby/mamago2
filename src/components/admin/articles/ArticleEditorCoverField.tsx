@@ -19,6 +19,7 @@ export function ArticleEditorCoverField({
   onChange,
   initialPreviewUrl,
   authorUserId,
+  articleId,
   showHeading = true,
   uploadButtonLabel = "Загрузить обложку",
   successUploadMessage = "Обложка загружена",
@@ -30,6 +31,7 @@ export function ArticleEditorCoverField({
   initialPreviewUrl?: string | null;
   /** Медиатека статьи = медиатека этого автора; без него сервер берёт медиатеку текущего пользователя. */
   authorUserId?: string | null;
+  articleId?: string | null;
   showHeading?: boolean;
   uploadButtonLabel?: string;
   successUploadMessage?: string;
@@ -81,7 +83,7 @@ export function ArticleEditorCoverField({
     for (const file of files) {
       const media = await uploadMediaFile(
         file,
-        authorUserId ? { ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE" } : undefined,
+        authorUserId ? { ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE", contextEntityId: articleId ?? undefined } : undefined,
       );
       uploaded.push({
         id: media.id,

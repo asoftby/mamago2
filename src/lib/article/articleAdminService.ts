@@ -16,6 +16,8 @@ import {
   isPublishLikeStatus,
   validateArticleGeoScope,
 } from "@/lib/article/articleGeoScopeValidation";
+import { syncArticleMediaUsage } from "@/server/services/media/media-usage.service";
+import { canonicalizeArticleMedia } from "@/server/media/mediaNaming";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -400,6 +402,8 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
 
   await resolveArticleSlugOnSave(created.id, input.title, input.slug);
   await syncArticleCanonical(created.id);
+  await syncArticleMediaUsage(created.id);
+  await canonicalizeArticleMedia(created.id, { allowPublished: true });
   perf.mark("seo");
 
   if (isPublishLikeStatus(input.status)) {
@@ -418,6 +422,8 @@ export async function saveArticleDraft(
   input: ArticleSaveInput,
 ): Promise<ArticleEditorSnapshot> {
   const perf = createRequestPerf("save-article:service:update");
+  const previous = await prisma.article.findUnique({ where: { id }, select: { status: true } });
+  if (!previous) throw new Error("Article not found");
   const resolvedGeo = resolvedGeoScope(input);
   const currentGeo = await fetchArticleGeoScope(id);
   const effectiveGeoScope =
@@ -506,6 +512,10 @@ export async function saveArticleDraft(
   await resolveArticleSlugOnSave(id, input.title, input.slug);
 
   await syncArticleCanonical(id);
+  await syncArticleMediaUsage(id);
+  await canonicalizeArticleMedia(id, {
+    allowPublished: previous.status !== "PUBLISHED",
+  });
   perf.mark("seo");
 
   const next = await getArticleForEditor(id);

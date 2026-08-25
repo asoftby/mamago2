@@ -1,5 +1,3 @@
-import "server-only";
-
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { basename, extname, join, posix, resolve, sep } from "path";

@@ -215,11 +215,13 @@ export function ArticleBlocksMvpEditor({
   blocks,
   onChange,
   authorUserId,
+  articleId,
   articleMediaSource,
 }: {
   blocks: ArticleBlockMvp[];
   onChange: (next: ArticleBlockMvp[]) => void;
   authorUserId?: string | null;
+  articleId?: string | null;
   /** «Фото этой статьи» — общий источник для image/gallery picker'ов всех блоков. */
   articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
@@ -360,6 +362,7 @@ export function ArticleBlocksMvpEditor({
             showHeading={false}
             value={block.mediaId}
             authorUserId={authorUserId}
+            articleId={articleId}
             uploadButtonLabel="Загрузить изображение"
             successUploadMessage="Изображение загружено"
             successPickMessage="Изображение выбрано"
@@ -396,6 +399,7 @@ export function ArticleBlocksMvpEditor({
             showHeading={false}
             value={block.mediaIds}
             authorUserId={authorUserId}
+            articleId={articleId}
             onChange={(ids) => updateAt(i, { ...block, mediaIds: ids })}
             articleMediaSource={articleMediaSource}
           />

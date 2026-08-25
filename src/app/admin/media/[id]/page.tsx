@@ -258,6 +258,10 @@ export default async function AdminMediaDetailPage({
                 <dd className="mt-1 text-sm text-gray-900 font-mono break-all">{displayFilename}</dd>
               </div>
               <div>
+                <dt className="text-sm font-medium text-gray-500">Исходный файл</dt>
+                <dd className="mt-1 text-sm text-gray-900 font-mono break-all">{displayOriginalName}</dd>
+              </div>
+              <div>
                 <dt className="text-sm font-medium text-gray-500">Тип</dt>
                 <dd className="mt-1 text-sm text-gray-900 font-mono">{media.mimeType}</dd>
               </div>

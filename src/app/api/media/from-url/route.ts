@@ -14,9 +14,9 @@ import { MediaSourceType } from "@prisma/client";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import {
   processImage,
-  generateProcessedFilename,
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
+import { buildMasterFilename, buildMediaStem, buildResponsiveFilename } from "@/server/media/mediaNaming";
 import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
 import { buildNeutralImportedMediaIdentity } from "@/lib/media/importedMediaPrivacy";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
@@ -95,8 +95,9 @@ export async function POST(req: NextRequest) {
     const processedImageSet = await processImage(buf, mime, DEFAULT_IMAGE_CONFIG);
     const mediaIdentity = buildNeutralImportedMediaIdentity(url);
 
+    const uploadStem = buildMediaStem({ type: "CONTEXTLESS" });
     const masterSaved = await writeRuntimeUpload(
-      generateProcessedFilename(mediaIdentity.seedFilename),
+      buildMasterFilename(uploadStem),
       processedImageSet.master.buffer,
     );
     const masterFilename = masterSaved.filename;
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
     for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
       if (sizeData) {
         await writeRuntimeUpload(
-          generateProcessedFilename(mediaIdentity.seedFilename, sizeName),
+          buildResponsiveFilename(uploadStem, sizeName),
           sizeData.buffer,
         );
       }
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
       publicUrl: masterUrl,
       sourceType,
       uploadedById: user.id,
-      title: mediaIdentity.title,
+      title: uploadStem,
     });
 
     return NextResponse.json({

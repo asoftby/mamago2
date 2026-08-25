@@ -4,7 +4,8 @@
  */
 
 import "server-only";
-import { processImage, generateProcessedFilename, DEFAULT_IMAGE_CONFIG, type ImageProcessingConfig } from "@/lib/media/imageProcessor";
+import { processImage, DEFAULT_IMAGE_CONFIG, type ImageProcessingConfig } from "@/lib/media/imageProcessor";
+import { buildMasterFilename, buildMediaStem } from "@/server/media/mediaNaming";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
 import { contentHashOf, findOwnedMediaByContentHash } from "@/lib/media/dedup";
@@ -139,7 +140,7 @@ export async function uploadImageFromUrl(
   });
 
   // Save master image
-  const filename = generateProcessedFilename(`instagram-avatar-${Date.now()}.jpg`);
+  const filename = buildMasterFilename(buildMediaStem({ type: "CONTEXTLESS" }));
   const masterSaved = await writeRuntimeUpload(filename, processedImageSet.master.buffer);
 
   console.log("[uploadFromUrl] Saved to storage:", masterSaved.publicUrl);

@@ -884,6 +884,7 @@ export function ArticleEditorClient({
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
             authorUserId={authorUserId}
+            articleId={hasPersistedId ? initial.id : null}
             onChange={(id, previewUrl) => {
               setCoverImageId(id);
               setCoverImagePreviewUrl(previewUrl ?? "");
@@ -1034,6 +1035,7 @@ export function ArticleEditorClient({
             blocks={content.blocks}
             onChange={(blocks) => setContent((prev) => ({ ...prev, blocks }))}
             authorUserId={authorUserId}
+            articleId={hasPersistedId ? initial.id : null}
             articleMediaSource={articleMediaSource}
           />
         </CardContent>

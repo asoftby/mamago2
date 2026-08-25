@@ -38,9 +38,9 @@ import {
 import { MediaSourceType } from "@prisma/client";
 import {
   processImage,
-  generateProcessedFilename,
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
+import { buildMasterFilename, buildMediaStem, buildResponsiveFilename, resolveArticleUploadContext } from "@/server/media/mediaNaming";
 import {
   MEDIA_STORAGE_ROOT,
   MEDIA_UPLOADS_DIR,
@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     // or context claim on their own — both are re-checked server-side below.
     const requestedOwnerUserId = (formData.get("ownerUserId") as string | null)?.trim() || null;
     const rawUploadContext = (formData.get("uploadContext") as string | null)?.trim() || null;
+    const contextEntityId = (formData.get("contextEntityId") as string | null)?.trim() || null;
     const uploadContext: UploadContext | null = rawUploadContext === "ADMIN_ARTICLE" ? "ADMIN_ARTICLE" : null;
     let ownerUserId: string;
     try {
@@ -161,9 +162,13 @@ export async function POST(req: NextRequest) {
     let masterFilename = "";
     let masterUrl = "";
     const responsiveSizes: Record<string, string> = {};
+    const articleContext = uploadContext === "ADMIN_ARTICLE" && contextEntityId
+      ? await resolveArticleUploadContext(contextEntityId)
+      : null;
+    const uploadStem = buildMediaStem(articleContext ?? { type: "CONTEXTLESS" });
     try {
       const masterSaved = await writeRuntimeUpload(
-        generateProcessedFilename(file.name),
+        buildMasterFilename(uploadStem),
         processedImageSet.master.buffer,
       );
       masterFilename = masterSaved.filename;
@@ -178,7 +183,7 @@ export async function POST(req: NextRequest) {
       for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
         if (!sizeData) continue;
         const sizeSaved = await writeRuntimeUpload(
-          generateProcessedFilename(file.name, sizeName),
+          buildResponsiveFilename(uploadStem, sizeName),
           sizeData.buffer,
         );
         responsiveSizes[sizeName] = sizeSaved.publicUrl;
@@ -215,6 +220,7 @@ export async function POST(req: NextRequest) {
         sourceType,
         uploadedById: ownerUserId,
         contentHash,
+        title: articleContext?.title ?? uploadStem,
       });
       mediaId = asset.id;
     } catch (mediaError) {

@@ -215,12 +215,6 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
                   mimeType: media.mimeType,
                 });
 
-                const displayOriginalName = resolveDisplayFilename({
-                  filename: media.originalName ?? "",
-                  extension: media.extension,
-                  mimeType: media.mimeType,
-                });
-
                 const usageContext =
                   media.usages.length > 0
                     ? {
@@ -283,7 +277,7 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 truncate">{displayOriginalName}</p>
+                        <p className="text-xs text-gray-500 truncate">{displayFilename}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3">

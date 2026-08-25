@@ -18,6 +18,7 @@ export function ArticleEditorGalleryField({
   value,
   onChange,
   authorUserId,
+  articleId,
   showHeading = true,
   articleMediaSource,
 }: {
@@ -25,6 +26,7 @@ export function ArticleEditorGalleryField({
   onChange: (ids: string[]) => void;
   /** Медиатека статьи = медиатека этого автора; без него сервер берёт медиатеку текущего пользователя. */
   authorUserId?: string | null;
+  articleId?: string | null;
   showHeading?: boolean;
   /** «Фото этой статьи» — первая вкладка picker'а. Без него picker остаётся одноисточниковым. */
   articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
@@ -92,7 +94,7 @@ export function ArticleEditorGalleryField({
     for (const file of files) {
       const media = await uploadMediaFile(
         file,
-        authorUserId ? { ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE" } : undefined,
+        authorUserId ? { ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE", contextEntityId: articleId ?? undefined } : undefined,
       );
       uploaded.push({
         id: media.id,
