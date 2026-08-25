@@ -204,7 +204,12 @@ export default async function CityArticlePage({ params }: PageProps) {
     const related = await loadRelatedBreakingNews(mvp.id);
     return (
       <>
-        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <AnalyticsDetailBeacon
+          entityType="ARTICLE"
+          entityId={mvp.id}
+          vertical="CITY"
+          meta={{ categorySlug: mvp.categorySlug }}
+        />
         <JsonLd
           data={[schemaJsonLd, breadcrumbJsonLd].filter(
             (item): item is Record<string, unknown> => Boolean(item),
@@ -283,7 +288,12 @@ export default async function CityArticlePage({ params }: PageProps) {
 
     return (
       <>
-        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <AnalyticsDetailBeacon
+          entityType="ARTICLE"
+          entityId={mvp.id}
+          vertical="CITY"
+          meta={{ categorySlug: mvp.categorySlug }}
+        />
         <JsonLd
           data={[schemaJsonLd, breadcrumbJsonLd].filter(
             (item): item is Record<string, unknown> => Boolean(item),
@@ -305,7 +315,12 @@ export default async function CityArticlePage({ params }: PageProps) {
 
   return (
     <>
-      <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+      <AnalyticsDetailBeacon
+        entityType="ARTICLE"
+        entityId={mvp.id}
+        vertical="CITY"
+        meta={{ categorySlug: mvp.categorySlug }}
+      />
       <JsonLd
         data={[schemaJsonLd, breadcrumbJsonLd].filter(
           (item): item is Record<string, unknown> => Boolean(item),

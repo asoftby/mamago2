@@ -35,6 +35,7 @@ const articleMvpBaseSelect = {
   category: {
     select: {
       nameRu: true,
+      slug: true,
     },
   },
   tags: {
@@ -492,6 +493,7 @@ export async function loadArticleMvpBySlugPublic(
         ? { displayName: article.authorLabel, avatarUrl: null }
         : null,
     categoryLabel: article.category?.nameRu ?? null,
+    categorySlug: article.category?.slug ?? null,
     tags: article.tags,
   };
 }
@@ -549,6 +551,7 @@ export async function loadArticleMvpById(articleId: string) {
     blocks,
     authorUserId: article.authorUser?.id ?? null,
     categoryLabel: article.category?.nameRu ?? null,
+    categorySlug: article.category?.slug ?? null,
     tags: article.tags,
   };
 }

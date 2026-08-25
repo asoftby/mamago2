@@ -380,7 +380,12 @@ export default async function ArticlePage({
       return (
         <>
           <ArticleGeoLabelSync label={articleGeoLabel} />
-          <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+          <AnalyticsDetailBeacon
+            entityType="ARTICLE"
+            entityId={mvp.id}
+            vertical="CITY"
+            meta={{ categorySlug: mvp.categorySlug }}
+          />
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
               (item): item is Record<string, unknown> => Boolean(item),
@@ -457,7 +462,12 @@ export default async function ArticlePage({
       return (
         <>
           <ArticleGeoLabelSync label={articleGeoLabel} />
-          <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+          <AnalyticsDetailBeacon
+            entityType="ARTICLE"
+            entityId={mvp.id}
+            vertical="CITY"
+            meta={{ categorySlug: mvp.categorySlug }}
+          />
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
               (item): item is Record<string, unknown> => Boolean(item),
@@ -480,7 +490,12 @@ export default async function ArticlePage({
     return (
       <>
         <ArticleGeoLabelSync label={articleGeoLabel} />
-        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        <AnalyticsDetailBeacon
+          entityType="ARTICLE"
+          entityId={mvp.id}
+          vertical="CITY"
+          meta={{ categorySlug: mvp.categorySlug }}
+        />
         <JsonLd
           data={[articleJsonLd, breadcrumbJsonLd].filter(
             (item): item is Record<string, unknown> => Boolean(item),

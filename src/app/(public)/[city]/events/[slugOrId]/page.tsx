@@ -212,6 +212,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           vertical="CITY"
           cityId={fromDb.cityId}
           citySlug={city}
+          meta={{ categorySlug: fromDb.eventCategory?.slug ?? null }}
         />
         <JsonLd
           data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}

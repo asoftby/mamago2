@@ -331,6 +331,7 @@ export function ContinuousArticleReader({
           const id = entry.target.getAttribute("data-article-id");
           const slug = entry.target.getAttribute("data-article-slug");
           const pos = Number(entry.target.getAttribute("data-article-pos") || "1");
+          const categorySlug = entry.target.getAttribute("data-article-category") || null;
           if (!id || !slug) continue;
           if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
             analyticsRef.current.track(
@@ -338,6 +339,7 @@ export function ContinuousArticleReader({
               id,
               slug,
               analyticsCtx(id, pos, null),
+              { categorySlug },
             );
           }
         }
@@ -444,6 +446,7 @@ export function ContinuousArticleReader({
         data-article-id={seed.id}
         data-article-slug={seed.slug}
         data-article-pos={1}
+        data-article-category={seed.section?.slug ?? ""}
       >
         {firstArticleSlot}
       </div>
@@ -474,6 +477,7 @@ export function ContinuousArticleReader({
               data-article-id={article.id}
               data-article-slug={article.slug}
               data-article-pos={index + 1}
+              data-article-category={article.section?.slug ?? ""}
             >
               <ArticleMvpView
                 title={article.title}

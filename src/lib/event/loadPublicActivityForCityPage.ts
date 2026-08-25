@@ -124,7 +124,7 @@ export async function loadPublicActivityForCityPage(
           },
         },
       },
-      eventCategory: { select: { nameRu: true } },
+      eventCategory: { select: { nameRu: true, slug: true } },
     },
   });
 

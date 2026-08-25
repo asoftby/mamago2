@@ -296,7 +296,7 @@ export function CityHomeJournalSection({
             entityId={a.id}
             vertical="CITY"
             citySlug={citySlug}
-            meta={{ section: "journal", position: index }}
+            meta={{ section: "journal", position: index, categorySlug: a.category?.slug ?? null }}
           >
             <Link
               href={a.href}

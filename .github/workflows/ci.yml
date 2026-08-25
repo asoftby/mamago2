@@ -38,6 +38,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Analytics taxonomy meta regression
+        run: pnpm exec tsx src/lib/analytics/taxonomyMetaEnrichment.test.ts
+
       - name: SEO indexing regressions
         run: |
           pnpm exec tsx src/lib/seo/globalNoindex.test.ts

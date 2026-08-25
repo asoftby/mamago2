@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
+import { getActivityAnalyticsContext } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       const idea = await addArticleIdea(user.id, articleId);
       const article = await prisma.article.findUnique({
         where: { id: articleId },
-        select: { cityId: true },
+        select: { cityId: true, category: { select: { slug: true } } },
       });
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
@@ -53,7 +53,12 @@ export async function POST(request: NextRequest) {
         entityId: articleId,
         vertical: "CITY",
         cityId: article?.cityId ?? null,
-        meta: { source: "detail", section: "journal", targetAction: "ideas" },
+        meta: {
+          source: "detail",
+          section: "journal",
+          targetAction: "ideas",
+          categorySlug: article?.category?.slug ?? null,
+        },
       });
       return NextResponse.json({ success: true, idea });
     }
@@ -62,7 +67,7 @@ export async function POST(request: NextRequest) {
       const idea = await addPlaceIdea(user.id, placeId);
       const place = await prisma.place.findUnique({
         where: { id: placeId },
-        select: { cityId: true },
+        select: { cityId: true, primaryCategory: { select: { slug: true } } },
       });
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
@@ -73,7 +78,12 @@ export async function POST(request: NextRequest) {
         entityId: placeId,
         vertical: "CITY",
         cityId: place?.cityId ?? null,
-        meta: { source: "detail", section: "places", targetAction: "ideas" },
+        meta: {
+          source: "detail",
+          section: "places",
+          targetAction: "ideas",
+          categorySlug: place?.primaryCategory?.slug ?? null,
+        },
       });
       return NextResponse.json({ success: true, idea });
     }
@@ -81,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (activityId) {
       const idea = await addIdea(user.id, activityId);
 
-      const cityId = await getActivityCityIdForAnalytics(activityId);
+      const { cityId, eventCategorySlug } = await getActivityAnalyticsContext(activityId);
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
         userId: user.id,
@@ -91,7 +101,12 @@ export async function POST(request: NextRequest) {
         entityId: activityId,
         vertical: "CITY",
         cityId,
-        meta: { source: "detail", section: "afisha", targetAction: "ideas" },
+        meta: {
+          source: "detail",
+          section: "afisha",
+          targetAction: "ideas",
+          categorySlug: eventCategorySlug,
+        },
       });
 
       return NextResponse.json({ success: true, idea });

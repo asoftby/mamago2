@@ -14,6 +14,14 @@ export type AnalyticsMetaPayload = {
   /** Краткое описание фильтров (строка), не полный объект фильтра */
   filterSummary?: string;
   targetAction?: "buy" | "book" | "contact" | "open_site" | "plan" | string;
+  /**
+   * EventCategory.slug (publicationType EVENT/PLACE/ARTICLE). Only populate
+   * from an authoritative domain-model lookup already in scope — never
+   * infer from entityType. OFFER (PartyCategory enum) and ROUTE (no
+   * taxonomy field) do not have a compatible categorySlug source; omit it
+   * for those entity types rather than guessing.
+   */
+  categorySlug?: string | null;
   [key: string]: unknown;
 };
 

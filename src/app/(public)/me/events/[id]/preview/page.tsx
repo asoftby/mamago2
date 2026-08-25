@@ -70,7 +70,7 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
           },
         },
       },
-      eventCategory: { select: { nameRu: true } },
+      eventCategory: { select: { nameRu: true, slug: true } },
     },
   });
 

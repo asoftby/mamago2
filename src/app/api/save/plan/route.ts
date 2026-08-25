@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
+import { getActivityAnalyticsContext } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import {
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
       const place = await prisma.place.findUnique({
         where: { id: placeId },
-        select: { cityId: true },
+        select: { cityId: true, primaryCategory: { select: { slug: true } } },
       });
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
@@ -94,7 +94,12 @@ export async function POST(request: NextRequest) {
         entityId: placeId,
         vertical: "CITY",
         cityId: place?.cityId ?? null,
-        meta: { source: "detail", section: "places", targetAction: "plan" },
+        meta: {
+          source: "detail",
+          section: "places",
+          targetAction: "plan",
+          categorySlug: place?.primaryCategory?.slug ?? null,
+        },
       });
     }
     // Handle route
@@ -142,7 +147,7 @@ export async function POST(request: NextRequest) {
       );
 
       if (planItem.created) {
-        const cityId = await getActivityCityIdForAnalytics(activityId);
+        const { cityId, eventCategorySlug } = await getActivityAnalyticsContext(activityId);
         const sessionRowId = await getSessionRowIdFromCookies();
         const personaIds =
           Array.isArray(selectedPersonaIds) ?
@@ -164,6 +169,7 @@ export async function POST(request: NextRequest) {
             source: sourceTag,
             section: "afisha",
             targetAction: "plan",
+            categorySlug: eventCategorySlug,
             ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
           },
         });

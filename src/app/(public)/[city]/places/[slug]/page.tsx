@@ -310,6 +310,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
       primaryCategory: {
         select: {
           nameRu: true,
+          slug: true,
         },
       },
       ownerBusiness: {
@@ -781,6 +782,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         entityId={place.id}
         vertical="CITY"
         cityId={place.cityId}
+        meta={{ categorySlug: place.primaryCategory?.slug ?? null }}
       />
       <JsonLd
         data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}

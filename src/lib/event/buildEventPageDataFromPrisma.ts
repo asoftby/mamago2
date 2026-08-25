@@ -114,7 +114,7 @@ export type ActivityForEventPageInput = {
       phone3Label?: string | null;
     } | null;
   } | null;
-  eventCategory: { nameRu: string } | null;
+  eventCategory: { nameRu: string; slug: string } | null;
 };
 
 function discoveryIntentForActivity(): Intent {

@@ -189,7 +189,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                 entityId={featured.id}
                 vertical="CITY"
                 citySlug={citySlug}
-                meta={{ section: "journal", position: "featured" }}
+                meta={{ section: "journal", position: "featured", categorySlug: featured.category?.slug ?? null }}
               >
                 <FeaturedArticle article={featured} saveStatus={saveStatuses[featured.id]} />
               </AnalyticsCardViewTracker>
@@ -213,7 +213,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                     entityId={a.id}
                     vertical="CITY"
                     citySlug={citySlug}
-                    meta={{ section: "journal", position: i + 1 }}
+                    meta={{ section: "journal", position: i + 1, categorySlug: a.category?.slug ?? null }}
                   >
                     <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
                   </AnalyticsCardViewTracker>
