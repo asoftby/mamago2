@@ -3718,3 +3718,54 @@ P3 — cleanup / polish / optional
 - Dependencies: none blocking; needs a batch status endpoint keyed by activityId/offerId (mirroring the article one, which already handles idea+plan state per entity) and a `useSaveStatusBatch`-style hook, then wiring the owning grid components to pass `initialStatus`/`skipOwnFetch`-equivalent props into `SaveHeart`.
 - Acceptance criteria: authenticated card grids for events/offers/activities issue one batched status request per page instead of one per card; `SaveHeart`'s own-fetch path remains for standalone (non-grid) usage; guest behavior (no request at all) is unaffected.
 - Source: `/api/save/status` guest-401/duplicate-request audit, base `772bdc1f`, 2026-08-25
+
+## [BACKLOG-131] PROD had no NAT hairpin/loopback for its own public IP — health_endpoint/sitemap_unavailable/global_noindex all failing on PROD
+
+- Status: DONE
+- Priority: P0 — Operations Center was blind on the actual PROD stack (3 of 7 detectors permanently red/never-run)
+- Area: Infra / PROD host networking (`134.17.17.134`, `/opt/mamago/prod`)
+- Added: 2026-08-25
+- Resolved: 2026-08-25
+- Context: Operations Center `health_endpoint`, `sitemap_unavailable`, and
+  `global_noindex` all read their base URL from the single
+  `getCanonicalPublicAppUrl()` helper (`src/lib/config/publicAppUrl.ts`),
+  which on `prod-worker-1` resolved to `APP_PUBLIC_URL=https://mamago.by`
+  — correct and explicitly configured, not a stale fallback. `mamago.by`
+  DNS points at `134.17.17.134`, the same floating public IP as the host
+  itself. `prod-worker-1`/`prod-app-1` sit on the PROD docker network
+  (`prod_prod_net`, subnet `172.20.0.0/16`), a sibling of the DEV network
+  (`172.19.0.0/16`) on the same physical host. Exactly the same bug as
+  BACKLOG-121 (DEV, resolved 2026-08-16) — except BACKLOG-121's fix was
+  deliberately scoped to the DEV subnet only ("no PROD subnet
+  (`172.20.0.0/16`) match"), and no equivalent PROD rule was ever added.
+- Root cause: missing PROD-container hairpin to the upstream floating IP.
+  `curl https://mamago.by/api/health` from the host itself, from
+  `prod-app-1`, and from `prod-worker-1` all hung to an 8s connection
+  timeout (TCP SYN goes out to the upstream NAT for the host's own public
+  IP, which never hairpins the connection back to local Traefik).
+  Confirmed externally reachable and fast (`/api/health` 200 in 0.38s,
+  `/sitemap.xml` 200 in 0.38s, `/robots.txt` 200 in 0.32s) the entire time
+  — this was purely an intra-host routing gap, never a real outage or an
+  app/SEO bug. `health_endpoint`/`sitemap_unavailable` degrade a caught
+  network error into a CRITICAL signal (`DetectorRun.status` stays `OK`);
+  `global_noindex`'s `probeGlobalNoindex` does not catch its `fetch`
+  calls, so the same transport failure threw instead, and
+  `DetectorRun.status` was never `OK` — the exact mechanism behind
+  `detector_stale`'s "Never completed a successful run" for
+  `global_noindex` specifically (see `src/server/ops/detectors/detectorStale.ts`).
+- Fix: one PROD-source-subnet-scoped HTTPS DNAT only, mirroring BACKLOG-121's
+  rule shape exactly:
+  `-s 172.20.0.0/16 -d 134.17.17.134 -p tcp --dport 443`
+  → `192.168.185.209:443` (local Traefik publish). No OUTPUT rules, no
+  port 80, no MASQUERADE, DEV's own rule/service left untouched.
+- Persistence: `/etc/systemd/system/mamago-prod-hairpin.service` (oneshot,
+  `iptables -C || -I`, enabled; ExecStop removes the same rule) — sibling
+  of `mamago-dev-hairpin.service`, not a modification of it.
+- Verification: `curl` from `prod-worker-1` to `/api/health`, `/sitemap.xml`,
+  `/robots.txt`, `/` all <0.2s with 2xx/307 after the fix. Operations
+  Center worker logs confirm all three detectors green post-fix:
+  `health_endpoint status=OK` (`signalsResolved=1`), `sitemap_unavailable
+  status=OK`, `global_noindex status=OK` (previously `FAILED` — first
+  `OK` run ever recorded for this detector on PROD).
+- Source: Operations Center PROD audit + BACKLOG-121-pattern host fix
+  (2026-08-25)
