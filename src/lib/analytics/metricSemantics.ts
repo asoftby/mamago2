@@ -6,7 +6,13 @@ export type BehaviorCounterDelta = {
   cta: number;
 };
 
-const ARTICLE_NON_CTA_EVENTS = new Set([
+/**
+ * Canonical article interactions that are transported through CTA_CLICK today
+ * but are NOT conversion/navigation CTA actions.
+ *
+ * Exported so both TypeScript aggregators and server-side SQL use one list.
+ */
+export const ARTICLE_NON_CTA_EVENT_KEYS = [
   "article_read_25",
   "article_read_50",
   "article_read_75",
@@ -14,11 +20,17 @@ const ARTICLE_NON_CTA_EVENTS = new Set([
   "next_article_loaded",
   "article_section_exhausted",
   "article_rating_submitted",
-]);
+] as const;
 
-const ARTICLE_NON_CONTENT_CARD_IMPRESSIONS = new Set([
+/** Article UI impressions transported as CARD_VIEW that are not content-card impressions. */
+export const ARTICLE_NON_CONTENT_CARD_IMPRESSION_KEYS = [
   "article_telegram_cta_impression",
-]);
+] as const;
+
+const ARTICLE_NON_CTA_EVENTS = new Set<string>(ARTICLE_NON_CTA_EVENT_KEYS);
+const ARTICLE_NON_CONTENT_CARD_IMPRESSIONS = new Set<string>(
+  ARTICLE_NON_CONTENT_CARD_IMPRESSION_KEYS,
+);
 
 function asMetaRecord(meta: unknown): Record<string, unknown> | null {
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) return null;
