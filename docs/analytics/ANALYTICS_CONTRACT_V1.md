@@ -59,7 +59,7 @@ mamaGo analytics is deliberately split into four layers. They must not replace e
 The word **views** is forbidden in new analytics code unless its exact meaning is obvious from the field name or UI label.
 
 - `pageViews` = count of `PAGE_VIEW` only.
-- `cardImpressions` = count of `CARD_VIEW` only.
+- `cardImpressions` = count of canonical content `CARD_VIEW` events only.
 - `detailOpens` = count of `DETAIL_OPEN` only.
 - `saves` = count of real state transitions into Ideas (`SAVE`).
 - `planAdds` = count of real `PlanItem` creations (`PLAN_ADD`).
@@ -67,13 +67,15 @@ The word **views** is forbidden in new analytics code unless its exact meaning i
 
 Do not sum `PAGE_VIEW + CARD_VIEW` into a generic `views` metric.
 
-For legacy response fields named `views`, until their public shape is migrated, the canonical meaning from Contract v1 is **card impressions only**.
+A `CARD_VIEW` used as a transport event for an inner UI block (for example `article_telegram_cta_impression`) is not a content card impression.
 
-## 4. Article reading telemetry
+For legacy response fields named `views`, until their public shape is migrated, the canonical meaning from Contract v1 is **content card impressions only**.
 
-Continuous-reading milestones may currently be transported through legacy `UserEventType` values with the specific action in `meta.articleEvent`.
+## 4. Article interaction telemetry
 
-These legacy transport events must not contaminate business metrics:
+Article milestones/interactions may currently be transported through legacy `UserEventType` values with the specific action in `meta.articleEvent`.
+
+These legacy transport events must not contaminate conversion CTA metrics:
 
 - `article_read_25`
 - `article_read_50`
@@ -81,8 +83,11 @@ These legacy transport events must not contaminate business metrics:
 - `article_complete`
 - `next_article_loaded`
 - `article_section_exhausted`
+- `article_rating_submitted`
 
 If transported as `CTA_CLICK`, they are **not CTA clicks** for aggregates, ranking, B2B analytics or conversion reports.
+
+Likewise, `article_telegram_cta_impression` transported as `CARD_VIEW` is an impression of an inner CTA block, not an impression of the article/content card.
 
 Real article CTA actions such as `article_telegram_cta_click` remain canonical CTA clicks.
 
@@ -105,11 +110,11 @@ Examples:
 
 From Contract v1 onward:
 
-- `totalViews` means content card impressions (`CARD_VIEW`), not page views.
+- `totalViews` means canonical content card impressions (`CARD_VIEW`), not page views or impressions of inner CTA blocks.
 - `totalOpens` means detail opens.
 - `totalSaves` means real saves.
 - `totalPlanAdds` means real plan creations.
-- `totalCtaClicks` means real CTA clicks and excludes article reading milestones.
+- `totalCtaClicks` means real CTA clicks and excludes article reading/rating milestones.
 - `preferredCategories` must only be incremented from actual category metadata. Entity type (`EVENT`, `PLACE`, `OFFER`, `ARTICLE`) is not a category.
 
 Historical profile values from before Contract v1 may contain legacy semantics and should be treated as rebuildable data.
@@ -123,7 +128,7 @@ Traffic and engagement are intentionally separate.
 - page views = `PAGE_VIEW` count.
 
 **Product engagement**
-- card impressions = `CARD_VIEW`;
+- card impressions = canonical content `CARD_VIEW`;
 - detail opens = `DETAIL_OPEN`;
 - saves / plan adds / CTA clicks = canonical product actions.
 
