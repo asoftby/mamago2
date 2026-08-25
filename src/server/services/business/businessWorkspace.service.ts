@@ -1,12 +1,21 @@
-import { AnalyticsEntityType, BillingTransactionType, type UserEventType } from "@prisma/client";
-import { NotificationAudience } from "@prisma/client";
+import {
+  AnalyticsEntityType,
+  BillingTransactionType,
+  NotificationAudience,
+  Prisma,
+} from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
 import { getPromotionOverviewData } from "@/server/services/promotion/promotion.service";
+import {
+  CANONICAL_CARD_IMPRESSION_SQL,
+  CANONICAL_CTA_CLICK_SQL,
+} from "@/server/services/analytics/analyticsMetricSql";
 
 type MetricMap = Record<
   string,
   {
+    /** Compatibility name: Contract v1 defines this as canonical CARD_VIEW impressions. */
     views: number;
     opens: number;
     saves: number;
@@ -15,14 +24,15 @@ type MetricMap = Record<
   }
 >;
 
-const PERFORMANCE_EVENT_TYPES: UserEventType[] = [
-  "PAGE_VIEW",
-  "CARD_VIEW",
-  "DETAIL_OPEN",
-  "SAVE",
-  "PLAN_ADD",
-  "CTA_CLICK",
-];
+type PerformanceMetricRow = {
+  entity_type: string;
+  entity_id: string;
+  impressions: bigint;
+  opens: bigint;
+  saves: bigint;
+  plan_adds: bigint;
+  cta_clicks: bigint;
+};
 
 function emptyMetrics(): MetricMap[string] {
   return {
@@ -78,6 +88,41 @@ export function getPeriodRange(period: DashboardPeriod): { from: Date; to: Date 
   }
 }
 
+async function loadPerformanceMetricRows(params: {
+  entityType: AnalyticsEntityType;
+  ids: string[];
+  dateRange?: { start: Date; end: Date };
+}): Promise<PerformanceMetricRow[]> {
+  if (params.ids.length === 0) return [];
+  const dateSql = params.dateRange
+    ? Prisma.sql`
+        AND e."createdAt" >= ${params.dateRange.start}
+        AND e."createdAt" <= ${params.dateRange.end}
+      `
+    : Prisma.empty;
+
+  return prisma.$queryRaw<PerformanceMetricRow[]>`
+    SELECT
+      e."entityType"::text AS entity_type,
+      e."entityId"::text AS entity_id,
+      COUNT(*) FILTER (WHERE ${CANONICAL_CARD_IMPRESSION_SQL})::bigint AS impressions,
+      COUNT(*) FILTER (WHERE e."eventType" = 'DETAIL_OPEN')::bigint AS opens,
+      COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
+      COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS plan_adds,
+      COUNT(*) FILTER (WHERE ${CANONICAL_CTA_CLICK_SQL})::bigint AS cta_clicks
+    FROM "UserEvent" e
+    WHERE e."entityType" = ${params.entityType}::"AnalyticsEntityType"
+      AND e."entityId" IN (${Prisma.join(params.ids)})
+      ${dateSql}
+    GROUP BY e."entityType", e."entityId"
+  `;
+}
+
+/**
+ * Canonical first-party publication metrics for B2B dashboards.
+ * PAGE_VIEW is traffic and never contributes to publication impressions.
+ * Article reading/rating transport events never contribute to CTA clicks.
+ */
 export async function getPerformanceMetricsByEntity(params: {
   events: Array<{ id: string; title: string; updatedAt: Date; status: string }>;
   offers: Array<{ id: string; title: string; updatedAt: Date; status: string }>;
@@ -94,65 +139,36 @@ export async function getPerformanceMetricsByEntity(params: {
     return new Map<string, MetricMap[string]>();
   }
 
-  const rows = await prisma.userEvent.groupBy({
-    by: ["entityType", "entityId", "eventType"],
-    where: {
-      eventType: { in: PERFORMANCE_EVENT_TYPES },
-      ...(params.dateRange
-        ? { createdAt: { gte: params.dateRange.start, lte: params.dateRange.end } }
-        : {}),
-      OR: [
-        eventIds.length > 0
-          ? {
-              entityType: AnalyticsEntityType.EVENT,
-              entityId: { in: eventIds },
-            }
-          : undefined,
-        offerIds.length > 0
-          ? {
-              entityType: AnalyticsEntityType.OFFER,
-              entityId: { in: offerIds },
-            }
-          : undefined,
-        placeIds.length > 0
-          ? {
-              entityType: AnalyticsEntityType.PLACE,
-              entityId: { in: placeIds },
-            }
-          : undefined,
-      ].filter(Boolean) as Array<{
-        entityType: AnalyticsEntityType;
-        entityId: { in: string[] };
-      }>,
-    },
-    _count: {
-      _all: true,
-    },
-  });
+  const rows = (
+    await Promise.all([
+      loadPerformanceMetricRows({
+        entityType: AnalyticsEntityType.EVENT,
+        ids: eventIds,
+        dateRange: params.dateRange,
+      }),
+      loadPerformanceMetricRows({
+        entityType: AnalyticsEntityType.OFFER,
+        ids: offerIds,
+        dateRange: params.dateRange,
+      }),
+      loadPerformanceMetricRows({
+        entityType: AnalyticsEntityType.PLACE,
+        ids: placeIds,
+        dateRange: params.dateRange,
+      }),
+    ])
+  ).flat();
 
   const metrics = new Map<string, MetricMap[string]>();
-
   for (const row of rows) {
-    if (!row.entityId) continue;
-    const key = `${row.entityType}:${row.entityId}`;
-    const current = metrics.get(key) ?? emptyMetrics();
-    const count = row._count._all;
-
-    if (row.eventType === "PAGE_VIEW" || row.eventType === "CARD_VIEW") {
-      current.views += count;
-    } else if (row.eventType === "DETAIL_OPEN") {
-      current.opens += count;
-    } else if (row.eventType === "SAVE") {
-      current.saves += count;
-    } else if (row.eventType === "PLAN_ADD") {
-      current.planAdds += count;
-    } else if (row.eventType === "CTA_CLICK") {
-      current.ctaClicks += count;
-    }
-
-    metrics.set(key, current);
+    metrics.set(`${row.entity_type}:${row.entity_id}`, {
+      views: Number(row.impressions),
+      opens: Number(row.opens),
+      saves: Number(row.saves),
+      planAdds: Number(row.plan_adds),
+      ctaClicks: Number(row.cta_clicks),
+    });
   }
-
   return metrics;
 }
 
@@ -371,11 +387,11 @@ export async function getBusinessWorkspaceData(params: {
       (item) => item.metrics.planAdds > 0 && item.metrics.ctaClicks === 0
     )
   ) {
-    recommendedActions.push("Некоторые публикации уже получают сохранения, но не приводят к обращению. Попробуйте продвинуть их или усилить CTA.");
+    recommendedActions.push("Некоторые публикации уже добавляют в план, но не приводят к обращению. Попробуйте продвинуть их или усилить CTA.");
   }
 
   if (recommendedActions.length === 0) {
-    recommendedActions.push("Кабинет собран так, чтобы вы быстро понимали, что уже работает. Следующий шаг — сравнить лучшие publications и направить бюджет в те, что дают сохранения и лиды.");
+    recommendedActions.push("Кабинет собран так, чтобы вы быстро понимали, что уже работает. Следующий шаг — сравнить лучшие publications и направить бюджет в те, что дают добавления в план и обращения.");
   }
 
   return {
@@ -414,14 +430,10 @@ export type BusinessPublicationRow = {
 };
 
 /**
- * Full list of a business's own publications with real aggregate metrics —
- * Task 3 Business Analytics MVP (`/business/analytics`). Reuses the exact
- * same ownership queries as `getBusinessWorkspaceData` (Event: businessId/
- * ownerUserId on Activity; Offer: place.ownerBusinessId/createdByUserId;
- * Place: ownerBusinessId/createdByUserId) and the same
- * `getPerformanceMetricsByEntity` aggregation — not a parallel pipeline.
- * Unlike the Dashboard's Top-5 preview, this returns the full list, not a
- * top-N slice.
+ * Full list of a business's own publications with canonical aggregate metrics.
+ * Reuses the exact same ownership queries as `getBusinessWorkspaceData` and
+ * the same `getPerformanceMetricsByEntity` aggregation — not a parallel KPI
+ * pipeline. The compatibility field `views` means card impressions.
  */
 export async function getBusinessPublicationsPerformance(params: {
   userId: string;
@@ -479,5 +491,9 @@ export async function getBusinessPublicationsPerformance(params: {
     ...events.map((e) => toRow("EVENT", e)),
     ...offers.map((o) => toRow("OFFER", o)),
     ...places.map((p) => toRow("PLACE", p)),
-  ].sort((a, b) => b.metrics.ctaClicks - a.metrics.ctaClicks || b.metrics.opens - a.metrics.opens);
+  ].sort(
+    (a, b) =>
+      b.metrics.ctaClicks - a.metrics.ctaClicks ||
+      b.metrics.opens - a.metrics.opens,
+  );
 }
