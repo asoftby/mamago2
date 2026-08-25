@@ -39,8 +39,11 @@ export function RefinementFiltersModal() {
     }
   }, [isOpen]);
 
+  // Keyed on isVisible (DOM-presence window), not isOpen, so the lock stays
+  // held through the 300ms close animation instead of releasing early while
+  // the sheet is still on screen.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isVisible) return;
     const scrollY = window.scrollY;
     document.body.style.position = "fixed";
     document.body.style.top = `-${scrollY}px`;
@@ -52,7 +55,7 @@ export function RefinementFiltersModal() {
       document.body.style.width = "";
       window.scrollTo(0, scrollY);
     };
-  }, [isOpen]);
+  }, [isVisible]);
 
   if (!isVisible || !currentIntent) return null;
 
