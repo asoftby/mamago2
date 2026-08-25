@@ -60,8 +60,16 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
               WHERE prior."userId" = "UserEvent"."userId" AND prior."createdAt" < ${window.start}
             )
         )::bigint AS "returningUsers",
-        COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'CARD_VIEW')::bigint AS views,
-        COUNT(*) FILTER (WHERE "createdAt" >= ${window.previousStart} AND "createdAt" < ${window.previousEnd} AND "eventType" = 'CARD_VIEW')::bigint AS "previousViews",
+        COUNT(*) FILTER (
+          WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end}
+            AND "eventType" = 'CARD_VIEW'
+            AND COALESCE("meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
+        )::bigint AS views,
+        COUNT(*) FILTER (
+          WHERE "createdAt" >= ${window.previousStart} AND "createdAt" < ${window.previousEnd}
+            AND "eventType" = 'CARD_VIEW'
+            AND COALESCE("meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
+        )::bigint AS "previousViews",
         COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'DETAIL_OPEN')::bigint AS opens,
         COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'SAVE')::bigint AS saves,
         COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'PLAN_ADD')::bigint AS "planAdds",
@@ -74,7 +82,8 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
               'article_read_75',
               'article_complete',
               'next_article_loaded',
-              'article_section_exhausted'
+              'article_section_exhausted',
+              'article_rating_submitted'
             )
         )::bigint AS "ctaClicks"
       FROM "UserEvent"
@@ -115,7 +124,8 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
             'article_read_75',
             'article_complete',
             'next_article_loaded',
-            'article_section_exhausted'
+            'article_section_exhausted',
+            'article_rating_submitted'
           )
         )
       GROUP BY "entityType", "entityId"
@@ -156,7 +166,7 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
       returningUsers: number(events?.returningUsers),
     },
     engagement: {
-      // Legacy field name kept for UI compatibility; Contract v1 meaning = CARD_VIEW only.
+      // Legacy field name kept for UI compatibility; Contract v1 meaning = canonical CARD_VIEW only.
       views,
       opens: number(events?.opens),
       saves: number(events?.saves),
