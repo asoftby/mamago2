@@ -20,7 +20,7 @@ export type AnalyticsFunnelStep = {
   key: "view" | "open" | "save" | "plan" | "click";
   label: string;
   count: number;
-  /** 0..100 относительно первого шага (views) */
+  /** 0..100 относительно первого шага (canonical content impressions) */
   percentOfTop: number;
 };
 
@@ -34,6 +34,7 @@ export type AnalyticsOverviewDayPoint = {
   day: string;
   /** ISO date YYYY-MM-DD */
   date: string;
+  /** Legacy field name; Contract v1 meaning = canonical content card impressions. */
   views: number;
   opens: number;
 };
@@ -42,14 +43,18 @@ export type AnalyticsOverviewResult = {
   range: { start: string; end: string };
   activeUsers: number;
   sessions: number;
+  /** Legacy field name; Contract v1 meaning = canonical content card impressions. */
   views: number;
   opens: number;
   saves: number;
   planAdds: number;
   ctaClicks: number;
-  saveRate: number;
-  planRate: number;
-  clickRate: number;
+  /** saves / opens; null when opens = 0 */
+  saveRate: number | null;
+  /** planAdds / saves; null when saves = 0 */
+  planRate: number | null;
+  /** canonical CTA clicks / opens; null when opens = 0 */
+  clickRate: number | null;
   funnel: AnalyticsFunnelStep[];
   /** Агрегаты из UserBehaviorProfile за период (lastSeen в окне) */
   profilesActiveInRange: number;
