@@ -24,6 +24,10 @@ async function resolveCityId(
 
 /**
  * Универсальная запись события продуктовой телеметрии. Не бросает наружу ошибки БД.
+ *
+ * For authenticated users the derived behavior profile is awaited after the
+ * authoritative UserEvent insert. This avoids losing profile updates when a
+ * request/process finishes before a fire-and-forget promise is flushed.
  */
 export async function trackUserEvent(
   input: TrackUserEventInput,
@@ -50,15 +54,18 @@ export async function trackUserEvent(
     });
 
     if (input.userId) {
-      void applyUserBehaviorEvent({
+      await applyUserBehaviorEvent({
         userId: input.userId,
         eventType: input.eventType,
         entityType: input.entityType ?? null,
         vertical: input.vertical ?? null,
         meta: meta === undefined ? null : (meta as Prisma.JsonValue),
+        createdAt: userEvent.createdAt,
       });
     }
 
+    // Legacy paid Promotion is disabled in first PROD; keep the adapter
+    // non-blocking because UserEvent/domain state is the source of truth.
     void registerPromotionActionFromUserEvent({
       userEventId: userEvent.id,
       eventType: input.eventType,
