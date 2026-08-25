@@ -7,13 +7,9 @@ import {
   type PerformancePeriod,
 } from "@/lib/performance/performanceMetrics";
 import { loadAllEntityTitles } from "@/server/services/analytics/analyticsQueryHelpers";
+import { computeCanonicalAudience } from "@/server/services/analytics/canonicalAudience";
 
 type EventAggregateRow = {
-  dau: bigint;
-  wau: bigint;
-  mau: bigint;
-  trackedVisitors: bigint;
-  previousTrackedVisitors: bigint;
   returningUsers: bigint;
   views: bigint;
   previousViews: bigint;
@@ -38,21 +34,20 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
   const dayWindow = resolvePerformanceWindow("today", now);
   const weekWindow = resolvePerformanceWindow("7d", now);
   const monthWindow = resolvePerformanceWindow("30d", now);
-  const eventScanStart = window.previousStart < monthWindow.start ? window.previousStart : monthWindow.start;
+  // Only bounded by window.previousStart now — dau/wau/mau/trackedVisitors
+  // moved to computeCanonicalAudience() below (each with its own window),
+  // so this raw query no longer needs to scan back to monthWindow.start.
+  const eventScanStart = window.previousStart;
   const whereCurrent = { createdAt: { gte: window.start, lt: window.end } };
 
   const [
     eventRows, userRows, searchRows,
     publishedEvents, publishedPlaces, publishedOffers, activeBusinesses, createdRoutes,
     topRows,
+    dayAudience, weekAudience, monthAudience, currentAudience, previousAudience,
   ] = await Promise.all([
     prisma.$queryRaw<EventAggregateRow[]>(Prisma.sql`
       SELECT
-        COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= ${dayWindow.start} AND "createdAt" < ${dayWindow.end})::bigint AS dau,
-        COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= ${weekWindow.start} AND "createdAt" < ${weekWindow.end})::bigint AS wau,
-        COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= ${monthWindow.start} AND "createdAt" < ${monthWindow.end})::bigint AS mau,
-        COUNT(DISTINCT "sessionId") FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end})::bigint AS "trackedVisitors",
-        COUNT(DISTINCT "sessionId") FILTER (WHERE "createdAt" >= ${window.previousStart} AND "createdAt" < ${window.previousEnd})::bigint AS "previousTrackedVisitors",
         COUNT(DISTINCT "userId") FILTER (
           WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end}
             AND EXISTS (
@@ -100,6 +95,11 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
       ORDER BY count DESC
       LIMIT 5
     `),
+    computeCanonicalAudience(prisma, dayWindow.start, dayWindow.end),
+    computeCanonicalAudience(prisma, weekWindow.start, weekWindow.end),
+    computeCanonicalAudience(prisma, monthWindow.start, monthWindow.end),
+    computeCanonicalAudience(prisma, window.start, window.end),
+    computeCanonicalAudience(prisma, window.previousStart, window.previousEnd),
   ]);
 
   const topRefs = topRows.map((row) => ({ entityType: row.entityType, entityId: row.entityId }));
@@ -108,11 +108,17 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
   const users = userRows[0];
   const search = searchRows[0];
   const number = (value: bigint | undefined) => Number(value ?? 0);
-  const dau = number(events?.dau);
-  const wau = number(events?.wau);
-  const mau = number(events?.mau);
-  const trackedVisitors = number(events?.trackedVisitors);
-  const previousTrackedVisitors = number(events?.previousTrackedVisitors);
+  // Canonical audience identity (see @/server/services/analytics/canonicalAudience) —
+  // PAGE_VIEW-only, ADMIN/MODERATOR excluded, anonymous-only sessions. `dau`
+  // here uses the SAME "today" window as Traffic's uniqueVisitorsToday, so
+  // the two agree for the same instant; `trackedVisitors` (this period,
+  // selectable today/7d/30d) is the same identity too, replacing its old
+  // "DISTINCT sessionId over ALL event types" definition.
+  const dau = dayAudience.visitors;
+  const wau = weekAudience.visitors;
+  const mau = monthAudience.visitors;
+  const trackedVisitors = currentAudience.visitors;
+  const previousTrackedVisitors = previousAudience.visitors;
   const newAccounts = number(users?.newAccounts);
   const previousNewAccounts = number(users?.previousNewAccounts);
   const views = number(events?.views);
