@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 const BASE_URL = getBaseUrl("BY");
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
-  title: "mamaGo — семейный гид Беларуси",
+  title: "mamaGo — помощник для семейного отдыха и развития",
   description:
-    "Афиша событий, занятия для детей, маршруты и журнал для семей. Выберите свой город.",
+    "mamaGo — удобный помощник в организации семейного отдыха и развития: события, места, занятия, маршруты и идеи для времени с детьми.",
   alternates: { canonical: BASE_URL },
 });
 
@@ -29,7 +29,8 @@ export default async function NationalHubPage() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">mamaGo</h1>
         <p className="text-muted-foreground">
-          Семейный гид Беларуси: события, занятия, маршруты и идеи для досуга с детьми.
+          Удобный помощник в организации семейного отдыха и развития: события, места,
+          занятия, маршруты и идеи для времени с детьми.
         </p>
       </div>
 
