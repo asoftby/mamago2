@@ -22,9 +22,10 @@ export async function buildCityEventsListingMetadata(
   if (!city) return {};
   const base = publicSiteBase();
   const canonical = `${base}${cityEventsListingPath(citySlug)}`;
+  const cityName = getCityDisplayName(citySlug);
   return {
-    title: `Куда пойти с ребёнком в ${city.name} — mamaGo`,
-    description: `Афиша семейных событий, места и развлечения для детей в ${city.name}. Фильтры по возрасту и району.`,
+    title: `Куда пойти с ребёнком в ${cityName} — mamaGo`,
+    description: `Афиша семейных событий, места и развлечения для детей в ${cityName}. Фильтры по возрасту и району.`,
     alternates: { canonical },
   };
 }
