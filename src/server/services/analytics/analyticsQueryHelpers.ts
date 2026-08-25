@@ -43,7 +43,11 @@ function bandFromAgeYears(age: number): string {
   return "10+";
 }
 
-async function youngestChildBandByUser(): Promise<Map<string, string>> {
+/**
+ * Shared youngest-child age-band resolver for analytics filters/breakdowns.
+ * Keeping one implementation prevents segment/age filter drift between tabs.
+ */
+export async function youngestChildBandByUser(): Promise<Map<string, string>> {
   const rows = await prisma.$queryRaw<Array<{ parentId: string; youngest: Date }>>`
     SELECT c."parentId", MAX(c."birthDate") AS youngest
     FROM "Child" c
