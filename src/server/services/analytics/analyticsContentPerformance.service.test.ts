@@ -169,6 +169,75 @@ async function testPublicationDetailAggregateCorrectness() {
   }
 }
 
+async function testContractV1ExcludesArticleUiTransportEvents() {
+  await cleanup();
+  try {
+    await trackUserEvent({
+      eventType: "CARD_VIEW",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+    });
+    await trackUserEvent({
+      eventType: "CARD_VIEW",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+      meta: { articleEvent: "article_telegram_cta_impression" },
+    });
+    await trackUserEvent({
+      eventType: "DETAIL_OPEN",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+    });
+    await trackUserEvent({
+      eventType: "CTA_CLICK",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+      meta: { targetAction: "call" },
+    });
+    await trackUserEvent({
+      eventType: "CTA_CLICK",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+      meta: { articleEvent: "article_complete" },
+    });
+    await trackUserEvent({
+      eventType: "CTA_CLICK",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+      meta: { articleEvent: "article_rating_submitted" },
+    });
+
+    const result = await getAnalyticsContentPerformance(baseFilters(), { pageSize: 100 });
+    const row = result.performanceTable.find(
+      (r) => r.entityType === "PLACE" && r.entityId === FIXTURE_ENTITY_ID,
+    );
+    assert.ok(row, "fixture entity must appear in the performance table");
+    assert.equal(row!.views, 1, "inner Telegram CTA impression must not inflate content impressions");
+    assert.equal(row!.ctaClicks, 1, "reading/rating transport events must not inflate conversion CTA clicks");
+
+    const detail = await getPublicationAnalyticsDetail({
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      filters: { dateRange: "90d", city: "" },
+    });
+    assert.equal(detail.metrics.impressions, 1);
+    assert.equal(detail.metrics.ctaClicks, 1);
+    assert.deepEqual(
+      detail.ctaBreakdown.map((item) => [item.action, item.count]),
+      [["call", 1]],
+      "CTA breakdown must contain only canonical CTA activations",
+    );
+  } finally {
+    await cleanup();
+  }
+}
+
 async function testCtaTargetActionGroupingAndUnknownFallback() {
   await cleanup();
   try {
@@ -281,6 +350,7 @@ async function main() {
   await testAggregationCountsMatchWrittenEvents();
   await testCityFilterMatchesEventsResolvedViaCitySlug();
   await testPublicationDetailAggregateCorrectness();
+  await testContractV1ExcludesArticleUiTransportEvents();
   await testCtaTargetActionGroupingAndUnknownFallback();
   await testDetailHasNoRawPiiOrEvents();
   await testDetailZeroDenominatorIsNullNotZero();
