@@ -9,9 +9,15 @@ export type AnalyticsFunnelStepMetrics = {
   key: AnalyticsFunnelStepKey;
   label: string;
   count: number;
-  /** Доля от предыдущего шага, %; у первого шага 100 */
+  /**
+   * Ratio of this event count to the previous event count, in percent.
+   * This is NOT sequential user/session conversion and can exceed 100%.
+   */
   pctFromPrevious: number;
-  /** Доля от первого шага (views), % */
+  /**
+   * Ratio of this event count to canonical content impressions, in percent.
+   * This is an event-volume ratio, not a unique-user conversion rate.
+   */
   pctFromFirst: number;
 };
 
@@ -31,7 +37,9 @@ export type AnalyticsFunnelDropTransition = {
   to: AnalyticsFunnelStepKey;
   fromCount: number;
   toCount: number;
+  /** Positive decrease in raw event volume; 0 when downstream volume is >= upstream. */
   lost: number;
+  /** Positive decrease percentage in raw event volume; never represents sequential-user drop-off. */
   dropOffPct: number;
 };
 
@@ -44,14 +52,14 @@ export type AnalyticsFunnelWorstEntity = {
   saves: number;
   planAdds: number;
   ctaClicks: number;
-  /** Доля перехода по объёму (например opens/views) */
+  /** Event-count ratio (for example opens / impressions), not unique-user conversion. */
   transitionRate: number;
 };
 
 export type AnalyticsFunnelVerticalDrop = {
   vertical: string;
   funnel: AnalyticsFunnelSeries;
-  /** Упорядочены по убыванию drop-off % */
+  /** Ordered by largest positive event-volume decrease. */
   transitions: AnalyticsFunnelDropTransition[];
 };
 
@@ -64,6 +72,11 @@ export type AnalyticsFunnelComparisonPair = {
 
 export type AnalyticsFunnelsResult = {
   range: { start: string; end: string };
+  /**
+   * Explicit contract marker: this endpoint compares first-party event volumes.
+   * Acquisition/session funnels belong to external analytics (GA4), not this dataset.
+   */
+  measurement: "event_volume";
   globalFunnel: AnalyticsFunnelSeries;
   breakdowns: {
     byEntityType: Record<string, AnalyticsFunnelSeries>;
