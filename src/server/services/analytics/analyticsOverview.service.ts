@@ -1,8 +1,4 @@
-import {
-  Prisma,
-  type AnalyticsEntityType,
-  type AnalyticsVertical,
-} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   eachDayOfInterval,
   endOfDay,
@@ -21,56 +17,14 @@ import {
 import {
   analyticsEventWhereSql,
   applyAnalyticsUserFilter,
+  buildAnalyticsBaseEventWhere,
   resolveAnalyticsAllowedUserIds,
 } from "@/server/services/analytics/analyticsQueryHelpers";
-
-function buildBaseWhere(
-  start: Date,
-  end: Date,
-  filters: AnalyticsOverviewFilters,
-  cityId: string | null,
-): Prisma.UserEventWhereInput {
-  const where: Prisma.UserEventWhereInput = {
-    createdAt: { gte: start, lte: end },
-  };
-
-  if (filters.entity && filters.entity !== "all") {
-    const map: Record<string, AnalyticsEntityType> = {
-      event: "EVENT",
-      place: "PLACE",
-      offer: "OFFER",
-      route: "ROUTE",
-      article: "ARTICLE",
-    };
-    const et = map[filters.entity];
-    if (et) where.entityType = et;
-  }
-
-  if (filters.vertical && filters.vertical !== "all") {
-    const vmap: Record<string, AnalyticsVertical> = {
-      city: "CITY",
-      travel: "TRAVEL",
-      birthday: "BIRTHDAY",
-      education: "EDUCATION",
-      weekend: "WEEKEND",
-      seasonal: "SEASONAL",
-    };
-    const v = vmap[filters.vertical];
-    if (v) where.vertical = v;
-  }
-
-  if (cityId) where.cityId = cityId;
-
-  return where;
-}
-
-type CanonicalMetricRow = {
-  views: bigint;
-  opens: bigint;
-  saves: bigint;
-  plan_adds: bigint;
-  cta_clicks: bigint;
-};
+import {
+  canonicalMetricRowToCounts,
+  canonicalMetricSelectSql,
+  type CanonicalMetricRow,
+} from "@/server/services/analytics/analyticsMetricSql";
 
 async function getCanonicalMetrics(whereSql: Prisma.Sql): Promise<{
   views: number;
@@ -79,45 +33,26 @@ async function getCanonicalMetrics(whereSql: Prisma.Sql): Promise<{
   planAdds: number;
   ctaClicks: number;
 }> {
-  const rows = await prisma.$queryRaw<CanonicalMetricRow[]>(Prisma.sql`
-    SELECT
-      COUNT(*) FILTER (
-        WHERE e."eventType" = 'CARD_VIEW'
-          AND COALESCE(e."meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
-      )::bigint AS views,
-      COUNT(*) FILTER (WHERE e."eventType" = 'DETAIL_OPEN')::bigint AS opens,
-      COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
-      COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS plan_adds,
-      COUNT(*) FILTER (
-        WHERE e."eventType" = 'CTA_CLICK'
-          AND COALESCE(e."meta"->>'articleEvent', '') NOT IN (
-            'article_read_25',
-            'article_read_50',
-            'article_read_75',
-            'article_complete',
-            'next_article_loaded',
-            'article_section_exhausted',
-            'article_rating_submitted'
-          )
-      )::bigint AS cta_clicks
+  const metricSelect = canonicalMetricSelectSql();
+  const rows = await prisma.$queryRaw<CanonicalMetricRow[]>`
+    SELECT ${metricSelect}
     FROM "UserEvent" e
     WHERE ${whereSql}
-  `);
-  const row = rows[0];
+  `;
+  const counts = canonicalMetricRowToCounts(rows[0]);
   return {
-    views: Number(row?.views ?? 0),
-    opens: Number(row?.opens ?? 0),
-    saves: Number(row?.saves ?? 0),
-    planAdds: Number(row?.plan_adds ?? 0),
-    ctaClicks: Number(row?.cta_clicks ?? 0),
+    views: counts.impressions,
+    opens: counts.opens,
+    saves: counts.saves,
+    planAdds: counts.planAdds,
+    ctaClicks: counts.ctaClicks,
   };
 }
 
 /**
- * Агрегированные метрики для вкладки Analytics → Overview.
- * Contract v1: views = canonical content CARD_VIEW impressions only;
- * PAGE_VIEW stays in traffic analytics, and article read/rating transport
- * events never inflate CTA conversion metrics.
+ * Aggregated metrics for Analytics → Overview.
+ * Contract v1: compatibility `views` means canonical content impressions;
+ * PAGE_VIEW remains traffic-only and article transport events never inflate CTA.
  */
 export async function getAnalyticsOverview(
   filters: AnalyticsOverviewFilters,
@@ -125,7 +60,7 @@ export async function getAnalyticsOverview(
   const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
   const cityId = await resolveCityIdFromSlug(filters.city);
   const allowed = await resolveAnalyticsAllowedUserIds(filters);
-  const baseUnfiltered = buildBaseWhere(start, end, filters, cityId);
+  const baseUnfiltered = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
   const base = applyAnalyticsUserFilter(baseUnfiltered, allowed);
   const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed);
 
@@ -178,8 +113,8 @@ export async function getAnalyticsOverview(
   const activeUsers = activeUserRows.length;
   const sessions = sessionRows.length;
 
-  // Contract v1 follows the publication funnel: impression → open → save → plan.
-  // Null means the rate is not measurable because its denominator is zero.
+  // Contract v1 follows the publication interaction chain for ratios.
+  // Null means the ratio is not measurable because its denominator is zero.
   const saveRate = opens > 0 ? saves / opens : null;
   const planRate = saves > 0 ? planAdds / saves : null;
   const clickRate = opens > 0 ? ctaClicks / opens : null;
