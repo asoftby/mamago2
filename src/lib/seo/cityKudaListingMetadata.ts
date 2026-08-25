@@ -40,7 +40,7 @@ export async function buildCityHubMetadata(citySlug: string): Promise<Metadata> 
   const canonical = `${base}/${citySlug}`;
   const cityName = getCityDisplayName(citySlug);
   return {
-    title: `mamaGo в ${cityName} — семейный отдых и развитие`,
+    title: `mamaGo — куда сходить в ${cityName} с ребёнком или всей семьёй`,
     description: `mamaGo — удобный помощник в организации семейного отдыха и развития в ${cityName}: события, места, занятия, маршруты и идеи для времени с детьми.`,
     alternates: { canonical },
   };
