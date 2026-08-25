@@ -12,7 +12,7 @@
  * - Google pageviews rely on GA4 Enhanced Measurement history changes;
  * - Yandex SPA views use defer:true + explicit hit calls.
  */
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ExternalAnalyticsConfig } from "@/lib/analytics/externalAnalyticsTypes";
 import { useCookieConsent } from "@/hooks/use-cookie-consent";
@@ -68,21 +68,45 @@ function setGoogleDisabled(measurementId: string, disabled: boolean): void {
   w[`ga-disable-${measurementId}`] = disabled;
 }
 
+function YandexRouteTracker({ counterId }: { counterId: number }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const lastUrlRef = useRef<string | null>(null);
+  const query = searchParams.toString();
+  const routeKey = `${pathname}${query ? `?${query}` : ""}`;
+
+  useEffect(() => {
+    const currentUrl = window.location.href;
+    if (lastUrlRef.current === currentUrl) return;
+
+    const ym = analyticsWindow().ym;
+    if (!ym) return;
+
+    const previousUrl = lastUrlRef.current;
+    ym(counterId, "hit", currentUrl, {
+      title: document.title,
+      ...(previousUrl || document.referrer
+        ? { referer: previousUrl ?? document.referrer }
+        : {}),
+    });
+    lastUrlRef.current = currentUrl;
+  }, [counterId, routeKey]);
+
+  return null;
+}
+
 export function AnalyticsLoader({
   config,
 }: {
   config: ExternalAnalyticsConfig;
 }) {
   const { canUseAnalytics } = useCookieConsent();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const yandexActiveRef = useRef(false);
-  const lastYandexUrlRef = useRef<string | null>(null);
+  const googleInitializedRef = useRef(false);
+  const [yandexReady, setYandexReady] = useState(false);
 
   const googleId = config.enabled ? config.googleAnalyticsId : null;
   const yandexId = config.enabled ? config.yandexMetrikaId : null;
-  const query = searchParams.toString();
-  const routeKey = `${pathname}${query ? `?${query}` : ""}`;
 
   // Provider lifecycle: load only after consent; actively disable on revoke.
   useEffect(() => {
@@ -96,7 +120,7 @@ export function AnalyticsLoader({
         const ym = analyticsWindow().ym;
         if (ym) ym(yandexId, "destruct");
         yandexActiveRef.current = false;
-        lastYandexUrlRef.current = null;
+        setYandexReady(false);
       }
       return;
     }
@@ -108,7 +132,10 @@ export function AnalyticsLoader({
         "mamago-google-analytics",
         `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
       );
-      gtag("js", new Date());
+      if (!googleInitializedRef.current) {
+        gtag("js", new Date());
+        googleInitializedRef.current = true;
+      }
       gtag("config", googleId, {
         // Marketing/advertising consent is a separate mamaGo category.
         allow_google_signals: false,
@@ -130,31 +157,19 @@ export function AnalyticsLoader({
         webvisor: true,
       });
       yandexActiveRef.current = true;
-      lastYandexUrlRef.current = null;
+      setYandexReady(true);
     }
   }, [canUseAnalytics, config.enabled, googleId, yandexId]);
 
-  // Yandex requires explicit SPA hits when initialized with defer:true.
-  useEffect(() => {
-    if (!config.enabled || !canUseAnalytics || !yandexId) return;
-    if (!yandexActiveRef.current) return;
+  if (!config.enabled || !canUseAnalytics || !yandexId || !yandexReady) {
+    return null;
+  }
 
-    const currentUrl = window.location.href;
-    if (lastYandexUrlRef.current === currentUrl) return;
-
-    const ym = analyticsWindow().ym;
-    if (!ym) return;
-
-    const previousUrl = lastYandexUrlRef.current;
-    ym(yandexId, "hit", currentUrl, {
-      title: document.title,
-      ...(previousUrl || document.referrer
-        ? { referer: previousUrl ?? document.referrer }
-        : {}),
-    });
-    lastYandexUrlRef.current = currentUrl;
-  }, [routeKey, canUseAnalytics, config.enabled, yandexId]);
-
-  // No noscript fallback by design: it would bypass the analytics-consent gate.
-  return null;
+  // useSearchParams lives behind Suspense to preserve static rendering of
+  // public routes. No noscript fallback: it would bypass the consent gate.
+  return (
+    <Suspense fallback={null}>
+      <YandexRouteTracker counterId={yandexId} />
+    </Suspense>
+  );
 }
