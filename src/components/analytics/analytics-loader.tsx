@@ -68,6 +68,30 @@ function setGoogleDisabled(measurementId: string, disabled: boolean): void {
   w[`ga-disable-${measurementId}`] = disabled;
 }
 
+function clearYandexLocalStorage(): void {
+  try {
+    const remove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key) continue;
+      if (
+        key === "_ym_uid" ||
+        key === "_ym_retryReqs" ||
+        key === "_ym_hide_phones" ||
+        /^_ym\d+_(lastHit|lsid|reqNum)$/.test(key) ||
+        /^ytm_(tf|tag)_/.test(key)
+      ) {
+        remove.push(key);
+      }
+    }
+    for (const key of remove) {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage may be unavailable in privacy modes; provider is already stopped.
+  }
+}
+
 function YandexRouteTracker({ counterId }: { counterId: number }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -122,6 +146,7 @@ export function AnalyticsLoader({
         yandexActiveRef.current = false;
         setYandexReady(false);
       }
+      clearYandexLocalStorage();
       return;
     }
 
