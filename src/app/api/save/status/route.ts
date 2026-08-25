@@ -14,7 +14,14 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({
+        isSaved: false,
+        isIdea: false,
+        inPlan: false,
+        planDate: null,
+        planStartsAt: null,
+        planItemId: null,
+      });
     }
 
     const { searchParams } = new URL(request.url);
