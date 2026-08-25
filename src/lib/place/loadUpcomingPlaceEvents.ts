@@ -60,7 +60,7 @@ export async function loadUpcomingPlaceEvents(input: {
         take: 100,
         select: { startsAt: true },
       },
-      eventCategory: { select: { nameRu: true } },
+      eventCategory: { select: { nameRu: true, slug: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
     },

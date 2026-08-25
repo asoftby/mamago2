@@ -17,6 +17,8 @@ export interface ActivityMock {
   type: ActivityType;
   discoveryIntent?: Intent;
   analyticsEntityType?: "EVENT" | "OFFER";
+  /** EventCategory.slug for EVENT_FIXED activities — analytics taxonomy only, not a display field. Never set for OFFER (PartyCategory is a different system). */
+  eventCategorySlug?: string | null;
   title: string;
   description: string;
   image: string;

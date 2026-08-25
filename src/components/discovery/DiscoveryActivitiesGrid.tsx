@@ -85,7 +85,15 @@ export function DiscoveryActivitiesGrid({
       entityId={activity.id}
       vertical="CITY"
       citySlug={citySlug}
-      meta={{ section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha" }}
+      meta={{
+        section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha",
+        // PartyCategory (OFFER) is a different taxonomy system than EventCategory —
+        // never let it leak into categorySlug.
+        categorySlug:
+          activity.analyticsEntityType === "OFFER"
+            ? null
+            : (activity.eventCategorySlug ?? null),
+      }}
     >
       {activity.analyticsEntityType === "OFFER" ? (
         <OfferCard

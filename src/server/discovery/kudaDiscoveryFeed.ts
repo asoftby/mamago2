@@ -75,7 +75,7 @@ export async function getKudaDiscoveryFeed(
         select: { id: true, url: true, mediaAssetId: true },
       },
       sessions: { orderBy: { startsAt: "asc" }, take: 100 },
-      eventCategory: { select: { nameRu: true } },
+      eventCategory: { select: { nameRu: true, slug: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
       boosts: {

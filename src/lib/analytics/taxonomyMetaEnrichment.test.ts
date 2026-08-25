@@ -12,14 +12,17 @@
  * ROUTE (no taxonomy field in the schema) are deliberately NOT wired here —
  * asserted negatively below so nobody "completes" them by guessing.
  *
- * CARD_VIEW: enriched only where categorySlug was zero-query-reachable
- * (ARTICLE producers — CityHomeContentRows, BlogIndex, the continuous
- * reader's article_impression). EVENT/OFFER grid producers
- * (DiscoveryActivitiesGrid, CityHomeContentRows classes row,
- * [city]/programs) consume the shared ActivityMock feed DTO, which has no
- * category field at all — enriching them would mean extending a broadly-
- * shared type and chasing down its source query, not widening one local
- * select, so that stays in docs/engineering/backlog.md (BACKLOG-130).
+ * CARD_VIEW: enriched wherever categorySlug was zero-query-reachable —
+ * ARTICLE producers (CityHomeContentRows, BlogIndex, the continuous
+ * reader's article_impression) and EVENT (DiscoveryActivitiesGrid, fed by
+ * the kuda feed / loadUpcomingPlaceEvents, both of which already `include`
+ * eventCategory — only the nameRu label was selected before, slug was one
+ * field away). ActivityMock gained one optional `eventCategorySlug` field;
+ * only the one EVENT branch in DiscoveryActivitiesGrid's tracker reads it,
+ * OFFER is explicitly forced to null there. The remaining OFFER CARD_VIEW
+ * producers (CityHomeContentRows classes row, [city]/programs) stay
+ * unenriched — Offer.category is PartyCategory, a different taxonomy
+ * system — tracked in docs/engineering/backlog.md (BACKLOG-130).
  *
  * Run: pnpm exec tsx src/lib/analytics/taxonomyMetaEnrichment.test.ts
  */
@@ -203,12 +206,38 @@ function main() {
     "Continuous reader's article_impression (CARD_VIEW) must read categorySlug from the DOM and pass it through to the tracker",
   );
 
-  // --- negative guards for the remaining CARD_VIEW producers ---
+  // --- EVENT CARD_VIEW: DiscoveryActivitiesGrid, sourced from the kuda feed ---
+  const activityType = source("src/types/activity.ts");
+  assert.ok(
+    /eventCategorySlug\?:\s*string \| null/.test(activityType),
+    "ActivityMock must declare eventCategorySlug as an optional field (backward-compatible for the ~20 other consumers)",
+  );
+  const eventMapper = source("src/server/discovery/mapDiscoveryEventToActivityMock.ts");
+  assert.ok(
+    eventMapper.includes("eventCategory: { nameRu: string; slug: string } | null;") &&
+      eventMapper.includes("eventCategorySlug: a.eventCategory?.slug ?? null,"),
+    "mapDiscoveryEventToActivityMock must type and return eventCategory.slug from the row it already receives",
+  );
+  const kudaFeed = source("src/server/discovery/kudaDiscoveryFeed.ts");
+  assert.ok(
+    kudaFeed.includes("eventCategory: { select: { nameRu: true, slug: true } },"),
+    "Kuda discovery feed must select eventCategory.slug alongside the existing nameRu label (same include, zero new query)",
+  );
+  const upcomingPlaceEvents = source("src/lib/place/loadUpcomingPlaceEvents.ts");
+  assert.ok(
+    upcomingPlaceEvents.includes("eventCategory: { select: { nameRu: true, slug: true } },"),
+    "loadUpcomingPlaceEvents must select eventCategory.slug too, to keep the shared mapper's input type satisfied (same include, zero new query)",
+  );
+
   const discoveryGrid = source("src/components/discovery/DiscoveryActivitiesGrid.tsx");
   assert.ok(
-    !discoveryGrid.includes("categorySlug"),
-    "DiscoveryActivitiesGrid must not claim categorySlug — the shared ActivityMock feed DTO has no category field (see BACKLOG-130); no entityType-derived guessing",
+    /categorySlug:\s*\n\s*activity\.analyticsEntityType === "OFFER"\s*\n\s*\? null\s*\n\s*: \(activity\.eventCategorySlug \?\? null\)/.test(
+      discoveryGrid,
+    ),
+    "DiscoveryActivitiesGrid must pass eventCategorySlug as categorySlug for EVENT cards, and explicitly null (never PartyCategory) for OFFER cards",
   );
+
+  // --- negative guards for the remaining CARD_VIEW producers ---
   const programsPage = source("src/app/(public)/[city]/programs/page.tsx");
   assert.ok(
     !programsPage.includes("categorySlug"),

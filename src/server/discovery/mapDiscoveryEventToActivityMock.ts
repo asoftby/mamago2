@@ -71,7 +71,7 @@ export type DiscoveryEventCardRow = {
   cityId: string | null;
   place: { cityId: string | null; city: { slug: string } | null } | null;
   venue: { cityId: string | null } | null;
-  eventCategory: { nameRu: string } | null;
+  eventCategory: { nameRu: string; slug: string } | null;
   images: Array<{ id: string; url: string; mediaAssetId: string | null }>;
   sessions: Array<{ startsAt: Date }>;
 };
@@ -135,6 +135,7 @@ export function mapDiscoveryEventToActivityMock(
     district: undefined,
     tags: tagsFromSchedule(a.nextOccurrenceAt ?? a.sessions[0]?.startsAt ?? null),
     badge: a.eventCategory?.nameRu ?? (ownerFirst ? "Моё событие" : "Событие"),
+    eventCategorySlug: a.eventCategory?.slug ?? null,
     geoBadge,
     engagementScore,
     reviewsCount: 0,
