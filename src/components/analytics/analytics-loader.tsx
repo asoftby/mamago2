@@ -42,11 +42,17 @@ function ensureExternalScript(id: string, src: string): void {
 function ensureGtag(): NonNullable<AnalyticsWindow["gtag"]> {
   const w = analyticsWindow();
   w.dataLayer = w.dataLayer ?? [];
-  w.gtag =
-    w.gtag ??
-    ((...args: unknown[]) => {
-      w.dataLayer!.push(args);
-    });
+  if (!w.gtag) {
+    // Must match Google's official gtag.js snippet byte-for-byte in
+    // semantics: `function(){dataLayer.push(arguments)}`. gtag.js's queue
+    // processor is written against that exact shape; an arrow function
+    // wrapping rest args into a new array is not the same object gtag.js
+    // expects to find queued.
+    w.gtag = function gtag() {
+      // eslint-disable-next-line prefer-rest-params -- must mirror the official snippet's `arguments` object, not a rest-collected array
+      w.dataLayer!.push(arguments);
+    };
+  }
   return w.gtag;
 }
 
