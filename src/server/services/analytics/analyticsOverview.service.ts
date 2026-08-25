@@ -1,9 +1,8 @@
-import type {
-  AnalyticsEntityType,
-  AnalyticsVertical,
+import {
   Prisma,
+  type AnalyticsEntityType,
+  type AnalyticsVertical,
 } from "@prisma/client";
-import { Prisma as PrismaRuntime } from "@prisma/client";
 import {
   eachDayOfInterval,
   endOfDay,
@@ -80,7 +79,7 @@ async function getCanonicalMetrics(whereSql: Prisma.Sql): Promise<{
   planAdds: number;
   ctaClicks: number;
 }> {
-  const rows = await prisma.$queryRaw<CanonicalMetricRow[]>(PrismaRuntime.sql`
+  const rows = await prisma.$queryRaw<CanonicalMetricRow[]>(Prisma.sql`
     SELECT
       COUNT(*) FILTER (
         WHERE e."eventType" = 'CARD_VIEW'
@@ -179,11 +178,11 @@ export async function getAnalyticsOverview(
   const activeUsers = activeUserRows.length;
   const sessions = sessionRows.length;
 
-  const denomViews = Math.max(views, 1);
-  const denomSaves = Math.max(saves, 1);
-  const saveRate = saves / denomViews;
-  const planRate = planAdds / denomSaves;
-  const clickRate = ctaClicks / denomViews;
+  // Contract v1 follows the publication funnel: impression → open → save → plan.
+  // Null means the rate is not measurable because its denominator is zero.
+  const saveRate = opens > 0 ? saves / opens : null;
+  const planRate = saves > 0 ? planAdds / saves : null;
+  const clickRate = opens > 0 ? ctaClicks / opens : null;
 
   const top = Math.max(views, 1);
   const funnel = [
