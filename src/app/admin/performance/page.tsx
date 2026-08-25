@@ -31,7 +31,7 @@ export default async function AdminPerformancePage({ searchParams }: { searchPar
           <Card label="WAU" value={data.audience.wau} note="Активные авторизованные пользователи за 7 дней" />
           <Card label="MAU" value={data.audience.mau} note="Активные авторизованные пользователи за 30 дней" />
           <Card label="WAU / MAU" value={formatValue(data.audience.stickiness, "%")} note="Stickiness авторизованной аудитории" />
-          <Card label="Tracked visitors" value={data.audience.trackedVisitors} trend={data.audience.trackedVisitorsTrend} />
+          <Card label="Tracked sessions" value={data.audience.trackedVisitors} trend={data.audience.trackedVisitorsTrend} />
           <Card label="Новые аккаунты" value={data.audience.newAccounts} trend={data.audience.newAccountsTrend} />
           <Card label="Returning users" value={data.audience.returningUsers} note="Были активны и до выбранного периода" />
           <Card label="Registration conversion" value="—" note="Нет надёжной registration-source attribution" />
@@ -40,11 +40,11 @@ export default async function AdminPerformancePage({ searchParams }: { searchPar
 
       <Section title="Engagement">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <Card label="Просмотры" value={data.engagement.views} trend={data.engagement.viewsTrend} />
+          <Card label="Показы карточек" value={data.engagement.views} trend={data.engagement.viewsTrend} />
           <Card label="Открытия контента" value={data.engagement.opens} />
           <Card label="Сохранения" value={data.engagement.saves} />
           <Card label="Добавления в план" value={data.engagement.planAdds} />
-          <Card label="CTA clicks" value={data.engagement.ctaClicks} />
+          <Card label="CTA клики" value={data.engagement.ctaClicks} />
         </div>
       </Section>
 
