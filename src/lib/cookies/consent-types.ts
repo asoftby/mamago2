@@ -10,7 +10,7 @@ export type CookieCategoryId = "necessary" | "analytics" | "marketing";
 export type ConsentSnapshot = {
   /** Всегда true, если плагин инициализирован и категория существует */
   necessary: true;
-  /** Сторонняя веб-аналитика (GA, PostHog, …), не продуктовая телеметрия mamaGo */
+  /** Сторонняя веб-аналитика (GA4, Yandex Metrica), не продуктовая телеметрия mamaGo */
   analytics: boolean;
   /** Сторонние рекламные/маркетинговые скрипты */
   marketing: boolean;
