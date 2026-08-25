@@ -17,6 +17,7 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { PublicationType } from "@prisma/client";
 
 interface EventPublicPageProps {
@@ -36,11 +37,6 @@ function searchParamsToSuffix(
   }
   const s = u.toString();
   return s ? `?${s}` : "";
-}
-
-function cityLabel(citySlug: string) {
-  if (citySlug === "minsk") return "Минске";
-  return citySlug;
 }
 
 function parseRobots(s: string | null | undefined): Metadata["robots"] | undefined {
@@ -83,10 +79,11 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
     id: fromDb.id,
     publicBase,
   });
+  const cityName = getCityDisplayName(city);
 
-  const title = fromDb.seoTitle?.trim() || `${fromDb.title} в ${cityLabel(city)} — mamaGo`;
+  const title = fromDb.seoTitle?.trim() || `${fromDb.title} в ${cityName} — mamaGo`;
   const description =
-    fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityLabel(city)}.`;
+    fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityName}.`;
 
   return {
     ...buildOgMeta({
@@ -152,7 +149,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
       [
         { name: "Главная", path: "/" },
-        { name: city, path: `/${city}` },
+        { name: getCityNominativeName(city), path: `/${city}` },
         { name: "Афиша", path: `/${city}/events` },
         { name: fromDb.title, path: `/${city}/events/${fromDb.slug ?? fromDb.id}` },
       ],
