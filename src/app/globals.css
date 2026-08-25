@@ -354,6 +354,14 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
     cursor: not-allowed;
     opacity: 0.6;
   }
+
+  /* Native clickable elements don't all get a pointer cursor by default
+     (buttons default to the arrow cursor in most browsers) — force it. */
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 
 @layer components {
