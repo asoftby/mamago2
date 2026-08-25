@@ -3,6 +3,8 @@ import "server-only";
 import { existsSync } from "fs";
 import { posix } from "path";
 import type { MediaAsset } from "@prisma/client";
+import type { MediaAliasWithAsset } from "@/server/media/mediaUrlAlias";
+import { normalizeMediaAliasPath } from "@/server/media/mediaUrlAlias";
 import type { AuthActor } from "@/lib/auth/safeUser";
 import {
   BusinessVerificationStatus,
@@ -380,6 +382,17 @@ export async function findMediaAssetByStorageRelativePath(
       storageKeysMatchRequest(m.storageKey, m.publicUrl, requestRel),
     ) ?? null
   );
+}
+
+export async function findMediaUrlAliasByStorageRelativePath(
+  pathSegments: string[],
+): Promise<MediaAliasWithAsset | null> {
+  const legacyPath = normalizeMediaAliasPath(pathSegments.join("/"));
+  if (!legacyPath) return null;
+  return prisma.mediaUrlAlias.findUnique({
+    where: { legacyPath },
+    include: { media: true },
+  });
 }
 
 async function userSharesBusinessCabinetWithUploader(

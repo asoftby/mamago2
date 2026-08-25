@@ -3,6 +3,11 @@ import { existsSync } from "fs";
 import { readFile, stat } from "fs/promises";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
+  canonicalAliasDestination,
+  decideMediaAliasRedirect,
+  normalizeMediaAliasPath,
+} from "@/server/media/mediaUrlAlias";
+import {
   mimeTypeFromFilename,
   resolveLegacyPublicUploadPath,
   resolveMediaStorageAbsolutePath,
@@ -17,6 +22,7 @@ import {
   canServeMediaResponse,
   ensureMediaAssetForExistingPlaceImageFile,
   findMediaAssetByStorageRelativePath,
+  findMediaUrlAliasByStorageRelativePath,
 } from "@/server/media/mediaPublicAccess";
 
 export const runtime = "nodejs";
@@ -28,6 +34,13 @@ export async function GET(
   try {
     const { path: pathSegments } = await params;
     const relativePath = pathSegments.join("/");
+    const normalizedPath = normalizeMediaAliasPath(relativePath);
+    if (!normalizedPath) {
+      return new NextResponse(JSON.stringify({ error: "invalid media path" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const absolutePath = resolveMediaStorageAbsolutePath(relativePath);
     const fileExists = Boolean(absolutePath && existsSync(absolutePath));
 
@@ -52,6 +65,32 @@ export async function GET(
       );
     };
 
+    let media = fileExists
+      ? await findMediaAssetByStorageRelativePath(pathSegments)
+      : null;
+
+    if (!media) {
+      const alias = await findMediaUrlAliasByStorageRelativePath(pathSegments);
+      if (alias) {
+        const destination = canonicalAliasDestination(alias);
+        const destinationPath = destination ? resolveStoredMediaPath(destination) : null;
+        const user = await getCurrentUser();
+        const decision = decideMediaAliasRedirect({
+          alias,
+          canonicalFileExists: Boolean(destinationPath && existsSync(destinationPath)),
+          canServe: await canServeMediaResponse(alias.media, user),
+        });
+        if (decision.status === 404) {
+          await devLogDeny({ media: alias.media, denyReason: "ALIAS_ACCESS_DENIED", user });
+          return new NextResponse(JSON.stringify({ error: "access denied" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return NextResponse.redirect(new URL(decision.destination, _request.url), 308);
+      }
+    }
+
     if (!absolutePath || !fileExists) {
       console.warn(`[media-file] file not on disk: path="${relativePath}"`);
       await devLogDeny({ media: null, denyReason: "FILE_NOT_ON_DISK" });
@@ -61,7 +100,6 @@ export async function GET(
       );
     }
 
-    let media = await findMediaAssetByStorageRelativePath(pathSegments);
     if (!media) {
       media = await ensureMediaAssetForExistingPlaceImageFile(pathSegments);
     }

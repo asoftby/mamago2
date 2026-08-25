@@ -1,110 +1,120 @@
-/**
- * Canonical media filename backfill. Safe by default: no flag means --dry-run.
- *
- * Usage:
- *   npx tsx scripts/data-migrations/backfill-media-canonical-names.ts --dry-run
- *   npx tsx scripts/data-migrations/backfill-media-canonical-names.ts --apply --limit 20
- *   npx tsx scripts/data-migrations/backfill-media-canonical-names.ts --media-id <id>
- *   npx tsx scripts/data-migrations/backfill-media-canonical-names.ts --article-id <id>
- */
-import prisma from "../../src/lib/prisma";
-import {
-  canonicalizeArticleMedia,
-  canonicalizeMediaAsset,
-  type CanonicalizeResult,
-} from "../../src/server/media/mediaNaming";
+/** Production-safe canonical media migration. Default mode is read-only. */
+import { writeFile } from "node:fs/promises";
+import type { MediaEntityType } from "@prisma/client";
+import { prismaBase } from "../../src/lib/prisma";
+import { isProductionAppEnv } from "../../src/lib/config/productionEnvGuard";
+import { parseMigrationDatabaseUrl, PROD_DATABASE_NAME } from "../../src/lib/migration/runtime/migrationDatabaseTarget";
 import { buildCanonicalNamingDryRun } from "../../src/server/media/mediaCanonicalPolicy";
+import {
+  applyCanonicalNamingRows,
+  countCanonicalActions,
+  filterCanonicalRows,
+  type CanonicalApplyReport,
+} from "../../src/server/media/mediaCanonicalMigration";
 
-type Args = { apply: boolean; limit?: number; mediaId?: string; articleId?: string };
+type Args = {
+  apply: boolean;
+  allowProduction: boolean;
+  report?: string;
+  limit?: number;
+  mediaId?: string;
+  entityType?: MediaEntityType;
+  entityId?: string;
+};
 
-function parseArgs(argv: string[]): Args {
+function value(argv: string[], flag: string) {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
+export function parseCanonicalCliArgs(argv: string[]): Args {
   const apply = argv.includes("--apply");
   if (apply && argv.includes("--dry-run")) throw new Error("Choose either --dry-run or --apply");
-  const value = (flag: string) => {
-    const index = argv.indexOf(flag);
-    return index >= 0 ? argv[index + 1] : undefined;
-  };
-  const rawLimit = value("--limit");
+  const rawLimit = value(argv, "--limit");
   const limit = rawLimit ? Number(rawLimit) : undefined;
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) throw new Error("--limit must be a positive integer");
-  return { apply, limit, mediaId: value("--media-id"), articleId: value("--article-id") };
+  const rawType = value(argv, "--entity-type")?.toUpperCase();
+  const allowed = ["ARTICLE", "EVENT", "PLACE", "ROUTE", "OFFER"];
+  if (rawType && !allowed.includes(rawType)) throw new Error(`Unsupported --entity-type: ${rawType}`);
+  return {
+    apply,
+    allowProduction: argv.includes("--allow-production"),
+    report: value(argv, "--report"),
+    limit,
+    mediaId: value(argv, "--media-id"),
+    entityType: rawType as MediaEntityType | undefined,
+    entityId: value(argv, "--entity-id") ?? value(argv, "--article-id"),
+  };
+}
+
+export function assertCanonicalEnvironment(input: {
+  databaseUrl?: string;
+  currentDatabase: string;
+  apply: boolean;
+  allowProduction: boolean;
+}) {
+  if (!input.databaseUrl) throw new Error("DATABASE_URL is required");
+  const parsed = parseMigrationDatabaseUrl(input.databaseUrl);
+  if (parsed.database !== input.currentDatabase) throw new Error("Connected database does not match DATABASE_URL");
+  const production = parsed.database === PROD_DATABASE_NAME || isProductionAppEnv();
+  if (input.apply && production && !input.allowProduction) {
+    throw new Error("Production apply requires explicit --allow-production");
+  }
+  if (input.allowProduction && !production) {
+    throw new Error("--allow-production is refused for a non-production target");
+  }
+  return { production, database: parsed.database, hostname: parsed.hostname, port: parsed.port };
+}
+
+async function persistReport(path: string | undefined, report: unknown) {
+  if (path) await writeFile(path, JSON.stringify(report, null, 2));
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.apply) {
-    throw new Error("--apply is disabled until MediaUsage repair is explicitly approved and completed");
-  }
-  const policy = await buildCanonicalNamingDryRun();
-  let report = policy.rows;
-  if (args.mediaId) report = report.filter((row) => row.mediaId === args.mediaId);
-  if (args.articleId) report = report.filter((row) => row.entityType === "ARTICLE" && row.entityId === args.articleId);
-  if (args.limit) report = report.slice(0, args.limit);
-  console.table(report);
-  console.log(JSON.stringify({
-    examined: report.length,
-    mode: "dry-run",
-    byAction: Object.fromEntries([...new Set(report.map((row) => row.action))].map((action) => [action, report.filter((row) => row.action === action).length])),
-  }));
-  return;
-
-  /* Legacy implementation retained temporarily for the future apply engine;
-   * unreachable while repair/apply is gated above. */
-  console.log(args.apply ? "MODE apply" : "MODE dry-run (default)");
-  const articles = await prisma.article.findMany({
-    where: {
-      ...(args.articleId ? { id: args.articleId } : {}),
-    },
-    select: { id: true, title: true },
-    orderBy: { createdAt: "asc" },
-    ...(args.limit ? { take: args.limit } : {}),
+  const args = parseCanonicalCliArgs(process.argv.slice(2));
+  const [{ currentDatabase }] = await prismaBase.$queryRaw<Array<{ currentDatabase: string }>>`
+    SELECT current_database() AS "currentDatabase"
+  `;
+  const environment = assertCanonicalEnvironment({
+    databaseUrl: process.env.DATABASE_URL,
+    currentDatabase,
+    apply: args.apply,
+    allowProduction: args.allowProduction,
   });
-
-  const seen = new Set<string>();
-  const rows: Array<CanonicalizeResult & { entityType: string; entityId: string; entityTitle: string }> = [];
-  for (const article of articles) {
-    const results = await canonicalizeArticleMedia(article.id, { allowPublished: true, dryRun: !args.apply });
-    for (const result of results) {
-      if (args.mediaId && result.mediaId !== args.mediaId) continue;
-      if (seen.has(result.mediaId)) continue;
-      seen.add(result.mediaId);
-      rows.push({ ...result, entityType: "ARTICLE", entityId: article.id, entityTitle: article.title });
-    }
+  const policy = await buildCanonicalNamingDryRun();
+  const rows = filterCanonicalRows(policy.rows, args);
+  if (!args.apply) {
+    const report = {
+      mode: "dry-run", environment, totalAssets: policy.audit.assets.length,
+      examined: rows.length, byAction: countCanonicalActions(rows),
+      unresolvedReferences: policy.audit.unresolved, rows,
+    };
+    await persistReport(args.report, report);
+    console.log(JSON.stringify(report));
+    return;
   }
-
-  if (args.mediaId && !seen.has(args.mediaId)) {
-    const media = await prisma.mediaAsset.findUnique({ where: { id: args.mediaId } });
-    if (media) {
-      const result = await canonicalizeMediaAsset({
-        mediaId: media.id,
-        context: { type: "CONTEXTLESS", createdAt: media.createdAt, unique: media.id.slice(-8) },
-        dryRun: !args.apply,
-      });
-      rows.push({ ...result, entityType: "CONTEXTLESS", entityId: "-", entityTitle: "-" });
-    }
+  let report: CanonicalApplyReport;
+  try {
+    report = await applyCanonicalNamingRows(rows);
+  } catch (error) {
+    const failed = error as Error & { report?: CanonicalApplyReport };
+    await persistReport(args.report, failed.report ?? { mode: "apply", error: failed.message });
+    throw error;
   }
-
-  const report = rows.map((row) => ({
-    mediaId: row.mediaId,
-    oldFilename: row.oldFilename,
-    oldUrl: row.oldUrl,
-    newFilename: row.newFilename,
-    newUrl: row.newUrl,
-    usageCount: row.usageCount,
-    entityType: row.entityType,
-    entityId: row.entityId,
-    entityTitle: row.entityTitle,
-    action: row.action,
-    reason: row.reason,
-  }));
-  console.table(report);
-  const actionable = rows.filter((row) => row.action === "rename" || row.action === "metadata-only").length;
-  console.log(JSON.stringify({ examined: rows.length, actionable, mode: args.apply ? "apply" : "dry-run" }));
+  const post = await buildCanonicalNamingDryRun();
+  const output = {
+    ...report,
+    environment,
+    postApply: {
+      totalAssets: post.audit.assets.length,
+      unresolvedReferences: post.audit.unresolved,
+      byAction: countCanonicalActions(post.rows),
+    },
+  };
+  await persistReport(args.report, output);
+  console.log(JSON.stringify(output));
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => prisma.$disconnect());
+if (process.argv[1]?.endsWith("backfill-media-canonical-names.ts")) {
+  main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => prismaBase.$disconnect());
+}

@@ -2611,6 +2611,7 @@ model MediaAsset {
   deletedAt        DateTime?
   uploadedBy       User?            @relation(fields: [uploadedById], references: [id])
   usages           MediaUsage[]
+  urlAliases       MediaUrlAlias[]
   activityCovers   Activity[]       @relation("ActivityCover")
   activityImages   ActivityImage[]  @relation("ActivityGalleryImageAsset")
   routeStopImages  RouteStopImage[] @relation("RouteStopGalleryImageAsset")
@@ -2629,6 +2630,18 @@ model MediaAsset {
   @@index([wizardSessionId, status])
   @@index([draftEntityId, draftEntityType, status])
   @@index([status, createdAt])
+}
+
+model MediaUrlAlias {
+  id         String     @id @default(cuid())
+  mediaId    String
+  legacyPath String     @unique
+  reason     String?
+  source     String?
+  createdAt  DateTime   @default(now())
+  media      MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([mediaId])
 }
 
 model MediaUsage {
