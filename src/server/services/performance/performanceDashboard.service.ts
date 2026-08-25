@@ -60,12 +60,23 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
               WHERE prior."userId" = "UserEvent"."userId" AND prior."createdAt" < ${window.start}
             )
         )::bigint AS "returningUsers",
-        COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" IN ('PAGE_VIEW', 'CARD_VIEW'))::bigint AS views,
-        COUNT(*) FILTER (WHERE "createdAt" >= ${window.previousStart} AND "createdAt" < ${window.previousEnd} AND "eventType" IN ('PAGE_VIEW', 'CARD_VIEW'))::bigint AS "previousViews",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'CARD_VIEW')::bigint AS views,
+        COUNT(*) FILTER (WHERE "createdAt" >= ${window.previousStart} AND "createdAt" < ${window.previousEnd} AND "eventType" = 'CARD_VIEW')::bigint AS "previousViews",
         COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'DETAIL_OPEN')::bigint AS opens,
         COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'SAVE')::bigint AS saves,
         COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'PLAN_ADD')::bigint AS "planAdds",
-        COUNT(*) FILTER (WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end} AND "eventType" = 'CTA_CLICK')::bigint AS "ctaClicks"
+        COUNT(*) FILTER (
+          WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end}
+            AND "eventType" = 'CTA_CLICK'
+            AND COALESCE("meta"->>'articleEvent', '') NOT IN (
+              'article_read_25',
+              'article_read_50',
+              'article_read_75',
+              'article_complete',
+              'next_article_loaded',
+              'article_section_exhausted'
+            )
+        )::bigint AS "ctaClicks"
       FROM "UserEvent"
       WHERE "createdAt" >= ${eventScanStart} AND "createdAt" < ${now}
     `),
@@ -96,6 +107,17 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
       WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end}
         AND "entityType" IS NOT NULL AND "entityId" IS NOT NULL
         AND "eventType" IN ('DETAIL_OPEN', 'SAVE', 'PLAN_ADD', 'CTA_CLICK')
+        AND (
+          "eventType" <> 'CTA_CLICK'
+          OR COALESCE("meta"->>'articleEvent', '') NOT IN (
+            'article_read_25',
+            'article_read_50',
+            'article_read_75',
+            'article_complete',
+            'next_article_loaded',
+            'article_section_exhausted'
+          )
+        )
       GROUP BY "entityType", "entityId"
       ORDER BY count DESC
       LIMIT 5
@@ -134,6 +156,7 @@ export async function getPerformanceDashboard(period: PerformancePeriod, now = n
       returningUsers: number(events?.returningUsers),
     },
     engagement: {
+      // Legacy field name kept for UI compatibility; Contract v1 meaning = CARD_VIEW only.
       views,
       opens: number(events?.opens),
       saves: number(events?.saves),
