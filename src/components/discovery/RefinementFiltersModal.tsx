@@ -57,6 +57,25 @@ export function RefinementFiltersModal() {
     };
   }, [isVisible]);
 
+  // The sheet is `lg:hidden` in CSS, so at >=1024px it's already invisible
+  // while still "open" in state — without this, resizing past the desktop
+  // breakpoint would leave the scroll lock above stuck forever (the effect
+  // only releases it when isVisible flips to false). Close immediately
+  // (skip the 300ms animation) so the lock and any stale RefinementFilters
+  // context state don't survive the jump to the desktop Dialog UI.
+  useEffect(() => {
+    if (!isOpen) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const closeForDesktop = () => {
+      if (!mq.matches) return;
+      setIsOpen(false);
+      setIsVisible(false);
+    };
+    closeForDesktop();
+    mq.addEventListener("change", closeForDesktop);
+    return () => mq.removeEventListener("change", closeForDesktop);
+  }, [isOpen, setIsOpen]);
+
   if (!isVisible || !currentIntent) return null;
 
   const intent = currentIntent as Intent;
@@ -76,7 +95,7 @@ export function RefinementFiltersModal() {
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[9999] md:hidden">
+      <div className="fixed inset-0 z-[9999] lg:hidden">
         <div
           className={cn(
             "fixed inset-0 bg-black/50 transition-opacity duration-300 ease-out",

@@ -13,7 +13,7 @@ type MobileSmartBackButtonProps = {
 /**
  * Единая мобильная кнопка «Назад» для публичных detail-страниц.
  * Внутренний переход → router.back(), внешний/прямой заход → fallbackHref.
- * Видна только на mobile (md:hidden).
+ * Видна, пока используется MobileHeader — весь диапазон `< lg` (lg:hidden).
  */
 export function MobileSmartBackButton({
   fallbackHref,
@@ -27,7 +27,7 @@ export function MobileSmartBackButton({
       type="button"
       onClick={goBack}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-white hover:text-gray-950 md:hidden",
+        "inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-white hover:text-gray-950 lg:hidden",
         className,
       )}
     >
