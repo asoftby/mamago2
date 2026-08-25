@@ -35,6 +35,7 @@ import {
   STATUS_LABEL,
   statusBadgeClass,
 } from "@/components/admin/articles/PublicationPanel";
+import { resolveArticlePublicationActionPolicy } from "@/components/admin/articles/articlePublicationActionPolicy";
 import { ArticleEditorStickyBar } from "@/components/admin/articles/ArticleEditorStickyBar";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
@@ -753,6 +754,31 @@ export function ArticleEditorClient({
           ? `Сохранено ${formatDistanceToNow(lastSavedAt, { addSuffix: true, locale: ru })}`
           : "Изменения сохранены";
 
+  /**
+   * Единственный источник условий видимости/disabled для «Одобрить» — та же
+   * чистая функция, что использует верхний PublicationPanel. Sticky-панель
+   * не переизобретает permissions/status-условия, только читает их отсюда.
+   */
+  const publicationActionPolicy = resolveArticlePublicationActionPolicy({
+    status,
+    canModerate,
+    hasUnsavedChanges: dirty,
+    hasPublicUrl: publicUrl != null,
+  });
+
+  const stickyApproveAction =
+    publicationActionPolicy.primary?.kind === "approve"
+      ? {
+          label: moderating ? "Одобрение…" : publicationActionPolicy.primary.label,
+          disabled: actionsBusy || publicationActionPolicy.primary.disabled,
+          disabledReason: publicationActionPolicy.primary.disabled
+            ? publicationActionPolicy.primary.disabledReason
+            : null,
+          loading: moderating,
+          onClick: () => void moderate("publish"),
+        }
+      : null;
+
   return (
     <>
     <div className={cn("p-6 md:p-4 space-y-8 max-w-4xl", everDirty && "pb-28 md:pb-24")}>
@@ -1137,6 +1163,7 @@ export function ArticleEditorClient({
         statusLabel={stickyStatusLabel}
         onSave={() => void save()}
         saveDisabled={actionsBusy || !dirty}
+        approveAction={stickyApproveAction}
         saving={saving}
         previewHref={hasPersistedId ? `/preview/articles/${initial.id}` : null}
         publicUrl={publicUrl}

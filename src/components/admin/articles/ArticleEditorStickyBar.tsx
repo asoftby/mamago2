@@ -7,12 +7,22 @@ import { cn } from "@/lib/utils";
 
 export type ArticleStickyBarStatus = "dirty" | "saving" | "saved" | "error";
 
+export interface ArticleStickyBarApproveAction {
+  label: string;
+  disabled: boolean;
+  disabledReason: string | null;
+  loading: boolean;
+  onClick: () => void;
+}
+
 export interface ArticleEditorStickyBarProps {
   status: ArticleStickyBarStatus;
   statusLabel: string;
   onSave: () => void;
   saveDisabled: boolean;
   saving: boolean;
+  /** null — действие «Одобрить» недоступно для текущего статуса/permissions (та же логика, что и в верхнем PublicationPanel). */
+  approveAction: ArticleStickyBarApproveAction | null;
   previewHref: string | null;
   publicUrl: string | null;
 }
@@ -30,6 +40,7 @@ export function ArticleEditorStickyBar({
   onSave,
   saveDisabled,
   saving,
+  approveAction,
   previewHref,
   publicUrl,
 }: ArticleEditorStickyBarProps) {
@@ -66,6 +77,22 @@ export function ArticleEditorStickyBar({
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
               Сохранить
             </Button>
+
+            {approveAction != null ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={approveAction.onClick}
+                disabled={approveAction.disabled}
+                title={approveAction.disabledReason ?? undefined}
+              >
+                {approveAction.loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : null}
+                {approveAction.label}
+              </Button>
+            ) : null}
 
             {previewHref != null ? (
               <Button

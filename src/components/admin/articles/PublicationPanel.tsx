@@ -293,9 +293,14 @@ export function PublicationPanel({
 
             {actionPolicy.primary?.kind === "approve" && onApprove && onReject ? (
               <>
-                <Button type="button" onClick={onApprove} disabled={actionsBusy}>
+                <Button
+                  type="button"
+                  onClick={onApprove}
+                  disabled={actionsBusy || actionPolicy.primary.disabled}
+                  title={actionPolicy.primary.disabled ? (actionPolicy.primary.disabledReason ?? undefined) : undefined}
+                >
                   {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                  {actionPolicy.primary.label}
+                  {moderating ? "Одобрение…" : actionPolicy.primary.label}
                 </Button>
                 <Button type="button" variant="destructive" onClick={onReject} disabled={actionsBusy}>
                   {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}

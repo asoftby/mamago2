@@ -2,7 +2,12 @@ import type { ContentStatus } from "@prisma/client";
 
 export type ArticlePublicationPrimaryAction =
   | { kind: "submit"; label: "Отправить на модерацию" | "Исправить и отправить снова" }
-  | { kind: "approve"; label: "Одобрить и опубликовать" }
+  | {
+      kind: "approve";
+      label: "Одобрить и опубликовать";
+      disabled: boolean;
+      disabledReason: string | null;
+    }
   | { kind: "save"; label: "Обновить публикацию" | "Изменения сохранены"; disabled: boolean }
   | null;
 
@@ -23,7 +28,12 @@ export function resolveArticlePublicationActionPolicy({
   } else if (status === "REJECTED") {
     primary = { kind: "submit", label: "Исправить и отправить снова" };
   } else if (status === "PENDING" && canModerate) {
-    primary = { kind: "approve", label: "Одобрить и опубликовать" };
+    primary = {
+      kind: "approve",
+      label: "Одобрить и опубликовать",
+      disabled: hasUnsavedChanges,
+      disabledReason: hasUnsavedChanges ? "Сначала сохраните изменения" : null,
+    };
   } else if (status === "PUBLISHED") {
     primary = {
       kind: "save",
