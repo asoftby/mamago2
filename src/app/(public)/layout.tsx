@@ -17,6 +17,7 @@ import { FamilyDerivedAgeSync } from "@/components/family/FamilyDerivedAgeSync";
 import { MyPlanProvider } from "@/components/MyPlanProvider";
 import { BetaTip } from "@/components/shared/BetaTip";
 import { DiscoveryBudgetProvider } from "@/features/filters/discovery/discoveryBudgetContext";
+import { getExternalAnalyticsConfig } from "@/server/services/analytics/externalAnalyticsConfig";
 
 export default function PublicGroupLayout({
   children,
@@ -32,9 +33,10 @@ export default function PublicGroupLayout({
   const webSiteJsonLd = buildWebSiteJsonLd({
     publicBase,
   });
+  const externalAnalytics = getExternalAnalyticsConfig();
 
   return (
-    <PublicProviders>
+    <PublicProviders externalAnalytics={externalAnalytics}>
       <RefinementFiltersProvider>
         <ReloadProbe />
         <PublicationIntentProvider>
