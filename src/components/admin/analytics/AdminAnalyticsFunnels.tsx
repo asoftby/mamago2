@@ -25,6 +25,10 @@ function pct(n: number): string {
   return `${n.toFixed(1)}%`;
 }
 
+function maxStepCount(data: AnalyticsFunnelSeries): number {
+  return Math.max(1, ...data.steps.map((step) => step.count));
+}
+
 function Section({
   title,
   subtitle,
@@ -49,7 +53,7 @@ function FunnelStrip({
   data,
   maxCount,
 }: {
-  data: AnalyticsFunnelsResult["globalFunnel"];
+  data: AnalyticsFunnelSeries;
   maxCount: number;
 }) {
   return (
@@ -70,11 +74,11 @@ function FunnelStrip({
             </div>
             <div className="mt-0.5 text-xs tabular-nums text-gray-600">
               {i === 0 ? (
-                <span>of top · {pct(step.pctFromFirst)}</span>
+                <span>canonical content-impression baseline</span>
               ) : (
                 <span>
-                  {pct(step.pctFromPrevious)} of prev · {pct(step.pctFromFirst)}{" "}
-                  of top
+                  {pct(step.pctFromPrevious)} vs prev · {pct(step.pctFromFirst)}{" "}
+                  vs impressions
                 </span>
               )}
             </div>
@@ -91,7 +95,7 @@ function FunnelStrip({
   );
 }
 
-/** Сгруппированные бары: % перехода к предыдущему шагу для двух воронок. */
+/** Grouped event-count ratios for two scopes. These are not user conversion. */
 function ComparisonGroupedBars({
   left,
   right,
@@ -107,7 +111,7 @@ function ComparisonGroupedBars({
   return (
     <div className="mt-4 border-t border-gray-100 pt-3">
       <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-500">
-        Conversion vs previous step (grouped)
+        Event-count ratio vs previous metric
       </p>
       <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-gray-600">
         <span className="flex items-center gap-1.5">
@@ -217,12 +221,10 @@ export function AdminAnalyticsFunnels({
     };
   }, [queryKey]);
 
-  const maxGlobal = data?.globalFunnel.raw.view ?? 0;
-
   if (loading && !data) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-        Loading funnels…
+        Loading interaction volumes…
       </div>
     );
   }
@@ -236,17 +238,21 @@ export function AdminAnalyticsFunnels({
   }
 
   const bd = data.breakdowns;
+  const maxGlobal = maxStepCount(data.globalFunnel);
 
   return (
     <div className="space-y-6">
       <Section
-        title="Global funnel"
-        subtitle="Steps match UserEvent types; first step = PAGE_VIEW + CARD_VIEW. Uses filters above."
+        title="Interaction volumes"
+        subtitle="First-party UserEvent volumes. Ratios compare event counts and are not sequential user/session conversion; values above 100% are valid. Acquisition/session funnels belong to GA4."
       >
         <FunnelStrip data={data.globalFunnel} maxCount={maxGlobal} />
       </Section>
 
-      <Section title="Funnel breakdowns" subtitle="Same filters except the chosen slice">
+      <Section
+        title="Interaction-volume breakdowns"
+        subtitle="Same canonical metrics and filters except the chosen slice"
+      >
         <Tabs
           value={breakdownTab}
           onValueChange={(v) =>
@@ -273,7 +279,7 @@ export function AdminAnalyticsFunnels({
                 <div className="mb-1 text-xs font-medium text-gray-700">
                   {k}
                 </div>
-                <FunnelStrip data={funnel} maxCount={funnel.raw.view || 1} />
+                <FunnelStrip data={funnel} maxCount={maxStepCount(funnel)} />
               </div>
             ))}
           </TabsContent>
@@ -283,7 +289,7 @@ export function AdminAnalyticsFunnels({
                 <div className="mb-1 text-xs font-medium text-gray-700">
                   {k}
                 </div>
-                <FunnelStrip data={funnel} maxCount={funnel.raw.view || 1} />
+                <FunnelStrip data={funnel} maxCount={maxStepCount(funnel)} />
               </div>
             ))}
           </TabsContent>
@@ -293,7 +299,7 @@ export function AdminAnalyticsFunnels({
                 <div className="mb-1 text-xs font-medium text-gray-700">
                   {k}
                 </div>
-                <FunnelStrip data={funnel} maxCount={funnel.raw.view || 1} />
+                <FunnelStrip data={funnel} maxCount={maxStepCount(funnel)} />
               </div>
             ))}
           </TabsContent>
@@ -308,7 +314,7 @@ export function AdminAnalyticsFunnels({
                   </div>
                   <FunnelStrip
                     data={c.funnel}
-                    maxCount={c.funnel.raw.view || 1}
+                    maxCount={maxStepCount(c.funnel)}
                   />
                 </div>
               ))
@@ -318,8 +324,8 @@ export function AdminAnalyticsFunnels({
       </Section>
 
       <Section
-        title="Funnel comparison"
-        subtitle="Counts and % vs previous step; grouped bars below for a quick read"
+        title="Volume comparison"
+        subtitle="Counts and event-count ratios. These comparisons do not imply that the same user moved through every step."
       >
         <div className="space-y-6">
           {data.comparisons.map((cmp) => (
@@ -339,9 +345,9 @@ export function AdminAnalyticsFunnels({
                     <table className="mt-2 w-full text-xs">
                       <thead>
                         <tr className="text-left text-[10px] text-gray-500">
-                          <th className="pb-1 font-medium">Step</th>
+                          <th className="pb-1 font-medium">Metric</th>
                           <th className="pb-1 font-medium text-right">Count</th>
-                          <th className="pb-1 font-medium text-right">% prev</th>
+                          <th className="pb-1 font-medium text-right">ratio prev</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -352,9 +358,7 @@ export function AdminAnalyticsFunnels({
                               {s.count.toLocaleString()}
                             </td>
                             <td className="py-1 text-right tabular-nums text-gray-500">
-                              {i === 0
-                                ? "—"
-                                : pct(s.pctFromPrevious)}
+                              {i === 0 ? "—" : pct(s.pctFromPrevious)}
                             </td>
                           </tr>
                         ))}
@@ -375,13 +379,13 @@ export function AdminAnalyticsFunnels({
       </Section>
 
       <Section
-        title="Drop-off analysis"
-        subtitle="Largest step losses, then weak entities and verticals"
+        title="Volume-gap analysis"
+        subtitle="Largest positive decreases in event volume, followed by entities and verticals with low event-count ratios."
       >
         <div className="space-y-6">
           <div>
             <h3 className="text-xs font-semibold text-gray-800">
-              Biggest drop-offs
+              Largest volume decreases
             </h3>
             <ul className="mt-2 space-y-1.5 text-xs">
               {data.dropOff.biggestSteps.map((t) => (
@@ -394,7 +398,7 @@ export function AdminAnalyticsFunnels({
                   </span>
                   <span className="tabular-nums">
                     −{t.lost.toLocaleString()} events · {pct(t.dropOffPct)}{" "}
-                    lost
+                    lower volume
                   </span>
                 </li>
               ))}
@@ -403,34 +407,34 @@ export function AdminAnalyticsFunnels({
 
           <div className="grid gap-4 lg:grid-cols-2">
             <DropEntityBlock
-              title="Views → opens (worst)"
+              title="Impressions → opens (lowest ratio)"
               rows={data.dropOff.byEntity.viewToOpen}
-              hint="Low open rate vs views"
+              hint="Low open / impression event-count ratio"
             />
             <DropEntityBlock
-              title="Opens → saves (worst)"
+              title="Opens → saves (lowest ratio)"
               rows={data.dropOff.byEntity.openToSave}
-              hint="Low save rate vs opens"
+              hint="Low save / open event-count ratio"
             />
             <DropEntityBlock
-              title="Saves → plan (worst)"
+              title="Saves → plan (lowest ratio)"
               rows={data.dropOff.byEntity.saveToPlan}
-              hint="Low plan rate vs saves"
+              hint="Low plan / save event-count ratio"
             />
             <DropEntityBlock
-              title="Plan → CTA (worst)"
+              title="Plan → CTA (lowest ratio)"
               rows={data.dropOff.byEntity.planToClick}
-              hint="Low CTA rate vs plan adds"
+              hint="Low CTA / plan event-count ratio"
             />
           </div>
 
           <div>
             <h3 className="text-xs font-semibold text-gray-800">
-              Drop-off by vertical
+              Volume decrease by vertical
             </h3>
             <p className="mt-1 text-[11px] text-gray-500">
-              Sorted by strongest first-step loss; each row lists transitions
-              worst-first.
+              Sorted by strongest positive decrease; this is not sequential
+              user drop-off.
             </p>
             <div className="mt-3 space-y-3">
               {data.dropOff.byVertical.map((v) => (
@@ -443,7 +447,7 @@ export function AdminAnalyticsFunnels({
                     {v.transitions.slice(0, 2).map((t) => (
                       <li key={`${v.vertical}-${t.from}-${t.to}`}>
                         {STEP_LABEL(t.from)} → {STEP_LABEL(t.to)}:{" "}
-                        {pct(t.dropOffPct)} drop
+                        {pct(t.dropOffPct)} lower volume
                       </li>
                     ))}
                   </ul>
@@ -463,11 +467,11 @@ export function AdminAnalyticsFunnels({
 
 function STEP_LABEL(k: string): string {
   const m: Record<string, string> = {
-    view: "View",
-    open: "Open",
-    save: "Save",
-    plan: "Plan",
-    click: "CTA",
+    view: "Impressions",
+    open: "Opens",
+    save: "Saves",
+    plan: "Plan adds",
+    click: "CTA clicks",
   };
   return m[k] ?? k;
 }
@@ -496,7 +500,7 @@ function DropEntityBlock({
             >
               <span className="font-medium text-gray-800">{r.title}</span>
               <span className="text-gray-500">
-                {r.entityType} · rate {pct(r.transitionRate * 100)}
+                {r.entityType} · count ratio {pct(r.transitionRate * 100)}
               </span>
             </li>
           ))}
