@@ -7,6 +7,7 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { buildArticlePublicPath, buildCityPublicPath } from "@/lib/routing/cityPaths";
+import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 
 type PageProps = {
@@ -100,11 +101,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     type: "tag",
     slug: data.tag.slug,
   })}`;
-  const title = data.tag.seoTitle?.trim() || `${data.tag.title} в ${data.city.name} — mamaGo`;
+  const cityName = getCityDisplayName(data.city.slug);
+  const title = data.tag.seoTitle?.trim() || `${data.tag.title} в ${cityName} — mamaGo`;
   const description =
     data.tag.seoDescription?.trim() ||
     data.tag.description?.trim() ||
-    `Публикации по теме «${data.tag.title}» в ${data.city.name}.`;
+    `Публикации по теме «${data.tag.title}» в ${cityName}.`;
 
   return applyGlobalRobotsOverride({
     ...buildOgMeta({
@@ -124,6 +126,8 @@ export default async function CityTagPage({ params }: PageProps) {
   const data = await loadTagPageData(citySlug, tagSlug);
   if (!data) notFound();
 
+  const cityName = getCityDisplayName(data.city.slug);
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 md:py-14">
       <div className="mb-8">
@@ -138,7 +142,7 @@ export default async function CityTagPage({ params }: PageProps) {
           {data.tag.title}
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-          {data.tag.description?.trim() || `Публикации по теме «${data.tag.title}» в ${data.city.name}.`}
+          {data.tag.description?.trim() || `Публикации по теме «${data.tag.title}» в ${cityName}.`}
         </p>
       </div>
 
