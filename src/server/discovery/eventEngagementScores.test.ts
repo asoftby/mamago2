@@ -4,8 +4,8 @@
  *
  * Proves: getEventEngagementScores() derives its SQL scoring purely from
  * ENGAGEMENT_WEIGHTS (no second hardcoded copy), PLAN_ADD outranks SAVE,
- * scoring is deterministic, and unlisted event types contribute 0 (no
- * larger/speculative weights snuck in).
+ * PAGE_VIEW traffic telemetry is excluded, scoring is deterministic, and
+ * unlisted event types contribute 0 (no larger/speculative weights snuck in).
  *
  * Self-generated temporary fixture (created and torn down within this
  * file), per project convention — exercises the real exported
@@ -92,12 +92,22 @@ async function testPlanAddOutranksSave() {
   }
 }
 
-async function testUnlistedEventTypeContributesZero() {
+async function testPageViewAndUnlistedEventsContributeZero() {
   await cleanup();
   try {
-    // SEARCH_APPLY is a real UserEventType but intentionally absent from
-    // ENGAGEMENT_WEIGHTS — must fall through to the ELSE 0 branch, not be
-    // silently invented as a new weight.
+    assert.equal(
+      ENGAGEMENT_WEIGHTS.PAGE_VIEW,
+      undefined,
+      "PAGE_VIEW is traffic telemetry and must not carry a content-ranking weight",
+    );
+
+    await trackUserEvent({
+      eventType: "PAGE_VIEW",
+      entityType: "EVENT",
+      entityId: ENTITY_C,
+      citySlug: CITY_SLUG,
+    });
+    // SEARCH_APPLY is also intentionally absent from engagement weights.
     await trackUserEvent({
       eventType: "SEARCH_APPLY",
       entityType: "EVENT",
@@ -145,7 +155,7 @@ async function testScoringIsDeterministicAndIndependentPerEntity() {
 async function main() {
   await testCanonicalWeightsAreTheOnlyRuntimeSource();
   await testPlanAddOutranksSave();
-  await testUnlistedEventTypeContributesZero();
+  await testPageViewAndUnlistedEventsContributeZero();
   await testScoringIsDeterministicAndIndependentPerEntity();
   console.log("eventEngagementScores canonical-weight tests: OK");
   process.exit(0);
