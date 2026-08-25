@@ -1,28 +1,28 @@
 import { Prisma } from "@prisma/client";
+import {
+  ARTICLE_NON_CONTENT_CARD_IMPRESSION_KEYS,
+  ARTICLE_NON_CTA_EVENT_KEYS,
+} from "@/lib/analytics/metricSemantics";
 
 /**
  * Server-side SQL fragments for Analytics Contract v1.
  *
  * All fragments assume the UserEvent table is aliased as `e`.
- * Keep raw-SQL analytics services on these helpers so the definition of a
- * content impression / conversion CTA cannot drift between dashboards.
+ * The exclusion lists come from metricSemantics so TypeScript and SQL cannot
+ * silently diverge on what counts as a content impression / conversion CTA.
  */
 
 export const CANONICAL_CARD_IMPRESSION_SQL = Prisma.sql`
   e."eventType" = 'CARD_VIEW'
-  AND COALESCE(e."meta"->>'articleEvent', '') <> 'article_telegram_cta_impression'
+  AND COALESCE(e."meta"->>'articleEvent', '') NOT IN (
+    ${Prisma.join([...ARTICLE_NON_CONTENT_CARD_IMPRESSION_KEYS])}
+  )
 `;
 
 export const CANONICAL_CTA_CLICK_SQL = Prisma.sql`
   e."eventType" = 'CTA_CLICK'
   AND COALESCE(e."meta"->>'articleEvent', '') NOT IN (
-    'article_read_25',
-    'article_read_50',
-    'article_read_75',
-    'article_complete',
-    'next_article_loaded',
-    'article_section_exhausted',
-    'article_rating_submitted'
+    ${Prisma.join([...ARTICLE_NON_CTA_EVENT_KEYS])}
   )
 `;
 
