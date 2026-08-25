@@ -6,6 +6,10 @@ import type {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
+  behaviorCounterDelta,
+  getAnalyticsCategoryKey,
+} from "@/lib/analytics/metricSemantics";
+import {
   fetchUserSegmentContext,
   resolveSegments,
 } from "@/server/services/analytics/SegmentResolverService";
@@ -79,32 +83,13 @@ function computePlanningShares(
   };
 }
 
-function counterDelta(eventType: UserEventType): {
-  views: number;
-  opens: number;
-  saves: number;
-  planAdds: number;
-  cta: number;
-} {
-  switch (eventType) {
-    case "PAGE_VIEW":
-    case "CARD_VIEW":
-      return { views: 1, opens: 0, saves: 0, planAdds: 0, cta: 0 };
-    case "DETAIL_OPEN":
-      return { views: 0, opens: 1, saves: 0, planAdds: 0, cta: 0 };
-    case "SAVE":
-      return { views: 0, opens: 0, saves: 1, planAdds: 0, cta: 0 };
-    case "PLAN_ADD":
-      return { views: 0, opens: 0, saves: 0, planAdds: 1, cta: 0 };
-    case "CTA_CLICK":
-      return { views: 0, opens: 0, saves: 0, planAdds: 0, cta: 1 };
-    default:
-      return { views: 0, opens: 0, saves: 0, planAdds: 0, cta: 0 };
-  }
-}
-
 /**
  * Агрегированный профиль поведения: счётчики, lastSeen, доли по PLAN_ADD, сегменты.
+ *
+ * Contract v1:
+ * - totalViews = CARD_VIEW only (content impressions), never PAGE_VIEW;
+ * - article reading milestones transported as CTA_CLICK do not increment CTA;
+ * - preferredCategories receives only real taxonomy metadata, never entityType.
  */
 export async function applyUserBehaviorEvent(
   input: BehaviorAggregationInput,
@@ -122,7 +107,7 @@ export async function applyUserBehaviorEvent(
       });
     }
 
-    const d = counterDelta(eventType);
+    const d = behaviorCounterDelta(eventType, meta);
     const now = new Date();
 
     const existing = await prisma.userBehaviorProfile.findUnique({
@@ -130,12 +115,12 @@ export async function applyUserBehaviorEvent(
     });
 
     const verticalKey = vertical ?? "_none";
-    const categoryKey = entityType ?? "_none";
+    const categoryKey = getAnalyticsCategoryKey(meta);
 
     let preferredVerticals: VerticalCounts = asRecord(existing?.preferredVerticals);
     let preferredCategories: CategoryCounts = asRecord(existing?.preferredCategories);
     if (vertical) preferredVerticals = bump(preferredVerticals, verticalKey);
-    if (entityType) preferredCategories = bump(preferredCategories, categoryKey);
+    if (categoryKey) preferredCategories = bump(preferredCategories, categoryKey);
 
     let planningBuckets = readPlanningBuckets(existing?.planningBuckets);
     const nextTotalPlanAdds = (existing?.totalPlanAdds ?? 0) + d.planAdds;
