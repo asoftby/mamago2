@@ -1,10 +1,16 @@
 name: Docker Build & Push
 
+# Builds the application image exactly once, from `dev` — the canonical
+# integration/release source. `main` intentionally has no build trigger
+# here: promoting a build to PROD is a registry-side digest copy done by
+# promote.yml (`docker buildx imagetools create`), never a rebuild. This
+# workflow has no branch-conditional tagging logic left to re-enable a
+# `main`-triggered rebuild by accident — see promote.yml for how a
+# `prod-*` tag actually gets created.
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
       - dev
     paths-ignore:
       - "docs/**"
@@ -35,11 +41,7 @@ jobs:
       - name: Compute build metadata
         id: build_meta
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "build_id=prod-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "build_id=dev-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "build_id=dev-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata for Docker
         id: meta
@@ -47,12 +49,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=prod-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=dev-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/dev' }}
-            type=raw,value=prod-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=dev-${{ github.run_number }},enable=${{ github.ref == 'refs/heads/dev' }}
-            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=raw,value=dev-${{ github.run_number }}
+            type=raw,value=dev
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -64,7 +62,9 @@ jobs:
           # DB-derived slug_history rows only add on top.
           # NEXT_PUBLIC_* vars must be passed as build-args (not just runtime env
           # vars on the host) — Next.js inlines them into the client bundle at
-          # `next build` time. Same key used for both dev and prod builds.
+          # `next build` time. This is the only build; the same image (same
+          # NEXT_PUBLIC_* values baked in) is later promoted to prod-* by
+          # promote.yml, so there is nothing further to pass at promotion time.
           build-args: |
             REDIRECT_MANIFEST_MIN_ROWS=850
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}

@@ -84,7 +84,7 @@ cutover.
    `APP_ENV`, indexing) comes entirely from `/opt/mamago/prod`'s own
    persistent `.env` + compose file, not from the image tag.
 3. Before deploying, **re-tag the same already-built image as `prod-<N>`
-   in GHCR with no rebuild** (`docker buildx imagetools create`), so it:
+   in GHCR with no rebuild**, so it:
    - matches the operator-facing naming convention already used on the
      PROD host (`prod-152` etc.),
    - falls into the separate `prod-*` retention pool that
@@ -94,18 +94,31 @@ cutover.
      leaving no re-pullable copy if the host's local Docker cache is ever
      cleared.
 
-   ```bash
-   # Run once, right before promoting a specific dev build to prod.mamago.by.
-   # No rebuild — points a new tag at the exact same image manifest/digest.
-   NEXT_PROD_N=<next prod run number, e.g. 153>
-   docker buildx imagetools create \
-     --tag ghcr.io/asoftby/mamago2:prod-${NEXT_PROD_N} \
-     ghcr.io/asoftby/mamago2:dev-<chosen dev run number>
-   ```
+   **Canonical mechanism: `.github/workflows/promote.yml`** (manual
+   `workflow_dispatch`, inputs `dev_tag` / `prod_tag`). It runs the exact
+   same `docker buildx imagetools create` registry-side copy previously
+   done by hand, but additionally: inspects and records the source digest
+   before promoting, inspects the destination digest after, and **fails
+   the run** if they don't match byte-for-byte — a promotion can never
+   silently produce a different image than the one that was reviewed and
+   smoked on DEV. It never SSHes or touches the deploy host; it only
+   writes a new tag to the registry. Run it from the Actions tab (or `gh
+   workflow run promote.yml -f dev_tag=dev-<N> -f prod_tag=prod-<N>`)
+   instead of running the command locally.
 
-4. The real `dev` → `main` merge is **deferred** to the actual future
-   `mamago.by` cutover decision, where it can go through normal review
-   instead of being forced by a CI tag rule.
+4. Do **not** rebuild on `main` to produce a `prod-*` tag. `docker.yml`'s
+   build trigger is `dev`-only by design (no `main` branch trigger exists
+   in that workflow at all) — this is what makes "one immutable image,
+   promoted, never rebuilt" hold structurally rather than by convention.
+   `main` may still run its own CI/security checks; it must never gain an
+   independent Docker build step for the application image again. If a
+   future change to `docker.yml` re-adds a `main` trigger, treat that as
+   a regression of this decision, not a routine CI tweak.
+
+5. The real `dev` → `main` merge (git history, not image builds) is
+   **deferred** to the actual future `mamago.by` cutover decision, where
+   it can go through normal review instead of being forced by a CI tag
+   rule.
 
 ## 2. Database migrations
 
@@ -217,9 +230,21 @@ than one documented command run by a human who reads it first).
 3. `pnpm prisma migrate deploy` via the existing `prod-migrate-1`-style
    one-shot service (owner-triggered).
 4. `pnpm prisma migrate status` → confirm "up to date".
-5. Pull + start the new app image (`dev-<N>` re-tagged `prod-<N>`, §1) via
-   the existing `prod` compose project (owner-triggered via Telegram).
-6. Smoke (§6b below / Task 17's own smoke list once reached).
+5. Pull + start the new image for **both `app` and `worker` together**
+   (`dev-<N>` re-tagged `prod-<N>`, §1) via the existing `prod` compose
+   project (owner-triggered via Telegram) — e.g.
+   `docker compose pull app worker && docker compose up -d app worker`.
+   **Never update only `app`.** `app` and `worker` are the same image with
+   a different command (see the root `docker-compose.yml` comment on the
+   `worker` service) and must move together on every deploy — a prior
+   audit found them five `dev-*` builds apart after a deploy that only
+   updated `app`, which is exactly the failure mode this step exists to
+   prevent. If the host's compose files don't yet pin both services to one
+   shared image reference, treat that as a prerequisite fix, not something
+   to work around by remembering to run two commands correctly by hand.
+6. Post-deploy digest verification (mandatory, see §6d) — confirm the
+   deployed pair actually matches before calling the deploy done.
+7. Smoke (§6b below / Task 17's own smoke list once reached).
 
 Media/content import is explicitly **out of scope for this first PROD
 preview** — Task 15's exit criteria is about the deploy/rollback mechanism,
@@ -256,6 +281,7 @@ separate, later product decision — noted, not decided or blocked on here.
 | `migrate deploy` itself fails partway | Do **not** redeploy the old app image. Follow `docs/audits/migration-baseline-deploy-runbook.md`'s failed-migration recovery (fix + `migrate resolve`, or restore from the §4 backup) before touching the app. |
 | Migrations applied cleanly, **new app** is broken for non-schema reasons (bug, bad config) | Fix forward and redeploy a new image against the **new** schema. Do **not** roll back to `prod-152` — it is schema-incompatible now. |
 | Migrations applied, new app broken in a way that requires reverting the schema itself | Full DB restore from the §4 backup (real data loss for anything written in PROD between backup and incident — acceptable here only because PROD is a noindex preview with no real users yet; would need a different plan at real cutover), then redeploy `prod-152` (or whichever old image matches the restored schema) against the restored DB. |
+| `app` and `worker` are found running different digests in the same environment | Not a code bug to fix forward — it's a process failure. Re-run `docker compose pull app worker && docker compose up -d app worker` together immediately so both land on the same digest. Then find out why the shared-image-reference config didn't prevent it (e.g. someone ran a bare `docker restart`/`docker run` on one container instead of going through compose) — that's the thing to actually fix. |
 
 ### 6c. Configuration rollback
 
@@ -265,6 +291,39 @@ deploy host exist in git — `docker-compose.yml` at repo root is the local
 dev-only file). Any config change on the host should be preceded by the
 operator saving a copy of the current file before editing — no script
 needed for this, it's a single `cp`.
+
+### 6d. Mandatory post-deploy digest verification
+
+Run after every deploy to either environment, not just PROD — this is
+what makes the app/worker drift row above something you catch immediately
+rather than discover in a later audit:
+
+```bash
+ssh mamago-prod "docker inspect prod-app-1 prod-worker-1 dev-app-1 dev-worker-1 \
+  --format '{{.Name}}: {{.Image}}'"
+```
+
+Required invariants, checked in this order:
+
+1. **DEV app digest == DEV worker digest** — `dev-app-1` and `dev-worker-1`
+   must always agree; `dev` deploys automatically per push, so any gap
+   here means the DEV deploy step itself didn't update both containers.
+2. **PROD app digest == PROD worker digest** — same requirement, checked
+   after every PROD deploy (§5 step 6). This is the exact invariant that
+   was found violated (`prod-app-1` on `dev-373`, `prod-worker-1` still on
+   `dev-368`, five builds behind) before this section existed.
+3. **Immediately after a PROD promotion, PROD digest == the promoted DEV
+   digest** (i.e. `prod-app-1`/`prod-worker-1` == the `dev-<N>` image named
+   in that promotion's `promote.yml` run, per the digest recorded in its
+   job summary). Confirms the promotion actually reached the host, not
+   just the registry.
+
+**What is *not* required**: DEV and PROD staying equal at all other
+times. PROD intentionally lags DEV between releases — `dev` gets a new
+image on every push, PROD only moves forward on a deliberate, owner
+promotion. Do not treat `DEV digest != PROD digest` on its own as a
+finding; it is the normal, expected state between releases. Only
+invariants 1–3 above are mandatory.
 
 ## 7. Disk headroom (pre-flight prune candidates + resize plan)
 
