@@ -23,8 +23,10 @@ export function isExecutableEventFilterKey(key: string): key is EventExecutableF
 }
 
 const EXECUTABLE_ADMIN_KEYS: Readonly<Partial<Record<Intent, ReadonlySet<string>>>> = {
-  // This legacy DB definition maps to the code-owned `free` query semantics.
-  kuda: new Set(["free_only", "adult_only"]),
+  // Global audience belongs to the header. Legacy adult_only remains understood
+  // by the URL/query layer for backward compatibility, but Admin must not expose
+  // it as a second independent public control.
+  kuda: new Set(["free_only"]),
 };
 
 export function isExecutableAdminFilterKey(intent: Intent, key: string): boolean {

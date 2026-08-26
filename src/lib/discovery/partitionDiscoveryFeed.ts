@@ -18,11 +18,40 @@ function activityOverlapsAgeRanges(
   return ranges.some((r) => r.min <= actMax && r.max >= actMin);
 }
 
+/**
+ * AgePolicy is authoritative where it carries stronger semantics than the
+ * card's numeric fallback. In particular UNRESTRICTED means “Любой возраст”
+ * and must match both children and adults even when legacy card bounds fall
+ * back to 0–12. UNKNOWN must not masquerade as a child match through that
+ * fallback.
+ */
+function activityMatchesAgeContext(
+  activity: ActivityMock,
+  ranges: Array<{ min: number; max: number }>,
+): boolean {
+  if (activity.agePolicy === "UNRESTRICTED") return true;
+  if (activity.agePolicy === "UNKNOWN") return false;
+  return activityOverlapsAgeRanges(activity, ranges);
+}
+
 function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
   return [...list].sort((a, b) => {
     const d = (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
     if (d !== 0) return d;
     return 0;
+  });
+}
+
+/** Explicit audience matches outrank merely unrestricted content. */
+function sortByAudienceRelevance(
+  list: ActivityMock[],
+  ranges: Array<{ min: number; max: number }>,
+): ActivityMock[] {
+  return [...list].sort((a, b) => {
+    const aRelevance = a.agePolicy === "UNRESTRICTED" ? 1 : activityOverlapsAgeRanges(a, ranges) ? 2 : 0;
+    const bRelevance = b.agePolicy === "UNRESTRICTED" ? 1 : activityOverlapsAgeRanges(b, ranges) ? 2 : 0;
+    if (aRelevance !== bRelevance) return bRelevance - aRelevance;
+    return (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
   });
 }
 
@@ -50,9 +79,12 @@ function buildAgeHintBadge(
 }
 
 const SECONDARY_MAX = 12;
-/** Минимум «сигналов», чтобы показать карточку во втором слое (не шум). */
-/** Один сильный сигнал (save/plan) или несколько просмотров карточки. */
-const MIN_ENGAGEMENT_FOR_SECONDARY = 2;
+/**
+ * Второй слой действительно должен быть популярным: 4 балла = как минимум
+ * один SAVE по текущей canonical шкале либо несколько пассивных действий.
+ * Одиночный DETAIL_OPEN больше не достаточен, чтобы называться «популярным».
+ */
+const MIN_ENGAGEMENT_FOR_SECONDARY = 4;
 
 export type DiscoveryFeedPartition = {
   primary: ActivityMock[];
@@ -61,9 +93,10 @@ export type DiscoveryFeedPartition = {
 };
 
 /**
- * Персонально подходящие по возрасту — выше; несовпадения с заметным engagement — второй блок.
- * При отсутствии фильтра по возрасту весь список в primary, сортировка по engagement.
- *
+ * Глобальный контекст «Для кого» задаёт основной слой выдачи.
+ * Несовместимый по возрасту контент никогда не подмешивается обратно в
+ * primary как fallback; если он действительно популярен, он может попасть
+ * только в явно отделённый блок «Популярное у других семей».
  */
 export function partitionDiscoveryFeed(
   filters: DiscoveryFilters,
@@ -99,28 +132,19 @@ export function partitionDiscoveryFeed(
   const matched: ActivityMock[] = [];
   const mismatched: ActivityMock[] = [];
 
-  for (const a of formatFiltered) {
-    if (activityOverlapsAgeRanges(a, ranges)) matched.push(a);
-    else mismatched.push(a);
+  for (const activity of formatFiltered) {
+    if (activityMatchesAgeContext(activity, ranges)) matched.push(activity);
+    else mismatched.push(activity);
   }
 
-  if (matched.length === 0) {
-    return {
-      primary: sortByEngagementThenStable(formatFiltered),
-      secondary: [],
-      secondaryHeading: null,
-    };
-  }
-
-  const primary = sortByEngagementThenStable(matched);
-
+  const primary = sortByAudienceRelevance(matched, ranges);
   const secondaryCandidates = sortByEngagementThenStable(mismatched).filter(
-    (a) => (a.engagementScore ?? 0) >= MIN_ENGAGEMENT_FOR_SECONDARY,
+    (activity) => (activity.engagementScore ?? 0) >= MIN_ENGAGEMENT_FOR_SECONDARY,
   );
 
-  const secondary = secondaryCandidates.slice(0, SECONDARY_MAX).map((a) => ({
-    ...a,
-    ageHintBadge: buildAgeHintBadge(a, ranges),
+  const secondary = secondaryCandidates.slice(0, SECONDARY_MAX).map((activity) => ({
+    ...activity,
+    ageHintBadge: buildAgeHintBadge(activity, ranges),
   }));
 
   return {
