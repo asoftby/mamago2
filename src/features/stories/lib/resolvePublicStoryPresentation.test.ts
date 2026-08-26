@@ -37,6 +37,7 @@ const free: StoryCollection = {
   assert.deepEqual(result.map((collection) => collection.intent), ["today", "free"]);
   assert.equal(result[0]?.title, "Сегодня");
   assert.deepEqual(result[0]?.items.map((entry) => entry.id), ["running-now", "running-today"]);
+  assert.ok(result[0]?.items.every((entry) => entry.eyebrow === "сегодня"));
   console.log("running is folded into Today and future serial items are hidden: OK");
 }
 
@@ -65,6 +66,7 @@ const free: StoryCollection = {
     ["shared", "today-2", "serial-today"],
     "Today + serial Today are merged and deduplicated by stable identity",
   );
+  assert.equal(result[0]?.items.find((entry) => entry.id === "serial-today")?.eyebrow, "сегодня");
   console.log("canonical Today merge/dedupe: OK");
 }
 
