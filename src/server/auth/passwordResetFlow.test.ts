@@ -41,6 +41,28 @@ assert.match(
   "successful password reset must revoke all existing sessions",
 );
 assert.match(resetServer, /export async function isPasswordResetTokenValid/);
+assert.match(
+  resetServer,
+  /prisma\.notificationDelivery\.create/,
+  "password reset email attempts must be visible in NotificationDelivery",
+);
+assert.match(resetServer, /kind: "password-reset"/);
+assert.match(resetServer, /status: "PENDING"/);
+assert.match(resetServer, /status: "SENT"/);
+assert.match(resetServer, /status: "SKIPPED"/);
+assert.match(resetServer, /status: "FAILED"/);
+assert.match(resetServer, /EMAIL_DISABLED/);
+assert.match(resetServer, /EMAIL_NOT_CONFIGURED/);
+assert.match(resetServer, /EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD/);
+assert.match(resetServer, /emailService\.getHealth\(\)/);
+
+const emailHealthRoute = read("src/app/api/admin/communications/email/health/route.ts");
+assert.match(emailHealthRoute, /requireAdminApiUser/);
+assert.match(emailHealthRoute, /provider: "resend"/);
+assert.match(emailHealthRoute, /deliveries1h/);
+assert.match(emailHealthRoute, /lastSuccessfulAt/);
+assert.match(emailHealthRoute, /debugRedirect/);
+assert.match(emailHealthRoute, /MISCONFIGURED/);
 
 const resetPage = read("src/app/(auth)/reset-password/[token]/page.tsx");
 assert.match(resetPage, /await isPasswordResetTokenValid\(token\)/);
