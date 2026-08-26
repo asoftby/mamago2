@@ -16,10 +16,10 @@ import type { Intent } from "@/lib/intent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
-import { getModalFilterCount, useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
-import { EventAdvancedFilters } from "@/components/discovery/EventAdvancedFilters";
+import { EventAdvancedFilters, getEventRefinementCount } from "@/components/discovery/EventAdvancedFilters";
 
 interface RefinementFiltersButtonCompactProps {
   className?: string;
@@ -44,7 +44,7 @@ export function RefinementFiltersButtonCompact({
     budget !== null &&
     budget < (budgetConfig?.max ?? Number.POSITIVE_INFINITY);
   const activeCount = safeIntent === "kuda"
-    ? getModalFilterCount(applied)
+    ? getEventRefinementCount(applied)
     : secondaryActiveCount + (budgetActive ? 1 : 0);
 
   if (!safeIntent) return null;
