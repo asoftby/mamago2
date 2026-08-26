@@ -1,16 +1,93 @@
 import { prisma } from "@/lib/prisma";
 import { generateRawToken, hashToken } from "@/lib/auth/tokenHash";
+import { isProductionAppEnv } from "@/lib/config/productionEnvGuard";
 import { emailService } from "@/features/email/server/email-service";
 
 const VERIFY_TTL_MS = 48 * 60 * 60 * 1000;
 /** Минимальный интервал между отправками письма подтверждения (resend). */
 export const VERIFICATION_EMAIL_RESEND_COOLDOWN_MS = 60_000;
 
+type VerificationDeliveryStatus = "SENT" | "SKIPPED" | "FAILED";
+
 async function recordVerificationEmailSentAt(userId: string): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
     data: { lastVerificationEmailSentAt: new Date() },
   });
+}
+
+async function createVerificationEmailDeliveryAudit(params: {
+  userId: string;
+  debugRedirect: boolean;
+}): Promise<string | null> {
+  try {
+    const delivery = await prisma.notificationDelivery.create({
+      data: {
+        userId: params.userId,
+        channel: "EMAIL",
+        status: "PENDING",
+        attemptCount: 1,
+        payloadJson: {
+          source: "auth",
+          kind: "verify-email",
+          debugRedirect: params.debugRedirect,
+        },
+      },
+      select: { id: true },
+    });
+    return delivery.id;
+  } catch (error) {
+    console.error("[auth] failed to create verification email delivery audit", {
+      userId: params.userId,
+      error,
+    });
+    return null;
+  }
+}
+
+async function finishVerificationEmailDeliveryAudit(params: {
+  deliveryId: string | null;
+  userId: string;
+  status: VerificationDeliveryStatus;
+  errorMessage?: string | null;
+}): Promise<void> {
+  if (!params.deliveryId) return;
+
+  try {
+    await prisma.notificationDelivery.update({
+      where: { id: params.deliveryId },
+      data: {
+        status: params.status,
+        errorMessage:
+          params.status === "SENT"
+            ? null
+            : params.errorMessage ?? "EMAIL_SEND_FAILED",
+        sentAt: params.status === "SENT" ? new Date() : null,
+      },
+    });
+  } catch (error) {
+    console.error("[auth] failed to finalize verification email delivery audit", {
+      userId: params.userId,
+      deliveryId: params.deliveryId,
+      status: params.status,
+      error,
+    });
+  }
+}
+
+function getEmailConfigurationFailure(): {
+  reason: "EMAIL_DISABLED" | "EMAIL_NOT_CONFIGURED" | "EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD";
+  missingKeys?: string[];
+} | null {
+  const health = emailService.getHealth();
+  if (!health.enabled) return { reason: "EMAIL_DISABLED" };
+  if (!health.configured) {
+    return { reason: "EMAIL_NOT_CONFIGURED", missingKeys: health.missingKeys };
+  }
+  if (isProductionAppEnv() && health.debugRedirect) {
+    return { reason: "EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD" };
+  }
+  return null;
 }
 
 export async function issueEmailVerificationForUser(
@@ -47,8 +124,9 @@ export async function sendRegistrationVerificationEmail(
   console.info("[auth] sendRegistrationVerificationEmail called", {
     event: "verify_email_send_started_after_registration",
     userId,
-    email,
   });
+
+  let deliveryId: string | null = null;
 
   try {
     const issued = await issueEmailVerificationForUser(userId);
@@ -57,30 +135,63 @@ export async function sendRegistrationVerificationEmail(
       return { verificationEmailSendFailed: false };
     }
 
+    const health = emailService.getHealth();
+    deliveryId = await createVerificationEmailDeliveryAudit({
+      userId,
+      debugRedirect: health.debugRedirect,
+    });
+
+    const configurationFailure = getEmailConfigurationFailure();
+    if (configurationFailure) {
+      await finishVerificationEmailDeliveryAudit({
+        deliveryId,
+        userId,
+        status: "SKIPPED",
+        errorMessage: configurationFailure.reason,
+      });
+      console.error("[auth] verification email not deliverable", {
+        event: "verify_email_send_skipped_after_registration",
+        userId,
+        reason: configurationFailure.reason,
+        ...(configurationFailure.missingKeys
+          ? { missingKeys: configurationFailure.missingKeys }
+          : {}),
+      });
+      return { verificationEmailSendFailed: true };
+    }
+
     console.info("[auth] calling emailService.sendVerifyEmail", {
       event: "email_service_send_verify_called",
       userId,
-      email,
       tokenPresent: Boolean(issued.token),
     });
 
     await emailService.sendVerifyEmail({ to: email, token: issued.token });
     await recordVerificationEmailSentAt(userId);
+    await finishVerificationEmailDeliveryAudit({
+      deliveryId,
+      userId,
+      status: "SENT",
+    });
 
     console.info("[auth] verification email sent successfully", {
       event: "verify_email_sent_successfully",
       userId,
-      email,
     });
 
     return { verificationEmailSendFailed: false };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const stack = e instanceof Error ? e.stack : undefined;
+    await finishVerificationEmailDeliveryAudit({
+      deliveryId,
+      userId,
+      status: "FAILED",
+      errorMessage: message,
+    });
     console.error("[auth] verification email send failed", {
       event: "verify_email_send_failed_after_registration",
       userId,
-      email,
       message,
       stack,
     });
@@ -95,7 +206,7 @@ export type ResendVerificationResult =
 
 /**
  * Повторная отправка письма подтверждения (авторизованный пользователь).
- * @throws если отправка не удалась при включённой доставке
+ * @throws если отправка не удалась или email-канал не настроен
  */
 export async function resendVerificationEmailForUser(
   userId: string,
@@ -126,9 +237,42 @@ export async function resendVerificationEmailForUser(
     return { sent: false, alreadyVerified: true };
   }
 
-  await emailService.sendVerifyEmail({ to: email, token: issued.token });
-  await recordVerificationEmailSentAt(userId);
-  return { sent: true, alreadyVerified: false };
+  const health = emailService.getHealth();
+  const deliveryId = await createVerificationEmailDeliveryAudit({
+    userId,
+    debugRedirect: health.debugRedirect,
+  });
+  const configurationFailure = getEmailConfigurationFailure();
+
+  if (configurationFailure) {
+    await finishVerificationEmailDeliveryAudit({
+      deliveryId,
+      userId,
+      status: "SKIPPED",
+      errorMessage: configurationFailure.reason,
+    });
+    throw new Error(configurationFailure.reason);
+  }
+
+  try {
+    await emailService.sendVerifyEmail({ to: email, token: issued.token });
+    await recordVerificationEmailSentAt(userId);
+    await finishVerificationEmailDeliveryAudit({
+      deliveryId,
+      userId,
+      status: "SENT",
+    });
+    return { sent: true, alreadyVerified: false };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "EMAIL_SEND_FAILED";
+    await finishVerificationEmailDeliveryAudit({
+      deliveryId,
+      userId,
+      status: "FAILED",
+      errorMessage: message,
+    });
+    throw error;
+  }
 }
 
 export type VerifyEmailResult =
