@@ -18,6 +18,8 @@ It combines:
 - point events / occurrences that belong to the current civil day in the city timezone;
 - serial programs from the internal `running` source only when they have an occurrence on the current day.
 
+Point/occurrence items keep priority; serial programs fill remaining capacity. The merged public collection keeps the existing maximum of 5 items.
+
 The public title is always `Сегодня`. The legacy `Идёт сейчас` wording is not a separate public circle and must not leak into the public viewer for these merged items.
 
 ### Бесплатно
@@ -41,6 +43,8 @@ Reserved contextual circle. It remains hidden until a real `promoUntil` / last-c
 - `newplaces`: deferred until a real publication/freshness signal exists; `Place.createdAt` is polluted by migration/import timing and is not a trustworthy product signal.
 - legacy `near`, `age_3_5`, `new`: type-level leftovers are not part of the canonical public Stories rail.
 
+The admin canonical-rail view may expose internal source names for diagnostics. That does not make those sources separate public circles.
+
 ## Seen / unseen behavior
 
 The existing client behavior remains:
@@ -59,4 +63,5 @@ This behavior is independent of the public circle composition policy above.
 - Serial representative occurrence selection must be deterministic: choose the earliest occurrence inside the applicable range, never depend on database row order.
 - Public temporal language follows the city timezone and calendar day.
 - Contextual circles may overlap `Сегодня`; temporal duplication as separate circles should not.
+- Distinct occurrences of the same content remain distinct Story items even when they share a seen-state identity.
 - Empty collections are not rendered.
