@@ -136,4 +136,23 @@ mkdir -p "$home_dir"
 }
 bash -n "$home_dir/.bashrc"
 
+# Repository paths containing an apostrophe must remain valid shell syntax and
+# round-trip exactly through MAMAGO_REPO.
+quoted_parent="$tmp_root/has'quote"
+quoted_repo="$quoted_parent/repo"
+quoted_home="$tmp_root/quoted-home"
+mkdir -p "$quoted_parent" "$quoted_home"
+quiet_git clone "$remote" "$quoted_repo"
+quiet_git -C "$quoted_repo" checkout dev
+(
+  cd "$quoted_repo"
+  HOME="$quoted_home" SHELL=/bin/bash sh scripts/git/install-shell-shortcuts.sh >/dev/null
+)
+bash -n "$quoted_home/.bashrc"
+resolved_repo="$(HOME="$quoted_home" bash -c '. "$HOME/.bashrc"; printf "%s" "$MAMAGO_REPO"')"
+[ "$resolved_repo" = "$quoted_repo" ] || {
+  echo "[task-workflow-test] shell shortcut installer did not preserve an apostrophe-containing repo path" >&2
+  exit 1
+}
+
 echo "[task-workflow-test] PASS"
