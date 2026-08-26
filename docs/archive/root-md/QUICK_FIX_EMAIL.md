@@ -14,7 +14,7 @@
 
 ```bash
 EMAIL_ENABLED=true
-RESEND_API_KEY=re_c5XCxVwh_JuQ3utb6FHecwzFkmiFoYF1b
+RESEND_API_KEY=re_REVOKED_REDACTED
 # Используется тестовый домен Resend для разработки
 EMAIL_FROM="mamaGo <onboarding@resend.dev>"
 EMAIL_REPLY_TO=hello@mamago.by
