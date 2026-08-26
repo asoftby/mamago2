@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
 import {
+  clearFetchHtmlPolicyStateForTests,
+  fetchHtml,
+} from "./fetchHtml";
+import {
   assertSourceRequestAllowed,
   clearSourceAccessPolicyCacheForTests,
   getActiveSourceFetchSettings,
@@ -28,6 +32,23 @@ Disallow: /
   assert.equal(isPathAllowedByRobots(policy, "/afisha/admin/test"), false);
   assert.equal(isPathAllowedByRobots(policy, "/afisha/admin/public"), true);
   assert.equal(isPathAllowedByRobots(policy, "/afisha/admin/public/child"), false);
+}
+
+async function makeFamilyContext() {
+  const source = {
+    slug: "family-by-afisha",
+    parserKey: "family-by-afisha-event",
+    baseUrl: "https://family.by/afisha/",
+    fetchStrategy: "HTML_SCRAPE",
+  } as never;
+
+  return prepareSourceAccessContext(source, async (url) => {
+    assert.equal(url, "https://family.by/robots.txt");
+    return {
+      status: 200,
+      text: "User-agent: *\nDisallow: /afisha/private/\nCrawl-delay: 1\n",
+    };
+  });
 }
 
 async function testManagedSourceContext() {
@@ -83,6 +104,73 @@ async function testManagedSourceContext() {
   assert.equal(robotsFetches, 1);
 }
 
+async function testManagedFetchCachesAndAvoidsIdentifyingHeaders() {
+  clearSourceAccessPolicyCacheForTests();
+  clearFetchHtmlPolicyStateForTests();
+  const context = await makeFamilyContext();
+  assert.ok(context);
+
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  let observedHeaders: Headers | null = null;
+
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    calls += 1;
+    observedHeaders = new Headers(init?.headers);
+    return new Response("<html>ok</html>", { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    await withSourceAccessContext(context, async () => {
+      const options = {
+        retries: 1,
+        nodeHttpFallback: false,
+        minRequestIntervalMs: 0,
+        cacheTtlMs: 60_000,
+      } as const;
+      await fetchHtml("https://family.by/afisha/123-event.html", options);
+      await fetchHtml("https://family.by/afisha/123-event.html", options);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearFetchHtmlPolicyStateForTests();
+  }
+
+  assert.equal(calls, 1, "the second identical HTML request must use the source-aware cache");
+  assert.ok(observedHeaders);
+  assert.equal(observedHeaders.get("cache-control"), null);
+  assert.equal(observedHeaders.get("pragma"), null);
+  assert.doesNotMatch(observedHeaders.get("user-agent") ?? "", /mamago/i);
+}
+
+async function test429IsNotRetried() {
+  clearFetchHtmlPolicyStateForTests();
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response("rate limited", { status: 429, statusText: "Too Many Requests" });
+  }) as typeof fetch;
+
+  try {
+    await assert.rejects(
+      () =>
+        fetchHtml("https://example.com/rate-limited", {
+          retries: 3,
+          retryDelayMs: 0,
+          nodeHttpFallback: false,
+        }),
+      /status 429/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    clearFetchHtmlPolicyStateForTests();
+  }
+
+  assert.equal(calls, 1, "HTTP 429 must not be retried automatically");
+}
+
 async function testRobotsFailureIsFailClosed() {
   clearSourceAccessPolicyCacheForTests();
 
@@ -106,6 +194,8 @@ async function testRobotsFailureIsFailClosed() {
 async function main() {
   testRobotsParsingAndSpecificity();
   await testManagedSourceContext();
+  await testManagedFetchCachesAndAvoidsIdentifyingHeaders();
+  await test429IsNotRetried();
   await testRobotsFailureIsFailClosed();
   console.log("sourceAccessPolicy tests: OK");
 }
