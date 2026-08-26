@@ -7,4 +7,20 @@ if [ "$remote_name" = "origin" ] && [ "$branch" = "main" ]; then
   exit 1
 fi
 
+if [ "$remote_name" = "origin" ] && [ "$branch" = "dev" ]; then
+  echo "Checking that local dev is not behind origin/dev..."
+  if ! git fetch --quiet origin dev; then
+    echo "Push blocked: could not refresh origin/dev, so remote freshness cannot be proven."
+    exit 1
+  fi
+
+  behind="$(git rev-list --count HEAD..origin/dev)"
+  if [ "$behind" -gt 0 ]; then
+    echo "Push blocked: local dev is behind origin/dev by $behind commit(s)."
+    echo "Do not force-push or reset. Reconcile with the current remote dev first."
+    echo "Inspect with: git log --oneline --decorate --graph --left-right HEAD...origin/dev"
+    exit 1
+  fi
+fi
+
 pnpm check:push
