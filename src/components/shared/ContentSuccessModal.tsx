@@ -70,8 +70,11 @@ export function ContentSuccessModal({
     return null;
   }
 
-  const openHref =
-    hydrated && state.openAction ? sameOriginUrl(state.openAction.href) : state.openAction?.href;
+  // Open actions deliberately preserve the resolver-provided destination:
+  // published content points at the canonical public origin, while preview
+  // actions are relative and therefore stay on the current admin/business host.
+  // Only editor/list navigation is rebased to the current surface.
+  const openHref = state.openAction?.href;
   const editHref =
     hydrated && state.continueEditingAction
       ? sameOriginUrl(state.continueEditingAction.href)
@@ -102,20 +105,14 @@ export function ContentSuccessModal({
         <DialogFooter className="flex-col gap-2 sm:flex-col">
           {state.openAction && openHref ? (
             <PrimaryButton className="w-full" asChild>
-              {state.openAction.target === "_blank" ? (
-                <a
-                  href={openHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => onOpenChange(false)}
-                >
-                  {state.openAction.label}
-                </a>
-              ) : (
-                <Link href={openHref} onClick={() => onOpenChange(false)}>
-                  {state.openAction.label}
-                </Link>
-              )}
+              <a
+                href={openHref}
+                target={state.openAction.target}
+                rel={state.openAction.target === "_blank" ? "noopener noreferrer" : undefined}
+                onClick={() => onOpenChange(false)}
+              >
+                {state.openAction.label}
+              </a>
             </PrimaryButton>
           ) : null}
           {state.continueEditingAction && editHref ? (
