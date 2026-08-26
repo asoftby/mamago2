@@ -1,218 +1,102 @@
 import assert from "node:assert/strict";
-
 import type { SendNotificationResult } from "@/lib/notifications/domainContracts";
+import type { PlanTomorrowDigestCandidate } from "@/server/services/plan.service";
 import { runPlanTomorrowDigestsCore } from "./run-plan-tomorrow-digests-core";
 
-const now = new Date("2026-05-14T07:00:00.000Z");
+const now = new Date("2026-10-24T21:30:00.000Z");
+
+function item(userId: string, id: string, startsAt: Date | null): PlanTomorrowDigestCandidate {
+  return {
+    id,
+    userId,
+    activityId: null,
+    routeId: null,
+    placeId: null,
+    articleId: null,
+    planRouteSlug: null,
+    planPlaceSlug: null,
+    date: userId === "minsk" ? "2026-10-26" : "2026-10-25",
+    startsAt,
+    title: id,
+    coverImageUrl: null,
+    createdAt: new Date(`2026-10-20T00:0${id.at(-1) ?? "0"}:00.000Z`),
+    activity: null,
+  } as PlanTomorrowDigestCandidate;
+}
+
+const sent: SendNotificationResult = {
+  status: "SENT",
+  notificationId: "notification",
+  prepared: {} as never,
+  deliveries: [],
+};
 
 void (async () => {
-  {
-    let sendCalls = 0;
-
-    const result = await runPlanTomorrowDigestsCore(
-      { now },
-      {
-        listPlanItemsForTomorrowDigestFn: async ({ date }) => {
-          assert.equal(date, "2026-05-15");
-          return [
-            {
-              id: "plan_1",
-              userId: "user_1",
-              activityId: "activity_1",
-              routeId: null,
-              planRouteSlug: null,
-              date: "2026-05-15",
-              startsAt: new Date("2026-05-15T08:00:00.000Z"),
-              title: "Детский спектакль",
-              coverImageUrl: null,
-              createdAt: new Date("2026-05-10T09:00:00.000Z"),
-              activity: {
-                id: "activity_1",
-                slug: "show",
-                title: "Детский спектакль",
-                type: "EVENT",
-                coverImageUrl: null,
-                ageLabel: null,
-                eventCategory: null,
-                priceFrom: null,
-                priceText: null,
-                currency: null,
-                status: "PUBLISHED",
-                owner: null,
-                place: {
-                  shortAddress: "Театр кукол",
-                  formattedAddr: null,
-                  customAddress: null,
-                  city: { name: "Минск" },
-                },
-                venue: null,
-                scheduleJson: null,
-              },
-            },
-            {
-              id: "plan_2",
-              userId: "user_1",
-              activityId: "activity_2",
-              routeId: null,
-              planRouteSlug: null,
-              date: "2026-05-15",
-              startsAt: null,
-              title: "Мастер-класс",
-              coverImageUrl: null,
-              createdAt: new Date("2026-05-10T10:00:00.000Z"),
-              activity: null,
-            },
-          ];
-        },
-        getTelegramConnectionFn: async () => ({
-          isActive: true,
-          telegramChatId: "chat_1",
-        }),
-        getChannelPreferencesFn: async () => ({
-          IN_APP: true,
-          EMAIL: false,
-          TELEGRAM: true,
-        }),
-        sendNotificationFn: async (input): Promise<SendNotificationResult> => {
-          sendCalls += 1;
-          assert.equal(input.scenario, "PLAN_TOMORROW_DIGEST");
-          assert.equal(input.userId, "user_1");
-          assert.equal(input.context.items.length, 2);
-          assert.equal(input.context.items[0]?.eventTitle, "Детский спектакль");
-          assert.equal(input.context.items[1]?.eventTitle, "Мастер-класс");
-
-          return {
-            status: "SENT",
-            notificationId: "notif_1",
-            prepared: {
-              scenario: "PLAN_TOMORROW_DIGEST",
-              userId: "user_1",
-              dedupeKey: "PLAN_TOMORROW_DIGEST:user_1:2026-05-15",
-              content: {
-                title: "Завтра в плане",
-                body: "digest",
-                ctaLabel: "Открыть мой план",
-                ctaUrl: "/me/plan",
-              },
-              context: input.context,
-              shouldSend: true,
-              skipReason: null,
-            },
-            deliveries: [
-              {
-                channel: "IN_APP",
-                status: "SENT",
-                deliveryId: "delivery_in_app",
-              },
-              {
-                channel: "TELEGRAM",
-                status: "SENT",
-                deliveryId: "delivery_tg",
-              },
-            ],
-          };
-        },
+  const targets: Array<{ userId: string; date: string }> = [];
+  const advances: string[] = [];
+  const sends: Array<{ userId: string; ids: string[]; timeZone: string }> = [];
+  const result = await runPlanTomorrowDigestsCore(
+    { now },
+    {
+      listDueSchedulesFn: async () => [
+        { userId: "minsk", timeZone: "Europe/Minsk", planEveningNextRunAt: now },
+        { userId: "amsterdam", timeZone: "Europe/Amsterdam", planEveningNextRunAt: now },
+        { userId: "empty", timeZone: "Europe/Amsterdam", planEveningNextRunAt: now },
+      ],
+      listPlanItemsForUserDatesFn: async (input) => {
+        targets.push(...input);
+        return [
+          item("minsk", "item_3", null),
+          item("minsk", "item_2", new Date("2026-10-26T12:00:00.000Z")),
+          item("minsk", "item_1", new Date("2026-10-26T08:00:00.000Z")),
+          item("amsterdam", "item_4", new Date("2026-10-25T08:00:00.000Z")),
+        ];
       },
-    );
-
-    assert.equal(sendCalls, 1);
-    assert.equal(result.usersProcessed, 1);
-    assert.equal(result.messagesSent, 1);
-    assert.equal(result.planItemsIncluded, 2);
-  }
-
-  {
-    let sendCalls = 0;
-
-    const result = await runPlanTomorrowDigestsCore(
-      { now },
-      {
-        listPlanItemsForTomorrowDigestFn: async () => [
-          {
-            id: "plan_3",
-            userId: "user_2",
-            activityId: "activity_3",
-            routeId: null,
-            planRouteSlug: null,
-            date: "2026-05-15",
-            startsAt: new Date("2026-05-15T12:00:00.000Z"),
-            title: "Концерт",
-            coverImageUrl: null,
-            createdAt: new Date("2026-05-10T10:00:00.000Z"),
-            activity: null,
-          },
-        ],
-        getTelegramConnectionFn: async () => null,
-        getChannelPreferencesFn: async () => ({
-          IN_APP: true,
-          EMAIL: false,
-          TELEGRAM: true,
-        }),
-        sendNotificationFn: async (): Promise<SendNotificationResult> => {
-          sendCalls += 1;
-          throw new Error("should not send");
-        },
+      advanceScheduleFn: async (userId) => { advances.push(userId); },
+      sendNotificationFn: async (input) => {
+        sends.push({
+          userId: input.userId,
+          ids: input.context.items.map((entry) => entry.planItemId),
+          timeZone: input.context.timeZone,
+        });
+        return sent;
       },
-    );
+    },
+  );
 
-    assert.equal(sendCalls, 0);
-    assert.equal(result.skippedNoTelegram, 1);
-  }
+  assert.deepEqual(targets, [
+    { userId: "minsk", date: "2026-10-26" },
+    { userId: "amsterdam", date: "2026-10-25" },
+    { userId: "empty", date: "2026-10-25" },
+  ]);
+  assert.deepEqual(sends, [
+    { userId: "minsk", ids: ["item_1", "item_2", "item_3"], timeZone: "Europe/Minsk" },
+    { userId: "amsterdam", ids: ["item_4"], timeZone: "Europe/Amsterdam" },
+  ]);
+  assert.deepEqual(advances, ["minsk", "amsterdam", "empty"]);
+  assert.equal(result.messagesSent, 2);
+  assert.equal(result.planItemsIncluded, 4);
+  assert.equal(result.skippedEmptyPlan, 1);
 
-  {
-    const result = await runPlanTomorrowDigestsCore(
-      { now },
-      {
-        listPlanItemsForTomorrowDigestFn: async () => [
-          {
-            id: "plan_4",
-            userId: "user_3",
-            activityId: "activity_4",
-            routeId: null,
-            planRouteSlug: null,
-            date: "2026-05-15",
-            startsAt: new Date("2026-05-15T12:00:00.000Z"),
-            title: "Экскурсия",
-            coverImageUrl: null,
-            createdAt: new Date("2026-05-10T10:00:00.000Z"),
-            activity: null,
-          },
-        ],
-        getTelegramConnectionFn: async () => ({
-          isActive: true,
-          telegramChatId: "chat_3",
-        }),
-        getChannelPreferencesFn: async () => ({
-          IN_APP: true,
-          EMAIL: false,
-          TELEGRAM: true,
-        }),
-        sendNotificationFn: async (input): Promise<SendNotificationResult> => ({
-          status: "SKIPPED",
-          notificationId: null,
-          prepared: {
-            scenario: "PLAN_TOMORROW_DIGEST",
-            userId: "user_3",
-            dedupeKey: "PLAN_TOMORROW_DIGEST:user_3:2026-05-15",
-            content: {
-              title: "Завтра в плане",
-              body: "digest",
-              ctaLabel: "Открыть мой план",
-              ctaUrl: "/me/plan",
-            },
-            context: input.context,
-            shouldSend: false,
-            skipReason: "DUPLICATE_ALREADY_SENT",
-          },
-          deliveries: [],
-          reason: "DUPLICATE_ALREADY_SENT",
-        }),
-      },
-    );
-
-    assert.equal(result.skippedDuplicate, 1);
-    assert.equal(result.messagesSent, 0);
-  }
+  const duplicate = await runPlanTomorrowDigestsCore(
+    { now },
+    {
+      listDueSchedulesFn: async () => [
+        { userId: "minsk", timeZone: "Europe/Minsk", planEveningNextRunAt: now },
+      ],
+      listPlanItemsForUserDatesFn: async () => [item("minsk", "item_1", now)],
+      advanceScheduleFn: async () => undefined,
+      sendNotificationFn: async (input) => ({
+        status: "SKIPPED",
+        notificationId: null,
+        prepared: { scenario: input.scenario, userId: input.userId, context: input.context, dedupeKey: "digest", shouldSend: false, skipReason: "DUPLICATE_ALREADY_SENT", content: { title: "", body: "", ctaLabel: null, ctaUrl: null } },
+        deliveries: [],
+        reason: "DUPLICATE_ALREADY_SENT",
+      }),
+    },
+  );
+  assert.equal(duplicate.skippedDuplicate, 1);
+  assert.equal(duplicate.messagesSent, 0);
 
   console.log("run-plan-tomorrow-digests tests: OK");
 })().catch((error) => {

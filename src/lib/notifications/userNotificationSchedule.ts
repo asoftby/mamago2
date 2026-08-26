@@ -116,3 +116,14 @@ export function isPlanReminderOffsetAllowed(
     : USER_PLAN_REMINDER_OFFSETS;
   return (allowed as readonly number[]).includes(offsetMinutes);
 }
+
+export function normalizePlanReminderOffset(
+  offsetMinutes: number | null | undefined,
+  isAdmin: boolean,
+): number {
+  return offsetMinutes !== null &&
+    offsetMinutes !== undefined &&
+    isPlanReminderOffsetAllowed(offsetMinutes, isAdmin)
+    ? offsetMinutes
+    : DEFAULT_PLAN_REMINDER_OFFSET_MINUTES;
+}

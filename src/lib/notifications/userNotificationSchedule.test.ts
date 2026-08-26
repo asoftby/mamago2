@@ -1,11 +1,23 @@
 import assert from "node:assert/strict";
 import {
+  ADMIN_PLAN_REMINDER_OFFSETS,
   computeNextPlanEveningRunAt,
+  DEFAULT_PLAN_EVENING_TIME,
+  DEFAULT_PLAN_REMINDER_OFFSET_MINUTES,
   getTimeZoneDateKey,
   isPlanReminderOffsetAllowed,
   isValidTimeZone,
+  normalizePlanReminderOffset,
+  USER_PLAN_REMINDER_OFFSETS,
   zonedLocalDateTimeToUtc,
 } from "./userNotificationSchedule";
+
+assert.equal(DEFAULT_PLAN_EVENING_TIME, "19:00");
+assert.equal(DEFAULT_PLAN_REMINDER_OFFSET_MINUTES, 120);
+assert.deepEqual(USER_PLAN_REMINDER_OFFSETS, [30, 60, 120, 180]);
+assert.deepEqual(ADMIN_PLAN_REMINDER_OFFSETS, [5, 30, 60, 120, 180]);
+assert.equal(normalizePlanReminderOffset(5, false), 120);
+assert.equal(normalizePlanReminderOffset(5, true), 5);
 
 assert.equal(isValidTimeZone("Europe/Minsk"), true);
 assert.equal(isValidTimeZone("Not/A_Zone"), false);

@@ -35,12 +35,14 @@ void (async () => {
           candidate("u30", new Date("2026-08-27T12:30:00.000Z")),
           candidate("u120", new Date("2026-08-27T14:00:00.000Z")),
           candidate("uLater", new Date("2026-08-27T15:00:00.000Z")),
+          candidate("disabled", new Date("2026-08-27T14:00:00.000Z")),
         ],
         getReminderSettingsForUsersFn: async () =>
           new Map([
             ["u30", { enabled: true, offsetMinutes: 30, timeZone: "Europe/Minsk" }],
             ["u120", { enabled: true, offsetMinutes: 120, timeZone: "Europe/Amsterdam" }],
             ["uLater", { enabled: true, offsetMinutes: 120, timeZone: "Europe/Minsk" }],
+            ["disabled", { enabled: false, offsetMinutes: 120, timeZone: "Europe/Minsk" }],
           ]),
         sendNotificationFn: async (input) => {
           sends.push({ userId: input.userId, timeZone: input.context.timeZone });
@@ -49,9 +51,9 @@ void (async () => {
       },
     );
 
-    assert.equal(result.candidatesFound, 3);
+    assert.equal(result.candidatesFound, 4);
     assert.equal(result.dueCandidates, 2);
-    assert.equal(result.skippedSchedule, 1);
+    assert.equal(result.skippedSchedule, 2);
     assert.equal(result.sent, 2);
     assert.deepEqual(sends, [
       { userId: "u30", timeZone: "Europe/Minsk" },

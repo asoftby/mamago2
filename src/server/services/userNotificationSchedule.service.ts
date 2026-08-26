@@ -8,6 +8,7 @@ import {
   isPlanReminderOffsetAllowed,
   isValidLocalTime,
   isValidTimeZone,
+  normalizePlanReminderOffset,
   type NotificationTimeZoneMode,
 } from "@/lib/notifications/userNotificationSchedule";
 
@@ -220,15 +221,10 @@ export async function getReminderSettingsForUsers(
 
   return new Map(
     users.map((user) => {
-      const storedOffset =
-        user.notificationSchedule?.planReminderOffsetMinutes ??
-        DEFAULT_PLAN_REMINDER_OFFSET_MINUTES;
-      const offsetMinutes = isPlanReminderOffsetAllowed(
-        storedOffset,
+      const offsetMinutes = normalizePlanReminderOffset(
+        user.notificationSchedule?.planReminderOffsetMinutes,
         user.role === Role.ADMIN,
-      )
-        ? storedOffset
-        : DEFAULT_PLAN_REMINDER_OFFSET_MINUTES;
+      );
 
       return [
         user.id,

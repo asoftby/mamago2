@@ -27,6 +27,7 @@ import {
   wouldDisableLastSystemNotificationChannel,
 } from "@/lib/notifications/userNotificationPresentation";
 import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
+import { PlanNotificationScheduleSettings } from "./PlanNotificationScheduleSettings";
 
 interface Props {
   initialData: NotificationSettingsSurfaceData;
@@ -537,6 +538,9 @@ export function NotificationPreferencesClient({
                     })}
                   </div>
                 </div>
+                {definition.notificationType === "REMINDER" ? (
+                  <PlanNotificationScheduleSettings />
+                ) : null}
               </div>
             );
           })}
