@@ -2,6 +2,30 @@
 
 > **CRITICAL: Before using or merging any agent/worktree output, verify its base SHA against the current repository HEAD. Never copy stale worktree files over newer repository files.**
 
+## Task Start / Environment Consistency — mandatory for EVERY new task
+
+A **new task** is any distinct user request that may change repository files, including a new request inside the same chat/session. This protocol is mandatory before implementation starts.
+
+1. In the canonical `dev` checkout run:
+
+```bash
+sh scripts/git/session-start-gate.sh
+```
+
+2. Continue only after `PASS`: local `HEAD` must exactly match freshly fetched `origin/dev`. If the gate reports stale, ahead, diverged, tracked/staged WIP, or cannot fetch the remote, STOP. Do not repair the state with `reset --hard`, force-push, broad checkout/restore, or automatic pull/rebase.
+3. Capture the exact clean base SHA:
+
+```bash
+BASE_HEAD=$(git rev-parse HEAD)
+```
+
+4. Every implementation task must run in its **own isolated task worktree/branch created from that exact `BASE_HEAD`**. Do not implement a new task directly in a shared worktree, and do not reuse an old task worktree for a different task without re-validating it against fresh `origin/dev`.
+5. Before integrating, committing to a shared branch, or pushing task output, fetch `origin/dev` again and compare it with `BASE_HEAD`. If `origin/dev` advanced, treat the task output as potentially stale: reconcile deliberately on top of the fresh base, inspect overlapping files, and rerun relevant verification before integration.
+6. Git/GitHub commit SHA is the source of truth. `local`, DEV, and PROD are environments, not independent code histories. Never make manual code edits directly on DEV or PROD.
+7. After deployment, verify that the environment reports the expected `gitSha`/build identity before claiming the change is deployed. PROD must come from a known, verified Git commit/artifact; never treat server filesystem state as authoritative source code.
+
+**Core task-start rule:** fresh `origin/dev` → exact `BASE_HEAD` → isolated task worktree/branch → verified integration → deployment identity check. If freshness cannot be proven, repository-changing work does not start.
+
 ## Git / Worktree Safety — mandatory
 
 Правила обязательны для любых параллельных задач, subagents, background agents и временных worktree.

@@ -11,7 +11,8 @@ import {
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
-import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
+import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
+import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import { syncOfferHomeStoryPlacements } from "@/server/stories/homeStoryItems";
@@ -256,6 +257,9 @@ export async function PATCH(
         status: true,
         productType: true,
         priceFrom: true,
+        priceTo: true,
+        priceMode: true,
+        priceItems: true,
         priceText: true,
         agePolicy: true,
         ageMinMonths: true,
@@ -341,6 +345,10 @@ export async function PATCH(
 
     // Calculate price fields if pricing data is provided
     let priceFrom: number | null = existingOffer.priceFrom;
+    let priceTo: number | null = existingOffer.priceTo;
+    let priceMode = existingOffer.priceMode;
+    let priceItems: Prisma.InputJsonValue | typeof Prisma.DbNull =
+      existingOffer.priceItems == null ? Prisma.DbNull : existingOffer.priceItems as Prisma.InputJsonValue;
     let priceText: string | null = existingOffer.priceText;
 
     const isCampOffer =
@@ -351,13 +359,26 @@ export async function PATCH(
       data.campSessions !== undefined ? data.campSessions : existingOffer.campSessions;
 
     if (isCampOffer) {
-      priceFrom = getMinCampSessionPrice(nextCampSessions);
+      const values = getCampSessionPriceValues(nextCampSessions);
+      const normalized = normalizePublicationPrice({ priceItems: values.map((price) => ({ price })) });
+      priceFrom = normalized.min;
+      priceTo = normalized.max;
+      priceMode = normalized.mode;
+      priceItems = values.map((price) => ({ price })) as Prisma.InputJsonValue;
       priceText = priceFrom != null ? formatPriceFrom(priceFrom) : null;
     } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
-      priceFrom = data.singlePrice;
+      const normalized = normalizePublicationPrice({ mode: "EXACT", min: data.singlePrice });
+      priceFrom = normalized.min;
+      priceTo = normalized.max;
+      priceMode = normalized.mode;
+      priceItems = Prisma.DbNull;
       priceText = data.singlePriceLabel || null;
     } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions && data.pricingOptions.length > 0) {
-      priceFrom = Math.min(...data.pricingOptions.map(p => p.price));
+      const normalized = normalizePublicationPrice({ priceItems: data.pricingOptions });
+      priceFrom = normalized.min;
+      priceTo = normalized.max;
+      priceMode = normalized.mode;
+      priceItems = data.pricingOptions as Prisma.InputJsonValue;
       priceText = formatPriceFrom(priceFrom);
     }
     
@@ -497,6 +518,10 @@ export async function PATCH(
 
     // Update price fields if they were recalculated
     if (priceFrom !== existingOffer.priceFrom) updateData.priceFrom = priceFrom;
+    if (priceTo !== existingOffer.priceTo) updateData.priceTo = priceTo;
+    if (priceMode !== existingOffer.priceMode) updateData.priceMode = priceMode;
+    if (data.pricingMode !== undefined || isCampOffer) updateData.priceItems = priceItems;
+    updateData.currency = "BYN";
     if (priceText !== existingOffer.priceText) updateData.priceText = priceText;
     const productType =
       data.productType !== undefined

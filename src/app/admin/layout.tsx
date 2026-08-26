@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import React from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -16,6 +17,11 @@ import { BackofficeProviders } from "@/components/providers/BackofficeProviders"
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 import { getBuildInfo } from "@/lib/system/buildInfo";
 import { getCurrentAppVersion } from "@/lib/system/getCurrentAppVersion";
+import { PERMANENT_NOINDEX_ROBOTS } from "@/lib/seo/indexingPolicy";
+
+export const metadata: Metadata = {
+  robots: PERMANENT_NOINDEX_ROBOTS,
+};
 
 const EMPTY_MODERATION_COUNTS: ModerationNavCounts = {
   queueTotal: 0,

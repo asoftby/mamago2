@@ -306,7 +306,7 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
             disabled: !isEditable,
             onClick: () => isEditable && handleAgeGroupsChange(ageOption.key),
             })),
-            { id: "adult-only", label: "Только 18+", active: data.agePolicy === AgePolicy.ADULT_ONLY, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.ADULT_ONLY, ageGroups: [] }) },
+            { id: "adult-only", label: "#nokids", active: data.agePolicy === AgePolicy.ADULT_ONLY, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.ADULT_ONLY, ageGroups: [] }) },
           ]}
         />
         <p className="text-xs text-muted-foreground">

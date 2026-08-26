@@ -15,15 +15,14 @@ import {
 } from "@/server/services/dayScenario.service";
 import {
   resolveScenarioItemTime,
-  resolveReliableDurationMinutes,
   sortScenarioItemsByEffectiveTime,
-  deriveFreeGapMinutes,
   deriveEndOfDay,
 } from "@/features/my-plan/lib/scenarioProjection";
 import { resolveActivityAddress } from "@/features/my-plan/lib/formatActivityAddress";
-import { detectScenarioConflictIds } from "@/features/my-plan/lib/detectScenarioConflicts";
+import { detectScenarioConflicts } from "@/features/my-plan/lib/detectScenarioConflicts";
+import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
-import { ScenarioTimeline, type ScenarioTimelineItem } from "@/features/my-plan/components/ScenarioTimeline";
+import { ScenarioDraftEditor } from "@/features/my-plan/components/ScenarioDraftEditor";
 import { refreshDayScenarioAction } from "./actions";
 
 export const metadata: Metadata = {
@@ -105,21 +104,28 @@ export default async function DayScenarioPage({ params }: PageProps) {
     );
   }
 
-  const currentFingerprint = computePlanFingerprint(items);
-  const planChanged = currentFingerprint !== existingScenario.planFingerprint;
   const overrides = await listScenarioItemOverrides(existingScenario.id);
+  const currentFingerprint = computePlanFingerprint(
+    items,
+    overrides,
+    existingScenario.acceptedConflictKeys,
+  );
+  const planChanged = currentFingerprint !== existingScenario.planFingerprint;
 
   const withTiming = items.map((item) => {
     const timing = resolveScenarioItemTime(item, overrides.get(item.id) ?? null);
+    const scheduling = resolveScenarioScheduling({ activity: item.activity, timing });
     return {
       id: item.id,
+      activityId: item.activityId,
+      activity: item.activity,
       title: item.title || item.activity?.title || "Активность",
       href:
         item.activityId && item.activity
           ? publicActivityPath(item.activityId, city.slug, item.activity.slug)
           : null,
       address: item.activity ? resolveActivityAddress(item.activity) : null,
-      durationMinutes: resolveReliableDurationMinutes(item),
+      durationMinutes: scheduling.durationMinutes,
       imageUrl: item.coverImageUrl || item.activity?.coverImageUrl || null,
       effectiveStartsAt: timing.effectiveStartsAt,
       isFlexible: timing.isFlexible,
@@ -127,51 +133,32 @@ export default async function DayScenarioPage({ params }: PageProps) {
         ? formatTime(overrides.get(item.id) ?? null)
         : null,
       createdAt: item.createdAt,
+      scheduling,
     };
   });
 
   const sorted = sortScenarioItemsByEffectiveTime(withTiming);
 
-  const conflictIds = detectScenarioConflictIds(
-    sorted.map((item) => ({ id: item.id, startsAt: item.effectiveStartsAt })),
+  const conflicts = detectScenarioConflicts(
+    sorted.map((item) => ({ id: item.id, contentId: item.activityId, scheduling: item.scheduling })),
   );
 
-  const timelineItems: ScenarioTimelineItem[] = sorted.map((item, index) => {
-    const previous = index > 0 ? sorted[index - 1] : null;
-    const freeGapBeforeMinutes =
-      previous && previous.effectiveStartsAt && item.effectiveStartsAt
-        ? deriveFreeGapMinutes(
-            {
-              id: previous.id,
-              effectiveStartsAt: previous.effectiveStartsAt,
-              durationMinutes: previous.durationMinutes,
-            },
-            {
-              id: item.id,
-              effectiveStartsAt: item.effectiveStartsAt,
-              durationMinutes: item.durationMinutes,
-            },
-          )
-        : null;
-
-    return {
-      id: item.id,
-      title: item.title,
-      href: item.href,
-      address: item.address,
-      durationMinutes: item.durationMinutes,
-      imageUrl: item.imageUrl,
-      effectiveStartsAt: item.effectiveStartsAt,
-      isFlexible: item.isFlexible,
-      overrideTime: item.overrideTime,
-      hasConflict: conflictIds.has(item.id),
-      // Overlap amount would require a real (not assumed) duration to state
-      // truthfully — not available yet, so never shown (see
-      // resolveReliableDurationMinutes).
-      conflictOverlapMinutes: null,
-      freeGapBeforeMinutes,
-    };
-  });
+  const clientItems = sorted.map((item) => ({
+    planItemId: item.id,
+    activityId: item.activityId,
+    activitySessionId:
+      item.activity?.sessions.find(
+        (session) => session.startsAt.getTime() === item.scheduling.startsAt?.getTime(),
+      )?.id ?? null,
+    title: item.title,
+    coverImageUrl: item.imageUrl,
+    href: item.href,
+    startsAt: item.scheduling.startsAt?.toISOString() ?? null,
+    endsAt: item.scheduling.endsAt?.toISOString() ?? null,
+    durationMinutes: item.scheduling.durationMinutes,
+    schedulingKind: item.scheduling.kind,
+    canReschedule: item.scheduling.canReschedule,
+  }));
 
   const timedSorted = sorted.filter(
     (item): item is typeof item & { effectiveStartsAt: Date } => item.effectiveStartsAt != null,
@@ -231,7 +218,14 @@ export default async function DayScenarioPage({ params }: PageProps) {
       ) : null}
 
       <div className="mt-6">
-        <ScenarioTimeline items={timelineItems} city={city.slug} date={date} />
+        <ScenarioDraftEditor
+          items={clientItems}
+          conflicts={conflicts}
+          acceptedConflictKeys={existingScenario.acceptedConflictKeys}
+          fingerprint={currentFingerprint}
+          city={city.slug}
+          date={date}
+        />
       </div>
 
       {endOfDay ? (

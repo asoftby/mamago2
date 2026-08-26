@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { Role, UserStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
+import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 
 export const runtime = "nodejs";
 
 /**
- * Справочники для редактора статьи: города + пользователи, которые могут быть системными авторами.
+ * Справочники для редактора статьи: города, области (регионы) + пользователи, которые могут быть системными авторами.
  */
 export async function GET() {
   const user = await requireAdminOrModerator();
@@ -14,10 +15,19 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [cities, authors, categories] = await Promise.all([
+  const [cities, regions, authors, categories] = await Promise.all([
     prisma.city.findMany({
       where: { isLegacyNonCity: false },
       orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true },
+    }),
+    prisma.region.findMany({
+      where: {
+        type: "OBLAST",
+        isActive: true,
+        country: { isoCode: DEFAULT_COUNTRY_ISO },
+      },
+      orderBy: [{ priority: "desc" }, { name: "asc" }],
       select: { id: true, name: true, slug: true },
     }),
     prisma.user.findMany({
@@ -48,6 +58,7 @@ export async function GET() {
 
   return NextResponse.json({
     cities,
+    regions,
     authors: authorOptions,
     categories: categories.map((c) => ({
       id: c.id,

@@ -37,3 +37,24 @@ jobs:
         run: pnpm tsc --noEmit
         env:
           NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Password reset regressions
+        run: pnpm exec tsx src/server/auth/passwordResetFlow.test.ts
+
+      - name: External analytics contract regressions
+        run: |
+          pnpm exec tsx src/lib/analytics/externalAnalyticsConfig.test.ts
+          pnpm exec tsx src/lib/analytics/externalAnalyticsContract.test.ts
+
+      - name: SEO indexing regressions
+        run: |
+          pnpm exec tsx src/lib/seo/globalNoindex.test.ts
+          pnpm exec tsx src/app/robots.test.ts
+          pnpm exec tsx src/lib/seo/indexingPolicy.test.ts
+          pnpm exec tsx src/lib/routing/legacyProdPreviewRedirect.test.ts
+          pnpm exec tsx src/lib/routing/subdomainMiddleware.test.ts
+          pnpm exec tsx scripts/verify-prelaunch-seo.test.ts
+          pnpm exec tsx scripts/verify-indexing-release.test.ts
+
+      - name: Imported media source privacy regression
+        run: pnpm exec tsx src/lib/media/importedMediaPrivacy.test.ts

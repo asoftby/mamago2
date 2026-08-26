@@ -2,7 +2,6 @@ import {
   CalendarDays,
   CalendarCheck,
   Lightbulb,
-  Map,
   MessageCircle,
   Settings,
   Shield,
@@ -60,7 +59,6 @@ export function buildPublicSiteAccountModel(input: {
     onGoToPersonalPlan,
     onGoToPersonalBookings,
     onGoToPersonalDirect,
-    onGoToPersonalRoutes,
     onGoToSettings,
     onGoToBusinessBilling,
     onGoToBusinessAccount,
@@ -131,15 +129,7 @@ export function buildPublicSiteAccountModel(input: {
           onGoToPersonalDirect();
         },
       },
-      {
-        key: "routes",
-        type: "button",
-        label: "Мои маршруты",
-        icon: Map,
-        onClick: () => {
-          onGoToPersonalRoutes();
-        },
-      },
+      // "Мои маршруты" скрыт до релиза раздела.
       {
         key: "settings",
         type: "button",

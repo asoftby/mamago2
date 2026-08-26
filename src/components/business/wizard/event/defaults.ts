@@ -37,6 +37,7 @@ export function getDefaultFormData(): EventFormData {
     // Step 1: Basics
     title: "",
     format: DEFAULT_ACTIVITY_FORMAT,
+    schedulingKind: null,
     eventFormats: [],
     categoryIds: [],
     subcategoryIdsByCategoryId: {},

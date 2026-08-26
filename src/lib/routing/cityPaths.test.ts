@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 
 import {
+  buildArticlePublicPath,
   buildCityPublicPath,
   buildNationalArticlePath,
   stripTrailingSlash,
@@ -48,6 +49,26 @@ assert.equal(
   buildNationalArticlePath("natsionalnyy-obzor"),
   "/blog/natsionalnyy-obzor",
   "national article path",
+);
+
+// ── buildArticlePublicPath by geo scope ──────────────────────────────────────
+
+assert.equal(
+  buildArticlePublicPath({ slug: "semeynyy-weekend", geoScope: "CITY", citySlug: "minsk" }),
+  "/minsk/blog/semeynyy-weekend",
+  "CITY → /{city}/blog/{slug}",
+);
+
+assert.equal(
+  buildArticlePublicPath({ slug: "braslavskiy-region", geoScope: "REGION", citySlug: null }),
+  "/blog/braslavskiy-region",
+  "REGION → /blog/{slug} (shares national namespace)",
+);
+
+assert.equal(
+  buildArticlePublicPath({ slug: "natsionalnyy-obzor", geoScope: "COUNTRY", citySlug: null }),
+  "/blog/natsionalnyy-obzor",
+  "COUNTRY → /blog/{slug}",
 );
 
 // ── URL contract: NEVER /blog/{city}/{slug} ──────────────────────────────────

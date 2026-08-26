@@ -253,3 +253,18 @@ export function applyBusinessQualityBoost(
 
   return effective;
 }
+
+/**
+ * Applies the existing time-bound publication Boost as a ranking signal.
+ * Callers must build the eligible candidate pool first; this function never
+ * changes visibility, city, age or date eligibility.
+ */
+export function applyActivePublicationBoost(
+  baseScore: number,
+  isBoosted: boolean,
+  qualityMultiplier: number,
+): number {
+  return isBoosted
+    ? baseScore + 1000
+    : applyBusinessQualityBoost(baseScore, qualityMultiplier);
+}

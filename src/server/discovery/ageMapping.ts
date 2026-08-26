@@ -29,7 +29,7 @@ export const AGE_DEFS: AgeDef[] = [
   { value: "14-16", label: "14–16 лет", group: "🧑 Подростки", order: 80, minMonths: 168, maxMonths: 192 },
   { value: "16-18", label: "16–18 лет", group: "🧑 Подростки", order: 90, minMonths: 192, maxMonths: 216 },
   // 👤 Взрослые
-  { value: "18+", label: "18+", group: "👤 Взрослые", order: 100, minMonths: 216, maxMonths: null },
+  { value: "18+", label: "#nokids", group: "👤 Взрослые", order: 100, minMonths: 216, maxMonths: null },
 ];
 
 export function selectedAgeValuesToRanges(

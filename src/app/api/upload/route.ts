@@ -28,6 +28,7 @@ import {
 import { jsonUploadError } from "@/lib/uploads/uploadErrors";
 import type { UploadSuccessResponse } from "@/lib/uploads/uploadTypes";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
+import { resolveUploadOwnerUserId, UploadOwnerOverrideError, type UploadContext } from "@/lib/uploads/resolveUploadOwner";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import {
   contentHashOf,
@@ -37,9 +38,9 @@ import {
 import { MediaSourceType } from "@prisma/client";
 import {
   processImage,
-  generateProcessedFilename,
   DEFAULT_IMAGE_CONFIG,
 } from "@/lib/media/imageProcessor";
+import { buildMasterFilename, buildMediaStem, buildResponsiveFilename, resolveArticleUploadContext } from "@/server/media/mediaNaming";
 import {
   MEDIA_STORAGE_ROOT,
   MEDIA_UPLOADS_DIR,
@@ -61,9 +62,35 @@ export async function POST(req: NextRequest) {
       return jsonUploadError("FILE_REQUIRED", "Upload request must include a file field", 400);
     }
 
+    // ownerUserId lets ADMIN/MODERATOR attribute an upload to another user's
+    // media library, but only inside the ADMIN_ARTICLE context (article
+    // editor uploading into the article's author's library) — plain callers
+    // (business wizard, avatar, etc.) never send either field, so they keep
+    // uploadedById = user.id unconditionally. Never trust the client's role
+    // or context claim on their own — both are re-checked server-side below.
+    const requestedOwnerUserId = (formData.get("ownerUserId") as string | null)?.trim() || null;
+    const rawUploadContext = (formData.get("uploadContext") as string | null)?.trim() || null;
+    const contextEntityId = (formData.get("contextEntityId") as string | null)?.trim() || null;
+    const uploadContext: UploadContext | null = rawUploadContext === "ADMIN_ARTICLE" ? "ADMIN_ARTICLE" : null;
+    let ownerUserId: string;
+    try {
+      ownerUserId = await resolveUploadOwnerUserId({
+        requesterId: user.id,
+        requesterRole: user.role,
+        requestedOwnerUserId,
+        uploadContext,
+      });
+    } catch (error) {
+      if (error instanceof UploadOwnerOverrideError) {
+        return jsonUploadError(error.code, error.message, error.code === "FORBIDDEN" ? 403 : 400);
+      }
+      throw error;
+    }
+
     console.log("[UPLOAD] Incoming file", {
       userId: user.id,
       role: user.role,
+      ownerUserId,
       name: file.name,
       type: file.type,
       size: file.size,
@@ -82,10 +109,11 @@ export async function POST(req: NextRequest) {
     // Dedup (Phase A): hash the raw original bytes and reuse an owner's existing
     // asset before doing any processing or storage writes.
     const contentHash = contentHashOf(buffer);
-    const existingByHash = await findOwnedMediaByContentHash(user.id, contentHash);
+    const existingByHash = await findOwnedMediaByContentHash(ownerUserId, contentHash);
     if (existingByHash) {
       console.log("[UPLOAD] Dedup hit — reusing existing asset", {
         userId: user.id,
+        ownerUserId,
         mediaId: existingByHash.id,
       });
       return NextResponse.json(buildDedupUploadResponse(existingByHash));
@@ -134,9 +162,13 @@ export async function POST(req: NextRequest) {
     let masterFilename = "";
     let masterUrl = "";
     const responsiveSizes: Record<string, string> = {};
+    const articleContext = uploadContext === "ADMIN_ARTICLE" && contextEntityId
+      ? await resolveArticleUploadContext(contextEntityId)
+      : null;
+    const uploadStem = buildMediaStem(articleContext ?? { type: "CONTEXTLESS" });
     try {
       const masterSaved = await writeRuntimeUpload(
-        generateProcessedFilename(file.name),
+        buildMasterFilename(uploadStem),
         processedImageSet.master.buffer,
       );
       masterFilename = masterSaved.filename;
@@ -151,7 +183,7 @@ export async function POST(req: NextRequest) {
       for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
         if (!sizeData) continue;
         const sizeSaved = await writeRuntimeUpload(
-          generateProcessedFilename(file.name, sizeName),
+          buildResponsiveFilename(uploadStem, sizeName),
           sizeData.buffer,
         );
         responsiveSizes[sizeName] = sizeSaved.publicUrl;
@@ -186,8 +218,9 @@ export async function POST(req: NextRequest) {
         storageKey: masterUrl,
         publicUrl: masterUrl,
         sourceType,
-        uploadedById: user.id,
+        uploadedById: ownerUserId,
         contentHash,
+        title: articleContext?.title ?? uploadStem,
       });
       mediaId = asset.id;
     } catch (mediaError) {

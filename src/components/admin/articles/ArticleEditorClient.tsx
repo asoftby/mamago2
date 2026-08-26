@@ -29,11 +29,14 @@ import {
 } from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
+import { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 import {
   PublicationPanel,
   STATUS_LABEL,
   statusBadgeClass,
 } from "@/components/admin/articles/PublicationPanel";
+import { resolveArticlePublicationActionPolicy } from "@/components/admin/articles/articlePublicationActionPolicy";
+import { ArticleEditorStickyBar } from "@/components/admin/articles/ArticleEditorStickyBar";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
 import { validateArticleGeoScope } from "@/lib/article/articleGeoScopeValidation";
@@ -56,45 +59,12 @@ import { resolveDraftTitle } from "@/lib/content-editor/resolveDraftTitle";
 import { ContentSuccessModal } from "@/components/shared/ContentSuccessModal";
 import { resolveContentSuccessState } from "@/lib/content-success/resolver";
 import type { ContentSuccessPayload, ResolvedContentSuccessState } from "@/lib/content-success/types";
-
-
-function toLocalDatetimeValue(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromLocalDatetimeValue(v: string): string | null {
-  const t = v.trim();
-  if (!t) return null;
-  const d = new Date(t);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function snapshotComparable(args: {
-  title: string;
-  slug: string;
-  coverImageId: string;
-  authorUserId: string | null;
-  authorLabel: string;
-  cityContext: string;
-  categoryId: string;
-  tagIds: string[];
-  geoScope: GeoScope | null;
-  cityId: string;
-  content: ArticleContentPayload;
-  status: ContentStatus;
-  publishedAtLocal: string;
-  scheduledAtLocal: string;
-  seoTitle: string;
-  seoDescription: string;
-  seoCanonicalUrl: string;
-  noindex: boolean;
-}): string {
-  return JSON.stringify(args);
-}
+import {
+  buildEditorComparable,
+  buildSavedComparable,
+  fromLocalDatetimeValue,
+  toLocalDatetimeValue,
+} from "@/lib/article/articleEditorComparable";
 
 function applySnapshot(setters: {
   setTitle: (v: string) => void;
@@ -107,6 +77,7 @@ function applySnapshot(setters: {
   setTagIds: (v: string[]) => void;
   setGeoScope: (v: GeoScope | null) => void;
   setCityId: (v: string | null) => void;
+  setRegionId: (v: string | null) => void;
   setContent: (v: ArticleContentPayload) => void;
   setStatus: (v: ContentStatus) => void;
   setPublishedAtLocal: (v: string) => void;
@@ -127,6 +98,7 @@ function applySnapshot(setters: {
   setters.setTagIds(snap.tagIds);
   setters.setGeoScope(snap.geoScope ?? null);
   setters.setCityId(snap.cityId ?? null);
+  setters.setRegionId(snap.regionId ?? null);
   setters.setContent(snap.content);
   setters.setStatus(snap.status);
   setters.setPublishedAtLocal(toLocalDatetimeValue(snap.publishedAt));
@@ -174,7 +146,9 @@ export function ArticleEditorClient({
   const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
   const [geoScope, setGeoScope] = useState<GeoScope | null>(initial.geoScope ?? null);
   const [cityId, setCityId] = useState<string | null>(initial.cityId ?? null);
+  const [regionId, setRegionId] = useState<string | null>(initial.regionId ?? null);
   const [cities, setCities] = useState<{ id: string; name: string; slug: string }[]>([]);
+  const [regions, setRegions] = useState<{ id: string; name: string; slug: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; label: string; slug: string }[]>([]);
   const [discoveryTags, setDiscoveryTags] = useState<
     { id: string; title: string; description: string | null; isActive: boolean }[]
@@ -194,42 +168,35 @@ export function ArticleEditorClient({
   /** Запись в БД ещё не создана — только после первого «Сохранить» / «Опубликовать». */
   const hasPersistedId = Boolean(initial.id?.trim());
 
-  const savedComparableRef = useRef(
-    snapshotComparable({
-      title: initial.title,
-      slug: initial.slug ?? "",
-      coverImageId: initial.coverImageId ?? "",
-      authorUserId: initial.authorUserId ?? null,
-      authorLabel: initial.authorLabel ?? "",
-      cityContext: initial.cityContext ?? "",
-      categoryId: initial.categoryId ?? "",
-      tagIds: initial.tagIds,
-      geoScope: initial.geoScope ?? null,
-      cityId: initial.cityId ?? "",
-      content: initial.content,
-      status: initial.status,
-      publishedAtLocal: toLocalDatetimeValue(initial.publishedAt),
-      scheduledAtLocal: toLocalDatetimeValue(initial.scheduledAt),
-      seoTitle: initial.seoTitle ?? "",
-      seoDescription: initial.seoDescription ?? "",
-      seoCanonicalUrl: initial.seoCanonicalUrl ?? "",
-      noindex: initial.noindex,
-    }),
-  );
+  /**
+   * «Фото этой статьи» — общий источник для всех image/gallery picker'ов на
+   * странице (обложка + каждый блок). Persisted-статья читает сервер
+   * (/api/admin/articles/[id]/media, актуальный сохранённый contentJson);
+   * ещё не сохранённая — тот же extractArticleMediaUsage прямо по текущему
+   * editor state, без временной записи в БД ради picker'а.
+   */
+  const articleMediaSource = useArticleMediaSource({
+    articleId: hasPersistedId ? initial.id : null,
+    coverImageId,
+    blocks: content.blocks,
+  });
+
+  const savedComparableRef = useRef(buildSavedComparable(initial));
 
   const currentComparable = useMemo(
     () =>
-      snapshotComparable({
+      buildEditorComparable({
         title,
         slug,
         coverImageId,
         authorUserId,
         authorLabel,
         cityContext,
-        categoryId: categoryId ?? "",
+        categoryId,
         tagIds,
         geoScope,
-        cityId: cityId ?? "",
+        cityId,
+        regionId,
         content,
         status,
         publishedAtLocal,
@@ -250,6 +217,7 @@ export function ArticleEditorClient({
       tagIds,
       geoScope,
       cityId,
+      regionId,
       content,
       status,
       publishedAtLocal,
@@ -263,6 +231,17 @@ export function ArticleEditorClient({
 
   const dirty = currentComparable !== savedComparableRef.current;
   const displayTitle = resolveDraftTitle(title, "Новая статья");
+
+  /**
+   * Sticky bottom bar показывается только после первого реального
+   * пользовательского изменения в этой сессии редактирования — не при
+   * первичной гидратации/normalization. После появления остаётся видимой
+   * даже когда `dirty` снова становится false (после успешного сохранения).
+   */
+  const [everDirty, setEverDirty] = useState(false);
+  useEffect(() => {
+    if (dirty) setEverDirty(true);
+  }, [dirty]);
 
   const { leaveDialogOpen, confirmLeave, onLeaveDialogOpenChange } = useUnsavedChangesNavigationGuard(dirty);
 
@@ -278,11 +257,13 @@ export function ArticleEditorClient({
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
+        regions?: { id: string; name: string; slug: string }[];
         authors?: { id: string; label: string; email: string }[];
         categories?: { id: string; label: string; slug: string }[];
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
+      setRegions(data.regions ?? []);
       setCategories(data.categories ?? []);
 
       const selectedIds = initial.tagIds.join(",");
@@ -351,6 +332,7 @@ export function ArticleEditorClient({
       setTagIds,
       setGeoScope,
       setCityId,
+      setRegionId,
       setContent,
       setStatus,
       setPublishedAtLocal,
@@ -387,7 +369,7 @@ export function ArticleEditorClient({
   );
 
   const validateGeoScopeForPublish = useCallback((): boolean => {
-    const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict: true });
     if (!result.ok) {
       setGeoScopeError(result.message);
       setError(result.message);
@@ -396,7 +378,7 @@ export function ArticleEditorClient({
     }
     setGeoScopeError(null);
     return true;
-  }, [geoScope, cityId]);
+  }, [geoScope, cityId, regionId]);
 
   const payload = useMemo(
     () => ({
@@ -413,6 +395,7 @@ export function ArticleEditorClient({
       tagIds,
       geoScope,
       cityId,
+      regionId,
       status,
       publishedAt: fromLocalDatetimeValue(publishedAtLocal),
       scheduledAt: fromLocalDatetimeValue(scheduledAtLocal),
@@ -436,6 +419,7 @@ export function ArticleEditorClient({
       tagIds,
       geoScope,
       cityId,
+      regionId,
       status,
       publishedAtLocal,
       scheduledAtLocal,
@@ -448,31 +432,12 @@ export function ArticleEditorClient({
 
   useEffect(() => {
     if (!geoScopeError) return;
-    const result = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict: true });
     if (result.ok) setGeoScopeError(null);
-  }, [geoScope, cityId, geoScopeError]);
+  }, [geoScope, cityId, regionId, geoScopeError]);
 
   const persistComparableFromSnapshot = useCallback((snap: ArticleEditorSnapshot) => {
-    savedComparableRef.current = snapshotComparable({
-      title: snap.title,
-      slug: snap.slug ?? "",
-      coverImageId: snap.coverImageId ?? "",
-      authorUserId: snap.authorUserId ?? "",
-      authorLabel: snap.authorLabel ?? "",
-      cityContext: snap.cityContext ?? "",
-      categoryId: snap.categoryId ?? "",
-      tagIds: snap.tagIds,
-      geoScope: snap.geoScope ?? null,
-      cityId: snap.cityId ?? "",
-      content: snap.content,
-      status: snap.status,
-      publishedAtLocal: toLocalDatetimeValue(snap.publishedAt),
-      scheduledAtLocal: toLocalDatetimeValue(snap.scheduledAt),
-      seoTitle: snap.seoTitle ?? "",
-      seoDescription: snap.seoDescription ?? "",
-      seoCanonicalUrl: snap.seoCanonicalUrl ?? "",
-      noindex: snap.noindex,
-    });
+    savedComparableRef.current = buildSavedComparable(snap);
   }, []);
 
   const showArticleSuccess = useCallback(
@@ -561,7 +526,12 @@ export function ArticleEditorClient({
         if (!Number.isNaN(updated)) setLastSavedAt(updated);
         else setLastSavedAt(Date.now());
         if (!opts?.silent) {
-          showArticleSuccess("draft_saved", next.id, next, true);
+          showArticleSuccess(
+            next.status === "PUBLISHED" ? "changes_published" : "draft_saved",
+            next.id,
+            next,
+            true,
+          );
         }
         router.refresh();
         return true;
@@ -766,8 +736,52 @@ export function ArticleEditorClient({
     return null;
   })();
 
+  /** Статус для sticky bottom bar — те же state-переменные, что и выше, без отдельной autosave-логики. */
+  const stickyStatus: "dirty" | "saving" | "saved" | "error" = error
+    ? "error"
+    : saving
+      ? "saving"
+      : dirty
+        ? "dirty"
+        : "saved";
+  const stickyStatusLabel = error
+    ? "Не удалось сохранить"
+    : saving
+      ? "Сохранение…"
+      : dirty
+        ? "Изменения не сохранены"
+        : lastSavedAt != null
+          ? `Сохранено ${formatDistanceToNow(lastSavedAt, { addSuffix: true, locale: ru })}`
+          : "Изменения сохранены";
+
+  /**
+   * Единственный источник условий видимости/disabled для «Одобрить» — та же
+   * чистая функция, что использует верхний PublicationPanel. Sticky-панель
+   * не переизобретает permissions/status-условия, только читает их отсюда.
+   */
+  const publicationActionPolicy = resolveArticlePublicationActionPolicy({
+    status,
+    canModerate,
+    hasUnsavedChanges: dirty,
+    hasPublicUrl: publicUrl != null,
+  });
+
+  const stickyApproveAction =
+    publicationActionPolicy.primary?.kind === "approve"
+      ? {
+          label: moderating ? "Одобрение…" : publicationActionPolicy.primary.label,
+          disabled: actionsBusy || publicationActionPolicy.primary.disabled,
+          disabledReason: publicationActionPolicy.primary.disabled
+            ? publicationActionPolicy.primary.disabledReason
+            : null,
+          loading: moderating,
+          onClick: () => void moderate("publish"),
+        }
+      : null;
+
   return (
-    <div className="p-6 md:p-4 space-y-8 max-w-4xl">
+    <>
+    <div className={cn("p-6 md:p-4 space-y-8 max-w-4xl", everDirty && "pb-28 md:pb-24")}>
       <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
@@ -869,18 +883,21 @@ export function ArticleEditorClient({
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
+            authorUserId={authorUserId}
+            articleId={hasPersistedId ? initial.id : null}
             onChange={(id, previewUrl) => {
               setCoverImageId(id);
               setCoverImagePreviewUrl(previewUrl ?? "");
             }}
+            articleMediaSource={articleMediaSource}
           />
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="article-geo-scope">Охват статьи</Label>
               <p className="text-xs text-muted-foreground">
-                Обязательно перед публикацией. Городская статья — в разделе города; национальная — на
-                /blog/&#123;slug&#125;.
+                Обязательно перед публикацией. Городская статья — в разделе города; региональная и
+                национальная — на /blog/&#123;slug&#125;.
               </p>
               {hydrated ? (
                 <Select
@@ -889,13 +906,20 @@ export function ArticleEditorClient({
                     if (v === "__unset__") {
                       setGeoScope(null);
                       setCityId(null);
+                      setRegionId(null);
                       setCityContext("");
                       return;
                     }
                     const scope = v as GeoScope;
                     setGeoScope(scope);
-                    if (scope === "COUNTRY") {
+                    if (scope === "CITY") {
+                      setRegionId(null);
+                    } else if (scope === "REGION") {
                       setCityId(null);
+                      setCityContext("");
+                    } else {
+                      setCityId(null);
+                      setRegionId(null);
                       setCityContext("");
                     }
                   }}
@@ -906,6 +930,7 @@ export function ArticleEditorClient({
                   <SelectContent>
                     <SelectItem value="__unset__">Не выбрано</SelectItem>
                     <SelectItem value="CITY">Городская (CITY)</SelectItem>
+                    <SelectItem value="REGION">Региональная (REGION)</SelectItem>
                     <SelectItem value="COUNTRY">Национальная (COUNTRY)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -959,6 +984,39 @@ export function ArticleEditorClient({
                 )}
               </div>
             ) : null}
+            {geoScope === "REGION" ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="article-region">Область</Label>
+                {hydrated ? (
+                  <Select
+                    value={regionId ?? "__none__"}
+                    onValueChange={(v) => {
+                      setRegionId(v === "__none__" ? null : v);
+                    }}
+                  >
+                    <SelectTrigger id="article-region" className="w-full">
+                      <SelectValue placeholder="Выберите область" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Не выбрана</SelectItem>
+                      {regions.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div
+                    id="article-region"
+                    className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground animate-pulse"
+                    aria-hidden
+                  >
+                    …
+                  </div>
+                )}
+              </div>
+            ) : null}
             {geoScopeError ? (
               <p className="text-xs text-red-600 sm:col-span-2">{geoScopeError}</p>
             ) : null}
@@ -976,6 +1034,9 @@ export function ArticleEditorClient({
           <ArticleBlocksMvpEditor
             blocks={content.blocks}
             onChange={(blocks) => setContent((prev) => ({ ...prev, blocks }))}
+            authorUserId={authorUserId}
+            articleId={hasPersistedId ? initial.id : null}
+            articleMediaSource={articleMediaSource}
           />
         </CardContent>
       </Card>
@@ -1097,5 +1158,19 @@ export function ArticleEditorClient({
         state={successState}
       />
     </div>
+
+    {everDirty ? (
+      <ArticleEditorStickyBar
+        status={stickyStatus}
+        statusLabel={stickyStatusLabel}
+        onSave={() => void save()}
+        saveDisabled={actionsBusy || !dirty}
+        approveAction={stickyApproveAction}
+        saving={saving}
+        previewHref={hasPersistedId ? `/preview/articles/${initial.id}` : null}
+        publicUrl={publicUrl}
+      />
+    ) : null}
+    </>
   );
 }

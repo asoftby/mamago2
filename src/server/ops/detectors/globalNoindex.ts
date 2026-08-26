@@ -107,12 +107,39 @@ export function htmlHasNoindexMeta(html: string): boolean {
 
 // ── probe / evaluate ────────────────────────────────────────────────────
 
+/**
+ * Wraps one `fetch` with a diagnostic error message identifying which
+ * request failed and why (timeout vs. transport error, plus the
+ * underlying `cause`) — never changes whether we throw, only what the
+ * thrown message says. Without this, a bare `Promise.all([fetch, fetch])`
+ * surfaces Node's generic `TypeError: fetch failed` with no indication of
+ * which of the two concurrent requests failed or what the actual network
+ * cause was (e.g. ECONNREFUSED/ENOTFOUND live on `err.cause`, not
+ * `err.message`), making `DetectorRun.error` useless for on-call triage.
+ */
+async function fetchIndexabilitySource(
+  ctx: DetectorContext,
+  label: "robots.txt" | "homepage",
+  url: string,
+): Promise<Response> {
+  try {
+    return await ctx.fetch(url, { signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS) });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new Error(`${label} request timed out after ${PER_REQUEST_TIMEOUT_MS}ms (${url})`);
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    const cause = err instanceof Error && err.cause instanceof Error ? `: ${err.cause.message}` : "";
+    throw new Error(`${label} network error (${url}): ${message}${cause}`);
+  }
+}
+
 export async function probeGlobalNoindex(ctx: DetectorContext): Promise<GlobalNoindexProbe> {
   const base = getCanonicalPublicAppUrl();
 
   const [robotsRes, homeRes] = await Promise.all([
-    ctx.fetch(`${base}/robots.txt`, { signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS) }),
-    ctx.fetch(`${base}/`, { signal: AbortSignal.timeout(PER_REQUEST_TIMEOUT_MS) }),
+    fetchIndexabilitySource(ctx, "robots.txt", `${base}/robots.txt`),
+    fetchIndexabilitySource(ctx, "homepage", `${base}/`),
   ]);
 
   // robots.txt missing (404) is normal/permissive web semantics — treat as

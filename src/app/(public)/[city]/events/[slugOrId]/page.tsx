@@ -1,8 +1,6 @@
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
-import Link from "next/link";
 import type { Metadata } from "next";
-import { permanentRedirect } from "next/navigation";
-import { Container } from "@/components/ui/Container";
+import { notFound, permanentRedirect } from "next/navigation";
 import { EventPageView } from "@/components/event-page";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
 import { ContentStatus } from "@prisma/client";
@@ -19,6 +17,7 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { PublicationType } from "@prisma/client";
 
 interface EventPublicPageProps {
@@ -38,11 +37,6 @@ function searchParamsToSuffix(
   }
   const s = u.toString();
   return s ? `?${s}` : "";
-}
-
-function cityLabel(citySlug: string) {
-  if (citySlug === "minsk") return "Минске";
-  return citySlug;
 }
 
 function parseRobots(s: string | null | undefined): Metadata["robots"] | undefined {
@@ -74,9 +68,8 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
     if (canonicalPath && canonicalPath !== `/${city}/events/${slugOrId}`) {
       permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
     }
+    notFound();
   }
-
-  if (!fromDb) return {};
 
   const publicBase = getCanonicalPublicAppUrl();
   const canonical = resolveEventCanonicalUrl({
@@ -86,10 +79,11 @@ export async function generateMetadata({ params, searchParams }: EventPublicPage
     id: fromDb.id,
     publicBase,
   });
+  const cityName = getCityDisplayName(city);
 
-  const title = fromDb.seoTitle?.trim() || `${fromDb.title} в ${cityLabel(city)} — mamaGo`;
+  const title = fromDb.seoTitle?.trim() || `${fromDb.title} в ${cityName} — mamaGo`;
   const description =
-    fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityLabel(city)}.`;
+    fromDb.seoDescription?.trim() || fromDb.shortDesc || `Событие для детей и родителей в ${cityName}.`;
 
   return {
     ...buildOgMeta({
@@ -155,7 +149,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
       [
         { name: "Главная", path: "/" },
-        { name: city, path: `/${city}` },
+        { name: getCityNominativeName(city), path: `/${city}` },
         { name: "Афиша", path: `/${city}/events` },
         { name: fromDb.title, path: `/${city}/events/${fromDb.slug ?? fromDb.id}` },
       ],
@@ -229,12 +223,5 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     permanentRedirect(`${canonicalPath}${searchParamsToSuffix(sp)}`);
   }
 
-  return (
-    <Container className="pt-20 text-center">
-      <h1 className="text-2xl font-bold">Событие не найдено</h1>
-      <Link href={`/${city}`} className="mt-4 block text-primary hover:underline">
-        На главную
-      </Link>
-    </Container>
-  );
+  notFound();
 }

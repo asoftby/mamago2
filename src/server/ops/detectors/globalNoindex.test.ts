@@ -166,3 +166,38 @@ testProbeFailureSemantics().then(
     process.exit(1);
   },
 );
+
+// ── probe() network error diagnostics ────────────────────────────────────
+
+async function testProbeNetworkErrorDiagnostics() {
+  // Nothing listens on this port — fetch fails at the transport level
+  // (ECONNREFUSED), not with an HTTP status, exercising the
+  // fetchIndexabilitySource catch path rather testProbeFailureSemantics's
+  // HTTP-500 path above.
+  process.env.APP_PUBLIC_URL = "http://127.0.0.1:1";
+  try {
+    const ctx: DetectorContext = { prisma: {} as never, fetch, workerStartedAt: new Date() };
+    await assert.rejects(
+      () => probeGlobalNoindex(ctx),
+      (err: unknown) => {
+        assert.ok(err instanceof Error, "must still throw an Error, never resolve as healthy");
+        assert.match(
+          err.message,
+          /^(robots\.txt|homepage) network error \(http:\/\/127\.0\.0\.1:1/,
+          "message must identify which request failed and that it was a network error",
+        );
+        return true;
+      },
+    );
+  } finally {
+    delete process.env.APP_PUBLIC_URL;
+  }
+}
+
+testProbeNetworkErrorDiagnostics().then(
+  () => console.log("globalNoindex.test.ts (probe network error diagnostics): OK"),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);

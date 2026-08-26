@@ -84,15 +84,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { city: citySlug, slug } = await params;
 
   const city = await findCityBySlug(citySlug, { select: { id: true, slug: true } });
-  if (!city) return { title: "Offer Not Found" };
+  if (!city) notFound();
 
   const scoped = await findOfferBySlugInCity(city.id, slug);
   const resolved = scoped ?? (await findOfferBySlug(slug));
-  if (!resolved) return { title: "Offer Not Found" };
+  if (!resolved) notFound();
 
   const offer = await prisma.offer.findUnique({ where: { id: resolved.offerId }, select: offerMetaSelect });
   if (!offer || !isOfferPubliclyVisible(offer)) {
-    return { title: "Offer Not Found" };
+    notFound();
   }
 
   const publicBase = getCanonicalPublicAppUrl();

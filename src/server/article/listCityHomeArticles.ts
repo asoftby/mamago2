@@ -65,6 +65,7 @@ export async function listCityHomeArticles(city: {
   id: string;
   slug: string;
   name: string;
+  regionId?: string | null;
 }): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
@@ -74,6 +75,8 @@ export async function listCityHomeArticles(city: {
       OR: [
         // CITY-scoped articles for this city
         { geoScope: "CITY", cityId: city.id },
+        // REGION-scoped articles relevant to this city's region
+        ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
         // Breaking news: country-scope articles shown on every city home
         { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" },
       ],
@@ -109,6 +112,67 @@ export async function listCityHomeArticles(city: {
         row.geoScope === "CITY"
           ? buildCityPublicPath({ citySlug: city.slug, type: "article", slug: row.slug })
           : buildNationalArticlePath(row.slug),
+      title: row.title,
+      subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
+      contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
+      category: row.category
+        ? {
+            id: row.category.id,
+            slug: row.category.slug,
+            name: row.category.nameRu,
+          }
+        : null,
+      tags: row.tags.map((tag) => ({
+        id: tag.id,
+        slug: tag.slug,
+        name: tag.title,
+      })),
+      isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
+      readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
+      publishedAt: row.publishedAt,
+      coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
+    }));
+}
+
+/**
+ * National journal listing for /blog. Only COUNTRY-scoped published articles
+ * belong here; city/region materials keep their own canonical discovery paths.
+ */
+export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
+  const rows = await prisma.article.findMany({
+    where: {
+      status: "PUBLISHED",
+      geoScope: "COUNTRY",
+      slug: { not: null },
+      publishedAt: { not: null },
+    },
+    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+    take: 100,
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      subtitle: true,
+      excerpt: true,
+      contentJson: true,
+      publishedAt: true,
+      heroImage: true,
+      coverImage: { select: { publicUrl: true } },
+      category: { select: { id: true, slug: true, nameRu: true } },
+      tags: {
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+        select: { id: true, slug: true, title: true },
+      },
+    },
+  });
+
+  return rows
+    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
+    .map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      href: buildNationalArticlePath(row.slug),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
       contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",

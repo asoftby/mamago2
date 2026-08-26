@@ -29,7 +29,15 @@ export const STORY_SLOTS: StorySlot[] = [
     range: (ctx) =>
       runningHorizonRange(ctx, SERIAL_CLASSIFICATION_CONFIG.runningHorizonDays),
     priority: 35,
-    minItems: DEFAULT_SLOT_MIN_ITEMS,
+    minItems: 1,
+  },
+  {
+    id: "free",
+    kind: "contextual",
+    label: () => "Бесплатно",
+    range: (ctx) => runningHorizonRange(ctx, 7),
+    priority: 40,
+    minItems: 1,
   },
   {
     id: "lastchance",

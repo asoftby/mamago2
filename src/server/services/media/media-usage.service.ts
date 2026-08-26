@@ -11,6 +11,9 @@ import {
   findMediaAssetByReference,
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
+import { extractArticleMediaUsage, parseArticleContentJson } from "@/lib/publications/articleMvp";
+import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
+import { collectPlaceMediaReferenceInputs } from "@/lib/media/placeMediaReferences";
 
 function mediaUsageDedupKey(u: {
   entityType: MediaEntityType;
@@ -586,6 +589,7 @@ export async function syncPlaceMediaUsage(placeId: string) {
     where: { id: placeId },
     include: {
       images: true,
+      createdBy: { select: { role: true } },
     },
   });
 
@@ -596,42 +600,62 @@ export async function syncPlaceMediaUsage(placeId: string) {
   const mediaIds = new Set<string>();
   const usageRecords: Array<{ mediaId: string; field: string }> = [];
 
-  // Logo image
-  if (place.logoImageId) {
-    mediaIds.add(place.logoImageId);
-    usageRecords.push({ mediaId: place.logoImageId, field: "logoImageId" });
+  const addResolved = (mediaId: string, field: "logo" | "gallery") => {
+    mediaIds.add(mediaId);
+    usageRecords.push({ mediaId, field });
+  };
+
+  const resolvePlaceImage = async (image: (typeof place.images)[number]) => {
+    const existing = await findMediaAssetByReference(image.url);
+    if (existing) return existing;
+    return ensureMediaAssetForStoredFileUrl({
+      publicUrl: image.url,
+      uploadedById: place.createdByUserId,
+      userRole: place.createdBy.role,
+      width: image.width,
+      height: image.height,
+      originalName: image.kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp",
+    });
+  };
+
+  for (const ref of collectPlaceMediaReferenceInputs(place)) {
+    const placeImage = ref.placeImageId ? place.images.find((image) => image.id === ref.placeImageId) : null;
+    const asset = placeImage ? await resolvePlaceImage(placeImage) : await findMediaAssetByReference(ref.reference);
+    if (asset) addResolved(asset.id, ref.field);
   }
 
-  // Gallery images (PlaceImage table with URLs)
-  // TODO: These are stored as URLs in separate table
-  // For now, skip gallery images as they don't have mediaId relations
-
-  // Remove old usage records for this place
-  await prisma.mediaUsage.deleteMany({
-    where: {
-      entityType: MediaEntityType.PLACE,
-      entityId: placeId,
-    },
-  });
-
-  // Create new usage records (deduplicated by field)
+  // Reconcile instead of delete/recreate: a second sync with unchanged Place
+  // performs no writes and duplicate legacy rows are removed deterministically.
   const seen = new Set<string>();
-  for (const record of usageRecords) {
+  const desired = usageRecords.filter((record) => {
     const key = `${record.mediaId}:${record.field}`;
-    if (!seen.has(key)) {
-      await prisma.mediaUsage.create({
-        data: {
-          mediaId: record.mediaId,
-          entityType: MediaEntityType.PLACE,
-          entityId: placeId,
-          field: record.field,
-        },
-      });
-      seen.add(key);
-    }
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const existingUsages = await prisma.mediaUsage.findMany({
+    where: { entityType: MediaEntityType.PLACE, entityId: placeId },
+    orderBy: { createdAt: "asc" },
+  });
+  const kept = new Set<string>();
+  const deleteIds = existingUsages.flatMap((usage) => {
+    const key = `${usage.mediaId}:${usage.field}`;
+    if (!seen.has(key) || kept.has(key)) return [usage.id];
+    kept.add(key);
+    return [];
+  });
+  if (deleteIds.length) {
+    await prisma.mediaUsage.deleteMany({ where: { id: { in: deleteIds } } });
+  }
+  for (const record of desired) {
+    const key = `${record.mediaId}:${record.field}`;
+    if (kept.has(key)) continue;
+    await prisma.mediaUsage.create({
+      data: { ...record, entityType: MediaEntityType.PLACE, entityId: placeId },
+    });
   }
 
-  return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
+  return { mediaIds: Array.from(mediaIds), usageCount: desired.length };
 }
 
 /**
@@ -726,16 +750,16 @@ export async function syncArticleMediaUsage(articleId: string) {
   const mediaIds = new Set<string>();
   const usageRecords: Array<{ mediaId: string; field: string }> = [];
 
-  // Cover image (proper relation)
-  if (article.coverImageId) {
-    mediaIds.add(article.coverImageId);
-    usageRecords.push({ mediaId: article.coverImageId, field: "coverImageId" });
-  }
-
-  // SEO image (proper relation)
-  if (article.seoImageId) {
-    mediaIds.add(article.seoImageId);
-    usageRecords.push({ mediaId: article.seoImageId, field: "seoImageId" });
+  const content = parseArticleContentJson(article.contentJson);
+  for (const entry of extractArticleMediaUsage({
+    coverImageId: article.coverImageId,
+    seoImageId: article.seoImageId,
+    blocks: content.blocks,
+  })) {
+    mediaIds.add(entry.mediaId);
+    for (const kind of entry.usage) {
+      usageRecords.push({ mediaId: entry.mediaId, field: kind });
+    }
   }
 
   // Remove old usage records for this article

@@ -1,5 +1,9 @@
 /**
- * Helper functions for city display names in Russian
+ * Helper functions for city display names in Russian.
+ *
+ * Keep this list aligned with the Belarus city slugs supported by
+ * `src/server/geo/city-resolver.ts`: any city that can be resolved into
+ * a public city slug must have both nominative and prepositional forms.
  */
 
 // Map city slugs to their display names in prepositional case (в + city)
@@ -11,6 +15,12 @@ export const CITY_DISPLAY_NAMES: Record<string, string> = {
   grodno: "Гродно",
   mogilev: "Могилёве",
   vitebsk: "Витебске",
+  borisov: "Борисове",
+  molodechno: "Молодечно",
+  soligorsk: "Солигорске",
+  pinsk: "Пинске",
+  orsha: "Орше",
+  lida: "Лиде",
 };
 
 /** Именительный падеж для подзаголовков («Алексей · Минск») */
@@ -22,6 +32,12 @@ export const CITY_NOMINATIVE: Record<string, string> = {
   grodno: "Гродно",
   mogilev: "Могилёв",
   vitebsk: "Витебск",
+  borisov: "Борисов",
+  molodechno: "Молодечно",
+  soligorsk: "Солигорск",
+  pinsk: "Пинск",
+  orsha: "Орша",
+  lida: "Лида",
 };
 
 export function getCityNominativeName(citySlug: string): string {

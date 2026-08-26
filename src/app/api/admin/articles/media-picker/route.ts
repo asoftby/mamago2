@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { MediaAssetKind, MediaAssetStatus } from "@prisma/client";
-import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
-import { parsePaginationParams } from "@/lib/api/pagination";
+import { queryMediaPickerPage } from "@/lib/media/mediaPickerQuery";
+import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
 
 export const runtime = "nodejs";
 
 /**
- * Недавние изображения для выбора обложки статьи (без полного UI медиатеки).
+ * Медиатека автора статьи для выбора обложки/галереи (курсорная пагинация).
+ * `authorUserId` доверяем только потому, что маршрут уже требует ADMIN/MODERATOR —
+ * без него редакторы не могут видеть чужую медиатеку иначе как через свою.
  */
 export async function GET(req: NextRequest) {
   const user = await requireAdminOrModerator();
@@ -15,26 +16,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { limit } = parsePaginationParams(req.nextUrl.searchParams, {
-    defaultLimit: 36,
-    maxLimit: 60,
-  });
+  const { searchParams } = req.nextUrl;
+  const authorUserId = searchParams.get("authorUserId")?.trim() || user.id;
+  const cursor = searchParams.get("cursor")?.trim() || null;
+  const rawLimit = parseInt(searchParams.get("limit") ?? "", 10);
+  const limit = Number.isFinite(rawLimit) ? rawLimit : MEDIA_PICKER_PAGE_SIZE;
 
-  const items = await prisma.mediaAsset.findMany({
-    where: {
-      kind: MediaAssetKind.IMAGE,
-      status: MediaAssetStatus.ACTIVE,
-      publicUrl: { not: null },
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      publicUrl: true,
-      alt: true,
-      title: true,
-    },
-  });
+  const page = await queryMediaPickerPage({ uploadedById: authorUserId, cursor, limit });
 
-  return NextResponse.json({ items });
+  return NextResponse.json(page);
 }

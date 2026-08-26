@@ -315,8 +315,9 @@ export function SitemapRobotsCenterClient({
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Сайт закрыт от индексации</AlertTitle>
                 <AlertDescription>
-                  Это безопасно для тестов, но перед запуском production нужно выключить
-                  `SITE_NOINDEX_DEFAULT` и `SITE_NOINDEX_FORCE`.
+                  Индексация открывается только через `SITE_INDEXING_ENABLED=true`. Перед запуском
+                  убедитесь, что `SITE_NOINDEX_FORCE=false`; `SITE_NOINDEX_DEFAULT=false` сам по себе
+                  индексацию не открывает.
                 </AlertDescription>
               </Alert>
             ) : (

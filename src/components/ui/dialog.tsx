@@ -34,6 +34,19 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
+/**
+ * Только enter-анимация (data-[state=open]:animate-in) — сознательно без
+ * exit-анимации на закрытии. @radix-ui/react-presence снимает компонент с
+ * DOM только после события `animationend`, совпадающего с текущим
+ * `animationName`; в этом стеке (Tailwind v4 + tw-animate-css) это событие
+ * на закрытии ненадёжно доставляется, и Presence зависает в
+ * `unmountSuspended` навсегда — а с ним не отрабатывает cleanup
+ * DismissableLayer, который восстанавливает `body.style.pointerEvents`
+ * (стек полностью блокируется). Без exit-класса `animationName` на
+ * data-state=closed сразу становится "none", и Presence снимает компонент
+ * синхронно, без ожидания — это штатный, документированный Radix-путь для
+ * компонентов без exit-анимации, а не патч вокруг симптома.
+ */
 function DialogOverlay({
   className,
   ...props
@@ -42,7 +55,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none fixed inset-0 z-[60] bg-black/50 pointer-events-auto",
+        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none fixed inset-0 z-[60] bg-black/50 pointer-events-auto",
         className
       )}
       {...props}
@@ -84,7 +97,7 @@ function DialogContent({
           onEscapeKeyDown?.(e)
         }}
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[70] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none pointer-events-auto sm:max-w-lg",
+          "bg-background data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:pointer-events-none data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[70] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none pointer-events-auto sm:max-w-lg",
           className
         )}
         {...props}

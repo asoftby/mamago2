@@ -4,6 +4,7 @@ import { BusinessContentList } from "@/components/business/shared/BusinessConten
 import { EventCardHorizontal } from "@/components/business/events/EventCardHorizontal";
 import { Calendar } from "lucide-react";
 import { ContentStatus, ActivityType, ScheduleMode } from "@prisma/client";
+import type { ActivityPromotionPerformance } from "@/server/services/promotion/boostPerformance.service";
 
 interface Activity {
   id: string;
@@ -16,6 +17,10 @@ interface Activity {
   title: string;
   shortDesc: string;
   description: string | null;
+  coverImageUrl?: string | null;
+  coverImage?: {
+    publicUrl: string | null;
+  } | null;
   scheduleMode: ScheduleMode;
   priceFrom: number | null;
   priceTo: number | null;
@@ -34,6 +39,8 @@ interface Activity {
   updatedAt: Date;
   createdAt: Date;
   nextOccurrenceAt?: Date | null;
+  isPromoted?: boolean;
+  promotionPerformance?: ActivityPromotionPerformance | null;
   metrics?: {
     views: number;
     saves: number;

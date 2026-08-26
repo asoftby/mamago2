@@ -15,11 +15,16 @@ function testPublicListingDoesNotRequirePlaceOrCategory() {
   assert.ok(!json.includes("eventCategoryId"), "public listing must not require eventCategoryId");
 }
 
+function testPublicListingExcludesArchivedActivities() {
+  const json = JSON.stringify(getPublicListingActivityWhere());
+  assert.ok(json.includes("ARCHIVED"), "public listing must exclude archived activities");
+}
+
 function main() {
   testActivityInCityWhereAllowsDirectCityIdWithoutPlace();
   testPublicListingDoesNotRequirePlaceOrCategory();
+  testPublicListingExcludesArchivedActivities();
 }
 
 main();
 console.log("activityVisibilityPhase2 tests: OK");
-

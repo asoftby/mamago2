@@ -159,11 +159,12 @@ export function buildNationalArticlePath(slug: string): string {
 
 /**
  * Article public path by geo scope (no trailing slash).
- * CITY → /{city}/blog/{slug} ; COUNTRY (and breaking news) → /blog/{slug}.
+ * CITY → /{city}/blog/{slug} ; REGION and COUNTRY (and breaking news) share
+ * the national namespace → /blog/{slug}.
  */
 export function buildArticlePublicPath(args: {
   slug: string;
-  geoScope?: "CITY" | "COUNTRY" | null;
+  geoScope?: "CITY" | "REGION" | "COUNTRY" | null;
   citySlug?: string | null;
 }): string {
   const { slug, geoScope, citySlug } = args;

@@ -7,28 +7,16 @@ export type PersistArticleMeta = {
 };
 
 /**
- * Клиентская логика сохранения статьи: план / идеи / снять.
+ * Клиентская логика сохранения статьи: только идеи (без даты).
+ * Статьи не поддерживают сохранение на конкретную дату — save UI для Article
+ * рендерит idea-only сценарий (см. SaveToPlanModal `ideaOnly`), поэтому
+ * "plan"/"remove-plan" сюда прийти не должны.
  */
 export async function persistArticleSave(
   result: SaveToPlanResult,
   meta: PersistArticleMeta,
 ): Promise<void> {
   if (result.action === "cancel") return;
-
-  if (result.action === "plan") {
-    const res = await fetch("/api/save/plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        articleId: meta.articleId,
-        date: result.dateISO,
-        title: meta.title,
-        coverImageUrl: meta.coverImageUrl,
-      }),
-    });
-    if (!res.ok) throw new Error("plan_save_failed");
-    return;
-  }
 
   if (result.action === "ideas") {
     const res = await fetch("/api/save/idea", {
@@ -49,11 +37,5 @@ export async function persistArticleSave(
     return;
   }
 
-  if (result.action === "remove-plan") {
-    const res = await fetch(
-      `/api/save/plan?planItemId=${encodeURIComponent(result.planItemId)}`,
-      { method: "DELETE" },
-    );
-    if (!res.ok) throw new Error("plan_remove_failed");
-  }
+  throw new Error("article_date_save_unsupported");
 }

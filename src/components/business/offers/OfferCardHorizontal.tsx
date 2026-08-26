@@ -25,6 +25,7 @@ import { formatUpdatedAgo } from "@/lib/date/formatUpdatedAgo";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
 import { format as fmtDate } from "date-fns";
+import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 
 interface Offer {
   id: string;
@@ -153,7 +154,7 @@ export function OfferCardHorizontal({
     ctaClicks: offer.metrics.ctaClicks,
   };
 
-  const tip = offer.status === "PUBLISHED" && offer.metrics.views < 100
+  const tip = BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && offer.status === "PUBLISHED" && offer.metrics.views < 100
     ? {
         text: "Продвигайте предложение, чтобы получить больше заявок и увеличить охват.",
         ctaLabel: "Узнать больше",
@@ -216,7 +217,7 @@ export function OfferCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
-            <Link
+            {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
               href={`/business/offers/${offer.id}/boost`}
               className={cn(
                 BUSINESS_PUBLICATION_ACTION_BUTTON,
@@ -225,7 +226,7 @@ export function OfferCardHorizontal({
             >
               <Zap className="h-4 w-4 shrink-0 fill-stone-950" />
               Купить Boost
-            </Link>
+            </Link>}
 
             {onArchive && offer.status !== "DRAFT" ? (
               <button

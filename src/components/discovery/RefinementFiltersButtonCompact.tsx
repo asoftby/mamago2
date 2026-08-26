@@ -19,7 +19,7 @@ import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/d
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
-import { EventAdvancedFilters } from "@/components/discovery/EventAdvancedFilters";
+import { EventAdvancedFilters, getEventRefinementCount } from "@/components/discovery/EventAdvancedFilters";
 
 interface RefinementFiltersButtonCompactProps {
   className?: string;
@@ -37,14 +37,14 @@ export function RefinementFiltersButtonCompact({
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const budgetConfig = budgetCtx?.budgetConfig ?? null;
   const { budget } = useBudgetFilter();
-  const { derived } = useDiscoveryFilters();
+  const { applied } = useDiscoveryFilters();
   const citySlug = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
   const budgetActive =
     Boolean(budgetConfig) &&
     budget !== null &&
     budget < (budgetConfig?.max ?? Number.POSITIVE_INFINITY);
   const activeCount = safeIntent === "kuda"
-    ? derived.activeCount
+    ? getEventRefinementCount(applied)
     : secondaryActiveCount + (budgetActive ? 1 : 0);
 
   if (!safeIntent) return null;

@@ -1,37 +1,24 @@
 /**
- * audience.dau — every 15 min (§21 Step 5, Phase C).
+ * audience.dau — every 15 min (§21 Step 5, Phase C; redefined by the
+ * canonical audience contract).
  *
- * Reuses the canonical mamaGo "active user" definition verbatim — the
- * same `COUNT(DISTINCT "userId")` over `UserEvent`, same
- * `resolvePerformanceWindow()` window resolution (Europe/Minsk calendar
- * days) already used by /admin/performance
- * (src/server/services/performance/performanceDashboard.service.ts).
- *
- * Identity key: authenticated `UserEvent.userId` only — anonymous
- * `sessionId` activity is a separate concept (`trackedVisitors` in the
- * canonical dashboard), never merged in here. No bot/admin/business
- * exclusion — the canonical definition doesn't apply one, and Step 5 must
- * not silently change it.
+ * Uses the canonical mamaGo audience identity
+ * (`@/server/services/analytics/canonicalAudience`) — PAGE_VIEW-only,
+ * authenticated userId (excluding ADMIN/MODERATOR) plus anonymous-only
+ * sessionId — over the same `resolvePerformanceWindow()` "today" window
+ * (Europe/Minsk) the Traffic block's `uniqueVisitorsToday` uses, so the
+ * two agree for the same instant. This is the SAME identity
+ * /admin/performance's `dau`/`trackedVisitors` and the WAU/MAU collector
+ * use — one shared definition, not reimplemented per consumer.
  */
-import { Prisma } from "@prisma/client";
-
 import { resolvePerformanceWindow } from "@/lib/performance/performanceMetrics";
+import { computeCanonicalAudience } from "@/server/services/analytics/canonicalAudience";
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
-
-interface DauRow {
-  dau: bigint;
-}
 
 export async function collectAudienceDau(ctx: MetricCollectorContext): Promise<MetricSampleDraft[]> {
   const window = resolvePerformanceWindow("today", ctx.now);
-
-  const rows = await ctx.prisma.$queryRaw<DauRow[]>(Prisma.sql`
-    SELECT COUNT(DISTINCT "userId")::bigint AS dau
-    FROM "UserEvent"
-    WHERE "createdAt" >= ${window.start} AND "createdAt" < ${window.end}
-  `);
-
-  return [{ metric: "audience.dau", value: Number(rows[0].dau) }];
+  const audience = await computeCanonicalAudience(ctx.prisma, window.start, window.end);
+  return [{ metric: "audience.dau", value: audience.visitors }];
 }
 
 export const audienceDauCollector: MetricCollector = {

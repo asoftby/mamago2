@@ -22,6 +22,27 @@ function testStoredCanonicalPreferredCity() {
   assert.equal(result, "https://mamago.by/minsk/blog/real-slug");
 }
 
+function testStoredCanonicalPreferredRegion() {
+  const result = resolveArticleCanonicalUrl({
+    seoCanonicalUrl: "https://mamago.by/blog/real-slug",
+    slug: "real-slug",
+    geoScope: "REGION",
+    publicBase: "https://mamago.by",
+  });
+  assert.equal(result, "https://mamago.by/blog/real-slug");
+}
+
+function testRegionFallsBackToNationalPath() {
+  // REGION shares the national /blog/{slug} namespace with COUNTRY.
+  const result = resolveArticleCanonicalUrl({
+    seoCanonicalUrl: null,
+    slug: "real-slug",
+    geoScope: "REGION",
+    publicBase: "https://mamago.by",
+  });
+  assert.equal(result, "https://mamago.by/blog/real-slug");
+}
+
 function testFallsBackToNationalPath() {
   const result = resolveArticleCanonicalUrl({
     seoCanonicalUrl: null,
@@ -123,6 +144,8 @@ function testQueryOrHashRejected() {
 
 testStoredCanonicalPreferredCountry();
 testStoredCanonicalPreferredCity();
+testStoredCanonicalPreferredRegion();
+testRegionFallsBackToNationalPath();
 testFallsBackToNationalPath();
 testFallsBackToCityPath();
 testStaleLocalOriginRejected();

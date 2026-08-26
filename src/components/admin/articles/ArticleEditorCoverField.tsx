@@ -2,31 +2,42 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
+import type { MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
+import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 
 type PickerItem = {
   id: string;
   publicUrl: string | null;
   alt: string | null;
   title: string | null;
+  isUsed: boolean;
 };
 
 export function ArticleEditorCoverField({
   value,
   onChange,
   initialPreviewUrl,
+  authorUserId,
+  articleId,
   showHeading = true,
   uploadButtonLabel = "Загрузить обложку",
   successUploadMessage = "Обложка загружена",
   successPickMessage = "Обложка выбрана",
+  articleMediaSource,
 }: {
   value: string;
   onChange: (mediaId: string, previewUrl: string | null) => void;
   initialPreviewUrl?: string | null;
+  /** Медиатека статьи = медиатека этого автора; без него сервер берёт медиатеку текущего пользователя. */
+  authorUserId?: string | null;
+  articleId?: string | null;
   showHeading?: boolean;
   uploadButtonLabel?: string;
   successUploadMessage?: string;
   successPickMessage?: string;
+  /** «Фото этой статьи» — первая вкладка picker'а. Без него picker остаётся одноисточниковым. */
+  articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
   const mediaId = value.trim();
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState<string | null>(initialPreviewUrl ?? null);
@@ -70,7 +81,10 @@ export function ArticleEditorCoverField({
     const uploaded: MediaUploadItem[] = [];
 
     for (const file of files) {
-      const media = await uploadMediaFile(file);
+      const media = await uploadMediaFile(
+        file,
+        authorUserId ? { ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE", contextEntityId: articleId ?? undefined } : undefined,
+      );
       uploaded.push({
         id: media.id,
         url: media.url,
@@ -82,20 +96,36 @@ export function ArticleEditorCoverField({
     return uploaded;
   };
 
-  const loadMediaLibraryItems = async (): Promise<MediaUploadItem[]> => {
-    const res = await fetch("/api/admin/articles/media-picker?limit=48");
+  const loadMediaLibraryPage = async ({
+    cursor,
+    limit,
+  }: {
+    cursor: string | null;
+    limit: number;
+  }): Promise<MediaLibraryPage<MediaUploadItem>> => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.set("cursor", cursor);
+    if (authorUserId) params.set("authorUserId", authorUserId);
+    const res = await fetch(`/api/admin/articles/media-picker?${params.toString()}`, {
+      credentials: "include",
+    });
     if (!res.ok) {
       throw new Error("Не удалось загрузить медиатеку");
     }
-    const data = (await res.json()) as { items: PickerItem[] };
-    return (data.items ?? [])
-      .filter((item): item is PickerItem & { publicUrl: string } => Boolean(item.publicUrl))
-      .map((item) => ({
-        id: item.id,
-        url: item.publicUrl,
-        alt: item.alt,
-        title: item.title,
-      }));
+    const data = (await res.json()) as { items: PickerItem[]; nextCursor: string | null; hasMore: boolean };
+    return {
+      items: (data.items ?? [])
+        .filter((item): item is PickerItem & { publicUrl: string } => Boolean(item.publicUrl))
+        .map((item) => ({
+          id: item.id,
+          url: item.publicUrl,
+          alt: item.alt,
+          title: item.title,
+          isUsed: item.isUsed,
+        })),
+      nextCursor: data.nextCursor ?? null,
+      hasMore: Boolean(data.hasMore),
+    };
   };
 
   return (
@@ -111,12 +141,24 @@ export function ArticleEditorCoverField({
       allowMediaLibrary
       allowUpload
       onUploadFiles={uploadFiles}
-      loadMediaLibraryItems={loadMediaLibraryItems}
+      loadMediaLibraryPage={loadMediaLibraryPage}
+      libraryOwnerKey={authorUserId ?? null}
       uploadButtonLabel={uploadButtonLabel}
       uploadSuccessMessage={successUploadMessage}
       librarySelectSuccessMessage={successPickMessage}
       mediaLibraryDescription="Недавно загруженные изображения. Полный список — в разделе «Медиатека»."
       singleEmptyHint="Выберите главное изображение из медиатеки или загрузите файл"
+      usedIds={articleMediaSource?.usedIds}
+      usageLabel="Используется"
+      articleLibrary={
+        articleMediaSource
+          ? {
+              items: articleMediaSource.items,
+              loading: articleMediaSource.loading,
+              load: articleMediaSource.load,
+            }
+          : undefined
+      }
     />
   );
 }

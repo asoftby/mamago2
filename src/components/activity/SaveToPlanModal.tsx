@@ -20,7 +20,7 @@ import {
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg: "#F6F2EA",
+  bg: "#FFFFFF",
   paper: "#FAF7F1",
   ink: "#141210",
   ink2: "#3A332B",
@@ -49,6 +49,12 @@ export type SaveScenario =
        * Used to render time chips. Session counts are derived from this.
        */
       eventPlanSessionsByDate?: Record<string, Array<{ id: string; time: string }>>;
+      /**
+       * Entity has no date semantics (e.g. Article) — render idea-only UI,
+       * no calendar/date-slider/"or without date" ever, regardless of any
+       * legacy inPlan/planDate state.
+       */
+      ideaOnly?: boolean;
     };
 
 export type SaveToPlanResult =
@@ -308,19 +314,24 @@ function OptRow({ num, iconEl, title, sub, onClick }: {
   );
 }
 
-function IdeasRow({ onClick, ghost }: { onClick: () => void; ghost?: boolean }) {
+function IdeasRow({
+  onClick, title = "Сохранить в идеи",
+  subtitle = "Вернуться к этому позже — без конкретного дня",
+}: {
+  onClick: () => void; title?: string; subtitle?: string;
+}) {
   return (
     <button className="stp-opt" onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: 14,
       width: "100%", padding: "14px 16px",
-      background: ghost ? "transparent" : C.paper, border: `1px solid ${C.line}`,
+      background: C.paper, border: `1px solid ${C.line}`,
       borderRadius: 16, textAlign: "left", cursor: "pointer",
       fontFamily: "var(--font-sans, ui-sans-serif)", transition: "all .22s ease",
     }}>
       <IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><BookmarkIcon size={17} /></IcoCircle>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em", color: C.ink }}>Сохранить в идеи</div>
-        <div style={{ fontSize: 13, color: C.ink3, marginTop: 2 }}>Вернуться к этому позже — без конкретного дня</div>
+        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em", color: C.ink }}>{title}</div>
+        <div style={{ fontSize: 13, color: C.ink3, marginTop: 2 }}>{subtitle}</div>
       </span>
       <span className="stp-arr" style={{ fontSize: 16, color: C.ink3, transition: "all .22s", flexShrink: 0 }}>→</span>
     </button>
@@ -393,7 +404,7 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
           style={{
             position: "absolute", [side]: -2, top: "50%", transform: "translateY(-50%)", zIndex: 2,
             width: 32, height: 32, borderRadius: 99,
-            background: C.bg, border: `1px solid ${C.line2}`,
+            background: C.paper, border: `1px solid ${C.line2}`,
             color: C.ink, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 4px 10px rgba(20,18,16,.06)",
@@ -882,7 +893,7 @@ function DateSliderView({
         )}
 
         <OrDivider label="или без даты" />
-        <IdeasRow onClick={onIdea} ghost />
+        <IdeasRow onClick={onIdea} />
       </div>
 
       {/* All-dates drawer */}
@@ -1465,6 +1476,92 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
   );
 }
 
+// ─── Idea-only view (no date semantics — e.g. Article) ───────────────────────
+function IdeaOnlyView({ title, isIdea, onIdea, onRemoveIdea }: {
+  title: string; isIdea: boolean; onIdea: () => void; onRemoveIdea: () => void;
+}) {
+  if (isIdea) {
+    return (
+      <div style={{ padding: "24px 24px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: 99, background: C.green, color: "#fff",
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            fontSize: 11, fontWeight: 700, boxShadow: `0 0 0 4px ${C.greenBg}`,
+          }}>✓</span>
+          <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.green }}>уже в идеях</span>
+        </div>
+
+        <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400 }}>
+          Сохранено в идеях
+        </h2>
+
+        <p style={{ marginTop: 8, marginBottom: 18, fontSize: 13, color: C.ink3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+          {title}
+        </p>
+
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "14px 14px 14px 16px",
+          background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, marginBottom: 18,
+        }}>
+          <IcoCircle bg={C.accentSoft} color={C.accentDeep}><BookmarkIcon size={16} /></IcoCircle>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em", color: C.ink }}>Без даты</div>
+            <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3, marginTop: 3, letterSpacing: ".04em" }}>● в идеях</div>
+          </div>
+          <button onClick={onRemoveIdea} title="Убрать из идей" style={{
+            width: 32, height: 32, borderRadius: 99, border: `1px solid ${C.line2}`,
+            background: "transparent", color: C.ink3,
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}><TrashIcon size={13} /></button>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
+          <button onClick={() => { window.location.href = "/me/ideas"; }} style={{
+            flex: 1, height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
+            border: 0, fontSize: 13, fontWeight: 600,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+            cursor: "pointer", fontFamily: "var(--font-sans)",
+          }}>
+            Все мои идеи <ExternalLinkIcon size={13} color="#FAF7F1" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "24px 24px 20px" }}>
+      <span style={{
+        fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+        fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
+        display: "inline-block", marginBottom: 12,
+      }}>● сохранить статью</span>
+
+      <h2 style={{
+        margin: "0 0 8px",
+        fontFamily: "var(--font-sans)",
+        fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 600,
+      }}>
+        Оставь{" "}
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 500, color: "var(--primary)" }}>
+          на потом
+        </span>
+      </h2>
+
+      <p style={{
+        marginTop: 8, marginBottom: 22, fontSize: 13, color: C.ink3,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+      }}>
+        {title}
+      </p>
+
+      <IdeasRow onClick={onIdea} title="Добавить в идеи" subtitle="Вернуться к этой статье позже" />
+    </div>
+  );
+}
+
 // ─── SaveToPlanPickerBody ─────────────────────────────────────────────────────
 export function SaveToPlanPickerBody({
   scenario, onCommit, isIdea = false, inPlan = false,
@@ -1476,6 +1573,7 @@ export function SaveToPlanPickerBody({
 
   const todayISO = getLocalDateKey();
   const isQuickdate = scenario.kind === "quickdate";
+  const isIdeaOnly = isQuickdate && scenario.ideaOnly === true;
 
   const eventPlanDateOptions = React.useMemo(() => {
     if (scenario.kind !== "quickdate") return [];
@@ -1500,6 +1598,19 @@ export function SaveToPlanPickerBody({
         scenario={scenario as Extract<SaveScenario, { kind: "confirm" | "timeslots" }>}
         isIdea={isIdea} inPlan={inPlan} planDate={planDate}
         onCommit={onCommit}
+      />
+    );
+  }
+
+  // Idea-only entity (e.g. Article): never render calendar/date-slider UI,
+  // regardless of any legacy inPlan/planDate state.
+  if (isIdeaOnly) {
+    return (
+      <IdeaOnlyView
+        title={scenario.title}
+        isIdea={isIdea}
+        onIdea={() => onCommit({ action: "ideas" })}
+        onRemoveIdea={() => onCommit({ action: "remove-idea" })}
       />
     );
   }
@@ -1622,7 +1733,6 @@ export function SaveToPlanModal(props: SaveToPlanModalProps) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        showCloseButton={false}
         className="fixed inset-x-0 bottom-0 w-full max-h-[90vh] rounded-t-3xl border-t shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
         style={{ background: C.bg, borderTopColor: C.line }}
       >

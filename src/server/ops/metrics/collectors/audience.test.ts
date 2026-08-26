@@ -60,25 +60,29 @@ async function main() {
     // Well outside every window.
     await makeEvent(userOutsideAll, new Date(monthWindow.start.getTime() - 10 * 24 * 60 * 60 * 1000));
 
-    // Anonymous event (null userId) — must not count toward DISTINCT userId.
+    // Anonymous event (null userId, real sessionId) — under the canonical
+    // audience contract this counts as an anonymous-ONLY visitor (it's
+    // never linked to any userId in-window), additive to the authenticated
+    // count, not excluded. It falls inside all three windows (dayWindow.start
+    // is by construction >= weekWindow.start >= monthWindow.start).
     const anonEvent = await prisma.userEvent.create({
       data: { userId: userNoIdentity ?? undefined, sessionId: `anon-${marker}`, eventType: "PAGE_VIEW", createdAt: dayWindow.start },
     });
     createdEventIds.push(anonEvent.id);
 
-    // DAU: only userToday is inside today's window.
+    // DAU: userToday (authenticated) + the anonymous session, both inside today's window.
     const dauResult = await collectAudienceDau({ prisma, now });
     assert.equal(dauResult.length, 1);
     assert.equal(dauResult[0].metric, "audience.dau");
-    assert.equal(dauResult[0].value, 1, "only the user active today must count toward DAU");
+    assert.equal(dauResult[0].value, 2, "today's authenticated user + the anonymous-only session must both count toward DAU");
 
-    // WAU/MAU: userToday + userThisWeekOnly inside the week window;
+    // WAU/MAU: userToday + userThisWeekOnly + the anonymous session inside the week window;
     // + userThisMonthOnly inside the month window; userOutsideAll never counts.
     const wauMauResult = await collectAudienceWeeklyMonthly({ prisma, now });
     const wau = wauMauResult.find((s) => s.metric === "audience.wau");
     const mau = wauMauResult.find((s) => s.metric === "audience.mau");
-    assert.equal(wau?.value, 2, "WAU must include today's and this-week's users, not this-month-only");
-    assert.equal(mau?.value, 3, "MAU must include all three in-window users");
+    assert.equal(wau?.value, 3, "WAU must include today's and this-week's users plus the anonymous session, not this-month-only");
+    assert.equal(mau?.value, 4, "MAU must include all three in-window authenticated users plus the anonymous session");
 
     // Identity/filter semantics: dimKey stays global ("").
     assert.equal(dauResult[0].dimKey, undefined, "collector emits no dimKey -> collectorRun writes global dimKey=''");

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { TrendingUp, Users } from "lucide-react";
+import { CalendarPlus, TrendingUp, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
@@ -39,6 +39,7 @@ export interface BusinessPublicationMetrics {
   ctaClicks: number;
   /** e.g. "+15%" — если есть, показываем под числом */
   viewsDelta?: string | null;
+  planAddsDelta?: string | null;
   ctaClicksDelta?: string | null;
 }
 
@@ -84,6 +85,8 @@ function MetricCell({
   delta?: string | null;
 }) {
   const isPositive = delta?.startsWith("+");
+  const isNegative = delta?.startsWith("-");
+  const trendIcon = isPositive ? "↑" : isNegative ? "↓" : null;
   return (
     <div className="flex min-w-[90px] flex-col gap-1 rounded-2xl bg-stone-50 px-4 py-3">
       <div className="flex items-center gap-1.5 text-stone-400">
@@ -97,10 +100,14 @@ function MetricCell({
         <p
           className={cn(
             "text-xs font-semibold",
-            isPositive ? "text-emerald-600" : "text-red-500",
+            isPositive
+              ? "text-emerald-600"
+              : isNegative
+                ? "text-red-500"
+                : "text-stone-500",
           )}
         >
-          {isPositive ? "↑" : "↓"} {delta}
+          {trendIcon ? `${trendIcon} ` : ""}{delta}
         </p>
       ) : null}
     </div>
@@ -141,7 +148,8 @@ export function BusinessPublicationCard({
   );
 
   const hasMetrics =
-    metrics != null && (metrics.views > 0 || metrics.ctaClicks > 0);
+    metrics != null &&
+    (type === "event" || metrics.views > 0 || metrics.ctaClicks > 0);
 
   // ── Avatar ──
   const avatar = (
@@ -244,10 +252,20 @@ export function BusinessPublicationCard({
               delta={metrics!.viewsDelta}
             />
             <MetricCell
-              icon={<Users className="h-3.5 w-3.5" />}
-              label="Заявки"
-              value={fmtNum(metrics!.ctaClicks)}
-              delta={metrics!.ctaClicksDelta}
+              icon={
+                type === "event" ? (
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                ) : (
+                  <Users className="h-3.5 w-3.5" />
+                )
+              }
+              label={type === "event" ? "В план" : "Заявки"}
+              value={fmtNum(
+                type === "event" ? metrics!.planAdds : metrics!.ctaClicks,
+              )}
+              delta={
+                type === "event" ? metrics!.planAddsDelta : metrics!.ctaClicksDelta
+              }
             />
           </div>
         ) : null}

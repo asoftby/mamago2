@@ -632,7 +632,7 @@ export function Step1Basics({
   });
   ageItems.push({
     id: "adult-only",
-    label: "Только 18+",
+    label: "#nokids",
     active: data.agePolicy === AgePolicy.ADULT_ONLY,
     disabled: !isEditable || loading,
     onClick: () => {
@@ -663,6 +663,43 @@ export function Step1Basics({
           Название, формат, интересы, возраст и категория события
         </p>
       </div>
+
+      <fieldset className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4">
+        <legend className="px-1 text-sm font-medium text-stone-900">
+          Как учитывается время события?
+        </legend>
+        {([
+          {
+            value: "SLOT" as const,
+            label: "В конкретное время",
+            description: "Сеанс, спектакль, мастер-класс, занятие",
+          },
+          {
+            value: "WINDOW" as const,
+            label: "В течение периода",
+            description: "Выставка, лагерь, свободное посещение",
+          },
+        ]).map((option) => (
+          <label key={option.value} className="flex cursor-pointer items-start gap-3">
+            <input
+              type="radio"
+              name="schedulingKind"
+              value={option.value}
+              checked={data.schedulingKind === option.value}
+              onChange={() => onChange({ schedulingKind: option.value })}
+              disabled={!isEditable}
+              className="mt-1 h-4 w-4 accent-stone-900"
+            />
+            <span>
+              <span className="block text-sm font-medium text-stone-900">{option.label}</span>
+              <span className="block text-xs text-stone-600">{option.description}</span>
+            </span>
+          </label>
+        ))}
+        {data.schedulingKind == null ? (
+          <p className="text-xs text-amber-700">Для старой публикации значение ещё не выбрано.</p>
+        ) : null}
+      </fieldset>
 
       {onRunAiEnrichment ? (
         <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">

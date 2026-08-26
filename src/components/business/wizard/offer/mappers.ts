@@ -886,6 +886,8 @@ export function mapOfferToFormData(offer: {
   promotionDetails?: string | null;
   promotionalOffer?: string | null;
   priceFrom: number | null;
+  priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN";
+  priceItems?: unknown;
   priceText: string | null;
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
@@ -1051,9 +1053,23 @@ export function mapOfferToFormData(offer: {
         : offer.promotionalOffer
           ? plainTextToRichTextHtml(normalizeRichTextCurrency(offer.promotionalOffer))
           : "",
-    pricingMode: "single",
+    pricingMode: offer.priceMode === "RANGE" && Array.isArray(offer.priceItems) ? "multiple" : "single",
     singlePrice: offer.priceFrom != null ? String(offer.priceFrom) : "",
     singleCurrency: "BYN",
+    pricingOptions: Array.isArray(offer.priceItems)
+      ? offer.priceItems.flatMap((item, index) => {
+          if (!item || typeof item !== "object") return [];
+          const row = item as Record<string, unknown>;
+          if (typeof row.price !== "number" || !Number.isFinite(row.price)) return [];
+          return [{
+            id: typeof row.id === "string" ? row.id : `persisted-price-${index}`,
+            title: typeof row.title === "string" ? row.title : "Тариф",
+            price: String(row.price),
+            oldPrice: typeof row.oldPrice === "number" ? String(row.oldPrice) : undefined,
+            description: typeof row.description === "string" ? row.description : "",
+          }];
+        })
+      : [],
     contactSource: offer.contactSource === "place" ? "place" : "manual",
     phone: offer.contactPhone ?? "",
     phoneLabel: offer.contactPhoneLabel ?? null,

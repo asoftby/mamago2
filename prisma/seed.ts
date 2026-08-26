@@ -520,6 +520,31 @@ async function main() {
     },
   });
 
+  // Остальные административные области Беларуси — справочник для REGION-статей.
+  const otherOblasts = [
+    { id: "region_brestskaya_oblast", name: "Брестская область", slug: "brestskaya-oblast", priority: 90 },
+    { id: "region_vitebskaya_oblast", name: "Витебская область", slug: "vitebskaya-oblast", priority: 90 },
+    { id: "region_gomelskaya_oblast", name: "Гомельская область", slug: "gomelskaya-oblast", priority: 90 },
+    { id: "region_grodnenskaya_oblast", name: "Гродненская область", slug: "grodnenskaya-oblast", priority: 90 },
+    { id: "region_mogilevskaya_oblast", name: "Могилёвская область", slug: "mogilevskaya-oblast", priority: 90 },
+  ] as const;
+
+  for (const oblast of otherOblasts) {
+    await prisma.region.upsert({
+      where: { countryId_slug: { countryId: belarus.id, slug: oblast.slug } },
+      update: { isActive: true, priority: oblast.priority },
+      create: {
+        id: oblast.id,
+        countryId: belarus.id,
+        name: oblast.name,
+        slug: oblast.slug,
+        type: "OBLAST",
+        isActive: true,
+        priority: oblast.priority,
+      },
+    });
+  }
+
   console.log("  → Cities");
 
   const minsk = await prisma.city.upsert({

@@ -28,6 +28,7 @@ import {
   isContentLifecycleOperationError,
   lifecycleErrorResponsePayload,
 } from "@/server/services/contentLifecycleOperation.service";
+import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 
 export async function GET(
   request: NextRequest,
@@ -389,7 +390,14 @@ export async function PATCH(
     if (body.googleReviewsJson !== undefined) updateData.googleReviewsJson = body.googleReviewsJson;
     if (body.googleReviewsSyncedAt !== undefined) updateData.googleReviewsSyncedAt = body.googleReviewsSyncedAt;
     if (body.googleMapsUri !== undefined) updateData.googleMapsUri = body.googleMapsUri;
-    if (body.priceItems !== undefined) updateData.priceItems = body.priceItems ?? null;
+    if (body.priceItems !== undefined) {
+      const normalizedPrice = normalizePublicationPrice({ priceItems: body.priceItems });
+      updateData.priceItems = body.priceItems ?? null;
+      updateData.priceFrom = normalizedPrice.min;
+      updateData.priceTo = normalizedPrice.max;
+      updateData.priceMode = normalizedPrice.mode;
+      updateData.currency = "BYN";
+    }
 
     // Bulk-attach any TEMP media uploaded during this wizard session (gallery photos,
     // and logo if it wasn't already resolved above via a direct logoImageId tempMedia id).

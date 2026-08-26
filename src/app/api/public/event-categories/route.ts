@@ -5,68 +5,28 @@
  * Структура: корневые категории с вложенными жанрами.
  */
 
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { getActiveEventTaxonomy, getAvailableEventTaxonomy } from "@/server/discovery/eventTaxonomyAvailability";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Получаем все активные категории EVENT (только корневые)
-    const categories = await prisma.eventCategory.findMany({
-      where: {
-        publicationType: "EVENT",
-        isActive: true,
-        parentId: null, // только корневые
-      },
-      select: {
-        id: true,
-        nameRu: true,
-        nameEn: true,
-        slug: true,
-        icon: true,
-        sortOrder: true,
-      },
-      orderBy: {
-        sortOrder: "asc",
-      },
-    });
+    const requestedCity = request.nextUrl.searchParams.get("city");
+    if (!requestedCity) {
+      return NextResponse.json(
+        { categories: await getActiveEventTaxonomy() },
+        { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=3600" } },
+      );
+    }
+    const citySlug = requestedCity.trim().toLowerCase();
+    const city = await findCityBySlug(citySlug, { select: { id: true, slug: true } });
+    if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
+    const categories = await getAvailableEventTaxonomy(city.id, city.slug);
 
-    // Получаем жанры для каждой категории
-    const categoriesWithGenres = await Promise.all(
-      categories.map(async (category) => {
-        const genres = await prisma.genre.findMany({
-          where: {
-            categoryId: category.id,
-            isActive: true,
-          },
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            sortOrder: true,
-          },
-          orderBy: {
-            sortOrder: "asc",
-          },
-        });
-
-        return {
-          id: category.id,
-          nameRu: category.nameRu,
-          nameEn: category.nameEn,
-          slug: category.slug,
-          icon: category.icon,
-          sortOrder: category.sortOrder,
-          genres: genres.map((genre) => ({
-            id: genre.id,
-            nameRu: genre.name,
-            slug: genre.slug,
-            sortOrder: genre.sortOrder,
-          })),
-        };
-      })
+    return NextResponse.json(
+      { categories },
+      { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=3600" } },
     );
-
-    return NextResponse.json({ categories: categoriesWithGenres });
   } catch (error) {
     console.error("[event-categories] Error:", error);
     return NextResponse.json(

@@ -1,9 +1,9 @@
-import { ActivityFormat, type Prisma } from "@prisma/client";
+import { ActivityFormat, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
-import { getBusinessQualityBoostMap, applyBusinessQualityBoost } from "@/server/services/ranking/businessQualityBoost";
+import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
 
 function ageBoundsFromOffer(offer: {
   ageMinMonths: number | null;
@@ -63,6 +63,24 @@ type GetClassesDiscoveryFeedOptions = {
   chipSlug?: string | null;
   chipTitleBySlug?: Map<string, string>;
 };
+
+type CanonicalOfferPrice = {
+  priceMode: PublicationPriceMode;
+  priceFrom: number | null;
+  priceTo: number | null;
+  currency: string;
+};
+
+export function projectCanonicalOfferPrice(
+  offer: CanonicalOfferPrice,
+): Pick<ActivityMock, "priceMode" | "priceMin" | "priceMax" | "currency"> {
+  return {
+    priceMode: offer.priceMode,
+    priceMin: offer.priceFrom ?? undefined,
+    priceMax: offer.priceTo ?? undefined,
+    currency: offer.currency as ActivityMock["currency"],
+  };
+}
 
 export async function getClassesDiscoveryFeed(
   cityId: string,
@@ -131,16 +149,18 @@ export async function getClassesDiscoveryFeed(
       campSessions: offer.campSessions,
     });
     const isBoosted = offer.boosts.length > 0;
-    const baseEngagement = isBoosted ? 1000 : 0;
+    const baseEngagement = 0;
 
     // Apply quality boost (capped at +10%, no effect on promoted boosts)
     const businessId = (offer.place as { ownerBusinessId?: string | null }).ownerBusinessId;
     const qualityMultiplier = businessId ? (qualityBoostMap.get(businessId) ?? 1.0) : 1.0;
     // Don't apply quality boost to already-promoted offers (isBoosted = 1000)
     // to avoid double-boosting. Only apply to organic offers.
-    const finalEngagement = isBoosted
-      ? baseEngagement
-      : applyBusinessQualityBoost(baseEngagement, qualityMultiplier);
+    const finalEngagement = applyActivePublicationBoost(
+      baseEngagement,
+      isBoosted,
+      qualityMultiplier,
+    );
 
     return {
       id: offer.id,
@@ -155,8 +175,7 @@ export async function getClassesDiscoveryFeed(
       image: offer.coverImage ?? "",
       ageFrom,
       ageTo,
-      priceMin: offer.priceFrom ?? undefined,
-      currency: "BYN",
+      ...projectCanonicalOfferPrice(offer),
       dateStart,
       dateEnd,
       format: ActivityFormat.OFFLINE,
@@ -217,7 +236,10 @@ async function runQuery({ publicWhereParts, cityId, chipSlug, now, skipChipSlugs
       coverImage: true,
       ageMinMonths: true,
       ageMaxMonths: true,
+      priceMode: true,
       priceFrom: true,
+      priceTo: true,
+      currency: true,
       dateFrom: true,
       dateTo: true,
       campSessions: true,
@@ -234,7 +256,7 @@ async function runQuery({ publicWhereParts, cityId, chipSlug, now, skipChipSlugs
       boosts: {
         where: {
           startAt: { lte: now },
-          endAt: { gte: now },
+          endAt: { gt: now },
         },
         select: { id: true },
       },

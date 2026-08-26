@@ -1,5 +1,6 @@
 /**
- * /blog/[slug] — COUNTRY-scope articles only.
+ * /blog/[slug] — REGION- and COUNTRY-scope articles (they share this
+ * national URL namespace; cityId IS NULL for both).
  *
  * If the slug belongs to a CITY article (geoScope === CITY), issue a
  * 308 permanent redirect to /{city}/blog/{slug}.
@@ -42,6 +43,8 @@ import {
   loadArticleContinuousContext,
 } from "@/lib/article/nextArticleInSection";
 import { buildContinuousArticleSeed } from "@/lib/article/buildContinuousArticleSeed";
+import { resolveArticleGeoHeaderLabel } from "@/lib/article/articleGeoHeaderLabel";
+import { ArticleGeoLabelSync } from "@/components/article/ArticleGeoLabelSync";
 
 /**
  * Redirect to canonical city-scoped URL if the article is CITY-scoped.
@@ -86,7 +89,7 @@ async function resolveCityRedirect(slug: string): Promise<string | null> {
 }
 
 async function getArticle(slug: string): Promise<ArticleVm | null> {
-  // COUNTRY scope only: cityId IS NULL
+  // REGION/COUNTRY scope: cityId IS NULL
   const resolved = await findArticleBySlug(slug, null);
   if (resolved) {
     const a = await prisma.article.findUnique({
@@ -155,6 +158,8 @@ async function getArticleSchemaData(articleId: string) {
       seoCanonicalUrl: true,
       seoJsonLdOverride: true,
       seoTitle: true,
+      geoScope: true,
+      region: { select: { name: true } },
     },
   });
 }
@@ -173,7 +178,7 @@ export async function generateMetadata({
   }
 
   const publicBase = getCanonicalPublicAppUrl();
-  // COUNTRY scope (cityId = null)
+  // REGION/COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const article = await prisma.article.findUnique({
@@ -314,12 +319,18 @@ export default async function ArticlePage({
 
   const user = await getCurrentUser();
   const canEditPublishedArticle = user?.role === "ADMIN" || user?.role === "MODERATOR";
-  // COUNTRY scope (cityId = null)
+  // REGION/COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const schemaArticle = await getArticleSchemaData(mvp.id);
     const publicBase = getCanonicalPublicAppUrl();
     const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
+    /** Header geo context: REGION → article's region, COUNTRY (incl. Breaking News) → «Беларусь». Never the URL-fallback city. */
+    const articleGeoLabel = resolveArticleGeoHeaderLabel({
+      geoScope: schemaArticle?.geoScope ?? "COUNTRY",
+      cityName: null,
+      regionName: schemaArticle?.region?.name ?? null,
+    });
     const canonicalUrl = resolveArticleCanonicalUrl({
       seoCanonicalUrl: schemaArticle?.seoCanonicalUrl,
       slug: mvp.slug ?? slug,
@@ -368,6 +379,7 @@ export default async function ArticlePage({
       const related = await loadRelatedBreakingNews(mvp.id);
       return (
         <>
+          <ArticleGeoLabelSync label={articleGeoLabel} />
           <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
@@ -444,6 +456,7 @@ export default async function ArticlePage({
 
       return (
         <>
+          <ArticleGeoLabelSync label={articleGeoLabel} />
           <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
@@ -466,6 +479,7 @@ export default async function ArticlePage({
 
     return (
       <>
+        <ArticleGeoLabelSync label={articleGeoLabel} />
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
         <JsonLd
           data={[articleJsonLd, breadcrumbJsonLd].filter(

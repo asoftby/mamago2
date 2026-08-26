@@ -305,7 +305,8 @@ export function AccountDesign(props: AccountDesignProps) {
           </Reveal>
         </section>
 
-        {/* ── Routes ── */}
+        {/* ── Routes ── (hidden until section release) */}
+        {false && (
         <section className="wrap" style={{ marginBottom: 44 }}>
           <Reveal>
             <div className="kicker">
@@ -368,8 +369,10 @@ export function AccountDesign(props: AccountDesignProps) {
             </div>
           </Reveal>
         </section>
+        )}
 
-        {/* ── Parties ── */}
+        {/* ── Parties ── (hidden until section release) */}
+        {false && (
         <section className="wrap" style={{ marginBottom: 80 }}>
           <Reveal>
             <div className="kicker">
@@ -449,6 +452,7 @@ export function AccountDesign(props: AccountDesignProps) {
             </div>
           </Reveal>
         </section>
+        )}
       </div>
 
       <AddParticipantModal

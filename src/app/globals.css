@@ -320,6 +320,14 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Единое акцентное начертание: любой визуально наклонный текст должен
+     использовать настоящие локальные PT Serif Italic / Bold Italic. */
+  :where(em, i, .italic, .font-display-italic),
+  [style*="font-style: italic"],
+  [style*="font-style:italic"] {
+    font-family: var(--font-pt-serif), ui-serif, serif !important;
+  }
 }
 
 @layer utilities {
@@ -345,6 +353,14 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   .interactive-disabled {
     cursor: not-allowed;
     opacity: 0.6;
+  }
+
+  /* Native clickable elements don't all get a pointer cursor by default
+     (buttons default to the arrow cursor in most browsers) — force it. */
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
   }
 }
 
@@ -809,7 +825,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 }
 
 .font-display-italic {
-  font-family: var(--font-display), ui-serif, serif;
+  font-family: var(--font-pt-serif), ui-serif, serif;
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.005em;

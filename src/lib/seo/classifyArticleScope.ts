@@ -16,7 +16,8 @@ export type ArticleScopeClassification =
   | { scope: "UNKNOWN" };
 
 export function classifyArticleScope(article: { geoScope: GeoScope | null; cityId: string | null }): ArticleScopeClassification {
-  if (article.geoScope === "COUNTRY") return { scope: "GLOBAL" };
+  // REGION shares the national /blog/{slug} URL namespace with COUNTRY — both classify as GLOBAL here.
+  if (article.geoScope === "COUNTRY" || article.geoScope === "REGION") return { scope: "GLOBAL" };
   if (article.geoScope === "CITY" && article.cityId) return { scope: "CITY", cityId: article.cityId };
   return { scope: "UNKNOWN" };
 }

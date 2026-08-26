@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { resolveScheduleItemTimeOrder } from "@/lib/event/scheduleItemTimeOrder";
+import { formatLocalPlanDate } from "@/lib/date/localDateKey";
 import type { EventScheduleItem, EventScheduleCardProps } from "./types";
 
 const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
@@ -50,6 +52,8 @@ export function EventScheduleCard({
   const handleUpdate = (updates: Partial<EventScheduleItem>) => {
     onChange({ ...item, ...updates });
   };
+
+  const timeOrder = resolveScheduleItemTimeOrder(item);
 
   // Convert date string to Date object
   const selectedDate = item.date ? new Date(item.date) : null;
@@ -426,6 +430,13 @@ export function EventScheduleCard({
                   value={item.endTime}
                   onChange={(e) => handleUpdate({ endTime: e.target.value })}
                 />
+                {timeOrder.crossesMidnight && (
+                  <p className="text-xs text-gray-500">
+                    {timeOrder.endDateLabel
+                      ? formatLocalPlanDate(timeOrder.endDateLabel)
+                      : "Следующий день"}
+                  </p>
+                )}
               </div>
             </div>
           )}

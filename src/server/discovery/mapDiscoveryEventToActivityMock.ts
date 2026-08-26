@@ -1,5 +1,4 @@
-import type { ActivityFormat } from "@prisma/client";
-import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
+import type { ActivityFormat, PublicationPriceMode } from "@prisma/client";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
 import type { ActivityMock } from "@/types/activity";
@@ -40,22 +39,6 @@ function tagsFromSchedule(next: Date | null): string[] {
   return tags;
 }
 
-/** «от» только для режима «цена от»; фикс — без префикса. */
-function discoveryCardPriceUsesOtPrefix(a: {
-  scheduleJson: unknown;
-  priceText: string | null;
-  priceFrom: number | null;
-  priceTo: number | null;
-}): boolean {
-  const sj = a.scheduleJson as Record<string, unknown> | null | undefined;
-  const mode = normalizePricingMode(sj?.pricingMode, {
-    priceText: a.priceText,
-    priceFrom: a.priceFrom,
-    priceTo: a.priceTo,
-  });
-  return mode === "from";
-}
-
 function resolveListingCityIdForKudaBadge(a: {
   cityId: string | null;
   place: { cityId: string | null } | null;
@@ -75,6 +58,7 @@ export type DiscoveryEventCardRow = {
   agePolicy: import("@prisma/client").AgePolicy;
   priceFrom: number | null;
   priceTo: number | null;
+  priceMode: PublicationPriceMode;
   priceText: string | null;
   currency: string | null;
   priceDetails: string | null;
@@ -120,27 +104,6 @@ export function mapDiscoveryEventToActivityMock(
     sessions: a.sessions,
   });
 
-  const sj = a.scheduleJson as Record<string, unknown> | null | undefined;
-  const pricingMode = normalizePricingMode(sj?.pricingMode, {
-    priceText: a.priceText,
-    priceFrom: a.priceFrom,
-    priceTo: a.priceTo,
-  });
-  const priceMinFromText = (() => {
-    if (!a.priceText) return undefined;
-    const m = a.priceText.replace(",", ".").match(/\d+(?:\.\d+)?/);
-    const n = m ? parseFloat(m[0]) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : undefined;
-  })();
-  const priceMin =
-    a.priceFrom != null && !Number.isNaN(a.priceFrom)
-      ? a.priceFrom
-      : pricingMode === "free"
-        ? 0
-        : pricingMode === "from" || pricingMode === "fixed"
-          ? priceMinFromText
-          : undefined;
-
   const listingCityId = resolveListingCityIdForKudaBadge(a);
   const geoBadge =
     listingCityId && listingCityId !== hubPrimaryCityId ? "За городом" : undefined;
@@ -162,14 +125,9 @@ export function mapDiscoveryEventToActivityMock(
     ageFrom,
     ageTo,
     agePolicy: a.agePolicy,
-    priceMin,
+    priceMin: a.priceFrom ?? undefined,
     priceMax: a.priceTo != null ? a.priceTo : undefined,
-    priceListUsesOt: discoveryCardPriceUsesOtPrefix({
-      scheduleJson: a.scheduleJson,
-      priceText: a.priceText,
-      priceFrom: a.priceFrom,
-      priceTo: a.priceTo,
-    }),
+    priceMode: a.priceMode,
     priceDetails: a.priceDetails ?? undefined,
     currency: "BYN",
     dateStart,

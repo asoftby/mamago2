@@ -38,6 +38,8 @@ import {
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { validateSchedulingCompleteness } from "@/lib/event/schedulingCompleteness";
+import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 
 /**
  * POST /api/business/events
@@ -90,6 +92,24 @@ export async function POST(request: NextRequest) {
         ? { organizer: organizerResolution.organizerSnapshot }
         : {}),
     };
+    const normalizedPrice = normalizePublicationPrice({
+      mode: scheduleJsonWithOrganizer.pricingMode as "free" | "fixed" | "from" | undefined,
+      min: body.priceFrom,
+      max: body.priceTo,
+      priceItems: body.priceItems,
+      priceText: body.priceText,
+    });
+    if (normalizedPrice.conflict) {
+      return NextResponse.json({ error: "Некорректный диапазон цены", code: "INVALID_PRICE_RANGE" }, { status: 400 });
+    }
+    const requestedSchedulingKind =
+      body.schedulingKind === "SLOT" || body.schedulingKind === "WINDOW"
+        ? body.schedulingKind
+        : null;
+    const schedulingError = validateSchedulingCompleteness(requestedSchedulingKind, scheduleJsonWithOrganizer);
+    if (schedulingError) {
+      return NextResponse.json({ error: schedulingError, code: "INCOMPLETE_SLOT_SCHEDULE" }, { status: 400 });
+    }
     const primaryRootCategoryId =
       typeof scheduleJsonWithOrganizer.categoryId === "string" ? scheduleJsonWithOrganizer.categoryId : null;
     const primaryLeafCategoryId =
@@ -189,6 +209,7 @@ export async function POST(request: NextRequest) {
         
         // Schedule
         scheduleMode: ScheduleMode.MULTI_DATE,
+        schedulingKind: requestedSchedulingKind,
         scheduleJson: scheduleJsonWithOrganizer as Prisma.InputJsonValue,
         
         // Event category (leaf: subcategory if selected, otherwise root)
@@ -209,10 +230,12 @@ export async function POST(request: NextRequest) {
             : undefined,
 
         // Pricing
-        priceFrom: body.priceFrom,
-        priceTo: body.priceTo,
+        priceFrom: normalizedPrice.min,
+        priceTo: normalizedPrice.max,
+        priceMode: normalizedPrice.mode,
         priceText: body.priceText,
         currency: body.currency || "BYN",
+        priceItems: body.priceItems as Prisma.InputJsonValue | undefined,
         faqItems: faqItems as unknown as Prisma.InputJsonValue,
 
         // Contact phones

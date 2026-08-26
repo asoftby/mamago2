@@ -11,7 +11,8 @@ import {
 import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
-import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
+import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
+import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 import { ensurePublishedOfferHasSlug } from "@/lib/slug/publishSlugGuards";
 import { createPublishTimer, runAfterPublishResponse } from "@/server/utils/publishPipeline";
 import {
@@ -254,20 +255,31 @@ export async function POST(request: NextRequest) {
 
       // Calculate price fields
       let priceFrom: number | null = null;
+      let priceTo: number | null = null;
+      let priceMode: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" = "UNKNOWN";
+      let priceItems: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
       let priceText: string | null = null;
 
-      const campPriceFrom = data.campProgramType
-        ? getMinCampSessionPrice(data.campSessions)
-        : null;
-
       if (data.campProgramType) {
-        priceFrom = campPriceFrom;
-        priceText = campPriceFrom != null ? formatPriceFrom(campPriceFrom) : null;
+        const values = getCampSessionPriceValues(data.campSessions);
+        const normalized = normalizePublicationPrice({ priceItems: values.map((price) => ({ price })) });
+        priceFrom = normalized.min;
+        priceTo = normalized.max;
+        priceMode = normalized.mode;
+        priceItems = values.map((price) => ({ price })) as Prisma.InputJsonValue;
+        priceText = priceFrom != null ? formatPriceFrom(priceFrom) : null;
       } else if (data.pricingMode === "SINGLE" && data.singlePrice !== undefined) {
-        priceFrom = data.singlePrice;
+        const normalized = normalizePublicationPrice({ mode: "EXACT", min: data.singlePrice });
+        priceFrom = normalized.min;
+        priceTo = normalized.max;
+        priceMode = normalized.mode;
         priceText = data.singlePriceLabel || null;
       } else if (data.pricingMode === "MULTIPLE" && data.pricingOptions.length > 0) {
-        priceFrom = Math.min(...data.pricingOptions.map(p => p.price));
+        const normalized = normalizePublicationPrice({ priceItems: data.pricingOptions });
+        priceFrom = normalized.min;
+        priceTo = normalized.max;
+        priceMode = normalized.mode;
+        priceItems = data.pricingOptions as Prisma.InputJsonValue;
         priceText = formatPriceFrom(priceFrom);
       }
 
@@ -296,6 +308,10 @@ export async function POST(request: NextRequest) {
             promotionDetails: data.promotionDetails,
             promotionalOffer: data.promotionalOffer,
             priceFrom,
+            priceTo,
+            priceMode,
+            currency: "BYN",
+            priceItems,
             priceText,
             ...(() => {
               const age = normalizeAgePolicy({ agePolicy: data.agePolicy, ageMinMonths: data.ageMinMonths, ageMaxMonths: data.ageMaxMonths });

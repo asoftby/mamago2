@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
 
   const city = await findCityBySlug(citySlug, { select: { id: true, slug: true } });
   if (!city) {
-    return { title: "Place Not Found" };
+    notFound();
   }
 
   const isLegacyId = slug.length > 20 && !slug.includes("-");
@@ -118,12 +118,12 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
       },
     });
     if (!place || place.cityId !== city.id) {
-      return { title: "Place Not Found" };
+      notFound();
     }
   } else {
     const slugResult = await findPlaceBySlugInCity(city.id, slug);
     if (!slugResult) {
-      return { title: "Place Not Found" };
+      notFound();
     }
     place = await prisma.place.findUnique({
       where: { id: slugResult.placeId },
@@ -155,7 +155,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
       },
     });
     if (!place) {
-      return { title: "Place Not Found" };
+      notFound();
     }
   }
 
@@ -164,7 +164,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
     archivedAt: place.archivedAt,
     owner: place.ownerBusiness ? { business: place.ownerBusiness } : null,
   })) {
-    return { title: "Place Not Found" };
+    notFound();
   }
 
   // Get display title with duplicate check

@@ -54,6 +54,8 @@ import {
   normalizeMediaDisplayUrl,
 } from "@/lib/media/resolveMediaAssetReference";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
+import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
+import { validateSchedulingCompleteness } from "@/lib/event/schedulingCompleteness";
 
 /**
  * GET /api/business/events/[id]
@@ -213,9 +215,11 @@ export async function PATCH(
         agePolicy: true,
         ageTags: true,
         scheduleMode: true,
+        schedulingKind: true,
         priceFrom: true,
         priceTo: true,
         priceText: true,
+        priceItems: true,
         currency: true,
         phone: true,
         phoneLabel: true,
@@ -355,6 +359,14 @@ export async function PATCH(
 
     const scheduleJsonDirty =
       stableJsonStringify(existing.scheduleJson) !== stableJsonStringify(nextScheduleJson);
+    const effectiveSchedulingKind =
+      body.schedulingKind === "SLOT" || body.schedulingKind === "WINDOW" || body.schedulingKind === null
+        ? body.schedulingKind
+        : existing.schedulingKind;
+    const schedulingError = validateSchedulingCompleteness(effectiveSchedulingKind, nextScheduleJson);
+    if (schedulingError) {
+      return NextResponse.json({ error: schedulingError, code: "INCOMPLETE_SLOT_SCHEDULE" }, { status: 400 });
+    }
     const nextScheduleFingerprint = eventSessionScheduleFingerprint(nextScheduleJson);
     const activitySessionsNeedResync =
       eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
@@ -504,6 +516,14 @@ export async function PATCH(
       updateData.scheduleMode = body.scheduleMode;
     }
 
+    if (
+      body.schedulingKind !== undefined &&
+      (body.schedulingKind === null || body.schedulingKind === "SLOT" || body.schedulingKind === "WINDOW") &&
+      body.schedulingKind !== existing.schedulingKind
+    ) {
+      updateData.schedulingKind = body.schedulingKind;
+    }
+
     if (scheduleJsonDirty) {
       updateData.scheduleJson = nextScheduleJson as Prisma.InputJsonValue;
     }
@@ -529,11 +549,24 @@ export async function PATCH(
       };
     }
 
-    if (body.priceFrom !== undefined && body.priceFrom !== existing.priceFrom) {
-      updateData.priceFrom = body.priceFrom;
-    }
-    if (body.priceTo !== undefined && body.priceTo !== existing.priceTo) {
-      updateData.priceTo = body.priceTo;
+    if (
+      body.priceFrom !== undefined || body.priceTo !== undefined ||
+      body.priceItems !== undefined || scheduleJsonDirty
+    ) {
+      const normalizedPrice = normalizePublicationPrice({
+        mode: nextScheduleJson.pricingMode as "free" | "fixed" | "from" | undefined,
+        min: body.priceFrom !== undefined ? body.priceFrom : existing.priceFrom,
+        max: body.priceTo !== undefined ? body.priceTo : existing.priceTo,
+        priceItems: body.priceItems !== undefined ? body.priceItems : existing.priceItems,
+        priceText: body.priceText !== undefined ? body.priceText : existing.priceText,
+      });
+      if (normalizedPrice.conflict) {
+        return NextResponse.json({ error: "Некорректный диапазон цены", code: "INVALID_PRICE_RANGE" }, { status: 400 });
+      }
+      updateData.priceFrom = normalizedPrice.min;
+      updateData.priceTo = normalizedPrice.max;
+      updateData.priceMode = normalizedPrice.mode;
+      updateData.currency = "BYN";
     }
     if (body.priceText !== undefined && body.priceText !== (existing.priceText ?? "")) {
       updateData.priceText = body.priceText;

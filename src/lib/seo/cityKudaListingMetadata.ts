@@ -22,9 +22,10 @@ export async function buildCityEventsListingMetadata(
   if (!city) return {};
   const base = publicSiteBase();
   const canonical = `${base}${cityEventsListingPath(citySlug)}`;
+  const cityName = getCityDisplayName(citySlug);
   return {
-    title: `Куда пойти с ребёнком в ${city.name} — mamaGo`,
-    description: `Афиша семейных событий, места и развлечения для детей в ${city.name}. Фильтры по возрасту и району.`,
+    title: `Куда пойти с ребёнком в ${cityName} — mamaGo`,
+    description: `Афиша семейных событий, места и развлечения для детей в ${cityName}. Фильтры по возрасту и району.`,
     alternates: { canonical },
   };
 }
@@ -38,9 +39,10 @@ export async function buildCityHubMetadata(citySlug: string): Promise<Metadata> 
   if (!city) return {};
   const base = publicSiteBase();
   const canonical = `${base}/${citySlug}`;
+  const cityName = getCityDisplayName(citySlug);
   return {
-    title: `${city.name} — семейный гид | mamaGo`,
-    description: `Афиша событий, занятия, маршруты и журнал mamaGo — городской хаб для семей с детьми в ${city.name}.`,
+    title: `mamaGo — куда сходить в ${cityName} с ребёнком или всей семьёй`,
+    description: `mamaGo — удобный помощник в организации семейного отдыха и развития в ${cityName}: события, места, занятия, маршруты и идеи для времени с детьми.`,
     alternates: { canonical },
   };
 }

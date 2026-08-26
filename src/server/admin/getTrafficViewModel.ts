@@ -7,12 +7,16 @@
  *   - "Unique visitors" and "page views" are now real, backed by the
  *     `PAGE_VIEW` UserEvent written by `PageViewTracker`
  *     (src/components/analytics/PageViewTracker.tsx), mounted once in the
- *     public shell (`(public)/PublicLayoutBody.tsx`). A visitor is a
- *     session that generated at least one PAGE_VIEW in the window — plain
- *     background telemetry (CARD_VIEW, CTA_CLICK, ...) does NOT make a
- *     session count as a visitor here. This is a deliberate narrower
- *     definition than /admin/performance's `trackedVisitors` (which counts
- *     DISTINCT sessionId over ALL UserEvent types).
+ *     public shell (`(public)/PublicLayoutBody.tsx`). "Unique visitors" is
+ *     the canonical audience identity (see
+ *     `@/server/services/analytics/canonicalAudience`) over PAGE_VIEW rows
+ *     in the window — the SAME identity `audience.dau`/`wau`/`mau` and
+ *     /admin/performance's `trackedVisitors` now use, so
+ *     `uniqueVisitorsToday` and `audience.dau` agree for the same window.
+ *     "Page views" uses the SAME canonical eligibility as visitors —
+ *     ADMIN/MODERATOR-linked sessions contribute 0 to both, so
+ *     views/visitor stays meaningful even on internal-only-traffic days
+ *     (never a raw-row count of purely internal browsing).
  *   - "Region distribution" (`regions`) remains a GAP. The trusted-IP
  *     question is now resolved: the live Traefik contract is verified
  *     (`forwardedHeaders.trustedIPs` empty, no CDN in front — only
@@ -33,6 +37,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { comparisonPercent } from "@/lib/performance/performanceMetrics";
 import { resolveElapsedTodayVsYesterday } from "@/lib/admin/trafficWindow";
+import { computeCanonicalAudience } from "@/server/services/analytics/canonicalAudience";
 
 export interface TrafficViewModel {
   /** null only if the underlying query itself failed — a successful query always yields a real number, including a true 0. */
@@ -60,30 +65,6 @@ export const EMPTY_TRAFFIC_VIEW_MODEL: TrafficViewModel = {
   regions: null,
 };
 
-interface CountRow {
-  count: bigint;
-}
-
-async function countDistinctPageViewSessions(prisma: PrismaClient, start: Date, end: Date): Promise<number> {
-  const rows = await prisma.$queryRaw<CountRow[]>`
-    SELECT COUNT(DISTINCT "sessionId")::bigint AS count
-    FROM "UserEvent"
-    WHERE "createdAt" >= ${start} AND "createdAt" < ${end}
-      AND "eventType" = 'PAGE_VIEW' AND "sessionId" IS NOT NULL
-  `;
-  return Number(rows[0]?.count ?? 0);
-}
-
-async function countPageViews(prisma: PrismaClient, start: Date, end: Date): Promise<number> {
-  const rows = await prisma.$queryRaw<CountRow[]>`
-    SELECT COUNT(*)::bigint AS count
-    FROM "UserEvent"
-    WHERE "createdAt" >= ${start} AND "createdAt" < ${end}
-      AND "eventType" = 'PAGE_VIEW'
-  `;
-  return Number(rows[0]?.count ?? 0);
-}
-
 function computePageViewsPerVisitor(pageViews: number, uniqueVisitors: number): number | null {
   if (uniqueVisitors <= 0) return null;
   return Math.round((pageViews / uniqueVisitors) * 10) / 10;
@@ -92,12 +73,14 @@ function computePageViewsPerVisitor(pageViews: number, uniqueVisitors: number): 
 export async function getTrafficViewModel(prisma: PrismaClient, now: Date): Promise<TrafficViewModel> {
   const window = resolveElapsedTodayVsYesterday(now);
 
-  const [uniqueVisitorsToday, uniqueVisitorsYesterday, pageViewsToday, pageViewsYesterday] = await Promise.all([
-    countDistinctPageViewSessions(prisma, window.todayStart, window.todayEnd),
-    countDistinctPageViewSessions(prisma, window.yesterdayStart, window.yesterdayEnd),
-    countPageViews(prisma, window.todayStart, window.todayEnd),
-    countPageViews(prisma, window.yesterdayStart, window.yesterdayEnd),
+  const [audienceToday, audienceYesterday] = await Promise.all([
+    computeCanonicalAudience(prisma, window.todayStart, window.todayEnd),
+    computeCanonicalAudience(prisma, window.yesterdayStart, window.yesterdayEnd),
   ]);
+  const uniqueVisitorsToday = audienceToday.visitors;
+  const uniqueVisitorsYesterday = audienceYesterday.visitors;
+  const pageViewsToday = audienceToday.pageViews;
+  const pageViewsYesterday = audienceYesterday.pageViews;
 
   return {
     uniqueVisitorsToday,

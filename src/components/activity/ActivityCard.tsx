@@ -7,12 +7,13 @@ import { H3, Caption } from "@/components/ui/typography";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { SaveToPlanResult } from "./SaveToPlanModal";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
-import { formatPrice, formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
-import type { ActivityFormat } from "@prisma/client";
+import type { ActivityFormat, PublicationPriceMode } from "@prisma/client";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 
 type DomainActivity = {
@@ -34,6 +35,7 @@ type DomainActivity = {
   priceMax?: number | null;
   /** true = «от X BYN»; false = «X BYN»; если не задано — эвристика по priceMin === priceMax */
   priceListUsesOt?: boolean | null;
+  priceMode?: PublicationPriceMode | null;
   currency?: string | null;
   badge?: string | null;
   /** Нейтральный гео-бейдж (область / пригород), не путать с категорией */
@@ -48,19 +50,10 @@ type DomainActivity = {
 function discoveryCardPriceCaption(
   a: Pick<
     DomainActivity,
-    "priceMin" | "priceMax" | "currency" | "priceListUsesOt"
+    "priceMin" | "priceMax" | "currency" | "priceMode"
   >,
 ): string | null {
-  if (a.priceMin === 0) return "бесплатно";
-  if (a.priceMin == null) return null;
-  const useOt =
-    a.priceListUsesOt ??
-    !(
-      a.priceMax != null &&
-      a.priceMin != null &&
-      a.priceMin === a.priceMax
-    );
-  return useOt ? formatPriceFrom(a.priceMin) : formatPrice(a.priceMin);
+  return formatPublicCardPrice({ priceMode: a.priceMode, priceFrom: a.priceMin, priceTo: a.priceMax, currency: a.currency });
 }
 
 export type ActivitySaveMeta = {

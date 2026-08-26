@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MapPin, Clock, Tag, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { StoryItem } from "../types/story";
 
 interface StoryModalActionCardProps {
@@ -94,15 +95,20 @@ export function StoryModalActionCard({
         </p>
       ) : null}
 
-      {/* ── Price ── */}
-      {item.price && (
-        <p className="text-[17px] font-semibold text-neutral-900 mb-1">
-          {item.price}
-        </p>
-      )}
-
       {/* ── Spacer ── */}
       <div className="flex-1 min-h-[16px]" />
+
+      {/* ── Price — anchored immediately above CTA ── */}
+      {item.price && (
+        <div className="mb-3">
+          <p className="mb-0.5 text-[11px] font-medium tracking-[0.18em] text-neutral-400">
+            Стоимость
+          </p>
+          <p className="text-[17px] font-semibold text-neutral-900">
+            {renderCurrencyText(item.price)}
+          </p>
+        </div>
+      )}
 
       {item.href ? (
         <Link

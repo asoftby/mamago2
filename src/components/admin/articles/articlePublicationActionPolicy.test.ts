@@ -18,10 +18,28 @@ const pendingAdmin = resolveArticlePublicationActionPolicy({
   hasUnsavedChanges: false,
   hasPublicUrl: true,
 });
-assert.deepStrictEqual(pendingAdmin.primary, { kind: "approve", label: "Одобрить и опубликовать" });
+assert.deepStrictEqual(pendingAdmin.primary, {
+  kind: "approve",
+  label: "Одобрить и опубликовать",
+  disabled: false,
+  disabledReason: null,
+});
 assert.strictEqual(pendingAdmin.showQuietSave, false);
 assert.strictEqual(pendingAdmin.showReject, true);
 assert.strictEqual(pendingAdmin.showPublicLink, false);
+
+const pendingAdminDirty = resolveArticlePublicationActionPolicy({
+  status: "PENDING",
+  canModerate: true,
+  hasUnsavedChanges: true,
+  hasPublicUrl: true,
+});
+assert.deepStrictEqual(pendingAdminDirty.primary, {
+  kind: "approve",
+  label: "Одобрить и опубликовать",
+  disabled: true,
+  disabledReason: "Сначала сохраните изменения",
+});
 
 const pendingAuthor = resolveArticlePublicationActionPolicy({
   status: "PENDING",
@@ -55,7 +73,7 @@ const rejected = resolveArticlePublicationActionPolicy({
 assert.deepStrictEqual(rejected.primary, { kind: "submit", label: "Исправить и отправить снова" });
 assert.strictEqual(rejected.showQuietSave, true);
 
-for (const policy of [draft, pendingAdmin, pendingAuthor, published, rejected]) {
+for (const policy of [draft, pendingAdmin, pendingAdminDirty, pendingAuthor, published, rejected]) {
   assert.ok(policy.primary == null || typeof policy.primary.kind === "string", "at most one primary action");
   assert.strictEqual(policy.showPreview, true);
 }

@@ -1,75 +1,238 @@
 "use client";
 
-import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
-import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
-import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import * as React from "react";
+import { serializeAppliedToSearchParams, useDiscoveryFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { normalizeDraftToAvailableTaxonomy, toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
+import { Chip } from "@/components/ui/Chip";
+import { Button } from "@/components/ui/button";
+import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
+import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
+import { formatPrice } from "@/lib/formatters/format-price";
+import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
+
+type PriceDistribution = { max: number | null; step: number | null; buckets: Array<{ from: number; to: number; count: number }> };
+
+/**
+ * Kuda header owns the global discovery context: where, when and who.
+ * The advanced dialog only refines that context and must never reset it.
+ */
+export function resetEventRefinements(filters: DiscoveryFilters): DiscoveryFilters {
+  return {
+    ...filters,
+    categories: [],
+    genres: [],
+    format: null,
+    free: false,
+    priceMax: null,
+    // Legacy strict #nokids lived in secondary filters. Header audience is now authoritative.
+    adultOnly: false,
+  };
+}
+
+/** Badge next to “Фильтры” counts only refinements, never global header context. */
+export function getEventRefinementCount(filters: DiscoveryFilters): number {
+  return (
+    (filters.categories.length > 0 ? 1 : 0) +
+    (filters.genres.length > 0 ? 1 : 0) +
+    (filters.format ? 1 : 0) +
+    (filters.free || filters.priceMax != null ? 1 : 0)
+  );
+}
+
+export function normalizePriceSliderValue(value: string, domainMax: number): number | null {
+  const numericValue = Number(value);
+  return numericValue >= domainMax ? null : numericValue;
+}
+
+export function priceSliderValueFromPosition(clientX: number, left: number, width: number, domainMax: number, step: number): number {
+  const ratio = Math.min(1, Math.max(0, (clientX - left) / width));
+  return Math.min(domainMax, Math.max(0, Math.round((ratio * domainMax) / step) * step));
+}
+
+export function priceSliderValueFromKey(key: string, current: number, domainMax: number, step: number): number | undefined {
+  if (key === "Home") return 0;
+  if (key === "End") return domainMax;
+  if (key === "ArrowLeft" || key === "ArrowDown") return Math.max(0, current - step);
+  if (key === "ArrowRight" || key === "ArrowUp") return Math.min(domainMax, current + step);
+  return undefined;
+}
 
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
   const { applied, actions } = useDiscoveryFilters();
-  const { options, loading } = useDiscoveryFilterOptions(citySlug);
-
-  const toggleAge = (value: string) => {
-    const age = applied.age.includes(value)
-      ? applied.age.filter((item) => item !== value)
-      : [...applied.age, value];
-    actions.setDraft({ age });
+  const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
+  const [draft, setDraft] = React.useState<DiscoveryFilters>(() => ({ ...applied, age: [...applied.age] }));
+  const [count, setCount] = React.useState<number | null>(null);
+  const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, step: null, buckets: [] });
+  const patch = (next: Partial<DiscoveryFilters>) => setDraft((current) => ({ ...current, ...next }));
+  const updatePriceMax = (value: string) => {
+    patch({
+      free: false,
+      priceMax: normalizePriceSliderValue(value, distribution.max!),
+    });
   };
+  const updatePriceMaxFromPointer = (event: React.PointerEvent<HTMLInputElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const value = priceSliderValueFromPosition(event.clientX, rect.left, rect.width, distribution.max!, distribution.step ?? 1);
+    updatePriceMax(String(value));
+  };
+
+  React.useEffect(() => {
+    if (!taxonomyLoading) {
+      setDraft((current) => normalizeDraftToAvailableTaxonomy(current, categories));
+    }
+  }, [categories, taxonomyLoading]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
+      params.set("city", citySlug);
+      fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => setCount(data?.count ?? null))
+        .catch(() => {});
+      params.delete("priceMax");
+      fetch(`/api/discovery/events/price-distribution?${params}`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => data && setDistribution(data))
+        .catch(() => {});
+    }, 150);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [citySlug, draft]);
 
   return (
     <div className="space-y-6 pb-1">
-      <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-neutral-900">Возраст</legend>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">Категория</legend>
         <div className="flex flex-wrap gap-2">
-          {AGE_GROUPS.map((group) => (
-            <button key={group.value} type="button" aria-pressed={applied.age.includes(group.value)} onClick={() => toggleAge(group.value)} className={applied.age.includes(group.value) ? "rounded-full bg-neutral-900 px-3 py-2 text-sm text-white" : "rounded-full border border-neutral-200 px-3 py-2 text-sm text-neutral-700"}>
-              {group.label}
-            </button>
+          {categories.map((category) => (
+            <Chip
+              key={category.id}
+              active={draft.categories.includes(category.slug)}
+              onClick={() => setDraft((current) => toggleEventCategory(current, category.slug, categories))}
+            >
+              {category.nameRu}
+            </Chip>
+          ))}
+          {taxonomyLoading && <span className="text-sm text-muted-foreground">Загрузка…</span>}
+        </div>
+      </fieldset>
+
+      {draft.categories.length > 0 && (
+        <fieldset className="space-y-4">
+          <legend className="text-sm font-semibold">Жанр</legend>
+          {categories
+            .filter((category) => draft.categories.includes(category.slug))
+            .map((category) => (
+              <div key={category.id} className="space-y-2">
+                <div className="text-xs font-medium text-muted-foreground">{category.nameRu}</div>
+                <div className="flex flex-wrap gap-2">
+                  {category.genres.map((genre) => (
+                    <Chip
+                      key={`${category.id}:${genre.id}`}
+                      active={draft.genres.includes(genre.slug)}
+                      onClick={() => patch({
+                        genres: draft.genres.includes(genre.slug)
+                          ? draft.genres.filter((slug) => slug !== genre.slug)
+                          : [...draft.genres, genre.slug],
+                      })}
+                    >
+                      {genre.nameRu}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </fieldset>
+      )}
+
+      <fieldset>
+        <legend className="mb-2 text-sm font-semibold">Формат</legend>
+        <div className="flex flex-wrap gap-2">
+          {ACTIVITY_FORMAT_OPTIONS.map(({ value, label }) => (
+            <Chip
+              key={value}
+              active={draft.format === value}
+              onClick={() => patch({ format: draft.format === value ? null : value })}
+            >
+              {label}
+            </Chip>
           ))}
         </div>
       </fieldset>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={applied.adultOnly}
-        onClick={() => actions.setDraft({ adultOnly: !applied.adultOnly })}
-        className="flex w-full items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-900"
-      >
-        <span>Только 18+</span>
-        <span
-          aria-hidden="true"
-          className={`relative h-6 w-11 rounded-full transition-colors ${
-            applied.adultOnly ? "bg-neutral-900" : "bg-neutral-200"
-          }`}
+      <fieldset className="space-y-4">
+        <legend className="text-sm font-semibold">Цена</legend>
+        <Chip active={draft.free} onClick={() => patch({ free: !draft.free, priceMax: null })}>
+          Бесплатно
+        </Chip>
+        {!draft.free && distribution.max != null && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span>Цена начинается до</span>
+              <strong>{renderPriceWithIcon(formatPrice(draft.priceMax ?? distribution.max, { hideZero: true }))}</strong>
+            </div>
+            <div className="flex h-10 items-end gap-1" aria-hidden>
+              {distribution.buckets.map((bucket, index) => {
+                const peak = Math.max(1, ...distribution.buckets.map((item) => item.count));
+                return (
+                  <span
+                    key={`${bucket.from}-${bucket.to}-${index}`}
+                    className="min-w-0 flex-1 rounded-t bg-primary/25"
+                    style={{ height: `${Math.max(3, (bucket.count / peak) * 100)}%` }}
+                  />
+                );
+              })}
+            </div>
+            <input
+              aria-label="Цена начинается до"
+              className="h-10 w-full accent-primary"
+              type="range"
+              min={0}
+              max={distribution.max}
+              step={distribution.step ?? 1}
+              value={draft.priceMax ?? distribution.max}
+              onInput={(event) => updatePriceMax(event.currentTarget.value)}
+              onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                updatePriceMaxFromPointer(event);
+              }}
+              onPointerMove={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) updatePriceMaxFromPointer(event);
+              }}
+              onKeyDown={(event) => {
+                const value = priceSliderValueFromKey(
+                  event.key,
+                  draft.priceMax ?? distribution.max!,
+                  distribution.max!,
+                  distribution.step ?? 1,
+                );
+                if (value == null) return;
+                event.preventDefault();
+                updatePriceMax(String(value));
+              }}
+            />
+          </div>
+        )}
+      </fieldset>
+
+      <div className="sticky bottom-0 flex items-center justify-between border-t bg-white pt-4">
+        <MobileOverlayResetAction
+          className="lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
+          onClick={() => setDraft((current) => resetEventRefinements(current))}
         >
-          <span
-            className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
-              applied.adultOnly ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </span>
-      </button>
-
-      <FilterSelect label="Формат" value={applied.format ?? ""} onChange={(value) => actions.setDraft({ format: (value || null) as typeof applied.format })} options={[{ value: "OFFLINE", label: "Офлайн" }, { value: "ONLINE", label: "Онлайн" }, { value: "HYBRID", label: "Гибрид" }]} />
-      <FilterSelect label="Район" value={applied.district ?? ""} onChange={(value) => actions.setDraft({ district: value || null })} options={options.districts} disabled={loading} />
-      <FilterSelect label="Метро" value={applied.metro ?? ""} onChange={(value) => actions.setDraft({ metro: value || null })} options={options.metros} disabled={loading} />
-
-      <div className="flex items-center justify-between border-t border-neutral-200 pt-4">
-        <button type="button" className="text-sm font-semibold text-neutral-600 underline underline-offset-2" onClick={() => actions.resetAll()}>Сбросить всё</button>
-        <button type="button" className="rounded-lg bg-neutral-900 px-8 py-3 text-sm font-semibold text-white" onClick={onApply}>Готово</button>
+          Сбросить уточнения
+        </MobileOverlayResetAction>
+        <Button
+          className="rounded-full px-6"
+          onClick={() => {
+            actions.commitFilters(draft);
+            onApply?.();
+          }}
+        >
+          Показать {count ?? "…"} событий
+        </Button>
       </div>
     </div>
-  );
-}
-
-function FilterSelect({ label, value, onChange, options, disabled = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; disabled?: boolean }) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-semibold text-neutral-900">{label}</span>
-      <select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-900 disabled:opacity-50">
-        <option value="">Не выбрано</option>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
   );
 }

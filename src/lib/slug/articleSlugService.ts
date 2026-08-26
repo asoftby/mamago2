@@ -6,8 +6,8 @@
  * - Slug never changes automatically afterwards
  * - Manual slug change via SEO editor stores old slug in history
  * - All lookups are city-scoped: (cityId, slug) is the composite key
- *   CITY articles  → cityId IS NOT NULL
- *   COUNTRY articles → cityId IS NULL  (national blog)
+ *   CITY articles              → cityId IS NOT NULL
+ *   REGION/COUNTRY articles    → cityId IS NULL  (share the national blog slug namespace)
  */
 
 import { prisma } from "@/lib/prisma";
@@ -36,7 +36,7 @@ export function shouldRecordArticleSlugHistory(
  * Check whether a slug is free within a given city scope.
  *
  * @param slug          The slug to check.
- * @param cityId        City scope (null = COUNTRY scope).
+ * @param cityId        City scope (null = REGION/COUNTRY scope).
  * @param excludeArticleId  Article id to exclude from the conflict check (for updates).
  */
 async function isSlugAvailable(
@@ -198,7 +198,7 @@ export async function updateArticleSlug(
  * Find an article by slug within a city scope.
  *
  * @param slug    The slug to look up.
- * @param cityId  City scope (null = COUNTRY scope).
+ * @param cityId  City scope (null = REGION/COUNTRY scope).
  */
 export async function findArticleBySlug(
   slug: string,

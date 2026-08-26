@@ -26,7 +26,7 @@ export function useCookieConsent() {
 
   return {
     ...state,
-    /** Внешняя веб-аналитика (GA, PostHog, …), не product telemetry */
+    /** Внешняя веб-аналитика (GA4, Yandex Metrica), не product telemetry */
     canUseAnalytics: state.analytics,
     /** Сторонние рекламные скрипты */
     canUseMarketing: state.marketing,

@@ -531,7 +531,7 @@ export function NewsPublicationEditor({
     }
     setAuthorError(null);
     // Validate geo scope before publishing.
-    const geoValidation = validateArticleGeoScope({ geoScope, cityId, strict: true });
+    const geoValidation = validateArticleGeoScope({ geoScope, cityId, regionId: null, strict: true });
     if (!geoValidation.ok) {
       setGeoScopeError(geoValidation.message);
       return;
@@ -606,7 +606,7 @@ export function NewsPublicationEditor({
     }
     setAuthorError(null);
     if (action === "publish") {
-      const geoValidation = validateArticleGeoScope({ geoScope, cityId, strict: true });
+      const geoValidation = validateArticleGeoScope({ geoScope, cityId, regionId: null, strict: true });
       if (!geoValidation.ok) {
         setGeoScopeError(geoValidation.message);
         return;
@@ -794,12 +794,13 @@ export function NewsPublicationEditor({
         <ArticleEditorCoverField
           value={coverImageId}
           initialPreviewUrl={coverImagePreviewUrl || undefined}
+          authorUserId={authorUserId}
           onChange={(id, previewUrl) => {
             setCoverImageId(id);
             setCoverImagePreviewUrl(previewUrl ?? "");
           }}
         />
-        <ArticleEditorGalleryField value={galleryIds} onChange={setGalleryIds} />
+        <ArticleEditorGalleryField value={galleryIds} onChange={setGalleryIds} authorUserId={authorUserId} />
         <div className="space-y-2">
           <Label>Текст</Label>
           <ArticleBlockRichEditor

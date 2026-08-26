@@ -72,6 +72,7 @@ const suggestionActivitySelect = {
     },
   },
   scheduleJson: true,
+  schedulingKind: true,
 } as const;
 
 export type PlanSuggestionActivity = Prisma.ActivityGetPayload<{

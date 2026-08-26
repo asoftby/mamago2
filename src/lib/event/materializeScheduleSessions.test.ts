@@ -257,6 +257,42 @@ function testExtractScheduleDatesAndStartTimeUsesFirstScheduleItemStartTime() {
   assert.equal(startTime, "16:00");
 }
 
+/**
+ * Proves the create/update write path (`replaceActivitySessionsFromScheduleJson`,
+ * which calls this exact function) never reads `endTime` at all — only
+ * `date`/`dateEnd`/`startTime` feed `ActivitySession.startsAt`. So an
+ * overnight (`endTime < startTime`) or even a nonsensical (`endTime ===
+ * startTime`) schedule item materializes identically either way: there is no
+ * stored data for a server-side time-order check to protect at create/update
+ * time, which is why that check lives only at the submit gate (see
+ * `collectEventScheduleTimeOrderErrors` / `validateEventScheduleTimeOrder.test.ts`).
+ */
+function testEndTimeNeverAffectsSessionMaterialization() {
+  const overnight = materializeEventScheduleSessions({
+    mode: "MULTI_DATE",
+    dates: ["2026-08-22"],
+    scheduleItems: [{ date: "2026-08-22", startTime: "20:00", endTime: "02:00" }],
+  });
+  const equalTimes = materializeEventScheduleSessions({
+    mode: "MULTI_DATE",
+    dates: ["2026-08-22"],
+    scheduleItems: [{ date: "2026-08-22", startTime: "20:00", endTime: "20:00" }],
+  });
+  const noEndTimeAtAll = materializeEventScheduleSessions({
+    mode: "MULTI_DATE",
+    dates: ["2026-08-22"],
+    scheduleItems: [{ date: "2026-08-22", startTime: "20:00" }],
+  });
+  assert.deepEqual(overnight.materializedDates, equalTimes.materializedDates);
+  assert.deepEqual(overnight.materializedDates, noEndTimeAtAll.materializedDates);
+  assert.equal(overnight.materializedSessionCount, 1);
+
+  const { startTime } = extractScheduleDatesAndStartTime({
+    scheduleItems: [{ date: "2026-08-22", startTime: "20:00", endTime: "02:00" }],
+  });
+  assert.equal(startTime, "20:00", "startsAt is built from startTime only — endTime order is irrelevant here");
+}
+
 function main() {
   testSingleDate();
   testSingleDayInclusiveRange();
@@ -276,6 +312,7 @@ function main() {
   testNullScheduleDraftYieldsZero();
   testPureNoSideEffects();
   testExtractScheduleDatesAndStartTimeUsesFirstScheduleItemStartTime();
+  testEndTimeNeverAffectsSessionMaterialization();
   console.log("materializeScheduleSessions tests: OK");
 }
 

@@ -104,8 +104,8 @@ async function testSitemapContents() {
 
     // --- seoRobots noindex exclusion, proven end-to-end (not just the helper) ---
     assert.ok(
-      urls.includes(`${base}/places/${visiblePlace.slug}`),
-      "a normal published place without seoRobots must appear in the sitemap",
+      urls.includes(`${base}/${city!.slug}/places/${visiblePlace.slug}`),
+      "a normal published place without seoRobots must appear under its city-scoped canonical",
     );
     assert.ok(
       !urls.some((url) => url.includes(noindexPlace.slug!)),

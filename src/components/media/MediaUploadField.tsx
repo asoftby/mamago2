@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,6 +29,10 @@ import {
   getFileTooLargeMessage,
   getUploadHintText,
 } from "@/lib/uploads/uploadConfig";
+import { useMediaLibraryPager, type MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
+import { useMediaLibraryScrollSentinel } from "@/components/media/useMediaLibraryScrollSentinel";
+import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export type MediaUploadMode = "single" | "multiple";
 
@@ -37,6 +41,8 @@ export type MediaUploadItem = {
   url: string;
   alt?: string | null;
   title?: string | null;
+  /** Persisted usage metadata supplied by a picker API. */
+  isUsed?: boolean;
 };
 
 type MediaUploadValue = MediaUploadItem | MediaUploadItem[] | null;
@@ -57,7 +63,11 @@ export interface MediaUploadFieldProps {
   allowMediaLibrary?: boolean;
   allowUpload?: boolean;
   onUploadFiles?: (files: File[]) => Promise<MediaUploadItem[]>;
-  loadMediaLibraryItems?: () => Promise<MediaUploadItem[]>;
+  loadMediaLibraryPage?: (args: { cursor: string | null; limit: number }) => Promise<MediaLibraryPage<MediaUploadItem>>;
+  /** Page size for infinite scroll in the library dialog (default 24). */
+  libraryPageSize?: number;
+  /** Owner identity of the library (e.g. article authorUserId). Changing it resets items/selection and refetches. */
+  libraryOwnerKey?: string | null;
   mediaLibraryTitle?: string;
   mediaLibraryDescription?: string;
   singleEmptyHint?: string;
@@ -69,6 +79,28 @@ export interface MediaUploadFieldProps {
   librarySelectSuccessMessage?: string;
   allowReorder?: boolean;
   className?: string;
+  /**
+   * Second, non-paginated source shown as a first "Фото этой статьи"-style tab
+   * ahead of the paginated library. Optional — omitting it (the default for every
+   * consumer except the Article editor) keeps the dialog exactly as a single
+   * library grid, unchanged.
+   */
+  articleLibrary?: {
+    items: MediaUploadItem[];
+    loading: boolean;
+    /** Called every time the dialog opens; expected to be idempotent-safe to call repeatedly. */
+    load: () => void | Promise<void>;
+    tabLabel?: string;
+    /** Shown when the source has finished loading and found nothing. */
+    emptyHint?: string;
+  };
+  authorLibraryTabLabel?: string;
+  /** Footer CTA label for `mode="multiple"`; the selected count is appended automatically. */
+  addSelectedButtonLabel?: string;
+  /** Live draft MediaAsset ids used outside this field. Optional: generic behavior is unchanged when omitted. */
+  usedIds?: ReadonlySet<string>;
+  /** Opt-in usage label/treatment for content pickers. */
+  usageLabel?: string;
 }
 
 function normalizeItems(mode: MediaUploadMode, value: MediaUploadValue): MediaUploadItem[] {
@@ -107,6 +139,53 @@ function reorderItems(items: MediaUploadItem[], index: number, direction: -1 | 1
   return next;
 }
 
+export type MediaTileState = "selected-in-current-field" | "used-elsewhere" | "pending-selection" | "available";
+
+/**
+ * Состояние плитки в диалоге медиатеки, по стабильному id (не url/filename).
+ * `currentIds` — id, уже находящиеся в текущем значении поля (галерея/обложка),
+ * то есть live draft-состояние формы, а не снапшот с сервера.
+ */
+export function getMediaTileState(
+  itemId: string,
+  currentIds: ReadonlySet<string>,
+  pendingSelection: ReadonlySet<string>,
+  usedElsewhere = false,
+): MediaTileState {
+  if (currentIds.has(itemId)) return "selected-in-current-field";
+  if (pendingSelection.has(itemId)) return "pending-selection";
+  if (usedElsewhere) return "used-elsewhere";
+  return "available";
+}
+
+/**
+ * Добавляет к текущим items только те `selectedIds`, которых там ещё нет —
+ * id, уже присутствующий в `currentItems`, никогда не добавляется повторно,
+ * даже если случайно оказался в selectedIds (защита на случай гонки состояний,
+ * а не только на клике — сам клик по already-added плитке уже блокируется
+ * отдельно, до попадания id в selection). `candidateSource` может содержать
+ * один и тот же id из разных источников (таб «Фото этой статьи» + таб
+ * «Медиатека автора») — такой id учитывается один раз.
+ */
+export function mergeNewLibrarySelection(
+  currentItems: MediaUploadItem[],
+  candidateSource: MediaUploadItem[],
+  selectedIds: ReadonlySet<string>,
+  maxFiles: number,
+): MediaUploadItem[] {
+  const existingIds = new Set(currentItems.map((item) => item.id));
+  const seenSelected = new Set<string>();
+  const merged = [...currentItems];
+  for (const item of candidateSource) {
+    if (!selectedIds.has(item.id) || seenSelected.has(item.id)) continue;
+    seenSelected.add(item.id);
+    if (existingIds.has(item.id)) continue;
+    merged.push(item);
+    existingIds.add(item.id);
+  }
+  return merged.slice(0, maxFiles);
+}
+
 export function MediaUploadField({
   label,
   description,
@@ -123,7 +202,9 @@ export function MediaUploadField({
   allowMediaLibrary = true,
   allowUpload = true,
   onUploadFiles,
-  loadMediaLibraryItems,
+  loadMediaLibraryPage,
+  libraryPageSize = MEDIA_PICKER_PAGE_SIZE,
+  libraryOwnerKey = null,
   mediaLibraryTitle = "Выбрать из медиатеки",
   mediaLibraryDescription,
   singleEmptyHint = "Выберите главное изображение из медиатеки или загрузите файл",
@@ -135,21 +216,42 @@ export function MediaUploadField({
   librarySelectSuccessMessage,
   allowReorder = false,
   className,
+  articleLibrary,
+  authorLibraryTabLabel = "Медиатека автора",
+  addSelectedButtonLabel = "Добавить выбранные",
+  usedIds,
+  usageLabel = "Используется",
 }: MediaUploadFieldProps) {
   const items = useMemo(() => normalizeItems(mode, value), [mode, value]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [libraryItems, setLibraryItems] = useState<MediaUploadItem[]>([]);
   const [librarySelection, setLibrarySelection] = useState<Set<string>>(() => new Set());
   const [uploading, setUploading] = useState(false);
+  const libraryScrollRef = useRef<HTMLDivElement | null>(null);
+  const librarySentinelRef = useRef<HTMLDivElement | null>(null);
+  const libraryOpenRef = useRef(libraryOpen);
+  const hasArticleLibrary = Boolean(articleLibrary);
+  const [activeSourceTab, setActiveSourceTab] = useState<"article" | "author">("article");
+
+  const {
+    items: libraryItems,
+    loadingInitial: libraryLoading,
+    loadingMore: libraryLoadingMore,
+    hasMore: libraryHasMore,
+    loadInitial: loadLibraryInitial,
+    loadMore: loadLibraryMore,
+  } = useMediaLibraryPager<MediaUploadItem>({
+    pageSize: libraryPageSize,
+    loadPage: loadMediaLibraryPage,
+    ownerKey: libraryOwnerKey,
+  });
 
   const effectiveMaxFiles = mode === "single" ? 1 : Math.max(1, maxFiles ?? MAX_IMAGE_FILES);
   const effectiveMaxSizeMb = maxSizeMb ?? MAX_IMAGE_FILE_SIZE_MB;
   const emptyHint = mode === "single" ? singleEmptyHint : multipleEmptyHint;
   const canUpload = allowUpload && !disabled && typeof onUploadFiles === "function";
-  const canOpenLibrary = allowMediaLibrary && !disabled && typeof loadMediaLibraryItems === "function";
+  const canOpenLibrary = allowMediaLibrary && !disabled && typeof loadMediaLibraryPage === "function";
 
   const commitItems = (nextItems: MediaUploadItem[]) => {
     if (mode === "single") {
@@ -230,16 +332,27 @@ export function MediaUploadField({
     if (!canOpenLibrary) return;
     setLibraryOpen(true);
     setLibrarySelection(new Set());
-    setLibraryLoading(true);
-    try {
-      const nextItems = await loadMediaLibraryItems();
-      setLibraryItems(nextItems.filter((item) => item?.id && item?.url));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
-    } finally {
-      setLibraryLoading(false);
+    setActiveSourceTab("article");
+    const tasks: Promise<unknown>[] = [
+      loadLibraryInitial().catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+      }),
+    ];
+    if (articleLibrary) {
+      tasks.push(
+        Promise.resolve(articleLibrary.load()).catch((error) => {
+          toast.error(error instanceof Error ? error.message : "Не удалось загрузить изображения статьи");
+        }),
+      );
     }
+    await Promise.all(tasks);
   };
+
+  const handleLoadMore = useCallback(() => {
+    void loadLibraryMore().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+    });
+  }, [loadLibraryMore]);
 
   const currentIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
 
@@ -267,23 +380,19 @@ export function MediaUploadField({
   };
 
   const addSelectedLibraryItems = () => {
-    const selected = libraryItems.filter((item) => librarySelection.has(item.id));
-    if (selected.length === 0) {
+    const combinedSource = [...(articleLibrary?.items ?? []), ...libraryItems];
+    const hasSelection = combinedSource.some((item) => librarySelection.has(item.id));
+    if (!hasSelection) {
       toast.message("Отметьте изображения галочками");
       return;
     }
-    const existingIds = new Set(items.map((item) => item.id));
-    const merged = [...items];
-    for (const item of selected) {
-      if (existingIds.has(item.id)) continue;
-      merged.push(item);
-      existingIds.add(item.id);
-    }
-    commitItems(merged.slice(0, effectiveMaxFiles));
+    const merged = mergeNewLibrarySelection(items, combinedSource, librarySelection, effectiveMaxFiles);
+    const addedCount = merged.length - items.length;
+    commitItems(merged);
     setLibraryOpen(false);
     if (librarySelectSuccessMessage) {
       toast.success(
-        selected.length === 1 ? librarySelectSuccessMessage : `${librarySelectSuccessMessage}: ${selected.length}`,
+        addedCount === 1 ? librarySelectSuccessMessage : `${librarySelectSuccessMessage}: ${addedCount}`,
       );
     }
   };
@@ -303,6 +412,97 @@ export function MediaUploadField({
       setLibrarySelection(new Set());
     }
   }, [libraryOpen]);
+
+  useEffect(() => {
+    libraryOpenRef.current = libraryOpen;
+  }, [libraryOpen]);
+
+  useEffect(() => {
+    setLibrarySelection(new Set());
+    if (libraryOpenRef.current) {
+      void loadLibraryInitial().catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Не удалось загрузить медиатеку");
+      });
+    }
+    // Owner switch (e.g. article author changed) must never mix libraries — the
+    // pager itself resets on libraryOwnerKey too; this only refetches if the
+    // dialog is already open, so the visible grid doesn't stall on stale data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraryOwnerKey]);
+
+  useMediaLibraryScrollSentinel({
+    // Gated on the author-library tab actually being visible: Radix unmounts
+    // inactive TabsContent, so the sentinel <div> doesn't exist in the DOM
+    // until this tab is active. Tying `active` to that (rather than just
+    // `libraryOpen`) makes the effect re-run — and find the now-mounted
+    // sentinel — exactly when the tab switches in. Without `articleLibrary`
+    // there's only ever one tab, so this collapses back to `libraryOpen`.
+    active: libraryOpen && (!hasArticleLibrary || activeSourceTab === "author"),
+    hasMore: libraryHasMore,
+    onLoadMore: handleLoadMore,
+    sentinelRef: librarySentinelRef,
+    rootRef: libraryScrollRef,
+  });
+
+  const renderMediaTile = (item: MediaUploadItem) => {
+    const usageAware = usedIds !== undefined;
+    const tileState = getMediaTileState(item.id, currentIds, librarySelection, usageAware && (usedIds.has(item.id) || item.isUsed === true));
+    const alreadySelected = tileState === "selected-in-current-field";
+    const usedElsewhere = tileState === "used-elsewhere";
+    const isPending = tileState === "pending-selection";
+    const disabledTile = disabled || alreadySelected;
+    const showUsageAccent = usageAware && (alreadySelected || usedElsewhere);
+
+    return (
+      <button
+        key={item.id}
+        type="button"
+        disabled={disabledTile}
+        title={showUsageAccent ? (alreadySelected ? "Уже выбрано" : usageLabel) : undefined}
+        className={cn(
+          "group relative overflow-hidden rounded-2xl border bg-muted text-left transition focus:outline-none focus:ring-2 focus:ring-primary",
+          alreadySelected && showUsageAccent
+            ? "cursor-not-allowed border-[#EF8759]"
+            : usedElsewhere
+              ? "border-[#EF8759] hover:border-[#EF8759]"
+            : disabledTile
+              ? "cursor-not-allowed border-border opacity-45"
+              : "border-gray-200 hover:border-primary/40",
+          isPending && "ring-2 ring-primary ring-offset-2",
+        )}
+        onClick={() => {
+          if (mode === "single") {
+            selectSingleLibraryItem(item);
+            return;
+          }
+          toggleMultipleLibrarySelection(item);
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.url}
+          alt={item.alt ?? item.title ?? ""}
+          className="aspect-square w-full object-cover transition group-hover:scale-[1.02]"
+        />
+        <div className="absolute inset-0 flex items-start justify-end p-2">
+          {showUsageAccent ? (
+            <span className="flex items-center gap-1 rounded-full bg-[#EF8759] px-2 py-1 text-[11px] font-medium text-white shadow-sm">
+              <Check className="h-3.5 w-3.5" />
+              {alreadySelected ? "Уже выбрано" : usageLabel}
+            </span>
+          ) : alreadySelected ? (
+            <span className="rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white">
+              Уже выбрано
+            </span>
+          ) : isPending ? (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-sm">
+              <Check className="h-4 w-4" />
+            </span>
+          ) : null}
+        </div>
+      </button>
+    );
+  };
 
   const actionButtons = (
     <div className="flex flex-wrap items-center gap-2">
@@ -493,63 +693,85 @@ export function MediaUploadField({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
-            {libraryLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          {hasArticleLibrary && articleLibrary ? (
+            <Tabs
+              value={activeSourceTab}
+              onValueChange={(v) => setActiveSourceTab(v === "author" ? "author" : "article")}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="px-6">
+                <TabsList>
+                  <TabsTrigger value="article">{articleLibrary.tabLabel ?? "Фото этой статьи"}</TabsTrigger>
+                  <TabsTrigger value="author">{authorLibraryTabLabel}</TabsTrigger>
+                </TabsList>
               </div>
-            ) : libraryItems.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                В медиатеке пока нет изображений.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {libraryItems.map((item) => {
-                  const alreadySelected = currentIds.has(item.id);
-                  const isPending = librarySelection.has(item.id);
-                  const disabledTile = disabled || alreadySelected;
 
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      disabled={disabledTile}
-                      className={cn(
-                        "group relative overflow-hidden rounded-2xl border bg-muted text-left transition focus:outline-none focus:ring-2 focus:ring-primary",
-                        disabledTile ? "cursor-not-allowed border-border opacity-45" : "border-gray-200 hover:border-primary/40",
-                        isPending && "ring-2 ring-primary ring-offset-2",
-                      )}
-                      onClick={() => {
-                        if (mode === "single") {
-                          selectSingleLibraryItem(item);
-                          return;
-                        }
-                        toggleMultipleLibrarySelection(item);
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.url}
-                        alt={item.alt ?? item.title ?? ""}
-                        className="aspect-square w-full object-cover transition group-hover:scale-[1.02]"
-                      />
-                      <div className="absolute inset-0 flex items-start justify-end p-2">
-                        {alreadySelected ? (
-                          <span className="rounded-full bg-black/65 px-2 py-1 text-[11px] font-medium text-white">
-                            Уже выбрано
-                          </span>
-                        ) : isPending ? (
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-sm">
-                            <Check className="h-4 w-4" />
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
+                <TabsContent value="article" className="mt-3">
+                  {articleLibrary.loading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : articleLibrary.items.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-10 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {articleLibrary.emptyHint ?? "В этой статье пока нет других изображений"}
+                      </p>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setActiveSourceTab("author")}>
+                        {authorLibraryTabLabel}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {articleLibrary.items.map(renderMediaTile)}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="author" className="mt-3">
+                  {libraryLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : libraryItems.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-muted-foreground">
+                      В медиатеке пока нет изображений.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                      {libraryItems.map(renderMediaTile)}
+                    </div>
+                  )}
+                  {libraryHasMore ? (
+                    <div ref={librarySentinelRef} className="flex justify-center py-4">
+                      {libraryLoadingMore ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
+                    </div>
+                  ) : null}
+                </TabsContent>
               </div>
-            )}
-          </div>
+            </Tabs>
+          ) : (
+            <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
+              {libraryLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : libraryItems.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  В медиатеке пока нет изображений.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {libraryItems.map(renderMediaTile)}
+                </div>
+              )}
+              {libraryHasMore ? (
+                <div ref={librarySentinelRef} className="flex justify-center py-4">
+                  {libraryLoadingMore ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : null}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {mode === "multiple" ? (
             <DialogFooter className="border-t border-border px-6 py-4">
@@ -557,7 +779,9 @@ export function MediaUploadField({
                 Закрыть
               </Button>
               <Button type="button" onClick={addSelectedLibraryItems} disabled={librarySelection.size === 0}>
-                Добавить выбранные
+                {librarySelection.size > 0
+                  ? `${addSelectedButtonLabel} (${librarySelection.size})`
+                  : addSelectedButtonLabel}
               </Button>
             </DialogFooter>
           ) : null}

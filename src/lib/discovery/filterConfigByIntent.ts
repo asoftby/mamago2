@@ -76,11 +76,11 @@ export const filterConfigByIntent: Record<Intent, SecondaryFilterGroup[]> = {
     },
     {
       id: "adult_only",
-      label: "Только 18+",
+      label: "#nokids",
       kind: "boolean",
       ui: "switcher",
       showTitle: false,
-      trueLabel: "Только 18+",
+      trueLabel: "#nokids",
     },
     {
       id: "activity_type",

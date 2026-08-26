@@ -74,6 +74,13 @@ lint-errors*.json
 build-errors.txt
 ts-errors.txt
 
+# Service account / cloud credential keys (never commit)
+/mamago-2-0-*.json
+*-firebase-adminsdk-*.json
+
+# Root-level scratch/audit output (prod audits, temp analysis dumps)
+/tmp/
+
 # Local AI assistant files
 .claude/
 # Graphify local knowledge graph output

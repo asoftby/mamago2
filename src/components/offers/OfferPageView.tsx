@@ -24,6 +24,8 @@ import { CallModal } from "@/components/shared/CallModal";
 import { FaqSection } from "@/components/public/FaqSection";
 import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
+import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { shouldFetchOwnSaveStatus } from "@/features/save/saveStatusFetchGuard";
 
 export interface OfferDirectCtaInfo {
   offerId: string;
@@ -106,6 +108,7 @@ export function OfferPageView({
   sectionNotes,
   direct,
 }: OfferPageViewProps) {
+  const { isAuthenticated } = useAuthMe();
   const ctaRef = useRef<HTMLElement | null>(null);
   const storageKey = `mamago:offer-plan:${data.id}`;
   const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(() => {
@@ -136,6 +139,10 @@ export function OfferPageView({
   }, [storageKey]);
 
   const loadIdeaStatus = useCallback(async () => {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
+      setIsIdeaSaved(false);
+      return;
+    }
     try {
       const res = await fetch(`/api/save/status?offerId=${data.id}`, {
         credentials: "include",
@@ -146,7 +153,7 @@ export function OfferPageView({
     } catch {
       // ignore auth/network errors for guests
     }
-  }, [data.id]);
+  }, [data.id, isAuthenticated]);
 
   useEffect(() => {
     queueMicrotask(() => {

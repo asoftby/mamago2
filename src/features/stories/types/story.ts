@@ -1,6 +1,8 @@
 export type StoryIntent =
   | "breaking_news"
   | "today"
+  | "running"
+  | "lastchance"
   | "tomorrow"
   | "weekend"
   | "free"

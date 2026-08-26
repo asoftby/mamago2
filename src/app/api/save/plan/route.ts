@@ -4,7 +4,6 @@ import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import {
-  addArticlePlanItem,
   addPlacePlanItem,
   addPlanItem,
   addRoutePlanItem,
@@ -52,42 +51,31 @@ export async function POST(request: NextRequest) {
         planAddSource?: unknown;
       };
 
+    // Articles have no date semantics — they can only be saved as an idea
+    // (see /api/save/idea). Reject before the generic validation below so a
+    // direct API call can't create a dated PlanItem for an article.
+    if (articleId) {
+      return NextResponse.json(
+        { error: "articles cannot be saved to a specific date; use /api/save/idea" },
+        { status: 400 }
+      );
+    }
+
     if (!date) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
 
     // Validate that at least one entity type is provided
-    if (!activityId && !routeId && !placeId && !articleId) {
+    if (!activityId && !routeId && !placeId) {
       return NextResponse.json(
-        { error: "activityId, routeId, placeId or articleId is required" },
+        { error: "activityId, routeId or placeId is required" },
         { status: 400 }
       );
     }
 
     let planItem;
 
-    if (articleId) {
-      planItem = await addArticlePlanItem(user.id, articleId, date, {
-        title: title ?? null,
-        coverImageUrl: coverImageUrl ?? null,
-      });
-
-      const article = await prisma.article.findUnique({
-        where: { id: articleId },
-        select: { cityId: true },
-      });
-      const sessionRowId = await getSessionRowIdFromCookies();
-      void trackUserEvent({
-        userId: user.id,
-        sessionId: sessionRowId,
-        eventType: "PLAN_ADD",
-        entityType: "ARTICLE",
-        entityId: articleId,
-        vertical: "CITY",
-        cityId: article?.cityId ?? null,
-        meta: { source: "detail", section: "journal", targetAction: "plan" },
-      });
-    } else if (placeId) {
+    if (placeId) {
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,
@@ -153,31 +141,33 @@ export async function POST(request: NextRequest) {
         coverImageUrl ?? undefined
       );
 
-      const cityId = await getActivityCityIdForAnalytics(activityId);
-      const sessionRowId = await getSessionRowIdFromCookies();
-      const personaIds =
-        Array.isArray(selectedPersonaIds) ?
-          selectedPersonaIds.filter((x): x is string => typeof x === "string")
-        : [];
-      const sourceTag =
-        planAddSource === "recommendation" || planAddSource === "idea" ?
-          ("plan" as const)
-        : ("detail" as const);
-      void trackUserEvent({
-        userId: user.id,
-        sessionId: sessionRowId,
-        eventType: "PLAN_ADD",
-        entityType: "EVENT",
-        entityId: activityId,
-        vertical: "CITY",
-        cityId,
-        meta: {
-          source: sourceTag,
-          section: "afisha",
-          targetAction: "plan",
-          ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
-        },
-      });
+      if (planItem.created) {
+        const cityId = await getActivityCityIdForAnalytics(activityId);
+        const sessionRowId = await getSessionRowIdFromCookies();
+        const personaIds =
+          Array.isArray(selectedPersonaIds) ?
+            selectedPersonaIds.filter((x): x is string => typeof x === "string")
+          : [];
+        const sourceTag =
+          planAddSource === "recommendation" || planAddSource === "idea" ?
+            ("plan" as const)
+          : ("detail" as const);
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_ADD",
+          entityType: "EVENT",
+          entityId: activityId,
+          vertical: "CITY",
+          cityId,
+          meta: {
+            source: sourceTag,
+            section: "afisha",
+            targetAction: "plan",
+            ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
+          },
+        });
+      }
     }
     return NextResponse.json({ success: true, planItem });
   } catch (error) {

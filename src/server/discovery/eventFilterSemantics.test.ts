@@ -5,6 +5,7 @@ import {
   buildEffectivePlaceMetroWhere,
   buildEventRuntimeWhere,
   isStructuredFreeEvent,
+  matchesCanonicalStartingPrice,
   resolveEventDateRange,
 } from "./eventFilterSemantics";
 
@@ -41,9 +42,16 @@ test("free requires explicit structured free state", () => {
   assert.equal(isStructuredFreeEvent({ priceFrom: null }), false);
 });
 
+test("free also detects the wizard's free priceText, case/whitespace-insensitively", () => {
+  assert.equal(isStructuredFreeEvent({ priceFrom: null, priceText: "Бесплатно" }), true);
+  assert.equal(isStructuredFreeEvent({ priceFrom: null, priceText: "  free  " }), true);
+  assert.equal(isStructuredFreeEvent({ priceFrom: null, priceText: "от 10 руб" }), false);
+  assert.equal(isStructuredFreeEvent({ priceFrom: 25, priceText: "25 руб" }), false);
+});
+
 test("resolved date range becomes an ActivitySession inclusion predicate", () => {
   const dateRange = resolveEventDateRange({ from: "2026-09-12" });
-  const where = buildEventRuntimeWhere({ dateRange, free: false, districtId: null, metroId: null, adultOnly: false });
+  const where = buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: false });
   assert.deepEqual(where, [{ sessions: { some: { startsAt: { gte: dateRange?.start, lt: dateRange?.end } } } }]);
 });
 
@@ -64,7 +72,50 @@ test("manual geo assignment wins and auto is used only when manual is absent", (
 
 test("adult-only uses the typed executable predicate", () => {
   assert.deepEqual(
-    buildEventRuntimeWhere({ dateRange: null, free: false, districtId: null, metroId: null, adultOnly: true }),
+    buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange: null, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: true }),
     [{ agePolicy: "ADULT_ONLY" }],
   );
+});
+
+test("categories and genres are OR within their dimension and AND with other dimensions", () => {
+  assert.deepEqual(
+    buildEventRuntimeWhere({
+      categorySlugs: ["theatre", "workshops"],
+      genreSlugs: ["puppet", "musical"],
+      dateRange: null,
+      free: true,
+      priceMax: null,
+      districtId: null,
+      metroId: null,
+      adultOnly: false,
+    }),
+    [
+      { eventCategory: { is: { slug: { in: ["theatre", "workshops"] } } } },
+      { genreSlugs: { hasSome: ["puppet", "musical"] } },
+      { priceMode: "FREE" },
+    ],
+  );
+});
+
+test("numeric max uses canonical starting price and excludes NONE and UNKNOWN", () => {
+  assert.deepEqual(
+    buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange: null, free: false, priceMax: 50, districtId: null, metroId: null, adultOnly: false }),
+    [{ priceMode: { in: ["FREE", "EXACT", "FROM", "RANGE"] }, priceFrom: { lte: 50 } }],
+  );
+});
+
+test("numeric max matches canonical modes by priceFrom while no max keeps every mode", () => {
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "EXACT", priceFrom: 40 }, 50), true);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "EXACT", priceFrom: 60 }, 50), false);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "FROM", priceFrom: 30 }, 50), true);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "RANGE", priceFrom: 30 }, 50), true);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "FREE", priceFrom: 0 }, 50), true);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "NONE", priceFrom: null }, 50), false);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "UNKNOWN", priceFrom: null }, 50), false);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "NONE", priceFrom: null }, null), true);
+  assert.equal(matchesCanonicalStartingPrice({ priceMode: "UNKNOWN", priceFrom: null }, null), true);
+});
+
+test("absent category and genre preserve the existing predicates", () => {
+  assert.deepEqual(buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange: null, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: false }), []);
 });

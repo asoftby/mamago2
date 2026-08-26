@@ -368,28 +368,28 @@ model Idea {
 }
 
 model PlanItem {
-  id            String    @id @default(cuid())
-  userId        String
-  activityId    String?
-  date          String
-  startsAt      DateTime?
-  createdAt     DateTime  @default(now())
-  title         String?
-  coverImageUrl String?
+  id                String                    @id @default(cuid())
+  userId            String
+  activityId        String?
+  date              String
+  startsAt          DateTime?
+  createdAt         DateTime                  @default(now())
+  title             String?
+  coverImageUrl     String?
   /// Маршрут в плане (альтернатива событию)
-  routeId       String?
+  routeId           String?
   /// Slug для демо/внешнего маршрута, когда записи в Route нет (routeId = null)
-  planRouteSlug String?
+  planRouteSlug     String?
   /// Место в плане (визит без привязки к событию)
-  placeId       String?
-  planPlaceSlug String?
+  placeId           String?
+  planPlaceSlug     String?
   /// Статья в плане (сохранённое чтение без привязки к событию/месту)
-  articleId     String?
-  activity      Activity? @relation(fields: [activityId], references: [id])
-  route         Route?    @relation(fields: [routeId], references: [id])
-  place         Place?    @relation(fields: [placeId], references: [id])
-  article       Article?  @relation(fields: [articleId], references: [id])
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  articleId         String?
+  activity          Activity?                 @relation(fields: [activityId], references: [id])
+  route             Route?                    @relation(fields: [routeId], references: [id])
+  place             Place?                    @relation(fields: [placeId], references: [id])
+  article           Article?                  @relation(fields: [articleId], references: [id])
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   scenarioOverrides DayScenarioItemOverride[]
 
   @@index([userId, date])
@@ -409,15 +409,19 @@ model PlanItem {
 /// дешёвую сигнатуру набора PlanItem на момент создания/обновления, чтобы
 /// обнаружить расхождение с текущим My Plan («План изменился»).
 model DayScenario {
-  id              String                     @id @default(cuid())
-  userId          String
-  date            String
-  status          String                     @default("READY")
-  planFingerprint String
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
-  user            User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  itemOverrides   DayScenarioItemOverride[]
+  id                     String                    @id @default(cuid())
+  userId                 String
+  date                   String
+  status                 String                    @default("READY")
+  planFingerprint        String
+  acceptedConflictKeys   String[]                  @default([])
+  lastSaveIdempotencyKey String?
+  lastSaveRequestHash    Json?
+  lastSaveResponse       Json?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  user                   User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemOverrides          DayScenarioItemOverride[]
 
   @@unique([userId, date])
   @@index([userId])
@@ -709,6 +713,7 @@ model Region {
   isActive  Boolean    @default(false)
   priority  Int        @default(0)
   cities    City[]
+  articles  Article[]  @relation("ArticleRegion")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -820,6 +825,7 @@ model Activity {
   createdBy            String?
   currency             String?                   @default("BYN")
   priceFrom            Float?
+  priceMode            PublicationPriceMode      @default(UNKNOWN)
   ageTags              String[]
   coverImageId         String?
   nextOccurrenceAt     DateTime?
@@ -829,6 +835,7 @@ model Activity {
   priceTo              Float?
   scheduleJson         Json?
   scheduleMode         ScheduleMode
+  schedulingKind       ActivitySchedulingKind?
   shortDesc            String
   status               ContentStatus             @default(DRAFT)
   title                String
@@ -890,6 +897,7 @@ model Activity {
   bookingCapacityPerSlot Int?
   bookingRequests        BookingRequest[]
   directThreads          DirectThread[]
+  boosts                 Boost[]
 
   @@unique([cityId, slug])
   @@index([placeId])
@@ -905,6 +913,7 @@ model Activity {
   @@index([organizerId])
   @@index([slug])
   @@index([coverImageId])
+  @@index([priceFrom])
 }
 
 /// Join table: категории «в программе» события (many-to-many Activity ↔ EventCategory).
@@ -1039,6 +1048,7 @@ model Business {
   accessRequests          BusinessAccessRequest[]
   directThreads           DirectThread[]
   directRiskSignals       DirectRiskSignal[]
+  boosts                  Boost[]
 
   @@index([ownerUserId])
   @@index([status])
@@ -1251,6 +1261,10 @@ model Place {
   googleReviewsSyncedAt  DateTime?
   googleMapsUri          String?
 
+  priceFrom  Float?
+  priceTo    Float?
+  currency   String               @default("BYN")
+  priceMode  PublicationPriceMode @default(UNKNOWN)
   priceItems Json?
   faqItems   Json?
 
@@ -1306,6 +1320,7 @@ model Place {
   @@index([archivedAt])
   @@index([status, revisionRequestedAt])
   @@index([primaryCategoryId])
+  @@index([priceFrom])
 }
 
 /// Подкатегории места (EventCategory с publicationType=PLACE, parentId=primaryCategoryId).
@@ -1416,7 +1431,7 @@ model PlaceRevision {
   instagramUrl          String?
   reelsUrl              String?
   ageTags               String[]
-  agePolicy             AgePolicy           @default(UNKNOWN)
+  agePolicy             AgePolicy            @default(UNKNOWN)
   visitFormats          String[]
   activityTypes         String[]
   faqItems              Json?
@@ -1774,30 +1789,30 @@ enum HomeStoryItemStatus {
 /// Small, query-ready projection used by the home page. Source content is
 /// deliberately snapshotted so the public read path never expands schedules.
 model HomeStoryItem {
-  id                String                 @id @default(cuid())
-  cityId            String
-  storyDate         DateTime
-  sourceType        HomeStorySourceType
-  sourceId          String
-  occurrenceKey     String
-  placementType     HomeStoryPlacementType
-  status            HomeStoryItemStatus    @default(ACTIVE)
-  inactiveReason    String?
-  startsAt          DateTime?
-  endsAt            DateTime?
-  manualOrder       Int?
-  pinned            Boolean                @default(false)
-  isFree            Boolean                @default(false)
-  titleSnapshot     String
-  subtitleSnapshot  String?
-  hrefSnapshot      String
-  coverUrlSnapshot  String?
-  displayFrom       DateTime?
-  displayUntil      DateTime?
-  createdById       String?
-  updatedById       String?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  id               String                 @id @default(cuid())
+  cityId           String
+  storyDate        DateTime
+  sourceType       HomeStorySourceType
+  sourceId         String
+  occurrenceKey    String
+  placementType    HomeStoryPlacementType
+  status           HomeStoryItemStatus    @default(ACTIVE)
+  inactiveReason   String?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  manualOrder      Int?
+  pinned           Boolean                @default(false)
+  isFree           Boolean                @default(false)
+  titleSnapshot    String
+  subtitleSnapshot String?
+  hrefSnapshot     String
+  coverUrlSnapshot String?
+  displayFrom      DateTime?
+  displayUntil     DateTime?
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@unique([cityId, sourceType, sourceId, occurrenceKey, storyDate])
   @@index([cityId, storyDate, status, pinned, manualOrder, startsAt])
@@ -1927,7 +1942,7 @@ model OpeningHoursExceptionInterval {
 }
 
 model Offer {
-  id                       String             @id @default(cuid())
+  id                       String               @id @default(cuid())
   /// Nullable: DRAFT Offers may temporarily exist without a Place (e.g.
   /// legacy Phoenix imports with no resolvable Place relation). PENDING/
   /// PUBLISHED always require a Place — enforced in application code
@@ -1935,7 +1950,7 @@ model Offer {
   placeId                  String?
   productType              OfferProductType?
   /// Источник контактных данных предложения: manual | place
-  contactSource            String?            @default("manual")
+  contactSource            String?              @default("manual")
   /// Ручной телефон предложения (fallback, если не берём контакты из места)
   contactPhone             String?
   /// Подпись основного телефона (например, "администратор")
@@ -1959,6 +1974,10 @@ model Offer {
   /// Rich-text подпись к цене: что входит, ограничения, условия участия
   priceCaption             String?
   priceFrom                Float?
+  priceTo                  Float?
+  currency                 String               @default("BYN")
+  priceMode                PublicationPriceMode @default(UNKNOWN)
+  priceItems               Json?
   priceText                String?
   /// Rich-text детали акций, скидок и специальных условий
   promotionDetails         String?
@@ -1966,22 +1985,22 @@ model Offer {
   promotionalOffer         String?
   ageMinMonths             Int?
   ageMaxMonths             Int?
-  agePolicy                AgePolicy          @default(UNKNOWN)
+  agePolicy                AgePolicy            @default(UNKNOWN)
   dateFrom                 DateTime?
   dateTo                   DateTime?
   promoTitle               String?
   promoDescription         String?
   promoUntil               DateTime?
-  status                   OfferStatus        @default(DRAFT)
+  status                   OfferStatus          @default(DRAFT)
   archivedAt               DateTime?
   archivedByUserId         String?
   archiveReason            String?
   publishedAt              DateTime?
   rejectionReason          String?
-  createRequestId          String?            @unique
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
-  inheritPlaceOpeningHours Boolean            @default(true)
+  createRequestId          String?              @unique
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  inheritPlaceOpeningHours Boolean              @default(true)
   openingHoursId           String?
   seoCanonicalUrl          String?
   seoDescription           String?
@@ -1994,15 +2013,15 @@ model Offer {
   seoTitle                 String?
   slug                     String?
   slugUpdatedAt            DateTime?
-  seoCanonicalSource       SeoCanonicalSource @default(FALLBACK)
+  seoCanonicalSource       SeoCanonicalSource   @default(FALLBACK)
   /// Snapshot cityId из place.cityId для роутинга; заполняется save-хуком, не редактируется напрямую
   cityId                   String?
   /// Сигналы DISCOVERY домена (entityType=OFFER), ID SignalDefinition
-  discoverySignalIds       String[]           @default([])
+  discoverySignalIds       String[]             @default([])
   /// Чипы публичной витрины /[city]/classes
-  classChipSlugs           String[]           @default([])
+  classChipSlugs           String[]             @default([])
   /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
-  wizardCompletedSteps     String[]           @default([])
+  wizardCompletedSteps     String[]             @default([])
   faqItems                 Json?
 
   // Настройки записи
@@ -2099,6 +2118,7 @@ model Offer {
   @@index([openingHoursId])
   @@index([slug])
   @@index([cityId])
+  @@index([priceFrom])
   // Party-filter indexes (Phase 3b-1)
   @@index([category])
   @@index([minChildren, maxChildren])
@@ -2221,19 +2241,28 @@ model OfferSlugHistory {
 
 model Boost {
   id                   String              @id @default(cuid())
-  offerId              String
+  offerId              String?
+  activityId           String?
+  businessId           String?
   startAt              DateTime
   endAt                DateTime
+  isFreeDaily          Boolean             @default(false)
+  freeDailyDateKey     String?
   durationDays         Int?
   price                Decimal?            @db.Decimal(10, 2)
   currency             String?
   purchaseRequestKey   String?             @unique
   billingTransactionId String?             @unique
   createdAt            DateTime            @default(now())
-  offer                Offer               @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  offer                Offer?              @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  activity             Activity?           @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  business             Business?           @relation(fields: [businessId], references: [id], onDelete: Cascade)
   billingTransaction   BillingTransaction? @relation(fields: [billingTransactionId], references: [id], onDelete: Restrict)
 
+  @@unique([businessId, freeDailyDateKey])
   @@index([offerId])
+  @@index([activityId])
+  @@index([businessId, createdAt])
   @@index([startAt, endAt])
 }
 
@@ -2582,6 +2611,7 @@ model MediaAsset {
   deletedAt        DateTime?
   uploadedBy       User?            @relation(fields: [uploadedById], references: [id])
   usages           MediaUsage[]
+  urlAliases       MediaUrlAlias[]
   activityCovers   Activity[]       @relation("ActivityCover")
   activityImages   ActivityImage[]  @relation("ActivityGalleryImageAsset")
   routeStopImages  RouteStopImage[] @relation("RouteStopGalleryImageAsset")
@@ -2600,6 +2630,18 @@ model MediaAsset {
   @@index([wizardSessionId, status])
   @@index([draftEntityId, draftEntityType, status])
   @@index([status, createdAt])
+}
+
+model MediaUrlAlias {
+  id         String     @id @default(cuid())
+  mediaId    String
+  legacyPath String     @unique
+  reason     String?
+  source     String?
+  createdAt  DateTime   @default(now())
+  media      MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([mediaId])
 }
 
 model MediaUsage {
@@ -2621,7 +2663,7 @@ model Route {
   slug               String             @unique
   title              String
   ageTags            String[]
-  agePolicy          AgePolicy       @default(UNKNOWN)
+  agePolicy          AgePolicy          @default(UNKNOWN)
   budgetLevel        BudgetLevel        @default(LOW)
   cityId             String?
   coverImageUrl      String?
@@ -2683,10 +2725,13 @@ model Article {
   /// Отображаемое имя автора (если не привязан User)
   authorLabel        String?
   cityContext        String?
-  /// FK to the city this article belongs to (null = country-scope article)
+  /// FK to the city this article belongs to (null = non-CITY-scope article)
   cityId             String?
   city               City?                @relation("ArticleCity", fields: [cityId], references: [id], onDelete: SetNull)
-  /// CITY = local article served at /{city}/blog/{slug}; COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
+  /// FK to the region this article belongs to (null = non-REGION-scope article)
+  regionId           String?
+  region             Region?              @relation("ArticleRegion", fields: [regionId], references: [id], onDelete: SetNull)
+  /// CITY = local article at /{city}/blog/{slug}; REGION = regional article at /blog/{slug} (relevant to cities in that region); COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
   geoScope           GeoScope?
   expiresAt          DateTime?
   scheduledAt        DateTime?
@@ -2735,6 +2780,7 @@ model Article {
   @@index([authorUserId])
   @@index([coverImageId])
   @@index([cityId])
+  @@index([regionId])
   @@index([geoScope])
   @@index([relatedPlaceId])
   @@index([categoryId])
@@ -3294,6 +3340,7 @@ enum BusinessOperationalStatus {
 /// COUNTRY = national article, served at /blog/{slug}
 enum GeoScope {
   CITY
+  REGION
   COUNTRY
 }
 
@@ -3332,6 +3379,11 @@ enum ActivityType {
   COURSE
   ROUTE
   OFFER
+}
+
+enum ActivitySchedulingKind {
+  SLOT
+  WINDOW
 }
 
 enum ActivityFormat {
@@ -3795,6 +3847,15 @@ enum RouteStopPriceType {
   RANGE
   FROM
   CUSTOM
+  UNKNOWN
+}
+
+enum PublicationPriceMode {
+  FREE
+  EXACT
+  FROM
+  RANGE
+  NONE
   UNKNOWN
 }
 

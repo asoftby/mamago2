@@ -11,14 +11,14 @@ interface PortalProps {
 export function Portal({ children, container }: PortalProps) {
   const [mounted, setMounted] = useState(false);
 
+  // Mount on the effect phase, not on the next animation frame: rAF is
+  // throttled/never fires while the tab is hidden or unfocused, which left
+  // this permanently un-mounted (and any scroll-lock tied to the opening
+  // component's own state stuck on) whenever that happened right as a
+  // portal-based sheet/modal opened.
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      setMounted(true);
-    });
-    return () => {
-      cancelAnimationFrame(id);
-      setMounted(false);
-    };
+    setMounted(true);
+    return () => setMounted(false);
   }, []);
 
   if (!mounted) {

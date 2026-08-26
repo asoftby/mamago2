@@ -22,11 +22,13 @@ import {
 } from "@/lib/intent";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
+import { MOBILE_DISCOVERY_EDGE_PADDING } from "@/components/mobile/mobile-control-geometry";
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
@@ -49,6 +51,8 @@ export function MobileHeader() {
   const currentCity = getCityFromPath(pathname);
   const { citySlug } = useCity();
   const isCityHubRoute = isCityHubPath(pathname);
+  /** REGION/COUNTRY статья на /blog/{slug} — там нет городского сегмента, citySlug ниже — не настоящая геопривязка. */
+  const articleGeoLabel = useArticleGeoLabel();
 
   const displayCity = citySlug;
   /** На главной города (`/minsk`) в URL нет раздела — не подсвечиваем «Куда пойти». */
@@ -89,7 +93,7 @@ export function MobileHeader() {
         )}
       >
         <div className="mx-auto w-full">
-          <div className="px-4 pt-4 pb-4">
+          <div className={cn(MOBILE_DISCOVERY_EDGE_PADDING, "pb-4 pt-4")}>
             <div className="flex min-w-0 items-center gap-3">
               <div className="min-w-0 flex-1">
                 <MobileSearchEntry
@@ -99,6 +103,7 @@ export function MobileHeader() {
                   onSearchClick={() => setIsSearchSheetOpen(true)}
                   citySlug={displayCity}
                   currentIntent={displayIntent}
+                  locationLabelOverride={articleGeoLabel}
                 />
               </div>
 

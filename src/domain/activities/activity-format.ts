@@ -30,7 +30,7 @@ export const ACTIVITY_FORMAT_OPTIONS: ActivityFormatOption[] = [
   {
     value: "HYBRID",
     queryValue: "hybrid",
-    label: "Онлайн + офлайн",
+    label: "Микс",
     description: "Можно участвовать онлайн или прийти на место",
     icon: RefreshCw,
     detailLabel: "Онлайн + офлайн",
@@ -88,4 +88,3 @@ export function normalizeActivityFormat(
   }
   return fallback;
 }
-

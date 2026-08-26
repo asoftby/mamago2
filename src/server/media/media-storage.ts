@@ -1,5 +1,3 @@
-import "server-only";
-
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { basename, extname, join, posix, resolve, sep } from "path";
@@ -24,6 +22,17 @@ export const MEDIA_STORAGE_ROOT = resolveMediaStorageRoot();
 export const MEDIA_UPLOADS_DIR = join(MEDIA_STORAGE_ROOT, "uploads");
 export const LEGACY_PUBLIC_UPLOADS_DIR = join(process.cwd(), "public", "uploads");
 
+/** Normalize a persisted/requested path below MEDIA_UPLOADS_DIR. */
+export function normalizeMediaStorageRelativePath(input: string): string | null {
+  const raw = input.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!raw || raw.includes("\0")) return null;
+  const segments = raw.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) return null;
+  const normalized = posix.normalize(raw);
+  if (!normalized || normalized === "." || normalized.startsWith("../") || normalized === "..") return null;
+  return normalized;
+}
+
 // Runtime uploads must not be written to public in dev/prod app runtime.
 
 export function normalizeMediaFilename(input: string): string {
@@ -46,13 +55,8 @@ export async function ensureMediaUploadsDir(): Promise<void> {
 }
 
 export function resolveMediaStorageAbsolutePath(relativePath: string): string | null {
-  const normalized = posix
-    .normalize(relativePath.replace(/\\/g, "/"))
-    .replace(/^\/+/, "");
-
-  if (!normalized || normalized === "." || normalized.startsWith("../") || normalized === "..") {
-    return null;
-  }
+  const normalized = normalizeMediaStorageRelativePath(relativePath);
+  if (!normalized) return null;
 
   const absolute = resolve(MEDIA_UPLOADS_DIR, normalized);
   if (absolute !== MEDIA_UPLOADS_DIR && !absolute.startsWith(`${MEDIA_UPLOADS_DIR}${sep}`)) {

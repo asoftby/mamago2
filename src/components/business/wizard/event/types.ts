@@ -53,6 +53,7 @@ export interface EventFormData {
   // Step 1: Basics
   title: string;
   format: ActivityFormat;
+  schedulingKind: "SLOT" | "WINDOW" | null;
   /** Пресет «как проходит событие» → при сохранении маппится в сигналы в scheduleJson */
   eventFormats: EventFormatPreset[];
   /**

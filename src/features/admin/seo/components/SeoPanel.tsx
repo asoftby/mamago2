@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
+import { useHydrated } from "@/hooks/use-hydrated";
+import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
 import { stripHtml, truncateSeoText } from "@/lib/publications/breakingNewsSeo";
 import { cn } from "@/lib/utils";
 
@@ -25,12 +26,21 @@ function normalizeUrl(value: string | null | undefined): string {
   return (value ?? "").trim();
 }
 
-function toSnippetUrl(value: string | undefined): string {
-  const trimmed = value?.trim();
-  if (!trimmed) return `${resolveSeoPublicBase()}/...`;
-  return trimmed;
+function samePathAndSearch(left: string, right: string): boolean {
+  try {
+    const base = "https://placeholder.invalid";
+    const a = new URL(left, base);
+    const b = new URL(right, base);
+    return a.pathname === b.pathname && a.search === b.search;
+  } catch {
+    return false;
+  }
 }
 
+function toSnippetUrl(value: string | undefined, fallbackUrl: string): string {
+  const trimmed = value?.trim();
+  return trimmed || fallbackUrl;
+}
 
 function CharCounter({
   value,
@@ -147,6 +157,8 @@ export function SeoPanel({
   onAutofillSeo,
   disableAutoFill = false,
 }: SeoPanelProps) {
+  void coverImageUrl;
+  const hydrated = useHydrated();
   const normalizedFallbackTitle = useMemo(
     () => truncateSeoText(normalizePlainText(fallbackTitle), SEO_TITLE_LIMIT),
     [fallbackTitle],
@@ -155,6 +167,19 @@ export function SeoPanel({
     () => truncateSeoText(normalizePlainText(fallbackDescription), SEO_DESCRIPTION_LIMIT),
     [fallbackDescription],
   );
+  /**
+   * `publicUrl` приходит от вызывающего кода уже с канонического origin
+   * (resolveSeoPublicBase() / NEXT_PUBLIC_APP_URL — тот же источник, что и
+   * серверный syncArticleCanonical()/absoluteBase()), а НЕ с origin текущей
+   * admin-страницы. Раньше здесь стоял sameOriginUrl(raw), перебазировавший
+   * значение на window.location.origin — из-за этого canonical URL
+   * «наследовал» admin/dev origin (admin.mamago.local, localhost:XXXX) и
+   * никогда не совпадал с тем, что реально сохраняет сервер, что держало
+   * dirty=true даже сразу после успешного save. Origin-ребейз для
+   * отображения (кликабельная ссылка в Google-снippet превью на dev) —
+   * отдельно, ниже, через effectiveCanonical/snippetFallbackUrl; в form
+   * state он попадать не должен.
+   */
   const normalizedPublicUrl = useMemo(() => normalizeUrl(publicUrl), [publicUrl]);
 
   const previousAutoTitleRef = useRef(normalizedFallbackTitle);
@@ -198,21 +223,28 @@ export function SeoPanel({
   }, [disableAutoFill, normalizedFallbackDescription, onSeoDescriptionChange, seoDescription]);
 
   useEffect(() => {
-    if (disableAutoFill) return;
+    if (!hydrated || disableAutoFill) return;
     const current = canonicalUrl.trim();
     const previousAuto = previousAutoCanonicalRef.current.trim();
     if (!manualCanonicalRef.current && (!current || current === previousAuto) && normalizedPublicUrl) {
       onCanonicalUrlChange(normalizedPublicUrl);
     }
     previousAutoCanonicalRef.current = normalizedPublicUrl;
-  }, [canonicalUrl, disableAutoFill, normalizedPublicUrl, onCanonicalUrlChange]);
+  }, [canonicalUrl, disableAutoFill, hydrated, normalizedPublicUrl, onCanonicalUrlChange]);
 
   const effectiveTitle = seoTitle.trim() || normalizedFallbackTitle || "Заголовок материала — mamaGo";
   const effectiveDescription =
     seoDescription.trim() ||
     normalizedFallbackDescription ||
     "Краткое описание материала появится здесь.";
-  const effectiveCanonical = canonicalUrl.trim() || normalizedPublicUrl;
+  const canonicalTrimmed = canonicalUrl.trim();
+  const effectiveCanonical =
+    hydrated && canonicalTrimmed && normalizedPublicUrl && samePathAndSearch(canonicalTrimmed, normalizedPublicUrl)
+      ? sameOriginUrl(canonicalTrimmed)
+      : canonicalTrimmed || normalizedPublicUrl;
+  const snippetFallbackUrl = hydrated ? sameOriginUrl("/...") : "/...";
+  const canonicalPlaceholder =
+    normalizedPublicUrl || (hydrated ? sameOriginUrl("/blog/slug") : "/blog/slug");
   const hasAutofillSource =
     Boolean(normalizedFallbackTitle) ||
     Boolean(normalizedFallbackDescription) ||
@@ -263,7 +295,9 @@ export function SeoPanel({
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Google snippet
           </p>
-          <p className="truncate text-xs text-[#006621]">{toSnippetUrl(effectiveCanonical)}</p>
+          <p className="truncate text-xs text-[#006621]">
+            {toSnippetUrl(effectiveCanonical || undefined, snippetFallbackUrl)}
+          </p>
           <p className="mt-1 truncate text-lg font-medium leading-snug text-[#1a0dab]">
             {effectiveTitle}
           </p>
@@ -345,7 +379,7 @@ export function SeoPanel({
               onCanonicalUrlChange(event.target.value);
             }}
             disabled={disabled}
-            placeholder={normalizedPublicUrl || "https://mamago.by/blog/slug"}
+            placeholder={canonicalPlaceholder}
           />
           <p className="text-xs leading-relaxed text-muted-foreground">
             Поле не обязательно. Если оставить пустым, публичная страница использует свой canonical URL по умолчанию.

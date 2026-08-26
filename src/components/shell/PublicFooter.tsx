@@ -32,7 +32,14 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
           <div className="flex flex-col gap-4">
             <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Проект</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-primary transition-colors">О нас</Link>
+              <a
+                href="https://probusiness.io/experience/12467-bylo-mnogo-oshibok-noluchshe-delat-chem-sidet-nameste-ichego-to-zhdat-muzh-izhena-poshli-protiv-mass-marketa-irazvivayut-biznes-nasemeynom-dosuge.html"
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                О нас
+              </a>
             </div>
           </div>
 
@@ -40,7 +47,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
           <div className="flex flex-col gap-4">
             <h3 className="text-foreground" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 18 }}>Партнёрам</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-primary transition-colors">Бизнес-аккаунт</Link>
+              <Link href="/business/onboarding" className="hover:text-primary transition-colors">Бизнес-аккаунт</Link>
             </div>
           </div>
 

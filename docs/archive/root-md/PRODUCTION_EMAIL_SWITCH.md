@@ -41,12 +41,14 @@
 **Финальная конфигурация:**
 ```bash
 EMAIL_ENABLED=true
-RESEND_API_KEY=re_REVOKED_REDACTED
+RESEND_API_KEY=re_REDACTED
 EMAIL_FROM="mamaGo <no-reply@mamago.by>"
 EMAIL_REPLY_TO=hello@mamago.by
 APP_PUBLIC_URL=http://localhost:3000
 # EMAIL_DEBUG_REDIRECT_TO= (закомментировано)
 ```
+
+> Security note: реальный API key удалён из документации. Секреты должны храниться только во внешнем secret/env store.
 
 ### 3. ✅ Проверка EmailService
 
@@ -75,14 +77,14 @@ APP_PUBLIC_URL=http://localhost:3000
    [email] sending {
      kind: 'verify-email',
      intendedTo: 'user@example.com',
-     actualTo: 'user@example.com',  ← Должен совпадать!
-     debugRedirect: false,  ← Должен быть false!
+     actualTo: 'user@example.com',
+     debugRedirect: false,
      subject: 'Подтвердите email в mamaGo'
    }
    [email] sent {
      kind: 'verify-email',
      intendedTo: 'user@example.com',
-     messageId: '...'  ← Должен быть ID от Resend
+     messageId: '...'
    }
    ```
 

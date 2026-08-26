@@ -19,6 +19,10 @@ import {
   hasSelectedChildren as familyHasSelectedChildren,
   resolveFamilyAgeMode,
 } from "@/lib/family/familyAgeMode";
+import {
+  MOBILE_DISCOVERY_FIELD_CHROME,
+  MOBILE_DISCOVERY_FIELD_GEOMETRY,
+} from "@/components/mobile/mobile-control-geometry";
 
 // Map intent IDs to fallback icons
 const INTENT_ICONS = {
@@ -36,6 +40,13 @@ interface MobileSearchEntryProps {
   currentIntent?: Intent | null;
   /** Хаб города: как в разделах, но только «Куда» и иконка MapPin */
   cityHubOnly?: boolean;
+  /**
+   * Явный geo-лейбл вместо вычисляемой городской фразы — для страниц без
+   * городского сегмента в URL (REGION/COUNTRY статья на /blog/{slug}),
+   * где `citySlug` — не настоящая геопривязка, а лишь предпочтение по
+   * умолчанию. См. ArticleGeoLabelContext.
+   */
+  locationLabelOverride?: string | null;
   /** На посадочной публикации — иконка раздела вместо MapPin при cityHubOnly */
   showSectionIcon?: boolean;
   /** Подсказка «тапни, чтобы выбрать» — только на главной города (`/{city}`) */
@@ -50,6 +61,7 @@ export function MobileSearchEntry({
   cityHubOnly = false,
   showSectionIcon = false,
   showTapToSelectHint = false,
+  locationLabelOverride = null,
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
@@ -93,7 +105,7 @@ export function MobileSearchEntry({
 
   // Build location text
   const getLocationText = () => {
-    const cityPhrase = getCityLocativePhrase(citySlug);
+    const cityPhrase = locationLabelOverride ?? getCityLocativePhrase(citySlug);
     const nearbyPart = applied.nearby ? "Поблизости" : null;
     
     let metroOrDistrictPart: string | null = null;
@@ -275,8 +287,10 @@ export function MobileSearchEntry({
     <button
       onClick={onSearchClick}
       className={cn(
-        "flex min-w-0 items-center gap-3 h-[52px] w-full max-w-full overflow-hidden rounded-full px-5 relative text-left",
-        "border border-gray-200 bg-white shadow-sm transition-all duration-200",
+        "relative flex min-w-0 w-full max-w-full items-center gap-3 overflow-hidden text-left",
+        MOBILE_DISCOVERY_FIELD_GEOMETRY,
+        MOBILE_DISCOVERY_FIELD_CHROME,
+        "transition-all duration-200",
         "hover:border-gray-300 hover:shadow-md",
         "active:scale-[0.98] active:shadow-sm",
         className

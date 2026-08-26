@@ -4,6 +4,9 @@ import React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Heart, MapPin } from "lucide-react";
+import type { PublicationPriceMode } from "@prisma/client";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
+import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 
 export type PlaceCardVariant = "default" | "compact" | "network";
 
@@ -31,6 +34,10 @@ export type PlaceCardProps = {
    * BACKLOG-118.
    */
   citySlug?: string;
+  priceMode?: PublicationPriceMode | null;
+  priceFrom?: number | null;
+  priceTo?: number | null;
+  currency?: string | null;
 };
 
 export function PlaceCard({
@@ -47,7 +54,12 @@ export function PlaceCard({
   onSaveToggle,
   className,
   citySlug,
+  priceMode,
+  priceFrom,
+  priceTo,
+  currency,
 }: PlaceCardProps) {
+  const priceLabel = formatPublicCardPrice({ priceMode, priceFrom, priceTo, currency });
   const handleSaveClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -133,6 +145,10 @@ export function PlaceCard({
               </span>
             ))}
           </div>
+        )}
+
+        {priceLabel && (
+          <div className="text-sm font-semibold text-foreground">{renderPriceWithIcon(priceLabel)}</div>
         )}
 
         {/* Title */}

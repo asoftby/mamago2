@@ -79,4 +79,20 @@ import { getDefaultFormData } from "./defaults";
   assert.deepEqual(payload.ageTags, []);
 }
 
+{
+  const legacyForm = mapEventToFormData({
+    id: "legacy-scheduling",
+    title: "Legacy scheduling",
+    schedulingKind: null,
+    scheduleJson: null,
+  } as unknown as ActivityWithRelations);
+  assert.equal(legacyForm.schedulingKind, null, "legacy Activity opens without a forced default");
+
+  legacyForm.schedulingKind = "SLOT";
+  assert.equal(buildEventPayload(legacyForm).schedulingKind, "SLOT");
+
+  legacyForm.schedulingKind = "WINDOW";
+  assert.equal(buildEventPayload(legacyForm).schedulingKind, "WINDOW");
+}
+
 console.log("event mappers tests: OK");

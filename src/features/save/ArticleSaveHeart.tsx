@@ -8,6 +8,7 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { persistArticleSave } from "@/features/save/persistArticleSave";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
 export type ArticleSaveStatus = {
   isIdea: boolean;
@@ -77,6 +78,17 @@ export function ArticleSaveHeart({
   const isSaved = saveStatus.isIdea || saveStatus.inPlan;
 
   const checkSaveStatus = useCallback(async () => {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
+      setSaveStatus({
+        isIdea: false,
+        inPlan: false,
+        planDate: null,
+        planStartsAt: null,
+        planItemId: null,
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/save/status?articleId=${encodeURIComponent(articleId)}`);
       if (!res.ok) return;
@@ -91,7 +103,7 @@ export function ArticleSaveHeart({
     } catch (error) {
       console.error("Failed to check article save status:", error);
     }
-  }, [articleId]);
+  }, [articleId, isAuthenticated]);
 
   // Батч-статус карточного грида может прийти позже монтирования — синхронизируем при обновлении пропа.
   useEffect(() => {
@@ -110,11 +122,12 @@ export function ArticleSaveHeart({
       setHasOpenedOnce(true);
       return;
     }
-    // На карточках не перепроверяем, пока пользователь реально не открыл chooser —
-    // иначе это тот же N+1 на монтировании, только под другим триггером.
-    if (skipOwnFetch && !hasOpenedOnce) return;
+    // Не перепроверяем, пока пользователь реально не открыл chooser — эффект выше
+    // (mount, если !skipOwnFetch) уже загрузил статус один раз; без этой проверки
+    // здесь случился бы дублирующийся GET сразу на монтировании.
+    if (!shouldRefetchAfterFlowClose({ flowOpen, hasOpenedOnce })) return;
     void checkSaveStatus();
-  }, [flowOpen, skipOwnFetch, hasOpenedOnce, checkSaveStatus]);
+  }, [flowOpen, hasOpenedOnce, checkSaveStatus]);
 
   const handlePersist = useCallback(
     async (result: SaveToPlanResult) => {
@@ -185,6 +198,7 @@ export function ArticleSaveHeart({
         scenario={{
           kind: "quickdate",
           title: articleTitle,
+          ideaOnly: true,
         }}
         source={source}
         onPersist={handlePersist}

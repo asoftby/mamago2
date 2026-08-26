@@ -4,17 +4,18 @@ import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 /**
  * Resolves the canonical URL for a publicly-visible Article page.
  *
- * An Article is either COUNTRY-scoped (`/blog/{slug}`) or CITY-scoped
- * (`/{city}/blog/{slug}`) — the two live at different routes. A stored
- * `seoCanonicalUrl` is only trusted if it matches the exact expected path
- * for the article's own geoScope/city/slug and current public origin;
- * otherwise it falls back to the deterministic path, so a stale origin or a
- * canonical carried over from a scope change never gets rendered verbatim.
+ * An Article is CITY-scoped (`/{city}/blog/{slug}`), or REGION/COUNTRY-scoped
+ * sharing the national route (`/blog/{slug}`) — CITY lives at a different
+ * route than the other two. A stored `seoCanonicalUrl` is only trusted if it
+ * matches the exact expected path for the article's own geoScope/city/slug
+ * and current public origin; otherwise it falls back to the deterministic
+ * path, so a stale origin or a canonical carried over from a scope change
+ * never gets rendered verbatim.
  */
 export interface ResolveArticleCanonicalUrlInput {
   seoCanonicalUrl: string | null | undefined;
   slug: string;
-  geoScope?: "CITY" | "COUNTRY" | null;
+  geoScope?: "CITY" | "REGION" | "COUNTRY" | null;
   citySlug?: string | null;
   publicBase: string;
 }

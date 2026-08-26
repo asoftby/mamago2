@@ -89,7 +89,7 @@ export const AGE_OPTIONS: readonly AgeOption[] = [
   ageRow("12-14", "12–14 лет", "12–14", 7, 12, 14, 144, 168),
   ageRow("14-16", "14–16 лет", "14–16", 8, 14, 16, 168, 192),
   ageRow("16-18", "16–18 лет", "16–18", 9, 16, 18, 192, 216),
-  ageRow("18+", "18+", "18+", 10, 18, null, 216, null, true),
+  ageRow("18+", "#nokids", "#nokids", 10, 18, null, 216, null, true),
 ] as const;
 
 /**
@@ -363,8 +363,67 @@ export function convertAgeKeysToRange(keys: string[]): {
 }
 
 /**
+ * Legacy age-tag values found in production `Activity.ageTags` that predate
+ * the current canonical {@link AGE_OPTIONS} keys. Read-layer only — never
+ * mutates stored data.
+ *
+ * `"18"` — a non-canonical Event Wizard chip value soft-deactivated by
+ * `scripts/data-migrations/20260804-upsert-canonical-age-signal-options.ts`
+ * ("Local may have used value "18" instead of canonical "18+""). That
+ * migration only deactivated the selectable `SignalOption` row and explicitly
+ * left existing `Activity.ageTags` content untouched, so events created
+ * against the old chip (e.g. `interaktivnyy-kvest-mir-naoschup`, live DB
+ * audit 2026-08-24: 1 row) still carry the literal `"18"`.
+ */
+const LEGACY_AGE_KEY_ALIASES: Record<string, string> = {
+  "18": "18+",
+};
+
+function normalizeAgeTagKey(key: string): string {
+  return LEGACY_AGE_KEY_ALIASES[key] ?? key;
+}
+
+/**
+ * Compact age-range label from selected ageTags (canonical shared formatter —
+ * used by both Stories and the public event page; do not reimplement).
+ *
+ * Collapses a *contiguous* run of adjacent categories into one range. A
+ * non-contiguous selection is never collapsed to min–max (that would imply
+ * coverage of the gap, which is false) — it falls back to the existing
+ * comma-separated {@link formatAgeKeys} enumeration instead. Known legacy
+ * key aliases (see {@link LEGACY_AGE_KEY_ALIASES}) are normalized first;
+ * any other unrecognized key is simply dropped, same as before.
+ *
+ * @example formatAgeTagsCompact(["5-7","7-9","9-12","12-14","14-16","16-18","18+"]) => "5+"
+ * @example formatAgeTagsCompact(["5-7","7-9","9-12","12-14"]) => "5–14 лет"
+ * @example formatAgeTagsCompact(["5-7"]) => "5–7 лет"
+ * @example formatAgeTagsCompact(["3-5","9-12"]) => "3–5 лет, 9–12 лет" (gap preserved, not "3–12 лет")
+ * @example formatAgeTagsCompact(["0-1", …, "18+"]) => "Любой возраст" (full coverage — existing universal-age semantics)
+ * @example formatAgeTagsCompact(["14-16","16-18","18"]) => "14+" (legacy "18" alias normalized to "18+")
+ */
+export function formatAgeTagsCompact(keys: string[] | null | undefined): string | undefined {
+  const validKeys = [...new Set((keys ?? []).map(normalizeAgeTagKey))].filter(isValidAgeKey);
+  if (validKeys.length === 0) return undefined;
+
+  const indices = validKeys
+    .map((key) => AGE_OPTIONS.findIndex((opt) => opt.key === key))
+    .sort((a, b) => a - b);
+
+  const isContiguous = indices.every((idx, i) => i === 0 || idx === indices[i - 1]! + 1);
+  if (!isContiguous) return formatAgeKeys(validKeys);
+
+  const first = AGE_OPTIONS[indices[0]!]!;
+  const last = AGE_OPTIONS[indices[indices.length - 1]!]!;
+
+  if (first.key === "0-1" && last.key === "18+") return "Любой возраст";
+  if (last.key === "18+") return `${first.minAge}+`;
+  if (first === last) return first.label;
+  return `${first.minAge}–${last.maxAge} лет`;
+}
+
+/**
  * Format age range for display
- * 
+ *
  * @example formatAgeRange(0, 12) => "0–1 год"
  * @example formatAgeRange(36, 60) => "3–5 лет"
  * @example formatAgeRange(216, null) => "18+"

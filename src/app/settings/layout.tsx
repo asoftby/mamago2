@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { BusinessShell } from "@/components/business/layout/BusinessShell";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
 import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
 import { getBuildInfo } from "@/lib/system/buildInfo";
+import { PERMANENT_NOINDEX_ROBOTS } from "@/lib/seo/indexingPolicy";
+
+export const metadata: Metadata = {
+  robots: PERMANENT_NOINDEX_ROBOTS,
+};
 
 export default async function UnifiedSettingsLayout({
   children,

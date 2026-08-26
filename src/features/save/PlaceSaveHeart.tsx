@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
@@ -8,6 +8,7 @@ import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlow
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { persistPlaceSave } from "@/features/save/persistPlaceSave";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
 type PlaceSaveHeartProps = {
   placeId: string;
@@ -39,6 +40,7 @@ export function PlaceSaveHeart({
   const { isAuthenticated } = useAuthMe();
   const [flowOpen, setFlowOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const hasOpenedOnceRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState({
     isIdea: false,
     inPlan: false,
@@ -50,6 +52,17 @@ export function PlaceSaveHeart({
   const isSaved = saveStatus.isIdea || saveStatus.inPlan;
 
   const checkSaveStatus = useCallback(async () => {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
+      setSaveStatus({
+        isIdea: false,
+        inPlan: false,
+        planDate: null,
+        planStartsAt: null,
+        planItemId: null,
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/save/status?placeId=${encodeURIComponent(placeId)}`);
       if (!res.ok) return;
@@ -64,14 +77,20 @@ export function PlaceSaveHeart({
     } catch (error) {
       console.error("Failed to check place save status:", error);
     }
-  }, [placeId]);
+  }, [placeId, isAuthenticated]);
 
   useEffect(() => {
     void checkSaveStatus();
   }, [checkSaveStatus]);
 
+  // Обновляем статус только после того, как пользователь реально открыл и закрыл модалку —
+  // на первом рендере эффект выше уже загрузил статус, повторный GET не нужен.
   useEffect(() => {
-    if (flowOpen) return;
+    if (flowOpen) {
+      hasOpenedOnceRef.current = true;
+      return;
+    }
+    if (!shouldRefetchAfterFlowClose({ flowOpen, hasOpenedOnce: hasOpenedOnceRef.current })) return;
     void checkSaveStatus();
   }, [flowOpen, checkSaveStatus]);
 

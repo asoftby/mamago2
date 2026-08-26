@@ -19,6 +19,7 @@ function draftFixture(overrides: Partial<EventCreateDraft> = {}): EventCreateDra
     organizerId: null,
     eventCategoryId: null,
     scheduleMode: "ONE_TIME",
+    schedulingKind: null,
     scheduleJson: { mode: "ONE_TIME", dates: ["2026-08-15"] },
     priceText: "10 BYN",
     venue: null,
@@ -207,6 +208,7 @@ async function testDataContainsOnlyAllowedFields() {
       "organizerId",
       "eventCategoryId",
       "scheduleMode",
+      "schedulingKind",
       "scheduleJson",
       "priceText",
     ]),
@@ -452,6 +454,7 @@ async function testUpdateUsesUpdateAndReturnsUpdatedStatus() {
   ).args as { where: { id: string }; data: Record<string, unknown> };
   assert.equal(updateCall.where.id, "activity-99");
   assert.equal(updateCall.data.title, "Updated Event");
+  assert.equal("schedulingKind" in updateCall.data, false, "re-import must preserve an editor classification");
 }
 
 async function testUpdateReplacesSessions() {

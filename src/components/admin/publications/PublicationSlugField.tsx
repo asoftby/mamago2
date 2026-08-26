@@ -35,6 +35,7 @@ export function PublicationSlugField({
   id = "publication-slug",
 }: PublicationSlugFieldProps) {
   void slug; // parent holds the raw state; display uses previewSlug
+  void slugHistorySupported;
 
   const helperText = isSlugPinned
     ? "Slug закреплён. Изменяйте его только если понимаете SEO-последствия."

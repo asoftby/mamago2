@@ -87,6 +87,7 @@ const opts = { publishedAtIso: null, scheduledAtIso: null };
     tagIds: [],
     geoScope: "COUNTRY",
     cityId: null,
+    regionId: null,
     status: "DRAFT",
     publishedAt: null,
     scheduledAt: null,

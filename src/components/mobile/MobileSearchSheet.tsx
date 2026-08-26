@@ -41,6 +41,7 @@ import {
 } from "@/lib/family/familyAgeMode";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
 import { MobileSearch } from "@/components/mobile/MobileSearch";
+import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import type { SearchResultItem } from "@/lib/search/types";
 
 /** Единый для всех разделов: пользователь хотя бы раз открыл и закрыл поиск в этой вкладке браузера */
@@ -869,12 +870,12 @@ export function MobileSearchSheet({
     <div className="fixed inset-0 z-[9999] flex min-h-0 flex-col bg-white">
       <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white px-4 py-3">
         <div className="flex items-center justify-between">
+          <div className="w-10" />
+          <h2 className="text-lg font-semibold text-gray-900">Поиск</h2>
           <ModalCloseButton
             onClick={handleSheetClose}
-            className="-ml-2 shrink-0"
+            className="-mr-2 shrink-0"
           />
-          <h2 className="text-lg font-semibold text-gray-900">Поиск</h2>
-          <div className="w-10" />
         </div>
       </div>
 
@@ -1016,13 +1017,11 @@ export function MobileSearchSheet({
               Пропустить
             </button>
           ) : showLeftReset ? (
-            <button
-              type="button"
+            <MobileOverlayResetAction
               onClick={handleResetAll}
-              className="shrink-0 rounded-xl px-3 py-3.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200"
             >
               Сбросить
-            </button>
+            </MobileOverlayResetAction>
           ) : (
             <div className="w-[5.5rem] shrink-0" aria-hidden />
           )}

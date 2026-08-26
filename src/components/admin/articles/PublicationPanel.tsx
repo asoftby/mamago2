@@ -291,9 +291,14 @@ export function PublicationPanel({
 
             {actionPolicy.primary?.kind === "approve" && onApprove && onReject ? (
               <>
-                <Button type="button" onClick={onApprove} disabled={actionsBusy}>
+                <Button
+                  type="button"
+                  onClick={onApprove}
+                  disabled={actionsBusy || actionPolicy.primary.disabled}
+                  title={actionPolicy.primary.disabled ? (actionPolicy.primary.disabledReason ?? undefined) : undefined}
+                >
                   {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                  {actionPolicy.primary.label}
+                  {moderating ? "Одобрение…" : actionPolicy.primary.label}
                 </Button>
                 <Button type="button" variant="destructive" onClick={onReject} disabled={actionsBusy}>
                   {moderating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
@@ -358,10 +363,10 @@ export function PublicationPanel({
                 className="text-muted-foreground hover:text-foreground"
                 asChild
               >
-                <Link href={publicUrl} target="_blank" rel="noopener noreferrer">
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />
                   Открыть на сайте
-                </Link>
+                </a>
               </Button>
             ) : null}
           </div>

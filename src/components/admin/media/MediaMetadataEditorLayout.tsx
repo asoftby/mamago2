@@ -3,6 +3,10 @@
 import { FileText, Image as ImageIcon } from "lucide-react";
 import { formatBytes } from "@/lib/media/formatBytes";
 import { resolveDisplayFilename } from "@/lib/media/resolveDisplayFilename";
+import {
+  mediaEntityTypeBadgeLabel,
+  resolveAdminMediaListTitle,
+} from "@/lib/media/mediaTitleOwnership";
 import type { MediaAssetKind } from "@prisma/client";
 
 interface MediaMetadataEditorLayoutProps {
@@ -40,19 +44,39 @@ interface MediaMetadataEditorLayoutProps {
   onUpdate?: () => void;
 }
 
+/**
+ * Preview + identity hierarchy for admin media detail.
+ * Primary: MediaAsset.title (fallback entity title → canonical filename).
+ * Secondary: canonical filename.
+ * Technical: originalName as uploaded (never rewrite extension).
+ */
 export function MediaMetadataEditorLayout({
   media,
   mediaId,
+  metadata,
   usageContext,
 }: MediaMetadataEditorLayoutProps) {
+  const displayFilename = resolveDisplayFilename({
+    filename: media.filename,
+    mimeType: media.mimeType,
+    extension: media.extension,
+  });
+  const displayTitle = resolveAdminMediaListTitle({
+    title: metadata.title,
+    entityTitle: usageContext?.entityTitle,
+    filename: displayFilename,
+  });
+  const entityBadge = mediaEntityTypeBadgeLabel(usageContext?.entityType);
+  // originalName must render exactly as stored — do not run through mime-based extension rewrite.
+  const originalNameAsUploaded = media.originalName;
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      {/* Image Preview */}
       <div className="min-h-[500px] bg-gray-50 flex items-center justify-center p-8">
         {media.kind === "IMAGE" ? (
           <img
             src={`/api/media/${mediaId}`}
-            alt={media.filename}
+            alt={metadata.alt?.trim() || displayTitle}
             className="max-w-full max-h-[450px] object-contain rounded-lg"
           />
         ) : (
@@ -62,7 +86,6 @@ export function MediaMetadataEditorLayout({
         )}
       </div>
 
-      {/* File Info */}
       <div className="p-6 border-t border-gray-200">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
@@ -72,11 +95,23 @@ export function MediaMetadataEditorLayout({
               <FileText className="w-5 h-5 text-blue-600" />
             )}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
-              {resolveDisplayFilename({ filename: media.originalName, mimeType: media.mimeType, extension: media.extension })}
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <p className="text-base font-semibold text-gray-900 truncate">{displayTitle}</p>
+              {entityBadge && (
+                <span className="inline-flex shrink-0 items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
+                  {entityBadge}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-600 font-mono truncate" title={displayFilename}>
+              {displayFilename}
             </p>
-            <div className="mt-2 space-y-1">
+            <p className="text-xs text-gray-500">
+              Исходный файл:{" "}
+              <span className="font-mono break-all">{originalNameAsUploaded}</span>
+            </p>
+            <div className="pt-2 space-y-1">
               <p className="text-xs text-gray-500">
                 {media.mimeType} • {formatBytes(media.sizeBytes)}
               </p>
@@ -85,12 +120,17 @@ export function MediaMetadataEditorLayout({
                   {media.width} × {media.height} px
                 </p>
               )}
+              {media.publicUrl && (
+                <p className="text-xs text-gray-500 font-mono break-all">
+                  Canonical URL: {media.publicUrl}
+                </p>
+              )}
             </div>
             {usageContext && (
               <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs text-gray-500">Источник метаданных</p>
+                <p className="text-xs text-gray-500">Использование / сущность</p>
                 <p className="text-sm font-medium text-gray-900 mt-1">
-                  {usageContext.entityType}
+                  {entityBadge ?? usageContext.entityType}
                   {usageContext.entityTitle && `: ${usageContext.entityTitle}`}
                 </p>
               </div>

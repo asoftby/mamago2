@@ -3,8 +3,8 @@
  * Конфигурация категорий и GUI для vanilla-cookieconsent (Orest Bida).
  *
  * Архитектура согласия (см. docs/cookies-and-telemetry.md):
- * - Категория `analytics` здесь = только сторонние скрипты веб-аналитики (GA, GTM, PostHog и т.п.).
- *   Она НЕ управляет first-party продуктовой телеметрией (UserEvent в нашей БД).
+ * - Категория `analytics` здесь = только сторонние скрипты веб-аналитики (Google Analytics 4,
+ *   Yandex Metrica). Она НЕ управляет first-party продуктовой телеметрией (UserEvent в нашей БД).
  * - Категория `marketing` = только сторонние рекламные/маркетинговые пиксели.
  * - Продуктовые события на наших серверах — отдельный слой, не «analytics cookies» в смысле этого UI.
  */
@@ -34,7 +34,7 @@ const PREFERENCES = {
     analytics: {
       title: "Внешняя веб-аналитика",
       description:
-        "Управляет только подключением сторонних сервисов аналитики (например, Google Analytics, PostHog). Без согласия они не загружаются. Это не отключает учёт действий внутри mamaGo, который нужен для работы продукта (сохранения, план, улучшение сервиса на наших серверах).",
+        "Управляет только подключением сторонних сервисов аналитики: Google Analytics 4 и Яндекс.Метрика. Без согласия они не загружаются. Это не отключает учёт действий внутри mamaGo, который нужен для работы продукта (сохранения, план, улучшение сервиса на наших серверах).",
     },
     marketing: {
       title: "Маркетинг и реклама",
@@ -53,7 +53,9 @@ export function createCookieConsentRunConfig(
 ): RunConfig {
   return {
     mode: "opt-in",
-    revision: 0,
+    // Bumped 0 -> 1: the external analytics provider set changed (Yandex Metrica
+    // added). Existing consent must be re-collected rather than silently reused.
+    revision: 1,
     autoShow: true,
     autoClearCookies: true,
     manageScriptTags: true,
@@ -92,11 +94,14 @@ export function createCookieConsentRunConfig(
         enabled: false,
         autoClear: {
           cookies: [
+            // Google Analytics 4 (first-party, our domain).
             { name: /^_ga/ },
             { name: /^_gid$/ },
             { name: "_gat" },
-            { name: /^ph_/ },
             { name: /^gcl_/ },
+            // Yandex Metrica (first-party, our domain only — the plugin can't
+            // reach cookies scoped to yandex.ru itself).
+            { name: /^_ym_/ },
           ],
         },
       },

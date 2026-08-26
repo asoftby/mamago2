@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Images, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,18 +16,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  LEGACY_ARTICLE_GALLERY_PRESENTATION,
-  type ArticleBlockMvp,
-  newBlock,
-} from "@/lib/publications/articleMvp";
+import { type ArticleBlockMvp, newBlock } from "@/lib/publications/articleMvp";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
 import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCardEntityPicker";
 import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEditorGalleryField";
+import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
+
+/** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
+export function convertImageBlockToGallery(block: Extract<ArticleBlockMvp, { type: "image" }>): ArticleBlockMvp {
+  return {
+    id: block.id,
+    type: "gallery",
+    mediaIds: block.mediaId ? [block.mediaId] : [],
+    presentation: "carousel",
+    caption: block.caption,
+  };
+}
+
+/** Два соседних `image`-блока → один `gallery` на месте первого, порядок A,B сохранён. */
+export function mergeImageBlocksIntoGallery(
+  a: Extract<ArticleBlockMvp, { type: "image" }>,
+  b: Extract<ArticleBlockMvp, { type: "image" }>,
+): ArticleBlockMvp {
+  return {
+    id: a.id,
+    type: "gallery",
+    mediaIds: [a.mediaId, b.mediaId].filter((id): id is string => Boolean(id)),
+    presentation: "carousel",
+    caption: a.caption || b.caption,
+  };
+}
 
 /** Короткие подписи в шапке блока */
 const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
@@ -192,9 +214,16 @@ function EmbedBlockEditor({
 export function ArticleBlocksMvpEditor({
   blocks,
   onChange,
+  authorUserId,
+  articleId,
+  articleMediaSource,
 }: {
   blocks: ArticleBlockMvp[];
   onChange: (next: ArticleBlockMvp[]) => void;
+  authorUserId?: string | null;
+  articleId?: string | null;
+  /** «Фото этой статьи» — общий источник для image/gallery picker'ов всех блоков. */
+  articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
   const hydrated = useHydrated();
 
@@ -226,6 +255,22 @@ export function ArticleBlocksMvpEditor({
 
   const removeAt = (i: number) => {
     onChange(blocks.filter((_, k) => k !== i));
+  };
+
+  /** Только references внутри contentJson меняются — ни новый MediaAsset, ни смена uploadedById. */
+  const makeGalleryAt = (i: number) => {
+    const block = blocks[i];
+    if (block.type !== "image") return;
+    updateAt(i, convertImageBlockToGallery(block));
+  };
+
+  const mergeAdjacentImagesAt = (i: number) => {
+    const a = blocks[i];
+    const b = blocks[i + 1];
+    if (a?.type !== "image" || b?.type !== "image") return;
+    const next = [...blocks];
+    next.splice(i, 2, mergeImageBlocksIntoGallery(a, b));
+    onChange(next);
   };
 
   const renderBlockBody = (block: ArticleBlockMvp, i: number) => (
@@ -316,10 +361,13 @@ export function ArticleBlocksMvpEditor({
           <ArticleEditorCoverField
             showHeading={false}
             value={block.mediaId}
+            authorUserId={authorUserId}
+            articleId={articleId}
             uploadButtonLabel="Загрузить изображение"
             successUploadMessage="Изображение загружено"
             successPickMessage="Изображение выбрано"
             onChange={(mediaId) => updateAt(i, { ...block, mediaId })}
+            articleMediaSource={articleMediaSource}
           />
           <Input
             placeholder="Alt"
@@ -331,34 +379,29 @@ export function ArticleBlocksMvpEditor({
             value={block.caption ?? ""}
             onChange={(e) => updateAt(i, { ...block, caption: e.target.value })}
           />
+          {block.mediaId ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 font-normal"
+              onClick={() => makeGalleryAt(i)}
+            >
+              <Images className="h-4 w-4 shrink-0" />
+              Сделать галереей
+            </Button>
+          ) : null}
         </>
       )}
       {block.type === "gallery" && (
         <>
-          <div className="space-y-1 max-w-sm">
-            <Label className="text-xs text-muted-foreground">Вид галереи</Label>
-            {hydrated ? (
-              <Select
-                value={block.presentation ?? LEGACY_ARTICLE_GALLERY_PRESENTATION}
-                onValueChange={(presentation: "carousel" | "mosaic" | "sequential") =>
-                  updateAt(i, { ...block, presentation })
-                }
-              >
-                <SelectTrigger aria-label="Вид галереи"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="carousel">Карусель</SelectItem>
-                  <SelectItem value="mosaic">Мозаика</SelectItem>
-                  <SelectItem value="sequential">На всю ширину по порядку</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <SelectSkeleton className="w-full" />
-            )}
-          </div>
           <ArticleEditorGalleryField
             showHeading={false}
             value={block.mediaIds}
+            authorUserId={authorUserId}
+            articleId={articleId}
             onChange={(ids) => updateAt(i, { ...block, mediaIds: ids })}
+            articleMediaSource={articleMediaSource}
           />
           <Input
             placeholder="Подпись к галерее (опционально)"
@@ -469,7 +512,19 @@ export function ArticleBlocksMvpEditor({
                     className="pointer-events-none absolute inset-x-8 top-1/2 border-t border-dashed border-border/80"
                     aria-hidden
                   />
-                  <div className="relative bg-background px-2">
+                  <div className="relative flex items-center gap-1 bg-background px-2">
+                    {block.type === "image" && blocks[i + 1]?.type === "image" ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground h-8"
+                        onClick={() => mergeAdjacentImagesAt(i)}
+                      >
+                        <Images className="h-3.5 w-3.5 shrink-0" />
+                        Объединить в галерею
+                      </Button>
+                    ) : null}
                     <BlockTypePicker
                       hasIntro={hasIntro}
                       onPick={(type) => insertAt(i + 1, type)}

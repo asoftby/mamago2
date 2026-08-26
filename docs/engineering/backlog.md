@@ -3453,3 +3453,500 @@ P3 — cleanup / polish / optional
   unsuffixed PROD token retired or documented as intentional; historical
   webhook docs either archived or updated; PROD running the APP_ENV-aware image.
 - Source: Telegram Bot + Resend production-readiness audit (2026-08-19)
+
+---
+
+## [BACKLOG-124] Article REGION scope — deferred follow-ups
+
+- Status: OPEN
+- Priority: P3
+- Area: Articles / Admin / Discovery
+- Added: 2026-08-20
+- Reason deferred: out of scope for the REGION-scope pre-release task
+  (feat/article-region-scope, base caa4af21) — kept minimal per task
+  instructions; noted here instead of expanding scope silently.
+- Context:
+  - Admin publications index (`src/lib/article/listArticlesForPublicationsIndex.ts`,
+    `PublicationListRow.cityOrContext`) has no region label — a REGION
+    article shows `cityOrContext: "—"` in `/admin/content/publications`,
+    same as COUNTRY. Not a bug (nothing breaks), just no visual
+    distinction for editors browsing the list. Would need a
+    `regionSlug`/label field threaded through similarly to `citySlug`.
+  - "Continuous reading" (read-next-in-section on `/blog/[slug]` and
+    `/{city}/blog/[slug]`, `src/lib/article/nextArticleInSection.ts` +
+    `nextArticleInSectionQuery.ts` + `buildContinuousArticleSeed.ts`) only
+    activates when `continuous.geoScope === "COUNTRY"` (national route) or
+    `"CITY"` (city route). REGION articles safely fall back to the
+    `standalone` article view (verified: `loadArticleContinuousContext`
+    returns a normal `GeoScope | null`, no crash) — they just never get a
+    "next article" chain. Extending it means deciding what "next" means
+    for REGION (same region only? national pool?) — a product decision,
+    not a mechanical extension.
+  - Local/DEV DB had only one Belarusian oblast (`minskaya-oblast`) with
+    exactly one non-Minsk City linked to it (Марьина Горка) before this
+    task; the other 5 oblasts were added to `prisma/seed.ts` and applied
+    locally, but **no City row exists yet for Vitebskaya oblast** (or any
+    oblast besides Minsk). The owner's planned DEV smoke test ("REGION
+    article appears in the relevant city feed for a city in Vitebskaya
+    oblast") needs at least one real City with
+    `regionId = <vitebskaya-oblast id>` to exist on DEV first — either
+    seed one, or set `regionId` on an existing DEV city that's actually
+    in that oblast. Not done in this task: inventing city data (coords,
+    metro flags, etc.) beyond the region reference rows themselves was
+    judged out of the minimal-scope instruction.
+- Current state: REGION scope shipped (schema, validation, editor,
+  discovery for CITY/journal/tags surfaces); the three items above are
+  deliberately not addressed.
+- Dependencies: none blocking; (3) blocks a specific owner smoke-test
+  scenario until a Vitebsk-region city exists on DEV.
+- Acceptance criteria: (1) admin list shows a region label for REGION
+  articles; (2) continuous-reading has an explicit REGION policy decision
+  and implementation; (3) DEV has at least one City per Belarusian oblast
+  (or at minimum Vitebskaya) with `regionId` set.
+- Source: Article REGION geo scope feature (2026-08-20)
+
+## [BACKLOG-125] Full LOCAL/GitHub/DEV/PROD sync audit (2026-08-20) — findings
+
+- Status: OPEN
+- Priority: P2
+- Area: Git / Environment / Process
+- Added: 2026-08-20
+- Reason deferred: audit found no broken state requiring immediate action —
+  LOCAL/origin/dev/DEV are exactly in sync and PROD is stable on a known-good
+  past commit; remaining items are owner-decision/process gaps, not defects.
+- Context:
+  - LOCAL `dev` HEAD `09f0fa9e` == `origin/dev` HEAD (0 ahead/0 behind,
+    verified via `git fetch --all` + `git rev-list --left-right --count`).
+  - Live DEV (`https://dev.mamago.by/api/health`) confirmed
+    `buildId=dev-329`, `gitSha=09f0fa9ec75c18c37c928b9b5963b97153b9f9c5` —
+    exact match to LOCAL/origin/dev HEAD.
+  - Live PROD (`https://prod.mamago.by/api/health`) confirmed
+    `buildId=dev-326`, `gitSha=caa4af2171359d865fd05127704db5a428fb496a`
+    (`fix(media): remove import source leakage`) — 3 commits behind current
+    `dev` (missing: `23902410` content-success popup fix, `4f21400a`/
+    `c33bf016`/`22b9af44` Article REGION geo scope, `09f0fa9e` public header
+    REGION/COUNTRY fix). This is the expected immutable-promotion lag (PROD
+    is only promoted deliberately, not on every dev push per
+    `.github/workflows/docker.yml`) — not a defect. Confirmed no drift: the
+    PROD `gitSha` is a real ancestor commit on `origin/dev`, not an
+    off-branch hotfix.
+  - **SSH to the app host (`mamago-prod` alias → `134.17.17.134`) times out
+    from this Claude Code sandbox environment** (both normal and
+    `dangerouslyDisableSandbox` mode) — outbound TCP/22 appears blocked at
+    the network level even though HTTPS (git fetch, `gh`, `curl` to
+    `*.mamago.by`) works fine. This means `docker diff`/container-filesystem
+    verification (catching a hand-edited-in-container hotfix that wouldn't
+    show up in `gitSha`/build labels) **cannot be performed from this kind
+    of session** — only from a shell with real SSH egress to that host.
+    Prior sessions document the same host's SSH as intermittently flaky
+    (see `docs/release/dev-to-prod-checklist.md` line ~2697), so this may be
+    session/network-specific rather than a host-side problem; worth
+    confirming next time SSH is available.
+  - Stale local branches/worktrees noise: 137 local branches exist, 28 have
+    tips unreachable from any `origin/*` ref. Nearly all of these are
+    **already tracked** — see BACKLOG-001 through BACKLOG-014 (worktree/
+    branch hygiene cleanup, 2026-08-07 audit), which as of this session's
+    fresh check still accurately describe the current state (e.g.
+    `mamago2-admin-pagination` is still dirty with the same ~50-file
+    pagination WIP BACKLOG-003 describes; `mamago2-rate-limit`,
+    `mamago2-wp-legacy`, `mamago2-phoenix-checklist` still clean/unmerged as
+    BACKLOG-010/011/012 describe). None of those items were re-litigated
+    here — do not duplicate, just re-confirmed still OPEN and still
+    accurate 13 days later.
+- Current state: no changes made to any branch, worktree, or environment
+  during this audit (read-only throughout, per explicit instruction).
+- Dependencies: none blocking day-to-day `dev` work.
+- Acceptance criteria: (1) owner decides if/when to promote `dev` HEAD to
+  PROD (or confirms current PROD lag is fine); (2) next session with real
+  SSH access to `mamago-prod` runs `docker diff` on both `dev-app-1` and
+  `prod-app-1` to close the one verification gap this audit could not
+  reach; (3) BACKLOG-001–014 eventually get their owner-decision merges/
+  drops so the branch/worktree count stops growing.
+- Source: full LOCAL↔GitHub↔DEV↔PROD audit, user-requested (2026-08-20)
+
+## [BACKLOG-126] /me/ideas page doesn't surface Article/Place/Offer ideas
+
+- Status: OPEN
+- Priority: P2
+- Area: My Ideas / Save
+- Added: 2026-08-21
+- Reason deferred: found while manually verifying the Article save-modal
+  "ideaOnly" change (Article can now only save to `ArticleIdea`, never a
+  dated `PlanItem`); the `/me/ideas` page and its data source only ever
+  queried the Activity/Event `Idea` model, never `ArticleIdea`/`PlaceIdea`/
+  `OfferIdea`. Fixing the Ideas page's data-fetching is out of scope for the
+  save-modal task (which only touched the save UI/API, not the Ideas list),
+  so it's recorded here instead of silently expanded into scope.
+- Context: confirmed by grepping `src/app/(public)/me/ideas/` and
+  `src/app/api/ideas` for `ArticleIdea`/`articleIdea` — zero hits. Manually
+  verified end-to-end: registered a throwaway test user
+  (`save-modal-test-2026@example.invalid`), saved a real article
+  (`cms37q1ca0006ws27z75ug52h`) via the Save modal's "Сохранить в идеи"
+  action, confirmed via `/api/save/status?articleId=...` that
+  `isIdea: true, inPlan: false, planDate: null` and via a direct Prisma
+  query that exactly one `ArticleIdea` row exists (no `PlanItem` row at
+  all) — the save itself is correct. But `/me/ideas` still rendered
+  "0 идей" / "Пока нет сохранённых идей" for that same user immediately
+  after.
+- Current state: `ArticleIdea` (and, per the same code-path, presumably
+  `PlaceIdea`/`OfferIdea` too — not separately re-verified here) rows are
+  written correctly and idempotently, and correctly excluded from any
+  dated `PlanItem`/"Мой план" view. They are simply invisible on the
+  dedicated "Мои идеи" list page. This predates the Article-save-modal
+  ideaOnly change — it is a pre-existing gap in the Ideas page's data
+  source, not a regression introduced by that change.
+- Dependencies: none blocking the Article save-modal work itself.
+- Acceptance criteria: `/me/ideas` (and its backing API route) queries
+  `ArticleIdea`/`PlaceIdea`/`OfferIdea` alongside the Activity `Idea` model
+  and renders them with appropriate per-type cards/links; a saved
+  Article/Place/Offer idea shows up there and can be removed from that page
+  too.
+- Source: manual QA during Article save-modal ideaOnly implementation
+  (2026-08-21)
+
+## [BACKLOG-127] Admin-only upload-as-author override for article media
+
+- Status: DONE (2026-08-22)
+- Priority: P3
+- Area: Admin / Media
+- Added: 2026-08-22
+- Renumbered: originally filed as "BACKLOG-004", which collided with the
+  pre-existing `recovery/plan-suggestions-age-tags-null` entry at that ID —
+  renumbered to the next free id (127) when closing, per backlog rule 5
+  (closed entries are kept, not deleted).
+- Reason deferred (original): `POST /api/upload` (`src/app/api/upload/route.ts`)
+  always set `uploadedById: user.id` (the requesting user's own id) — there
+  was no mechanism to attribute an upload to another user. Deferred at the
+  time because it touches the shared upload endpoint used by every upload
+  flow in the app, not just the article editor.
+- Context: an ADMIN/MODERATOR editing another user's article could already
+  *browse and pick* that author's existing media (fixed earlier the same
+  day via `authorUserId` scoping on `/api/admin/articles/media-picker`),
+  but uploading a *new* file from within that same editor landed in the
+  editor's own library, not the article author's — so the freshly uploaded
+  image would not show up next time the author (or another editor) opened
+  that article's picker.
+- Resolution: `POST /api/upload` (`src/app/api/upload/route.ts`) accepts two
+  optional form fields, `ownerUserId` and `uploadContext`. Resolution is
+  centralized in `resolveUploadOwnerUserId()`
+  (`src/lib/uploads/resolveUploadOwner.ts`), deliberately narrower than the
+  first draft of this fix (which let any ADMIN/MODERATOR override the owner
+  for *any* `/api/upload` call — flagged as too broad on review and tightened
+  before commit): the override is a no-op when `ownerUserId` is omitted or
+  equal to the requester's own id (the case for every non-article upload
+  flow); otherwise it requires **both** `uploadContext === "ADMIN_ARTICLE"`
+  (a closed literal union, not a free-form string — a typo/garbage value
+  fails closed to `null`) **and** the requester's role being ADMIN/MODERATOR,
+  checked as two independent gates — neither is silently downgraded, each
+  throws `UploadOwnerOverrideError("FORBIDDEN")` on its own. A dangling
+  target id throws `UploadOwnerOverrideError("OWNER_NOT_FOUND")` rather than
+  surfacing a raw FK-constraint error. Considered (per the task's own
+  guidance) splitting this into a separate `/api/admin/articles/upload`
+  endpoint reusing the existing processing/storage pipeline, but the
+  pipeline (preflight, dedup, sharp processing, storage write, DB
+  registration, response shaping) is ~180 lines of sequential logic in one
+  handler with no extracted reusable core — duplicating a second route
+  around it, or refactoring the whole pipeline into a shared function, was
+  judged unjustified duplication/risk for a P3 fix; the explicit
+  `uploadContext=ADMIN_ARTICLE` gate on the single existing endpoint was the
+  allowed fallback and adds zero duplication. Plain `/api/upload` callers
+  (business wizard, avatar, etc.) never send either field, so
+  `uploadedById = user.id` unconditionally, byte-for-byte unchanged. The
+  resolved id (not the requester's) is used for both the per-owner
+  content-hash dedup lookup (`findOwnedMediaByContentHash`) and
+  `registerUploadedMedia`'s `uploadedById`, so a duplicate re-upload for
+  author A dedups against A's library, never the admin's.
+  `uploadClient.ts`'s `uploadMediaFile()` grew matching `ownerUserId`/
+  `uploadContext` options, both appended only when set.
+  `ArticleEditorCoverField`/`ArticleEditorGalleryField`'s `uploadFiles` pass
+  `{ ownerUserId: authorUserId, uploadContext: "ADMIN_ARTICLE" }` only when
+  `authorUserId` is set (new/no-author-yet articles keep uploading to the
+  current admin's own library, unchanged).
+- Verification: `src/lib/uploads/resolveUploadOwner.test.ts` — no-op cases;
+  USER + ownerUserId → `FORBIDDEN` (including with a forged
+  `uploadContext=ADMIN_ARTICLE`, proving context alone isn't enough);
+  BUSINESS_OWNER + ownerUserId → `FORBIDDEN` (same, including forged
+  context); ADMIN (and separately MODERATOR) + ownerUserId **without** the
+  `ADMIN_ARTICLE` context → `FORBIDDEN` (proving role alone isn't enough —
+  this is the scenario the narrowing fixed); ADMIN + ownerUserId +
+  `ADMIN_ARTICLE` context targeting a nonexistent user → `OWNER_NOT_FOUND`;
+  ADMIN (and MODERATOR) + `ADMIN_ARTICLE` + real author A → resolves to A;
+  and the full acceptance scenario end-to-end against a real DB: ADMIN B
+  resolves+registers a `MediaAsset` for author A in the `ADMIN_ARTICLE`
+  context, asserts `uploadedById === authorA` (not adminB), asserts the
+  asset appears in author A's `queryMediaPickerPage` page and never in
+  admin B's.
+- Source: engineering audit + implementation during media-picker
+  infinite-scroll work (see `mediaPickerQuery.ts` / `MediaUploadField.tsx` /
+  `ArticleEditorCoverField.tsx` / `resolveUploadOwner.ts` changes)
+
+## [BACKLOG-128] Model event intervals for discovery date overlap and density
+
+- Status: BLOCKED
+- Priority: P1
+- Area: Discovery / Events / Data model
+- Added: 2026-08-24
+- Reason deferred: the current `ActivitySession` model contains `startsAt` only; there is no authoritative per-session `endsAt`, so interval overlap and expansion of one multiday session across every intersecting calendar day cannot be implemented without inventing semantics or changing the materialization contract.
+- Context: discovery filters and `/api/calendar/density` now share the executable Activity/session predicates and Minsk timezone policy. They correctly count materialized session days, but cannot infer an event interval that the schema does not store.
+- Current state: `buildEventRuntimeWhere` matches sessions whose `startsAt` is inside the selected half-open window. Density replaces applied dates with its visible-month window and groups matching materialized sessions by Minsk date.
+- Dependencies: product/data decision for session duration vs activity-level interval, schema migration adding an authoritative end boundary (or an explicit guarantee that multiday events materialize one session per active day), importer/wizard backfill rules.
+- Acceptance criteria: authoritative interval semantics are documented; schema/materialization and backfill are implemented; shared overlap predicate matches `start < filterEnd AND end >= filterStart`; density expands an interval into each intersecting Minsk day; fixtures cover an event starting before TODAY and remaining active today, plus month/year boundaries.
+- Source: discovery filters completion audit, base `961f8bae`, 2026-08-24
+
+## [BACKLOG-129] Normalize event prices for executable discovery ranges
+
+- Status: BLOCKED
+- Priority: P1
+- Area: Discovery / Events / Pricing data model
+- Added: 2026-08-24
+- Reason deferred: `priceFrom`/`priceTo` are not authoritative across the event wizard, tariff `priceItems`, and imported text prices; exposing a range slider or histogram now would silently omit or misclassify events.
+- Context: the discovery filter sheet currently exposes the executable “Бесплатно” predicate. Owner-review requested a min/max price control only if the stored data could support honest filtering and distribution counts.
+- Current state: the wizard writes the primary fixed/from price into `priceFrom` and writes tariff rows independently to JSON `priceItems`; free events may be represented by `scheduleJson.pricingMode = "free"` and/or a zero price; import performs best-effort parsing of `priceText`; no executable `priceMin`/`priceMax` predicate or price-distribution endpoint exists.
+- Dependencies: product semantics for “от”, tariff minima/maxima, session-specific prices and currency conversion; an authoritative numeric projection such as `effectivePriceMin`/`effectivePriceMax` (or a strict replacement contract for `priceFrom`/`priceTo`); writer and importer updates.
+- Acceptance criteria: explicit free status remains independent from paid ranges; all write paths populate an authoritative BYN numeric min/max projection; a migration/backfill derives safe values from structured pricing modes and `priceItems`, reports coverage, and quarantines unparseable text for manual review; list/count/distribution use one shared executable predicate; fixtures cover free, fixed, from, ranged, multi-tariff, imported, and unknown prices; the range UI is enabled only after measured coverage is accepted.
+- Source: event discovery filter owner-review audit, base `a01101c0`, 2026-08-24
+
+## [BACKLOG-130] Batch /api/save/status for Event/Place/Offer card grids
+
+- Status: OPEN
+- Priority: P2
+- Area: Save / Discovery / Performance
+- Added: 2026-08-25
+- Reason deferred: fixing this is a bounded batch-endpoint feature (schema, N new API route, wiring into 3 different card components), out of scope for the guest-401/duplicate-request bugfix that motivated this audit; that fix only needed to stop guest and duplicate requests, not eliminate legitimate authenticated N+1.
+- Context: `SaveHeart` (used by `EventCard`, `OfferCard`, `ActivityCard`) has no batch path — every card on a list page does its own `GET /api/save/status` on mount. For an authenticated user viewing e.g. 20 event cards, that's 20 individual requests. `ArticleSaveHeart` already solved the same problem for article grids via `useArticleSaveStatusBatch` + `POST /api/save/status/articles` + `skipOwnFetch`/`initialStatus` props (see `src/features/save/useArticleSaveStatusBatch.ts`, `src/app/api/save/status/articles/route.ts`) — that pattern is the template to replicate, not a new design.
+- Current state: `PlaceSaveHeart` has no batch path either (no grid currently renders many `PlaceSaveHeart` at once, so lower urgency there). `EventCard`/`OfferCard`/`ActivityCard` grids (e.g. city home rows, discovery listing, activity listing) each mount `SaveHeart` directly with per-card fetch, now correctly guarded against guest/duplicate requests but still N+1 for authenticated users.
+- Dependencies: none blocking; needs a batch status endpoint keyed by activityId/offerId (mirroring the article one, which already handles idea+plan state per entity) and a `useSaveStatusBatch`-style hook, then wiring the owning grid components to pass `initialStatus`/`skipOwnFetch`-equivalent props into `SaveHeart`.
+- Acceptance criteria: authenticated card grids for events/offers/activities issue one batched status request per page instead of one per card; `SaveHeart`'s own-fetch path remains for standalone (non-grid) usage; guest behavior (no request at all) is unaffected.
+- Source: `/api/save/status` guest-401/duplicate-request audit, base `772bdc1f`, 2026-08-25
+
+## [BACKLOG-131] PROD had no NAT hairpin/loopback for its own public IP — health_endpoint/sitemap_unavailable/global_noindex all failing on PROD
+
+- Status: DONE
+- Priority: P0 — Operations Center was blind on the actual PROD stack (3 of 7 detectors permanently red/never-run)
+- Area: Infra / PROD host networking (`134.17.17.134`, `/opt/mamago/prod`)
+- Added: 2026-08-25
+- Resolved: 2026-08-25
+- Context: Operations Center `health_endpoint`, `sitemap_unavailable`, and
+  `global_noindex` all read their base URL from the single
+  `getCanonicalPublicAppUrl()` helper (`src/lib/config/publicAppUrl.ts`),
+  which on `prod-worker-1` resolved to `APP_PUBLIC_URL=https://mamago.by`
+  — correct and explicitly configured, not a stale fallback. `mamago.by`
+  DNS points at `134.17.17.134`, the same floating public IP as the host
+  itself. `prod-worker-1`/`prod-app-1` sit on the PROD docker network
+  (`prod_prod_net`, subnet `172.20.0.0/16`), a sibling of the DEV network
+  (`172.19.0.0/16`) on the same physical host. Exactly the same bug as
+  BACKLOG-121 (DEV, resolved 2026-08-16) — except BACKLOG-121's fix was
+  deliberately scoped to the DEV subnet only ("no PROD subnet
+  (`172.20.0.0/16`) match"), and no equivalent PROD rule was ever added.
+- Root cause: missing PROD-container hairpin to the upstream floating IP.
+  `curl https://mamago.by/api/health` from the host itself, from
+  `prod-app-1`, and from `prod-worker-1` all hung to an 8s connection
+  timeout (TCP SYN goes out to the upstream NAT for the host's own public
+  IP, which never hairpins the connection back to local Traefik).
+  Confirmed externally reachable and fast (`/api/health` 200 in 0.38s,
+  `/sitemap.xml` 200 in 0.38s, `/robots.txt` 200 in 0.32s) the entire time
+  — this was purely an intra-host routing gap, never a real outage or an
+  app/SEO bug. `health_endpoint`/`sitemap_unavailable` degrade a caught
+  network error into a CRITICAL signal (`DetectorRun.status` stays `OK`);
+  `global_noindex`'s `probeGlobalNoindex` does not catch its `fetch`
+  calls, so the same transport failure threw instead, and
+  `DetectorRun.status` was never `OK` — the exact mechanism behind
+  `detector_stale`'s "Never completed a successful run" for
+  `global_noindex` specifically (see `src/server/ops/detectors/detectorStale.ts`).
+- Fix: one PROD-source-subnet-scoped HTTPS DNAT only, mirroring BACKLOG-121's
+  rule shape exactly:
+  `-s 172.20.0.0/16 -d 134.17.17.134 -p tcp --dport 443`
+  → `192.168.185.209:443` (local Traefik publish). No OUTPUT rules, no
+  port 80, no MASQUERADE, DEV's own rule/service left untouched.
+- Persistence: `/etc/systemd/system/mamago-prod-hairpin.service` (oneshot,
+  `iptables -C || -I`, enabled; ExecStop removes the same rule) — sibling
+  of `mamago-dev-hairpin.service`, not a modification of it.
+- Verification: `curl` from `prod-worker-1` to `/api/health`, `/sitemap.xml`,
+  `/robots.txt`, `/` all <0.2s with 2xx/307 after the fix. Operations
+  Center worker logs confirm all three detectors green post-fix:
+  `health_endpoint status=OK` (`signalsResolved=1`), `sitemap_unavailable
+  status=OK`, `global_noindex status=OK` (previously `FAILED` — first
+  `OK` run ever recorded for this detector on PROD).
+- Source: Operations Center PROD audit + BACKLOG-121-pattern host fix
+  (2026-08-25)
+
+## [BACKLOG-132] GA4/Yandex server-side reconciliation for /admin visitor KPIs
+
+- Status: OPEN
+- Priority: P1
+- Area: Analytics / /admin dashboard
+- Added: 2026-08-26
+- Context: The /admin dashboard rework (North Star, habit, funnel — see
+  `src/app/admin/page.tsx`, `src/lib/admin/dashboardViewModels.ts`,
+  `src/lib/admin/metricDictionary.ts`) ships every visitor-derived KPI
+  (MAU/WAU/WPF/W1-W4 retention/3-of-4-week habit) as `PROVISIONAL`, never
+  `VERIFIED`, because no server-side pull from GA4 Data API or Yandex
+  Metrica Reporting API exists — only client-side gtag/ym script injection
+  (`src/lib/analytics/externalAnalyticsConfig.ts`). Flipping `verifiable:
+  true` on the affected `METRIC_DICTIONARY` entries in
+  `src/lib/admin/metricDictionary.ts` is the entire promotion mechanism once
+  this ships.
+- Blocked on: GA4 service-account credentials with Data API access, and a
+  Yandex Metrica OAuth token + counter ID — not available as of 2026-08-26,
+  explicitly deferred by Aleksei to a later phase.
+
+## [BACKLOG-133] No first-party acquisition-source (UTM/referrer) tracking
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / /admin dashboard
+- Added: 2026-08-26
+- Context: The dashboard spec's Growth (Organic/Direct growth) and
+  Acquisition Quality (Organic/Direct/Referral/Social split + activation by
+  source) blocks are not implemented — `deriveGrowth()` in
+  `src/lib/admin/dashboardViewModels.ts` and `GrowthBlock.tsx` render an
+  explicit "нет проверенных данных" placeholder for this. Research during
+  planning found no UTM/referrer capture at signup; this is unconfirmed by a
+  fresh grep at implementation time and should be re-verified before
+  starting. Either first-party capture or GA4/Yandex reconciliation
+  (BACKLOG-132) could unblock this.
+
+## [BACKLOG-134] RouteIdea / DayScenario / route-PlanItem writes emit no UserEvent
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics instrumentation
+- Added: 2026-08-26
+- Context: `src/server/services/analytics/planningActivity.ts` (Weekly
+  Planning Families / W1-W4 retention / 3-of-4-week habit) has to read
+  `RouteIdea`, `DayScenario`, and `PlanItem` directly because none of their
+  write paths (`src/server/services/idea.service.ts:addRouteIdea`,
+  `src/app/api/save/plan/route.ts`'s `routeId` branch, `dayScenario.service.ts`)
+  call `trackUserEvent`. Same class of gap as BACKLOG-029 (missing `SHARE`
+  event type). Worth its own event-type/instrumentation pass so future
+  analytics don't need bespoke per-table queries.
+
+## [BACKLOG-135] B2B repeat-promotion rate and revenue have no honest signal
+
+- Status: OPEN
+- Priority: P2
+- Area: B2B analytics / monetization
+- Added: 2026-08-26
+- Context: `deriveB2BHealth()` (`src/lib/admin/dashboardViewModels.ts`)
+  hard-codes `repeatPromotionRate: null` and `revenue: null` — paid
+  `Promotion` create/resume both throw `"...not available in first
+  PROD. Use explicit Boost purchase."` (`src/server/services/promotion/promotion.service.ts`),
+  and `registerPromotionActionFromUserEvent()` is a no-op. No reliable
+  revenue definition/source exists either. Revisit once/if paid Promotion or
+  a stable Boost-revenue accounting exists — do not fabricate a placeholder
+  metric before then.
+
+## [BACKLOG-136] Supply "coverage gaps" enumeration not implemented
+
+- Status: OPEN
+- Priority: P3
+- Area: /admin dashboard — Supply Health
+- Added: 2026-08-26
+- Context: The dashboard spec's §8 "Coverage gaps" (categories/dates/
+  districts with critically low supply) needs a threshold definition for
+  "critically low" that only Aleksei can set — not attempted in the
+  dashboard rework. `SupplyHealthBlock.tsx`/`supplyHealth.ts` cover active
+  events/places/offers + freshness only.
+
+## [BACKLOG-137] No MetricSample range-query/trend-chart consumer exists
+
+- Status: OPEN
+- Priority: P3
+- Area: /admin dashboard / Operations Center metrics
+- Added: 2026-08-26
+- Context: `MetricSample` is indexed for range scans
+  (`[metric, dimKey, collectedAt DESC]`) and now carries real history for
+  every dashboard KPI, but every current consumer (`metricProjection.ts`,
+  and the dashboard rework's `_prev`-companion-metric growth deltas) only
+  does single-point lookups — no genuine range query for a sparkline/trend
+  chart exists anywhere. Building one is net-new work, not a fix to
+  anything broken.
+
+## [BACKLOG-138] Fix PR #126 typecheck failure (source-aware crawl policy)
+
+- Status: OPEN
+- Priority: P1
+- Area: Import / CI
+- Added: 2026-08-26
+- Reason deferred: full LOCAL/GitHub/DEV/PROD reconciliation session found
+  it while auditing all open PRs; fixing someone else's failing PR test
+  was out of scope for that reconciliation pass.
+- Context: PR #126 `fix/import-source-access-policy` (`feat(import): add
+  source-aware crawl policy`) has `mergeStateStatus: UNSTABLE`,
+  `mergeable: MERGEABLE`. CI `typecheck` job fails with real errors in the
+  PR's own test file, not a dev-drift issue:
+  `src/server/modules/import/parsers/sourceAccessPolicy.test.ts:141-143`
+  — `error TS2339: Property 'get' does not exist on type 'never'` (3
+  occurrences), from CI run
+  https://github.com/asoftby/mamago2/actions/runs/32989481643.
+- Current state: branch unchanged since audit, not rebased onto latest
+  `origin/dev` (`73c0a26a` at audit time).
+- Dependencies: none.
+- Acceptance criteria: type narrowing fixed so `pnpm tsc --noEmit` passes,
+  PR rebased onto current `origin/dev`, CI green, then normal merge.
+- Source: full reconciliation audit, 2026-08-26.
+
+## [BACKLOG-139] Rebase and land PR #117 + #118 (analytics contract v1 + followup)
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics
+- Added: 2026-08-26
+- Reason deferred: both stale (58+ commits behind `origin/dev` at audit
+  time) and marked draft by the author — not signaled ready, and rebasing
+  is substantial standalone work, not a reconciliation step.
+- Context: PR #117 `chore/analytics-contract-v1` (draft, `CLEAN`,
+  typecheck green, 58 commits behind `origin/dev` at audit) defines the
+  analytics contract v1 baseline. PR #118
+  `chore/analytics-contract-v1-followup` (draft, `CONFLICTING`, typecheck
+  failing) is stacked directly on top of #117
+  (`git merge-base --is-ancestor` confirms #117's head is an ancestor of
+  #118's head) — #118 cannot be rebased/merged before #117 is.
+- Current state: both untouched since audit; not rebased.
+- Dependencies: #118 blocked on #117.
+- Acceptance criteria: #117 rebased onto current `origin/dev`, marked
+  ready, CI green, merged; then #118 rebased on the new `origin/dev`,
+  its typecheck failure fixed, CI green, merged.
+- Source: full reconciliation audit, 2026-08-26.
+
+## [BACKLOG-140] Rebase and land PR #109 (Article inline media MediaUsage reverse-index)
+
+- Status: OPEN
+- Priority: P1
+- Area: Media / Admin cleanup tooling
+- Added: 2026-08-26
+- Reason deferred: 255 commits behind `origin/dev` at audit time and
+  `CONFLICTING` — rebasing that much drift is substantial standalone
+  work, not a reconciliation step. Explicitly verified NOT superseded
+  by later dev work before deferring (see Context).
+- Context: PR #109 `fix/article-inline-media-public-access` adds a
+  `MediaUsage` reverse index for Article `image`/`gallery` content
+  blocks (`extractArticleContentMediaIds()` +
+  `syncArticleContentMediaUsages()`, field `"content"`). Per the PR's own
+  description, public visibility of inline article images is already
+  fixed in `dev` independently (commit `51b5b4d6`,
+  `hasPublishedPublicLinkage()` reads `Article.contentJson` directly) —
+  this PR is NOT about that. It closes a separate, still-open gap:
+  `grep -rn "articleContentMedia" src/lib/publications/
+  src/server/services/media/media-usage.service.ts` on `origin/dev`
+  (`73c0a26a`) returns nothing, confirming the admin orphan-detection /
+  hard-delete tooling (`recalculateMediaUsageStatus`,
+  `hardDeleteMediaAssetIfUnused`, `bulkHardDeleteUnusedMediaAssets`) still
+  has zero `MediaUsage` awareness of `Article.contentJson`, so an admin
+  running "recalculate orphans" or "bulk-delete unused media" today could
+  still mark live inline Article images `ORPHANED` and hard-delete them.
+  Every other entity type (Place/Event/Offer/Route) already has this
+  reverse-index wired in; Article is the one remaining gap.
+- Current state: branch unchanged since audit (255 commits behind
+  `origin/dev`, `mergeStateStatus: DIRTY`, `mergeable: CONFLICTING`, no CI
+  run recorded). Also needs a separate data-only `MediaUsage` backfill for
+  existing DEV Articles after merge (per PR description, not included in
+  the PR itself; ~9 Articles identified in an earlier read-only audit
+  referenced by the PR).
+- Dependencies: none for the rebase itself; the post-merge backfill is a
+  separate follow-up.
+- Acceptance criteria: rebased onto current `origin/dev`, conflicts
+  resolved, tests still passing (`test:article-content-media-linkage`,
+  `test:article-content-media-usage`, `test:article-media-replay`), CI
+  green, merged; backfill run and tracked separately.
+- Source: full reconciliation audit, 2026-08-26.

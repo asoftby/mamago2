@@ -43,6 +43,7 @@ import {
   validateOpeningHours,
 } from "@/lib/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
+import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 
 async function finalizePublishedPlaceSlugIfNeeded(placeId: string, isPublished: boolean) {
   if (!isPublished) return;
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
           category: String(data.category ?? "").trim() || "other",
         }
       : data;
+    const normalizedPrice = normalizePublicationPrice({ priceItems: d.priceItems });
     const phones = normalizePlacePhoneFields(d);
     const faqItems = normalizeFaqItems(d.faqItems);
     const openingHoursData =
@@ -262,6 +264,11 @@ export async function POST(request: NextRequest) {
         googleReviewsJson: d.googleReviewsJson || null,
         googleReviewsSyncedAt: d.googleReviewsSyncedAt || null,
         googleMapsUri: d.googleMapsUri || null,
+        priceFrom: normalizedPrice.min,
+        priceTo: normalizedPrice.max,
+        priceMode: normalizedPrice.mode,
+        currency: "BYN",
+        priceItems: d.priceItems as Prisma.InputJsonValue | undefined,
 
         // Step 3: не пишем временный/чужой id — выставит аттач temp media или ветка MediaAsset
         logoImageId: d.wizardSessionId ? null : d.logoImageId || null,

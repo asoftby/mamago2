@@ -7,7 +7,7 @@ import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpa
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
-import { getBusinessQualityBoostMap, applyBusinessQualityBoost } from "@/server/services/ranking/businessQualityBoost";
+import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
 import {
   getWeatherRankingBoost,
   type HomeWeatherScenario,
@@ -15,6 +15,15 @@ import {
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+
+export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters }) {
+  const now = new Date();
+  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
+  const pub = getPublicListingActivityWhere(now);
+  const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
+  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), activityInAnyOfCitiesWhere(expandedCityIds), ...buildEventRuntimeWhere(options.eventFilters), ...pubParts] };
+  return { where, primaryCityId };
+}
 
 /**
  * Опубликованные события (EVENT) в городе для ленты «Куда пойти».
@@ -38,29 +47,18 @@ export async function getKudaDiscoveryFeed(
 ): Promise<ActivityMock[]> {
   /** Больше кандидатов в ответе — клиент ранжирует по возрасту + показывает второй слой по engagement. */
   const take = options?.take ?? 80;
-  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
-  const pub = getPublicListingActivityWhere();
-  const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
-
-  const where: Prisma.ActivityWhereInput = {
-    AND: [
-      { type: ActivityType.EVENT },
-      ...(options?.format
-        ? [{ format: options.format }]
-        : options?.nearby
-          ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }]
-          : []),
-      activityInAnyOfCitiesWhere(expandedCityIds),
-      ...buildEventRuntimeWhere(options?.eventFilters ?? {
+  const now = new Date();
+  const runtimeFilters = options?.eventFilters ?? {
+        categorySlugs: [],
+        genreSlugs: [],
         dateRange: null,
         free: false,
+        priceMax: null,
         districtId: null,
         metroId: null,
         adultOnly: false,
-      }),
-      ...pubParts,
-    ],
-  };
+      };
+  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters });
 
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
   const GALLERY_FOR_COVER = 40;
@@ -80,6 +78,10 @@ export async function getKudaDiscoveryFeed(
       eventCategory: { select: { nameRu: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
+      boosts: {
+        where: { startAt: { lte: now }, endAt: { gt: now } },
+        select: { id: true },
+      },
     },
   });
 
@@ -121,8 +123,13 @@ export async function getKudaDiscoveryFeed(
 
   const cards = rows.map((a) => {
     const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
+    const isBoosted = a.boosts.length > 0;
     const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
-    const finalEngagement = applyBusinessQualityBoost(baseEngagement, qualityMultiplier);
+    const finalEngagement = applyActivePublicationBoost(
+      baseEngagement,
+      isBoosted,
+      qualityMultiplier,
+    );
 
     return mapDiscoveryEventToActivityMock(a, {
       ownerFirst: Boolean(currentUserId && a.ownerUserId === currentUserId),
@@ -149,4 +156,13 @@ export async function getKudaDiscoveryFeed(
   });
 
   return cards.slice(0, take);
+}
+
+export async function countKudaDiscoveryEvents(
+  cityId: string,
+  citySlug: string,
+  options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters },
+): Promise<number> {
+  const { where } = await buildKudaDiscoveryWhere(cityId, citySlug, options);
+  return prisma.activity.count({ where });
 }

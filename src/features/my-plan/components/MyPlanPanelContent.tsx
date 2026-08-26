@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
 import { useMyPlan } from "../hooks/useMyPlan";
 import { PlanMainContent } from "./PlanMainContent";
 import { GuestMyPlanPanel } from "./GuestMyPlanPanel";
@@ -43,11 +44,47 @@ export function MyPlanPanelContent({
     suggestionsLoading,
     addActivityToPlanFromSuggestion,
     refetchPlanForDate,
+    refetchPlanSummary,
   } = useMyPlan();
 
   const { isAuthenticated, isLoading: authMeLoading } = useAuthMe();
 
   const [isDateLoading, setIsDateLoading] = useState(false);
+
+  /**
+   * Recovery bridge for guest "Подбери за меня" -> auth.
+   * The main post-auth pipeline performs the same idempotent migration earlier;
+   * this retry covers interrupted navigation/auth-cookie races. The local draft
+   * is cleared only after every explicitly committed card is saved by the API.
+   */
+  useEffect(() => {
+    if (!open || !isAuthenticated || authMeLoading) return;
+    let cancelled = false;
+
+    void migrateGuestMyPlanAfterAuth()
+      .then((result) => {
+        if (cancelled || result.migratedCount === 0) return;
+        if (result.selectedDate) {
+          setSelectedPlanDate(result.selectedDate);
+          void refetchPlanForDate(result.selectedDate);
+        }
+        void refetchPlanSummary();
+      })
+      .catch((error) => {
+        console.error("[my-plan] guest plan recovery migration failed", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    isAuthenticated,
+    authMeLoading,
+    setSelectedPlanDate,
+    refetchPlanForDate,
+    refetchPlanSummary,
+  ]);
 
   /** Подтягиваем план с сервера при открытии и при смене даты — только для авторизованных */
   useEffect(() => {

@@ -42,10 +42,12 @@ export const UI_LAB_REGISTRY: Record<string, ComponentUsageMeta> = {
     status: "rendered",
     usedIn: [
       "src/features/save/SaveHeart.tsx",
-      "src/features/save/ScheduleModal.tsx",
-      "src/app/(ui)/ui-lab/_sections/ActivitySection.tsx",
+      "src/features/save/ArticleSaveHeart.tsx",
+      "src/features/save/PlaceSaveHeart.tsx",
+      "src/components/activity/SaveActivityFlowAdaptive.tsx",
+      "src/app/(ui)/ui-lab/_sections/SaveModalSection.tsx",
     ],
-    description: "Modal for saving activities to user's plan",
+    description: "Modal for saving activities/articles/places to user's plan or ideas",
   },
   
   "opening-hours-preview": {

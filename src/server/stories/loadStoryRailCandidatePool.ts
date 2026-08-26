@@ -6,6 +6,7 @@ import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import { buildDateRangeWhere, buildOfferSessionOccurrenceWhere } from "@/lib/stories/dateRangeWhere";
 import type { DateRange } from "@/lib/stories/types";
 import type { ActivityParentClass, StoryRailCandidatePool } from "@/lib/stories/classify";
+import { isStructuredFreeEvent } from "@/server/discovery/eventFilterSemantics";
 import {
   isSerialBySessionSpan,
   sessionSpanDays,
@@ -89,6 +90,9 @@ export async function loadStoryRailCandidatePool(input: {
               placeId: true,
               coverImageId: true,
               coverImageUrl: true,
+              priceFrom: true,
+              priceText: true,
+              scheduleJson: true,
               venue: { select: { placeId: true } },
             },
           },
@@ -110,6 +114,7 @@ export async function loadStoryRailCandidatePool(input: {
               title: true,
               placeId: true,
               coverImage: true,
+              priceFrom: true,
             },
           },
         },
@@ -129,6 +134,7 @@ export async function loadStoryRailCandidatePool(input: {
           title: true,
           placeId: true,
           coverImage: true,
+          priceFrom: true,
         },
       }),
       prisma.activity.findMany({
@@ -160,6 +166,9 @@ export async function loadStoryRailCandidatePool(input: {
           placeId: true,
           coverImageId: true,
           coverImageUrl: true,
+          priceFrom: true,
+          priceText: true,
+          scheduleJson: true,
           venue: { select: { placeId: true } },
         },
       }),
@@ -315,6 +324,7 @@ export async function loadStoryRailCandidatePool(input: {
         coverImageUrl: s.activity.coverImageUrl,
       }),
       parentClass: parentClassFor(s.activityId),
+      isFree: isStructuredFreeEvent(s.activity),
     })),
     activityOrphans: orphanActivities
       .filter((a): a is typeof a & { nextOccurrenceAt: Date } => Boolean(a.nextOccurrenceAt))
@@ -330,6 +340,7 @@ export async function loadStoryRailCandidatePool(input: {
         }),
         hasSessionInUnion: activityIdsWithSession.has(a.id),
         parentClass: parentClassFor(a.id),
+        isFree: isStructuredFreeEvent(a),
       })),
     offerSessions: offerSessions.map((s) => ({
       id: s.id,
@@ -341,6 +352,7 @@ export async function loadStoryRailCandidatePool(input: {
         id: s.offerId,
         coverImage: s.offer.coverImage,
       }),
+      isFree: s.offer.priceFrom === 0,
     })),
     ongoingOffers: ongoingOffers.map((o) => ({
       id: o.id,
@@ -353,6 +365,7 @@ export async function loadStoryRailCandidatePool(input: {
         coverImage: o.coverImage,
       }),
       hasSessions: false,
+      isFree: o.priceFrom === 0,
     })),
   };
 }

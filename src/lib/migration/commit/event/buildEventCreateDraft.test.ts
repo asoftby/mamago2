@@ -53,6 +53,7 @@ function testHappyPath() {
   assert.equal(result.draft.organizerId, null);
   assert.equal(result.draft.eventCategoryId, null);
   assert.equal(result.draft.scheduleMode, "ONE_TIME");
+  assert.equal(result.draft.schedulingKind, null, "ambiguous importer data must remain UNKNOWN");
   assert.deepEqual(result.draft.scheduleJson, { mode: "ONE_TIME", dates: ["2026-08-15T10:00:00.000Z"] });
   assert.equal(result.draft.priceText, "10 BYN");
 }
@@ -212,6 +213,7 @@ function testDraftHasExactlyTheApprovedFieldSet() {
       "organizerId",
       "eventCategoryId",
       "scheduleMode",
+      "schedulingKind",
       "scheduleJson",
       "priceText",
       "venue",

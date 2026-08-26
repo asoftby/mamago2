@@ -25,7 +25,10 @@ import { MediaKindBadge } from "@/components/admin/media/MediaKindBadge";
 import { MediaPreview } from "@/components/admin/media/MediaPreview";
 import { formatBytes } from "@/lib/media/formatBytes";
 import { resolveDisplayFilename } from "@/lib/media/resolveDisplayFilename";
-import { resolveEffectiveMetadata } from "@/lib/media/generateMediaMetadata";
+import {
+  mediaEntityTypeBadgeLabel,
+  resolveAdminMediaListTitle,
+} from "@/lib/media/mediaTitleOwnership";
 import { pluralRu } from "@/lib/i18n/pluralRu";
 import { cn } from "@/lib/utils";
 import { TableContainer } from "@/components/ui/table";
@@ -215,31 +218,12 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
                   mimeType: media.mimeType,
                 });
 
-                const displayOriginalName = resolveDisplayFilename({
-                  filename: media.originalName ?? "",
-                  extension: media.extension,
-                  mimeType: media.mimeType,
+                // Primary: MediaAsset.title → canonical filename. Never originalName.
+                const displayTitle = resolveAdminMediaListTitle({
+                  title: media.title,
+                  filename: displayFilename,
                 });
-
-                const usageContext =
-                  media.usages.length > 0
-                    ? {
-                        entityType: media.usages[0].entityType,
-                        entityTitle: undefined,
-                      }
-                    : undefined;
-
-                const effectiveMetadata = resolveEffectiveMetadata(
-                  {
-                    title: media.title,
-                    alt: media.alt,
-                    caption: media.caption,
-                    filename: displayFilename,
-                  },
-                  usageContext
-                );
-
-                const displayTitle = effectiveMetadata.title || displayFilename;
+                const entityBadge = mediaEntityTypeBadgeLabel(media.usages[0]?.entityType);
                 const isRowSelected = selectedIds.includes(media.id);
 
                 return (
@@ -277,13 +261,18 @@ export function AdminMediaTableClient({ items }: { items: AdminMediaTableRow[] }
                           >
                             {displayTitle}
                           </Link>
+                          {entityBadge && (
+                            <span className="inline-flex shrink-0 items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
+                              {entityBadge}
+                            </span>
+                          )}
                           {media.status === "ARCHIVED" && (
                             <span className="inline-flex shrink-0 items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
                               Архивный
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 truncate">{displayOriginalName}</p>
+                        <p className="text-xs text-gray-500 truncate font-mono">{displayFilename}</p>
                       </div>
                     </td>
                     <td className="px-4 py-3">

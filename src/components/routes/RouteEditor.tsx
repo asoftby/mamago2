@@ -289,7 +289,7 @@ function Step1({
                 : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400",
             )}
           >
-            Только 18+
+            #nokids
           </button>
         </div>
       </div>

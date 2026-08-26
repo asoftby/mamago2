@@ -4,6 +4,7 @@ import Link from "next/link";
 import { MediaCover } from "@/components/ui/media-cover";
 import { AssignScenarioTimeControl } from "./AssignScenarioTimeControl";
 import type { ActivityAddressLabel } from "@/features/my-plan/lib/formatActivityAddress";
+import type { ScenarioConflict } from "@/features/my-plan/lib/detectScenarioConflicts";
 
 export type ScenarioTimelineItem = {
   id: string;
@@ -16,14 +17,13 @@ export type ScenarioTimelineItem = {
   isFlexible: boolean;
   /** "HH:MM" if a Scenario override time is currently assigned. */
   overrideTime: string | null;
-  hasConflict: boolean;
-  conflictOverlapMinutes: number | null;
   /** Free time between the previous item and this one, in minutes. */
   freeGapBeforeMinutes: number | null;
 };
 
 type ScenarioTimelineProps = {
   items: ScenarioTimelineItem[];
+  conflicts: ScenarioConflict[];
   city: string;
   date: string;
 };
@@ -52,9 +52,23 @@ function GapBlock({ minutes }: { minutes: number }) {
   );
 }
 
-export function ScenarioTimeline({ items, city, date }: ScenarioTimelineProps) {
+export function ScenarioTimeline({ items, conflicts, city, date }: ScenarioTimelineProps) {
+  const titleById = new Map(items.map((item) => [item.id, item.title]));
   return (
     <div className="relative">
+      {conflicts.map((conflict) => (
+        <div
+          key={conflict.key}
+          className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <p className="text-sm font-medium text-amber-800">
+            Два события пересекаются по времени
+          </p>
+          <p className="mt-1 text-xs text-amber-700/80">
+            {conflict.itemIds.map((id) => titleById.get(id) ?? id).join(" · ")}
+          </p>
+        </div>
+      ))}
       <div className="absolute left-[19px] top-2 bottom-2 w-px bg-neutral-200" />
       <div className="space-y-1">
         {items.map((item, index) => {
@@ -104,14 +118,6 @@ export function ScenarioTimeline({ items, city, date }: ScenarioTimelineProps) {
                         {item.durationMinutes != null ? (
                           <p className="mt-1 text-xs font-medium uppercase tracking-wide text-neutral-400">
                             {formatDurationLabel(item.durationMinutes)}
-                          </p>
-                        ) : null}
-                        {item.hasConflict ? (
-                          <p className="mt-1.5 text-sm font-medium text-amber-600">
-                            ⚠ Время пересекается
-                            {item.conflictOverlapMinutes
-                              ? ` на ${formatDurationLabel(item.conflictOverlapMinutes)}`
-                              : ""}
                           </p>
                         ) : null}
                         {item.isFlexible ? (

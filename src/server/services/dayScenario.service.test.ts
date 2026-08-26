@@ -82,6 +82,21 @@ async function main() {
       computePlanFingerprint([{ id: "x", startsAt: new Date("2026-09-01T11:00:00Z") }]),
       "fingerprint must change when startsAt changes",
     );
+    assert.notEqual(
+      computePlanFingerprint([{ ...a, activityId: "activity-a", date }]),
+      computePlanFingerprint([{ ...a, activityId: "activity-b", date }]),
+      "fingerprint must change when replacement content changes",
+    );
+    assert.notEqual(
+      computePlanFingerprint([a]),
+      computePlanFingerprint([a], new Map([[a.id, new Date("2026-09-01T12:00:00Z")]])),
+      "fingerprint must change when a scenario override changes",
+    );
+    assert.notEqual(
+      computePlanFingerprint([a]),
+      computePlanFingerprint([a], new Map(), ["TIME_OVERLAP:a@A:b@B"]),
+      "fingerprint must change when accepted conflicts change",
+    );
 
     // ── ensureDayScenario: create, idempotent, no duplicate row ──
     assert.equal(await getDayScenario(userA, date), null, "starts unscheduled");

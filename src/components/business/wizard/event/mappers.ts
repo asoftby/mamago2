@@ -172,6 +172,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
   // Step 1: Basics
   formData.title = event.title || "";
   formData.format = normalizeActivityFormat(event.format, DEFAULT_ACTIVITY_FORMAT);
+  formData.schedulingKind = event.schedulingKind ?? null;
   const scheduleJson = (event.scheduleJson || {}) as Record<string, unknown>;
   const persistedAgeRangeIds = normalizeAgeKeys(scheduleJson.ageRangeIds);
   const derivedSavedAgeBuckets = deriveSavedAgeBuckets(event);
@@ -637,6 +638,7 @@ type EventPayload = {
   description: string;
   type: "EVENT";
   format: ActivityFormat;
+  schedulingKind: "SLOT" | "WINDOW" | null;
   ageLabel: string | null;
   ageMaxMonths: number | null;
   ageMinMonths: number | null;
@@ -743,6 +745,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
 
     type: "EVENT",
     format: normalizeActivityFormat(data.format, DEFAULT_ACTIVITY_FORMAT),
+    schedulingKind: data.schedulingKind,
 
     ageLabel,
     ageMinMonths: ageRange?.minMonths ?? null,
@@ -910,6 +913,7 @@ type EventChanges = {
   title?: string;
   description?: string;
   format?: ActivityFormat;
+  schedulingKind?: "SLOT" | "WINDOW" | null;
   ageTags?: string[];
   agePolicy?: import("@prisma/client").AgePolicy;
   coverImageId?: string | null;
@@ -940,6 +944,10 @@ export function extractChanges(current: EventFormData, original: EventFormData):
 
   if (current.format !== original.format) {
     changes.format = current.format;
+  }
+
+  if (current.schedulingKind !== original.schedulingKind) {
+    changes.schedulingKind = current.schedulingKind;
   }
 
   if (JSON.stringify(current.ageTags) !== JSON.stringify(original.ageTags)) {

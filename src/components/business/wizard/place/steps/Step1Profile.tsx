@@ -360,7 +360,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
               })),
               {
                 id: "adult-only",
-                label: "Только 18+",
+                label: "#nokids",
                 active: data.agePolicy === AgePolicy.ADULT_ONLY,
                 disabled: !isEditable,
                 onClick: () => {

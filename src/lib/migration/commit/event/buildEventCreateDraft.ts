@@ -209,6 +209,7 @@ export function buildEventCreateDraft(input: BuildEventCreateDraftInput): EventC
     organizerId: context.organizerId ?? null,
     eventCategoryId: context.eventCategoryId ?? null,
     scheduleMode: candidate.scheduleDraft!.mode,
+    schedulingKind: null,
     scheduleJson: candidate.scheduleDraft!,
     priceText: candidate.priceRaw,
     venue: buildVenueDraft(candidate, context),

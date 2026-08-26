@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Zap } from "lucide-react";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { cn } from "@/lib/utils";
+import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 
 interface DashboardActionStackProps {
   promotionHref: string;
@@ -25,13 +26,13 @@ export function DashboardActionStack({
             onClick={onClick}
             className="w-full rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98]"
           >
-            Создать объявление
+            Создать публикацию
           </button>
         )}
       />
 
       {/* Secondary: Promote */}
-      {hasPublications ? (
+      {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && (hasPublications ? (
         <Link
           href={promotionHref}
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]"
@@ -59,7 +60,7 @@ export function DashboardActionStack({
             First PROD: платный Boost доступен только для опубликованных Offers
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

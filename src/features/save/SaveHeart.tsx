@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Heart } from "lucide-react";
 import { toast } from "@/lib/toast";
@@ -9,6 +9,7 @@ import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
 type SaveHeartProps = {
   activityId: string;
@@ -59,6 +60,7 @@ export function SaveHeart({
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [eventPlanDateOptions, setEventPlanDateOptions] = useState<string[]>([]);
+  const hasOpenedOnceRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState({
     isIdea: false,
     inPlan: false,
@@ -71,10 +73,21 @@ export function SaveHeart({
   const normalizedEventPlanDateISO = normalizePlanDateISO(eventPlanDateISO);
 
   const checkSaveStatus = useCallback(async () => {
+    if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
+      setSaveStatus({
+        isIdea: false,
+        inPlan: false,
+        planDate: null,
+        planStartsAt: null,
+        planItemId: null,
+      });
+      return;
+    }
+
     try {
       const statusQuery = offerId
-        ? `offerId=${offerId}`
-        : `activityId=${activityId}`;
+        ? `offerId=${encodeURIComponent(offerId)}`
+        : `activityId=${encodeURIComponent(activityId)}`;
       const res = await fetch(`/api/save/status?${statusQuery}`);
       if (!res.ok) return;
       const data = await res.json();
@@ -88,16 +101,20 @@ export function SaveHeart({
     } catch (error) {
       console.error("Failed to check save status:", error);
     }
-  }, [activityId, offerId]);
+  }, [activityId, offerId, isAuthenticated]);
 
   useEffect(() => {
     void checkSaveStatus();
   }, [checkSaveStatus]);
 
-  // Обновляем статус только после закрытия модалки (не во время),
-  // чтобы избежать мигания при перерисовке до закрытия.
+  // Обновляем статус только после того, как пользователь реально открыл и закрыл модалку.
+  // На первом рендере отдельный эффект выше уже загрузил статус, поэтому повторный GET не нужен.
   useEffect(() => {
-    if (flowOpen) return;
+    if (flowOpen) {
+      hasOpenedOnceRef.current = true;
+      return;
+    }
+    if (!shouldRefetchAfterFlowClose({ flowOpen, hasOpenedOnce: hasOpenedOnceRef.current })) return;
     void checkSaveStatus();
   }, [flowOpen, checkSaveStatus]);
 
@@ -158,7 +175,7 @@ export function SaveHeart({
         setIsLoading(false);
       }
     },
-    [activityId, offerId, activityTitle, coverImageUrl, checkSaveStatus, onSaveChange],
+    [activityId, offerId, activityTitle, coverImageUrl, onSaveChange],
   );
 
   const triggerAnimation = () => {

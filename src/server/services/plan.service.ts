@@ -52,6 +52,7 @@ export type PlanItemWithActivity = {
   planRouteSlug?: string | null;
   placeId?: string | null;
   planPlaceSlug?: string | null;
+  articleId?: string | null;
   date: string;
   startsAt: Date | null;
   title: string | null;
@@ -95,6 +96,30 @@ export type PlanItemWithActivity = {
 export type PlanReminderCandidate = PlanItemWithActivity;
 
 /**
+ * Current number of users who have each activity in My Plan.
+ * PlanItem is the source of truth: removing an item lowers the count, while
+ * moving/re-adding the same activity for another date still counts one user.
+ */
+export async function countPlanUsersByActivity(
+  activityIds: string[],
+): Promise<Map<string, number>> {
+  if (activityIds.length === 0) return new Map();
+
+  const rows = await prisma.planItem.findMany({
+    where: { activityId: { in: activityIds } },
+    select: { activityId: true, userId: true },
+    distinct: ["activityId", "userId"],
+  });
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.activityId) continue;
+    counts.set(row.activityId, (counts.get(row.activityId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
  * Candidate for tomorrow's plan digest notification.
  * Reuses PlanItemWithActivity shape which covers all fields needed
  * for building digest context (activity title, place, venue, city, startsAt).
@@ -114,7 +139,7 @@ export async function addPlanItem(
   startsAt?: Date,
   title?: string,
   coverImageUrl?: string
-): Promise<{ id: string }> {
+): Promise<{ id: string; created: boolean }> {
   // Only deduplicate when activityId is present
   if (activityId) {
     const existing = await prisma.planItem.findFirst({
@@ -122,18 +147,20 @@ export async function addPlanItem(
       select: { id: true },
     });
     if (existing) {
-      return await prisma.planItem.update({
+      const updated = await prisma.planItem.update({
         where: { id: existing.id },
         data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
         select: { id: true },
       });
+      return { ...updated, created: false };
     }
   }
 
-  return await prisma.planItem.create({
+  const created = await prisma.planItem.create({
     data: { userId, activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
     select: { id: true },
   });
+  return { ...created, created: true };
 }
 
 /**

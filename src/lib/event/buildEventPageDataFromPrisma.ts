@@ -13,6 +13,7 @@ import {
   getActivityFormatLabel,
 } from "@/domain/activities/activity-format";
 import { ageFromPlusBadgeFromAgeTags } from "@/lib/event/activityAgeBounds";
+import { formatAgeTagsCompact } from "@/lib/config/ages";
 import { getActivityDateDisplay } from "@/lib/event/getActivityDateDisplay";
 import { getNormalizedPhones, type NormalizedPhone } from "@/lib/phones/normalizePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
@@ -289,7 +290,7 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   // 02 Возраст
   const ageBadge = activity.agePolicy === "ADULT_ONLY"
     ? "Только 18+"
-    : ageFromPlusBadgeFromAgeTags(activity.ageTags);
+    : formatAgeTagsCompact(activity.ageTags) ?? ageFromPlusBadgeFromAgeTags(activity.ageTags);
   if (ageBadge) {
     rows.push({
       id: "age",
@@ -490,7 +491,7 @@ export function buildEventPageDataFromPrismaActivity(
     citySlug,
     isPastEvent,
     discoveryIntent: discoveryIntentForActivity(),
-    ageFromBadge: activity.agePolicy === "ADULT_ONLY" ? "18+" : ageFromPlusBadgeFromAgeTags(activity.ageTags),
+    ageFromBadge: activity.agePolicy === "ADULT_ONLY" ? "18+" : formatAgeTagsCompact(activity.ageTags) ?? ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
     title: activity.title,
     subtitle: activity.shortDesc,

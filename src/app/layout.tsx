@@ -20,8 +20,9 @@ import {
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
-  title: "mamaGo 2.0",
-  description: "Next Generation City Guide",
+  title: "mamaGo — помощник для семейного отдыха и развития",
+  description:
+    "mamaGo — удобный помощник в организации семейного отдыха и развития: события, места, занятия, маршруты и идеи для времени с детьми.",
 });
 
 export const viewport: Viewport = {
