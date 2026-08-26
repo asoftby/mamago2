@@ -1,5 +1,7 @@
 import type { StoryCollection, StoryItem } from "../types/story";
 
+const PUBLIC_STORY_ITEM_LIMIT = 5;
+
 /**
  * `running` is an internal serial-program source, not a public navigation
  * concept. Its registry range is the current city day, so every item from that
@@ -31,7 +33,8 @@ function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
  * Public Stories presentation rules.
  *
  * - one temporal circle: «Сегодня»;
- * - serial `running` inventory is merged into it;
+ * - point/occurrence Today items stay first; serial `running` items fill gaps;
+ * - merged Today keeps the existing 5-item public collection limit;
  * - legacy «Идёт сейчас» wording does not leak into the public viewer;
  * - contextual/editorial circles (`free`, `lastchance`, `breaking_news`)
  *   retain their canonical order and content.
@@ -42,7 +45,10 @@ export function resolvePublicStoryPresentation(
   const today = collections.find((collection) => collection.intent === "today");
   const running = collections.find((collection) => collection.intent === "running");
   const runningTodayItems = running?.items.map(normalizeRunningTodayItem) ?? [];
-  const todayItems = dedupeItems([...(today?.items ?? []), ...runningTodayItems]);
+  const todayItems = dedupeItems([...(today?.items ?? []), ...runningTodayItems]).slice(
+    0,
+    PUBLIC_STORY_ITEM_LIMIT,
+  );
 
   const temporalIndexes = collections
     .map((collection, index) => ({ collection, index }))
