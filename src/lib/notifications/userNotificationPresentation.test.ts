@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 
-import { wouldDisableLastSystemNotificationChannel } from "./userNotificationPresentation";
+import {
+  getUserNotificationMatrixDefinitions,
+  wouldDisableLastSystemNotificationChannel,
+} from "./userNotificationPresentation";
+
+{
+  assert.deepEqual(
+    getUserNotificationMatrixDefinitions().map((item) => item.title),
+    ["План", "Рекомендации", "Новое и интересное", "Аккаунт"],
+  );
+}
 
 {
   assert.equal(

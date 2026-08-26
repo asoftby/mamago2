@@ -2,7 +2,6 @@ import type { NotificationChannel, NotificationType } from "@prisma/client";
 import type { LucideIcon } from "lucide-react";
 import {
   BellRing,
-  CalendarClock,
   Lock,
   Sparkles,
   Target,
@@ -19,12 +18,6 @@ export type UserNotificationMatrixDefinition = {
 };
 
 export const USER_NOTIFICATION_MATRIX_DEFINITIONS: readonly UserNotificationMatrixDefinition[] = [
-  {
-    notificationType: "PLAN_TOMORROW_DIGEST",
-    title: "Завтра в плане",
-    description: "Ежедневный Telegram-digest о событиях на завтра",
-    icon: CalendarClock,
-  },
   {
     notificationType: "REMINDER",
     title: "План",

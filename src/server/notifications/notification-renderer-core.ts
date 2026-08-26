@@ -5,34 +5,38 @@ import type {
   RenderedNotificationContent,
   SendNotificationContext,
 } from "@/lib/notifications/domainContracts";
+import { DEFAULT_NOTIFICATION_TIME_ZONE } from "@/lib/notifications/userNotificationSchedule";
 
-const MINSK_TIME_ZONE = "Europe/Minsk";
-
-export function formatTime(date: Date): string {
+export function formatTime(
+  date: Date,
+  timeZone: string = DEFAULT_NOTIFICATION_TIME_ZONE,
+): string {
   return new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: MINSK_TIME_ZONE,
+    timeZone,
   }).format(date);
 }
 
-export function formatDateKey(date: Date): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
+export function formatDateKey(
+  date: Date,
+  timeZone: string = DEFAULT_NOTIFICATION_TIME_ZONE,
+): string {
+  return new Intl.DateTimeFormat("en-CA", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    timeZone: MINSK_TIME_ZONE,
-  });
-
-  return formatter.format(date);
+    timeZone,
+  }).format(date);
 }
 
 function renderPlanEvent2hBefore(
   context: SendNotificationContext,
 ): RenderedNotificationContent {
   const planContext = context as PlanEventReminderContext;
-  const startsAtLabel = formatTime(planContext.startsAt);
-  const ctaUrl = `/me/day/${formatDateKey(planContext.startsAt)}`;
+  const timeZone = planContext.timeZone ?? DEFAULT_NOTIFICATION_TIME_ZONE;
+  const startsAtLabel = formatTime(planContext.startsAt, timeZone);
+  const ctaUrl = `/me/day/${formatDateKey(planContext.startsAt, timeZone)}`;
 
   return {
     title: "Скоро событие",
@@ -42,15 +46,21 @@ function renderPlanEvent2hBefore(
   };
 }
 
-function renderDigestLine(item: PlanTomorrowDigestContext["items"][number]): string {
-  const timeLabel = item.startsAt ? `${formatTime(item.startsAt)} — ` : "";
+function renderDigestLine(
+  item: PlanTomorrowDigestContext["items"][number],
+  timeZone: string,
+): string {
+  const timeLabel = item.startsAt ? `${formatTime(item.startsAt, timeZone)} — ` : "";
   const titleLine = `${timeLabel}${item.eventTitle}`;
   if (!item.placeName) return titleLine;
   return `${titleLine}\n📍 ${item.placeName}`;
 }
 
 /** Готовый текст позиций дайджеста — переиспользуется шаблонным payload-builder'ом. */
-export function buildDigestItemsText(items: PlanTomorrowDigestContext["items"]): string {
+export function buildDigestItemsText(
+  items: PlanTomorrowDigestContext["items"],
+  timeZone: string = DEFAULT_NOTIFICATION_TIME_ZONE,
+): string {
   return items
     .slice()
     .sort((left, right) => {
@@ -58,14 +68,17 @@ export function buildDigestItemsText(items: PlanTomorrowDigestContext["items"]):
       const rightTs = right.startsAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
       return leftTs - rightTs;
     })
-    .map(renderDigestLine)
+    .map((item) => renderDigestLine(item, timeZone))
     .join("\n\n");
 }
 
 function renderPlanTomorrowDigest(
   context: PlanTomorrowDigestContext,
 ): RenderedNotificationContent {
-  const body = buildDigestItemsText(context.items);
+  const body = buildDigestItemsText(
+    context.items,
+    context.timeZone ?? DEFAULT_NOTIFICATION_TIME_ZONE,
+  );
 
   return {
     title: "Завтра в плане",

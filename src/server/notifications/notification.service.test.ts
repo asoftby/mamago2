@@ -141,7 +141,7 @@ function baseDeps(params: {
       preferences: { IN_APP: true, EMAIL: true, TELEGRAM: true },
       telegramConnected: true,
     }),
-    "TELEGRAM",
+    "BOTH",
   );
   assert.equal(
     resolveExternalChannelChoiceCore({
@@ -170,8 +170,9 @@ void (async () => {
 
     assert.equal(result.status, "SENT");
     assert.equal(result.notificationId, "notif_1");
-    assert.deepEqual(events, ["in-app", "telegram"]);
+    assert.deepEqual(events, ["in-app", "telegram", "email"]);
     assert.equal(result.deliveries[1]?.channel, "TELEGRAM");
+    assert.equal(result.deliveries[2]?.channel, "EMAIL");
   }
 
   {
