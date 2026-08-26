@@ -7,17 +7,27 @@ import { Button } from "@/components/ui/button";
 import type { NodeKey, NodeState } from "@/server/ops/types";
 import { formatFreshness } from "../_lib/operationsSignalPresentation";
 import { OperationsBlock, type DashboardSignal } from "./OperationsBlock";
-import { TrafficBlock } from "./blocks/TrafficBlock";
 import { ProductPulseBlock } from "./blocks/ProductPulseBlock";
-import { EngagementBlock } from "./blocks/EngagementBlock";
+import { NorthStarBlock } from "./blocks/NorthStarBlock";
+import { HabitBlock } from "./blocks/HabitBlock";
+import { FunnelBlock } from "./blocks/FunnelBlock";
+import { GrowthBlock } from "./blocks/GrowthBlock";
 import { SearchDiscoveryBlock } from "./blocks/SearchDiscoveryBlock";
+import { SupplyHealthBlock } from "./blocks/SupplyHealthBlock";
+import { B2BHealthBlock } from "./blocks/B2BHealthBlock";
 import { OperationalLoadBlock } from "./blocks/OperationalLoadBlock";
-import type { TrafficViewModel } from "@/server/admin/getTrafficViewModel";
+import { DataQualityBlock } from "./blocks/DataQualityBlock";
 import type {
   ProductPulseViewModel,
-  EngagementViewModel,
-  SearchDiscoveryViewModel,
+  NorthStarViewModel,
+  HabitViewModel,
+  EngagementFunnelViewModel,
+  GrowthViewModel,
+  DiscoveryQualityViewModel,
+  SupplyHealthViewModel,
+  B2BHealthViewModel,
   WorkloadViewModel,
+  DataQualityViewModel,
 } from "@/lib/admin/dashboardViewModels";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -34,15 +44,20 @@ export interface AdminDashboardShellProps {
   serverNow: Date;
   /** Server-computed via isProductionAppEnv() — never inferred client-side. */
   isDev: boolean;
-  // Product blocks — pre-derived view-models, sourced from the SAME
-  // single getOperationsView() call (kpis/queues) plus one small bounded
-  // Traffic query. Never re-fetched client-side; a refresh re-runs the
-  // whole Server Component tree via router.refresh().
-  traffic: TrafficViewModel;
+  // Product blocks — pre-derived view-models, sourced entirely from the
+  // SAME single getOperationsView() call's kpis/queues. Never re-fetched
+  // client-side; a refresh re-runs the whole Server Component tree via
+  // router.refresh().
   product: ProductPulseViewModel;
-  engagement: EngagementViewModel;
-  search: SearchDiscoveryViewModel;
+  northStar: NorthStarViewModel;
+  habit: HabitViewModel;
+  funnel: EngagementFunnelViewModel;
+  growth: GrowthViewModel;
+  search: DiscoveryQualityViewModel;
+  supply: SupplyHealthViewModel;
+  b2b: B2BHealthViewModel;
   workload: WorkloadViewModel;
+  dataQuality: DataQualityViewModel;
 }
 
 export function AdminDashboardShell({
@@ -55,11 +70,16 @@ export function AdminDashboardShell({
   canResolve,
   serverNow,
   isDev,
-  traffic,
   product,
-  engagement,
+  northStar,
+  habit,
+  funnel,
+  growth,
   search,
+  supply,
+  b2b,
   workload,
+  dataQuality,
 }: AdminDashboardShellProps) {
   const router = useRouter();
   const [now, setNow] = useState(serverNow);
@@ -110,28 +130,54 @@ export function AdminDashboardShell({
         </div>
       </div>
 
-      {/* Block 1 — Operations: full width, visually dominant */}
-      <OperationsBlock
-        stale={stale}
-        nodes={nodes}
-        staleSyntheticTitle={staleSyntheticTitle}
-        signals={signals}
-        previousLastViewedAt={previousLastViewedAt}
-        canResolve={canResolve}
-        now={now}
-        isDev={isDev}
-      />
-
-      {/* Blocks 2-6 — the quieter modular product grid */}
+      {/* Row 1 — Company Pulse: audience + North Star */}
       <div>
-        <h2 className="text-base font-semibold text-gray-700 mb-3">Сводка продукта</h2>
+        <h2 className="text-base font-semibold text-gray-700 mb-3">Company Pulse</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <TrafficBlock model={traffic} />
           <ProductPulseBlock model={product} />
-          <EngagementBlock model={engagement} />
-          <SearchDiscoveryBlock model={search} />
-          <OperationalLoadBlock model={workload} />
+          <NorthStarBlock model={northStar} />
         </div>
+      </div>
+
+      {/* Row 2 — Habit & retention */}
+      <HabitBlock model={habit} />
+
+      {/* Row 3 — Core value funnel */}
+      <FunnelBlock model={funnel} />
+
+      {/* Row 4 — Growth */}
+      <GrowthBlock model={growth} />
+
+      {/* Row 5 — Discovery + Supply */}
+      <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SearchDiscoveryBlock model={search} />
+          <SupplyHealthBlock model={supply} />
+        </div>
+      </div>
+
+      {/* Row 6 — B2B health */}
+      <B2BHealthBlock model={b2b} />
+
+      {/* Row 7 — Operations + Data Quality (moved from top per product spec:
+          audience -> activation -> planning -> habit -> growth -> supply ->
+          B2B -> operations/data-quality last) */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-700 mb-3">Operations & Data Quality</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <OperationalLoadBlock model={workload} />
+          <DataQualityBlock model={dataQuality} />
+        </div>
+        <OperationsBlock
+          stale={stale}
+          nodes={nodes}
+          staleSyntheticTitle={staleSyntheticTitle}
+          signals={signals}
+          previousLastViewedAt={previousLastViewedAt}
+          canResolve={canResolve}
+          now={now}
+          isDev={isDev}
+        />
       </div>
     </div>
   );

@@ -5,47 +5,51 @@
 import assert from "node:assert/strict";
 import { ADMIN_DASHBOARD_BLOCKS, getEnabledDashboardBlocks, getDashboardBlock } from "./dashboardBlocks";
 
+const ENABLED_IDS = [
+  "product",
+  "northStar",
+  "habit",
+  "funnel",
+  "growth",
+  "search",
+  "supply",
+  "b2b",
+  "workload",
+  "dataQuality",
+  "operations",
+] as const;
+const DISABLED_IDS = ["traffic", "engagement", "finance"] as const;
+
 function main() {
   const ids = ADMIN_DASHBOARD_BLOCKS.map((b) => b.id);
   assert.deepEqual(
-    ids,
-    ["operations", "traffic", "product", "engagement", "search", "workload", "retention", "finance"],
-    "exact 8 frozen block ids, in registry order",
+    ids.slice().sort(),
+    [...ENABLED_IDS, ...DISABLED_IDS].slice().sort(),
+    "registry must contain exactly the expected frozen block ids",
   );
 
   const byId = Object.fromEntries(ADMIN_DASHBOARD_BLOCKS.map((b) => [b.id, b]));
-  assert.equal(byId.operations.order, 10);
-  assert.equal(byId.traffic.order, 20);
-  assert.equal(byId.product.order, 30);
-  assert.equal(byId.engagement.order, 40);
-  assert.equal(byId.search.order, 50);
-  assert.equal(byId.workload.order, 60);
-  assert.equal(byId.retention.order, 70);
-  assert.equal(byId.finance.order, 80);
 
-  for (const id of ["operations", "traffic", "product", "engagement", "search", "workload"] as const) {
+  for (const id of ENABLED_IDS) {
     assert.equal(byId[id].enabled, true, `${id} must be enabled`);
   }
-  assert.equal(byId.retention.enabled, false, "retention must be disabled");
-  assert.equal(byId.finance.enabled, false, "finance must be disabled");
-
-  assert.equal(byId.operations.size, "wide", "operations must be the sole wide block");
-  for (const id of ["traffic", "product", "engagement", "search", "workload", "retention", "finance"] as const) {
-    assert.equal(byId[id].size, "medium", `${id} must be medium`);
+  for (const id of DISABLED_IDS) {
+    assert.equal(byId[id].enabled, false, `${id} must be disabled (data source removed from the first screen, not deleted)`);
   }
 
   const enabled = getEnabledDashboardBlocks();
   assert.deepEqual(
-    enabled.map((b) => b.id),
-    ["operations", "traffic", "product", "engagement", "search", "workload"],
-    "getEnabledDashboardBlocks must return exactly the 6 enabled blocks, sorted by order",
+    enabled.map((b) => b.id).slice().sort(),
+    [...ENABLED_IDS].slice().sort(),
+    "getEnabledDashboardBlocks must return exactly the enabled blocks",
   );
   assert.ok(
     enabled.every((b, i) => i === 0 || enabled[i - 1].order < b.order),
     "returned blocks must be strictly ascending by order",
   );
 
-  assert.equal(getDashboardBlock("retention").enabled, false);
+  assert.equal(getDashboardBlock("habit").enabled, true);
+  assert.equal(getDashboardBlock("traffic").enabled, false);
   assert.throws(() => getDashboardBlock("unknown" as never), "unknown id must throw, not silently return undefined");
 
   console.log("dashboardBlocks.test.ts: OK");

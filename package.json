@@ -100,6 +100,7 @@
     "migration:phoenix-release": "tsx scripts/migration-phoenix-release.ts",
     "migration:phoenix-release:generate-manifest": "tsx scripts/generate-phoenix-release-manifest.ts",
     "migration:phoenix-release:generate-business-ownership-artifacts": "tsx scripts/generate-phoenix-business-ownership-artifacts.ts",
+    "test:admin-dashboard-metrics": "tsx src/lib/admin/dashboardBlocks.test.ts && tsx src/lib/admin/dashboardViewModels.test.ts && tsx src/server/services/analytics/planningActivity.integration.test.ts && tsx src/server/ops/metrics/collectors/weeklyPlanningFamilies.test.ts && tsx src/server/ops/metrics/collectors/retention.test.ts && tsx src/server/ops/metrics/collectors/habit.test.ts && tsx src/server/ops/metrics/collectors/engagementFunnel.test.ts && tsx src/server/ops/metrics/collectors/supplyHealth.test.ts && tsx src/server/ops/metrics/collectors/b2bHealth.test.ts && tsx src/server/ops/metrics/collectors/search.test.ts",
     "test:phoenix-release": "tsx src/lib/migration/release/release.test.ts",
     "test:phoenix-release-users-businesses-adapters": "tsx src/lib/migration/release/adapters/phoenixUsersBusinessesAdapters.test.ts",
     "test:phoenix-release-offers-adapter": "tsx src/lib/migration/release/adapters/offersAdapter.test.ts",

@@ -1,14 +1,18 @@
 import { getCurrentUser } from "@/lib/auth/server";
-import prisma from "@/lib/prisma";
 import { getOperationsView } from "@/server/ops/read/getOperationsView";
 import type { OperationsSyntheticSignal, OperationsView } from "@/server/ops/read/getOperationsView";
 import type { OperationalSignal } from "@prisma/client";
-import { getTrafficViewModel, EMPTY_TRAFFIC_VIEW_MODEL } from "@/server/admin/getTrafficViewModel";
 import {
   deriveProductPulse,
-  deriveEngagement,
-  deriveSearchDiscovery,
+  deriveNorthStar,
+  deriveHabit,
+  deriveEngagementFunnel,
+  deriveGrowth,
+  deriveDiscoveryQuality,
+  deriveSupplyHealth,
+  deriveB2BHealth,
   deriveWorkload,
+  deriveDataQuality,
 } from "@/lib/admin/dashboardViewModels";
 import { AdminDashboardShell } from "./_components/AdminDashboardShell";
 import type { DashboardSignal } from "./_components/OperationsBlock";
@@ -60,22 +64,17 @@ export default async function AdminDashboardPage() {
 
   const now = new Date();
 
-  // Traffic is a genuinely separate data source (live UserEvent query, not
-  // part of the Operations snapshot) — a failure here must not take down
-  // Operations or the rest of the page, so it fails independently into an
-  // honest "no data" state rather than propagating.
-  let traffic = EMPTY_TRAFFIC_VIEW_MODEL;
-  try {
-    traffic = await getTrafficViewModel(prisma, now);
-  } catch (err) {
-    console.error("[admin] Failed to load Traffic view model:", err);
-  }
-
   const signals = view.signals.map((signal) => toDashboardSignal(signal, view));
   const product = deriveProductPulse(view.kpis);
-  const engagement = deriveEngagement(view.kpis);
-  const search = deriveSearchDiscovery(view.kpis);
+  const northStar = deriveNorthStar(view.kpis);
+  const habit = deriveHabit(view.kpis);
+  const funnel = deriveEngagementFunnel(view.kpis);
+  const growth = deriveGrowth(view.kpis);
+  const search = deriveDiscoveryQuality(view.kpis);
+  const supply = deriveSupplyHealth(view.kpis);
+  const b2b = deriveB2BHealth(view.kpis);
   const workload = deriveWorkload(view.queues, view.kpis);
+  const dataQuality = deriveDataQuality(view.stale);
 
   return (
     <AdminDashboardShell
@@ -88,11 +87,16 @@ export default async function AdminDashboardPage() {
       canResolve={user.role === "ADMIN"}
       serverNow={now}
       isDev={!isProductionAppEnv()}
-      traffic={traffic}
       product={product}
-      engagement={engagement}
+      northStar={northStar}
+      habit={habit}
+      funnel={funnel}
+      growth={growth}
       search={search}
+      supply={supply}
+      b2b={b2b}
       workload={workload}
+      dataQuality={dataQuality}
     />
   );
 }

@@ -15,15 +15,17 @@ if (!DATABASE_URL) {
 
 const marker = randomUUID().slice(0, 8);
 const createdLogIds: string[] = [];
+const createdEventIds: string[] = [];
 
 async function main() {
   const prisma = new PrismaClient({ datasourceUrl: DATABASE_URL });
 
-  async function makeLog(resultsCount: number, createdAt: Date) {
+  async function makeLog(resultsCount: number, createdAt: Date, opts: { sessionId?: string; userId?: string } = {}) {
     const log = await prisma.searchQueryLog.create({
-      data: { query: `q-${marker}-${randomUUID()}`, resultsCount, createdAt },
+      data: { query: `q-${marker}-${randomUUID()}`, resultsCount, createdAt, ...opts },
     });
     createdLogIds.push(log.id);
+    return log.id;
   }
 
   try {
@@ -64,8 +66,31 @@ async function main() {
       assert.equal(rate3?.value, 0, "a real zero rate (no zero-result queries) must still be written");
     }
 
+    await prisma.searchQueryLog.deleteMany({ where: { id: { in: createdLogIds } } });
+    createdLogIds.length = 0;
+
+    // search.action_rate: a search followed by a meaningful action (by the
+    // same sessionId) within the window counts as actioned; one with no
+    // follow-up doesn't.
+    {
+      const sessionActioned = `sess-actioned-${marker}`;
+      await makeLog(4, inWindow, { sessionId: sessionActioned });
+      const openEvent = await prisma.userEvent.create({
+        data: { sessionId: sessionActioned, eventType: "DETAIL_OPEN", createdAt: new Date(inWindow.getTime() + 30_000) },
+      });
+      createdEventIds.push(openEvent.id);
+
+      const sessionNoAction = `sess-no-action-${marker}`;
+      await makeLog(2, inWindow, { sessionId: sessionNoAction });
+
+      const result4 = await collectSearchMetrics({ prisma, now });
+      const actionRate = result4.find((s) => s.metric === "search.action_rate");
+      assert.equal(actionRate?.value, 0.5, "1 of 2 identified searches led to a meaningful action");
+    }
+
     console.log("search.test.ts: OK");
   } finally {
+    await prisma.userEvent.deleteMany({ where: { id: { in: createdEventIds } } });
     await prisma.searchQueryLog.deleteMany({ where: { id: { in: createdLogIds } } });
     await prisma.$disconnect();
   }

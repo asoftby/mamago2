@@ -3769,3 +3769,95 @@ P3 — cleanup / polish / optional
   `OK` run ever recorded for this detector on PROD).
 - Source: Operations Center PROD audit + BACKLOG-121-pattern host fix
   (2026-08-25)
+
+## [BACKLOG-132] GA4/Yandex server-side reconciliation for /admin visitor KPIs
+
+- Status: OPEN
+- Priority: P1
+- Area: Analytics / /admin dashboard
+- Added: 2026-08-26
+- Context: The /admin dashboard rework (North Star, habit, funnel — see
+  `src/app/admin/page.tsx`, `src/lib/admin/dashboardViewModels.ts`,
+  `src/lib/admin/metricDictionary.ts`) ships every visitor-derived KPI
+  (MAU/WAU/WPF/W1-W4 retention/3-of-4-week habit) as `PROVISIONAL`, never
+  `VERIFIED`, because no server-side pull from GA4 Data API or Yandex
+  Metrica Reporting API exists — only client-side gtag/ym script injection
+  (`src/lib/analytics/externalAnalyticsConfig.ts`). Flipping `verifiable:
+  true` on the affected `METRIC_DICTIONARY` entries in
+  `src/lib/admin/metricDictionary.ts` is the entire promotion mechanism once
+  this ships.
+- Blocked on: GA4 service-account credentials with Data API access, and a
+  Yandex Metrica OAuth token + counter ID — not available as of 2026-08-26,
+  explicitly deferred by Aleksei to a later phase.
+
+## [BACKLOG-133] No first-party acquisition-source (UTM/referrer) tracking
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / /admin dashboard
+- Added: 2026-08-26
+- Context: The dashboard spec's Growth (Organic/Direct growth) and
+  Acquisition Quality (Organic/Direct/Referral/Social split + activation by
+  source) blocks are not implemented — `deriveGrowth()` in
+  `src/lib/admin/dashboardViewModels.ts` and `GrowthBlock.tsx` render an
+  explicit "нет проверенных данных" placeholder for this. Research during
+  planning found no UTM/referrer capture at signup; this is unconfirmed by a
+  fresh grep at implementation time and should be re-verified before
+  starting. Either first-party capture or GA4/Yandex reconciliation
+  (BACKLOG-132) could unblock this.
+
+## [BACKLOG-134] RouteIdea / DayScenario / route-PlanItem writes emit no UserEvent
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics instrumentation
+- Added: 2026-08-26
+- Context: `src/server/services/analytics/planningActivity.ts` (Weekly
+  Planning Families / W1-W4 retention / 3-of-4-week habit) has to read
+  `RouteIdea`, `DayScenario`, and `PlanItem` directly because none of their
+  write paths (`src/server/services/idea.service.ts:addRouteIdea`,
+  `src/app/api/save/plan/route.ts`'s `routeId` branch, `dayScenario.service.ts`)
+  call `trackUserEvent`. Same class of gap as BACKLOG-029 (missing `SHARE`
+  event type). Worth its own event-type/instrumentation pass so future
+  analytics don't need bespoke per-table queries.
+
+## [BACKLOG-135] B2B repeat-promotion rate and revenue have no honest signal
+
+- Status: OPEN
+- Priority: P2
+- Area: B2B analytics / monetization
+- Added: 2026-08-26
+- Context: `deriveB2BHealth()` (`src/lib/admin/dashboardViewModels.ts`)
+  hard-codes `repeatPromotionRate: null` and `revenue: null` — paid
+  `Promotion` create/resume both throw `"...not available in first
+  PROD. Use explicit Boost purchase."` (`src/server/services/promotion/promotion.service.ts`),
+  and `registerPromotionActionFromUserEvent()` is a no-op. No reliable
+  revenue definition/source exists either. Revisit once/if paid Promotion or
+  a stable Boost-revenue accounting exists — do not fabricate a placeholder
+  metric before then.
+
+## [BACKLOG-136] Supply "coverage gaps" enumeration not implemented
+
+- Status: OPEN
+- Priority: P3
+- Area: /admin dashboard — Supply Health
+- Added: 2026-08-26
+- Context: The dashboard spec's §8 "Coverage gaps" (categories/dates/
+  districts with critically low supply) needs a threshold definition for
+  "critically low" that only Aleksei can set — not attempted in the
+  dashboard rework. `SupplyHealthBlock.tsx`/`supplyHealth.ts` cover active
+  events/places/offers + freshness only.
+
+## [BACKLOG-137] No MetricSample range-query/trend-chart consumer exists
+
+- Status: OPEN
+- Priority: P3
+- Area: /admin dashboard / Operations Center metrics
+- Added: 2026-08-26
+- Context: `MetricSample` is indexed for range scans
+  (`[metric, dimKey, collectedAt DESC]`) and now carries real history for
+  every dashboard KPI, but every current consumer (`metricProjection.ts`,
+  and the dashboard rework's `_prev`-companion-metric growth deltas) only
+  does single-point lookups — no genuine range query for a sparkline/trend
+  chart exists anywhere. Building one is net-new work, not a fix to
+  anything broken.
