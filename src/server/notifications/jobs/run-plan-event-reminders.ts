@@ -2,7 +2,7 @@ import "server-only";
 
 import { sendNotification } from "@/server/notifications/notification.service";
 import { listPlanItemsDueForReminder } from "@/server/services/plan.service";
-import { getEffectiveNotificationPolicyForScenario } from "@/server/services/notificationPolicy.service";
+import { getReminderSettingsForUsers } from "@/server/services/userNotificationSchedule.service";
 import {
   runPlanEventRemindersCore,
   type RunPlanEventRemindersArgs,
@@ -12,15 +12,9 @@ import {
 export async function runPlanEventReminders(
   args: RunPlanEventRemindersArgs = {},
 ): Promise<RunPlanEventRemindersResult> {
-  const policy = await getEffectiveNotificationPolicyForScenario("PLAN_EVENT_2H_BEFORE");
-  const lookaheadMinutes =
-    args.lookaheadMinutes ??
-    (policy?.defaultReminderOffsetMinutes && policy.defaultReminderOffsetMinutes > 0
-      ? policy.defaultReminderOffsetMinutes
-      : undefined);
-
-  return runPlanEventRemindersCore({ ...args, lookaheadMinutes }, {
+  return runPlanEventRemindersCore(args, {
     listPlanItemsDueForReminderFn: listPlanItemsDueForReminder,
+    getReminderSettingsForUsersFn: getReminderSettingsForUsers,
     sendNotificationFn: sendNotification,
   });
 }
