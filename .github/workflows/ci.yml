@@ -38,6 +38,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Import source access regressions
+        run: |
+          pnpm exec tsx src/server/modules/import/parsers/sourceAccessPolicy.test.ts
+          pnpm exec tsx src/server/modules/import/parsers/fetchHtml.test.ts
+
       - name: Password reset regressions
         run: pnpm exec tsx src/server/auth/passwordResetFlow.test.ts
 
