@@ -24,8 +24,8 @@ case "$branch" in
     ;;
 esac
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "[task-sync] STOP: tracked/staged changes exist; commit or preserve them before syncing." >&2
+if [ -n "$(git status --porcelain)" ]; then
+  echo "[task-sync] STOP: task worktree is not clean; commit or preserve all tracked/staged/untracked work before syncing." >&2
   git status --short
   exit 3
 fi
