@@ -18,6 +18,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Git task workflow regressions
+        run: sh scripts/git/task-workflow.test.sh
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
