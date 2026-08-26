@@ -41,7 +41,9 @@ if grep -Fq "$start_marker" "$rc_file"; then
 fi
 
 quote_single() {
-  printf "%s" "$1" | sed "s/'/'\\''/g"
+  # Inside a shell single-quoted value, an apostrophe must be encoded as '\''.
+  # Four backslashes are required here so sed emits one literal backslash.
+  printf "%s" "$1" | sed "s/'/'\\\\''/g"
 }
 repo_quoted="$(quote_single "$repo_root")"
 
