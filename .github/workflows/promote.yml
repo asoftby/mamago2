@@ -1,0 +1,131 @@
+name: Promote DEV image to PROD
+
+# Registry-side promotion only: aliases an already-built dev-* image as a
+# prod-* tag via `docker buildx imagetools create` (a manifest copy), with
+# no Docker build step anywhere in this workflow. This is what makes
+# `dev commit -> one immutable image -> DEV -> promote exact digest -> PROD`
+# hold — the source image built by docker.yml is never rebuilt, only
+# re-tagged. This workflow never touches the deploy host: it only writes to
+# the container registry. Pulling/restarting the actual DEV/PROD containers
+# remains the owner-only, Telegram-triggered step documented in
+# docs/release/task15-deployment-rollback-runbook.md.
+#
+# Two safety properties beyond the plain retag:
+# - Inputs must exactly match dev-<number> / prod-<number> — no `dev`,
+#   `latest`, or arbitrary strings, so a promotion always names one
+#   specific immutable build, never a mutable alias.
+# - A prod-<N> tag is treated as immutable once created: re-running this
+#   workflow with the same prod_tag against the same source is a no-op
+#   success (idempotent), but pointing an existing prod_tag at a
+#   *different* digest fails the run instead of silently rewriting
+#   release history. Promoting to a fresh, unused prod-<N> is always safe;
+#   fixing a mistake means choosing a new tag, not overwriting the old one.
+on:
+  workflow_dispatch:
+    inputs:
+      dev_tag:
+        description: "Source tag to promote, e.g. dev-373 (must already exist in GHCR)"
+        required: true
+        type: string
+      prod_tag:
+        description: "Destination tag to create, e.g. prod-153"
+        required: true
+        type: string
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Validate tag inputs
+        run: |
+          if [[ ! "${{ inputs.dev_tag }}" =~ ^dev-[0-9]+$ ]]; then
+            echo "::error::dev_tag must exactly match dev-<number> (e.g. dev-373). Got: '${{ inputs.dev_tag }}'. Mutable aliases like 'dev' or 'latest' are not a valid promotion source — a promotion must name one specific, immutable build."
+            exit 1
+          fi
+          if [[ ! "${{ inputs.prod_tag }}" =~ ^prod-[0-9]+$ ]]; then
+            echo "::error::prod_tag must exactly match prod-<number> (e.g. prod-153). Got: '${{ inputs.prod_tag }}'."
+            exit 1
+          fi
+          echo "Inputs valid: dev_tag=${{ inputs.dev_tag }} prod_tag=${{ inputs.prod_tag }}"
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Inspect source digest
+        id: source
+        run: |
+          digest=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          revision=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}" --format '{{index .Image.Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || echo "unknown")
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "Source: ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}"
+          echo "Source digest:   $digest"
+          echo "Source revision: $revision"
+
+      - name: Check destination immutability
+        id: destcheck
+        run: |
+          dest_ref="ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}"
+          set +e
+          existing_digest=$(docker buildx imagetools inspect "$dest_ref" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"')
+          inspect_exit=$?
+          set -e
+
+          if [ $inspect_exit -ne 0 ] || [ -z "$existing_digest" ]; then
+            echo "Destination tag $dest_ref does not exist yet — will create."
+            echo "idempotent=false" >> "$GITHUB_OUTPUT"
+          elif [ "$existing_digest" = "${{ steps.source.outputs.digest }}" ]; then
+            echo "Destination tag $dest_ref already exists and already points to the exact source digest (${{ steps.source.outputs.digest }}) — idempotent no-op, treating as success without rewriting the tag."
+            echo "idempotent=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Destination tag $dest_ref already exists and points to a DIFFERENT digest ($existing_digest) than source ${{ steps.source.outputs.digest }}. prod-<N> tags are immutable once created — refusing to overwrite release provenance. If this was a typo, choose an unused prod-<N> tag instead."
+            exit 1
+          fi
+
+      - name: Create prod-* alias (registry-side, no rebuild)
+        if: steps.destcheck.outputs.idempotent != 'true'
+        run: |
+          docker buildx imagetools create \
+            --tag "ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}" \
+            "ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}"
+
+      - name: Inspect destination digest
+        id: dest
+        run: |
+          digest=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Destination: ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}"
+          echo "Destination digest: $digest"
+
+      - name: Fail if digest changed (promotion must be an exact copy)
+        run: |
+          if [ "${{ steps.source.outputs.digest }}" != "${{ steps.dest.outputs.digest }}" ]; then
+            echo "::error::Digest mismatch after promotion — source ${{ steps.source.outputs.digest }} != destination ${{ steps.dest.outputs.digest }}. This must never happen for a registry-side tag copy; treat as a promotion failure, not a warning."
+            exit 1
+          fi
+          echo "Digest match confirmed: ${{ steps.source.outputs.digest }}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Promotion complete"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Source tag | \`${{ inputs.dev_tag }}\` |"
+            echo "| Destination tag | \`${{ inputs.prod_tag }}\` |"
+            echo "| Git revision | \`${{ steps.source.outputs.revision }}\` |"
+            echo "| Immutable digest | \`${{ steps.dest.outputs.digest }}\` |"
+            echo "| Idempotent no-op | \`${{ steps.destcheck.outputs.idempotent == 'true' }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
