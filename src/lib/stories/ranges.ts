@@ -50,8 +50,9 @@ export function todayRange(ctx: ResolveContext): DateRange {
 }
 
 /**
- * Horizon for the `running` contextual slot: [today 00:00, today+N 00:00).
- * N comes from {@link SERIAL_CLASSIFICATION_CONFIG.runningHorizonDays}.
+ * Generic contextual horizon [today 00:00, today+N 00:00) in city TZ.
+ * The historical function name is retained for compatibility; the public
+ * `running` source itself now uses {@link todayRange}.
  */
 export function runningHorizonRange(
   ctx: ResolveContext,
