@@ -1,0 +1,61 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import {
+  PASSWORD_RESET_RATE_LIMIT_MAX,
+  PASSWORD_RESET_RATE_LIMIT_WINDOW_MS,
+  PASSWORD_RESET_RESEND_COOLDOWN_SECONDS,
+  PASSWORD_RESET_TOKEN_TTL_MS,
+} from "@/lib/auth/passwordResetPolicy";
+
+function read(path: string): string {
+  return readFileSync(path, "utf8");
+}
+
+assert.equal(PASSWORD_RESET_RESEND_COOLDOWN_SECONDS, 60);
+assert.equal(PASSWORD_RESET_RATE_LIMIT_MAX, 3);
+assert.equal(PASSWORD_RESET_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000);
+assert.equal(PASSWORD_RESET_TOKEN_TTL_MS, 60 * 60 * 1000);
+
+const forgotForm = read("src/app/(auth)/forgot-password/ForgotPasswordForm.tsx");
+assert.match(
+  forgotForm,
+  /state\.ok && state\.status === "sent"/,
+  "forgot-password must replace the email form with a dedicated sent state",
+);
+assert.match(forgotForm, /Проверьте почту/);
+assert.match(forgotForm, /type="hidden" name="email" value=\{state\.email\}/);
+assert.match(forgotForm, /PASSWORD_RESET_RESEND_COOLDOWN_SECONDS/);
+assert.match(forgotForm, /Вернуться ко входу/);
+
+const forgotAction = read("src/app/(auth)/forgot-password/actions.ts");
+assert.match(forgotAction, /status: "sent"/);
+assert.match(forgotAction, /sentAt: Date\.now\(\)/);
+
+const resetServer = read("src/server/auth/password-reset.ts");
+assert.match(resetServer, /password-reset:cooldown:/);
+assert.match(resetServer, /password-reset:window:/);
+assert.match(resetServer, /getPasswordResetRateLimitFingerprint/);
+assert.match(
+  resetServer,
+  /await tx\.session\.deleteMany\(\{ where: \{ userId: user\.id \} \}\)/,
+  "successful password reset must revoke all existing sessions",
+);
+assert.match(resetServer, /export async function isPasswordResetTokenValid/);
+
+const resetPage = read("src/app/(auth)/reset-password/[token]/page.tsx");
+assert.match(resetPage, /await isPasswordResetTokenValid\(token\)/);
+assert.match(resetPage, /Ссылка больше не действует/);
+assert.match(resetPage, /href="\/forgot-password"/);
+
+const resetForm = read("src/app/(auth)/reset-password/[token]/ResetPasswordForm.tsx");
+assert.match(resetForm, /minLength=\{PASSWORD_MIN_LENGTH\}/);
+assert.match(resetForm, /maxLength=\{PASSWORD_MAX_LENGTH\}/);
+assert.match(resetForm, /fieldErrors\?\.confirmPassword/);
+assert.doesNotMatch(resetForm, /minLength=\{6\}/);
+assert.doesNotMatch(resetForm, /Минимум 6 символов/);
+
+const resetAction = read("src/app/(auth)/reset-password/[token]/actions.ts");
+assert.match(resetAction, /confirmPassword: \["Пароли не совпадают"\]/);
+assert.match(resetAction, /code: "INVALID_TOKEN"/);
+
+console.log("passwordResetFlow.test.ts: OK");

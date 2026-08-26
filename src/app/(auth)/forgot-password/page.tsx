@@ -7,13 +7,9 @@ export const metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="relative min-h-screen bg-neutral-50 flex items-center justify-center px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-8">
       <PageCloseButton href="/login" />
-      <div className="w-full max-w-[420px] bg-white rounded-2xl shadow-md p-6 sm:p-8 space-y-5">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold text-neutral-900">Восстановление пароля</h1>
-          <p className="text-sm text-neutral-500">Введите email, и мы пришлём инструкцию для восстановления пароля.</p>
-        </div>
+      <div className="w-full max-w-[420px] rounded-2xl bg-white p-6 shadow-md sm:p-8">
         <ForgotPasswordForm />
       </div>
     </div>
