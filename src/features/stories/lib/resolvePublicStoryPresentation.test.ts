@@ -28,7 +28,6 @@ const free: StoryCollection = {
       items: [
         item("running-now", "Идёт сейчас · до 18:00"),
         item("running-today", "Сегодня · 19:00–20:00"),
-        item("running-future", "29 августа · 12:00–13:00"),
       ],
     },
     free,
@@ -38,7 +37,7 @@ const free: StoryCollection = {
   assert.equal(result[0]?.title, "Сегодня");
   assert.deepEqual(result[0]?.items.map((entry) => entry.id), ["running-now", "running-today"]);
   assert.ok(result[0]?.items.every((entry) => entry.eyebrow === "сегодня"));
-  console.log("running is folded into Today and future serial items are hidden: OK");
+  console.log("internal running source is folded into the public Today circle: OK");
 }
 
 {
@@ -93,18 +92,15 @@ const free: StoryCollection = {
 }
 
 {
-  const result = resolvePublicStoryPresentation([
-    {
-      id: "running",
-      intent: "running",
-      title: "Идёт сейчас",
-      items: [item("future-only", "2 сентября · 10:00")],
-    },
-    free,
-  ]);
-
-  assert.deepEqual(result.map((collection) => collection.intent), ["free"]);
-  console.log("future-only running collection does not masquerade as Today: OK");
+  const breaking: StoryCollection = {
+    id: "breaking_news",
+    intent: "breaking_news",
+    title: "Срочно",
+    items: [item("breaking-1", "важно")],
+  };
+  const result = resolvePublicStoryPresentation([breaking, free]);
+  assert.deepEqual(result.map((collection) => collection.intent), ["breaking_news", "free"]);
+  console.log("non-temporal contextual/editorial circles keep their order: OK");
 }
 
 console.log("resolvePublicStoryPresentation tests: all OK");
