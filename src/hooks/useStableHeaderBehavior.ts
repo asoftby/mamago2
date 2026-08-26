@@ -320,6 +320,19 @@ export function useStableHeaderBehavior(options: UseStableHeaderBehaviorOptions 
       if (!current.showSearchSurface && current.activePanel === "none") return;
 
       const target = event.target as Node;
+
+      // «Фильтры» — соседняя верхнеуровневая discovery-surface. Перед открытием
+      // Radix Dialog закрываем только активный dropdown хедера; сам search surface
+      // оставляем на месте, чтобы открытие модалки не меняло layout под overlay.
+      if (
+        current.activePanel !== "none" &&
+        target instanceof Element &&
+        target.closest("[data-secondary-filters-trigger]")
+      ) {
+        actionsRef.current.closePanel();
+        return;
+      }
+
       const root = headerRef?.current;
       const block1 = document.querySelector("[data-header-block1]");
       const block2 = document.querySelector("[data-header-block2]");
