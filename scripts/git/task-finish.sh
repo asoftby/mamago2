@@ -44,6 +44,21 @@ if [ "$ahead" -eq 0 ]; then
   exit 4
 fi
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "[task-finish] STOP: Node 22.x is required but node is not installed." >&2
+  exit 5
+fi
+node_major="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$node_major" != "22" ]; then
+  echo "[task-finish] STOP: Node 22.x is required; current: $(node -v)." >&2
+  echo "[task-finish] The mgfinish shell shortcut auto-switches when nvm/fnm is available." >&2
+  exit 5
+fi
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "[task-finish] STOP: pnpm is not available." >&2
+  exit 5
+fi
+
 echo "[task-finish] Final task-only diff against origin/dev:"
 git diff --name-only origin/dev...HEAD | sed 's/^/  - /'
 
