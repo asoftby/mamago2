@@ -45,6 +45,7 @@ export type PlanEventReminderContext = {
   startsAt: Date;
   placeName?: string | null;
   cityName?: string | null;
+  timeZone?: string;
 };
 
 export type PlanTomorrowDigestItem = {
@@ -61,6 +62,7 @@ export type PlanTomorrowDigestContext = {
   citySlug?: string | null;
   planItemIds: string[];
   items: PlanTomorrowDigestItem[];
+  timeZone?: string;
 };
 
 export type SendNotificationContext =
