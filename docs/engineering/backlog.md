@@ -3861,3 +3861,92 @@ P3 — cleanup / polish / optional
   does single-point lookups — no genuine range query for a sparkline/trend
   chart exists anywhere. Building one is net-new work, not a fix to
   anything broken.
+
+## [BACKLOG-138] Fix PR #126 typecheck failure (source-aware crawl policy)
+
+- Status: OPEN
+- Priority: P1
+- Area: Import / CI
+- Added: 2026-08-26
+- Reason deferred: full LOCAL/GitHub/DEV/PROD reconciliation session found
+  it while auditing all open PRs; fixing someone else's failing PR test
+  was out of scope for that reconciliation pass.
+- Context: PR #126 `fix/import-source-access-policy` (`feat(import): add
+  source-aware crawl policy`) has `mergeStateStatus: UNSTABLE`,
+  `mergeable: MERGEABLE`. CI `typecheck` job fails with real errors in the
+  PR's own test file, not a dev-drift issue:
+  `src/server/modules/import/parsers/sourceAccessPolicy.test.ts:141-143`
+  — `error TS2339: Property 'get' does not exist on type 'never'` (3
+  occurrences), from CI run
+  https://github.com/asoftby/mamago2/actions/runs/32989481643.
+- Current state: branch unchanged since audit, not rebased onto latest
+  `origin/dev` (`73c0a26a` at audit time).
+- Dependencies: none.
+- Acceptance criteria: type narrowing fixed so `pnpm tsc --noEmit` passes,
+  PR rebased onto current `origin/dev`, CI green, then normal merge.
+- Source: full reconciliation audit, 2026-08-26.
+
+## [BACKLOG-139] Rebase and land PR #117 + #118 (analytics contract v1 + followup)
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics
+- Added: 2026-08-26
+- Reason deferred: both stale (58+ commits behind `origin/dev` at audit
+  time) and marked draft by the author — not signaled ready, and rebasing
+  is substantial standalone work, not a reconciliation step.
+- Context: PR #117 `chore/analytics-contract-v1` (draft, `CLEAN`,
+  typecheck green, 58 commits behind `origin/dev` at audit) defines the
+  analytics contract v1 baseline. PR #118
+  `chore/analytics-contract-v1-followup` (draft, `CONFLICTING`, typecheck
+  failing) is stacked directly on top of #117
+  (`git merge-base --is-ancestor` confirms #117's head is an ancestor of
+  #118's head) — #118 cannot be rebased/merged before #117 is.
+- Current state: both untouched since audit; not rebased.
+- Dependencies: #118 blocked on #117.
+- Acceptance criteria: #117 rebased onto current `origin/dev`, marked
+  ready, CI green, merged; then #118 rebased on the new `origin/dev`,
+  its typecheck failure fixed, CI green, merged.
+- Source: full reconciliation audit, 2026-08-26.
+
+## [BACKLOG-140] Rebase and land PR #109 (Article inline media MediaUsage reverse-index)
+
+- Status: OPEN
+- Priority: P1
+- Area: Media / Admin cleanup tooling
+- Added: 2026-08-26
+- Reason deferred: 255 commits behind `origin/dev` at audit time and
+  `CONFLICTING` — rebasing that much drift is substantial standalone
+  work, not a reconciliation step. Explicitly verified NOT superseded
+  by later dev work before deferring (see Context).
+- Context: PR #109 `fix/article-inline-media-public-access` adds a
+  `MediaUsage` reverse index for Article `image`/`gallery` content
+  blocks (`extractArticleContentMediaIds()` +
+  `syncArticleContentMediaUsages()`, field `"content"`). Per the PR's own
+  description, public visibility of inline article images is already
+  fixed in `dev` independently (commit `51b5b4d6`,
+  `hasPublishedPublicLinkage()` reads `Article.contentJson` directly) —
+  this PR is NOT about that. It closes a separate, still-open gap:
+  `grep -rn "articleContentMedia" src/lib/publications/
+  src/server/services/media/media-usage.service.ts` on `origin/dev`
+  (`73c0a26a`) returns nothing, confirming the admin orphan-detection /
+  hard-delete tooling (`recalculateMediaUsageStatus`,
+  `hardDeleteMediaAssetIfUnused`, `bulkHardDeleteUnusedMediaAssets`) still
+  has zero `MediaUsage` awareness of `Article.contentJson`, so an admin
+  running "recalculate orphans" or "bulk-delete unused media" today could
+  still mark live inline Article images `ORPHANED` and hard-delete them.
+  Every other entity type (Place/Event/Offer/Route) already has this
+  reverse-index wired in; Article is the one remaining gap.
+- Current state: branch unchanged since audit (255 commits behind
+  `origin/dev`, `mergeStateStatus: DIRTY`, `mergeable: CONFLICTING`, no CI
+  run recorded). Also needs a separate data-only `MediaUsage` backfill for
+  existing DEV Articles after merge (per PR description, not included in
+  the PR itself; ~9 Articles identified in an earlier read-only audit
+  referenced by the PR).
+- Dependencies: none for the rebase itself; the post-merge backfill is a
+  separate follow-up.
+- Acceptance criteria: rebased onto current `origin/dev`, conflicts
+  resolved, tests still passing (`test:article-content-media-linkage`,
+  `test:article-content-media-usage`, `test:article-media-replay`), CI
+  green, merged; backfill run and tracked separately.
+- Source: full reconciliation audit, 2026-08-26.
