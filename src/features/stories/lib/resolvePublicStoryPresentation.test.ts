@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import type { StoryCollection, StoryItem } from "../types/story";
 import { resolvePublicStoryPresentation } from "./resolvePublicStoryPresentation";
 
-function item(id: string, eyebrow: string): StoryItem {
+function item(id: string, eyebrow: string, offerId = id): StoryItem {
   return {
     id,
-    offerId: id,
+    offerId,
     title: id,
     image: `/media/${id}.jpg`,
     eyebrow,
@@ -64,10 +64,32 @@ const free: StoryCollection = {
   assert.deepEqual(
     result[0]?.items.map((entry) => entry.id),
     ["shared", "today-2", "serial-today"],
-    "Today + serial Today are merged and deduplicated by stable identity",
+    "Today + serial Today are merged and exact duplicate items are removed",
   );
   assert.equal(result[0]?.items.find((entry) => entry.id === "serial-today")?.eyebrow, "сегодня");
   console.log("canonical Today merge/dedupe: OK");
+}
+
+{
+  const result = resolvePublicStoryPresentation([
+    {
+      id: "today",
+      intent: "today",
+      title: "Сегодня",
+      items: [
+        item("session-morning", "сегодня", "activity-1"),
+        item("session-evening", "сегодня", "activity-1"),
+      ],
+    },
+    free,
+  ]);
+
+  assert.deepEqual(
+    result[0]?.items.map((entry) => entry.id),
+    ["session-morning", "session-evening"],
+    "distinct occurrences sharing seen-state identity must remain in the viewer",
+  );
+  console.log("distinct Today occurrences are preserved: OK");
 }
 
 {
