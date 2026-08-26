@@ -160,11 +160,8 @@ export default async function MePage({ searchParams }: PageProps) {
     };
   });
 
-  const stats = [
-    { n: family.length, label: "в семье" },
-    { n: routes.length, label: "маршрут" },
-    { n: parties.length, label: "праздник" },
-  ];
+  // "Мои маршруты" / "Мои праздники" секции и счётчики скрыты до релиза разделов.
+  const stats = [{ n: family.length, label: "в семье" }];
 
   return (
     <AccountDesign
