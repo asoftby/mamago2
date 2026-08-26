@@ -11,6 +11,7 @@ import {
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
 import { isSessionEligibleAccount } from "@/lib/auth/accountEligibility";
 import { checkRateLimit } from "@/lib/security/rateLimit";
+import { isProductionAppEnv } from "@/lib/config/productionEnvGuard";
 import { emailService } from "@/features/email/server/email-service";
 import { AuthError } from "./register";
 
@@ -25,6 +26,66 @@ const resetPasswordSchema = z.object({
 
 function getPasswordResetRateLimitFingerprint(email: string): string {
   return hashToken(email);
+}
+
+async function createPasswordResetEmailDeliveryAudit(params: {
+  userId: string;
+  debugRedirect: boolean;
+}): Promise<string | null> {
+  try {
+    const delivery = await prisma.notificationDelivery.create({
+      data: {
+        userId: params.userId,
+        channel: "EMAIL",
+        status: "PENDING",
+        attemptCount: 1,
+        payloadJson: {
+          source: "auth",
+          kind: "password-reset",
+          debugRedirect: params.debugRedirect,
+        },
+      },
+      select: { id: true },
+    });
+
+    return delivery.id;
+  } catch (error) {
+    console.error("[Password Reset] failed to create email delivery audit", {
+      userId: params.userId,
+      error,
+    });
+    return null;
+  }
+}
+
+async function finishPasswordResetEmailDeliveryAudit(params: {
+  deliveryId: string | null;
+  userId: string;
+  status: "SENT" | "SKIPPED" | "FAILED";
+  errorMessage?: string | null;
+}): Promise<void> {
+  if (!params.deliveryId) return;
+
+  try {
+    await prisma.notificationDelivery.update({
+      where: { id: params.deliveryId },
+      data: {
+        status: params.status,
+        errorMessage:
+          params.status === "SENT"
+            ? null
+            : params.errorMessage ?? "EMAIL_SEND_FAILED",
+        sentAt: params.status === "SENT" ? new Date() : null,
+      },
+    });
+  } catch (error) {
+    console.error("[Password Reset] failed to finalize email delivery audit", {
+      userId: params.userId,
+      deliveryId: params.deliveryId,
+      status: params.status,
+      error,
+    });
+  }
 }
 
 /**
@@ -81,13 +142,73 @@ export async function requestPasswordReset(email: string): Promise<void> {
     },
   });
 
+  const emailHealth = emailService.getHealth();
+  const deliveryId = await createPasswordResetEmailDeliveryAudit({
+    userId: user.id,
+    debugRedirect: emailHealth.debugRedirect,
+  });
+
+  if (!emailHealth.enabled) {
+    await finishPasswordResetEmailDeliveryAudit({
+      deliveryId,
+      userId: user.id,
+      status: "SKIPPED",
+      errorMessage: "EMAIL_DISABLED",
+    });
+    console.warn("[Password Reset] email send skipped: EMAIL_DISABLED", {
+      userId: user.id,
+    });
+    return;
+  }
+
+  if (!emailHealth.configured) {
+    await finishPasswordResetEmailDeliveryAudit({
+      deliveryId,
+      userId: user.id,
+      status: "SKIPPED",
+      errorMessage: "EMAIL_NOT_CONFIGURED",
+    });
+    console.error("[Password Reset] email send skipped: EMAIL_NOT_CONFIGURED", {
+      userId: user.id,
+      missingKeys: emailHealth.missingKeys,
+    });
+    return;
+  }
+
+  if (isProductionAppEnv() && emailHealth.debugRedirect) {
+    await finishPasswordResetEmailDeliveryAudit({
+      deliveryId,
+      userId: user.id,
+      status: "SKIPPED",
+      errorMessage: "EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD",
+    });
+    console.error("[Password Reset] email send blocked: debug redirect is active in production", {
+      userId: user.id,
+    });
+    return;
+  }
+
   try {
     // Only the raw token leaves the server; the database stores its SHA-256 hash.
     await emailService.sendPasswordResetEmail({
       to: normalizedEmail,
       token: rawToken,
     });
+
+    await finishPasswordResetEmailDeliveryAudit({
+      deliveryId,
+      userId: user.id,
+      status: "SENT",
+    });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "EMAIL_SEND_FAILED";
+    await finishPasswordResetEmailDeliveryAudit({
+      deliveryId,
+      userId: user.id,
+      status: "FAILED",
+      errorMessage,
+    });
+
     // Do not include the email address in logs.
     console.error("[Password Reset] sendPasswordResetEmail failed", {
       userId: user.id,
