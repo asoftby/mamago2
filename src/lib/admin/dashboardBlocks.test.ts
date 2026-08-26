@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { ADMIN_DASHBOARD_BLOCKS, getEnabledDashboardBlocks, getDashboardBlock } from "./dashboardBlocks";
 
 const ENABLED_IDS = [
+  "operations",
   "product",
   "northStar",
   "habit",
@@ -16,7 +17,6 @@ const ENABLED_IDS = [
   "b2b",
   "workload",
   "dataQuality",
-  "operations",
 ] as const;
 const DISABLED_IDS = ["traffic", "engagement", "finance"] as const;
 
@@ -39,9 +39,9 @@ function main() {
 
   const enabled = getEnabledDashboardBlocks();
   assert.deepEqual(
-    enabled.map((b) => b.id).slice().sort(),
-    [...ENABLED_IDS].slice().sort(),
-    "getEnabledDashboardBlocks must return exactly the enabled blocks",
+    enabled.map((b) => b.id),
+    [...ENABLED_IDS],
+    "getEnabledDashboardBlocks must match the dashboard render order",
   );
   assert.ok(
     enabled.every((b, i) => i === 0 || enabled[i - 1].order < b.order),
