@@ -22,13 +22,15 @@ function activityOverlapsAgeRanges(
  * AgePolicy is authoritative where it carries stronger semantics than the
  * card's numeric fallback. In particular UNRESTRICTED means “Любой возраст”
  * and must match both children and adults even when legacy card bounds fall
- * back to 0–12.
+ * back to 0–12. UNKNOWN must not masquerade as a child match through that
+ * fallback.
  */
 function activityMatchesAgeContext(
   activity: ActivityMock,
   ranges: Array<{ min: number; max: number }>,
 ): boolean {
   if (activity.agePolicy === "UNRESTRICTED") return true;
+  if (activity.agePolicy === "UNKNOWN") return false;
   return activityOverlapsAgeRanges(activity, ranges);
 }
 
@@ -37,6 +39,19 @@ function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
     const d = (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
     if (d !== 0) return d;
     return 0;
+  });
+}
+
+/** Explicit audience matches outrank merely unrestricted content. */
+function sortByAudienceRelevance(
+  list: ActivityMock[],
+  ranges: Array<{ min: number; max: number }>,
+): ActivityMock[] {
+  return [...list].sort((a, b) => {
+    const aRelevance = a.agePolicy === "UNRESTRICTED" ? 1 : activityOverlapsAgeRanges(a, ranges) ? 2 : 0;
+    const bRelevance = b.agePolicy === "UNRESTRICTED" ? 1 : activityOverlapsAgeRanges(b, ranges) ? 2 : 0;
+    if (aRelevance !== bRelevance) return bRelevance - aRelevance;
+    return (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
   });
 }
 
@@ -122,7 +137,7 @@ export function partitionDiscoveryFeed(
     else mismatched.push(activity);
   }
 
-  const primary = sortByEngagementThenStable(matched);
+  const primary = sortByAudienceRelevance(matched, ranges);
   const secondaryCandidates = sortByEngagementThenStable(mismatched).filter(
     (activity) => (activity.engagementScore ?? 0) >= MIN_ENGAGEMENT_FOR_SECONDARY,
   );
