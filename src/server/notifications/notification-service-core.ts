@@ -9,15 +9,13 @@ import type {
 export function resolveExternalChannelChoiceCore(params: {
   preferences: NotificationChannelPreferenceMatrix;
   telegramConnected: boolean;
-}): "TELEGRAM" | "EMAIL" | null {
-  if (params.preferences.TELEGRAM && params.telegramConnected) {
-    return "TELEGRAM";
-  }
+}): "BOTH" | "TELEGRAM" | "EMAIL" | null {
+  const telegramEnabled = params.preferences.TELEGRAM && params.telegramConnected;
+  const emailEnabled = params.preferences.EMAIL;
 
-  if (params.preferences.EMAIL) {
-    return "EMAIL";
-  }
-
+  if (telegramEnabled && emailEnabled) return "BOTH";
+  if (telegramEnabled) return "TELEGRAM";
+  if (emailEnabled) return "EMAIL";
   return null;
 }
 
@@ -133,7 +131,7 @@ export async function sendNotificationCore(
     telegramConnected,
   });
 
-  if (externalChannel === "EMAIL") {
+  if (externalChannel === "EMAIL" || externalChannel === "BOTH") {
     deliveries.push(
       await deps.sendEmailNotificationFn({
         userId: input.userId,
