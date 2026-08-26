@@ -92,6 +92,39 @@ const free: StoryCollection = {
 }
 
 {
+  const result = resolvePublicStoryPresentation([
+    {
+      id: "today",
+      intent: "today",
+      title: "Сегодня",
+      items: [
+        item("point-1", "сегодня"),
+        item("point-2", "сегодня"),
+        item("point-3", "сегодня"),
+        item("point-4", "сегодня"),
+      ],
+    },
+    {
+      id: "running",
+      intent: "running",
+      title: "Идёт сейчас",
+      items: [
+        item("serial-1", "Сегодня · 16:00"),
+        item("serial-2", "Сегодня · 18:00"),
+      ],
+    },
+    free,
+  ]);
+
+  assert.deepEqual(
+    result[0]?.items.map((entry) => entry.id),
+    ["point-1", "point-2", "point-3", "point-4", "serial-1"],
+    "Today keeps the five-item limit and serial programs fill remaining capacity",
+  );
+  console.log("Today item limit/fill strategy: OK");
+}
+
+{
   const breaking: StoryCollection = {
     id: "breaking_news",
     intent: "breaking_news",
