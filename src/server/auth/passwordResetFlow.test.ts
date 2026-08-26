@@ -82,8 +82,21 @@ assert.match(emailHealthRoute, /requireAdminApiUser/);
 assert.match(emailHealthRoute, /provider: "resend"/);
 assert.match(emailHealthRoute, /deliveries1h/);
 assert.match(emailHealthRoute, /lastSuccessfulAt/);
+assert.match(emailHealthRoute, /lastFailure/);
 assert.match(emailHealthRoute, /debugRedirect/);
 assert.match(emailHealthRoute, /MISCONFIGURED/);
+assert.match(emailHealthRoute, /DEGRADED/);
+assert.match(emailHealthRoute, /CONFIGURED/);
+assert.match(
+  emailHealthRoute,
+  /if \(params\.failed1h > 0\) return "DEGRADED"/,
+  "recent provider failures must never be hidden behind successful attempts",
+);
+assert.match(
+  emailHealthRoute,
+  /if \(params\.sent1h > 0\) return "OK";\s*return "CONFIGURED";/,
+  "configured env without a real recent send must not be false-green",
+);
 
 const resetPage = read("src/app/(auth)/reset-password/[token]/page.tsx");
 assert.match(resetPage, /await isPasswordResetTokenValid\(token\)/);
