@@ -436,6 +436,7 @@ export function GuestMyPlanPanel({
       setScenarioSlots((rows) => rows.filter((r) => r.slot !== slot));
       toast.success(`Добавлено в ${SLOT_LABEL[slot]}`);
       setPhase("engaged");
+      setAuthGateVisible(true);
       recordEngagement();
     },
     [recordEngagement, resolvedTargetDate],
