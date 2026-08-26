@@ -56,6 +56,27 @@ assert.match(resetServer, /EMAIL_NOT_CONFIGURED/);
 assert.match(resetServer, /EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD/);
 assert.match(resetServer, /emailService\.getHealth\(\)/);
 
+const verificationServer = read("src/server/auth/email-verification.ts");
+assert.match(
+  verificationServer,
+  /prisma\.notificationDelivery\.create/,
+  "verification email attempts must be visible in NotificationDelivery",
+);
+assert.match(verificationServer, /kind: "verify-email"/);
+assert.match(verificationServer, /status: "PENDING"/);
+assert.match(verificationServer, /status: "SENT"/);
+assert.match(verificationServer, /status: "SKIPPED"/);
+assert.match(verificationServer, /status: "FAILED"/);
+assert.match(verificationServer, /EMAIL_DISABLED/);
+assert.match(verificationServer, /EMAIL_NOT_CONFIGURED/);
+assert.match(verificationServer, /EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD/);
+assert.match(verificationServer, /verificationEmailSendFailed: true/);
+assert.doesNotMatch(
+  verificationServer,
+  /event: "verify_email_sent_successfully"[\s\S]*?email,/,
+  "verification success logs must not include the recipient email",
+);
+
 const emailHealthRoute = read("src/app/api/admin/communications/email/health/route.ts");
 assert.match(emailHealthRoute, /requireAdminApiUser/);
 assert.match(emailHealthRoute, /provider: "resend"/);
