@@ -100,9 +100,6 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     return () => { clearTimeout(timer); controller.abort(); };
   }, [citySlug, draft]);
 
-  const selectClass = "h-11 w-full appearance-none rounded-xl border border-neutral-200 bg-white pl-3 pr-9 text-sm";
-  void selectClass; // Keep layout constant available for future refinement-only selects.
-
   return (
     <div className="space-y-6 pb-1">
       <fieldset className="space-y-2">
