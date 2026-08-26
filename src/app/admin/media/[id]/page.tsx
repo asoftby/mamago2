@@ -59,11 +59,8 @@ export default async function AdminMediaDetailPage({
     mimeType: media.mimeType,
   });
 
-  const displayOriginalName = resolveDisplayFilename({
-    filename: media.originalName,
-    extension: media.extension,
-    mimeType: media.mimeType,
-  });
+  // originalName must display exactly as uploaded — never rewrite extension via mime.
+  const displayOriginalName = media.originalName;
 
   // Get usage context for auto-generated metadata
   const usageContext = await getMediaUsageContext(id);

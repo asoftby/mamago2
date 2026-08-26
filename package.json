@@ -146,6 +146,8 @@
     "test:billing-financial": "tsx --test src/lib/billing/billingPolicy.test.ts && tsx --test --test-concurrency=1 src/server/services/billing/billingFinancial.integration.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "media:backfill-migrated-metadata": "tsx scripts/backfill-migrated-media-metadata.ts",
+    "media:backfill-titles": "tsx scripts/data-migrations/backfill-media-titles.ts",
+    "media:audit-alt": "tsx scripts/data-migrations/audit-media-alt.ts",
     "test:media-metadata-backfill": "tsx src/lib/media/isTechnicalMediaTitle.test.ts && tsx src/lib/media/decideMigratedMediaMetadataPatch.test.ts",
     "test:media-picker-pagination": "tsx src/lib/media/mediaPickerQuery.test.ts && tsx src/components/media/useMediaLibraryPager.test.ts && tsx src/app/api/admin/articles/media-picker/route.test.ts && tsx src/app/api/business/media-picker/route.test.ts && NODE_OPTIONS=--conditions=react-server tsx src/lib/uploads/resolveUploadOwner.test.ts",
     "test:media-from-url-transport": "tsx src/server/modules/import/parsers/fetchHtml.test.ts && tsx src/lib/media/safeRemoteImageUrl.test.ts",
