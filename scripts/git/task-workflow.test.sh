@@ -64,6 +64,21 @@ git -C "$updater" add dev.txt
 git -C "$updater" commit -m "chore: advance dev" >/dev/null
 quiet_git -C "$updater" push origin dev
 
+# Any visible WIP, including untracked files, must block reconciliation.
+printf 'untracked\n' > "$first_worktree/untracked.txt"
+set +e
+(
+  cd "$first_worktree"
+  sh scripts/git/task-sync.sh >/dev/null 2>&1
+)
+dirty_status=$?
+set -e
+[ "$dirty_status" -eq 3 ] || {
+  echo "[task-workflow-test] untracked task work must stop task-sync" >&2
+  exit 1
+}
+rm "$first_worktree/untracked.txt"
+
 (
   cd "$first_worktree"
   sh scripts/git/task-sync.sh >/dev/null
