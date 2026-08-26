@@ -5,55 +5,55 @@ import { ZodError } from "zod";
 import { resetPassword } from "@/server/auth/password-reset";
 import { AuthError } from "@/server/auth/register";
 
-type ActionState =
+export type ResetPasswordActionState =
   | { ok: true }
-  | { ok: false; message: string; fieldErrors?: Record<string, string[]> };
+  | {
+      ok: false;
+      message: string;
+      code?: "INVALID_TOKEN";
+      fieldErrors?: Record<string, string[]>;
+    };
 
 export async function resetPasswordAction(
   token: string,
-  prevState: ActionState,
-  formData: FormData
-): Promise<ActionState> {
+  _prevState: ResetPasswordActionState,
+  formData: FormData,
+): Promise<ResetPasswordActionState> {
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  // Check if passwords match
   if (password !== confirmPassword) {
     return {
       ok: false,
-      message: "Пароли не совпадают",
+      message: "",
+      fieldErrors: { confirmPassword: ["Пароли не совпадают"] },
     };
   }
 
   try {
     await resetPassword(token, password);
-  } catch (e) {
-    // Handle Zod validation errors
-    if (e instanceof ZodError) {
+  } catch (error) {
+    if (error instanceof ZodError) {
       return {
         ok: false,
-        message: "Проверьте поля формы",
-        fieldErrors: e.flatten().fieldErrors,
+        message: "",
+        fieldErrors: error.flatten().fieldErrors as Record<string, string[]>,
       };
     }
 
-    // Handle AuthError
-    if (e instanceof AuthError) {
-      if (e.code === "INVALID_TOKEN") {
-        return {
-          ok: false,
-          message: "Ссылка недействительна или истекла. Запросите новую ссылку.",
-        };
-      }
+    if (error instanceof AuthError && error.code === "INVALID_TOKEN") {
+      return {
+        ok: false,
+        code: "INVALID_TOKEN",
+        message: "Срок действия ссылки истёк или она уже была использована.",
+      };
     }
 
-    // Generic error
     return {
       ok: false,
-      message: "Не удалось сбросить пароль. Попробуйте ещё раз.",
+      message: "Не удалось изменить пароль. Попробуйте ещё раз.",
     };
   }
 
-  // Success - redirect to login
   redirect("/login?reset=success");
 }
