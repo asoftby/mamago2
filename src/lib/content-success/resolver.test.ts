@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 
+import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import {
   resolveContentListHref,
   resolveContentSuccessState,
 } from "./resolver";
+
+const publicOrigin = getCanonicalPublicAppUrl();
 
 assert.equal(
   resolveContentListHref({
@@ -99,7 +102,7 @@ assert.equal(publicPublished.title, "Публикация обновлена");
 assert.equal(publicPublished.listAction, null);
 assert.deepEqual(publicPublished.openAction, {
   label: "Смотреть публикацию",
-  href: "/minsk/offers/offer-1",
+  href: `${publicOrigin}/minsk/offers/offer-1`,
   target: "_self",
 });
 assert.equal(
@@ -122,7 +125,7 @@ assert.ok(publicDraft);
 assert.equal(publicDraft.listAction, null);
 assert.deepEqual(publicDraft.openAction, {
   label: "Вернуться к публикации",
-  href: "/minsk/offers/offer-1",
+  href: `${publicOrigin}/minsk/offers/offer-1`,
   target: "_self",
 });
 assert.ok(publicDraft.continueEditingAction);
@@ -137,7 +140,28 @@ const publicSubmitted = resolveContentSuccessState({
 });
 assert.ok(publicSubmitted);
 assert.equal(publicSubmitted.listAction, null);
-assert.equal(publicSubmitted.openAction?.label, "Открыть предпросмотр");
+assert.deepEqual(publicSubmitted.openAction, {
+  label: "Открыть предпросмотр",
+  href: "/me/offers/offer-1/preview",
+  target: "_blank",
+});
 assert.ok(publicSubmitted.continueEditingAction?.href.includes("returnTo="));
+
+const businessPublished = resolveContentSuccessState({
+  kind: "offer",
+  surface: "business",
+  outcome: "published",
+  id: "offer-2",
+  slug: "family-program",
+  citySlug: "minsk",
+  offerKind: "SERVICE",
+});
+assert.ok(businessPublished);
+assert.deepEqual(businessPublished.openAction, {
+  label: "Смотреть публикацию",
+  href: `${publicOrigin}/minsk/offers/family-program`,
+  target: "_blank",
+});
+assert.equal(businessPublished.listAction?.href, "/business/publications/offers");
 
 console.log("content success resolver tests: OK");

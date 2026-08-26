@@ -214,7 +214,9 @@ export function resolveContentLinks(payload: ContentSuccessPayload): ResolvedCon
 function resolvePublicOriginReturnTo(payload: ContentSuccessPayload): string | null {
   const returnTo = resolveEffectiveReturnTo(payload);
   if (!returnTo) return null;
-  return resolveReturnToSurface(returnTo) === "public" ? returnTo : null;
+  return resolveReturnToSurface(returnTo) === "public"
+    ? toAbsolutePublicUrl(returnTo)
+    : null;
 }
 
 function resolveDraftSavedTitle(payload: ContentSuccessPayload): string {
