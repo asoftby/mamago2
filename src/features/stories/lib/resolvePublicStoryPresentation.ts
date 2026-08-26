@@ -2,21 +2,9 @@ import type { StoryCollection, StoryItem } from "../types/story";
 
 /**
  * `running` is an internal serial-program source, not a public navigation
- * concept. On the homepage it is folded into the single «Сегодня» circle,
- * but only when the representative occurrence is actually today / in progress.
- * Future serial programs stay out of the temporal circle instead of making
- * «Идёт сейчас» mean «sometime later».
+ * concept. Its registry range is the current city day, so every item from that
+ * source is folded into the single public «Сегодня» circle.
  */
-function runningItemBelongsToday(item: StoryItem): boolean {
-  const eyebrow = item.eyebrow?.trim().toLocaleLowerCase("ru-RU") ?? "";
-  return (
-    eyebrow === "сегодня" ||
-    eyebrow.startsWith("сегодня ·") ||
-    eyebrow === "идёт сейчас" ||
-    eyebrow.startsWith("идёт сейчас ·")
-  );
-}
-
 function normalizeRunningTodayItem(item: StoryItem): StoryItem {
   return {
     ...item,
@@ -43,9 +31,8 @@ function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
  * Public Stories presentation rules.
  *
  * - one temporal circle: «Сегодня»;
- * - serial `running` inventory relevant to today is merged into it;
+ * - serial `running` inventory is merged into it;
  * - legacy «Идёт сейчас» wording does not leak into the public viewer;
- * - future serial inventory is not exposed as «Сегодня»;
  * - contextual/editorial circles (`free`, `lastchance`, `breaking_news`)
  *   retain their canonical order and content.
  */
@@ -54,9 +41,7 @@ export function resolvePublicStoryPresentation(
 ): StoryCollection[] {
   const today = collections.find((collection) => collection.intent === "today");
   const running = collections.find((collection) => collection.intent === "running");
-  const runningTodayItems = running?.items
-    .filter(runningItemBelongsToday)
-    .map(normalizeRunningTodayItem) ?? [];
+  const runningTodayItems = running?.items.map(normalizeRunningTodayItem) ?? [];
   const todayItems = dedupeItems([...(today?.items ?? []), ...runningTodayItems]);
 
   const temporalIndexes = collections
