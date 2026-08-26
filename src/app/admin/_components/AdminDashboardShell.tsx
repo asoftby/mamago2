@@ -130,6 +130,18 @@ export function AdminDashboardShell({
         </div>
       </div>
 
+      {/* System status — critical health is visible first */}
+      <OperationsBlock
+        stale={stale}
+        nodes={nodes}
+        staleSyntheticTitle={staleSyntheticTitle}
+        signals={signals}
+        previousLastViewedAt={previousLastViewedAt}
+        canResolve={canResolve}
+        now={now}
+        isDev={isDev}
+      />
+
       {/* Row 1 — Company Pulse: audience + North Star */}
       <div>
         <h2 className="text-base font-semibold text-gray-700 mb-3">Company Pulse</h2>
@@ -159,25 +171,13 @@ export function AdminDashboardShell({
       {/* Row 6 — B2B health */}
       <B2BHealthBlock model={b2b} />
 
-      {/* Row 7 — Operations + Data Quality (moved from top per product spec:
-          audience -> activation -> planning -> habit -> growth -> supply ->
-          B2B -> operations/data-quality last) */}
+      {/* Row 7 — Operations + Data Quality */}
       <div>
         <h2 className="text-base font-semibold text-gray-700 mb-3">Operations & Data Quality</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <OperationalLoadBlock model={workload} />
           <DataQualityBlock model={dataQuality} />
         </div>
-        <OperationsBlock
-          stale={stale}
-          nodes={nodes}
-          staleSyntheticTitle={staleSyntheticTitle}
-          signals={signals}
-          previousLastViewedAt={previousLastViewedAt}
-          canResolve={canResolve}
-          now={now}
-          isDev={isDev}
-        />
       </div>
     </div>
   );
