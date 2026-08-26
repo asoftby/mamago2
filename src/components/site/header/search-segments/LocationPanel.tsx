@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Navigation, Zap, ChevronDown, Check } from "lucide-react";
+import { MapPin, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useOptionalCity } from "@/contexts/CityContext";
 import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -26,51 +26,23 @@ interface LocationPanelProps {
   apiOptions: { metros: FilterOption[]; districts: FilterOption[] };
 }
 
+/**
+ * Global header location scope is city-only.
+ * District and metro are section-specific refinements and live in EventAdvancedFilters.
+ * Legacy geo filter props stay in the contract so existing callers do not need a parallel API.
+ */
 export function LocationPanel({
-  variant = "default",
-  allowCitySelection = false,
   citySlug,
   selectedCitySlug,
   onCityPick,
-  searchText,
-  onSearchTextChange,
   onClose,
-  applied,
   actions,
-  apiOptions,
 }: LocationPanelProps) {
   const router = useRouter();
   const cityCtx = useOptionalCity();
   const { cities } = usePublicCityOptions();
   const [showCityList, setShowCityList] = useState(false);
-  const [showMetroList, setShowMetroList] = useState(false);
-  const [showDistrictList, setShowDistrictList] = useState(false);
-  const handleNearbyClick = () => {
-    // Toggle nearby state - if already selected, deselect it
-    const newNearbyState = !applied.nearby;
-    actions.setDraft({ nearby: newNearbyState, metro: null, district: null });
-    onSearchTextChange("");
-    // Don't close panel - let user continue selecting
-  };
 
-  const handleMetroSelect = (metroValue: string) => {
-    // When selecting metro, clear district and nearby
-    actions.setDraft({ metro: metroValue, district: null, nearby: false });
-    onSearchTextChange("");
-    setShowMetroList(false);
-    // Don't close panel - let user continue selecting
-  };
-
-  const handleDistrictSelect = (districtValue: string) => {
-    // When selecting district, clear metro and nearby
-    actions.setDraft({ district: districtValue, metro: null, nearby: false });
-    onSearchTextChange("");
-    setShowDistrictList(false);
-    // Don't close panel - let user continue selecting
-  };
-
-  const selectedMetro = apiOptions.metros.find((m) => m.value === applied.metro);
-  const selectedDistrict = apiOptions.districts.find((d) => d.value === applied.district);
   const activeCitySlug = selectedCitySlug ?? citySlug;
   const cityOptions = useMemo(() => {
     const map = new Map(cities.map((city) => [city.slug, city]));
@@ -94,227 +66,94 @@ export function LocationPanel({
       return a.name.localeCompare(b.name, "ru");
     });
   }, [cities, activeCitySlug]);
+
   const selectedCityName =
     cityOptions.find((city) => city.slug === activeCitySlug)?.name ?? activeCitySlug;
-  const showCitySelection = true;
-  const hasMetroOptions = apiOptions.metros.length > 0;
-  const hasDistrictOptions = apiOptions.districts.length > 0;
+
+  const handleCitySelect = (slug: string) => {
+    if (slug === activeCitySlug) {
+      setShowCityList(false);
+      return;
+    }
+
+    // Geo refinements belong to the previous city and must not leak across city changes.
+    actions.setDraft({ nearby: false, metro: null, district: null });
+
+    if (onCityPick) {
+      onCityPick(slug);
+      setShowCityList(false);
+      return;
+    }
+
+    if (cityCtx?.setCity) {
+      cityCtx.setCity(slug);
+    } else {
+      router.push(`/${slug}`);
+    }
+    setShowCityList(false);
+    onClose();
+  };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
       <div className="p-6">
-        {/* Quick Actions */}
-        <div className="space-y-3">
-          {showCitySelection ? (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setShowCityList((value) => !value)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors text-left"
-                aria-expanded={showCityList}
-                aria-haspopup="listbox"
-              >
-                <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full">
-                  <MapPin className="h-5 w-5 text-gray-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">{selectedCityName}</div>
-                  <div className="text-sm text-gray-500">Сменить город</div>
-                </div>
-                <ChevronDown
-                  className={cn(
-                    "h-5 w-5 text-gray-400 transition-transform duration-200",
-                    showCityList && "rotate-180",
-                  )}
-                  aria-hidden
-                />
-              </button>
-
-              {showCityList ? (
-                <div
-                  className="ml-14 space-y-1 max-h-56 overflow-y-auto bg-white rounded-lg p-2"
-                  role="listbox"
-                  aria-label="Выбор города"
-                >
-                  {cityOptions.map((city) => {
-                    const selected = city.slug === activeCitySlug;
-                    return (
-                      <button
-                        key={city.slug}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        onClick={() => {
-                          if (onCityPick) {
-                            onCityPick(city.slug);
-                            setShowCityList(false);
-                            setShowMetroList(false);
-                            setShowDistrictList(false);
-                            return;
-                          }
-                          actions.setDraft({ nearby: false, metro: null, district: null });
-                          if (cityCtx?.setCity) {
-                            cityCtx.setCity(city.slug);
-                          } else {
-                            router.push(`/${city.slug}`);
-                          }
-                          setShowCityList(false);
-                          onClose();
-                        }}
-                        className={cn(
-                          "w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-left transition-colors",
-                          selected
-                            ? "bg-[#EF8759]/10 text-[#EF8759]"
-                            : "hover:bg-gray-50 text-gray-700",
-                        )}
-                      >
-                        <span className="min-w-0">
-                          <span className="font-medium block">{city.name}</span>
-                          <span className="text-xs text-gray-500">Весь город</span>
-                        </span>
-                        {selected ? (
-                          <Check className="h-4 w-4 shrink-0 text-[#EF8759]" aria-hidden />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 opacity-50 cursor-not-allowed">
-              <div className="flex items-center justify-center w-10 h-10 bg-gray-100 rounded-full">
-                <MapPin className="h-5 w-5 text-gray-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900">{selectedCityName}</div>
-                <div className="text-sm text-gray-500">Весь город</div>
-              </div>
-            </div>
-          )}
-
-          {variant !== "cityHub" ? (
-            <>
-          {/* Nearby */}
+        <div className="space-y-2">
           <button
-            onClick={handleNearbyClick}
-            className={cn(
-              "w-full flex items-center gap-4 p-4 rounded-xl transition-colors text-left border",
-              applied.nearby 
-                ? "bg-blue-50 border-blue-200" 
-                : "border-transparent hover:bg-gray-50"
-            )}
+            type="button"
+            onClick={() => setShowCityList((value) => !value)}
+            className="flex w-full items-center gap-4 rounded-xl p-4 text-left transition-colors hover:bg-gray-50"
+            aria-expanded={showCityList}
+            aria-haspopup="listbox"
           >
-            <div className={cn(
-              "flex items-center justify-center w-10 h-10 rounded-full",
-              applied.nearby ? "bg-blue-100" : "bg-blue-50"
-            )}>
-              <Navigation className={cn(
-                "h-5 w-5",
-                applied.nearby ? "text-blue-700" : "text-blue-600"
-              )} />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+              <MapPin className="h-5 w-5 text-gray-600" />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className={cn(
-                "font-medium",
-                applied.nearby ? "text-blue-700" : "text-gray-900"
-              )}>Поблизости</div>
-              <div className="text-sm text-gray-500">Найти рядом со мной</div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-gray-900">{selectedCityName}</div>
+              <div className="text-sm text-gray-500">Сменить город</div>
             </div>
+            <ChevronDown
+              className={cn(
+                "h-5 w-5 text-gray-400 transition-transform duration-200",
+                showCityList && "rotate-180",
+              )}
+              aria-hidden
+            />
           </button>
 
-          {hasMetroOptions ? (
-            <div className="space-y-2">
-              <button
-                onClick={() => setShowMetroList(!showMetroList)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors text-left"
-              >
-                <div className="flex items-center justify-center w-10 h-10 bg-green-50 rounded-full">
-                  <Zap className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">
-                    {selectedMetro ? selectedMetro.label : "Метро"}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {selectedMetro ? "Метро" : "Выбрать станцию"}
-                  </div>
-                </div>
-                <ChevronDown 
-                  className={cn(
-                    "h-5 w-5 text-gray-400 transition-transform duration-200",
-                    showMetroList && "rotate-180"
-                  )}
-                />
-              </button>
-
-              {showMetroList && (
-                <div className="ml-14 space-y-1 max-h-40 overflow-y-auto bg-white rounded-lg p-2">
-                  {apiOptions.metros.map((metro) => (
-                    <button
-                      key={metro.value}
-                      onClick={() => handleMetroSelect(metro.value)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                        applied.metro === metro.value
-                          ? "bg-[#EF8759]/10 text-[#EF8759] font-medium"
-                          : "hover:bg-gray-50 text-gray-700"
-                      )}
-                    >
-                      {metro.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+          {showCityList ? (
+            <div
+              className="ml-14 max-h-56 space-y-1 overflow-y-auto rounded-lg bg-white p-2"
+              role="listbox"
+              aria-label="Выбор города"
+            >
+              {cityOptions.map((city) => {
+                const selected = city.slug === activeCitySlug;
+                return (
+                  <button
+                    key={city.slug}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => handleCitySelect(city.slug)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors",
+                      selected
+                        ? "bg-[#EF8759]/10 text-[#EF8759]"
+                        : "text-gray-700 hover:bg-gray-50",
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-medium">{city.name}</span>
+                      <span className="text-xs text-gray-500">Весь город</span>
+                    </span>
+                    {selected ? (
+                      <Check className="h-4 w-4 shrink-0 text-[#EF8759]" aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
-          ) : null}
-
-          {hasDistrictOptions ? (
-            <div className="space-y-2">
-              <button
-                onClick={() => setShowDistrictList(!showDistrictList)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors text-left"
-              >
-                <div className="flex items-center justify-center w-10 h-10 bg-purple-50 rounded-full">
-                <MapPin className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900">
-                    {selectedDistrict ? selectedDistrict.label : "Район"}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {selectedDistrict ? "Район" : "Выбрать район"}
-                  </div>
-                </div>
-                <ChevronDown 
-                  className={cn(
-                    "h-5 w-5 text-gray-400 transition-transform duration-200",
-                    showDistrictList && "rotate-180"
-                  )}
-                />
-              </button>
-
-              {showDistrictList && (
-                <div className="ml-14 space-y-1 max-h-40 overflow-y-auto bg-white rounded-lg p-2">
-                  {apiOptions.districts.map((district) => (
-                    <button
-                      key={district.value}
-                      onClick={() => handleDistrictSelect(district.value)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                        applied.district === district.value
-                          ? "bg-[#EF8759]/10 text-[#EF8759] font-medium"
-                          : "hover:bg-gray-50 text-gray-700"
-                      )}
-                    >
-                      {district.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-            </>
           ) : null}
         </div>
       </div>
