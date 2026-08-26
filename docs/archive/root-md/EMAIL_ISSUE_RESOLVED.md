@@ -21,10 +21,12 @@
 
 ```bash
 EMAIL_ENABLED=true
-RESEND_API_KEY=re_c5XCxVwh_JuQ3utb6FHecwzFkmiFoYF1b
+RESEND_API_KEY=re_REDACTED
 EMAIL_FROM="mamaGo <onboarding@resend.dev>"  # Изменено с send.mamago.by
 EMAIL_REPLY_TO=hello@mamago.by
 ```
+
+> Security note: реальный API key удалён из документации. Секреты должны храниться только во внешнем secret/env store.
 
 ### Сервер перезапущен ✅
 
@@ -114,8 +116,7 @@ pnpm dev
 
 [auth] verification email sent successfully {
   event: 'verify_email_sent_successfully',
-  userId: '...',
-  email: 'test@example.com'
+  userId: '...'
 }
 ```
 
