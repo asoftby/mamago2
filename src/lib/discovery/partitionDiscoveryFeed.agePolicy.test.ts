@@ -56,6 +56,28 @@ test("adult self context treats unrestricted and adult content as compatible", (
   assert.deepEqual(result.secondary.map((item) => item.id), ["kids"]);
 });
 
+test("explicit adult matches outrank unrestricted content even with lower engagement", () => {
+  const result = partitionDiscoveryFeed(
+    { ...defaultFilters, age: ["18+"] },
+    [
+      activity("unrestricted", "UNRESTRICTED", 0, 12, 100),
+      activity("adult", "ADULT_ONLY", 18, 99, 4),
+    ],
+  );
+
+  assert.deepEqual(result.primary.map((item) => item.id), ["adult", "unrestricted"]);
+});
+
+test("UNKNOWN age does not become a child match through numeric fallback", () => {
+  const result = partitionDiscoveryFeed(
+    { ...defaultFilters, age: ["3-5"] },
+    [activity("unknown", "UNKNOWN", 0, 12, 3)],
+  );
+
+  assert.deepEqual(result.primary, []);
+  assert.deepEqual(result.secondary, []);
+});
+
 test("ordinary SPECIFIC 18+ remains an age bucket, not strict adult-only", () => {
   const result = partitionDiscoveryFeed(
     { ...defaultFilters, age: ["18+"] },
