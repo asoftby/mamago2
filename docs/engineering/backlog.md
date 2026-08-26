@@ -122,15 +122,15 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-005] Integrate recovery/article-inline-media-public-access
 
-- Status: OPEN
+- Status: SUPERSEDED_BY_BACKLOG-140
 - Priority: P2
 - Area: Media / Articles
 - Added: 2026-08-07
-- Reason deferred: восстановлена 3-коммитная цепочка функциональности из устаревшего worktree; ещё не влита.
+- Reason deferred: восстановлена 3-коммитная цепочка функциональности из устаревшего worktree; дальнейший путь интеграции заменён более узким fresh-dev extraction в BACKLOG-140.
 - Context: публичный доступ к inline media опубликованных статей, article content usage sync, выравнивание usage-tracking с `dev` (один predecessor-коммит, `51b5b4d6`, уже приземлился независимо в `origin/dev`; recovery реплеит два действительно уникальных коммита плюс этот общий, разрешая один тривиальный конфликт порядка scripts в `package.json`).
 - Current state: branch `recovery/article-inline-media-public-access`, HEAD `e2edfe4dedfbbe780fd257df7b50b24677c00af2`. Все проверки зелёные (tsc, lint, целевые тесты, build). Source worktree `.claude/worktrees/agent-afb427503fa2ade7a` уже удалён (подтверждён clean, preservation proof проверен свежим прямо перед удалением).
 - Dependencies: нет блокирующих.
-- Acceptance criteria: влит в `dev`.
+- Acceptance criteria: не интегрировать recovery-ветку целиком и не rebase старого PR #109; выполнить BACKLOG-140, извлекая только актуальный `MediaUsage` delta в новую task-ветку от свежего `origin/dev`.
 - Source: cleanup (Category C worktree audit — agent-afb427503fa2ade7a recovery)
 
 ## [BACKLOG-006] Remove legacy source worktrees after recovery branches are integrated
@@ -3886,15 +3886,14 @@ P3 — cleanup / polish / optional
   PR rebased onto current `origin/dev`, CI green, then normal merge.
 - Source: full reconciliation audit, 2026-08-26.
 
-## [BACKLOG-139] Rebase and land PR #117 + #118 (analytics contract v1 + followup)
+## [BACKLOG-139] Rebuild archived PR #117 + #118 analytics semantics from fresh dev
 
 - Status: OPEN
 - Priority: P2
 - Area: Analytics
 - Added: 2026-08-26
-- Reason deferred: both stale (58+ commits behind `origin/dev` at audit
-  time) and marked draft by the author — not signaled ready, and rebasing
-  is substantial standalone work, not a reconciliation step.
+- Reason deferred: both stale and marked draft by the author; the stacked
+  history is no longer a sensible integration path against current `dev`.
 - Context: PR #117 `chore/analytics-contract-v1` (draft, `CLEAN`,
   typecheck green, 58 commits behind `origin/dev` at audit) defines the
   analytics contract v1 baseline. PR #118
@@ -3902,23 +3901,29 @@ P3 — cleanup / polish / optional
   failing) is stacked directly on top of #117
   (`git merge-base --is-ancestor` confirms #117's head is an ancestor of
   #118's head) — #118 cannot be rebased/merged before #117 is.
-- Current state: both untouched since audit; not rebased.
-- Dependencies: #118 blocked on #117.
-- Acceptance criteria: #117 rebased onto current `origin/dev`, marked
-  ready, CI green, merged; then #118 rebased on the new `origin/dev`,
-  its typecheck failure fixed, CI green, merged.
+- Current state: exact heads are archived as
+  `archive-pr/117-analytics-contract-v1` at
+  `300a424a5ccee878f30c26461ccb80999be94756` and
+  `archive-pr/118-analytics-contract-v1-followup` at
+  `4fa3bbef3c8842628f32fa1037b288f66654aa2f`, plus the verified external
+  bundle `mamago2-analytics-pr117-pr118-20260827.bundle`. PR #117 is an
+  ancestor of #118.
+- Dependencies: product review of which archived analytics semantics remain
+  wanted on current `dev`.
+- Acceptance criteria: start from fresh `origin/dev`, extract only approved
+  semantics from the archived chain into new focused task branches/PRs,
+  pass current tests and CI, and do not rebase the stale stacked PR history.
 - Source: full reconciliation audit, 2026-08-26.
 
-## [BACKLOG-140] Rebase and land PR #109 (Article inline media MediaUsage reverse-index)
+## [BACKLOG-140] Rebuild PR #109 Article MediaUsage protection from fresh dev
 
 - Status: OPEN
 - Priority: P1
 - Area: Media / Admin cleanup tooling
 - Added: 2026-08-26
-- Reason deferred: 255 commits behind `origin/dev` at audit time and
-  `CONFLICTING` — rebasing that much drift is substantial standalone
-  work, not a reconciliation step. Explicitly verified NOT superseded
-  by later dev work before deferring (see Context).
+- Reason deferred: the PR is stale/conflicting, but its Article inline/gallery
+  `MediaUsage` protection is still absent from current `dev`. The stale PR
+  must not be rebased merely to keep its old integration path alive.
 - Context: PR #109 `fix/article-inline-media-public-access` adds a
   `MediaUsage` reverse index for Article `image`/`gallery` content
   blocks (`extractArticleContentMediaIds()` +
@@ -3937,16 +3942,39 @@ P3 — cleanup / polish / optional
   still mark live inline Article images `ORPHANED` and hard-delete them.
   Every other entity type (Place/Event/Offer/Route) already has this
   reverse-index wired in; Article is the one remaining gap.
-- Current state: branch unchanged since audit (255 commits behind
-  `origin/dev`, `mergeStateStatus: DIRTY`, `mergeable: CONFLICTING`, no CI
-  run recorded). Also needs a separate data-only `MediaUsage` backfill for
-  existing DEV Articles after merge (per PR description, not included in
-  the PR itself; ~9 Articles identified in an earlier read-only audit
-  referenced by the PR).
-- Dependencies: none for the rebase itself; the post-merge backfill is a
+- Current state: historical PR #109 is preserved by
+  `recovery/article-inline-media-public-access` at
+  `e2edfe4dedfbbe780fd257df7b50b24677c00af2`. The recovery chain contains
+  the content-media extractor, transactional usage synchronization, replay
+  integration, field-scoped recomputation and tests. A separate data-only
+  `MediaUsage` backfill is still required for existing Articles after the
+  code lands.
+- Dependencies: none for a fresh extraction; the post-merge backfill is a
   separate follow-up.
-- Acceptance criteria: rebased onto current `origin/dev`, conflicts
-  resolved, tests still passing (`test:article-content-media-linkage`,
-  `test:article-content-media-usage`, `test:article-media-replay`), CI
-  green, merged; backfill run and tracked separately.
+- Acceptance criteria: create a new task branch from fresh `origin/dev`,
+  extract only the still-needed `MediaUsage` reverse-index delta from the
+  recovery branch, pass `test:article-content-media-linkage`,
+  `test:article-content-media-usage`, `test:article-media-replay` and current
+  CI, then merge normally. Do not rebase the stale #109 branch. Track and run
+  the backfill separately.
 - Source: full reconciliation audit, 2026-08-26.
+
+## [BACKLOG-141] Skip code builds for pure remote branch deletion pushes
+
+- Status: OPEN
+- Priority: P3
+- Area: Git / Developer workflow
+- Added: 2026-08-27
+- Reason deferred: hook behavior is outside the preservation-only Git cleanup
+  scope and requires a focused safety review.
+- Context: the pre-push hook currently runs `tsc --noEmit` and a full
+  `pnpm build` even when the push contains only remote ref deletions and no
+  new commits or code. This makes proven ref-only cleanup unnecessarily
+  expensive.
+- Dependencies: preserve the existing direct-push and commit validation
+  guardrails.
+- Acceptance criteria: distinguish pushes containing commits/code from pure
+  remote ref deletion updates; retain ref/deletion safety checks, run full
+  validation for code pushes, and safely skip code typecheck/build only for
+  verified deletion-only pushes.
+- Source: final Git sterility cleanup, 2026-08-27.
