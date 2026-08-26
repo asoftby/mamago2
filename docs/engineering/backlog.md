@@ -122,15 +122,15 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-005] Integrate recovery/article-inline-media-public-access
 
-- Status: OPEN
+- Status: SUPERSEDED_BY_BACKLOG-140
 - Priority: P2
 - Area: Media / Articles
 - Added: 2026-08-07
-- Reason deferred: восстановлена 3-коммитная цепочка функциональности из устаревшего worktree; ещё не влита.
+- Reason deferred: восстановлена 3-коммитная цепочка функциональности из устаревшего worktree; дальнейший путь интеграции заменён более узким fresh-dev extraction в BACKLOG-140.
 - Context: публичный доступ к inline media опубликованных статей, article content usage sync, выравнивание usage-tracking с `dev` (один predecessor-коммит, `51b5b4d6`, уже приземлился независимо в `origin/dev`; recovery реплеит два действительно уникальных коммита плюс этот общий, разрешая один тривиальный конфликт порядка scripts в `package.json`).
 - Current state: branch `recovery/article-inline-media-public-access`, HEAD `e2edfe4dedfbbe780fd257df7b50b24677c00af2`. Все проверки зелёные (tsc, lint, целевые тесты, build). Source worktree `.claude/worktrees/agent-afb427503fa2ade7a` уже удалён (подтверждён clean, preservation proof проверен свежим прямо перед удалением).
 - Dependencies: нет блокирующих.
-- Acceptance criteria: влит в `dev`.
+- Acceptance criteria: не интегрировать recovery-ветку целиком и не rebase старого PR #109; выполнить BACKLOG-140, извлекая только актуальный `MediaUsage` delta в новую task-ветку от свежего `origin/dev`.
 - Source: cleanup (Category C worktree audit — agent-afb427503fa2ade7a recovery)
 
 ## [BACKLOG-006] Remove legacy source worktrees after recovery branches are integrated
