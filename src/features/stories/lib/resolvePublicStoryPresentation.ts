@@ -5,7 +5,7 @@ import type { StoryCollection, StoryItem } from "../types/story";
  * concept. On the homepage it is folded into the single «Сегодня» circle,
  * but only when the representative occurrence is actually today / in progress.
  * Future serial programs stay out of the temporal circle instead of making
- * «Идёт сейчас» mean «sometime in the next two weeks».
+ * «Идёт сейчас» mean «sometime later».
  */
 function runningItemBelongsToday(item: StoryItem): boolean {
   const eyebrow = item.eyebrow?.trim().toLocaleLowerCase("ru-RU") ?? "";
@@ -15,6 +15,15 @@ function runningItemBelongsToday(item: StoryItem): boolean {
     eyebrow === "идёт сейчас" ||
     eyebrow.startsWith("идёт сейчас ·")
   );
+}
+
+function normalizeRunningTodayItem(item: StoryItem): StoryItem {
+  return {
+    ...item,
+    // Public temporal language is intentionally calendar-based. The technical
+    // `running` source must not leak its legacy «Идёт сейчас» label into UI.
+    eyebrow: "сегодня",
+  };
 }
 
 function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
@@ -33,7 +42,8 @@ function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
  *
  * - one temporal circle: «Сегодня»;
  * - serial `running` inventory relevant to today is merged into it;
- * - future serial inventory is not exposed as «Идёт сейчас»;
+ * - legacy «Идёт сейчас» wording does not leak into the public viewer;
+ * - future serial inventory is not exposed as «Сегодня»;
  * - contextual/editorial circles (`free`, `lastchance`, `breaking_news`)
  *   retain their canonical order and content.
  */
@@ -42,7 +52,9 @@ export function resolvePublicStoryPresentation(
 ): StoryCollection[] {
   const today = collections.find((collection) => collection.intent === "today");
   const running = collections.find((collection) => collection.intent === "running");
-  const runningTodayItems = running?.items.filter(runningItemBelongsToday) ?? [];
+  const runningTodayItems = running?.items
+    .filter(runningItemBelongsToday)
+    .map(normalizeRunningTodayItem) ?? [];
   const todayItems = dedupeItems([...(today?.items ?? []), ...runningTodayItems]);
 
   const temporalIndexes = collections
