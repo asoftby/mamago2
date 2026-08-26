@@ -2,6 +2,10 @@ import * as http from "node:http";
 import * as https from "node:https";
 
 import { resolveSourceSpecificTlsCa } from "./familyByTls";
+import {
+  assertSourceRequestAllowed,
+  getActiveSourceFetchSettings,
+} from "./sourceAccessPolicy";
 
 export interface FetchHtmlOptions {
   timeoutMs?: number;
@@ -14,6 +18,17 @@ export interface FetchHtmlOptions {
   retryDelayMs?: number;
   headers?: Record<string, string>;
   encoding?: string;
+  /**
+   * Override the source-aware in-memory HTML cache TTL. By default this is
+   * enabled only while a parser is running inside SourceAccessContext.
+   */
+  cacheTtlMs?: number;
+  /**
+   * Override the minimum interval between requests to the same source host.
+   * By default this comes from SourceAccessContext / robots Crawl-delay.
+   */
+  minRequestIntervalMs?: number;
+  bypassCache?: boolean;
   /**
    * When native Node fetch/Undici fails before an HTTP response exists, retry
    * the same URL once through Node's built-in http/https transport (IPv4).
@@ -35,6 +50,8 @@ const DEFAULT_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 350;
 const DEFAULT_NODE_HTTP_FALLBACK = true;
 const MAX_REDIRECTS = 5;
+const MAX_HTML_CACHE_BYTES = 24 * 1024 * 1024;
+const MAX_HTML_CACHE_ENTRY_BYTES = 2 * 1024 * 1024;
 
 const DEFAULT_HEADERS: Record<string, string> = {
   "User-Agent":
@@ -43,8 +60,6 @@ const DEFAULT_HEADERS: Record<string, string> = {
   "Accept":
     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
   "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-  "Cache-Control": "no-cache",
-  "Pragma": "no-cache",
 };
 
 const TRANSPORT_ERROR_CODES = new Set([
@@ -63,6 +78,18 @@ const TRANSPORT_ERROR_CODES = new Set([
   "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
 ]);
+
+type HtmlCacheEntry = {
+  result: FetchHtmlResult;
+  expiresAt: number;
+  sizeBytes: number;
+};
+
+const htmlCache = new Map<string, HtmlCacheEntry>();
+const inFlightHtmlRequests = new Map<string, Promise<FetchHtmlResult>>();
+const hostRequestQueues = new Map<string, Promise<void>>();
+const hostLastRequestStartedAt = new Map<string, number>();
+let htmlCacheBytes = 0;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -90,6 +117,108 @@ function buildStatusErrorMessage(url: string, status: number, statusText: string
 function readErrorField(error: unknown, key: string): unknown {
   if (!error || typeof error !== "object") return undefined;
   return (error as Record<string, unknown>)[key];
+}
+
+function normalizedHeadersCacheKey(headers: Record<string, string>): string {
+  return Object.entries(headers)
+    .map(([key, value]) => [key.toLowerCase(), value] as const)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}:${value}`)
+    .join("\n");
+}
+
+function buildHtmlCacheKey(
+  url: string,
+  encoding: string,
+  headers: Record<string, string>,
+): string {
+  return `${url}\nencoding:${encoding}\n${normalizedHeadersCacheKey(headers)}`;
+}
+
+function getCachedHtml(cacheKey: string): FetchHtmlResult | null {
+  const cached = htmlCache.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    htmlCache.delete(cacheKey);
+    htmlCacheBytes = Math.max(0, htmlCacheBytes - cached.sizeBytes);
+    return null;
+  }
+
+  return cached.result;
+}
+
+function evictHtmlCacheUntilFits(requiredBytes: number): void {
+  while (htmlCacheBytes + requiredBytes > MAX_HTML_CACHE_BYTES && htmlCache.size > 0) {
+    const oldestKey = htmlCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    const oldest = htmlCache.get(oldestKey);
+    htmlCache.delete(oldestKey);
+    if (oldest) htmlCacheBytes = Math.max(0, htmlCacheBytes - oldest.sizeBytes);
+  }
+}
+
+function setCachedHtml(cacheKey: string, result: FetchHtmlResult, ttlMs: number): void {
+  if (ttlMs <= 0) return;
+
+  const sizeBytes = Buffer.byteLength(result.html, "utf8");
+  if (sizeBytes > MAX_HTML_CACHE_ENTRY_BYTES) return;
+
+  const existing = htmlCache.get(cacheKey);
+  if (existing) {
+    htmlCache.delete(cacheKey);
+    htmlCacheBytes = Math.max(0, htmlCacheBytes - existing.sizeBytes);
+  }
+
+  evictHtmlCacheUntilFits(sizeBytes);
+  if (htmlCacheBytes + sizeBytes > MAX_HTML_CACHE_BYTES) return;
+
+  htmlCache.set(cacheKey, {
+    result,
+    expiresAt: Date.now() + ttlMs,
+    sizeBytes,
+  });
+  htmlCacheBytes += sizeBytes;
+}
+
+async function runWithHostRateLimit<T>(
+  url: string,
+  minRequestIntervalMs: number,
+  task: () => Promise<T>,
+): Promise<T> {
+  if (minRequestIntervalMs <= 0) return task();
+
+  const host = new URL(url).hostname.toLowerCase();
+  const previous = hostRequestQueues.get(host) ?? Promise.resolve();
+  let release!: () => void;
+  const currentGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const currentTail = previous.catch(() => {}).then(() => currentGate);
+  hostRequestQueues.set(host, currentTail);
+
+  await previous.catch(() => {});
+
+  try {
+    const lastStartedAt = hostLastRequestStartedAt.get(host) ?? 0;
+    const waitMs = Math.max(0, lastStartedAt + minRequestIntervalMs - Date.now());
+    if (waitMs > 0) await sleep(waitMs);
+    hostLastRequestStartedAt.set(host, Date.now());
+    return await task();
+  } finally {
+    release();
+    if (hostRequestQueues.get(host) === currentTail) {
+      void currentTail.finally(() => {
+        if (hostRequestQueues.get(host) === currentTail) {
+          hostRequestQueues.delete(host);
+        }
+      });
+    }
+  }
+}
+
+function shouldRetryHttpStatus(status: number): boolean {
+  return status >= 500 && status < 600;
 }
 
 /**
@@ -201,6 +330,7 @@ async function fetchHtmlViaNodeHttp(
   redirectCount = 0,
 ): Promise<FetchHtmlResult> {
   const parsedUrl = new URL(url);
+  assertSourceRequestAllowed(parsedUrl.toString());
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
     throw new Error(`Unsupported URL protocol for import fetch: ${parsedUrl.protocol}`);
@@ -220,17 +350,9 @@ async function fetchHtmlViaNodeHttp(
         method: "GET",
         headers: {
           ...options.headers,
-          // Node's low-level transport does not transparently decompress like
-          // native fetch. Ask the upstream for the raw HTML body.
           "Accept-Encoding": "identity",
         },
-        // Source-specific CA bundles only extend the normal trusted roots for
-        // known upstreams with incomplete chains. Verification is never
-        // disabled, and unrelated hosts keep Node's default TLS behavior.
         ca: sourceSpecificTlsCa,
-        // The fallback intentionally uses IPv4. It is only reached after
-        // native fetch has already failed, and avoids broken IPv6 routes on
-        // legacy upstream infrastructure without weakening TLS verification.
         family: 4,
       },
       (response) => {
@@ -245,6 +367,7 @@ async function fetchHtmlViaNodeHttp(
           let redirectedUrl: string;
           try {
             redirectedUrl = new URL(location, parsedUrl).toString();
+            assertSourceRequestAllowed(redirectedUrl);
           } catch (error) {
             reject(error);
             return;
@@ -307,28 +430,11 @@ async function fetchHtmlViaNodeHttp(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Binary transport (image/asset downloads)
-//
-// Shares the same source-specific TLS CA resolution (`resolveSourceSpecificTlsCa`)
-// and native-fetch → Node http/https fallback heuristic as `fetchHtml` above,
-// so upstreams with an incomplete chain (currently family.by) only need to be
-// fixed in one place. Unlike `fetchHtml`, redirects are followed manually so
-// every hop can be validated by the caller (SSRF protection for
-// user-supplied URLs) and the response body is capped in-flight instead of
-// being buffered fully before a size check.
-// ---------------------------------------------------------------------------
-
 export interface FetchBinaryOptions {
   timeoutMs?: number;
   headers?: Record<string, string>;
   maxBytes?: number;
   maxRedirects?: number;
-  /**
-   * Called with every URL that will actually be requested — the initial URL
-   * and each redirect hop — before the request is made. Throw to reject an
-   * unsafe target. Required for any endpoint that accepts a user-supplied URL.
-   */
   validateUrl?: (url: URL) => void;
   nodeHttpFallback?: boolean;
 }
@@ -341,9 +447,6 @@ export interface FetchBinaryResult {
 }
 
 const DEFAULT_BINARY_TIMEOUT_MS = 25_000;
-// User-facing (route handlers surface these directly): keep them in Russian,
-// matching the rest of the /api/media/from-url error copy, and free of any
-// upstream/internal detail.
 const SIZE_LIMIT_MESSAGE = "Файл слишком большой";
 const TOO_MANY_REDIRECTS_MESSAGE = "Слишком много перенаправлений";
 
@@ -464,9 +567,6 @@ async function fetchBinaryViaNodeHttp(
   options.validateUrl(parsedUrl);
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    // Defense-in-depth: for /api/media/from-url this is already rejected by
-    // `validateUrl` (assertSafeRemoteImageUrl) above with a user-safe
-    // message. This branch only guards direct/programmatic callers.
     throw Object.assign(new Error("Разрешены только http и https"), { httpStatus: 400 });
   }
 
@@ -475,9 +575,6 @@ async function fetchBinaryViaNodeHttp(
   }
 
   const transport = parsedUrl.protocol === "https:" ? https : http;
-  // Source-specific CA bundles only extend the normal trusted roots for known
-  // upstreams with incomplete chains (see familyByTls.ts). Verification is
-  // never disabled, and unrelated hosts keep Node's default TLS behavior.
   const sourceSpecificTlsCa = resolveSourceSpecificTlsCa(parsedUrl);
 
   return new Promise<FetchBinaryResult>((resolve, reject) => {
@@ -487,9 +584,6 @@ async function fetchBinaryViaNodeHttp(
         method: "GET",
         headers: options.headers,
         ca: sourceSpecificTlsCa,
-        // Only reached after native fetch has already failed; IPv4 avoids
-        // broken IPv6 routes on legacy upstream infrastructure without
-        // weakening TLS verification.
         family: 4,
       },
       (response) => {
@@ -590,17 +684,6 @@ async function fetchBinaryViaNodeHttp(
   });
 }
 
-/**
- * Download an arbitrary binary resource (e.g. a remote image) with TLS
- * verification always enabled. Reuses the same source-specific CA workaround
- * and transport-fallback heuristic as `fetchHtml`; the only workaround for an
- * upstream's incomplete chain lives in `familyByTls.ts`.
- *
- * Redirects are followed manually (native fetch and the Node http fallback
- * both call `options.validateUrl` on every hop) so callers handling
- * user-supplied URLs can reject unsafe redirect targets (SSRF) before the
- * next request is made.
- */
 export async function fetchBinary(
   url: string,
   options: FetchBinaryOptions = {},
@@ -626,8 +709,6 @@ export async function fetchBinary(
       });
     } catch (nativeError) {
       if (hasHttpStatus(nativeError)) {
-        // Already a controlled classification (SSRF/redirect/size limit) —
-        // surface it as-is instead of masking it behind a transport retry.
         throw nativeError;
       }
 
@@ -668,19 +749,16 @@ export async function fetchBinary(
   }
 }
 
-export async function fetchHtml(
+async function fetchHtmlUncached(
   url: string,
-  options: FetchHtmlOptions = {},
+  options: FetchHtmlOptions,
+  headers: Record<string, string>,
+  encoding: string,
+  retryDelayMs: number,
 ): Promise<FetchHtmlResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const attempts = Math.max(1, options.retries ?? DEFAULT_RETRIES);
-  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
-  const encoding = options.encoding ?? "utf-8";
   const nodeHttpFallback = options.nodeHttpFallback ?? DEFAULT_NODE_HTTP_FALLBACK;
-  const headers = {
-    ...DEFAULT_HEADERS,
-    ...options.headers,
-  };
 
   let lastError: Error | null = null;
 
@@ -718,6 +796,10 @@ export async function fetchHtml(
         }
       }
 
+      if (response.url) {
+        assertSourceRequestAllowed(response.url);
+      }
+
       const responseHeaders = headersToRecord(response.headers);
 
       if (!response.ok) {
@@ -735,7 +817,6 @@ export async function fetchHtml(
           attempt,
           status: response.status,
           statusText: response.statusText,
-          headers: responseHeaders,
         });
 
         throw error;
@@ -771,10 +852,12 @@ export async function fetchHtml(
             cause: error,
           });
 
-      if (attempt < attempts) {
+      const retryable = !isHttpStatusError || shouldRetryHttpStatus(status);
+      if (attempt < attempts && retryable) {
         await sleep(retryDelayMs);
         continue;
       }
+      break;
     } finally {
       clearTimeout(timer);
     }
@@ -784,4 +867,68 @@ export async function fetchHtml(
   throw Object.assign(new Error(fallbackMessage), {
     cause: lastError ?? undefined,
   });
+}
+
+export async function fetchHtml(
+  url: string,
+  options: FetchHtmlOptions = {},
+): Promise<FetchHtmlResult> {
+  assertSourceRequestAllowed(url);
+
+  const encoding = options.encoding ?? "utf-8";
+  const headers = {
+    ...DEFAULT_HEADERS,
+    ...options.headers,
+  };
+
+  const sourceSettings = getActiveSourceFetchSettings(url);
+  const minRequestIntervalMs = Math.max(
+    0,
+    options.minRequestIntervalMs ?? sourceSettings?.minRequestIntervalMs ?? 0,
+  );
+  const cacheTtlMs = Math.max(
+    0,
+    options.cacheTtlMs ?? sourceSettings?.cacheTtlMs ?? 0,
+  );
+  const retryDelayMs = Math.max(
+    options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS,
+    minRequestIntervalMs,
+  );
+  const cacheKey = buildHtmlCacheKey(url, encoding, headers);
+
+  if (!options.bypassCache && cacheTtlMs > 0) {
+    const cached = getCachedHtml(cacheKey);
+    if (cached) return cached;
+
+    const inFlight = inFlightHtmlRequests.get(cacheKey);
+    if (inFlight) return inFlight;
+  }
+
+  const requestPromise = runWithHostRateLimit(url, minRequestIntervalMs, () =>
+    fetchHtmlUncached(url, options, headers, encoding, retryDelayMs),
+  );
+
+  if (!options.bypassCache && cacheTtlMs > 0) {
+    inFlightHtmlRequests.set(cacheKey, requestPromise);
+  }
+
+  try {
+    const result = await requestPromise;
+    if (!options.bypassCache && cacheTtlMs > 0) {
+      setCachedHtml(cacheKey, result, cacheTtlMs);
+    }
+    return result;
+  } finally {
+    if (inFlightHtmlRequests.get(cacheKey) === requestPromise) {
+      inFlightHtmlRequests.delete(cacheKey);
+    }
+  }
+}
+
+export function clearFetchHtmlPolicyStateForTests(): void {
+  htmlCache.clear();
+  inFlightHtmlRequests.clear();
+  hostRequestQueues.clear();
+  hostLastRequestStartedAt.clear();
+  htmlCacheBytes = 0;
 }
