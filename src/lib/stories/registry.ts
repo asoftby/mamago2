@@ -1,6 +1,7 @@
 import { todayRange, runningHorizonRange } from "./ranges";
-import { SERIAL_CLASSIFICATION_CONFIG } from "./serialConfig";
 import { DEFAULT_SLOT_MIN_ITEMS, TODAY_SLOT_MIN_ITEMS, type StorySlot } from "./types";
+
+const LAST_CHANCE_HORIZON_DAYS = 14;
 
 /**
  * Declarative story-rail slot registry — branch (a).
@@ -45,8 +46,7 @@ export const STORY_SLOTS: StorySlot[] = [
     kind: "contextual",
     label: () => "Успеть",
     // Range unused while condition is false; Phase 4 wires promoUntil load.
-    range: (ctx) =>
-      runningHorizonRange(ctx, SERIAL_CLASSIFICATION_CONFIG.runningHorizonDays),
+    range: (ctx) => runningHorizonRange(ctx, LAST_CHANCE_HORIZON_DAYS),
     priority: 45,
     minItems: DEFAULT_SLOT_MIN_ITEMS,
     /**
