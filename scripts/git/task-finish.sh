@@ -30,8 +30,8 @@ else
   sh scripts/git/task-sync.sh
 fi
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "[task-finish] STOP: tracked/staged changes remain; commit task changes first." >&2
+if [ -n "$(git status --porcelain)" ]; then
+  echo "[task-finish] STOP: task worktree is not clean; commit or preserve tracked/staged/untracked work first." >&2
   git status --short
   exit 3
 fi
