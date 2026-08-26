@@ -19,12 +19,112 @@ sh scripts/git/session-start-gate.sh
 BASE_HEAD=$(git rev-parse HEAD)
 ```
 
-4. Every implementation task must run in its **own isolated task worktree/branch created from that exact `BASE_HEAD`**. Do not implement a new task directly in a shared worktree, and do not reuse an old task worktree for a different task without re-validating it against fresh `origin/dev`.
-5. Before integrating, committing to a shared branch, or pushing task output, fetch `origin/dev` again and compare it with `BASE_HEAD`. If `origin/dev` advanced, treat the task output as potentially stale: reconcile deliberately on top of the fresh base, inspect overlapping files, and rerun relevant verification before integration.
+4. Every repository-changing task must run in its **own isolated task worktree/branch created from that exact `BASE_HEAD`**. Do not implement a new task directly in a shared worktree, and do not reuse an old task worktree for a different task without re-validating it against fresh `origin/dev`.
+5. Before pushing task output or integrating it through a PR, fetch `origin/dev` again and compare it with `BASE_HEAD`. If `origin/dev` advanced, treat the task output as potentially stale: reconcile deliberately on top of the fresh base, inspect overlapping files, and rerun relevant verification before integration.
 6. Git/GitHub commit SHA is the source of truth. `local`, DEV, and PROD are environments, not independent code histories. Never make manual code edits directly on DEV or PROD.
 7. After deployment, verify that the environment reports the expected `gitSha`/build identity before claiming the change is deployed. PROD must come from a known, verified Git commit/artifact; never treat server filesystem state as authoritative source code.
 
-**Core task-start rule:** fresh `origin/dev` → exact `BASE_HEAD` → isolated task worktree/branch → verified integration → deployment identity check. If freshness cannot be proven, repository-changing work does not start.
+**Core task-start rule:** fresh `origin/dev` → exact `BASE_HEAD` → isolated task worktree/branch → verified PR integration → deployment identity check. If freshness cannot be proven, repository-changing work does not start.
+
+## Branch / PR Integration Model — mandatory
+
+This section is the canonical workflow for all repository-changing tasks, for Claude Code and every other coding agent.
+
+### 1. `dev` is merge-only
+
+`dev` is the integration branch. It is **not** an implementation workspace.
+
+Forbidden:
+- implementing a feature/fix/refactor/chore/docs task directly on `dev`;
+- creating normal task commits directly on `dev`;
+- pushing task commits directly to `dev`;
+- using the canonical `dev` checkout as the worktree for feature implementation.
+
+A normal task reaches `dev` only through a verified PR merge from its dedicated task branch.
+
+### 2. One task = one branch = one isolated worktree = one PR
+
+Every distinct repository-changing task gets:
+- one fresh task branch;
+- one isolated task worktree;
+- task-only commits;
+- one PR targeting `dev`.
+
+A new distinct user request is a new task even if it arrives in the same chat/session immediately after another task. Do not continue task B in task A's branch, worktree, or PR.
+
+One branch may contain multiple commits only when every commit belongs to the same logical task and is intended to be reviewed and merged together.
+
+Recommended prefixes:
+- `feat/` — feature;
+- `fix/` — bug fix;
+- `refactor/` — internal restructuring;
+- `chore/` — maintenance/tooling;
+- `docs/` — documentation-only change;
+- `test/` — test-only change.
+
+### 3. Every task branch starts from the exact fresh `origin/dev`
+
+After `session-start-gate.sh` passes, capture `BASE_HEAD` and create the task branch/worktree explicitly from that exact SHA. Never branch from a stale local branch, another task branch, an old worktree, DEV server filesystem, or PROD server filesystem.
+
+The intended shape is:
+
+```text
+origin/dev @ BASE_HEAD
+├── feat/task-a  -> PR -> dev
+├── fix/task-b   -> PR -> dev
+└── chore/task-c -> PR -> dev
+```
+
+Parallel tasks may share the same `BASE_HEAD` only if they were independently created from that verified base. They must never share a working tree.
+
+### 4. No unrelated "while here" changes
+
+If unrelated work is discovered during a task:
+- do not silently fix it in the current branch;
+- do not stage or commit it with the current task;
+- report/record it separately;
+- handle it as a new task on a new branch from a fresh `origin/dev`.
+
+If two changes can be independently reviewed, tested, reverted, or released, treat them as separate tasks/branches unless the user explicitly defines them as one atomic task.
+
+### 5. Re-check `origin/dev` before PR integration
+
+Immediately before final PR integration:
+
+1. fetch fresh `origin/dev`;
+2. compare it with the task's `BASE_HEAD`;
+3. if `origin/dev` advanced, deliberately reconcile the task branch with the new base;
+4. inspect overlapping files and possible semantic conflicts;
+5. rerun relevant verification on the reconciled result;
+6. verify the PR diff still contains only the intended task.
+
+Never make stale output "fit" by copying whole files over newer code.
+
+### 6. Merge gate
+
+A PR may be merged into `dev` only when:
+- the branch is based/reconciled against current `origin/dev`;
+- the diff is task-only and contains no foreign/stale work;
+- relevant targeted checks pass;
+- required repository/project gates pass for the task's risk level;
+- merge conflicts and overlapping edits have been deliberately reviewed.
+
+The merge operation is the integration event. Do not recreate the same task as a manual direct commit on `dev` after the PR.
+
+### 7. After merge, the branch/worktree is finished
+
+Once a task PR is merged:
+- treat that branch/worktree as closed for new development;
+- remove/archive it when convenient;
+- start the next task again from fresh `origin/dev` and capture a new `BASE_HEAD`.
+
+Never use "the previous branch is already close enough" as a reason to skip the fresh-start gate.
+
+### 8. Deployment does not change the branch model
+
+DEV/PROD deployment mechanics are separate from task integration. The code source of truth remains Git/GitHub. Follow the release/deployment documentation for promotion, but never bypass the task branch → PR → `dev` model by editing environment files directly.
+
+**Core integration rule:** **one task = one task branch = one isolated worktree = one task-only PR; `dev` is merge-only.**
 
 ## Git / Worktree Safety — mandatory
 
