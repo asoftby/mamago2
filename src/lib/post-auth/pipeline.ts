@@ -1,6 +1,7 @@
 "use client";
 
 import { toast } from "@/lib/toast";
+import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
 import type { AuthEntryPoint } from "./types";
 import { getPostAuthContext, clearPostAuthAction, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";
@@ -43,6 +44,18 @@ export async function runPostAuthPipeline(
   const source: AuthEntryPoint = ctx?.source ?? defaultSource;
   const authAction = ctx?.authAction ?? null;
   const returnTo = ctx?.returnTo ?? null;
+
+  // Guest "Подбери за меня" keeps explicitly added cards in localStorage.
+  // Materialize them before profile completion/navigation can replace the UI.
+  // On failure the draft remains intact; MyPlanPanelContent performs a recovery retry.
+  try {
+    const guestPlanMigration = await migrateGuestMyPlanAfterAuth();
+    if (guestPlanMigration.migratedCount > 0) {
+      trackPostAuthEvent("pending_action_executed", { source });
+    }
+  } catch (e) {
+    console.error("[post-auth] guest my-plan migration failed", e);
+  }
 
   if (ctx?.pendingAction) {
     try {
