@@ -71,10 +71,10 @@ assert.match(verificationServer, /EMAIL_DISABLED/);
 assert.match(verificationServer, /EMAIL_NOT_CONFIGURED/);
 assert.match(verificationServer, /EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD/);
 assert.match(verificationServer, /verificationEmailSendFailed: true/);
-assert.doesNotMatch(
+assert.match(
   verificationServer,
-  /event: "verify_email_sent_successfully"[\s\S]*?email,/,
-  "verification success logs must not include the recipient email",
+  /console\.info\("\[auth\] verification email sent successfully", \{\s*event: "verify_email_sent_successfully",\s*userId,\s*\}\);/,
+  "verification success log must only include non-recipient metadata",
 );
 
 const emailHealthRoute = read("src/app/api/admin/communications/email/health/route.ts");
