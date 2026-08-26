@@ -30,8 +30,10 @@ function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
   const seen = new Set<string>();
   const result: StoryItem[] = [];
   for (const item of items) {
-    if (seen.has(item.offerId)) continue;
-    seen.add(item.offerId);
+    // Keep distinct occurrences of the same Activity. `offerId` is the stable
+    // seen-state identity and is intentionally shared by those occurrences.
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
     result.push(item);
   }
   return result;
