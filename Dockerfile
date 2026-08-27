@@ -4,6 +4,10 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Prisma generation runs from pnpm's postinstall. Copy the config before
+# dependencies are installed so Prisma loads the complete domain-split schema
+# folder instead of falling back to prisma/schema.prisma only.
+COPY prisma.config.ts ./prisma.config.ts
 COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
@@ -44,6 +48,7 @@ RUN apk add --no-cache curl
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
