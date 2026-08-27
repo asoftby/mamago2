@@ -41,6 +41,56 @@ const free: StoryCollection = {
 }
 
 {
+  const result = resolvePublicStoryPresentation(
+    [
+      {
+        id: "running",
+        intent: "running",
+        title: "Идёт сейчас",
+        items: [item("serial-today", "Сегодня · 16:00")],
+      },
+      free,
+    ],
+    {
+      todayEnabled: false,
+      orderByIntent: { running: 0, free: 10, today: 20 },
+    },
+  );
+
+  assert.deepEqual(
+    result.map((collection) => collection.intent),
+    ["free"],
+    "disabled Today must hide the merged temporal circle even when Running has items",
+  );
+  console.log("disabled Today cannot be reconstructed from Running: OK");
+}
+
+{
+  const result = resolvePublicStoryPresentation(
+    [
+      {
+        id: "running",
+        intent: "running",
+        title: "Идёт сейчас",
+        items: [item("serial-today", "Сегодня · 16:00")],
+      },
+      free,
+    ],
+    {
+      todayEnabled: true,
+      orderByIntent: { running: 0, free: 10, today: 20 },
+    },
+  );
+
+  assert.deepEqual(
+    result.map((collection) => collection.intent),
+    ["free", "today"],
+    "merged Today must use Today's configured order rather than Running's technical order",
+  );
+  console.log("merged Today uses Today's configured position: OK");
+}
+
+{
   const shared = item("shared", "сегодня");
   const result = resolvePublicStoryPresentation([
     {
