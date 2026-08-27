@@ -5,7 +5,6 @@ import {
   CalendarClock,
   Lock,
   Sparkles,
-  Target,
 } from "lucide-react";
 
 export const SYSTEM_NOTIFICATION_GUARD_MESSAGE =
@@ -18,6 +17,14 @@ export type UserNotificationMatrixDefinition = {
   icon: LucideIcon;
 };
 
+/**
+ * Public USER notification settings matrix.
+ *
+ * RECOMMENDATION intentionally stays out of the settings surface until the
+ * recommendation quality/feedback loop is ready. The underlying notification
+ * type and preference storage remain intact so the row can be restored later
+ * without another data migration.
+ */
 export const USER_NOTIFICATION_MATRIX_DEFINITIONS: readonly UserNotificationMatrixDefinition[] = [
   {
     notificationType: "PLAN_TOMORROW_DIGEST",
@@ -30,12 +37,6 @@ export const USER_NOTIFICATION_MATRIX_DEFINITIONS: readonly UserNotificationMatr
     title: "План",
     description: "Напоминания о событиях и изменениях в вашем плане",
     icon: BellRing,
-  },
-  {
-    notificationType: "RECOMMENDATION",
-    title: "Рекомендации",
-    description: "Подборки и идеи для вас и детей",
-    icon: Target,
   },
   {
     notificationType: "NEWS",
