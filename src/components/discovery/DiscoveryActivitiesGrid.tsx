@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { EventCard, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
@@ -9,6 +9,7 @@ import {
   type DiscoveryFilters,
 } from "@/features/filters/discovery/filters.store";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { postProductTelemetryEvent } from "@/lib/analytics/client";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
@@ -71,21 +72,58 @@ export function DiscoveryActivitiesGrid({
   const ratio = coverRatio ?? "4/5";
   const { applied, actions, derived } = useDiscoveryFilters();
   const debounced = useDebouncedValue(applied, 400);
-  const isPending = filtersSignature(applied) !== filtersSignature(debounced);
+  const appliedFilterSummary = filtersSignature(applied);
+  const filterSummary = filtersSignature(debounced);
+  const isPending = appliedFilterSummary !== filterSummary;
+  const previousFilterSummaryRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const previous = previousFilterSummaryRef.current;
+    previousFilterSummaryRef.current = filterSummary;
+
+    // Initial state is context, not an explicit user filter action.
+    if (previous === null || previous === filterSummary) return;
+
+    void postProductTelemetryEvent({
+      eventType: "FILTER_APPLY",
+      vertical: "CITY",
+      citySlug,
+      meta: {
+        source: "listing",
+        section: "afisha",
+        filterSummary,
+      },
+    });
+  }, [citySlug, filterSummary]);
 
   const { primary, secondary, secondaryHeading } = useMemo(
     () => partitionDiscoveryFeed(debounced, activities),
     [debounced, activities],
   );
 
-  const renderCard = (activity: (typeof activities)[number]) => (
+  const renderCard = (
+    activity: (typeof activities)[number],
+    position: number,
+    feedBucket: "primary" | "secondary",
+  ) => (
     <AnalyticsCardViewTracker
       key={activity.id}
       entityType={activity.analyticsEntityType ?? "EVENT"}
       entityId={activity.id}
       vertical="CITY"
       citySlug={citySlug}
-      meta={{ section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha" }}
+      meta={{
+        section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha",
+        position,
+        filterSummary,
+        feedBucket,
+        format: activity.format ?? null,
+        ageFrom: activity.ageFrom,
+        ageTo: activity.ageTo,
+        priceMin: activity.priceMin ?? null,
+        priceMax: activity.priceMax ?? null,
+        discoveryIntent: activity.discoveryIntent ?? null,
+      }}
     >
       {activity.analyticsEntityType === "OFFER" ? (
         <OfferCard
@@ -168,7 +206,9 @@ export function DiscoveryActivitiesGrid({
                 aria-hidden
               />
             ))
-          : primary.map(renderCard)}
+          : primary.map((activity, index) =>
+              renderCard(activity, index + 1, "primary"),
+            )}
       </div>
       )}
 
@@ -180,7 +220,9 @@ export function DiscoveryActivitiesGrid({
           <div
             className="grid grid-cols-2 gap-5 lg:grid-cols-4"
           >
-            {secondary.map(renderCard)}
+            {secondary.map((activity, index) =>
+              renderCard(activity, primary.length + index + 1, "secondary"),
+            )}
           </div>
         </div>
       )}

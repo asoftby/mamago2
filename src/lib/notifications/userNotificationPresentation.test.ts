@@ -8,7 +8,7 @@ import {
 {
   assert.deepEqual(
     getUserNotificationMatrixDefinitions().map((item) => item.title),
-    ["План", "Рекомендации", "Новое и интересное", "Аккаунт"],
+    ["План", "Новое и интересное", "Аккаунт"],
   );
 }
 

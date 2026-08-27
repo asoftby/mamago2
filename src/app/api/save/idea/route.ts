@@ -153,20 +153,85 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const sessionRowId = await getSessionRowIdFromCookies();
+
     if (articleId) {
+      const article = await prisma.article.findUnique({
+        where: { id: articleId },
+        select: { cityId: true },
+      });
       await removeArticleIdea(user.id, articleId);
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "UNSAVE",
+        entityType: "ARTICLE",
+        entityId: articleId,
+        vertical: "CITY",
+        cityId: article?.cityId ?? null,
+        meta: { section: "journal", targetAction: "ideas" },
+      });
     } else if (placeId) {
+      const place = await prisma.place.findUnique({
+        where: { id: placeId },
+        select: { cityId: true },
+      });
       await removePlaceIdea(user.id, placeId);
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "UNSAVE",
+        entityType: "PLACE",
+        entityId: placeId,
+        vertical: "CITY",
+        cityId: place?.cityId ?? null,
+        meta: { section: "places", targetAction: "ideas" },
+      });
     } else if (activityId) {
+      const cityId = await getActivityCityIdForAnalytics(activityId);
       await removeIdea(user.id, activityId);
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "UNSAVE",
+        entityType: "EVENT",
+        entityId: activityId,
+        vertical: "CITY",
+        cityId,
+        meta: { section: "afisha", targetAction: "ideas" },
+      });
     } else if (offerId) {
       if (!hasOfferIdeaSupport()) {
         return NextResponse.json({ success: true });
       }
+      const offer = await prisma.offer.findUnique({
+        where: { id: offerId },
+        select: { place: { select: { cityId: true } } },
+      });
       await removeOfferIdea(user.id, offerId);
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "UNSAVE",
+        entityType: "OFFER",
+        entityId: offerId,
+        vertical: "CITY",
+        cityId: offer?.place?.cityId ?? null,
+        meta: { section: "offers", targetAction: "ideas" },
+      });
     } else if (routeId) {
       await prisma.routeIdea.deleteMany({
         where: { userId: user.id, routeId },
+      });
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "UNSAVE",
+        entityType: "ROUTE",
+        entityId: routeId,
+        vertical: "CITY",
+        cityId: null,
+        meta: { section: "routes", targetAction: "ideas" },
       });
     }
 

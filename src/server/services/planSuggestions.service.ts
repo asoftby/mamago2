@@ -8,6 +8,13 @@ import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpa
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
+/**
+ * Current real My Plan ranking contract. This is deliberately versioned before
+ * any ML/personal ranking is introduced so historic exposures remain
+ * explainable after the algorithm evolves.
+ */
+export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-freshness-v1";
+
 /** Следующий календарный день для "YYYY-MM-DD" — чистая арифметика по частям даты, без Date/TZ. */
 function nextDateKey(dateIso: string): string {
   const [y, m, d] = dateIso.split("-").map(Number);
@@ -39,7 +46,7 @@ const suggestionActivitySelect = {
   type: true,
   coverImageUrl: true,
   ageLabel: true,
-  eventCategory: { select: { nameRu: true } },
+  eventCategory: { select: { id: true, nameRu: true } },
   priceFrom: true,
   priceText: true,
   currency: true,
@@ -79,43 +86,63 @@ export type PlanSuggestionActivity = Prisma.ActivityGetPayload<{
   select: typeof suggestionActivitySelect;
 }>;
 
-/**
- * Короткий список опубликованных событий в городе для блока «Рекомендации» в «Мой план».
- * Не recommendation engine: ранжирование по engagement + свежести, как в ленте «Куда пойти».
- */
-export async function listPlanSuggestionsForCity(input: {
+export type RankedPlanSuggestion = {
+  activity: PlanSuggestionActivity;
+  /** Existing engagement score. Freshness is only a tie-break in v1. */
+  score: number;
+  scoreBreakdown: {
+    engagementScore: number;
+    freshnessSortAt: string;
+    ageFilterApplied: boolean;
+    ageFallbackUsed: boolean;
+  };
+  reasonCodes: string[];
+};
+
+export type PlanSuggestionRankedBatch = {
+  suggestions: RankedPlanSuggestion[];
+  candidateCount: number;
+  algorithmVersion: typeof PLAN_SUGGESTION_ALGORITHM_VERSION;
+};
+
+export type PlanSuggestionsInput = {
   citySlug: string;
   excludeActivityIds: string[];
   /** Сколько карточек отдать клиенту */
   take?: number;
-  /**
-   * Значения возрастных групп (как в Activity.ageTags), из выбранных в «Мой план» детей / фильтра.
-   * Если задано — оставляем события без возраста или с пересечением по тегам (не «умный» подбор).
-   */
+  /** Значения возрастных групп (как в Activity.ageTags). */
   ageRangeValues?: string[];
-  /**
-   * "YYYY-MM-DD" — календарный день в Europe/Minsk, выбранный в «Мой план».
-   * Без него дата не влияет на выдачу вообще (было так раньше — сознательно оставлено
-   * опциональным для обратной совместимости с другими вызывающими, если появятся).
-   * В отличие от возраста — без фолбэка: пустой день на этот день остаётся пустым,
-   * а не подменяется случайным ближайшим контентом.
-   */
+  /** "YYYY-MM-DD" — календарный день в Europe/Minsk. */
   date?: string;
-}): Promise<PlanSuggestionActivity[]> {
+};
+
+/**
+ * Shared ranked batch for My Plan. This function does not know about Telegram
+ * or any other surface and therefore cannot fork the recommendation algorithm.
+ * It exposes the exact factors already used by the existing implementation so
+ * the result can be traced without silently changing product behaviour.
+ */
+export async function rankPlanSuggestionsForCity(
+  input: PlanSuggestionsInput,
+): Promise<PlanSuggestionRankedBatch> {
   const take = input.take ?? 6;
   const ageRangeValues = (input.ageRangeValues ?? []).filter(Boolean);
   const city = await findCityBySlug(input.citySlug.toLowerCase());
-  if (!city) return [];
+  if (!city) {
+    return {
+      suggestions: [],
+      candidateCount: 0,
+      algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
+    };
+  }
 
-  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(
+  const { expandedCityIds } = await resolveKudaDiscoveryCityIds(
     input.citySlug,
     city.id,
   );
-  void primaryCityId;
 
   const pub = getPublicListingActivityWhere();
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
-
   const exclude = input.excludeActivityIds.filter(Boolean);
 
   const dayFilterAnd: Prisma.ActivityWhereInput[] = input.date
@@ -166,9 +193,7 @@ export async function listPlanSuggestionsForCity(input: {
     createdAt: Date;
   };
 
-  async function fetchCandidateRows(
-    withAgePreference: boolean,
-  ): Promise<Row[]> {
+  async function fetchCandidateRows(withAgePreference: boolean): Promise<Row[]> {
     const agePart =
       withAgePreference && ageFilterAnd.length > 0 ? ageFilterAnd : [];
     const where: Prisma.ActivityWhereInput = {
@@ -186,21 +211,69 @@ export async function listPlanSuggestionsForCity(input: {
     })) as Row[];
   }
 
+  let ageFallbackUsed = false;
   let rows = await fetchCandidateRows(true);
   if (rows.length === 0 && ageRangeValues.length > 0) {
+    ageFallbackUsed = true;
     rows = await fetchCandidateRows(false);
   }
 
-  const scoreMap = await getEventEngagementScores(rows.map((r) => r.id));
+  const candidateCount = rows.length;
+  const scoreMap = await getEventEngagementScores(rows.map((row) => row.id));
 
   rows.sort((a, b) => {
-    const sa = scoreMap.get(a.id) ?? 0;
-    const sb = scoreMap.get(b.id) ?? 0;
-    if (sa !== sb) return sb - sa;
-    const ta = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
-    const tb = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
-    return tb - ta;
+    const scoreA = scoreMap.get(a.id) ?? 0;
+    const scoreB = scoreMap.get(b.id) ?? 0;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    const timeA = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
+    const timeB = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
+    return timeB - timeA;
   });
 
-  return rows.slice(0, take).map(({ nextOccurrenceAt: _n, createdAt: _c, ...activity }) => activity);
+  const ageFilterApplied = ageRangeValues.length > 0 && !ageFallbackUsed;
+  const suggestions = rows.slice(0, take).map((row) => {
+    const {
+      nextOccurrenceAt,
+      createdAt,
+      ...activity
+    } = row;
+    const engagementScore = scoreMap.get(row.id) ?? 0;
+    const freshnessSortAt = (nextOccurrenceAt ?? createdAt).toISOString();
+    const reasonCodes = [
+      ...(ageFilterApplied ? ["AGE_SCOPE"] : []),
+      ...(ageFallbackUsed ? ["AGE_FALLBACK"] : []),
+      ...(engagementScore > 0 ? ["ENGAGEMENT"] : []),
+      "FRESHNESS_TIE_BREAK",
+    ];
+
+    return {
+      activity,
+      score: engagementScore,
+      scoreBreakdown: {
+        engagementScore,
+        freshnessSortAt,
+        ageFilterApplied,
+        ageFallbackUsed,
+      },
+      reasonCodes,
+    };
+  });
+
+  return {
+    suggestions,
+    candidateCount,
+    algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
+  };
+}
+
+/**
+ * Backward-compatible activity-only wrapper. New recommendation surfaces should
+ * consume a ranked batch and record a RecommendationRun instead of duplicating
+ * this ranking logic.
+ */
+export async function listPlanSuggestionsForCity(
+  input: PlanSuggestionsInput,
+): Promise<PlanSuggestionActivity[]> {
+  const batch = await rankPlanSuggestionsForCity(input);
+  return batch.suggestions.map((item) => item.activity);
 }
