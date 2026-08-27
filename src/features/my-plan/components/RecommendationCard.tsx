@@ -12,6 +12,8 @@ import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/forma
 import type { PlanItemWithActivity } from "../types/event";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { postProductTelemetryEvent } from "@/lib/analytics/client";
 
 interface RecommendationCardProps {
   item: PlanItemWithActivity;
@@ -26,6 +28,14 @@ interface RecommendationCardProps {
   variantPosition?: number;
   variantTotal?: number;
 }
+
+type RecommendationActivityTrace = {
+  recommendationRunId?: string | null;
+  recommendationExposureId?: string | null;
+  recommendationPosition?: number | null;
+  recommendationAlgorithmVersion?: string | null;
+  eventCategory?: { id?: string; nameRu: string } | null;
+};
 
 export function RecommendationCard({
   item,
@@ -69,7 +79,7 @@ export function RecommendationCard({
         minute: "2-digit",
       })
     : null;
-  void timeStr; // не используется в metaLine, сохранён для возможного будущего использования
+  void timeStr;
 
   const agePart = item.activity?.ageLabel ?? null;
   const categoryLabel = item.activity?.eventCategory?.nameRu?.trim() || null;
@@ -101,10 +111,44 @@ export function RecommendationCard({
 
   const title = item.title || item.activity?.title || "Активность";
   const isRoute = item.routeId || item.planRouteSlug;
+  const recommendationTrace = !isInPlan
+    ? (item.activity as (typeof item.activity & RecommendationActivityTrace) | null)
+    : null;
+  const recommendationExposureId = recommendationTrace?.recommendationExposureId?.trim() || null;
+  const recommendationRunId = recommendationTrace?.recommendationRunId?.trim() || null;
+  const recommendationPosition = recommendationTrace?.recommendationPosition ?? undefined;
+  const categoryId = recommendationTrace?.eventCategory?.id;
+
+  const recommendationMeta = recommendationExposureId
+    ? {
+        source: "recommendation" as const,
+        section: "my_plan" as const,
+        recommendationSurface: "my_plan" as const,
+        recommendationExposureId,
+        ...(recommendationRunId ? { recommendationRunId } : {}),
+        ...(recommendationPosition ? { position: recommendationPosition } : {}),
+        ...(categoryId ? { categoryIds: [categoryId] } : {}),
+        dateFrom: item.date,
+        dateTo: item.date,
+      }
+    : null;
+
+  const trackRecommendationDetailOpen = () => {
+    if (!recommendationMeta || !item.activity?.id) return;
+    void postProductTelemetryEvent({
+      eventType: "DETAIL_OPEN",
+      entityType: "EVENT",
+      entityId: item.activity.id,
+      vertical: "CITY",
+      citySlug: city,
+      meta: recommendationMeta,
+    });
+  };
 
   const titleEl = activityDetailHref ? (
     <Link
       href={activityDetailHref}
+      onClick={trackRecommendationDetailOpen}
       className="line-clamp-2 text-left text-base font-semibold leading-snug tracking-tight text-neutral-900 hover:text-neutral-700"
     >
       {title}
@@ -115,7 +159,7 @@ export function RecommendationCard({
     </span>
   );
 
-  return (
+  const card = (
     <div
       className={cn(
         "flex flex-col gap-3 overflow-hidden rounded-[24px] border p-4 shadow-sm transition-all",
@@ -222,7 +266,7 @@ export function RecommendationCard({
               >
                 {showVariantControls ? (
                   <div className="col-start-1 row-start-1 flex items-center gap-1.5">
-                  <Button
+                    <Button
                       type="button"
                       variant="outline"
                       size="sm"
@@ -265,4 +309,20 @@ export function RecommendationCard({
       </div>
     </div>
   );
+
+  if (recommendationMeta && item.activity?.id) {
+    return (
+      <AnalyticsCardViewTracker
+        entityType="EVENT"
+        entityId={item.activity.id}
+        vertical="CITY"
+        citySlug={city}
+        meta={recommendationMeta}
+      >
+        {card}
+      </AnalyticsCardViewTracker>
+    );
+  }
+
+  return card;
 }
