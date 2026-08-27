@@ -81,3 +81,9 @@ In particular, the mandatory `Git / Worktree Safety` section applies to:
 - cherry-pick/patch/rebase integration.
 
 If `AGENTS.md` and `CLAUDE.md` ever conflict, `CLAUDE.md` is canonical.
+
+## Recommendation architecture — do not fork by surface
+
+Before changing recommendations, personalization, ranking feedback, Telegram подборки, My Plan recommendations, Home recommendations, or Discovery recommendation behavior, read `docs/architecture/recommendation-data-foundation.md`.
+
+Mandatory rule: Telegram, My Plan, Home, Discovery and future delivery surfaces consume one shared recommendation/learning foundation. Surface-specific code may define composition/delivery policy, but must not create a duplicate recommendation engine, duplicate behavior weights, or separate feedback truth. `UserEvent` remains raw behavior truth; `RecommendationRun` / `RecommendationExposure` record what the shared pipeline returned; outcomes link back to those exposures.
