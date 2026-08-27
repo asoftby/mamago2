@@ -121,9 +121,13 @@ const PARTY_PRODUCT_TYPES: OfferProductType[] = ["PARTY_SERVICE", "PARTY_PACKAGE
  * Every field is sourced from the same models/visibility rules as the real
  * place page (`src/app/(public)/[city]/places/[slug]/page.tsx`) and the
  * public Offer page (`src/lib/offer/offerPageData.ts`) — no invented fields,
- * no mock data. Returns `null` when the place isn't publicly visible, or has
- * nothing live to show in any of the four tabs (by design: an empty block
- * must not render at all).
+ * no mock data. Returns `null` only when the place doesn't exist or isn't
+ * publicly visible/published. A visible place always resolves to a card,
+ * even when all four tabs (`afisha`/`visit`/`party`/`promo`) are empty —
+ * the compact base card (photo, title, category, rating, hours, metro,
+ * age, address, link to the place page) still has real data worth showing;
+ * it's the `ArticlePlaceEmbed` component's job to hide empty tabs/chips and
+ * the whole tabs/nav row when there is nothing to expand into.
  */
 export async function getArticlePlaceEmbedData(placeId: string): Promise<ResolvedPlaceEmbedCard | null> {
   const place = await prisma.place.findFirst({
@@ -276,10 +280,6 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
       return item;
     })
     .filter((item): item is ArticlePlaceListItem => item != null);
-
-  const hasAnything =
-    afisha.length > 0 || visit.length > 0 || party.length > 0 || promo.length > 0;
-  if (!hasAnything) return null;
 
   return {
     kind: "place-embed",

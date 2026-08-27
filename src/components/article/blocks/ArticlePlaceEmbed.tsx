@@ -331,45 +331,47 @@ export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
               ))}
             </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 7, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
-              <span style={{ ...capsStyle, marginRight: 2 }}>сейчас</span>
-              {availableTabs.map((id) => {
-                const count = card.tabs[id].length;
-                const priceHint = id === "visit" || id === "party" ? minPriceLabel(card.tabs[id]) : null;
-                const isPromo = id === "promo";
-                return (
-                  <span
-                    key={id}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 7, height: 32, padding: "0 12px", borderRadius: 999,
-                      background: isPromo ? T.accentSoft : T.paper2, border: isPromo ? "1px solid transparent" : `1px solid ${T.line}`,
-                      fontSize: 12.5, color: isPromo ? T.accentDeep : T.ink2, whiteSpace: "nowrap",
-                    }}
-                  >
-                    {QUICK_LABELS[id]}{" "}
-                    <b style={{ color: isPromo ? T.accentDeep : T.ink, fontWeight: 600 }}>
-                      {priceHint ? renderCurrencyText(normalizeUiCurrencyText(priceHint), { iconSize: "sm" }) : count}
-                    </b>
-                  </span>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                style={{
-                  marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, height: 32, padding: "0 13px",
-                  borderRadius: 999, border: `1px solid ${T.ink}`, background: T.ink, color: T.paper, fontSize: 12.5,
-                  fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer",
-                }}
-              >
-                {open ? "Свернуть" : "Все предложения"}
-                <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform .25s" }} />
-              </button>
-            </div>
+            {availableTabs.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 7, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
+                <span style={{ ...capsStyle, marginRight: 2 }}>сейчас</span>
+                {availableTabs.map((id) => {
+                  const count = card.tabs[id].length;
+                  const priceHint = id === "visit" || id === "party" ? minPriceLabel(card.tabs[id]) : null;
+                  const isPromo = id === "promo";
+                  return (
+                    <span
+                      key={id}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 7, height: 32, padding: "0 12px", borderRadius: 999,
+                        background: isPromo ? T.accentSoft : T.paper2, border: isPromo ? "1px solid transparent" : `1px solid ${T.line}`,
+                        fontSize: 12.5, color: isPromo ? T.accentDeep : T.ink2, whiteSpace: "nowrap",
+                      }}
+                    >
+                      {QUICK_LABELS[id]}{" "}
+                      <b style={{ color: isPromo ? T.accentDeep : T.ink, fontWeight: 600 }}>
+                        {priceHint ? renderCurrencyText(normalizeUiCurrencyText(priceHint), { iconSize: "sm" }) : count}
+                      </b>
+                    </span>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setOpen((v) => !v)}
+                  style={{
+                    marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, height: 32, padding: "0 13px",
+                    borderRadius: 999, border: `1px solid ${T.ink}`, background: T.ink, color: T.paper, fontSize: 12.5,
+                    fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer",
+                  }}
+                >
+                  {open ? "Свернуть" : "Все предложения"}
+                  <ChevronDown size={13} style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform .25s" }} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {open && (
+        {open && availableTabs.length > 0 && (
           <div style={{ borderTop: `1px solid ${T.line}` }}>
             <div style={{ display: "flex", gap: 2, padding: "0 20px", borderBottom: `1px solid ${T.line}`, overflowX: "auto" }}>
               {availableTabs.map((id) => (
