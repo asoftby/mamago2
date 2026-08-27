@@ -2,6 +2,13 @@ import type { StoryCollection, StoryItem } from "../types/story";
 
 const PUBLIC_STORY_ITEM_LIMIT = 5;
 
+type PublicStoryPresentationOptions = {
+  /** Public Today toggle. Internal `running` must never bypass it. */
+  todayEnabled?: boolean;
+  /** Canonical admin order by intent; merged Today is anchored to `today`. */
+  orderByIntent?: Readonly<Record<string, number>>;
+};
+
 /**
  * `running` is an internal serial-program source, not a public navigation
  * concept. Its registry range is the current city day, so every item from that
@@ -29,11 +36,28 @@ function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
   return result;
 }
 
+function isTemporal(collection: StoryCollection): boolean {
+  return collection.intent === "today" || collection.intent === "running";
+}
+
+function fallbackInsertIndex(
+  collections: readonly StoryCollection[],
+  contextual: readonly StoryCollection[],
+): number {
+  const todayIndex = collections.findIndex((collection) => collection.intent === "today");
+  const runningIndex = collections.findIndex((collection) => collection.intent === "running");
+  const anchorIndex = todayIndex >= 0 ? todayIndex : runningIndex;
+  if (anchorIndex < 0) return contextual.length;
+  return collections.slice(0, anchorIndex).filter((collection) => !isTemporal(collection)).length;
+}
+
 /**
  * Public Stories presentation rules.
  *
  * - one temporal circle: «Сегодня»;
  * - point/occurrence Today items stay first; serial `running` items fill gaps;
+ * - the public Today toggle controls the merged circle as a whole;
+ * - merged Today is positioned by Today's admin order, never Running's order;
  * - merged Today keeps the existing 5-item public collection limit;
  * - legacy «Идёт сейчас» wording does not leak into the public viewer;
  * - contextual/editorial circles (`free`, `lastchance`, `breaking_news`)
@@ -41,7 +65,11 @@ function dedupeItems(items: readonly StoryItem[]): StoryItem[] {
  */
 export function resolvePublicStoryPresentation(
   collections: readonly StoryCollection[],
+  options: PublicStoryPresentationOptions = {},
 ): StoryCollection[] {
+  const contextual = collections.filter((collection) => !isTemporal(collection));
+  if (options.todayEnabled === false) return contextual;
+
   const today = collections.find((collection) => collection.intent === "today");
   const running = collections.find((collection) => collection.intent === "running");
   const runningTodayItems = running?.items.map(normalizeRunningTodayItem) ?? [];
@@ -50,30 +78,30 @@ export function resolvePublicStoryPresentation(
     PUBLIC_STORY_ITEM_LIMIT,
   );
 
-  const temporalIndexes = collections
-    .map((collection, index) => ({ collection, index }))
-    .filter(({ collection }) => collection.intent === "today" || collection.intent === "running")
-    .map(({ index }) => index);
-  const insertAt = temporalIndexes.length > 0 ? Math.min(...temporalIndexes) : -1;
+  if (todayItems.length === 0) return contextual;
 
-  const replacement: StoryCollection | null = todayItems.length > 0
-    ? {
-        ...(today ?? running!),
-        id: "today",
-        intent: "today",
-        title: "Сегодня",
-        emoji: "☀️",
-        items: todayItems,
-      }
-    : null;
+  const replacement: StoryCollection = {
+    ...(today ?? running!),
+    id: "today",
+    intent: "today",
+    title: "Сегодня",
+    emoji: "☀️",
+    items: todayItems,
+  };
 
-  const result: StoryCollection[] = [];
-  for (let index = 0; index < collections.length; index++) {
-    if (index === insertAt && replacement) result.push(replacement);
-    const collection = collections[index]!;
-    if (collection.intent === "today" || collection.intent === "running") continue;
-    result.push(collection);
-  }
+  const configuredTodayOrder = options.orderByIntent?.today;
+  const insertAt = configuredTodayOrder == null
+    ? fallbackInsertIndex(collections, contextual)
+    : (() => {
+        const index = contextual.findIndex(
+          (collection) => (options.orderByIntent?.[collection.intent] ?? Number.MAX_SAFE_INTEGER) > configuredTodayOrder,
+        );
+        return index >= 0 ? index : contextual.length;
+      })();
 
-  return result;
+  return [
+    ...contextual.slice(0, insertAt),
+    replacement,
+    ...contextual.slice(insertAt),
+  ];
 }
