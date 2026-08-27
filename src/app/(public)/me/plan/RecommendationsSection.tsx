@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import type { SerializedPlanItem } from "./PlanPageClient";
@@ -12,6 +13,8 @@ import { formatPrice as formatPriceAmount, formatPriceFrom } from "@/lib/formatt
 type RecommendationCardProps = {
   activity: ActivityMock;
   selectedDate: string;
+  recommendationBlock: string;
+  position: number;
   onAdded: (item: SerializedPlanItem) => void;
 };
 
@@ -21,7 +24,13 @@ function formatPrice(activity: ActivityMock): string {
   return "";
 }
 
-function RecommendationCard({ activity, selectedDate, onAdded }: RecommendationCardProps) {
+function RecommendationCard({
+  activity,
+  selectedDate,
+  recommendationBlock,
+  position,
+  onAdded,
+}: RecommendationCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +46,7 @@ function RecommendationCard({ activity, selectedDate, onAdded }: RecommendationC
           date: result.dateISO,
           title: activity.title,
           coverImageUrl: activity.image,
+          planAddSource: "recommendation",
         }),
       });
       if (res.ok) {
@@ -68,39 +78,53 @@ function RecommendationCard({ activity, selectedDate, onAdded }: RecommendationC
     .join(" • ");
 
   return (
-    <>
-      <div className="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white hover:border-neutral-300 transition-colors">
-        <img
-          src={activity.image}
-          alt={activity.title}
-          className="w-12 h-12 rounded-xl object-cover shrink-0"
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-1">
-            {activity.title}
-          </p>
-          {meta && <p className="text-xs text-neutral-400 mt-0.5">{meta}</p>}
+    <AnalyticsCardViewTracker
+      entityType={activity.analyticsEntityType ?? "EVENT"}
+      entityId={activity.id}
+      vertical="CITY"
+      meta={{
+        source: "recommendation",
+        section: "afisha",
+        position,
+        recommendationSurface: "plan",
+        recommendationBlock,
+        selectedDate,
+      }}
+    >
+      <>
+        <div className="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white hover:border-neutral-300 transition-colors">
+          <img
+            src={activity.image}
+            alt={activity.title}
+            className="w-12 h-12 rounded-xl object-cover shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-neutral-900 leading-tight line-clamp-1">
+              {activity.title}
+            </p>
+            {meta && <p className="text-xs text-neutral-400 mt-0.5">{meta}</p>}
+          </div>
+          <button
+            onClick={() => setModalOpen(true)}
+            disabled={saving}
+            className={cn(
+              "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors",
+              "bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-40"
+            )}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Добавить
+          </button>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          disabled={saving}
-          className={cn(
-            "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors",
-            "bg-neutral-900 text-white hover:bg-neutral-700 disabled:opacity-40"
-          )}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Добавить
-        </button>
-      </div>
 
-      <SaveToPlanModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        scenario={{ kind: "quickdate", title: activity.title }}
-        onConfirm={handleConfirm}
-      />
-    </>
+        <SaveToPlanModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          scenario={{ kind: "quickdate", title: activity.title }}
+          onConfirm={handleConfirm}
+        />
+      </>
+    </AnalyticsCardViewTracker>
   );
 }
 
@@ -160,11 +184,13 @@ export function RecommendationsSection({
             <p className="text-xs text-neutral-400 mt-0.5">{block.subtitle}</p>
           </div>
           <div className="space-y-2">
-            {block.activities.map((activity) => (
+            {block.activities.map((activity, index) => (
               <RecommendationCard
                 key={activity.id}
                 activity={activity}
                 selectedDate={selectedDate}
+                recommendationBlock={block.key}
+                position={index + 1}
                 onAdded={onItemAdded}
               />
             ))}
