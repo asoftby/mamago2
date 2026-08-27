@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RecommendationCard } from "./RecommendationCard";
 import type { PlanItemWithActivity } from "../types/event";
 import type { PlanSlotType } from "../hooks/useMyPlan";
+import { postProductTelemetryEvent } from "@/lib/analytics/client";
 import { cn } from "@/lib/utils";
 
 interface PlanSuggestionsSheetProps {
@@ -52,6 +53,33 @@ export function PlanSuggestionsSheet({
 }: PlanSuggestionsSheetProps) {
   const isDesktop = layout === "desktop";
   const slotLabel = SLOT_LABELS[slot];
+
+  useEffect(() => {
+    if (!open || !suggestionItem?.activityId) return;
+
+    void postProductTelemetryEvent({
+      eventType: "CARD_VIEW",
+      entityType: "EVENT",
+      entityId: suggestionItem.activityId,
+      vertical: "CITY",
+      meta: {
+        source: "recommendation",
+        section: "afisha",
+        recommendationSurface: "plan_suggestions",
+        slot,
+        selectedDate: date,
+        position: variantPosition,
+        variantTotal,
+      },
+    });
+  }, [
+    open,
+    suggestionItem?.activityId,
+    slot,
+    date,
+    variantPosition,
+    variantTotal,
+  ]);
 
   const content = (
     <div className="flex h-full min-h-0 flex-col">
