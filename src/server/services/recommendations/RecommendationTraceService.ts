@@ -109,6 +109,46 @@ export async function recordRecommendationRun(
   }
 }
 
+export type RecentRecommendationAttributionInput = {
+  userId: string;
+  entityType: AnalyticsEntityType;
+  entityId: string;
+  surface?: RecommendationSurface;
+  maxAgeMinutes?: number;
+};
+
+/**
+ * Server-side attribution fallback for actions whose existing client contract
+ * predates recommendation IDs. Explicit exposure IDs remain preferable, but a
+ * short recent window lets old call sites participate without duplicating UI
+ * state or recommendation logic.
+ */
+export async function findRecentRecommendationAttribution(
+  input: RecentRecommendationAttributionInput,
+): Promise<{ exposureId: string; runId: string } | null> {
+  try {
+    const maxAgeMinutes = Math.min(24 * 60, Math.max(1, input.maxAgeMinutes ?? 120));
+    const since = new Date(Date.now() - maxAgeMinutes * 60_000);
+    const exposure = await prisma.recommendationExposure.findFirst({
+      where: {
+        entityType: input.entityType,
+        entityId: input.entityId,
+        exposedAt: { gte: since },
+        run: {
+          userId: input.userId,
+          ...(input.surface ? { surface: input.surface } : {}),
+        },
+      },
+      orderBy: { exposedAt: "desc" },
+      select: { id: true, runId: true },
+    });
+    return exposure ? { exposureId: exposure.id, runId: exposure.runId } : null;
+  } catch (error) {
+    console.error("[recommendation-trace] recent attribution lookup failed", error);
+    return null;
+  }
+}
+
 export type RecommendationOutcomeLinkInput = {
   exposureId: string;
   userEventId: string;
@@ -172,6 +212,7 @@ export async function getPublishedRecommendationSurfacePolicy(
 
 export const RecommendationTraceService = {
   recordRecommendationRun,
+  findRecentRecommendationAttribution,
   linkRecommendationOutcome,
   getPublishedRecommendationSurfacePolicy,
 };
