@@ -1054,9 +1054,11 @@ export function BreakingNewsView({
       ) : null}
       <ArticleBody blocks={blocks} />
 
-      {activityBlock?.card && activityBlock.card.kind === "basic" && activityBlock.card.placeExtra && (
-        <PriceSection placeExtra={activityBlock.card.placeExtra} />
-      )}
+      {activityBlock?.card &&
+        (activityBlock.card.kind === "basic" || activityBlock.card.kind === "place-embed") &&
+        activityBlock.card.placeExtra && (
+          <PriceSection placeExtra={activityBlock.card.placeExtra} />
+        )}
 
       {activityBlock?.card && (
         <LinkedEntityCard

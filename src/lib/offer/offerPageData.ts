@@ -108,7 +108,7 @@ function parseCampSession(value: Prisma.JsonValue, index: number): OfferSchedule
   };
 }
 
-function stripHtml(html?: string | null): string {
+export function stripHtml(html?: string | null): string {
   if (!html) return "";
   return html
     .replace(/<br\s*\/?>/gi, "\n")
@@ -121,7 +121,7 @@ function stripHtml(html?: string | null): string {
     .trim();
 }
 
-function extractDiscountsFromPromotionDetails(html?: string | null): Array<{ rate: string; label: string }> {
+export function extractDiscountsFromPromotionDetails(html?: string | null): Array<{ rate: string; label: string }> {
   if (!html) return [];
 
   const liMatches = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
@@ -180,7 +180,7 @@ function resolvePriceUnit(args: {
   return BELARUS_CURRENCY_SYMBOL;
 }
 
-function resolvePromotionText(args: {
+export function resolvePromotionText(args: {
   promoTitle?: string | null;
   promotionalOffer?: string | null;
   hasDiscounts: boolean;
