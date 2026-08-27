@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate Prisma schema
+        run: pnpm exec prisma validate
+
       - name: Type check
         run: pnpm tsc --noEmit
         env:
