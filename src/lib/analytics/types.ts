@@ -5,15 +5,39 @@ import type {
 } from "@prisma/client";
 
 /**
- * Допустимые ключи meta для лёгкого контекста (без тяжёлых payload).
+ * Lightweight context shared by first-party product telemetry.
+ *
+ * Keep this payload compact (the HTTP contract caps it at 4 KB). Raw behavior
+ * remains in UserEvent; recommendation attribution is expressed by IDs rather
+ * than by duplicating recommendation state into every event.
  */
 export type AnalyticsMetaPayload = {
   source?: "listing" | "detail" | "recommendation" | "plan";
-  section?: "home" | "afisha" | "offers" | "routes" | "journal" | "places";
+  section?: "home" | "afisha" | "offers" | "routes" | "journal" | "places" | "my_plan";
   position?: number;
   /** Краткое описание фильтров (строка), не полный объект фильтра */
   filterSummary?: string;
   targetAction?: "buy" | "book" | "contact" | "open_site" | "plan" | string;
+
+  /** Recommendation attribution. These IDs point to the shared trace layer. */
+  recommendationRunId?: string;
+  recommendationExposureId?: string;
+  recommendationSurface?: "home" | "discovery" | "my_plan" | "telegram";
+
+  /** Small, normalized user/context dimensions useful for later ranking. */
+  selectedPersonaIds?: string[];
+  ageRanges?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  categoryIds?: string[];
+  genreIds?: string[];
+  signalIds?: string[];
+  districtId?: string;
+  metroId?: string;
+  free?: boolean;
+  priceMax?: number;
+  query?: string;
+
   [key: string]: unknown;
 };
 
