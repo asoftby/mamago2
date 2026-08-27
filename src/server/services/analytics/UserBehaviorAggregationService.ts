@@ -50,12 +50,14 @@ function metaRecord(meta: Prisma.JsonValue | null | undefined): Record<string, u
 
 function readStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [...new Set(
-    value
-      .filter((item): item is string => typeof item === "string")
-      .map((item) => item.trim())
-      .filter(Boolean),
-  )];
+  return [
+    ...new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function bump(map: NumericMap, key: string): NumericMap {
@@ -134,59 +136,18 @@ function counterDelta(eventType: UserEventType): {
   }
 }
 
-const STRONG_ENTITY_SIGNAL_EVENTS = new Set<UserEventType>([
-  "DETAIL_OPEN",
-  "SAVE",
-  "UNSAVE",
-  "PLAN_ADD",
-  "PLAN_REMOVE",
-  "CTA_CLICK",
-  "BOOKING_CREATED",
-  "BOOKING_CONFIRMED",
-  "BOOKING_COMPLETED",
-  "BOOKING_CANCELLED",
-  "FEEDBACK_LEFT",
-]);
-
 /**
- * Resolve stable semantic traits only when they are missing from telemetry and
- * the action is strong enough to justify one DB lookup. CARD_VIEW/PAGE_VIEW do
- * not cause an extra query: high-volume impressions must remain cheap.
+ * Semantic enrichment happens once in AnalyticsEventService before UserEvent is
+ * persisted. The behavior projection consumes that immutable event context and
+ * must not re-query Activity for the same action.
  */
-async function resolveSemanticTraits(input: BehaviorAggregationInput): Promise<SemanticTraits> {
-  const m = metaRecord(input.meta);
-  let categoryIds = readStringList(m.categoryIds);
-  let signalIds = readStringList(m.signalIds);
-  let format = typeof m.format === "string" && m.format.trim() ? m.format.trim() : null;
-
-  const shouldResolveActivity =
-    input.entityType === "EVENT" &&
-    Boolean(input.entityId) &&
-    STRONG_ENTITY_SIGNAL_EVENTS.has(input.eventType) &&
-    (categoryIds.length === 0 || !format);
-
-  if (shouldResolveActivity) {
-    const activity = await prisma.activity.findUnique({
-      where: { id: input.entityId! },
-      select: {
-        eventCategoryId: true,
-        format: true,
-      },
-    });
-    if (categoryIds.length === 0 && activity?.eventCategoryId) {
-      categoryIds = [activity.eventCategoryId];
-    }
-    if (!format && activity?.format) {
-      format = String(activity.format);
-    }
-  }
-
-  // Signals are accepted from normalized telemetry only for now. Resolving
-  // taxonomy relations per impression/action would be needless query load and
-  // can be added later in one batch projection job if required.
-  signalIds = [...new Set(signalIds)];
-
-  return { categoryIds, format, signalIds };
+function resolveSemanticTraits(meta: Prisma.JsonValue | null | undefined): SemanticTraits {
+  const m = metaRecord(meta);
+  return {
+    categoryIds: readStringList(m.categoryIds),
+    format: typeof m.format === "string" && m.format.trim() ? m.format.trim() : null,
+    signalIds: readStringList(m.signalIds),
+  };
 }
 
 /**
@@ -211,10 +172,8 @@ export async function applyUserBehaviorEvent(
 
     const d = counterDelta(eventType);
     const now = new Date();
-    const [existing, semanticTraits] = await Promise.all([
-      prisma.userBehaviorProfile.findUnique({ where: { userId } }),
-      resolveSemanticTraits(input),
-    ]);
+    const existing = await prisma.userBehaviorProfile.findUnique({ where: { userId } });
+    const semanticTraits = resolveSemanticTraits(meta);
 
     let preferredVerticals = asRecord(existing?.preferredVerticals);
     let preferredCategories = asRecord(existing?.preferredCategories);
