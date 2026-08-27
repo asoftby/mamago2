@@ -11,6 +11,7 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
 import { enrichSemanticEventMeta } from "@/server/services/analytics/SemanticEventContextService";
+import { enrichPlanningEventMeta } from "@/server/services/analytics/PlanningEventContextService";
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
 import {
   findRecentRecommendationAttribution,
@@ -51,6 +52,13 @@ export async function trackUserEvent(
     // behavior-profile projection so both raw history and the projection learn
     // from the same immutable context.
     meta = await enrichSemanticEventMeta({
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+      eventType: input.eventType,
+      meta,
+    });
+    meta = await enrichPlanningEventMeta({
+      userId: input.userId ?? null,
       entityType: input.entityType ?? null,
       entityId: input.entityId ?? null,
       eventType: input.eventType,
