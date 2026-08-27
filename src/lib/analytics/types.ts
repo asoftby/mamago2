@@ -30,11 +30,16 @@ export type AnalyticsMetaPayload = {
   dateFrom?: string;
   dateTo?: string;
   categoryIds?: string[];
+  /** Activity currently stores canonical genre slugs rather than genre IDs. */
+  genreSlugs?: string[];
+  /** Reserved for domains that expose stable genre IDs later. */
   genreIds?: string[];
   signalIds?: string[];
+  format?: string;
   districtId?: string;
   metroId?: string;
   free?: boolean;
+  priceFrom?: number;
   priceMax?: number;
   query?: string;
 
