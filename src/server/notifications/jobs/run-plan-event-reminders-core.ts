@@ -1,15 +1,15 @@
 import type { SendNotificationResult } from "@/lib/notifications/domainContracts";
+import { DEFAULT_NOTIFICATION_TIME_ZONE } from "@/lib/notifications/userNotificationSchedule";
 import type { PlanReminderCandidate } from "@/server/services/plan.service";
+import type { UserReminderSchedule } from "@/server/services/userNotificationSchedule.service";
 
-const DEFAULT_LOOKAHEAD_MINUTES = 120;
-const DEFAULT_WINDOW_BEFORE_MINUTES = 10;
-const DEFAULT_WINDOW_AFTER_MINUTES = 10;
+const DEFAULT_MAX_OFFSET_MINUTES = 180;
+const DEFAULT_DUE_GRACE_MINUTES = 10;
 
 export type RunPlanEventRemindersArgs = {
   now?: Date;
-  lookaheadMinutes?: number;
-  windowBeforeMinutes?: number;
-  windowAfterMinutes?: number;
+  maxOffsetMinutes?: number;
+  dueGraceMinutes?: number;
 };
 
 type RunPlanEventRemindersDeps = {
@@ -17,6 +17,9 @@ type RunPlanEventRemindersDeps = {
     windowStart: Date;
     windowEnd: Date;
   }) => Promise<PlanReminderCandidate[]>;
+  getReminderSettingsForUsersFn: (
+    userIds: string[],
+  ) => Promise<Map<string, UserReminderSchedule>>;
   sendNotificationFn: (input: {
     scenario: "PLAN_EVENT_2H_BEFORE";
     userId: string;
@@ -27,6 +30,7 @@ type RunPlanEventRemindersDeps = {
       startsAt: Date;
       placeName?: string | null;
       cityName?: string | null;
+      timeZone?: string;
     };
   }) => Promise<SendNotificationResult>;
 };
@@ -36,6 +40,8 @@ export type RunPlanEventRemindersResult = {
   windowStartIso: string;
   windowEndIso: string;
   candidatesFound: number;
+  dueCandidates: number;
+  skippedSchedule: number;
   sent: number;
   skipped: number;
   failed: number;
@@ -45,6 +51,7 @@ export type RunPlanEventRemindersResult = {
     activityId: string | null;
     eventTitle: string;
     startsAt: string | null;
+    offsetMinutes: number;
     result: SendNotificationResult | { status: "FAILED"; errorMessage: string };
   }>;
 };
@@ -79,25 +86,43 @@ export async function runPlanEventRemindersCore(
   deps: RunPlanEventRemindersDeps,
 ): Promise<RunPlanEventRemindersResult> {
   const now = args.now ?? new Date();
-  const lookaheadMinutes = args.lookaheadMinutes ?? DEFAULT_LOOKAHEAD_MINUTES;
-  const windowBeforeMinutes = args.windowBeforeMinutes ?? DEFAULT_WINDOW_BEFORE_MINUTES;
-  const windowAfterMinutes = args.windowAfterMinutes ?? DEFAULT_WINDOW_AFTER_MINUTES;
+  const maxOffsetMinutes = args.maxOffsetMinutes ?? DEFAULT_MAX_OFFSET_MINUTES;
+  const dueGraceMinutes = args.dueGraceMinutes ?? DEFAULT_DUE_GRACE_MINUTES;
+  const windowStart = addMinutes(now, -dueGraceMinutes);
+  const windowEnd = addMinutes(now, maxOffsetMinutes + dueGraceMinutes);
 
-  const target = addMinutes(now, lookaheadMinutes);
-  const windowStart = addMinutes(target, -windowBeforeMinutes);
-  const windowEnd = addMinutes(target, windowAfterMinutes);
-
-  const candidates = await deps.listPlanItemsDueForReminderFn({
-    windowStart,
-    windowEnd,
-  });
+  const candidates = await deps.listPlanItemsDueForReminderFn({ windowStart, windowEnd });
+  const settingsByUser = await deps.getReminderSettingsForUsersFn(
+    Array.from(new Set(candidates.map((candidate) => candidate.userId))),
+  );
 
   const results: RunPlanEventRemindersResult["results"] = [];
+  let dueCandidates = 0;
+  let skippedSchedule = 0;
   let sent = 0;
   let skipped = 0;
   let failed = 0;
 
   for (const candidate of candidates) {
+    const settings = settingsByUser.get(candidate.userId) ?? {
+      enabled: true,
+      offsetMinutes: 120,
+      timeZone: DEFAULT_NOTIFICATION_TIME_ZONE,
+    };
+    const startsAt = candidate.startsAt;
+    if (!settings.enabled || !startsAt || startsAt.getTime() <= now.getTime()) {
+      skippedSchedule += 1;
+      continue;
+    }
+
+    const dueAt = addMinutes(startsAt, -settings.offsetMinutes);
+    const oldestAllowedDueAt = addMinutes(now, -dueGraceMinutes);
+    if (dueAt.getTime() > now.getTime() || dueAt.getTime() < oldestAllowedDueAt.getTime()) {
+      skippedSchedule += 1;
+      continue;
+    }
+
+    dueCandidates += 1;
     try {
       const result = await deps.sendNotificationFn({
         scenario: "PLAN_EVENT_2H_BEFORE",
@@ -106,9 +131,10 @@ export async function runPlanEventRemindersCore(
           planItemId: candidate.id,
           activityId: candidate.activityId,
           eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
-          startsAt: candidate.startsAt ?? windowStart,
+          startsAt,
           placeName: resolvePlaceName(candidate),
           cityName: resolveCityName(candidate),
+          timeZone: settings.timeZone,
         },
       });
 
@@ -120,7 +146,8 @@ export async function runPlanEventRemindersCore(
         userId: candidate.userId,
         activityId: candidate.activityId,
         eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
-        startsAt: candidate.startsAt?.toISOString() ?? null,
+        startsAt: startsAt.toISOString(),
+        offsetMinutes: settings.offsetMinutes,
         result,
       });
     } catch (error) {
@@ -130,7 +157,8 @@ export async function runPlanEventRemindersCore(
         userId: candidate.userId,
         activityId: candidate.activityId,
         eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
-        startsAt: candidate.startsAt?.toISOString() ?? null,
+        startsAt: startsAt.toISOString(),
+        offsetMinutes: settings.offsetMinutes,
         result: {
           status: "FAILED",
           errorMessage: error instanceof Error ? error.message : "REMINDER_JOB_FAILED",
@@ -144,6 +172,8 @@ export async function runPlanEventRemindersCore(
     windowStartIso: windowStart.toISOString(),
     windowEndIso: windowEnd.toISOString(),
     candidatesFound: candidates.length,
+    dueCandidates,
+    skippedSchedule,
     sent,
     skipped,
     failed,

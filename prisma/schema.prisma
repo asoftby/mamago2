@@ -113,6 +113,7 @@ model User {
   performedModerationActions        UserModerationAction[]           @relation("ModeratorUser")
   moderationActions                 UserModerationAction[]           @relation("TargetUser")
   notificationPreferences           UserNotificationPreference[]
+  notificationSchedule              UserNotificationSchedule?
   unsubscribeTokens                 UnsubscribeToken[]               @relation("UnsubscribeTokens")
   actionTokens                      UserActionToken[]
   activationDeliveryAudits          ActivationDeliveryAudit[]
@@ -400,6 +401,7 @@ model PlanItem {
   @@index([placeId])
   @@index([userId, planPlaceSlug])
   @@index([articleId])
+  @@index([startsAt])
 }
 
 /// Сценарий дня (Task 7 MVP) — минимальная persisted-разметка поверх
@@ -3001,6 +3003,24 @@ model UserNotificationPreference {
   @@unique([userId, notificationType])
   @@index([userId, audience])
   @@index([userId])
+}
+
+/// Per-user local timing for plan notifications. Channel preferences remain
+/// in UserNotificationPreference.
+model UserNotificationSchedule {
+  userId                    String   @id
+  timeZone                  String   @default("Europe/Minsk")
+  timeZoneMode              String   @default("AUTO")
+  planEveningEnabled        Boolean  @default(true)
+  planEveningTime           String   @default("19:00")
+  planEveningNextRunAt      DateTime
+  planReminderEnabled       Boolean  @default(true)
+  planReminderOffsetMinutes Int      @default(120)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([planEveningEnabled, planEveningNextRunAt])
 }
 
 model NotificationPolicy {

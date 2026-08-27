@@ -119,7 +119,7 @@
     "test:discovery-intent-config": "tsx src/lib/discovery/discoveryIntentConfig.test.ts",
     "test:discovery-intent-tabs": "tsx src/components/city/DiscoveryIntentTabs.test.tsx",
     "test:responsive-table": "tsx src/components/ui/table.test.tsx && tsx src/components/ui/data-card-list.test.tsx",
-    "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/template-render.test.ts",
+    "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/lib/notifications/userNotificationSchedule.test.ts && tsx src/lib/notifications/planNotificationScheduleUi.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/jobs/run-plan-tomorrow-digests.test.ts && tsx src/server/notifications/template-render.test.ts",
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",
     "test:my-plan-default-participants": "tsx src/features/my-plan/lib/resolveDefaultParticipants.test.ts",

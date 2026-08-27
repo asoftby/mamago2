@@ -579,3 +579,17 @@ export async function listPlanItemsForTomorrowDigest(args: {
     orderBy: { startsAt: "asc" },
   })) as PlanTomorrowDigestCandidate[];
 }
+
+export async function listPlanItemsForUserDates(
+  targets: Array<{ userId: string; date: string }>,
+): Promise<PlanTomorrowDigestCandidate[]> {
+  if (targets.length === 0) return [];
+
+  return (await prisma.planItem.findMany({
+    where: {
+      OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
+    },
+    include: { activity: { select: planActivitySelect } },
+    orderBy: [{ userId: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
+  })) as PlanTomorrowDigestCandidate[];
+}
