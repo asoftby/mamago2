@@ -6,6 +6,11 @@ import {
   Prisma,
 } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import {
+  DEFAULT_PLAN_EVENING_TIME,
+  DEFAULT_PLAN_REMINDER_OFFSET_MINUTES,
+  USER_PLAN_REMINDER_OFFSETS,
+} from "@/lib/notifications/userNotificationSchedule";
 
 export type NotificationPolicySeed = {
   key: string;
@@ -69,15 +74,15 @@ export const DEFAULT_NOTIFICATION_POLICIES: NotificationPolicySeed[] = [
     quietHoursStart: "22:00",
     quietHoursEnd: "08:00",
     digestTime: null,
-    defaultReminderOffsetMinutes: 120,
-    availableReminderOffsets: [30, 60, 120, 180],
+    defaultReminderOffsetMinutes: DEFAULT_PLAN_REMINDER_OFFSET_MINUTES,
+    availableReminderOffsets: [...USER_PLAN_REMINDER_OFFSETS],
     isSystemLocked: false,
     description: "Напоминание о событии в плане перед началом.",
   },
   {
     key: "PLAN_TOMORROW_DIGEST",
     surface: NotificationPolicySurface.USER,
-    notificationType: "PLAN_TOMORROW_DIGEST",
+    notificationType: "REMINDER",
     scenario: "PLAN_TOMORROW_DIGEST",
     enabled: true,
     allowedInApp: true,
@@ -91,7 +96,7 @@ export const DEFAULT_NOTIFICATION_POLICIES: NotificationPolicySeed[] = [
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
     quietHoursEnd: "08:00",
-    digestTime: "19:00",
+    digestTime: DEFAULT_PLAN_EVENING_TIME,
     defaultReminderOffsetMinutes: null,
     availableReminderOffsets: [],
     isSystemLocked: false,

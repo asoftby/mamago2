@@ -22,6 +22,17 @@ import { renderNotificationContentCore } from "./notification-renderer-core";
 }
 
 {
+  const rendered = renderNotificationContentCore("PLAN_EVENT_2H_BEFORE", {
+    planItemId: "plan_dst",
+    eventTitle: "DST test",
+    startsAt: new Date("2026-03-29T22:30:00.000Z"),
+    timeZone: "Europe/Amsterdam",
+  });
+  assert.equal(rendered.body, "В 00:30 у вас в плане: DST test");
+  assert.equal(rendered.ctaUrl, "/me/day/2026-03-30");
+}
+
+{
   const rendered = renderNotificationContentCore("PLAN_TOMORROW_DIGEST", {
     digestDate: "2026-05-15",
     citySlug: "minsk",

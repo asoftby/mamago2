@@ -42,11 +42,6 @@ export function buildPlaceJsonLd(input: BuildPlaceJsonLdInput): Record<string, u
     (item, index, array): item is string => Boolean(item) && array.indexOf(item) === index,
   );
   const hasGeo = typeof input.lat === "number" && typeof input.lng === "number";
-  const hasAggregateRating =
-    typeof input.rating === "number" &&
-    Number.isFinite(input.rating) &&
-    typeof input.reviewCount === "number" &&
-    input.reviewCount > 0;
 
   return {
     "@context": "https://schema.org",
@@ -66,12 +61,10 @@ export function buildPlaceJsonLd(input: BuildPlaceJsonLdInput): Record<string, u
       : undefined,
     telephone: input.phone ?? undefined,
     sameAs: sameAs.length > 0 ? sameAs : undefined,
-    aggregateRating: hasAggregateRating
-      ? {
-          "@type": "AggregateRating",
-          ratingValue: input.rating,
-          reviewCount: input.reviewCount,
-        }
-      : undefined,
+    // Google Search review snippets do not support generic schema.org Place
+    // as the reviewed parent type. Ratings remain available to the UI and
+    // callers, but must not be serialized into this Place JSON-LD. If a
+    // future page emits an explicitly supported subtype such as
+    // LocalBusiness, aggregateRating can be added in that dedicated schema.
   };
 }

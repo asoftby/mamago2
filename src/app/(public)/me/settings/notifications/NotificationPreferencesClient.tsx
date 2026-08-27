@@ -27,6 +27,7 @@ import {
   wouldDisableLastSystemNotificationChannel,
 } from "@/lib/notifications/userNotificationPresentation";
 import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
+import { PlanNotificationScheduleSettings } from "./PlanNotificationScheduleSettings";
 
 interface Props {
   initialData: NotificationSettingsSurfaceData;
@@ -144,7 +145,7 @@ export function NotificationPreferencesClient({
     if (!currentRow) return;
 
     if (channel === "TELEGRAM" && enabled && !telegramConnected) {
-      toast.info("Сначала подключите Telegram");
+      void handleTelegramConnect();
       return;
     }
 
@@ -203,7 +204,7 @@ export function NotificationPreferencesClient({
     });
   };
 
-  const handleTelegramConnect = async () => {
+  async function handleTelegramConnect() {
     if (!telegramConfigured) {
       toast.error("Telegram бот пока не настроен на сервере");
       return;
@@ -233,7 +234,7 @@ export function NotificationPreferencesClient({
     } finally {
       setIsLinkingTelegram(false);
     }
-  };
+  }
 
   const handleTelegramDisconnect = async () => {
     setIsDisconnectingTelegram(true);
@@ -315,10 +316,10 @@ export function NotificationPreferencesClient({
 
   return (
     <div className={cn("flex flex-col", embedded ? "gap-5" : "gap-6")}>
-      {!embedded && (
-        <section
+      <section
           className={cn(
             "rounded-[28px] border px-5 py-5 sm:px-6",
+            embedded && "rounded-2xl px-4 py-4 sm:px-5",
             !telegramConfigured
               ? "border-amber-200/80 bg-amber-50/70"
               : telegramConnected
@@ -404,7 +405,7 @@ export function NotificationPreferencesClient({
               </Button>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <Button
+                {!embedded ? <Button
                   type="button"
                   variant="outline"
                   className="rounded-2xl bg-white"
@@ -419,7 +420,7 @@ export function NotificationPreferencesClient({
                   ) : (
                     "Отправить тест"
                   )}
-                </Button>
+                </Button> : null}
                 <Button
                   type="button"
                   variant="outline"
@@ -432,7 +433,6 @@ export function NotificationPreferencesClient({
             )}
           </div>
         </section>
-      )}
 
       <section className="rounded-[28px] border border-neutral-100 bg-white shadow-sm">
         <div className="border-b border-neutral-100 px-5 py-4 sm:px-6">
@@ -466,12 +466,7 @@ export function NotificationPreferencesClient({
                 className="px-5 py-4 sm:px-6 sm:py-5"
               >
                 <div
-                  className={cn(
-                    "grid gap-4",
-                    embedded
-                      ? ""
-                      : "md:grid-cols-[minmax(0,1fr)_88px_88px_88px] md:items-center",
-                  )}
+                  className="grid gap-4 md:grid-cols-[minmax(0,1fr)_88px_88px_88px] md:items-center"
                 >
                   <div className="min-w-0">
                     <div className="flex items-start gap-3">
@@ -492,13 +487,13 @@ export function NotificationPreferencesClient({
                   <div
                     className={cn(
                       "grid grid-cols-3 gap-2",
-                      embedded ? "" : "md:contents",
+                      "md:contents",
                     )}
                   >
                     {CHANNEL_OPTIONS.map((channel) => {
                       const telegramToggleBlocked =
                         channel.key === "TELEGRAM" &&
-                        (!telegramConfigured || !telegramConnected) &&
+                        !telegramConfigured &&
                         row.channels.TELEGRAM !== true;
                       const disabled =
                         pending ||
@@ -510,13 +505,13 @@ export function NotificationPreferencesClient({
                           key={channel.key}
                           className={cn(
                             "flex flex-col items-center gap-2 rounded-2xl bg-stone-50/70 px-3 py-3",
-                            embedded ? "" : "md:bg-transparent md:px-0 md:py-0",
+                            "md:bg-transparent md:px-0 md:py-0",
                           )}
                         >
                           <span
                             className={cn(
                               "text-[11px] font-medium text-neutral-500",
-                              embedded ? "" : "md:hidden",
+                              "md:hidden",
                             )}
                           >
                             {channel.shortTitle}
@@ -537,6 +532,9 @@ export function NotificationPreferencesClient({
                     })}
                   </div>
                 </div>
+                {definition.notificationType === "REMINDER" ? (
+                  <PlanNotificationScheduleSettings />
+                ) : null}
               </div>
             );
           })}
