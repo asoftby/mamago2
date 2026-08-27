@@ -1,11 +1,21 @@
 import { StoryRings } from "./StoryRings";
+import { resolvePublicStoryPresentation } from "../lib/resolvePublicStoryPresentation";
 import { loadPublicStoryCollections } from "@/server/stories/loadPublicStoryCollections";
+import { getPublicStoryIntentConfigs } from "@/server/stories/storyIntentConfig";
 
 type StoriesSectionProps = { cityId: string; citySlug: string };
 
-/** Public Stories 2.0: canonical rail data adapted to the existing viewer UI. */
+/** Public Stories 2.0: canonical rail data adapted to the public viewer UI. */
 export async function StoriesSection({ cityId, citySlug }: StoriesSectionProps) {
-  const stories = await loadPublicStoryCollections({ cityId, citySlug });
+  const [canonicalStories, configs] = await Promise.all([
+    loadPublicStoryCollections({ cityId, citySlug }),
+    getPublicStoryIntentConfigs(),
+  ]);
+  const todayConfig = configs.find((config) => config.intent === "today");
+  const stories = resolvePublicStoryPresentation(canonicalStories, {
+    todayEnabled: todayConfig?.enabled !== false,
+    orderByIntent: Object.fromEntries(configs.map((config) => [config.intent, config.order])),
+  });
   if (stories.length === 0) return null;
   return (
     <section aria-label="Stories">

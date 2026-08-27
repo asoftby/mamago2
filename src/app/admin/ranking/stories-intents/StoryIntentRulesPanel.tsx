@@ -17,11 +17,13 @@ type StoryIntent = {
 };
 
 const INTENT_META: Record<string, { description: string }> = {
-  today: { description: "Активности текущего календарного дня в timezone города." },
+  today: { description: "Единый публичный круг «Сегодня»: активности текущего календарного дня в timezone города." },
+  running: { description: "Технический источник серийных программ с показом сегодня. На главной объединяется с «Сегодня» и отдельным кругом не показывается." },
   tomorrow: { description: "Активности следующего календарного дня по календарной границе." },
   weekend: { description: "Ближайший актуальный диапазон субботы и воскресенья." },
-  breaking_news: { description: "Срочные редакционные публикации, которые выводятся с повышенным приоритетом." },
-  free: { description: "Ближайшие бесплатные события." },
+  breaking_news: { description: "Срочные редакционные публикации. Отдельный круг появляется только при наличии актуального Breaking news." },
+  free: { description: "Ближайшие бесплатные события и предложения на 7 дней. Отдельный контекстный круг." },
+  lastchance: { description: "Будущий контекстный круг «Успеть». Сейчас скрыт до появления реального promoUntil-сигнала." },
 };
 
 export function StoryIntentRulesPanel() {
@@ -78,7 +80,7 @@ export function StoryIntentRulesPanel() {
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Правила ранжирования</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Реальные публичные блоки Stories. Их порядок соответствует главной; Offers добавляются только через ручные placements.
+          Canonical-источники Stories. Серийные программы — внутренний источник для «Сегодня»; контекстные круги вроде «Бесплатно» выводятся отдельно.
         </p>
       </div>
 
@@ -96,49 +98,54 @@ export function StoryIntentRulesPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {intents.map((intent) => (
-                <tr key={intent.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="w-full px-4 py-3">
-                    <Input
-                      value={intent.title}
-                      onChange={(e) => update(intent.id, { title: e.target.value })}
-                      className="h-auto min-h-0 rounded-none border-0 border-b border-transparent bg-transparent px-0 py-0.5 text-sm text-gray-900 shadow-none transition-colors hover:border-gray-200 focus-visible:ring-0 focus-visible:border-gray-400"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">{INTENT_META[intent.intent]?.description}</p>
-                    <span className="mt-1 inline-block font-mono text-[10px] text-gray-400">{intent.intent}</span>
-                  </td>
-                  {/* Enabled toggle */}
-                  <td className="px-4 py-3 text-center">
-                    <Toggle
-                      checked={intent.enabled}
-                      onChange={(val) => update(intent.id, { enabled: val })}
-                      aria-label={intent.enabled ? "Выключить" : "Включить"}
-                    />
-                  </td>
+              {intents.map((intent) => {
+                const isInternalRunning = intent.intent === "running";
+                return (
+                  <tr key={intent.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="w-full px-4 py-3">
+                      <Input
+                        value={intent.title}
+                        disabled={isInternalRunning}
+                        onChange={(e) => update(intent.id, { title: e.target.value })}
+                        className="h-auto min-h-0 rounded-none border-0 border-b border-transparent bg-transparent px-0 py-0.5 text-sm text-gray-900 shadow-none transition-colors hover:border-gray-200 focus-visible:ring-0 focus-visible:border-gray-400 disabled:cursor-default disabled:opacity-60"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">{INTENT_META[intent.intent]?.description}</p>
+                      <span className="mt-1 inline-block font-mono text-[10px] text-gray-400">{intent.intent}</span>
+                    </td>
+                    {/* Enabled toggle */}
+                    <td className="px-4 py-3 text-center">
+                      <Toggle
+                        checked={intent.enabled}
+                        onChange={(val) => update(intent.id, { enabled: val })}
+                        aria-label={intent.enabled ? "Выключить" : "Включить"}
+                      />
+                    </td>
 
-                  {/* Order */}
-                  <td className="px-4 py-3 text-center">
-                    <Input
-                      type="number"
-                      min={0}
-                      value={intent.order}
-                      onChange={(e) => update(intent.id, { order: Number(e.target.value) })}
-                      className="h-9 w-14 px-2 py-0 text-center text-sm"
-                    />
-                  </td>
+                    {/* Order */}
+                    <td className="px-4 py-3 text-center">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={intent.order}
+                        disabled={isInternalRunning}
+                        onChange={(e) => update(intent.id, { order: Number(e.target.value) })}
+                        className="h-9 w-14 px-2 py-0 text-center text-sm disabled:cursor-default disabled:opacity-60"
+                      />
+                    </td>
 
-                  {/* Save */}
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => save(intent)}
-                      disabled={saving === intent.id}
-                      className="text-xs font-medium text-[#EF8759] hover:text-[#e8784a] disabled:opacity-40 transition-colors"
-                    >
-                      {saving === intent.id ? "..." : "Сохранить"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    {/* Save */}
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => save(intent)}
+                        disabled={saving === intent.id}
+                        className="text-xs font-medium text-[#EF8759] hover:text-[#e8784a] disabled:opacity-40 transition-colors"
+                      >
+                        {saving === intent.id ? "..." : "Сохранить"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

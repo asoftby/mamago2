@@ -1,13 +1,15 @@
 import { todayRange, runningHorizonRange } from "./ranges";
-import { SERIAL_CLASSIFICATION_CONFIG } from "./serialConfig";
 import { DEFAULT_SLOT_MIN_ITEMS, TODAY_SLOT_MIN_ITEMS, type StorySlot } from "./types";
+
+const LAST_CHANCE_HORIZON_DAYS = 14;
 
 /**
  * Declarative story-rail slot registry — branch (a).
  *
- * Temporal axis collapsed to a single honest `today` (point events).
- * Serial programs live in contextual `running`. Facet slots for Phase 4
- * (`lastchance`, `free`, `breakingnews`) join here; `newplaces` is deferred.
+ * Public temporal navigation is a single honest `today`. The technical
+ * `running` slot supplies serial programs only when they have an occurrence
+ * today; public presentation folds them into that same «Сегодня» circle.
+ * Contextual facets (`free`, later `lastchance`) may look further ahead.
  *
  * Removed: `tomorrow` / `weekend` / `nextweek` — on current inventory they
  * cannot reach minItems without lying about dates.
@@ -25,9 +27,9 @@ export const STORY_SLOTS: StorySlot[] = [
   {
     id: "running",
     kind: "contextual",
+    // Internal source label only. Public UI folds this source into «Сегодня».
     label: () => "Идёт сейчас",
-    range: (ctx) =>
-      runningHorizonRange(ctx, SERIAL_CLASSIFICATION_CONFIG.runningHorizonDays),
+    range: todayRange,
     priority: 35,
     minItems: 1,
   },
@@ -44,8 +46,7 @@ export const STORY_SLOTS: StorySlot[] = [
     kind: "contextual",
     label: () => "Успеть",
     // Range unused while condition is false; Phase 4 wires promoUntil load.
-    range: (ctx) =>
-      runningHorizonRange(ctx, SERIAL_CLASSIFICATION_CONFIG.runningHorizonDays),
+    range: (ctx) => runningHorizonRange(ctx, LAST_CHANCE_HORIZON_DAYS),
     priority: 45,
     minItems: DEFAULT_SLOT_MIN_ITEMS,
     /**

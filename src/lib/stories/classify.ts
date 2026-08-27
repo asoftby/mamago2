@@ -188,6 +188,9 @@ export function classifyItemsForRange(
 
 /**
  * `running`: one item per serial Activity that has ≥1 session in the horizon.
+ * The representative occurrence is always the earliest matching session,
+ * independent of database row order. Public presentation relies on `at` to
+ * decide whether a serial program belongs in the «Сегодня» circle.
  */
 export function classifyRunningItems(
   pool: StoryRailCandidatePool,
@@ -198,8 +201,12 @@ export function classifyRunningItems(
   for (const row of pool.activitySessions) {
     if (row.parentClass !== "serial") continue;
     if (!occurrenceBelongsToRange(row.startsAt, horizon)) continue;
-    if (byActivity.has(row.activityId)) continue;
-    byActivity.set(row.activityId, toSerialActivityItem(row));
+
+    const candidate = toSerialActivityItem(row);
+    const current = byActivity.get(row.activityId);
+    if (!current || candidate.at.getTime() < current.at.getTime()) {
+      byActivity.set(row.activityId, candidate);
+    }
   }
 
   return [...byActivity.values()];
@@ -235,22 +242,27 @@ export function breakdownForSlot(
   };
 }
 
-/** Canonical free semantics: structured priceFrom=0, carried by pool rows. */
+/**
+ * Canonical free semantics: structured priceFrom=0, carried by pool rows.
+ * Free is a contextual facet, so it includes both point/window inventory and
+ * one representative item for each serial free Activity in the same horizon.
+ */
 export function classifyFreeItems(
   pool: StoryRailCandidatePool,
   range: DateRange,
   ongoingPolicy: OngoingTemporalPolicy,
 ): StoryRailItem[] {
-  return classifyItemsForRange(
-    {
-      activitySessions: pool.activitySessions.filter((row) => row.isFree),
-      activityOrphans: pool.activityOrphans.filter((row) => row.isFree),
-      offerSessions: pool.offerSessions.filter((row) => row.isFree),
-      ongoingOffers: pool.ongoingOffers.filter((row) => row.isFree),
-    },
-    range,
-    ongoingPolicy,
-  );
+  const freePool: StoryRailCandidatePool = {
+    activitySessions: pool.activitySessions.filter((row) => row.isFree),
+    activityOrphans: pool.activityOrphans.filter((row) => row.isFree),
+    offerSessions: pool.offerSessions.filter((row) => row.isFree),
+    ongoingOffers: pool.ongoingOffers.filter((row) => row.isFree),
+  };
+
+  return [
+    ...classifyItemsForRange(freePool, range, ongoingPolicy),
+    ...classifyRunningItems(freePool, range),
+  ];
 }
 
 export function countsFromBreakdowns(

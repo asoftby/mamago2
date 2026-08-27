@@ -10,17 +10,11 @@ export type SerialClassificationConfig = {
   minSpanDays: number;
   /** Minimum session rows on the parent Activity. */
   minSessionCount: number;
-  /**
-   * `running` slot: serial parent counts if it has ≥1 session in
-   * [today 00:00, today+N 00:00) city TZ.
-   */
-  runningHorizonDays: number;
 };
 
 export const SERIAL_CLASSIFICATION_CONFIG: SerialClassificationConfig = {
   minSpanDays: 7,
   minSessionCount: 3,
-  runningHorizonDays: 14,
 };
 
 export function isSerialBySessionSpan(input: {
