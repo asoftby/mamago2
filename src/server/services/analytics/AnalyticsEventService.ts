@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
+import { enrichSemanticEventMeta } from "@/server/services/analytics/SemanticEventContextService";
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
 import {
   findRecentRecommendationAttribution,
@@ -45,6 +46,16 @@ export async function trackUserEvent(
       input.meta != null && typeof input.meta === "object"
         ? (input.meta as Prisma.InputJsonValue)
         : undefined;
+
+    // Preserve semantic facts at event time. This is intentionally before the
+    // behavior-profile projection so both raw history and the projection learn
+    // from the same immutable context.
+    meta = await enrichSemanticEventMeta({
+      entityType: input.entityType ?? null,
+      entityId: input.entityId ?? null,
+      eventType: input.eventType,
+      meta,
+    });
     let metaObject = metaRecord(meta);
 
     // Existing recommendation call sites may not yet carry exposure IDs through
@@ -125,11 +136,11 @@ export async function trackUserEvent(
     }
 
     return { ok: true };
-  } catch (e) {
-    console.error("[product-telemetry] trackUserEvent failed:", e);
+  } catch (error) {
+    console.error("[product-telemetry] trackUserEvent failed:", error);
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "unknown_error",
+      error: error instanceof Error ? error.message : "unknown_error",
     };
   }
 }
