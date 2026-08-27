@@ -12,6 +12,22 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 
+function planningTimingForDate(dateKey: string): "same_day" | "weekend" | "advance" {
+  if (dateKey === getLocalDateKey()) return "same_day";
+
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay();
+  return weekday === 0 || weekday === 6 ? "weekend" : "advance";
+}
+
+function planDateAnalyticsMeta(dateKey: string) {
+  return {
+    dateFrom: dateKey,
+    dateTo: dateKey,
+    planningTiming: planningTimingForDate(dateKey),
+  } as const;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -35,21 +51,21 @@ export async function POST(request: NextRequest) {
       selectedPersonaIds,
       planAddSource,
     } = body as {
-        activityId?: string;
-        routeId?: string;
-        planRouteSlug?: string;
-        placeId?: string;
-        planPlaceSlug?: string;
-        articleId?: string;
-        date?: string;
-        startsAt?: string;
-        /** ActivitySession.id — used to derive startsAt; validated server-side */
-        activitySessionId?: string | null;
-        title?: string;
-        coverImageUrl?: string;
-        selectedPersonaIds?: unknown;
-        planAddSource?: unknown;
-      };
+      activityId?: string;
+      routeId?: string;
+      planRouteSlug?: string;
+      placeId?: string;
+      planPlaceSlug?: string;
+      articleId?: string;
+      date?: string;
+      startsAt?: string;
+      /** ActivitySession.id — used to derive startsAt; validated server-side */
+      activitySessionId?: string | null;
+      title?: string;
+      coverImageUrl?: string;
+      selectedPersonaIds?: unknown;
+      planAddSource?: unknown;
+    };
 
     // Articles have no date semantics — they can only be saved as an idea
     // (see /api/save/idea). Reject before the generic validation below so a
@@ -57,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (articleId) {
       return NextResponse.json(
         { error: "articles cannot be saved to a specific date; use /api/save/idea" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -65,14 +81,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
 
-    // Validate that at least one entity type is provided
     if (!activityId && !routeId && !placeId) {
       return NextResponse.json(
         { error: "activityId, routeId or placeId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
+    const planDateMeta = planDateAnalyticsMeta(date);
     let planItem;
 
     if (placeId) {
@@ -94,17 +110,20 @@ export async function POST(request: NextRequest) {
         entityId: placeId,
         vertical: "CITY",
         cityId: place?.cityId ?? null,
-        meta: { source: "detail", section: "places", targetAction: "plan" },
+        meta: {
+          source: "detail",
+          section: "places",
+          targetAction: "plan",
+          ...planDateMeta,
+        },
       });
-    }
-    // Handle route
-    else if (routeId) {
+    } else if (routeId) {
       planItem = await addRoutePlanItem(
         user.id,
         routeId,
         date,
         planRouteSlug ?? null,
-        { title: title ?? null, coverImageUrl: coverImageUrl ?? null }
+        { title: title ?? null, coverImageUrl: coverImageUrl ?? null },
       );
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
@@ -115,12 +134,14 @@ export async function POST(request: NextRequest) {
         entityId: routeId,
         vertical: "CITY",
         cityId: null,
-        meta: { source: "detail", section: "routes", targetAction: "plan" },
+        meta: {
+          source: "detail",
+          section: "routes",
+          targetAction: "plan",
+          ...planDateMeta,
+        },
       });
-    }
-    // Handle activity
-    else if (activityId) {
-      // Resolve startsAt: prefer activitySessionId lookup; fall back to raw startsAt string.
+    } else if (activityId) {
       let resolvedStartsAt: Date | undefined = startsAt ? new Date(startsAt) : undefined;
 
       if (
@@ -132,7 +153,6 @@ export async function POST(request: NextRequest) {
           where: { id: activitySessionId },
           select: { activityId: true, startsAt: true },
         });
-        // Validate session belongs to this activity and falls on the requested date
         if (
           session &&
           session.activityId === activityId &&
@@ -140,7 +160,6 @@ export async function POST(request: NextRequest) {
         ) {
           resolvedStartsAt = session.startsAt;
         }
-        // If mismatch: silently ignore — PlanItem saved without time
       }
 
       planItem = await addPlanItem(
@@ -149,15 +168,14 @@ export async function POST(request: NextRequest) {
         date,
         resolvedStartsAt,
         title ?? undefined,
-        coverImageUrl ?? undefined
+        coverImageUrl ?? undefined,
       );
 
       if (planItem.created) {
         const cityId = await getActivityCityIdForAnalytics(activityId);
         const sessionRowId = await getSessionRowIdFromCookies();
-        const personaIds =
-          Array.isArray(selectedPersonaIds) ?
-            selectedPersonaIds.filter((x): x is string => typeof x === "string")
+        const personaIds = Array.isArray(selectedPersonaIds)
+          ? selectedPersonaIds.filter((x): x is string => typeof x === "string")
           : [];
         const sourceTag =
           planAddSource === "recommendation"
@@ -177,6 +195,7 @@ export async function POST(request: NextRequest) {
             source: sourceTag,
             section: "afisha",
             targetAction: "plan",
+            ...planDateMeta,
             ...(planAddSource === "recommendation" || planAddSource === "idea"
               ? { planAddSource }
               : {}),
@@ -185,12 +204,13 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
     return NextResponse.json({ success: true, planItem });
   } catch (error) {
     console.error("Add plan item error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -208,7 +228,7 @@ export async function DELETE(request: NextRequest) {
     if (!planItemId) {
       return NextResponse.json(
         { error: "planItemId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -268,7 +288,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Remove plan item error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
