@@ -11,6 +11,7 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
+import { linkRecommendationOutcome } from "@/server/services/recommendations/RecommendationTraceService";
 
 async function resolveCityId(
   cityId?: string | null,
@@ -20,6 +21,12 @@ async function resolveCityId(
   if (!citySlug?.trim()) return null;
   const row = await findCityBySlug(citySlug.trim(), { select: { id: true } });
   return row?.id ?? null;
+}
+
+function metaRecord(meta: Prisma.InputJsonValue | undefined): Record<string, unknown> | null {
+  return meta && typeof meta === "object" && !Array.isArray(meta)
+    ? (meta as Record<string, unknown>)
+    : null;
 }
 
 /**
@@ -35,6 +42,7 @@ export async function trackUserEvent(
       input.meta != null && typeof input.meta === "object"
         ? (input.meta as Prisma.InputJsonValue)
         : undefined;
+    const metaObject = metaRecord(meta);
 
     const userEvent = await prisma.userEvent.create({
       data: {
@@ -64,11 +72,22 @@ export async function trackUserEvent(
       eventType: input.eventType,
       entityType: input.entityType ?? null,
       entityId: input.entityId ?? null,
-      meta:
-        meta && typeof meta === "object" && !Array.isArray(meta)
-          ? (meta as Record<string, unknown>)
-          : null,
+      meta: metaObject,
     });
+
+    const recommendationExposureId =
+      typeof metaObject?.recommendationExposureId === "string"
+        ? metaObject.recommendationExposureId.trim()
+        : "";
+    if (recommendationExposureId) {
+      void linkRecommendationOutcome({
+        exposureId: recommendationExposureId,
+        userEventId: userEvent.id,
+        eventType: input.eventType,
+        userId: input.userId ?? null,
+        sessionId: input.sessionId ?? null,
+      });
+    }
 
     return { ok: true };
   } catch (e) {
