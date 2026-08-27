@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
