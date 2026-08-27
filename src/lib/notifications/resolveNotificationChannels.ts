@@ -4,6 +4,7 @@
  * Determines which delivery channels are enabled for a given user + notification type.
  *
  * Resolution order (highest priority wins):
+ *   0. Product kill switch — recommendation delivery is disabled by default
  *   1. User override  — UserNotificationPreference row (if exists, non-null field)
  *   2. Surface default — shared notification settings domain for that type
  *   3. Hard guards    — email requires user.email, telegram requires active TelegramConnection
@@ -30,6 +31,9 @@ export interface UserForChannelResolution {
   telegramLinked?: boolean;
 }
 
+const RECOMMENDATION_DELIVERY_ENABLED =
+  process.env.USER_RECOMMENDATIONS_DELIVERY_ENABLED === "true";
+
 /**
  * Resolve effective delivery channels for one user + notification type.
  * Never throws — returns safe defaults on any error.
@@ -38,6 +42,12 @@ export async function resolveNotificationChannels(
   user: UserForChannelResolution,
   notificationType: NotificationType,
 ): Promise<ResolvedChannels> {
+  // Product-level pause: legacy preferences cannot accidentally reactivate
+  // recommendation delivery before quality/feedback gates are ready.
+  if (notificationType === "RECOMMENDATION" && !RECOMMENDATION_DELIVERY_ENABLED) {
+    return { inApp: false, email: false, telegram: false };
+  }
+
   // Step 1: notification surface defaults
   const defaults = getNotificationSurfaceDefaults(
     resolveNotificationSettingsSurfaceForType(notificationType),
