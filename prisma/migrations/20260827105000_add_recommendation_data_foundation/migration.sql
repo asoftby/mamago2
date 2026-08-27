@@ -51,7 +51,7 @@ CREATE TABLE "RecommendationExposure" (
     "position" INTEGER NOT NULL,
     "score" DOUBLE PRECISION,
     "scoreBreakdown" JSONB,
-    "reasonCodes" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "reasonCodes" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     "exposedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deliveredAt" TIMESTAMP(3),
 
@@ -98,5 +98,10 @@ ALTER TABLE "RecommendationOutcome" ADD CONSTRAINT "RecommendationOutcome_exposu
 -- populate this projection instead. Raw UserEvent history is untouched.
 UPDATE "UserBehaviorProfile"
 SET "preferredCategories" = COALESCE("preferredCategories", '{}'::jsonb)
-  - ARRAY['EVENT', 'OFFER', 'PLACE', 'ROUTE', 'ARTICLE', '_none']::text[]
+  - 'EVENT'
+  - 'OFFER'
+  - 'PLACE'
+  - 'ROUTE'
+  - 'ARTICLE'
+  - '_none'
 WHERE "preferredCategories" IS NOT NULL;
