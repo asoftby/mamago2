@@ -3,7 +3,7 @@
  * Hard-delete the authenticated user's account.
  *
  * - Personal data: deleted via Prisma cascade + explicit deletes
- * - Analytics (UserEvent): userId set to null (anonymised, record kept)
+ * - Analytics (UserEvent + RecommendationRun): identity fields anonymised, aggregate records kept
  * - AuditLog: строки с участием пользователя удаляются (actorId/targetId NOT NULL в схеме)
  * - Ссылки User? без onDelete Cascade — обнуляются до delete user
  * - Sessions: deleted → cookie becomes invalid on next request
@@ -23,7 +23,6 @@ export async function POST() {
 
     const userId = user.id;
 
-    // ── Balance guard: запретить удаление, если пользователь — владелец бизнеса с положительным балансом ──
     const business = await prisma.business.findFirst({
       where: { ownerUserId: userId },
       select: {
@@ -51,8 +50,13 @@ export async function POST() {
     }
 
     await prisma.$transaction(async (tx) => {
-      // 1. Anonymise analytics — keep rows, remove identity
+      // 1. Anonymise product analytics — keep aggregate learning history,
+      // remove direct account/session identity.
       await tx.userEvent.updateMany({
+        where: { userId },
+        data: { userId: null, sessionId: null },
+      });
+      await tx.recommendationRun.updateMany({
         where: { userId },
         data: { userId: null, sessionId: null },
       });
@@ -110,8 +114,6 @@ export async function POST() {
       });
 
       // 5. Hard-delete personal data (cascade handles children of these)
-      // Order: leaf tables first, then parent rows
-
       await tx.userNotificationPreference.deleteMany({ where: { userId } });
       await tx.notification.deleteMany({ where: { userId } });
       await tx.planItem.deleteMany({ where: { userId } });
@@ -121,12 +123,11 @@ export async function POST() {
       await tx.session.deleteMany({ where: { userId } });
       await tx.userBehaviorProfile.deleteMany({ where: { userId } });
 
-      // Children + their interests (parentId → User; cascade при удалении User, но явно для ясности)
       const children = await tx.child.findMany({
         where: { parentId: userId },
         select: { id: true },
       });
-      const childIds = children.map((c) => c.id);
+      const childIds = children.map((child) => child.id);
       if (childIds.length > 0) {
         await tx.childInterest.deleteMany({ where: { childId: { in: childIds } } });
         await tx.childCustomInterest.deleteMany({ where: { childId: { in: childIds } } });
@@ -137,7 +138,6 @@ export async function POST() {
       await tx.user.delete({ where: { id: userId } });
     });
 
-    // Clear session cookie
     const response = NextResponse.json({ success: true });
     await deleteSessionCookieAction();
     return response;
