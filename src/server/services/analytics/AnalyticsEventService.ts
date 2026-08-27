@@ -11,7 +11,6 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
 import { enrichSemanticEventMeta } from "@/server/services/analytics/SemanticEventContextService";
-import { enrichPlanningEventMeta } from "@/server/services/analytics/PlanningEventContextService";
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
 import {
   findRecentRecommendationAttribution,
@@ -50,15 +49,9 @@ export async function trackUserEvent(
 
     // Preserve semantic facts at event time. This is intentionally before the
     // behavior-profile projection so both raw history and the projection learn
-    // from the same immutable context.
+    // from the same immutable context. Planning timing is supplied by the
+    // plan-write path directly because that date is already known there.
     meta = await enrichSemanticEventMeta({
-      entityType: input.entityType ?? null,
-      entityId: input.entityId ?? null,
-      eventType: input.eventType,
-      meta,
-    });
-    meta = await enrichPlanningEventMeta({
-      userId: input.userId ?? null,
       entityType: input.entityType ?? null,
       entityId: input.entityId ?? null,
       eventType: input.eventType,
