@@ -92,3 +92,11 @@ CREATE INDEX "RecommendationOutcome_eventType_createdAt_idx" ON "RecommendationO
 ALTER TABLE "RecommendationRun" ADD CONSTRAINT "RecommendationRun_policyId_fkey" FOREIGN KEY ("policyId") REFERENCES "RecommendationSurfacePolicy"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "RecommendationExposure" ADD CONSTRAINT "RecommendationExposure_runId_fkey" FOREIGN KEY ("runId") REFERENCES "RecommendationRun"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "RecommendationOutcome" ADD CONSTRAINT "RecommendationOutcome_exposureId_fkey" FOREIGN KEY ("exposureId") REFERENCES "RecommendationExposure"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Repair legacy profile semantics. These keys were entity types (EVENT/OFFER/...)
+-- accidentally stored inside preferredCategories; semantic category IDs now
+-- populate this projection instead. Raw UserEvent history is untouched.
+UPDATE "UserBehaviorProfile"
+SET "preferredCategories" = COALESCE("preferredCategories", '{}'::jsonb)
+  - ARRAY['EVENT', 'OFFER', 'PLACE', 'ROUTE', 'ARTICLE', '_none']::text[]
+WHERE "preferredCategories" IS NOT NULL;
