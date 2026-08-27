@@ -1,0 +1,103 @@
+/// Surfaces consume one recommendation/ranking foundation. A surface can
+/// compose/limit the common ranked result, but must not own a duplicate engine.
+enum RecommendationSurface {
+  HOME
+  DISCOVERY
+  MY_PLAN
+  TELEGRAM
+}
+
+enum RecommendationPolicyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// Versioned composition policy for a recommendation surface.
+/// `config` stores surface-only constraints (item limits, diversity,
+/// cooldowns, quality gates, horizons). Core ranking weights do not belong
+/// here and remain shared across surfaces.
+model RecommendationSurfacePolicy {
+  id              String                     @id @default(cuid())
+  surface         RecommendationSurface
+  version         Int
+  status          RecommendationPolicyStatus @default(DRAFT)
+  algorithmVersion String
+  config          Json
+  createdByUserId String?
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  runs            RecommendationRun[]
+
+  @@unique([surface, version])
+  @@index([surface, status])
+  @@index([createdAt])
+}
+
+/// One invocation of the shared recommendation pipeline for one surface.
+/// User/session IDs intentionally remain logical identifiers: tracing must
+/// never become a hard dependency that can break account or telemetry writes.
+model RecommendationRun {
+  id               String                @id @default(cuid())
+  userId           String?
+  sessionId        String?
+  surface          RecommendationSurface
+  cityId           String?
+  citySlug         String?
+  targetDateFrom   String?
+  targetDateTo     String?
+  algorithmVersion String
+  policyId         String?
+  policyVersion    Int?
+  context          Json?
+  candidateCount   Int                   @default(0)
+  selectedCount    Int                   @default(0)
+  generatedAt      DateTime              @default(now())
+  policy           RecommendationSurfacePolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  exposures        RecommendationExposure[]
+
+  @@index([userId, generatedAt])
+  @@index([sessionId, generatedAt])
+  @@index([surface, generatedAt])
+  @@index([cityId, generatedAt])
+  @@index([policyId])
+}
+
+/// A recommendation actually returned to a surface. We intentionally do not
+/// persist every discarded candidate; this keeps storage cheap while retaining
+/// the exact ranked choices that users could act on.
+model RecommendationExposure {
+  id             String               @id @default(cuid())
+  runId          String
+  entityType     AnalyticsEntityType
+  entityId       String
+  position       Int
+  score          Float?
+  scoreBreakdown Json?
+  reasonCodes    String[]             @default([])
+  exposedAt      DateTime             @default(now())
+  deliveredAt    DateTime?
+  run            RecommendationRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  outcomes       RecommendationOutcome[]
+
+  @@unique([runId, entityType, entityId])
+  @@index([entityType, entityId, exposedAt])
+  @@index([runId, position])
+}
+
+/// Connects an existing first-party UserEvent to the recommendation exposure
+/// that caused it. UserEvent stays the raw behavior source of truth; this table
+/// only adds recommendation attribution and can be rebuilt from event metadata.
+model RecommendationOutcome {
+  id          String                 @id @default(cuid())
+  exposureId  String
+  userEventId String                 @unique
+  eventType   UserEventType
+  createdAt   DateTime               @default(now())
+  exposure    RecommendationExposure @relation(fields: [exposureId], references: [id], onDelete: Cascade)
+
+  @@index([exposureId, eventType, createdAt])
+  @@index([eventType, createdAt])
+}
