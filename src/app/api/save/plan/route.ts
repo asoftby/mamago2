@@ -106,6 +106,17 @@ export async function POST(request: NextRequest) {
         planRouteSlug ?? null,
         { title: title ?? null, coverImageUrl: coverImageUrl ?? null }
       );
+      const sessionRowId = await getSessionRowIdFromCookies();
+      void trackUserEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "PLAN_ADD",
+        entityType: "ROUTE",
+        entityId: routeId,
+        vertical: "CITY",
+        cityId: null,
+        meta: { source: "detail", section: "routes", targetAction: "plan" },
+      });
     }
     // Handle activity
     else if (activityId) {
@@ -149,9 +160,11 @@ export async function POST(request: NextRequest) {
             selectedPersonaIds.filter((x): x is string => typeof x === "string")
           : [];
         const sourceTag =
-          planAddSource === "recommendation" || planAddSource === "idea" ?
-            ("plan" as const)
-          : ("detail" as const);
+          planAddSource === "recommendation"
+            ? ("recommendation" as const)
+            : planAddSource === "idea"
+              ? ("plan" as const)
+              : ("detail" as const);
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -164,6 +177,9 @@ export async function POST(request: NextRequest) {
             source: sourceTag,
             section: "afisha",
             targetAction: "plan",
+            ...(planAddSource === "recommendation" || planAddSource === "idea"
+              ? { planAddSource }
+              : {}),
             ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
           },
         });
@@ -196,7 +212,56 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const existing = await prisma.planItem.findFirst({
+      where: { id: planItemId, userId: user.id },
+      select: { activityId: true, placeId: true, routeId: true },
+    });
+
     await removePlanItem(user.id, planItemId);
+
+    if (existing) {
+      const sessionRowId = await getSessionRowIdFromCookies();
+
+      if (existing.activityId) {
+        const cityId = await getActivityCityIdForAnalytics(existing.activityId);
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_REMOVE",
+          entityType: "EVENT",
+          entityId: existing.activityId,
+          vertical: "CITY",
+          cityId,
+          meta: { section: "afisha", targetAction: "plan" },
+        });
+      } else if (existing.placeId) {
+        const place = await prisma.place.findUnique({
+          where: { id: existing.placeId },
+          select: { cityId: true },
+        });
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_REMOVE",
+          entityType: "PLACE",
+          entityId: existing.placeId,
+          vertical: "CITY",
+          cityId: place?.cityId ?? null,
+          meta: { section: "places", targetAction: "plan" },
+        });
+      } else if (existing.routeId) {
+        void trackUserEvent({
+          userId: user.id,
+          sessionId: sessionRowId,
+          eventType: "PLAN_REMOVE",
+          entityType: "ROUTE",
+          entityId: existing.routeId,
+          vertical: "CITY",
+          cityId: null,
+          meta: { section: "routes", targetAction: "plan" },
+        });
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
