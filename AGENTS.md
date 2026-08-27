@@ -1,12 +1,36 @@
 # Agent Instructions
 
+## Preferred automation — use it instead of making the user operate Git
+
+For every repository-changing task, agents with repository shell access MUST use the repository workflow scripts themselves instead of asking the user to manually create branches/worktrees or repeat routine Git commands:
+
+```bash
+# from canonical dev
+sh scripts/git/task-start.sh <slug> [prefix]
+
+# from the task worktree
+sh scripts/git/task-sync.sh
+sh scripts/git/task-check.sh
+sh scripts/git/task-finish.sh
+```
+
+Human shell shortcuts are available after `sh scripts/git/install-shell-shortcuts.sh`:
+
+```bash
+mgtask <slug> [prefix]
+mgcheck
+mgfinish
+```
+
+These commands automate the rules below; they do not relax them. If a script stops on dirty/diverged state, overlapping files, failed verification, or missing freshness proof, do not bypass the stop with reset, force push, broad restore, automatic rebase, or `--no-verify`. Read `docs/engineering/one-command-task-workflow.md` for the exact behavior.
+
 ## CRITICAL — mandatory start for EVERY repository-changing task
 
 A "new task" means any distinct user request that may change repository files, even when it arrives in the same chat/session immediately after another task.
 
 Before reading/modifying implementation files for a new task, the agent MUST establish a fresh, clean base from `origin/dev`:
 
-1. In the canonical `dev` checkout, run `sh scripts/git/session-start-gate.sh`.
+1. In the canonical `dev` checkout, run `sh scripts/git/session-start-gate.sh` (normally through `task-start.sh`).
 2. Repository work may start only when the gate reports PASS and local `HEAD` exactly matches fresh `origin/dev`.
 3. Capture that exact SHA as `BASE_HEAD`.
 4. Perform the task in an isolated task worktree/branch created from that exact `BASE_HEAD`; do not implement a new task directly in a shared/stale worktree.

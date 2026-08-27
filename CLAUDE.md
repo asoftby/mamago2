@@ -6,6 +6,22 @@
 
 A **new task** is any distinct user request that may change repository files, including a new request inside the same chat/session. This protocol is mandatory before implementation starts.
 
+### Preferred automation entrypoint
+
+When repository shell access is available, Claude Code MUST execute the task workflow itself instead of asking the user to manually create/sync worktrees or repeat routine Git commands:
+
+```bash
+# canonical dev checkout
+sh scripts/git/task-start.sh <slug> [prefix]
+
+# task worktree
+sh scripts/git/task-sync.sh
+sh scripts/git/task-check.sh
+sh scripts/git/task-finish.sh
+```
+
+`task-start.sh` wraps the freshness gate, captures exact `BASE_HEAD`, creates the isolated dated branch/worktree, and verifies its base. `task-sync.sh` automatically merges non-overlapping fresh `origin/dev` changes but stops when the same files changed on both sides. `task-check.sh` runs the shared push gate; task-specific tests are still required. `task-finish.sh` performs the final freshness/diff checks and normal push/PR handoff. Never bypass a safety stop. Human shortcuts `mgtask`, `mgcheck`, and `mgfinish` are documented in `docs/engineering/one-command-task-workflow.md`.
+
 1. In the canonical `dev` checkout run:
 
 ```bash
@@ -257,7 +273,6 @@ git rev-parse HEAD
 ### 9. При crash / usage limit / interrupted agent
 
 Если subagent или background agent завершился аварийно:
-
 - не копировать его рабочее дерево целиком;
 - сначала определить, какие изменения реально были сделаны;
 - проверить его base SHA;
