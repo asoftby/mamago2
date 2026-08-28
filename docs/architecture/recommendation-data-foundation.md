@@ -67,13 +67,23 @@ When a new surface is added, prefer reusing the shared candidate/ranking path an
 
 Telegram is a recommendation consumer and learning surface, not a separate recommender.
 
-Future Admin `Ranking -> Telegram` controls only Telegram surface policy: candidate horizon, result count, diversity, repeat cooldown, score/no-send gates, exploration ratio and similar composition constraints.
+Admin `Ranking -> Telegram` controls only Telegram surface policy: candidate horizon, result count, diversity, repeat cooldown, score/no-send gates and similar composition constraints.
 
 Transport, bot health, templates and delivery errors belong to Communications/Telegram, not Ranking.
 
 User settings control opt-in/channel/time/frequency only. They do not contain ranking weights.
 
 Telegram feedback should produce a normal recommendation-attributed behavioral outcome (with reason-coded feedback), linked to the original `RecommendationExposure`.
+
+### Current Telegram admin implementation
+
+`/admin/ranking/telegram` is the policy/configuration surface for Telegram recommendations.
+
+- It reuses the existing shared EVENT ranking contract `engagement-freshness-v1` and does not define Telegram behavior weights.
+- `RecommendationSurfacePolicy` stores draft/published policy versions separately from `algorithmVersion`.
+- The current policy fields are `resultCount`, `horizonDays`, `minimumScore`, `minimumResultCount`, `maxPerCategory`, and `repeatCooldownDays`.
+- Preview applies the policy read-only and deliberately does **not** write `RecommendationRun` / `RecommendationExposure`; admin experiments must not pollute recommendation telemetry or learning.
+- Publishing a policy does **not** enable Telegram delivery. Delivery remains a Communications concern and stays disabled until the explicit delivery task wires the published policy into a real send flow.
 
 ## Editorial collections
 
