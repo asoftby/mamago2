@@ -6,6 +6,8 @@ import {
   getPublicPublishedArticleWhere,
   getPublicPublishedOfferWhere,
   getPublicPublishedPlaceWhere,
+  getPublicRouteDetailWhere,
+  getPublicRouteIndexWhere,
 } from "./publicContentVisibility";
 
 assert.deepEqual(getPublicPublishedArticleWhere(), {
@@ -18,6 +20,16 @@ assert.deepEqual(getPublicPageDetailWhere(), {
 });
 
 assert.deepEqual(getPublicPageIndexWhere(), {
+  status: "PUBLISHED",
+  visibility: "PUBLIC",
+});
+
+assert.deepEqual(getPublicRouteDetailWhere(), {
+  status: "PUBLISHED",
+  visibility: { in: ["PUBLIC", "UNLISTED"] },
+});
+
+assert.deepEqual(getPublicRouteIndexWhere(), {
   status: "PUBLISHED",
   visibility: "PUBLIC",
 });
