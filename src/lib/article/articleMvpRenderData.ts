@@ -4,13 +4,17 @@ import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
-import { parsePriceData, type PriceData } from "@/lib/priceItems";
-import { generateSummary, mapToUIState } from "@/lib/openingHours/openingHoursMapper";
-import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
+import {
+  getArticlePlaceEmbedData,
+  type PlaceCardExtra,
+  type ResolvedPlaceEmbedCard,
+} from "@/lib/place/articlePlaceEmbedData";
 import {
   buildCityPublicPath,
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
+
+export type { PlaceCardExtra } from "@/lib/place/articlePlaceEmbedData";
 
 /** Без coverImage / seoImageAsset — на старой БД может не быть колонки coverImageId. */
 const articleMvpBaseSelect = {
@@ -68,19 +72,6 @@ async function resolveCoverMedia(coverImageId: string | null): Promise<{
     select: { publicUrl: true, alt: true },
   });
 }
-
-export type PlaceCardExtra = {
-  lat: number | null;
-  lng: number | null;
-  address: string | null;
-  cityName: string | null;
-  openingHoursSummary: string | null;
-  ageTags: string[];
-  activityTypes: string[];
-  createdAt: Date;
-  priceData: PriceData;
-  priceUpdatedAt: Date;
-};
 
 export type ResolvedActivityCard = {
   kind: "basic";
@@ -146,7 +137,9 @@ export type ArticleMvpResolvedBlock =
         height: number | null;
       }>;
     })
-  | (Extract<ArticleBlockMvp, { type: "activityCard" }> & { card: ResolvedActivityCard | ResolvedOfferEmbedCard | null })
+  | (Extract<ArticleBlockMvp, { type: "activityCard" }> & {
+      card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null;
+    })
   | Extract<ArticleBlockMvp, { type: "embed" }>;
 
 function parseRuDateToTimestamp(value?: string | null): number {
@@ -173,61 +166,13 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
 
 async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
-): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | null> {
+): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null> {
   if (!b.entityId.trim()) return null;
   if (b.entityType === "PLACE") {
-    const p = await prisma.place.findUnique({
-      where: { id: b.entityId },
-      select: {
-        title: true,
-        slug: true,
-        lat: true,
-        lng: true,
-        formattedAddr: true,
-        customAddress: true,
-        ageTags: true,
-        activityTypes: true,
-        openingHours: {
-          include: {
-            rules: {
-              include: {
-                intervals: true,
-              },
-            },
-            exceptions: {
-              include: {
-                intervals: true,
-              },
-            },
-          },
-        },
-        createdAt: true,
-        updatedAt: true,
-        priceItems: true,
-        city: { select: { slug: true, name: true } },
-      },
-    });
-    if (!p) return null;
-    const href = p.slug ? `/places/${p.slug}` : "#";
-    const priceData = parsePriceData(p.priceItems);
-    const openingHoursSummary = p.openingHours
-      ? generateSummary(mapToUIState(p.openingHours as OpeningHoursWithRelations))
-          .split("\n")[0]
-          ?.trim() || null
-      : null;
-    const placeExtra: PlaceCardExtra = {
-      lat: p.lat ?? null,
-      lng: p.lng ?? null,
-      address: p.formattedAddr ?? p.customAddress ?? null,
-      cityName: p.city?.name ?? null,
-      openingHoursSummary,
-      ageTags: p.ageTags,
-      activityTypes: p.activityTypes,
-      createdAt: p.createdAt,
-      priceData,
-      priceUpdatedAt: p.updatedAt,
-    };
-    return { kind: "basic", href, title: p.title, placeExtra };
+    // Returns null both when the place doesn't exist/isn't public AND when it
+    // has nothing live to show (no upcoming events, visit pricing, party
+    // offers, or promos) — by design the block must not render in either case.
+    return getArticlePlaceEmbedData(b.entityId);
   }
   if (b.entityType === "EVENT") {
     const a = await prisma.activity.findUnique({

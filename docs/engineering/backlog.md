@@ -3978,3 +3978,40 @@ P3 — cleanup / polish / optional
   validation for code pushes, and safely skip code typecheck/build only for
   verified deletion-only pushes.
 - Source: final Git sterility cleanup, 2026-08-27.
+
+## [BACKLOG-142] Article place-embed block: editor note field + optional facts
+
+- Status: OPEN
+- Priority: P3
+- Area: Article publishing / Place
+- Added: 2026-08-27
+- Reason deferred: product decisions I should not make unilaterally while
+  wiring the new `ArticlePlaceEmbed` (`activityCard` block, `entityType:
+  "PLACE"`) to real data; each item below has no backing field today and the
+  Claude Design mockup (`Блок места в статье v2/v3.html`) assumed one.
+- Context:
+  1. **Editor note.** The v3 mockup shows an optional italic "Комментарий
+     редакции" quote under the facts row. The `activityCard` block schema
+     (`src/lib/publications/articleMvp.ts`) has no caption/note field, and
+     the admin entity picker (`ActivityCardEntityPicker.tsx`) has no field
+     for it. Currently editors get the same effect by writing a normal
+     `text` block immediately before/after the place block, so this was
+     left out rather than adding a new schema field speculatively.
+  2. **Metro walking minutes.** `Place.metroAutoDistanceM` /
+     `metroManualDistanceM` exist, but no formatter/UI anywhere in the app
+     currently converts meters to "N мин" — the real place page only shows
+     the metro name. The block matches that (name only, no distance) rather
+     than inventing a new walking-time convention.
+  3. **"Средний чек" (average check) fact.** Not computed/shown anywhere on
+     the real place page today; left out of the block for the same reason.
+  4. **"✓ подтверждено" verified badge.** No public "place/business
+     verified" concept exists in the UI; `Business.verificationStatus`
+     governs an internal moderation workflow, not necessarily a safe public
+     trust badge. Left out pending a product decision.
+- Dependencies: none blocking; each is additive.
+- Acceptance criteria: for whichever items get sign-off, add the schema
+  field / formatter and wire it into `src/lib/place/articlePlaceEmbedData.ts`
+  and `ArticlePlaceEmbed.tsx` without inventing values for places lacking
+  the underlying data.
+- Source: `feat/article-place-block-20260827` (Claude Design handoff —
+  "Блок места в статье v2.html").
