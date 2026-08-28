@@ -1,5 +1,11 @@
 import prisma from "@/lib/prisma";
 import type { SearchIndexEntityType, SearchIndexStatus } from "@prisma/client";
+import {
+  getPublicPublishedArticleWhere,
+  getPublicPublishedOfferWhere,
+  getPublicPublishedPlaceWhere,
+  getPublicRouteIndexWhere,
+} from "@/server/public/publicContentVisibility";
 
 interface IndexRecordParams {
   entityId: string;
@@ -144,45 +150,52 @@ export async function bulkReindex(entityType: SearchIndexEntityType): Promise<vo
     let entityIds: string[] = [];
 
     switch (entityType) {
-      case "PLACE":
+      case "PLACE": {
         const places = await prisma.place.findMany({
-          where: { status: "PUBLISHED" },
+          where: getPublicPublishedPlaceWhere(),
           select: { id: true },
         });
         entityIds = places.map((p) => p.id);
         break;
+      }
 
-      case "EVENT":
+      case "EVENT": {
+        // Preserve the current indexing contract (strictly PUBLISHED) until
+        // Event moves from live PENDING_UPDATE to revision-based edits.
         const activities = await prisma.activity.findMany({
           where: { status: "PUBLISHED" },
           select: { id: true },
         });
         entityIds = activities.map((a) => a.id);
         break;
+      }
 
-      case "OFFER":
+      case "OFFER": {
         const offers = await prisma.offer.findMany({
-          where: { status: "PUBLISHED", archivedAt: null, place: { archivedAt: null } },
+          where: getPublicPublishedOfferWhere(),
           select: { id: true },
         });
         entityIds = offers.map((o) => o.id);
         break;
+      }
 
-      case "ROUTE":
+      case "ROUTE": {
         const routes = await prisma.route.findMany({
-          where: { status: "PUBLISHED" },
+          where: getPublicRouteIndexWhere(),
           select: { id: true },
         });
         entityIds = routes.map((r) => r.id);
         break;
+      }
 
-      case "ARTICLE":
+      case "ARTICLE": {
         const articles = await prisma.article.findMany({
-          where: { status: "PUBLISHED" },
+          where: getPublicPublishedArticleWhere(),
           select: { id: true },
         });
         entityIds = articles.map((a) => a.id);
         break;
+      }
     }
 
     // Reindex all
