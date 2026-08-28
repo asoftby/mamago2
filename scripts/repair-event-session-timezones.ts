@@ -4,8 +4,8 @@ import {
   eventSessionFingerprintFromStoredSessions,
   eventSessionScheduleFingerprint,
 } from "../src/lib/business/syncEventActivitySessions";
-import { extractScheduleDatesAndStartTime } from "../src/lib/event/materializeScheduleSessions";
-import { getLocalDateKey, localWallClockToUtc } from "../src/lib/date/localDateKey";
+import { syncActivityNextOccurrenceAt } from "../src/lib/business/eventMutationSideEffects";
+import { buildEventSessionTimezoneRepairPlan } from "../src/lib/event/eventSessionTimezoneRepair";
 import { SearchIndexerService } from "../src/lib/search/SearchIndexerService";
 
 function parseMode(argv: readonly string[]): "preview" | "commit" {
@@ -32,6 +32,8 @@ async function main(): Promise<void> {
 
   let scanned = 0;
   let mismatched = 0;
+  let timezoneCandidates = 0;
+  let unrelatedMismatches = 0;
   let repairedActivities = 0;
   let repairedPlanItems = 0;
 
@@ -61,18 +63,37 @@ async function main(): Promise<void> {
       if (desiredFingerprint === actualFingerprint) continue;
 
       mismatched += 1;
-      const { dates, startTime } = extractScheduleDatesAndStartTime(activity.scheduleJson);
-      const desiredByDate = new Map(
-        dates.map((dateKey) => [dateKey, localWallClockToUtc(dateKey, startTime)] as const),
+      const repairPlan = buildEventSessionTimezoneRepairPlan(
+        activity.scheduleJson,
+        activity.sessions,
       );
 
-      const currentStartsByDate = new Map<string, Set<number>>();
-      for (const session of activity.sessions) {
-        const dateKey = getLocalDateKey(session.startsAt);
-        const set = currentStartsByDate.get(dateKey) ?? new Set<number>();
-        set.add(session.startsAt.getTime());
-        currentStartsByDate.set(dateKey, set);
+      if (repairPlan.kind !== "legacy-utc-wall-clock") {
+        unrelatedMismatches += 1;
+        console.log(
+          JSON.stringify({
+            activityId: activity.id,
+            title: activity.title,
+            status: activity.status,
+            classification: "skip-unrelated",
+            reason: repairPlan.reason,
+            desiredFingerprint,
+            actualFingerprint,
+            sessions: activity.sessions.length,
+            mode,
+          }),
+        );
+        continue;
       }
+
+      timezoneCandidates += 1;
+      const desiredByDate = new Map(
+        repairPlan.entries.map((entry) => [entry.dateKey, entry.desiredStartsAt] as const),
+      );
+      const legacyByDate = new Map(
+        repairPlan.entries.map((entry) => [entry.dateKey, entry.legacyStartsAt] as const),
+      );
+      const dates = repairPlan.entries.map((entry) => entry.dateKey);
 
       const planItems = await prisma.planItem.findMany({
         where: {
@@ -85,10 +106,10 @@ async function main(): Promise<void> {
 
       const planRepairs = planItems.flatMap((item) => {
         if (!item.startsAt) return [];
-        const currentSessionInstants = currentStartsByDate.get(item.date);
+        const legacyStartsAt = legacyByDate.get(item.date);
         const desiredStartsAt = desiredByDate.get(item.date);
-        if (!currentSessionInstants || !desiredStartsAt) return [];
-        if (!currentSessionInstants.has(item.startsAt.getTime())) return [];
+        if (!legacyStartsAt || !desiredStartsAt) return [];
+        if (item.startsAt.getTime() !== legacyStartsAt.getTime()) return [];
         if (item.startsAt.getTime() === desiredStartsAt.getTime()) return [];
         return [{ id: item.id, startsAt: desiredStartsAt }];
       });
@@ -98,10 +119,15 @@ async function main(): Promise<void> {
           activityId: activity.id,
           title: activity.title,
           status: activity.status,
-          desiredFingerprint,
-          actualFingerprint,
+          classification: "timezone-candidate",
+          reason: repairPlan.reason,
           sessions: activity.sessions.length,
           planItemsToRepair: planRepairs.length,
+          sample: repairPlan.entries.slice(0, 3).map((entry) => ({
+            date: entry.dateKey,
+            before: entry.legacyStartsAt.toISOString(),
+            after: entry.desiredStartsAt.toISOString(),
+          })),
           mode,
         }),
       );
@@ -118,10 +144,15 @@ async function main(): Promise<void> {
 
         await tx.activitySession.deleteMany({ where: { activityId: activity.id } });
         await tx.activitySession.createMany({
-          data: dates.map((dateKey) => ({
+          data: repairPlan.entries.map((entry) => ({
             activityId: activity.id,
-            startsAt: desiredByDate.get(dateKey)!,
+            startsAt: entry.desiredStartsAt,
           })),
+        });
+
+        await syncActivityNextOccurrenceAt({
+          prisma: tx,
+          activityId: activity.id,
         });
       });
 
@@ -138,6 +169,8 @@ async function main(): Promise<void> {
         mode,
         scanned,
         mismatched,
+        timezoneCandidates,
+        unrelatedMismatches,
         repairedActivities,
         repairedPlanItems,
       }),
