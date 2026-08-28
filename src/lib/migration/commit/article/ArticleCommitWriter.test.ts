@@ -12,7 +12,7 @@ function draftFixture(overrides: Partial<ArticleCreateDraft> = {}): ArticleCreat
     slug: "hello-article",
     excerpt: "Some rich content",
     publishedAt: "2026-01-01 00:00:00",
-    status: "PENDING",
+    status: "DRAFT",
     seoTitle: "SEO Title",
     seoDescription: "SEO description",
     seoCanonicalUrl: "https://example.com/hello-article",
@@ -58,7 +58,7 @@ function articleFixture(overrides: Partial<Article> = {}): Article {
     seoRobots: "index, follow",
     seoJsonLdOverride: null,
     publishedAt: new Date("2026-01-01T00:00:00.000Z"),
-    status: "PENDING",
+    status: "DRAFT",
     noindex: false,
     views: 0,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -117,7 +117,7 @@ async function testPrismaReceivesExpectedCreatePayload() {
   assert.equal(call.data.excerpt, "Some rich content");
   assert.ok(call.data.publishedAt instanceof Date);
   assert.equal(call.data.publishedAt.toISOString(), "2026-01-01T00:00:00.000Z");
-  assert.equal(call.data.status, "PENDING");
+  assert.equal(call.data.status, "DRAFT");
   assert.equal(call.data.seoTitle, "SEO Title");
   assert.equal(call.data.seoDescription, "SEO description");
   assert.equal(call.data.seoCanonicalUrl, "https://example.com/hello-article");

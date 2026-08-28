@@ -44,7 +44,7 @@ function testSuccessfulMinimalDraft() {
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.draft.title, "Hello Article");
-  assert.equal(result.draft.status, "PENDING");
+  assert.equal(result.draft.status, "DRAFT");
   assert.equal(result.draft.authorUserId, null);
   assert.equal(result.draft.authorLabel, null);
 }

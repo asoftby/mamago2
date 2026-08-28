@@ -39,7 +39,10 @@ import { resolveArticlePublicationActionPolicy } from "@/components/admin/articl
 import { ArticleEditorStickyBar } from "@/components/admin/articles/ArticleEditorStickyBar";
 import { SeoPanel } from "@/features/admin/seo/components/SeoPanel";
 import { resolveSeoPublicBase } from "@/lib/admin/seo/seoEditorCanonical";
-import { validateArticleGeoScope } from "@/lib/article/articleGeoScopeValidation";
+import {
+  isPublishLikeStatus,
+  validateArticleGeoScope,
+} from "@/lib/article/articleGeoScopeValidation";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { usePublicationSlugField } from "@/hooks/usePublicationSlugField";
 import { PublicationSlugField } from "@/components/admin/publications/PublicationSlugField";
@@ -368,8 +371,8 @@ export function ArticleEditorClient({
     [],
   );
 
-  const validateGeoScopeForPublish = useCallback((): boolean => {
-    const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict: true });
+  const validateGeoScopeForWrite = useCallback((strict: boolean): boolean => {
+    const result = validateArticleGeoScope({ geoScope, cityId, regionId, strict });
     if (!result.ok) {
       setGeoScopeError(result.message);
       setError(result.message);
@@ -471,6 +474,7 @@ export function ArticleEditorClient({
 
   const save = useCallback(
     async (opts?: { silent?: boolean; skipLoading?: boolean }): Promise<boolean> => {
+      if (!validateGeoScopeForWrite(isPublishLikeStatus(status))) return false;
       if (!opts?.skipLoading) setSaving(true);
       setError(null);
       try {
@@ -552,6 +556,8 @@ export function ArticleEditorClient({
       persistComparableFromSnapshot,
       router,
       showArticleSuccess,
+      status,
+      validateGeoScopeForWrite,
     ],
   );
 
@@ -567,7 +573,7 @@ export function ArticleEditorClient({
   );
 
   const submitForModeration = useCallback(async () => {
-    if (!validateGeoScopeForPublish()) return;
+    if (!validateGeoScopeForWrite(true)) return;
     setSubmitting(true);
     try {
       let articleId = initial.id.trim();
@@ -633,14 +639,14 @@ export function ArticleEditorClient({
     fetchSnapshot,
     persistComparableFromSnapshot,
     router,
-    validateGeoScopeForPublish,
+    validateGeoScopeForWrite,
     applyEditorSnapshot,
     showArticleSuccess,
   ]);
 
   const moderate = useCallback(
     async (decision: "publish" | "reject") => {
-      if (decision === "publish" && !validateGeoScopeForPublish()) return;
+      if (decision === "publish" && !validateGeoScopeForWrite(true)) return;
       setError(null);
       setModerating(true);
       try {
@@ -686,7 +692,7 @@ export function ArticleEditorClient({
       fetchSnapshot,
       persistComparableFromSnapshot,
       router,
-      validateGeoScopeForPublish,
+      validateGeoScopeForWrite,
       applyEditorSnapshot,
       showArticleSuccess,
       save,
