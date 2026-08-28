@@ -26,11 +26,7 @@ import {
 } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
-
-const GENITIVE_MONTHS = [
-  "января", "февраля", "марта", "апреля", "мая", "июня",
-  "июля", "августа", "сентября", "октября", "ноября", "декабря",
-];
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
 function truncate(text: string, max: number): string {
   const trimmed = text.trim();
@@ -42,6 +38,36 @@ function buildGoogleMapsUrl(lat: number | null, lng: number | null, address: str
   if (lat != null && lng != null) return `https://maps.google.com/?q=${lat},${lng}`;
   if (address?.trim()) return `https://maps.google.com/?q=${encodeURIComponent(address.trim())}`;
   return null;
+}
+
+function formatEventDateParts(when: Date | null): {
+  day: string | null;
+  month: string | null;
+  weekday: string | null;
+  time: string | null;
+} {
+  if (!when) {
+    return { day: null, month: null, weekday: null, time: null };
+  }
+
+  const dateParts = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+    timeZone: DEFAULT_TZ,
+  }).formatToParts(when);
+
+  return {
+    day: dateParts.find((part) => part.type === "day")?.value ?? null,
+    month: dateParts.find((part) => part.type === "month")?.value ?? null,
+    weekday: when
+      .toLocaleDateString("ru-RU", { weekday: "short", timeZone: DEFAULT_TZ })
+      .replace(".", ""),
+    time: when.toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: DEFAULT_TZ,
+    }),
+  };
 }
 
 export type ArticlePlaceAfishaItem = {
@@ -230,8 +256,7 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
   const afisha: ArticlePlaceAfishaItem[] = upcomingEvents.map((event) => {
     const when = event.sessions[0]?.startsAt ?? event.nextOccurrenceAt ?? null;
     const ageLabel = formatAgeRange(event.ageMinMonths, event.ageMaxMonths);
-    const weekday = when ? when.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "") : null;
-    const time = when ? when.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : null;
+    const { day, month, weekday, time } = formatEventDateParts(when);
     const priceLabel =
       event.priceText?.trim() ||
       (event.priceFrom != null ? formatBelarusPrice(event.priceFrom) : null) ||
@@ -242,8 +267,8 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
       title: event.title,
       imageUrl: event.coverImageUrl ?? event.images[0]?.url ?? null,
       categoryLabel: event.eventCategory?.nameRu ?? null,
-      day: when ? String(when.getDate()) : null,
-      month: when ? GENITIVE_MONTHS[when.getMonth()] : null,
+      day,
+      month,
       meta: weekday && time ? `${weekday}, ${time}${ageLabel !== "Любой возраст" ? ` · ${ageLabel}` : ""}` : null,
       priceLabel,
     };
@@ -274,7 +299,9 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
         id: o.id,
         href: o.slug ? getOfferPublicPath({ slug: o.slug }, citySlug) : href,
         title,
-        meta: o.promoUntil ? `до ${o.promoUntil.toLocaleDateString("ru-RU")}` : null,
+        meta: o.promoUntil
+          ? `до ${o.promoUntil.toLocaleDateString("ru-RU", { timeZone: DEFAULT_TZ })}`
+          : null,
         priceLabel: primaryDiscount?.rate ?? null,
       };
       return item;
@@ -300,7 +327,12 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
     lat: place.lat ?? null,
     lng: place.lng ?? null,
     mapsUrl: buildGoogleMapsUrl(place.lat, place.lng, address),
-    updatedAt: place.updatedAt.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }),
+    updatedAt: place.updatedAt.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: DEFAULT_TZ,
+    }),
     tabs: { afisha, visit, party, promo },
     placeExtra: {
       lat: place.lat ?? null,
