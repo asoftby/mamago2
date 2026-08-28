@@ -24,14 +24,24 @@ run_job() {
       echo "CRON_SECRET is missing" >&2
       exit 2
     fi
-    curl -fsS --max-time 240 \
+    curl -fsS --max-time 240 -o /dev/null \
       -H "Authorization: Bearer $CRON_SECRET" \
       "http://127.0.0.1:3000'"$endpoint"'"
   '
 
-  echo
   echo "[mamago-notifications] $(date -u +'%Y-%m-%dT%H:%M:%SZ') finish $label"
 }
 
-run_job "/api/cron/plan-event-reminders" "plan-event-reminders"
-run_job "/api/cron/plan-tomorrow-digests" "plan-tomorrow-digests"
+overall_status=0
+
+if ! run_job "/api/cron/plan-event-reminders" "plan-event-reminders"; then
+  echo "[mamago-notifications] plan-event-reminders failed" >&2
+  overall_status=1
+fi
+
+if ! run_job "/api/cron/plan-tomorrow-digests" "plan-tomorrow-digests"; then
+  echo "[mamago-notifications] plan-tomorrow-digests failed" >&2
+  overall_status=1
+fi
+
+exit "$overall_status"
