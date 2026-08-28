@@ -5,6 +5,7 @@ import {
 } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
 export type CityHomeJournalArticle = {
   id: string;
@@ -69,7 +70,7 @@ export async function listCityHomeArticles(city: {
 }): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
-      status: "PUBLISHED",
+      ...getPublicPublishedArticleWhere(),
       slug: { not: null },
       publishedAt: { not: null },
       OR: [
@@ -141,7 +142,7 @@ export async function listCityHomeArticles(city: {
 export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
-      status: "PUBLISHED",
+      ...getPublicPublishedArticleWhere(),
       geoScope: "COUNTRY",
       slug: { not: null },
       publishedAt: { not: null },
