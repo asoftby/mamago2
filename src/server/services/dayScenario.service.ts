@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Prisma, type DayScenario, type DayScenarioItemOverride } from "@prisma/client";
+import { BookingStatus, Prisma, type DayScenario, type DayScenarioItemOverride } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 
@@ -13,6 +13,17 @@ export type FingerprintSource = {
   startsAt: Date | null;
 };
 
+const scenarioPlaceSelect = {
+  shortAddress: true,
+  formattedAddr: true,
+  customAddress: true,
+  lat: true,
+  lng: true,
+  city: { select: { name: true } },
+  metroAuto: { select: { name: true } },
+  metroManual: { select: { name: true } },
+} satisfies Prisma.PlaceSelect;
+
 const scenarioActivitySelect = {
   id: true,
   slug: true,
@@ -23,30 +34,16 @@ const scenarioActivitySelect = {
   scheduleMode: true,
   schedulingKind: true,
   scheduleJson: true,
-  place: {
-    select: {
-      shortAddress: true,
-      formattedAddr: true,
-      customAddress: true,
-      city: { select: { name: true } },
-      metroAuto: { select: { name: true } },
-      metroManual: { select: { name: true } },
-    },
-  },
+  priceFrom: true,
+  priceTo: true,
+  currency: true,
+  priceText: true,
+  place: { select: scenarioPlaceSelect },
   venue: {
     select: {
       addressLine: true,
       kind: true,
-      place: {
-        select: {
-          shortAddress: true,
-          formattedAddr: true,
-          customAddress: true,
-          city: { select: { name: true } },
-          metroAuto: { select: { name: true } },
-          metroManual: { select: { name: true } },
-        },
-      },
+      place: { select: scenarioPlaceSelect },
     },
   },
 } satisfies Prisma.ActivitySelect;
@@ -76,8 +73,9 @@ export type ScenarioPlanItem = {
  * whose `PlanItem.startsAt` is null only because the add-flow didn't resolve
  * a session (not because the source has no fixed time). See
  * `resolveScenarioItemTime` in `src/features/my-plan/lib/scenarioProjection.ts`.
- * Scenario-only: intentionally does not select price/currency fields —
- * Scenario cards never show pricing (see Task 7 UX phase).
+ * Also carries price/currency and Place coordinates for the Scenario UI —
+ * price for the card's price tag, coordinates for the estimated travel-time
+ * gap between consecutive items (see `scenarioPricing.ts`/`scenarioTravel.ts`).
  */
 export async function listPlanItemsByDateForScenario(
   userId: string,
@@ -319,4 +317,25 @@ export async function pruneScenarioItemOverrides(
   await prisma.dayScenarioItemOverride.deleteMany({
     where: { scenarioId, planItemId: { notIn: currentPlanItemIds } },
   });
+}
+
+/**
+ * Activity ids the user has a confirmed/completed BookingRequest for — used
+ * for the Scenario card's "Забронировано" tag. Real data, batched into one
+ * query; never inferred or guessed for activities with no BookingRequest.
+ */
+export async function listConfirmedBookingActivityIds(
+  userId: string,
+  activityIds: string[],
+): Promise<Set<string>> {
+  if (activityIds.length === 0) return new Set();
+  const rows = await prisma.bookingRequest.findMany({
+    where: {
+      userId,
+      activityId: { in: activityIds },
+      status: { in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED] },
+    },
+    select: { activityId: true },
+  });
+  return new Set(rows.map((row) => row.activityId).filter((id): id is string => id != null));
 }

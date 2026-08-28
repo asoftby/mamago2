@@ -13,6 +13,12 @@ export type ScenarioClientItem = {
   durationMinutes: number | null;
   schedulingKind: ScenarioSchedulingKind;
   canReschedule: boolean;
+  /** Display-only enrichment — never read by conflict detection or the
+   * reducer, just carried through replace/save so the redesigned card can
+   * render it. Null/false when the source has nothing real to show. */
+  priceLabel: string | null;
+  addressLabel: string | null;
+  isBooked: boolean;
 };
 
 export type ScenarioReplacementCandidate = Omit<ScenarioClientItem, "planItemId">;
@@ -156,6 +162,12 @@ export function suitableReplacementCandidates(input: {
     return { candidate, conflictCount: conflictsForScenarioItems(modeled).length, index };
   }).sort((a, b) => a.conflictCount - b.conflictCount || a.index - b.index)
     .map(({ candidate }) => candidate);
+}
+
+/** DOM-safe anchor id for a conflict's jump-link — conflict keys contain
+ * `:`/`@`, which are legal in an `id` but awkward in a URL fragment. */
+export function scenarioConflictAnchorId(conflictKey: string): string {
+  return `conflict-${conflictKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 export function scenarioDraftStorageKey(date: string, baseFingerprint: string): string {

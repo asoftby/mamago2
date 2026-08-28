@@ -61,6 +61,7 @@ const suggestionActivitySelect = {
   ageLabel: true,
   eventCategory: { select: { id: true, nameRu: true } },
   priceFrom: true,
+  priceTo: true,
   priceText: true,
   currency: true,
   status: true,

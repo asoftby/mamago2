@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { listPlanSuggestionsForCity } from "@/server/services/planSuggestions.service";
 import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
+import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
+import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
 import type { ScenarioReplacementCandidate } from "@/features/my-plan/lib/scenarioDraft";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,6 +52,12 @@ export async function GET(request: NextRequest) {
         durationMinutes: scheduling.durationMinutes,
         schedulingKind: scheduling.kind,
         canReschedule: scheduling.canReschedule,
+        priceLabel: formatScenarioPriceLabel(activity),
+        addressLabel: formatActivityAddressLine(activity),
+        // Candidates aren't yet on the plan — a real booking-status check
+        // would need a per-candidate BookingRequest lookup; not worth the
+        // extra query for a swap-suggestion rail, so this is always false.
+        isBooked: false,
       };
     });
   });
