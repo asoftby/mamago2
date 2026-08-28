@@ -37,6 +37,22 @@ export function getPublicPageIndexWhere(): Prisma.PageWhereInput {
   };
 }
 
+/** Public Route detail/direct-link visibility. */
+export function getPublicRouteDetailWhere(): Prisma.RouteWhereInput {
+  return {
+    status: "PUBLISHED",
+    visibility: { in: ["PUBLIC", "UNLISTED"] },
+  };
+}
+
+/** Public Route discovery/index visibility. */
+export function getPublicRouteIndexWhere(): Prisma.RouteWhereInput {
+  return {
+    status: "PUBLISHED",
+    visibility: "PUBLIC",
+  };
+}
+
 /**
  * Публичная выдача событий: «живые» карточки = не черновик, не первичная модерация, не правки/отклонено/удалено.
  * Используем `notIn`, а не `in: [PUBLISHED, PENDING_UPDATE]`: иначе часть рантаймов Prisma/Turbopack
