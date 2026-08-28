@@ -9,8 +9,8 @@ import { getEventEngagementScores } from "@/server/discovery/eventEngagementScor
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
 /**
- * Current real My Plan ranking contract. This is deliberately versioned before
- * any ML/personal ranking is introduced so historic exposures remain
+ * Current real shared EVENT ranking contract. This is deliberately versioned
+ * before any ML/personal ranking is introduced so historic exposures remain
  * explainable after the algorithm evolves.
  */
 export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-freshness-v1";
@@ -30,6 +30,19 @@ function zonedDayRange(dateIso: string, timeZone: string): { start: Date; end: D
   const start = fromZonedTime(`${dateIso}T00:00:00`, timeZone);
   const end = fromZonedTime(`${nextDateKey(dateIso)}T00:00:00`, timeZone);
   return { start, end };
+}
+
+/** [dateFrom, dateTo+1) в указанной TZ; используется surface horizon без форка ranking. */
+function zonedDateRange(
+  dateFrom: string,
+  dateTo: string,
+  timeZone: string,
+): { start: Date; end: Date } {
+  const safeTo = dateTo >= dateFrom ? dateTo : dateFrom;
+  return {
+    start: fromZonedTime(`${dateFrom}T00:00:00`, timeZone),
+    end: fromZonedTime(`${nextDateKey(safeTo)}T00:00:00`, timeZone),
+  };
 }
 
 /** Постоянно доступные активности (без привязки к сессии) — видимы независимо от выбранного дня. */
@@ -112,20 +125,29 @@ export type PlanSuggestionsInput = {
   take?: number;
   /** Значения возрастных групп (как в Activity.ageTags). */
   ageRangeValues?: string[];
-  /** "YYYY-MM-DD" — календарный день в Europe/Minsk. */
+  /** "YYYY-MM-DD" — один календарный день в Europe/Minsk. */
   date?: string;
+  /** Опциональный диапазон для surface horizon. Игнорируется, если задан `date`. */
+  dateFrom?: string;
+  dateTo?: string;
+  /**
+   * Read-only diagnostics/composition may need the complete ranked set before
+   * applying a surface policy. Normal product calls stay bounded to avoid an
+   * unbounded query. This does not change scoring or signal interpretation.
+   */
+  exhaustiveCandidatePool?: boolean;
 };
 
 /**
- * Shared ranked batch for My Plan. This function does not know about Telegram
- * or any other surface and therefore cannot fork the recommendation algorithm.
- * It exposes the exact factors already used by the existing implementation so
- * the result can be traced without silently changing product behaviour.
+ * Shared ranked EVENT batch. The function is surface-agnostic: My Plan,
+ * Telegram and future consumers may pass different candidate windows, but
+ * scoring/engagement interpretation remains one shared implementation.
  */
 export async function rankPlanSuggestionsForCity(
   input: PlanSuggestionsInput,
 ): Promise<PlanSuggestionRankedBatch> {
   const take = input.take ?? 6;
+  const exhaustiveCandidatePool = input.exhaustiveCandidatePool === true;
   const ageRangeValues = (input.ageRangeValues ?? []).filter(Boolean);
   const city = await findCityBySlug(input.citySlug.toLowerCase());
   if (!city) {
@@ -145,31 +167,34 @@ export async function rankPlanSuggestionsForCity(
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
   const exclude = input.excludeActivityIds.filter(Boolean);
 
-  const dayFilterAnd: Prisma.ActivityWhereInput[] = input.date
-    ? (() => {
-        const range = zonedDayRange(input.date!, DEFAULT_TZ);
-        return [
-          {
-            OR: [
-              { sessions: { some: { startsAt: { gte: range.start, lt: range.end } } } },
-              { nextOccurrenceAt: { gte: range.start, lt: range.end } },
-              {
-                AND: [
-                  { scheduleMode: { in: ALWAYS_AVAILABLE_SCHEDULE_MODES } },
-                  { nextOccurrenceAt: null },
-                ],
-              },
-            ],
-          },
-        ];
-      })()
+  const requestedRange = input.date
+    ? zonedDayRange(input.date, DEFAULT_TZ)
+    : input.dateFrom
+      ? zonedDateRange(input.dateFrom, input.dateTo ?? input.dateFrom, DEFAULT_TZ)
+      : null;
+
+  const scheduleFilterAnd: Prisma.ActivityWhereInput[] = requestedRange
+    ? [
+        {
+          OR: [
+            { sessions: { some: { startsAt: { gte: requestedRange.start, lt: requestedRange.end } } } },
+            { nextOccurrenceAt: { gte: requestedRange.start, lt: requestedRange.end } },
+            {
+              AND: [
+                { scheduleMode: { in: ALWAYS_AVAILABLE_SCHEDULE_MODES } },
+                { nextOccurrenceAt: null },
+              ],
+            },
+          ],
+        },
+      ]
     : [];
 
   const baseAnd: Prisma.ActivityWhereInput[] = [
     { type: ActivityType.EVENT },
     activityInAnyOfCitiesWhere(expandedCityIds),
     ...pubParts,
-    ...dayFilterAnd,
+    ...scheduleFilterAnd,
     ...(exclude.length > 0 ? [{ id: { notIn: exclude } }] : []),
     ...(ageRangeValues.some((value) => value !== "18+")
       ? [{ agePolicy: { not: "ADULT_ONLY" as const } }]
@@ -201,7 +226,9 @@ export async function rankPlanSuggestionsForCity(
     };
     return (await prisma.activity.findMany({
       where,
-      take: Math.min(80, Math.max(take * 5, 24)),
+      ...(exhaustiveCandidatePool
+        ? {}
+        : { take: Math.min(80, Math.max(take * 5, 24)) }),
       orderBy: [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
       select: {
         ...suggestionActivitySelect,
@@ -231,7 +258,8 @@ export async function rankPlanSuggestionsForCity(
   });
 
   const ageFilterApplied = ageRangeValues.length > 0 && !ageFallbackUsed;
-  const suggestions = rows.slice(0, take).map((row) => {
+  const rankedRows = exhaustiveCandidatePool ? rows : rows.slice(0, take);
+  const suggestions = rankedRows.map((row) => {
     const {
       nextOccurrenceAt,
       createdAt,

@@ -32,8 +32,8 @@ export default function AdminCommunicationsTelegramPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-stone-600">
-            <p>На этом этапе админка уже умеет управлять доступностью Telegram внутри notification policies.</p>
-            <p>Следующий шаг — вынести сюда мониторинг bot health, delivery metrics и быстрые тестовые отправки.</p>
+            <p>Коммуникационный раздел отвечает за bot health, delivery, шаблоны и пользовательские настройки канала.</p>
+            <p>Алгоритмический состав рекомендаций управляется отдельно в Ranking → Telegram, чтобы transport не дублировал recommendation logic.</p>
           </CardContent>
         </Card>
 
@@ -44,10 +44,16 @@ export default function AdminCommunicationsTelegramPage() {
             </div>
             <CardTitle>Связанные разделы</CardTitle>
             <CardDescription>
-              Быстрые переходы в уже готовые поверхности домена уведомлений.
+              Быстрые переходы в связанные поверхности без смешивания ranking и delivery.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
+            <Button asChild variant="outline" className="rounded-2xl">
+              <Link href={adminPath("/ranking/telegram")}>
+                Ranking → Telegram
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
             <Button asChild variant="outline" className="rounded-2xl">
               <Link href={adminPath("/communications/notifications")}>
                 Открыть политики
