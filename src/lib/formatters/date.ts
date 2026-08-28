@@ -1,79 +1,98 @@
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+
 /**
  * Date Formatters
- * Deterministic date formatting for SSR + client hydration
- * 
- * CRITICAL: These formatters MUST produce identical output on server (Node.js) and client (browser)
- * to avoid React hydration mismatches.
+ * Deterministic date formatting for SSR + client hydration.
+ *
+ * Public calendar/time values are formatted in an explicit product timezone
+ * (Europe/Minsk for the Belarus MVP) instead of the ambient OS/browser zone.
  */
 
-// Hardcoded month abbreviations to ensure consistency across all environments
 const RU_MONTH_SHORT = [
   "янв.", "фев.", "мар.", "апр.", "мая", "июн.",
   "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."
 ];
 
+export type ZonedDateTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
 /**
- * Format date as short Russian day + month (e.g., "4 мар.")
- * 
- * This formatter is 100% deterministic - uses hardcoded month names
- * instead of Intl.DateTimeFormat to avoid Node.js vs browser differences.
- * 
- * Examples:
- * - new Date("2024-03-04") → "4 мар."
- * - new Date("2024-12-25") → "25 дек."
- * 
- * @param date - Date object or ISO string
- * @returns Formatted string like "4 мар." or empty string if invalid
+ * Read calendar/time components in an explicit IANA timezone.
+ * Never uses Date#getHours()/getDate(), so output is independent of the
+ * executing server or browser timezone.
  */
+export function getZonedDateTimeParts(
+  date: Date | string,
+  timeZone: string = DEFAULT_TZ,
+): ZonedDateTimeParts | null {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value);
+
+  const result = {
+    year: value("year"),
+    month: value("month"),
+    day: value("day"),
+    hour: value("hour"),
+    minute: value("minute"),
+    second: value("second"),
+  };
+
+  return Object.values(result).every(Number.isFinite) ? result : null;
+}
+
+/** Format date as short Russian day + month (e.g. "4 мар."). */
 export function formatRuShortDayMonth(date: Date | string): string {
   try {
-    // Parse string to Date if needed
-    const dateObj = typeof date === "string" ? new Date(date) : date;
-    
-    // Check for invalid date
-    if (isNaN(dateObj.getTime())) {
-      return "";
-    }
-
-    const day = dateObj.getDate();
-    const monthIndex = dateObj.getMonth();
-    const monthShort = RU_MONTH_SHORT[monthIndex];
-
-    return `${day} ${monthShort}`;
+    const p = getZonedDateTimeParts(date);
+    if (!p) return "";
+    return `${p.day} ${RU_MONTH_SHORT[p.month - 1]}`;
   } catch (error) {
-    // Gracefully handle any errors
     console.error("formatRuShortDayMonth error:", error);
     return "";
   }
 }
 
-function sameLocalCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function sameCalendarDay(a: ZonedDateTimeParts, b: ZonedDateTimeParts): boolean {
+  return a.year === b.year && a.month === b.month && a.day === b.day;
 }
 
-/**
- * Одна дата или интервал: «4 апр.», «4–5 апр.», «4 апр.–5 мар.» (детерминированно, как formatRuShortDayMonth).
- */
+/** Одна дата или интервал: «4 апр.», «4–5 апр.», «4 апр.–5 мар.». */
 export function formatRuShortDayMonthRange(
   start: Date | string,
   end?: Date | string | null,
 ): string {
   try {
-    const s = typeof start === "string" ? new Date(start) : start;
-    if (isNaN(s.getTime())) return "";
-    if (end == null || end === "") return formatRuShortDayMonth(s);
-    const e = typeof end === "string" ? new Date(end) : end;
-    if (isNaN(e.getTime())) return formatRuShortDayMonth(s);
-    if (sameLocalCalendarDay(s, e)) return formatRuShortDayMonth(s);
-    if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
-      const monthShort = RU_MONTH_SHORT[s.getMonth()];
-      return `${s.getDate()}–${e.getDate()} ${monthShort}`;
+    const s = getZonedDateTimeParts(start);
+    if (!s) return "";
+    if (end == null || end === "") return `${s.day} ${RU_MONTH_SHORT[s.month - 1]}`;
+
+    const e = getZonedDateTimeParts(end);
+    if (!e) return `${s.day} ${RU_MONTH_SHORT[s.month - 1]}`;
+    if (sameCalendarDay(s, e)) return `${s.day} ${RU_MONTH_SHORT[s.month - 1]}`;
+    if (s.year === e.year && s.month === e.month) {
+      return `${s.day}–${e.day} ${RU_MONTH_SHORT[s.month - 1]}`;
     }
-    return `${formatRuShortDayMonth(s)}–${formatRuShortDayMonth(e)}`;
+    return `${s.day} ${RU_MONTH_SHORT[s.month - 1]}–${e.day} ${RU_MONTH_SHORT[e.month - 1]}`;
   } catch (error) {
     console.error("formatRuShortDayMonthRange error:", error);
     return formatRuShortDayMonth(start);
@@ -81,32 +100,26 @@ export function formatRuShortDayMonthRange(
 }
 
 /**
- * Format a Date or ISO string as HH:mm (24-hour, zero-padded).
- * Deterministic: uses getHours/getMinutes, not Intl, to avoid SSR/client drift.
- *
- * @example formatHHMM(new Date("2024-06-09T16:05:00")) → "16:05"
- * @example formatHHMM("2024-06-09T09:00:00")          → "09:00"
+ * Format a Date or ISO string as HH:mm in the explicit product timezone.
+ * This is intentionally not the viewer/browser timezone: event schedules are
+ * venue-local wall-clock values.
  */
-export function formatHHMM(date: Date | string | null | undefined): string {
+export function formatHHMM(
+  date: Date | string | null | undefined,
+  timeZone: string = DEFAULT_TZ,
+): string {
   if (!date) return "";
-  const d = typeof date === "string" ? new Date(date) : date;
-  if (isNaN(d.getTime())) return "";
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const p = getZonedDateTimeParts(date, timeZone);
+  if (!p) return "";
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 }
 
-/**
- * Dev-only validation helper
- * Ensures formatter produces expected output
- */
 if (process.env.NODE_ENV === "development") {
-  // Self-test on module load
-  const testDate = new Date("2024-03-04T12:00:00Z");
+  const testDate = new Date("2024-03-04T09:00:00Z");
   const result = formatRuShortDayMonth(testDate);
-  
-  // Expected format: "4 мар."
   if (!result.match(/^\d{1,2}\s[а-я]{3,4}\.?$/)) {
     console.warn(
-      `[formatRuShortDayMonth] Unexpected format: "${result}". Expected pattern: "4 мар."`
+      `[formatRuShortDayMonth] Unexpected format: "${result}". Expected pattern: "4 мар."`,
     );
   }
 }
