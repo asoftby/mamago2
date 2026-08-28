@@ -6,6 +6,7 @@ import {
   rejectDevBusinessApplication,
 } from "@/server/services/telegram/devTelegramBusinessApplication.service";
 import { consumeTelegramLinkToken } from "@/server/services/telegramLink.service";
+import { initializeTelegramPlanNotificationPreferences } from "@/server/services/telegram/telegramNotificationBootstrap.service";
 import {
   findTelegramConnectionByChatIdForCurrentEnvironment,
   touchTelegramConnectionByChatIdForCurrentEnvironment,
@@ -137,6 +138,21 @@ export class TelegramWebhookService {
       telegramUsername,
       telegramFirstName,
     });
+
+    if (result.ok) {
+      try {
+        await initializeTelegramPlanNotificationPreferences(result.userId);
+      } catch (error) {
+        // The Telegram connection itself is already valid. Keep the link and surface
+        // the bootstrap failure in logs rather than turning a successful /start into
+        // a misleading expired-token response on Telegram retry.
+        console.error(
+          "[telegram:webhook] Failed to initialize plan Telegram preferences userId=%s",
+          result.userId,
+          error,
+        );
+      }
+    }
 
     // Dev logging: result
     if (process.env.NODE_ENV !== "production") {
