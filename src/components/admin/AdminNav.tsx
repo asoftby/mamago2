@@ -79,6 +79,15 @@ const NAV_SECTIONS: NavSection[] = [
     })),
   },
   {
+    title: "Ranking",
+    items: [
+      { label: "Stories", href: adminPath("/ranking/stories-intents") },
+      { label: "Telegram", href: adminPath("/ranking/telegram") },
+      { label: "Weights (read-only)", href: adminPath("/ranking/weights") },
+      { label: "Boost (read-only)", href: adminPath("/ranking/boost") },
+    ],
+  },
+  {
     title: "Communications",
     items: [
       { label: "Overview", href: adminPath("/communications") },
