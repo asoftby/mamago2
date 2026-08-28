@@ -5,20 +5,22 @@ type ActivityDateLike = {
   sessions?: Array<{ startsAt: Date }>;
 };
 
-function parseDateKey(value: string): Date | null {
+function parseDateKey(value: string): string | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) return null;
   const [, year, month, day] = match;
-  const date = new Date(Number(year), Number(month) - 1, Number(day));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function sameLocalDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (
+    probe.getUTCFullYear() !== y ||
+    probe.getUTCMonth() !== m - 1 ||
+    probe.getUTCDate() !== d
+  ) {
+    return null;
+  }
+  return `${year}-${month}-${day}`;
 }
 
 function pushDateKey(bucket: Set<string>, value: unknown): void {
@@ -34,7 +36,7 @@ function pushDateKey(bucket: Set<string>, value: unknown): void {
   const isoDateMatch = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
   if (isoDateMatch) {
     const parsed = parseDateKey(isoDateMatch[1]);
-    if (parsed) bucket.add(getLocalDateKey(parsed));
+    if (parsed) bucket.add(parsed);
     return;
   }
 
@@ -113,18 +115,16 @@ export function getActivityDateDisplay(
 
   const startKey = dateKeys[0]!;
   const endKey = dateKeys[dateKeys.length - 1]!;
-  const startDate = parseDateKey(startKey);
-  const endDate = parseDateKey(endKey);
-  if (!startDate || !endDate) return null;
+  const todayKey = getLocalDateKey(now);
 
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  if (endDate.getTime() < today.getTime()) {
+  // YYYY-MM-DD keys are lexicographically sortable and are all resolved in
+  // Europe/Minsk. Avoid reconstructing ambient-local Date objects here.
+  if (endKey < todayKey) {
     return "Уже прошло";
   }
 
-  if (startDate.getTime() <= today.getTime() && endDate.getTime() >= today.getTime()) {
-    return sameLocalDay(endDate, today) ? "до сегодня" : `до ${formatLocalPlanDate(endKey, "ru-RU")}`;
+  if (startKey <= todayKey && endKey >= todayKey) {
+    return endKey === todayKey ? "до сегодня" : `до ${formatLocalPlanDate(endKey, "ru-RU")}`;
   }
 
   if (dateKeys.length === 1) {
