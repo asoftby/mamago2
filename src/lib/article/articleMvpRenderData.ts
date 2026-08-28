@@ -13,6 +13,12 @@ import {
   buildCityPublicPath,
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
+import {
+  getPublicActivityDetailWhere,
+  getPublicPublishedArticleWhere,
+  getPublicPublishedOfferWhere,
+  getPublicRouteIndexWhere,
+} from "@/server/public/publicContentVisibility";
 
 export type { PlaceCardExtra } from "@/lib/place/articlePlaceEmbedData";
 
@@ -169,14 +175,11 @@ async function resolveActivityCard(
 ): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null> {
   if (!b.entityId.trim()) return null;
   if (b.entityType === "PLACE") {
-    // Returns null both when the place doesn't exist/isn't public AND when it
-    // has nothing live to show (no upcoming events, visit pricing, party
-    // offers, or promos) — by design the block must not render in either case.
     return getArticlePlaceEmbedData(b.entityId);
   }
   if (b.entityType === "EVENT") {
-    const a = await prisma.activity.findUnique({
-      where: { id: b.entityId },
+    const a = await prisma.activity.findFirst({
+      where: { id: b.entityId, ...getPublicActivityDetailWhere() },
       select: {
         title: true,
         slug: true,
@@ -191,8 +194,8 @@ async function resolveActivityCard(
     return { kind: "basic", href, title: a.title };
   }
   if (b.entityType === "OFFER") {
-    const o = await prisma.offer.findUnique({
-      where: { id: b.entityId },
+    const o = await prisma.offer.findFirst({
+      where: { id: b.entityId, ...getPublicPublishedOfferWhere() },
       select: {
         id: true,
         title: true,
@@ -220,9 +223,7 @@ async function resolveActivityCard(
       slug: o.slug,
     });
 
-    if (!offerData) {
-      return { kind: "basic", href, title: o.title };
-    }
+    if (!offerData) return null;
 
     const ageLabel =
       offerData.metaGrid.find((item) => item.id === "age")?.value?.trim() || null;
@@ -304,16 +305,16 @@ async function resolveActivityCard(
     };
   }
   if (b.entityType === "ROUTE") {
-    const r = await prisma.route.findUnique({
-      where: { id: b.entityId },
+    const r = await prisma.route.findFirst({
+      where: { id: b.entityId, ...getPublicRouteIndexWhere() },
       select: { title: true, slug: true },
     });
     if (!r) return null;
     return { kind: "basic", href: `/routes/${r.slug}`, title: r.title };
   }
   // ARTICLE
-  const article = await prisma.article.findUnique({
-    where: { id: b.entityId },
+  const article = await prisma.article.findFirst({
+    where: { id: b.entityId, ...getPublicPublishedArticleWhere() },
     select: {
       title: true,
       slug: true,
@@ -410,7 +411,7 @@ export async function loadArticleMvpBySlugPublic(
   const article = await prisma.article.findFirst({
     where: {
       id: resolved.articleId,
-      status: "PUBLISHED",
+      ...getPublicPublishedArticleWhere(),
     },
     select: articleMvpBaseSelect,
   });
@@ -445,7 +446,7 @@ export async function loadArticleMvpBySlugPublic(
 export async function loadRelatedBreakingNews(excludeId: string) {
   const rows = await prisma.article.findMany({
     where: {
-      status: "PUBLISHED",
+      ...getPublicPublishedArticleWhere(),
       subtitle: "__breaking_news__",
       id: { not: excludeId },
     },
