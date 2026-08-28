@@ -4,10 +4,12 @@
  */
 import assert from "node:assert/strict";
 import {
+  articlePublicSlugHistoryWhere,
+  articlePublicSlugWhere,
   articleSlugScopeWhere,
   articlesShareSlugScope,
-} from "./articleSlugScope";
-import { shouldRecordArticleSlugHistory } from "./articleSlugService";
+  shouldRecordArticleSlugHistory,
+} from "./articleSlugService";
 import { ensureUniqueSlug } from "./ensureUniqueSlug";
 import {
   SLUG_CHANGE_REDIRECT_WARNING,
@@ -37,6 +39,26 @@ assert.notEqual(
   articleSlugScopeWhere("weekend", "minsk").cityId,
   articleSlugScopeWhere("weekend", "brest").cityId,
 );
+
+// ── public article lookup must never resolve unpublished content ─────────────
+
+assert.deepEqual(articlePublicSlugWhere("weekend", null), {
+  slug: "weekend",
+  cityId: null,
+  status: "PUBLISHED",
+});
+assert.deepEqual(articlePublicSlugWhere("weekend", "minsk"), {
+  slug: "weekend",
+  cityId: "minsk",
+  status: "PUBLISHED",
+});
+assert.deepEqual(articlePublicSlugHistoryWhere("old-weekend", null), {
+  slug: "old-weekend",
+  cityId: null,
+  article: {
+    status: "PUBLISHED",
+  },
+});
 
 // ── duplicate slug in same scope → -2 suffix ──────────────────────────────────
 
