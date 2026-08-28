@@ -62,6 +62,7 @@ jobs:
           pnpm exec tsx src/lib/seo/globalNoindex.test.ts
           pnpm exec tsx src/app/robots.test.ts
           pnpm exec tsx src/lib/seo/indexingPolicy.test.ts
+          pnpm exec tsx src/server/public/publicContentVisibility.test.ts
           pnpm exec tsx src/lib/slug/slugFlow.test.ts
           pnpm exec tsx src/lib/seo/schema/buildPlaceJsonLd.test.ts
           pnpm exec tsx src/lib/routing/legacyProdPreviewRedirect.test.ts
