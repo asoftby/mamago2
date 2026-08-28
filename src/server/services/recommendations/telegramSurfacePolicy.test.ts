@@ -61,7 +61,7 @@ const composed = applyTelegramSurfacePolicy({
   },
   cooldownEntityIds: new Set(["d"]),
 });
-assert.deepEqual(composed.selected.map((row) => row.activity.id), ["a"]);
+assert.deepEqual(composed.selected, [], "no-send gate must return no deliverable items");
 assert.equal(composed.noSendReason, "MIN_RESULT_COUNT");
 assert.deepEqual(composed.filtered, {
   belowMinimumScore: 1,
