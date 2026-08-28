@@ -28,6 +28,19 @@ export class RecommendationPolicyConflictError extends Error {
   }
 }
 
+function isConcurrentPolicyWrite(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error)) return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "P2002" || code === "P2034";
+}
+
+function requiredExpectedUpdatedAt(value: string | null | undefined): Date {
+  if (!value) throw new RecommendationPolicyConflictError();
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) throw new RecommendationPolicyConflictError();
+  return parsed;
+}
+
 function dateKeyPlusDays(dateIso: string, days: number): string {
   const [year, month, day] = dateIso.split("-").map(Number);
   const shifted = new Date(Date.UTC(year, (month ?? 1) - 1, (day ?? 1) + days));
@@ -96,24 +109,30 @@ export async function saveTelegramRecommendationPolicyDraft(input: {
     orderBy: { version: "desc" },
   });
 
-  if (
-    before &&
-    input.expectedUpdatedAt &&
-    new Date(input.expectedUpdatedAt).getTime() !== before.updatedAt.getTime()
-  ) {
-    throw new RecommendationPolicyConflictError();
-  }
-
-  const updated = before
-    ? await prisma.recommendationSurfacePolicy.update({
-        where: { id: before.id },
+  let updated;
+  try {
+    if (before) {
+      const expectedUpdatedAt = requiredExpectedUpdatedAt(input.expectedUpdatedAt);
+      const mutationAt = new Date();
+      const claimed = await prisma.recommendationSurfacePolicy.updateMany({
+        where: {
+          id: before.id,
+          surface: TELEGRAM_SURFACE,
+          status: "DRAFT",
+          updatedAt: expectedUpdatedAt,
+        },
         data: {
           algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
           config,
           createdByUserId: input.actor.id,
+          updatedAt: mutationAt,
         },
-      })
-    : await prisma.$transaction(async (tx) => {
+      });
+      if (claimed.count !== 1) throw new RecommendationPolicyConflictError();
+      updated = await prisma.recommendationSurfacePolicy.findUnique({ where: { id: before.id } });
+      if (!updated) throw new RecommendationPolicyConflictError();
+    } else {
+      updated = await prisma.$transaction(async (tx) => {
         const latest = await tx.recommendationSurfacePolicy.aggregate({
           where: { surface: TELEGRAM_SURFACE },
           _max: { version: true },
@@ -129,6 +148,13 @@ export async function saveTelegramRecommendationPolicyDraft(input: {
           },
         });
       });
+    }
+  } catch (error) {
+    if (error instanceof RecommendationPolicyConflictError || isConcurrentPolicyWrite(error)) {
+      throw new RecommendationPolicyConflictError();
+    }
+    throw error;
+  }
 
   await logAdminAudit({
     actorId: input.actor.id,
@@ -154,60 +180,85 @@ export async function publishTelegramRecommendationPolicy(input: {
     orderBy: { version: "desc" },
   });
 
-  if (
-    existingDraft &&
-    input.expectedUpdatedAt &&
-    new Date(input.expectedUpdatedAt).getTime() !== existingDraft.updatedAt.getTime()
-  ) {
-    throw new RecommendationPolicyConflictError();
-  }
+  let published;
+  try {
+    published = await prisma.$transaction(async (tx) => {
+      const mutationAt = new Date();
+      let draft;
 
-  const published = await prisma.$transaction(async (tx) => {
-    let draft = existingDraft;
-    if (draft) {
-      draft = await tx.recommendationSurfacePolicy.update({
-        where: { id: draft.id },
-        data: {
-          algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
-          config,
-          createdByUserId: input.actor.id,
-        },
-      });
-    } else {
-      const latest = await tx.recommendationSurfacePolicy.aggregate({
-        where: { surface: TELEGRAM_SURFACE },
-        _max: { version: true },
-      });
-      draft = await tx.recommendationSurfacePolicy.create({
-        data: {
+      if (existingDraft) {
+        const expectedUpdatedAt = requiredExpectedUpdatedAt(input.expectedUpdatedAt);
+        const claimed = await tx.recommendationSurfacePolicy.updateMany({
+          where: {
+            id: existingDraft.id,
+            surface: TELEGRAM_SURFACE,
+            status: "DRAFT",
+            updatedAt: expectedUpdatedAt,
+          },
+          data: {
+            algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
+            config,
+            createdByUserId: input.actor.id,
+            updatedAt: mutationAt,
+          },
+        });
+        if (claimed.count !== 1) throw new RecommendationPolicyConflictError();
+        draft = await tx.recommendationSurfacePolicy.findUnique({ where: { id: existingDraft.id } });
+        if (!draft) throw new RecommendationPolicyConflictError();
+      } else {
+        const latest = await tx.recommendationSurfacePolicy.aggregate({
+          where: { surface: TELEGRAM_SURFACE },
+          _max: { version: true },
+        });
+        draft = await tx.recommendationSurfacePolicy.create({
+          data: {
+            surface: TELEGRAM_SURFACE,
+            version: (latest._max.version ?? 0) + 1,
+            status: "DRAFT",
+            algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
+            config,
+            createdByUserId: input.actor.id,
+            updatedAt: mutationAt,
+          },
+        });
+      }
+
+      await tx.recommendationSurfacePolicy.updateMany({
+        where: {
           surface: TELEGRAM_SURFACE,
-          version: (latest._max.version ?? 0) + 1,
+          status: "PUBLISHED",
+          id: { not: draft.id },
+        },
+        data: { status: "ARCHIVED", archivedAt: mutationAt },
+      });
+
+      const publishedAt = new Date();
+      const promoted = await tx.recommendationSurfacePolicy.updateMany({
+        where: {
+          id: draft.id,
+          surface: TELEGRAM_SURFACE,
           status: "DRAFT",
-          algorithmVersion: PLAN_SUGGESTION_ALGORITHM_VERSION,
-          config,
-          createdByUserId: input.actor.id,
+          updatedAt: mutationAt,
+        },
+        data: {
+          status: "PUBLISHED",
+          publishedAt,
+          archivedAt: null,
+          updatedAt: publishedAt,
         },
       });
+      if (promoted.count !== 1) throw new RecommendationPolicyConflictError();
+
+      const row = await tx.recommendationSurfacePolicy.findUnique({ where: { id: draft.id } });
+      if (!row) throw new RecommendationPolicyConflictError();
+      return row;
+    });
+  } catch (error) {
+    if (error instanceof RecommendationPolicyConflictError || isConcurrentPolicyWrite(error)) {
+      throw new RecommendationPolicyConflictError();
     }
-
-    await tx.recommendationSurfacePolicy.updateMany({
-      where: {
-        surface: TELEGRAM_SURFACE,
-        status: "PUBLISHED",
-        id: { not: draft.id },
-      },
-      data: { status: "ARCHIVED", archivedAt: new Date() },
-    });
-
-    return tx.recommendationSurfacePolicy.update({
-      where: { id: draft.id },
-      data: {
-        status: "PUBLISHED",
-        publishedAt: new Date(),
-        archivedAt: null,
-      },
-    });
-  });
+    throw error;
+  }
 
   await logAdminAudit({
     actorId: input.actor.id,
@@ -275,10 +326,10 @@ export async function previewTelegramRecommendations(input: {
   const ranked = await rankPlanSuggestionsForCity({
     citySlug,
     excludeActivityIds: [],
-    take: Math.min(40, Math.max(24, config.resultCount * 6)),
     ageRangeValues: ageRanges,
     dateFrom,
     dateTo,
+    exhaustiveCandidatePool: true,
   });
 
   const composed = applyTelegramSurfacePolicy({
