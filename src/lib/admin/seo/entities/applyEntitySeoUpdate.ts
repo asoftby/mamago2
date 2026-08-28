@@ -1,15 +1,19 @@
 import { SeoCanonicalSource } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
+import prisma, { searchIndexer } from "@/lib/prisma";
 import {
   syncActivityCanonical,
-  syncArticleCanonical,
+  syncArticleCanonicalInTransaction,
   syncOfferCanonical,
   syncPlaceCanonical,
   syncRouteCanonical,
 } from "@/lib/seo/syncEntityCanonical";
 import { updateActivitySlug } from "@/lib/slug/activitySlugService";
-import { updateArticleSlug } from "@/lib/slug/articleSlugService";
+import { updateArticleSlugInTransaction } from "@/lib/slug/articleSlugService";
+import {
+  runArticleCriticalWrite,
+  runBestEffortArticleEffect,
+} from "@/lib/article/articleWriteAtomicity";
 import { updateOfferSlug } from "@/lib/slug/offerSlugService";
 import { updatePlaceSlug } from "@/lib/slug/placeSlugService";
 import { updateRouteSlug } from "@/lib/slug/routeSlugService";
@@ -132,31 +136,33 @@ export async function applyRouteSeoUpdate(entityId: string, input: SeoEntityUpda
 }
 
 export async function applyArticleSeoUpdate(entityId: string, input: SeoEntityUpdateInput): Promise<void> {
-  if (typeof input.slug === "string") {
-    await updateArticleSlug(entityId, input.slug);
-  }
   const trimmedCanon = input.seoCanonicalUrl?.trim() || null;
   const manual = !!trimmedCanon;
 
-  await prisma.article.update({
-    where: { id: entityId },
-    data: {
-      seoTitle: input.seoTitle,
-      seoDescription: input.seoDescription,
-      seoH1: input.seoH1,
-      ...(manual
-        ? { seoCanonicalUrl: trimmedCanon, seoCanonicalSource: SeoCanonicalSource.MANUAL }
-        : { seoCanonicalSource: SeoCanonicalSource.FALLBACK }),
-      seoOgTitle: input.seoOgTitle,
-      seoOgDescription: input.seoOgDescription,
-      seoOgImage: input.seoOgImage,
-      seoRobots: input.seoRobots,
-      seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
-    },
-    select: { id: true },
+  await runArticleCriticalWrite(prisma, async (tx) => {
+    if (typeof input.slug === "string") {
+      await updateArticleSlugInTransaction(tx, entityId, input.slug);
+    }
+    await tx.article.update({
+      where: { id: entityId },
+      data: {
+        seoTitle: input.seoTitle,
+        seoDescription: input.seoDescription,
+        seoH1: input.seoH1,
+        ...(manual
+          ? { seoCanonicalUrl: trimmedCanon, seoCanonicalSource: SeoCanonicalSource.MANUAL }
+          : { seoCanonicalSource: SeoCanonicalSource.FALLBACK }),
+        seoOgTitle: input.seoOgTitle,
+        seoOgDescription: input.seoOgDescription,
+        seoOgImage: input.seoOgImage,
+        seoRobots: input.seoRobots,
+        seoJsonLdOverride: input.seoJsonLdOverride as Prisma.InputJsonValue,
+      },
+      select: { id: true },
+    });
+    if (!manual) await syncArticleCanonicalInTransaction(tx, entityId);
   });
-
-  if (!manual) {
-    await syncArticleCanonical(entityId);
-  }
+  await runBestEffortArticleEffect("search-index", entityId, async () => {
+    await searchIndexer.upsertArticle(entityId);
+  });
 }

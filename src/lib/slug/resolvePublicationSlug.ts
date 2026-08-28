@@ -1,4 +1,10 @@
-import { assignArticleSlugIfMissing, updateArticleSlug } from "@/lib/slug/articleSlugService";
+import type { Prisma } from "@prisma/client";
+import {
+  assignArticleSlugIfMissing,
+  assignArticleSlugIfMissingInTransaction,
+  updateArticleSlug,
+  updateArticleSlugInTransaction,
+} from "@/lib/slug/articleSlugService";
 import {
   EmptyPublicationSlugError,
   isMeaningfulPublicationTitle,
@@ -25,6 +31,22 @@ export async function resolveArticleSlugOnSave(
   }
 
   await assignArticleSlugIfMissing(articleId, title.trim());
+}
+
+export async function resolveArticleSlugOnSaveInTransaction(
+  tx: Prisma.TransactionClient,
+  articleId: string,
+  title: string,
+  slugInput: string | null | undefined,
+): Promise<void> {
+  const trimmed = slugInput?.trim();
+  if (trimmed) {
+    const normalized = normalizeSlugStrict(trimmed);
+    if (!normalized) throw new EmptyPublicationSlugError();
+    await updateArticleSlugInTransaction(tx, articleId, trimmed, { strict: false });
+    return;
+  }
+  await assignArticleSlugIfMissingInTransaction(tx, articleId, title.trim());
 }
 
 /** Preview/fallback без обращения к БД. */

@@ -10,6 +10,7 @@
  *   REGION/COUNTRY articles    → cityId IS NULL  (share the national blog slug namespace)
  */
 
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { articleSlugScopeWhere } from "@/lib/slug/articleSlugScope";
 import { ensureUniqueSlug } from "@/lib/slug/ensureUniqueSlug";
@@ -21,6 +22,8 @@ import {
   resolveSlugCandidateForSave,
 } from "@/lib/slug/publicSlug";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
+
+export type ArticleSlugTransactionClient = Prisma.TransactionClient;
 
 export { articleSlugScopeWhere, articlesShareSlugScope } from "@/lib/slug/articleSlugScope";
 
@@ -43,15 +46,16 @@ async function isSlugAvailable(
   slug: string,
   cityId: string | null,
   excludeArticleId?: string,
+  db: ArticleSlugTransactionClient = prisma,
 ) {
   const scope = articleSlugScopeWhere(slug, cityId);
-  const existing = await prisma.article.findFirst({
+  const existing = await db.article.findFirst({
     where: scope,
     select: { id: true },
   });
   if (existing && existing.id !== excludeArticleId) return false;
 
-  const history = await prisma.articleSlugHistory.findFirst({
+  const history = await db.articleSlugHistory.findFirst({
     where: scope,
     select: { articleId: true },
   });
@@ -64,6 +68,7 @@ export async function generateArticleSlugFromTitle(
   title: string,
   cityId: string | null,
   excludeArticleId?: string,
+  db: ArticleSlugTransactionClient = prisma,
 ) {
   const base = resolveSlugCandidateForSave({
     title: isMeaningfulPublicationTitle(title) ? title : "",
@@ -74,30 +79,39 @@ export async function generateArticleSlugFromTitle(
   });
   return ensureUniqueSlug({
     base,
-    isAvailable: (s) => isSlugAvailable(s, cityId, excludeArticleId),
+    isAvailable: (s) => isSlugAvailable(s, cityId, excludeArticleId, db),
   });
 }
 
-export async function assignArticleSlugIfMissing(
+export async function assignArticleSlugIfMissingInTransaction(
+  tx: ArticleSlugTransactionClient,
   articleId: string,
   title: string,
 ) {
-  const article = await prisma.article.findUnique({
+  const article = await tx.article.findUnique({
     where: { id: articleId },
     select: { id: true, slug: true, cityId: true },
   });
   if (!article) throw new Error(`Article not found: ${articleId}`);
   if (article.slug) return article.slug;
 
-  const slug = await generateArticleSlugFromTitle(title, article.cityId, articleId);
-  await prisma.$transaction(async (tx) => {
-    await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId, article.cityId);
-    await tx.article.update({
-      where: { id: articleId },
-      data: { slug, slugUpdatedAt: new Date() },
-      select: { id: true },
-    });
+  const slug = await generateArticleSlugFromTitle(title, article.cityId, articleId, tx);
+  await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId, article.cityId);
+  await tx.article.update({
+    where: { id: articleId },
+    data: { slug, slugUpdatedAt: new Date() },
+    select: { id: true },
   });
+  return slug;
+}
+
+export async function assignArticleSlugIfMissing(
+  articleId: string,
+  title: string,
+) {
+  const slug = await prisma.$transaction((tx) =>
+    assignArticleSlugIfMissingInTransaction(tx, articleId, title),
+  );
   await syncArticleCanonical(articleId);
   return slug;
 }
@@ -109,6 +123,55 @@ export type UpdateArticleSlugOptions = {
    */
   strict?: boolean;
 };
+
+export async function updateArticleSlugInTransaction(
+  tx: ArticleSlugTransactionClient,
+  articleId: string,
+  newSlugRaw: string,
+  options?: UpdateArticleSlugOptions,
+) {
+  const trimmed = newSlugRaw.trim();
+  const newSlug = trimmed
+    ? normalizeSlugStrict(trimmed) || (() => { throw new EmptyPublicationSlugError(); })()
+    : normalizeSlugStrict(newSlugRaw);
+  if (!newSlug) throw new EmptyPublicationSlugError();
+
+  const current = await tx.article.findUnique({
+    where: { id: articleId },
+    select: { slug: true, cityId: true },
+  });
+  if (!current) throw new Error(`Article not found: ${articleId}`);
+  if (current.slug === newSlug) return newSlug;
+
+  if (options?.strict) {
+    if (!trimmed) {
+      throw new Error("Укажите корректный slug или оставьте поле пустым для автогенерации");
+    }
+    const ok = await isSlugAvailable(newSlug, current.cityId, articleId, tx);
+    if (!ok) {
+      throw new Error("Этот адрес (slug) уже занят другой статьёй или зарезервирован в истории URL");
+    }
+  }
+
+  if (!current.slug) {
+    await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId, current.cityId);
+  }
+  const finalSlug = options?.strict
+    ? newSlug
+    : await ensureUniqueSlug({
+        base: newSlug,
+        isAvailable: async (slug) => isSlugAvailable(slug, current.cityId, articleId, tx),
+      });
+  if (shouldRecordArticleSlugHistory(current.slug, finalSlug)) {
+    await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, current.slug!, current.cityId);
+  }
+  await tx.article.update({
+    where: { id: articleId },
+    data: { slug: finalSlug, slugUpdatedAt: new Date() },
+    select: { id: true },
+  });
+  return finalSlug;
+}
 
 export async function updateArticleSlug(
   articleId: string,
@@ -144,53 +207,9 @@ export async function updateArticleSlug(
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    const current = await tx.article.findUnique({
-      where: { id: articleId },
-      select: { slug: true, cityId: true },
-    });
-    if (!current) throw new Error(`Article not found: ${articleId}`);
-    if (current.slug === newSlug) return;
-
-    if (!current.slug) {
-      await createArticleSlugHistoryIgnoreDuplicate(tx, articleId, articleId, current.cityId);
-    }
-
-    const finalSlug = options?.strict
-      ? newSlug
-      : await ensureUniqueSlug({
-          base: newSlug,
-          isAvailable: async (s) => {
-            const scope = articleSlugScopeWhere(s, current.cityId);
-            const conflict = await tx.article.findFirst({
-              where: scope,
-              select: { id: true },
-            });
-            const hist = await tx.articleSlugHistory.findFirst({
-              where: scope,
-              select: { articleId: true },
-            });
-            return (
-              (!conflict || conflict.id === articleId) &&
-              (!hist || hist.articleId === articleId)
-            );
-          },
-        });
-
-    if (shouldRecordArticleSlugHistory(current.slug, finalSlug)) {
-      await createArticleSlugHistoryIgnoreDuplicate(
-        tx,
-        articleId,
-        current.slug!,
-        current.cityId,
-      );
-    }
-    await tx.article.update({
-      where: { id: articleId },
-      data: { slug: finalSlug, slugUpdatedAt: new Date() },
-      select: { id: true },
-    });
-  });
+  await prisma.$transaction((tx) =>
+    updateArticleSlugInTransaction(tx, articleId, newSlugRaw, options),
+  );
   await syncArticleCanonical(articleId);
 }
 
