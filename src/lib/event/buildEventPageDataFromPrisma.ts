@@ -380,8 +380,8 @@ function venueFromActivity(
           undefined,
         lat: linkedPlace?.lat ?? undefined,
         lng: linkedPlace?.lng ?? undefined,
-        district: (linkedPlace?.districtManual ?? linkedPlace.districtAuto)?.name ?? undefined,
-        metro: (linkedPlace?.metroManual ?? linkedPlace.metroAuto)?.name ?? undefined,
+        district: (linkedPlace?.districtManual ?? linkedPlace?.districtAuto)?.name ?? undefined,
+        metro: (linkedPlace?.metroManual ?? linkedPlace?.metroAuto)?.name ?? undefined,
         placeHref: linkedPlace ? publicPlaceHref(cityForPlace, linkedPlace) : undefined,
         mapUrl:
           v.addressLine != null && v.addressLine.length > 0
@@ -534,6 +534,7 @@ export function buildEventPageDataFromPrismaActivity(
     previewBannerLabel: options?.previewBannerLabel,
     hidePublicationStats: options?.hidePublicationStats ?? true,
   };
+
   return data;
 }
 
