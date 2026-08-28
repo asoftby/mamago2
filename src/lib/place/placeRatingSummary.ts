@@ -29,7 +29,10 @@ export function combinePlaceRatingSummary(input: {
   const totalCount = input.mamagoCount + (input.googleUserRatingsTotal ?? 0);
   if (totalCount === 0) return null;
 
-  const value = (weightedMamago + (input.googleRating ?? 0) * (input.googleUserRatingsTotal ?? 0)) / totalCount;
+  const value =
+    (weightedMamago +
+      (input.googleRating ?? 0) * (input.googleUserRatingsTotal ?? 0)) /
+    totalCount;
   return { value, count: totalCount };
 }
 
@@ -38,16 +41,26 @@ export async function getPlaceRatingSummary(
   placeId: string,
   google: { googleRating: number | null; googleUserRatingsTotal: number | null },
 ): Promise<{ value: number; count: number } | null> {
-  const stats = await prisma.placeReview.aggregate({
-    where: { placeId, status: "PUBLISHED" },
-    _avg: { rating: true },
-    _count: true,
-  });
+  const [stats, persistedGoogleReview] = await Promise.all([
+    prisma.placeReview.aggregate({
+      where: { placeId, status: "PUBLISHED" },
+      _avg: { rating: true },
+      _count: true,
+    }),
+    prisma.placeReview.findFirst({
+      where: { placeId, status: "PUBLISHED", source: "GOOGLE" },
+      select: { id: true },
+    }),
+  ]);
+
+  const hasPersistedGoogleReviews = persistedGoogleReview != null;
 
   return combinePlaceRatingSummary({
     mamagoAverage: stats._avg.rating,
     mamagoCount: stats._count,
-    googleRating: google.googleRating,
-    googleUserRatingsTotal: google.googleUserRatingsTotal,
+    googleRating: hasPersistedGoogleReviews ? null : google.googleRating,
+    googleUserRatingsTotal: hasPersistedGoogleReviews
+      ? null
+      : google.googleUserRatingsTotal,
   });
 }
