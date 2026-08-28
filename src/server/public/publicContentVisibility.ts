@@ -8,9 +8,43 @@ import {
 export { activityOwnerBusinessActiveWhere, placeOwnerBusinessActiveWhere };
 
 /**
+ * Canonical public visibility for articles.
+ *
+ * `noindex` is deliberately not part of this predicate: it controls search
+ * engine indexing, not whether a user may read the article by URL.
+ */
+export function getPublicPublishedArticleWhere(): Prisma.ArticleWhereInput {
+  return { status: ContentStatus.PUBLISHED };
+}
+
+/**
+ * Public Page detail/direct-link visibility.
+ * UNLISTED pages are intentionally readable by direct URL but must not be
+ * exposed in indexes/sitemaps.
+ */
+export function getPublicPageDetailWhere(): Prisma.PageWhereInput {
+  return {
+    status: "PUBLISHED",
+    visibility: { in: ["PUBLIC", "UNLISTED"] },
+  };
+}
+
+/** Public Page discovery/index visibility (sitemaps, listings). */
+export function getPublicPageIndexWhere(): Prisma.PageWhereInput {
+  return {
+    status: "PUBLISHED",
+    visibility: "PUBLIC",
+  };
+}
+
+/**
  * Публичная выдача событий: «живые» карточки = не черновик, не первичная модерация, не правки/отклонено/удалено.
  * Используем `notIn`, а не `in: [PUBLISHED, PENDING_UPDATE]`: иначе часть рантаймов Prisma/Turbopack
  * валидирует массив `in` против устаревшего списка enum и падает на PENDING_UPDATE даже при актуальной БД.
+ *
+ * Важно: здесь намеренно сохраняется текущая семантика PENDING_UPDATE как
+ * публичного live-состояния. Она будет убрана только при миграции Event на
+ * revision-based publication lifecycle, а не в visibility-foundation.
  */
 function publicListingActivityStatusWhere(): Prisma.ActivityWhereInput {
   return {
