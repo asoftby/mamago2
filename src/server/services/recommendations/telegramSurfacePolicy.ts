@@ -19,6 +19,7 @@ export type TelegramRecommendationPolicyConfig = {
 };
 
 export type TelegramSurfacePolicyResult = {
+  /** Composed candidates, even when no-send suppresses delivery. */
   selected: RankedPlanSuggestion[];
   noSendReason: "NO_CANDIDATES" | "MIN_RESULT_COUNT" | null;
   filtered: {
@@ -96,6 +97,8 @@ export function normalizeTelegramRecommendationPolicyConfig(
 /**
  * Applies Telegram-only composition after the shared ranked result.
  * The input order is preserved; this function never re-scores candidates.
+ * `selected` remains observable when the minimum-result no-send gate trips;
+ * delivery callers must require `noSendReason === null` before sending.
  */
 export function applyTelegramSurfacePolicy(input: {
   ranked: RankedPlanSuggestion[];
@@ -139,7 +142,7 @@ export function applyTelegramSurfacePolicy(input: {
         : null;
 
   return {
-    selected: noSendReason ? [] : selected,
+    selected,
     noSendReason,
     filtered: {
       belowMinimumScore,
