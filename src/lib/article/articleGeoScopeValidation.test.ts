@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { validateArticleGeoScope } from "./articleGeoScopeValidation";
+import {
+  ARTICLE_GEO_SCOPE_MESSAGES,
+  assertArticleGeoScope,
+  validateArticleGeoScope,
+} from "./articleGeoScopeValidation";
 
 // ── CITY ──────────────────────────────────────────────────────────────────
 
@@ -14,6 +18,12 @@ assert.equal(
   validateArticleGeoScope({ geoScope: "CITY", cityId: null, regionId: null, strict: true }).ok,
   false,
   "CITY without cityId → FAIL",
+);
+
+assert.throws(
+  () => assertArticleGeoScope({ geoScope: "CITY", cityId: null, regionId: null, strict: false }),
+  new Error(ARTICLE_GEO_SCOPE_MESSAGES.cityRequired),
+  "a chosen CITY scope is invalid even for draft until a city is selected",
 );
 
 assert.equal(
@@ -34,6 +44,12 @@ assert.equal(
   validateArticleGeoScope({ geoScope: "REGION", cityId: null, regionId: null, strict: true }).ok,
   false,
   "REGION without regionId → FAIL",
+);
+
+assert.throws(
+  () => assertArticleGeoScope({ geoScope: "REGION", cityId: null, regionId: null, strict: false }),
+  new Error(ARTICLE_GEO_SCOPE_MESSAGES.regionRequired),
+  "a chosen REGION scope is invalid even for draft until a region is selected",
 );
 
 assert.equal(

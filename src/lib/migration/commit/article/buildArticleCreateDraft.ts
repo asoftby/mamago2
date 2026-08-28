@@ -59,7 +59,7 @@ export interface ArticleCreateDraft {
   excerpt: string | null;
   /** Raw WP date string, unconverted — turning this into a real `Date`/ISO value is a writer-stage concern, not this pure builder's. */
   publishedAt: string;
-  status: "PENDING";
+  status: "DRAFT";
   seoTitle: string | null;
   seoDescription: string | null;
   seoCanonicalUrl: string | null;
@@ -137,7 +137,10 @@ export function buildArticleCreateDraft(input: BuildArticleCreateDraftInput): Ar
     slug: candidate.slug?.trim() || null,
     excerpt: candidate.excerpt?.trim() || null,
     publishedAt: candidate.publishedAt,
-    status: "PENDING",
+    // Imported content has no evidence-backed primary geography yet. Keep it
+    // editable, but do not put it into the publish-like moderation state until
+    // an editor explicitly resolves geography.
+    status: "DRAFT",
     seoTitle: candidate.seo.title,
     seoDescription: candidate.seo.description,
     seoCanonicalUrl: candidate.seo.canonicalUrl,
