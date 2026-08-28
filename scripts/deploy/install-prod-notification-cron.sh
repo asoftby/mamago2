@@ -20,7 +20,7 @@ fi
 
 install -m 0755 "$RUNNER_SOURCE" "$RUNNER_TARGET"
 touch "$LOG_FILE"
-chmod 0644 "$LOG_FILE"
+chmod 0600 "$LOG_FILE"
 
 cat > "$CRON_FILE" <<'EOF'
 SHELL=/bin/bash
@@ -39,6 +39,7 @@ cat > "$LOGROTATE_FILE" <<'EOF'
     missingok
     notifempty
     copytruncate
+    create 0600 root root
 }
 EOF
 chmod 0644 "$LOGROTATE_FILE"
