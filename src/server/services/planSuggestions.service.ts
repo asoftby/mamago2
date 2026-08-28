@@ -130,6 +130,12 @@ export type PlanSuggestionsInput = {
   /** Опциональный диапазон для surface horizon. Игнорируется, если задан `date`. */
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * Read-only diagnostics/composition may need the complete ranked set before
+   * applying a surface policy. Normal product calls stay bounded to avoid an
+   * unbounded query. This does not change scoring or signal interpretation.
+   */
+  exhaustiveCandidatePool?: boolean;
 };
 
 /**
@@ -141,6 +147,7 @@ export async function rankPlanSuggestionsForCity(
   input: PlanSuggestionsInput,
 ): Promise<PlanSuggestionRankedBatch> {
   const take = input.take ?? 6;
+  const exhaustiveCandidatePool = input.exhaustiveCandidatePool === true;
   const ageRangeValues = (input.ageRangeValues ?? []).filter(Boolean);
   const city = await findCityBySlug(input.citySlug.toLowerCase());
   if (!city) {
@@ -219,7 +226,9 @@ export async function rankPlanSuggestionsForCity(
     };
     return (await prisma.activity.findMany({
       where,
-      take: Math.min(80, Math.max(take * 5, 24)),
+      ...(exhaustiveCandidatePool
+        ? {}
+        : { take: Math.min(80, Math.max(take * 5, 24)) }),
       orderBy: [{ nextOccurrenceAt: "desc" }, { createdAt: "desc" }],
       select: {
         ...suggestionActivitySelect,
@@ -249,7 +258,8 @@ export async function rankPlanSuggestionsForCity(
   });
 
   const ageFilterApplied = ageRangeValues.length > 0 && !ageFallbackUsed;
-  const suggestions = rows.slice(0, take).map((row) => {
+  const rankedRows = exhaustiveCandidatePool ? rows : rows.slice(0, take);
+  const suggestions = rankedRows.map((row) => {
     const {
       nextOccurrenceAt,
       createdAt,
