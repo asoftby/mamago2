@@ -55,6 +55,31 @@ assert.match(resetServer, /EMAIL_DISABLED/);
 assert.match(resetServer, /EMAIL_NOT_CONFIGURED/);
 assert.match(resetServer, /EMAIL_DEBUG_REDIRECT_ACTIVE_IN_PROD/);
 assert.match(resetServer, /emailService\.getHealth\(\)/);
+assert.match(
+  resetServer,
+  /account\.status === "PENDING_ACTIVATION"/,
+  "migrated pending accounts must be eligible for self-service password reset",
+);
+assert.match(
+  resetServer,
+  /const activatesMigratedAccount = user\.status === "PENDING_ACTIVATION"/,
+  "successful reset must detect migrated pending accounts",
+);
+assert.match(
+  resetServer,
+  /status: "ACTIVE"/,
+  "successful reset must activate a migrated pending account",
+);
+assert.match(
+  resetServer,
+  /purpose: "MIGRATED_ACCOUNT_ACTIVATION"/,
+  "successful reset must invalidate stale migrated-account activation tokens",
+);
+assert.doesNotMatch(
+  resetServer,
+  /Pending migrated users must activate instead of establishing a password via reset/,
+  "password reset must no longer block migrated pending accounts",
+);
 
 const verificationServer = read("src/server/auth/email-verification.ts");
 assert.match(
