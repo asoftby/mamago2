@@ -7,6 +7,7 @@ import {
   replaceActivitySessionsFromScheduleJson,
 } from "@/lib/business/syncEventActivitySessions";
 import { formatRuSessionHero, formatRuSessionSlot } from "@/lib/event/eventPageFormat";
+import { buildEventSessionTimezoneRepairPlan } from "@/lib/event/eventSessionTimezoneRepair";
 import { formatHHMM } from "@/lib/formatters/date";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 
@@ -58,4 +59,44 @@ test("public event time stays 12:00 regardless of UTC instant representation", (
   assert.equal(formatHHMM(startsAt), "12:00");
   assert.equal(formatRuSessionSlot(startsAt), "сб, 29 авг. · 12:00");
   assert.equal(formatRuSessionHero(startsAt), "сб, 29 авг. 2026 · 12:00");
+});
+
+test("repair recognizes only the exact legacy UTC wall-clock bug", () => {
+  const scheduleJson = {
+    dates: ["2026-08-29", "2026-08-30"],
+    startTime: "12:00",
+  };
+
+  const plan = buildEventSessionTimezoneRepairPlan(scheduleJson, [
+    { startsAt: new Date("2026-08-29T12:00:00.000Z") },
+    { startsAt: new Date("2026-08-30T12:00:00.000Z") },
+  ]);
+
+  assert.equal(plan.kind, "legacy-utc-wall-clock");
+  assert.deepEqual(
+    plan.entries.map((entry) => entry.desiredStartsAt.toISOString()),
+    ["2026-08-29T09:00:00.000Z", "2026-08-30T09:00:00.000Z"],
+  );
+});
+
+test("repair refuses partial schedule/session mismatches", () => {
+  const scheduleJson = {
+    dates: ["2026-08-29", "2026-08-30"],
+    startTime: "12:00",
+  };
+
+  const plan = buildEventSessionTimezoneRepairPlan(scheduleJson, [
+    { startsAt: new Date("2026-08-30T12:00:00.000Z") },
+  ]);
+
+  assert.equal(plan.kind, "unrelated-mismatch");
+});
+
+test("repair refuses stray sessions when schedule has no dates", () => {
+  const plan = buildEventSessionTimezoneRepairPlan(
+    { dates: [], startTime: "10:00" },
+    [{ startsAt: new Date("2026-08-25T00:16:00.000Z") }],
+  );
+
+  assert.equal(plan.kind, "unrelated-mismatch");
 });
