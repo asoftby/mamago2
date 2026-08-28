@@ -195,7 +195,36 @@ export async function updateArticleSlug(
 }
 
 /**
- * Find an article by slug within a city scope.
+ * Canonical public lookup predicates for an article slug.
+ *
+ * These are deliberately stricter than slug-allocation checks above: drafts,
+ * pending/rejected revisions and archived articles may reserve a slug, but
+ * must never resolve through a public route or a historical redirect.
+ */
+export function articlePublicSlugWhere(slug: string, cityId: string | null) {
+  return {
+    slug,
+    cityId: cityId ?? null,
+    status: "PUBLISHED" as const,
+  };
+}
+
+export function articlePublicSlugHistoryWhere(slug: string, cityId: string | null) {
+  return {
+    slug,
+    cityId: cityId ?? null,
+    article: {
+      status: "PUBLISHED" as const,
+    },
+  };
+}
+
+/**
+ * Find a publicly visible article by slug within a city scope.
+ *
+ * Only PUBLISHED articles may resolve either through their current slug or
+ * through ArticleSlugHistory. This keeps public route, metadata and JSON-LD
+ * fallbacks from exposing unpublished article content.
  *
  * @param slug    The slug to look up.
  * @param cityId  City scope (null = REGION/COUNTRY scope).
@@ -205,13 +234,13 @@ export async function findArticleBySlug(
   cityId: string | null,
 ): Promise<{ articleId: string; isRedirect: boolean } | null> {
   const current = await prisma.article.findFirst({
-    where: { slug, cityId: cityId ?? null },
+    where: articlePublicSlugWhere(slug, cityId),
     select: { id: true },
   });
   if (current) return { articleId: current.id, isRedirect: false };
 
   const hist = await prisma.articleSlugHistory.findFirst({
-    where: { slug, cityId: cityId ?? null },
+    where: articlePublicSlugHistoryWhere(slug, cityId),
     select: { articleId: true },
   });
   if (hist) return { articleId: hist.articleId, isRedirect: true };
