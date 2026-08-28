@@ -9,7 +9,6 @@ import {
   PASSWORD_RESET_TOKEN_TTL_MS,
 } from "@/lib/auth/passwordResetPolicy";
 import { passwordSchema } from "@/lib/auth/passwordPolicy";
-import { isSessionEligibleAccount } from "@/lib/auth/accountEligibility";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { isProductionAppEnv } from "@/lib/config/productionEnvGuard";
 import { emailService } from "@/features/email/server/email-service";
@@ -26,6 +25,18 @@ const resetPasswordSchema = z.object({
 
 function getPasswordResetRateLimitFingerprint(email: string): string {
   return hashToken(email);
+}
+
+function isPasswordResetEligibleAccount(account: {
+  status: string;
+  deletedAt: Date | null;
+}): boolean {
+  return (
+    account.deletedAt === null &&
+    (account.status === "ACTIVE" ||
+      account.status === "LIMITED" ||
+      account.status === "PENDING_ACTIVATION")
+  );
 }
 
 async function createPasswordResetEmailDeliveryAudit(params: {
@@ -93,6 +104,8 @@ async function finishPasswordResetEmailDeliveryAudit(params: {
  *
  * The public flow intentionally behaves the same for existing, missing and
  * rate-limited accounts so an attacker cannot enumerate registered emails.
+ * Migrated PENDING_ACTIVATION accounts are allowed to use the same self-service
+ * recovery flow; successful password creation activates the account.
  */
 export async function requestPasswordReset(email: string): Promise<void> {
   const validated = requestResetSchema.parse({ email });
@@ -124,9 +137,10 @@ export async function requestPasswordReset(email: string): Promise<void> {
     select: { id: true, status: true, deletedAt: true },
   });
 
-  // Unknown and ineligible accounts are indistinguishable publicly. Pending
-  // migrated users must activate instead of establishing a password via reset.
-  if (!user || !isSessionEligibleAccount(user)) {
+  // Unknown, deleted, suspended and otherwise ineligible accounts are
+  // indistinguishable publicly. PENDING_ACTIVATION is intentionally eligible
+  // so migrated users can recover access without a separate bulk activation.
+  if (!user || !isPasswordResetEligibleAccount(user)) {
     return;
   }
 
@@ -240,7 +254,7 @@ export async function isPasswordResetTokenValid(token: string): Promise<boolean>
     },
   });
 
-  return Boolean(user && isSessionEligibleAccount(user));
+  return Boolean(user && isPasswordResetEligibleAccount(user));
 }
 
 /**
@@ -270,18 +284,22 @@ export async function resetPassword(
           id: true,
           status: true,
           deletedAt: true,
+          emailVerifiedAt: true,
           resetTokenExpires: true,
         },
       });
+      const now = new Date();
 
       if (
         !user ||
-        !isSessionEligibleAccount(user) ||
+        !isPasswordResetEligibleAccount(user) ||
         !user.resetTokenExpires ||
-        user.resetTokenExpires < new Date()
+        user.resetTokenExpires < now
       ) {
         throw new AuthError("Invalid or expired reset token", "INVALID_TOKEN");
       }
+
+      const activatesMigratedAccount = user.status === "PENDING_ACTIVATION";
 
       await tx.user.update({
         where: { id: user.id },
@@ -289,8 +307,28 @@ export async function resetPassword(
           passwordHash,
           resetToken: null,
           resetTokenExpires: null,
+          ...(activatesMigratedAccount
+            ? {
+                status: "ACTIVE",
+                emailVerifiedAt: user.emailVerifiedAt ?? now,
+              }
+            : {}),
         },
       });
+
+      if (activatesMigratedAccount) {
+        // Any older activation links must stop working once the user has
+        // established access through password recovery.
+        await tx.userActionToken.updateMany({
+          where: {
+            userId: user.id,
+            purpose: "MIGRATED_ACCOUNT_ACTIVATION",
+            usedAt: null,
+            invalidatedAt: null,
+          },
+          data: { invalidatedAt: now },
+        });
+      }
 
       // A password reset is a security boundary: all previously issued sessions
       // must stop working, including sessions on other devices.

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createSession, validateSession } from "./session";
 import { hashToken } from "./tokenHash";
 import { requestPasswordReset, resetPassword } from "@/server/auth/password-reset";
+import { issueUserActionToken } from "@/server/auth/userActionToken.service";
 import { checkUserStatus } from "@/server/services/userModeration.service";
 import { unbanUser } from "@/server/services/userModeration.service";
 
@@ -89,11 +90,21 @@ async function main(): Promise<void> {
       "PENDING_ACTIVATION",
     );
 
+    // A migrated account can initiate the same self-service password reset as
+    // an active account. requestPasswordReset stores only the token hash, so
+    // assert issuance here and then install a known raw token for completion.
     await requestPasswordReset(`pending-${marker}`);
-    assert.equal(
-      (await prisma.user.findUnique({ where: { id: pending.id } }))?.resetToken,
-      null,
-    );
+    const pendingAfterRequest = await prisma.user.findUnique({
+      where: { id: pending.id },
+      select: { resetToken: true, resetTokenExpires: true },
+    });
+    assert.ok(pendingAfterRequest?.resetToken);
+    assert.ok(pendingAfterRequest?.resetTokenExpires);
+
+    const activationToken = await issueUserActionToken({
+      userId: pending.id,
+      purpose: "MIGRATED_ACCOUNT_ACTIVATION",
+    });
     const pendingResetRaw = randomUUID();
     await prisma.user.update({
       where: { id: pending.id },
@@ -102,14 +113,31 @@ async function main(): Promise<void> {
         resetTokenExpires: new Date(Date.now() + 60_000),
       },
     });
-    await assert.rejects(
-      resetPassword(pendingResetRaw, "Foundation-reset-123"),
-      /Invalid or expired reset token/,
-    );
-    assert.equal(
-      (await prisma.user.findUnique({ where: { id: pending.id } }))?.passwordHash,
-      null,
-    );
+
+    await resetPassword(pendingResetRaw, "Foundation-reset-123");
+    const pendingAfterReset = await prisma.user.findUnique({
+      where: { id: pending.id },
+      select: {
+        status: true,
+        passwordHash: true,
+        emailVerifiedAt: true,
+        resetToken: true,
+        resetTokenExpires: true,
+      },
+    });
+    assert.equal(pendingAfterReset?.status, "ACTIVE");
+    assert.ok(pendingAfterReset?.passwordHash);
+    assert.ok(pendingAfterReset?.emailVerifiedAt);
+    assert.equal(pendingAfterReset?.resetToken, null);
+    assert.equal(pendingAfterReset?.resetTokenExpires, null);
+
+    const staleActivationToken = await prisma.userActionToken.findUnique({
+      where: { id: activationToken.id },
+      select: { invalidatedAt: true, usedAt: true },
+    });
+    assert.ok(staleActivationToken?.invalidatedAt);
+    assert.equal(staleActivationToken?.usedAt, null);
+    assert.equal((await checkUserStatus(pending.id)).isAllowed, true);
 
     const token = await createSession(active.id);
     assert.equal((await validateSession(token))?.id, active.id);
@@ -152,7 +180,6 @@ async function main(): Promise<void> {
       data: { status: "SUSPENDED", suspendedUntil: new Date(Date.now() + 60_000) },
     });
     assert.equal(await validateSession(suspendedToken), null);
-
   } finally {
     const ids = [
       activeUserId,
