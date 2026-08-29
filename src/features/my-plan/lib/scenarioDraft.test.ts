@@ -18,11 +18,13 @@ const item = (planItemId: string, activityId: string, start: number, end: number
   planItemId, activityId, activitySessionId: null, title: activityId, coverImageUrl: null, href: null,
   startsAt: iso(start), endsAt: iso(end), durationMinutes: (end - start) * 60,
   schedulingKind: "SLOT", canReschedule: false,
+  priceLabel: null, addressLabel: null, isBooked: false,
 });
 const candidate = (activityId: string, start: number, end: number, kind: "SLOT" | "WINDOW" | "UNKNOWN" = "SLOT"): ScenarioReplacementCandidate => ({
   activityId, activitySessionId: null, title: activityId, coverImageUrl: null, href: null,
   startsAt: iso(start), endsAt: iso(end), durationMinutes: (end - start) * 60,
   schedulingKind: kind, canReschedule: false,
+  priceLabel: null, addressLabel: null, isBooked: false,
 });
 
 const original = [item("a", "A", 9, 14), item("b", "B", 10, 11), item("c", "C", 12, 13)];
