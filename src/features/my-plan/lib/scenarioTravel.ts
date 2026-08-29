@@ -33,7 +33,7 @@ export type ScenarioGap = {
    * known coordinates — otherwise null (never fabricated). */
   travelMinutes: number | null;
   /** Free minutes left after the estimated travel time, only computable
-   * when both the previous item's end and the next item's start are known. */
+   * when both timestamps and a real travel estimate are available. */
   bufferMinutes: number | null;
   /** True when the buffer is thin enough to flag visually. */
   tight: boolean;
@@ -53,11 +53,11 @@ export function computeScenarioGap(input: {
       : null;
 
   let bufferMinutes: number | null = null;
-  if (input.previousEndsAt && input.nextStartsAt) {
+  if (travelMinutes != null && input.previousEndsAt && input.nextStartsAt) {
     const totalGapMinutes = Math.round(
       (input.nextStartsAt.getTime() - input.previousEndsAt.getTime()) / 60_000,
     );
-    bufferMinutes = totalGapMinutes - (travelMinutes ?? 0);
+    bufferMinutes = totalGapMinutes - travelMinutes;
   }
 
   return {
