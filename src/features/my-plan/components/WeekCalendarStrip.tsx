@@ -195,14 +195,17 @@ export function WeekCalendarStrip({
                     <span
                       aria-label={plannedLabel}
                       title={plannedLabel}
-                      className={cn(
-                        "absolute left-1/2 bottom-0.5 z-10 -translate-x-1/2 inline-flex items-center justify-center",
-                        "h-1.5 w-1.5 rounded-full",
-                        selected
-                          ? "bg-white text-[#141210]"
-                          : "bg-[#EF8759] text-white",
-                      )}
+                      className="absolute left-1/2 bottom-0.5 z-10 -translate-x-1/2 inline-flex items-center gap-[3px]"
                     >
+                      {Array.from({ length: Math.min(plannedCount, 3) }).map((_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            "h-1 w-1 rounded-full",
+                            selected ? "bg-white" : "bg-[#EF8759]",
+                          )}
+                        />
+                      ))}
                     </span>
                   ) : null}
                   {/* Today dot */}
