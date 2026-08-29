@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  conflictsForScenarioItems,
   effectiveScenarioItems,
   isScenarioDraftDirty,
   restoreScenarioDraft,
+  scenarioConflictAnchorId,
   scenarioDraftReducer,
   scenarioDraftStorageKey,
   serializeScenarioDraft,
@@ -15,9 +18,9 @@ import {
   type ScenarioDraftState,
   type ScenarioReplacementCandidate,
 } from "@/features/my-plan/lib/scenarioDraft";
-import { conflictsForScenarioItems } from "@/features/my-plan/lib/scenarioDraft";
+import { deriveEndOfDay } from "@/features/my-plan/lib/scenarioProjection";
 import type { ScenarioGap } from "@/features/my-plan/lib/scenarioTravel";
-import { IcPlus } from "@/features/my-plan/components/scenarioIcons";
+import { IcAlert, IcPlus } from "@/features/my-plan/components/scenarioIcons";
 import {
   ScenarioCard,
   ScenarioConflictCluster,
@@ -40,8 +43,8 @@ type Props = CanonicalResponse & {
   date: string;
   /** Estimated travel gap before each item, keyed by that item's
    * planItemId — precomputed server-side from the canonical (pre-edit)
-   * order; hidden once that boundary is touched by an edit (see the
-   * `gapUnedited` guard below), since it would otherwise go stale. */
+   * order; hidden once that boundary is touched by an edit and while a
+   * just-saved canonical plan is refreshing from the server. */
   gaps: Record<string, ScenarioGap>;
   endOfDayLabel: string | null;
 };
@@ -55,7 +58,15 @@ function initialState(items: ScenarioClientItem[], acceptedConflictKeys: string[
   };
 }
 
+const endOfDayFormatter = new Intl.DateTimeFormat("ru-RU", {
+  timeZone: "Europe/Minsk",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 export function ScenarioDraftEditor(props: Props) {
+  const router = useRouter();
   const [state, dispatch] = useReducer(
     scenarioDraftReducer,
     initialState(props.items, props.acceptedConflictKeys),
@@ -67,11 +78,25 @@ export function ScenarioDraftEditor(props: Props) {
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [gapsInvalidated, setGapsInvalidated] = useState(false);
   const requestedFor = useRef<string | null>(null);
   const saveKeyRef = useRef<{ signature: string; key: string } | null>(null);
 
   const items = useMemo(() => effectiveScenarioItems(state), [state]);
   const unresolved = useMemo(() => unresolvedScenarioConflicts(state), [state]);
+  const endOfDayLabel = useMemo(() => {
+    const timed = items.flatMap((item) =>
+      item.startsAt
+        ? [{
+            id: item.planItemId,
+            effectiveStartsAt: new Date(item.startsAt),
+            durationMinutes: item.durationMinutes,
+          }]
+        : [],
+    ).sort((a, b) => a.effectiveStartsAt.getTime() - b.effectiveStartsAt.getTime());
+    const endOfDay = deriveEndOfDay(timed);
+    return endOfDay ? endOfDayFormatter.format(endOfDay) : null;
+  }, [items]);
   const dirty = isScenarioDraftDirty(state);
   const storageKey = scenarioDraftStorageKey(props.date, baseFingerprint);
 
@@ -94,6 +119,10 @@ export function ScenarioDraftEditor(props: Props) {
     if (dirty) sessionStorage.setItem(storageKey, serializeScenarioDraft(state));
     else sessionStorage.removeItem(storageKey);
   }, [dirty, state, storageKey]);
+
+  useEffect(() => {
+    if (props.fingerprint === baseFingerprint) setGapsInvalidated(false);
+  }, [baseFingerprint, props.fingerprint]);
 
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
@@ -167,9 +196,11 @@ export function ScenarioDraftEditor(props: Props) {
         return;
       }
       sessionStorage.removeItem(storageKey);
+      setGapsInvalidated(true);
       setBaseFingerprint(data.fingerprint);
       dispatch({ type: "resetCanonical", items: data.items, acceptedConflictKeys: data.acceptedConflictKeys });
       saveKeyRef.current = null;
+      router.refresh();
     } catch {
       setSaveError("Не удалось сохранить план.");
     } finally {
@@ -216,13 +247,25 @@ export function ScenarioDraftEditor(props: Props) {
         </div>
       ) : null}
 
+      {unresolved.length > 0 ? (
+        <div className={styles.sum}>
+          <a href={`#${scenarioConflictAnchorId(unresolved[0]!.key)}`} className={`${styles.st} ${styles.stWarn}`}>
+            <IcAlert />
+            {unresolved.length} {unresolved.length === 1 ? "пересечение" : "пересечения"}
+          </a>
+        </div>
+      ) : null}
+
       <div className={styles.tl}>
         {state.original.map((originalItem, index) => {
           const change = state.changes[originalItem.planItemId];
           const previousOriginal = index > 0 ? state.original[index - 1] : null;
           const gap = props.gaps[originalItem.planItemId];
           const gapUnedited =
-            gap != null && !change && (previousOriginal == null || !state.changes[previousOriginal.planItemId]);
+            !gapsInvalidated &&
+            gap != null &&
+            !change &&
+            (previousOriginal == null || !state.changes[previousOriginal.planItemId]);
 
           if (change?.state === "REMOVED") {
             return (
@@ -316,7 +359,7 @@ export function ScenarioDraftEditor(props: Props) {
         </Link>
       </div>
 
-      {props.endOfDayLabel ? <p className={styles.footNote}>День завершится около {props.endOfDayLabel}</p> : null}
+      {endOfDayLabel ? <p className={styles.footNote}>День завершится около {endOfDayLabel}</p> : null}
 
       {dirty ? (
         <div className={styles.bar}>
