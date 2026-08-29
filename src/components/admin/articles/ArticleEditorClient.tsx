@@ -77,6 +77,7 @@ function applySnapshot(setters: {
   setAuthorLabel: (v: string) => void;
   setCityContext: (v: string) => void;
   setCategoryId: (v: string | null) => void;
+  setAdditionalCategoryIds: (v: string[]) => void;
   setTagIds: (v: string[]) => void;
   setGeoScope: (v: GeoScope | null) => void;
   setCityId: (v: string | null) => void;
@@ -98,6 +99,7 @@ function applySnapshot(setters: {
   setters.setAuthorLabel(snap.authorLabel ?? "");
   setters.setCityContext(snap.cityContext ?? "");
   setters.setCategoryId(snap.categoryId ?? null);
+  setters.setAdditionalCategoryIds(snap.additionalCategoryIds ?? []);
   setters.setTagIds(snap.tagIds);
   setters.setGeoScope(snap.geoScope ?? null);
   setters.setCityId(snap.cityId ?? null);
@@ -146,6 +148,7 @@ export function ArticleEditorClient({
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial.categoryId ?? null);
+  const [additionalCategoryIds, setAdditionalCategoryIds] = useState<string[]>(initial.additionalCategoryIds ?? []);
   const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
   const [geoScope, setGeoScope] = useState<GeoScope | null>(initial.geoScope ?? null);
   const [cityId, setCityId] = useState<string | null>(initial.cityId ?? null);
@@ -196,6 +199,7 @@ export function ArticleEditorClient({
         authorLabel,
         cityContext,
         categoryId,
+        additionalCategoryIds,
         tagIds,
         geoScope,
         cityId,
@@ -217,6 +221,7 @@ export function ArticleEditorClient({
       authorLabel,
       cityContext,
       categoryId,
+      additionalCategoryIds,
       tagIds,
       geoScope,
       cityId,
@@ -256,7 +261,8 @@ export function ArticleEditorClient({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch("/api/admin/articles/editor-options");
+      const selectedCategoryIds = [initial.categoryId, ...(initial.additionalCategoryIds ?? [])].filter(Boolean).join(",");
+      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}`);
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
@@ -284,7 +290,7 @@ export function ArticleEditorClient({
     return () => {
       cancelled = true;
     };
-  }, [initial.tagIds]);
+  }, [initial.categoryId, initial.additionalCategoryIds, initial.tagIds]);
 
   const {
     previewSlug,
@@ -332,6 +338,7 @@ export function ArticleEditorClient({
       setAuthorLabel,
       setCityContext,
       setCategoryId,
+      setAdditionalCategoryIds,
       setTagIds,
       setGeoScope,
       setCityId,
@@ -395,6 +402,7 @@ export function ArticleEditorClient({
       authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
       categoryId,
+      additionalCategoryIds,
       tagIds,
       geoScope,
       cityId,
@@ -419,6 +427,7 @@ export function ArticleEditorClient({
       authorUserId,
       cityContext,
       categoryId,
+      additionalCategoryIds,
       tagIds,
       geoScope,
       cityId,
@@ -823,7 +832,7 @@ export function ArticleEditorClient({
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="article-category">Категория</Label>
+            <Label htmlFor="article-category">Основная категория</Label>
             <p className="text-xs text-muted-foreground">
               Категории журнала настраиваются в разделе{" "}
               <Link href="/admin/taxonomy/categories?type=ARTICLE" className="underline underline-offset-2">
@@ -834,7 +843,11 @@ export function ArticleEditorClient({
             {hydrated ? (
               <Select
                 value={categoryId ?? "__none__"}
-                onValueChange={(v) => setCategoryId(v === "__none__" ? null : v)}
+                onValueChange={(v) => {
+                  const next = v === "__none__" ? null : v;
+                  setCategoryId(next);
+                  if (next) setAdditionalCategoryIds((ids) => ids.filter((id) => id !== next));
+                }}
               >
                 <SelectTrigger id="article-category" className="w-full">
                   <SelectValue placeholder="Выберите категорию" />
@@ -857,6 +870,23 @@ export function ArticleEditorClient({
                 …
               </div>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="article-additional-categories">Дополнительные категории</Label>
+            <p className="text-xs text-muted-foreground">
+              Статья появится в подборках этих категорий. Основная категория задаёт рубрику статьи и SEO.
+            </p>
+            <div id="article-additional-categories">
+              <CardMultiSelect
+                placeholder="Выберите дополнительные категории"
+                values={additionalCategoryIds}
+                onChange={(ids) => setAdditionalCategoryIds(ids.filter((id) => id !== categoryId))}
+                options={categories
+                  .filter((category) => category.id !== categoryId)
+                  .map((category) => ({ value: category.id, label: category.label }))}
+                allowClear
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="article-discovery-tags">Теги</Label>
