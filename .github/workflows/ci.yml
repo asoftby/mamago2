@@ -52,6 +52,7 @@ jobs:
       - name: Telegram plan notification regressions
         run: |
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
+          pnpm exec tsx src/lib/my-plan/planItemTimezoneRepair.test.ts
           bash -n scripts/deploy/run-prod-notification-jobs.sh
           bash -n scripts/deploy/install-prod-notification-cron.sh
 
