@@ -5,7 +5,9 @@ import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 type QueryCb = (args: unknown) => Promise<unknown>;
 
 function fireAndForget(p: Promise<void>) {
-  void p.catch(() => {});
+  void p.catch((error) => {
+    console.error("[prisma-search-extension:indexing]", error);
+  });
 }
 
 function getSingleId(where: unknown): string | undefined {
