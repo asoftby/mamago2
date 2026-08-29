@@ -22,11 +22,10 @@ import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivity
 import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
 import { computeScenarioGap, type ScenarioCoordinates } from "@/features/my-plan/lib/scenarioTravel";
 import { detectScenarioConflicts } from "@/features/my-plan/lib/detectScenarioConflicts";
-import { scenarioConflictAnchorId } from "@/features/my-plan/lib/scenarioDraft";
 import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
 import { ScenarioDraftEditor } from "@/features/my-plan/components/ScenarioDraftEditor";
-import { IcBack, IcMapPin, IcClock, IcCalendar, IcAlert } from "@/features/my-plan/components/scenarioIcons";
+import { IcBack, IcMapPin, IcClock, IcCalendar } from "@/features/my-plan/components/scenarioIcons";
 import { refreshDayScenarioAction } from "./actions";
 import styles from "@/features/my-plan/components/scenarioDay.module.css";
 
@@ -162,11 +161,6 @@ export default async function DayScenarioPage({ params }: PageProps) {
   const conflicts = detectScenarioConflicts(
     sorted.map((item) => ({ id: item.id, contentId: item.activityId, scheduling: item.scheduling })),
   );
-  const unresolvedConflicts = conflicts.filter(
-    (conflict) => !existingScenario!.acceptedConflictKeys.includes(conflict.key),
-  );
-  const unresolvedCount = unresolvedConflicts.length;
-  const firstUnresolvedKey = unresolvedConflicts[0]?.key ?? null;
 
   const clientItems = sorted.map((item) => ({
     planItemId: item.id,
@@ -190,7 +184,7 @@ export default async function DayScenarioPage({ params }: PageProps) {
 
   // Estimated travel-time gaps between originally-adjacent items — computed
   // once from the canonical (pre-edit) order and shown only while that pair
-  // stays unedited; see ScenarioDraftEditor for why edits drop stale gaps.
+  // stays unedited; the client refreshes these values after a successful save.
   const gaps: Record<string, ReturnType<typeof computeScenarioGap>> = {};
   for (let i = 1; i < sorted.length; i += 1) {
     const previous = sorted[i - 1]!;
@@ -248,12 +242,6 @@ export default async function DayScenarioPage({ params }: PageProps) {
               </b>
               {flexibleCount > 0 ? ` · ${flexibleCount} гибко` : ""}
             </span>
-            {unresolvedCount > 0 ? (
-              <a href={firstUnresolvedKey ? `#${scenarioConflictAnchorId(firstUnresolvedKey)}` : undefined} className={`${styles.st} ${styles.stWarn}`}>
-                <IcAlert />
-                {unresolvedCount} {unresolvedCount === 1 ? "пересечение" : "пересечения"}
-              </a>
-            ) : null}
           </div>
         </div>
 
