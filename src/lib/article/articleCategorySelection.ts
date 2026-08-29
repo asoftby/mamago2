@@ -9,4 +9,3 @@ export function assertArticleCategorySelectionShape(
     throw new Error("Основная категория не может быть дополнительной");
   }
 }
-

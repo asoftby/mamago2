@@ -5,7 +5,6 @@ import { assertArticleCategorySelectionShape } from "./articleCategorySelection"
 test("accepts ordered unique additional categories", () => {
   assert.doesNotThrow(() => assertArticleCategorySelectionShape("primary", ["second", "third"]));
 });
-
 test("accepts a primary-only article", () => {
   assert.doesNotThrow(() => assertArticleCategorySelectionShape("primary", []));
 });
@@ -23,4 +22,3 @@ test("rejects duplicate additional categories", () => {
     /не должны повторяться/,
   );
 });
-
