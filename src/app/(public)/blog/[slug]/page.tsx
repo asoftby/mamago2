@@ -326,6 +326,9 @@ export default async function ArticlePage({
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const schemaArticle = await getArticleSchemaData(mvp.id);
+    if (!schemaArticle) {
+      notFound();
+    }
     const publicBase = getCanonicalPublicAppUrl();
     const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
     /** Header geo context: REGION → article's region, COUNTRY (incl. Breaking News) → «Беларусь». Never the URL-fallback city. */
