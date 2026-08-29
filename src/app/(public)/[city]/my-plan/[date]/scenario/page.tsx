@@ -1,29 +1,33 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth/server";
-import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
-import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import {
   ensureDayScenario,
   getDayScenario,
   computePlanFingerprint,
   listPlanItemsByDateForScenario,
   listScenarioItemOverrides,
+  listConfirmedBookingActivityIds,
 } from "@/server/services/dayScenario.service";
 import {
   resolveScenarioItemTime,
   sortScenarioItemsByEffectiveTime,
   deriveEndOfDay,
 } from "@/features/my-plan/lib/scenarioProjection";
-import { resolveActivityAddress } from "@/features/my-plan/lib/formatActivityAddress";
+import { getCurrentUser } from "@/lib/auth/server";
+import { redirectToLogin } from "@/lib/auth/requireAuthRedirect";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { publicActivityPath } from "@/lib/business/eventPublicLink";
+import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
+import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
+import { computeScenarioGap, type ScenarioCoordinates } from "@/features/my-plan/lib/scenarioTravel";
 import { detectScenarioConflicts } from "@/features/my-plan/lib/detectScenarioConflicts";
 import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
 import { ScenarioDraftEditor } from "@/features/my-plan/components/ScenarioDraftEditor";
+import { IcBack, IcMapPin, IcClock, IcCalendar } from "@/features/my-plan/components/scenarioIcons";
 import { refreshDayScenarioAction } from "./actions";
+import styles from "@/features/my-plan/components/scenarioDay.module.css";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -35,21 +39,32 @@ interface PageProps {
   params: Promise<{ city: string; date: string }>;
 }
 
-function formatDate(dateStr: string): string {
+function formatWeekday(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const weekday = d.toLocaleDateString("ru-RU", { weekday: "long" });
-  const day = d.getDate();
-  const month = d.toLocaleDateString("ru-RU", { month: "long" });
-  return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${day} ${month}`;
+  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+}
+
+function formatDayMonth(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
 function formatTime(date: Date | null): string {
   if (!date) return "";
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" });
 }
 
-function flexibleSummary(n: number): string {
-  return n === 1 ? "1 требует времени" : `${n} требуют времени`;
+function pluralEvents(n: number): string {
+  return n === 1 ? "событие" : n < 5 ? "события" : "событий";
+}
+
+function activityCoords(activity: {
+  place: { lat: number | null; lng: number | null } | null;
+  venue: { place: { lat: number | null; lng: number | null } | null } | null;
+} | null): ScenarioCoordinates | null {
+  const place = activity?.place ?? activity?.venue?.place ?? null;
+  return place?.lat != null && place?.lng != null ? { lat: place.lat, lng: place.lng } : null;
 }
 
 export default async function DayScenarioPage({ params }: PageProps) {
@@ -80,25 +95,24 @@ export default async function DayScenarioPage({ params }: PageProps) {
     existingScenario = await ensureDayScenario(user.id, date, items);
   }
 
-  const formattedDate = formatDate(date);
+  const weekday = formatWeekday(date);
+  const dayMonth = formatDayMonth(date);
 
   if (!existingScenario) {
     return (
-      <div className="mx-auto min-h-screen max-w-2xl bg-[#FFF9F5] px-5 py-8">
-        <BackLink />
-        <h1 className="mt-3 text-2xl font-semibold text-neutral-900">{formattedDate}</h1>
-        <div className="mt-6 rounded-[24px] border border-neutral-200 bg-white p-6 text-center shadow-sm">
-          <h2 className="text-lg font-semibold text-neutral-900">Пока недостаточно событий</h2>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-            Добавьте хотя бы три активности на {formattedDate.toLowerCase()}, чтобы собрать
-            сценарий дня.
-          </p>
-          <Link
-            href="/me/plan"
-            className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-neutral-900 px-5 text-sm font-semibold text-white hover:bg-neutral-800"
-          >
-            Перейти в план
-          </Link>
+      <div className={styles.page}>
+        <div className={styles.wrap}>
+          <BackLink />
+          <h1 className={`${styles.title} ${styles.serif}`}>
+            {weekday}, <span className={styles.titleAccent}>{dayMonth}</span>
+          </h1>
+          <div className={styles.empty}>
+            <h2>Пока недостаточно событий</h2>
+            <p>Добавьте хотя бы три активности на {weekday.toLowerCase()}, {dayMonth}, чтобы собрать сценарий дня.</p>
+            <Link href="/me/plan" className={styles.emptyLink}>
+              Перейти в план
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -112,6 +126,11 @@ export default async function DayScenarioPage({ params }: PageProps) {
   );
   const planChanged = currentFingerprint !== existingScenario.planFingerprint;
 
+  const bookedActivityIds = await listConfirmedBookingActivityIds(
+    user.id,
+    items.map((item) => item.activityId).filter((id): id is string => id != null),
+  );
+
   const withTiming = items.map((item) => {
     const timing = resolveScenarioItemTime(item, overrides.get(item.id) ?? null);
     const scheduling = resolveScenarioScheduling({ activity: item.activity, timing });
@@ -124,14 +143,14 @@ export default async function DayScenarioPage({ params }: PageProps) {
         item.activityId && item.activity
           ? publicActivityPath(item.activityId, city.slug, item.activity.slug)
           : null,
-      address: item.activity ? resolveActivityAddress(item.activity) : null,
+      addressLabel: item.activity ? formatActivityAddressLine(item.activity) : null,
+      priceLabel: formatScenarioPriceLabel(item.activity),
+      isBooked: item.activityId != null && bookedActivityIds.has(item.activityId),
+      coords: activityCoords(item.activity),
       durationMinutes: scheduling.durationMinutes,
       imageUrl: item.coverImageUrl || item.activity?.coverImageUrl || null,
       effectiveStartsAt: timing.effectiveStartsAt,
       isFlexible: timing.isFlexible,
-      overrideTime: overrides.has(item.id)
-        ? formatTime(overrides.get(item.id) ?? null)
-        : null,
       createdAt: item.createdAt,
       scheduling,
     };
@@ -158,7 +177,25 @@ export default async function DayScenarioPage({ params }: PageProps) {
     durationMinutes: item.scheduling.durationMinutes,
     schedulingKind: item.scheduling.kind,
     canReschedule: item.scheduling.canReschedule,
+    priceLabel: item.priceLabel,
+    addressLabel: item.addressLabel,
+    isBooked: item.isBooked,
   }));
+
+  // Estimated travel-time gaps between originally-adjacent items — computed
+  // once from the canonical (pre-edit) order and shown only while that pair
+  // stays unedited; the client refreshes these values after a successful save.
+  const gaps: Record<string, ReturnType<typeof computeScenarioGap>> = {};
+  for (let i = 1; i < sorted.length; i += 1) {
+    const previous = sorted[i - 1]!;
+    const next = sorted[i]!;
+    gaps[next.id] = computeScenarioGap({
+      previousEndsAt: previous.scheduling.endsAt,
+      nextStartsAt: next.scheduling.startsAt,
+      previousCoords: previous.coords,
+      nextCoords: next.coords,
+    });
+  }
 
   const timedSorted = sorted.filter(
     (item): item is typeof item & { effectiveStartsAt: Date } => item.effectiveStartsAt != null,
@@ -172,52 +209,53 @@ export default async function DayScenarioPage({ params }: PageProps) {
     })),
   );
 
-  const metaLine =
-    flexibleCount === 0 && timedSorted.length > 0
-      ? `${sorted.length} ${sorted.length === 1 ? "событие" : sorted.length < 5 ? "события" : "событий"} · ${formatTime(timedSorted[0]!.effectiveStartsAt)}–${formatTime(timedSorted.at(-1)!.effectiveStartsAt)}`
-      : `${sorted.length} ${sorted.length === 1 ? "событие" : sorted.length < 5 ? "события" : "событий"} · ${flexibleSummary(flexibleCount)}`;
-
   return (
-    <div className="mx-auto min-h-screen max-w-2xl bg-[#FFF9F5] px-5 py-8">
-      <BackLink />
+    <div className={styles.page}>
+      <div className={styles.wrap}>
+        <BackLink />
 
-      <div className="mt-3 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">{formattedDate}</h1>
-          <p className="mt-1 text-sm text-neutral-500">{city.name}</p>
+        <div className={styles.headTop}>
+          <span className={`${styles.caps} ${styles.kicker}`}>● Сценарий дня</span>
+          <h1 className={`${styles.title} ${styles.serif}`}>
+            {weekday}, <span className={styles.titleAccent}>{dayMonth}</span>
+          </h1>
+          <p className={styles.cityLine}>{city.name}</p>
+
+          <div className={styles.sum}>
+            <span className={styles.st}>
+              <IcMapPin />
+              {city.name}
+            </span>
+            {timedSorted.length > 0 ? (
+              <span className={styles.st}>
+                <IcClock />
+                <b>
+                  {formatTime(timedSorted[0]!.effectiveStartsAt)}
+                  {timedSorted.length > 1 ? `–${formatTime(timedSorted.at(-1)!.effectiveStartsAt)}` : ""}
+                </b>
+              </span>
+            ) : null}
+            <span className={styles.st}>
+              <IcCalendar />
+              <b>
+                {sorted.length} {pluralEvents(sorted.length)}
+              </b>
+              {flexibleCount > 0 ? ` · ${flexibleCount} гибко` : ""}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#BE4F2E]/75">
-            Сценарий дня
-          </p>
-          <p className="mt-1 text-sm text-neutral-600">{metaLine}</p>
-        </div>
-        <Link
-          href="/me/plan"
-          className="shrink-0 text-sm font-medium text-neutral-500 hover:text-neutral-900"
-        >
-          Изменить план
-        </Link>
-      </div>
+        {planChanged ? (
+          <div className={styles.changed}>
+            <p>План изменился</p>
+            <form action={refreshDayScenarioAction.bind(null, city.slug, date)}>
+              <button type="submit" className={styles.refreshBtn}>
+                Обновить сценарий
+              </button>
+            </form>
+          </div>
+        ) : null}
 
-      {planChanged ? (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-medium text-amber-800">План изменился</p>
-          <form action={refreshDayScenarioAction.bind(null, city.slug, date)}>
-            <button
-              type="submit"
-              className="inline-flex h-9 items-center rounded-full bg-neutral-900 px-4 text-sm font-semibold text-white hover:bg-neutral-800"
-            >
-              Обновить сценарий
-            </button>
-          </form>
-        </div>
-      ) : null}
-
-      <div className="mt-6">
         <ScenarioDraftEditor
           items={clientItems}
           conflicts={conflicts}
@@ -225,25 +263,18 @@ export default async function DayScenarioPage({ params }: PageProps) {
           fingerprint={currentFingerprint}
           city={city.slug}
           date={date}
+          gaps={gaps}
+          endOfDayLabel={endOfDay ? formatTime(endOfDay) : null}
         />
       </div>
-
-      {endOfDay ? (
-        <p className="mt-4 text-center text-sm text-neutral-400">
-          День завершится около {formatTime(endOfDay)}
-        </p>
-      ) : null}
     </div>
   );
 }
 
 function BackLink() {
   return (
-    <Link
-      href="/me/plan"
-      className="inline-flex items-center gap-2 text-sm font-medium text-neutral-500 hover:text-neutral-900"
-    >
-      <ArrowLeft className="h-4 w-4" />
+    <Link href="/me/plan" className={styles.back}>
+      <IcBack />
       Мой план
     </Link>
   );

@@ -4,9 +4,11 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
-import { computePlanFingerprint } from "@/server/services/dayScenario.service";
+import { computePlanFingerprint, listConfirmedBookingActivityIds } from "@/server/services/dayScenario.service";
 import { resolveScenarioItemTime } from "@/features/my-plan/lib/scenarioProjection";
 import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
+import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
+import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
 import {
   conflictsForScenarioItems,
   type ScenarioClientItem,
@@ -62,9 +64,18 @@ function parseIntent(raw: unknown): SaveIntent {
   return { date: body.date, baseFingerprint: body.baseFingerprint, replacements, removals, acceptedConflictKeys };
 }
 
+const activityPlaceSelect = {
+  shortAddress: true, formattedAddr: true, customAddress: true,
+  city: { select: { name: true } },
+  metroAuto: { select: { name: true } }, metroManual: { select: { name: true } },
+} satisfies Prisma.PlaceSelect;
+
 const activitySelect = {
   id: true, slug: true, title: true, coverImageUrl: true, schedulingKind: true, scheduleJson: true,
   scheduleMode: true, status: true,
+  priceFrom: true, priceTo: true, currency: true, priceText: true,
+  place: { select: activityPlaceSelect },
+  venue: { select: { addressLine: true, place: { select: activityPlaceSelect } } },
   sessions: { select: { id: true, startsAt: true }, orderBy: { startsAt: "asc" as const } },
 } satisfies Prisma.ActivitySelect;
 
@@ -84,6 +95,7 @@ async function loadCanonical(tx: Tx, userId: string, date: string, scenarioId: s
 function projectItems(
   rows: Awaited<ReturnType<typeof loadCanonical>>["items"],
   overrides: Map<string, Date>,
+  bookedActivityIds: Set<string>,
 ): ScenarioClientItem[] {
   return rows.map((row) => {
     const sessions = row.activity?.sessions.filter((session) => getLocalDateKey(session.startsAt) === row.date) ?? [];
@@ -105,6 +117,9 @@ function projectItems(
       durationMinutes: scheduling.durationMinutes,
       schedulingKind: scheduling.kind,
       canReschedule: scheduling.canReschedule,
+      priceLabel: formatScenarioPriceLabel(row.activity),
+      addressLabel: row.activity ? formatActivityAddressLine(row.activity) : null,
+      isBooked: row.activityId != null && bookedActivityIds.has(row.activityId),
     };
   });
 }
@@ -180,7 +195,11 @@ export async function saveScenarioDraftForUser(
     }
 
     const finalLoaded = await loadCanonical(tx as Tx, userId, intent.date, scenario.id);
-    const projected = projectItems(finalLoaded.items, finalLoaded.overrides);
+    const finalActivityIds = finalLoaded.items
+      .map((item) => item.activityId)
+      .filter((id): id is string => id != null);
+    const bookedActivityIds = await listConfirmedBookingActivityIds(userId, finalActivityIds);
+    const projected = projectItems(finalLoaded.items, finalLoaded.overrides, bookedActivityIds);
     const conflicts = conflictsForScenarioItems(projected);
     const validKeys = new Set(conflicts.map((conflict) => conflict.key));
     const acceptedConflictKeys = [...new Set(intent.acceptedConflictKeys)].filter((key) => validKeys.has(key)).sort();
