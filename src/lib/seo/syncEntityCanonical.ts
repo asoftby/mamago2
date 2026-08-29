@@ -1,4 +1,4 @@
-import { SeoCanonicalSource } from "@prisma/client";
+import { SeoCanonicalSource, type Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 import {
@@ -117,9 +117,11 @@ export async function syncRouteCanonical(routeId: string): Promise<void> {
   });
 }
 
-export async function syncArticleCanonical(articleId: string): Promise<void> {
-  try {
-    const row = await prisma.article.findUnique({
+export async function syncArticleCanonicalInTransaction(
+  tx: Prisma.TransactionClient,
+  articleId: string,
+): Promise<void> {
+  const row = await tx.article.findUnique({
       where: { id: articleId },
       select: {
         id: true,
@@ -139,7 +141,7 @@ export async function syncArticleCanonical(articleId: string): Promise<void> {
     const absolute = `${absoluteBase()}${path}`;
     const hasSlug = !!row.slug?.trim();
 
-    await prisma.article.update({
+  await tx.article.update({
       where: { id: articleId },
       data: {
         seoCanonicalUrl: absolute,
@@ -147,6 +149,11 @@ export async function syncArticleCanonical(articleId: string): Promise<void> {
       },
       select: { id: true },
     });
+}
+
+export async function syncArticleCanonical(articleId: string): Promise<void> {
+  try {
+    await prisma.$transaction((tx) => syncArticleCanonicalInTransaction(tx, articleId));
   } catch (e) {
     console.error("[syncArticleCanonical]", articleId, e);
   }

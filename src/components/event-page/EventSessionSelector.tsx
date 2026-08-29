@@ -5,11 +5,15 @@ import { cn } from "@/lib/utils";
 import type { EventPageSession } from "@/lib/event/eventPageTypes";
 import { SessionCard } from "@/components/shared/SessionCard";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
 const INITIAL_VISIBLE = 3;
 
 function getDayLabel(isoString: string): string {
-  return new Date(isoString).toLocaleDateString("ru-RU", { weekday: "long" });
+  return new Date(isoString).toLocaleDateString("ru-RU", {
+    weekday: "long",
+    timeZone: DEFAULT_TZ,
+  });
 }
 
 function getDateLabel(isoString: string): string {
@@ -17,6 +21,7 @@ function getDateLabel(isoString: string): string {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: DEFAULT_TZ,
   });
 }
 
@@ -24,6 +29,7 @@ function getTimeLabel(isoString: string): string {
   return new Date(isoString).toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: DEFAULT_TZ,
   });
 }
 

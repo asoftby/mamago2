@@ -7,6 +7,7 @@ import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { BYN_SYMBOL, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatHHMM } from "@/lib/formatters/date";
 import type { EventPageData } from "./eventPageTypes";
 import {
   getActivityFormatDetailLabel,
@@ -302,11 +303,7 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   // 03 Время начала
   if (activity.sessions.length > 0) {
     const uniqueTimes = [
-      ...new Set(
-        activity.sessions.map((s) =>
-          new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(s.startsAt),
-        ),
-      ),
+      ...new Set(activity.sessions.map((s) => formatHHMM(s.startsAt))),
     ];
     rows.push({
       id: "time",

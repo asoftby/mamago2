@@ -762,20 +762,25 @@ export async function syncArticleMediaUsage(articleId: string) {
     }
   }
 
-  // Remove old usage records for this article
-  await prisma.mediaUsage.deleteMany({
-    where: {
-      entityType: MediaEntityType.ARTICLE,
-      entityId: articleId,
-    },
+  const seen = new Set<string>();
+  const deduplicated = usageRecords.filter((record) => {
+    const key = `${record.mediaId}:${record.field}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 
-  // Create new usage records (deduplicated by field)
-  const seen = new Set<string>();
-  for (const record of usageRecords) {
-    const key = `${record.mediaId}:${record.field}`;
-    if (!seen.has(key)) {
-      await prisma.mediaUsage.create({
+  // MediaUsage is a rebuildable projection, but replacing that projection is
+  // atomic so a failed rebuild keeps the previous complete projection.
+  await prisma.$transaction(async (tx) => {
+    await tx.mediaUsage.deleteMany({
+      where: {
+        entityType: MediaEntityType.ARTICLE,
+        entityId: articleId,
+      },
+    });
+    for (const record of deduplicated) {
+      await tx.mediaUsage.create({
         data: {
           mediaId: record.mediaId,
           entityType: MediaEntityType.ARTICLE,
@@ -783,9 +788,8 @@ export async function syncArticleMediaUsage(articleId: string) {
           field: record.field,
         },
       });
-      seen.add(key);
     }
-  }
+  });
 
   return { mediaIds: Array.from(mediaIds), usageCount: usageRecords.length };
 }
