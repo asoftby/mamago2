@@ -100,13 +100,10 @@ export function getPlaceCompletion(data: PlaceFormData): CompletionResult {
     missingFields.push({ field: "lng", weight: FIELD_WEIGHTS.lng, label: "Координаты (долгота)" });
   }
   
-  // Check age tags
-  if (data.ageTags && data.ageTags.length > 0) {
-    achievedScore += FIELD_WEIGHTS.ageTags;
-    completedFields.push("ageTags");
-  } else {
-    missingFields.push({ field: "ageTags", weight: FIELD_WEIGHTS.ageTags, label: "Возраст" });
-  }
+  // Age is always an explicit policy choice. `ageTags: []` is valid and
+  // intentional for both UNRESTRICTED ("Любой возраст") and ADULT_ONLY.
+  achievedScore += FIELD_WEIGHTS.ageTags;
+  completedFields.push("ageTags");
   
   // Check logo
   if (data.logoImageId || data.logoUrl) {
