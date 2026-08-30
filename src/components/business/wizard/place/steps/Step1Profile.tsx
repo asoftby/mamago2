@@ -19,8 +19,7 @@ const MAX_SUBCATEGORIES = 3;
 
 /** UI-only chip id — never stored. "Любой возраст" is represented by `ageTags: []`. */
 const ANY_AGE_CHIP_ID = "__any_age__";
-/** Global 18+ age key is represented in Place Wizard by the dedicated ADULT_ONLY policy chip. */
-const ADULT_ONLY_AGE_TAG = "18+";
+const ADULT_SUITABILITY_AGE_TAG = "18+";
 
 type PlaceCategoryChild = {
   id: string;
@@ -152,13 +151,9 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   };
 
   const toggleAgeTag = (tag: string) => {
-    // `18+` is represented by ADULT_ONLY in this wizard. Drop a legacy
-    // specific `18+` value as soon as the user chooses a child-age range so
-    // the two semantics cannot be mixed in one selection.
-    const specificAgeTags = ageTags.filter((value) => value !== ADULT_ONLY_AGE_TAG);
-    const rawTags = specificAgeTags.includes(tag)
-      ? specificAgeTags.filter((value) => value !== tag)
-      : [...specificAgeTags, tag];
+    const rawTags = ageTags.includes(tag)
+      ? ageTags.filter((value) => value !== tag)
+      : [...ageTags, tag];
     const newTags = canonicalizeAgeTags(rawTags);
     setAgeTags(newTags);
     onChange({
@@ -354,24 +349,27 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
                   onChange({ ageTags: [], agePolicy: AgePolicy.UNRESTRICTED });
                 },
               },
-              ...AGE_OPTIONS
-                .filter((ageOption) => ageOption.key !== ADULT_ONLY_AGE_TAG)
-                .map((ageOption): ChipItem => ({
-                  id: ageOption.key,
-                  label: ageOption.shortLabel,
-                  active: isPlaceAgeChipActive({
+              ...AGE_OPTIONS.map((ageOption): ChipItem => ({
+                id: ageOption.key,
+                // The shared catalog historically labels 18+ as #nokids, but
+                // in the discriminated Place policy 18+ is ordinary suitability.
+                label:
+                  ageOption.key === ADULT_SUITABILITY_AGE_TAG
+                    ? "18+"
+                    : ageOption.shortLabel,
+                active:
+                  data.agePolicy === AgePolicy.SPECIFIC &&
+                  isPlaceAgeChipActive({
                     storedAgeTags: ageTags,
                     chipAgeTag: ageOption.key,
                   }),
-                  disabled: !isEditable,
-                  onClick: () => isEditable && toggleAgeTag(ageOption.key),
-                })),
+                disabled: !isEditable,
+                onClick: () => isEditable && toggleAgeTag(ageOption.key),
+              })),
               {
                 id: "adult-only",
-                label: "#nokids",
-                active:
-                  data.agePolicy === AgePolicy.ADULT_ONLY ||
-                  ageTags.includes(ADULT_ONLY_AGE_TAG),
+                label: "Только 18+",
+                active: data.agePolicy === AgePolicy.ADULT_ONLY,
                 disabled: !isEditable,
                 onClick: () => {
                   if (!isEditable) return;
@@ -383,7 +381,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
           />
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          «Любой возраст» означает, что место подходит детям всех возрастов.
+          «18+» — подходит взрослым; «Только 18+» — строгая возрастная граница.
         </p>
       </div>
 
