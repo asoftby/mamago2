@@ -1,6 +1,7 @@
 // Config-driven behavioral definitions for Place Wizard steps.
 // Semantic identity, ordering and copy live in ./config.ts.
 
+import { AgePolicy } from "@prisma/client";
 import { WizardStepConfig, SummaryItem, buildReviewSections } from "../shared/types";
 import type { PlaceFormData } from "./types";
 import { sortAgeKeys } from "@/lib/config/ages";
@@ -8,6 +9,7 @@ import {
   getPlaceWizardSteps,
   type PlaceWizardStepDefinition,
 } from "./config";
+import { isPlaceAgeSelectionComplete } from "./isPlaceAgeChipActive";
 
 // Re-export buildReviewSections for convenience
 export { buildReviewSections };
@@ -73,6 +75,20 @@ function createPlaceCtaSummary(data: PlaceFormData): SummaryItem[] {
   ];
 }
 
+function getPlaceAgeSummary(data: PlaceFormData): string {
+  switch (data.agePolicy) {
+    case AgePolicy.UNRESTRICTED:
+      return "Любой возраст";
+    case AgePolicy.ADULT_ONLY:
+      return "Только 18+";
+    case AgePolicy.SPECIFIC:
+      return data.ageTags.length > 0 ? sortAgeKeys(data.ageTags).join(", ") : "Не указан";
+    case AgePolicy.UNKNOWN:
+    default:
+      return "Не указан";
+  }
+}
+
 function createPlaceStepConfig(
   step: PlaceWizardStepDefinition,
 ): WizardStepConfig<PlaceFormData> | null {
@@ -85,8 +101,7 @@ function createPlaceStepConfig(
           data.shortDesc?.trim() &&
           data.description?.trim() &&
           data.category &&
-          // ageTags is always "complete": either a specific selection, or an
-          // empty array representing the deliberate "Любой возраст" choice.
+          isPlaceAgeSelectionComplete({ agePolicy: data.agePolicy, ageTags: data.ageTags }) &&
           data.visitFormats?.length > 0
         ),
         getSummary: (data) => [
@@ -105,9 +120,11 @@ function createPlaceStepConfig(
           },
           {
             label: "Возраст",
-            value: data.ageTags?.length > 0
-              ? sortAgeKeys(data.ageTags).join(", ")
-              : "Любой возраст",
+            value: getPlaceAgeSummary(data),
+            isMissing: !isPlaceAgeSelectionComplete({
+              agePolicy: data.agePolicy,
+              ageTags: data.ageTags,
+            }),
           },
         ],
         getMissingFields: (data) => {
@@ -116,6 +133,9 @@ function createPlaceStepConfig(
           if (!data.shortDesc?.trim()) missing.push("Краткое описание");
           if (!data.description?.trim()) missing.push("Полное описание");
           if (!data.category) missing.push("Категория");
+          if (!isPlaceAgeSelectionComplete({ agePolicy: data.agePolicy, ageTags: data.ageTags })) {
+            missing.push("Возраст");
+          }
           if (!data.visitFormats?.length) missing.push("Формат посещения");
           return missing;
         },
