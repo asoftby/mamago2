@@ -5,12 +5,12 @@ import { canonicalizeAgeTags, isPlaceAgeChipActive } from "./isPlaceAgeChipActiv
 
 const ALL_KEYS = AGE_OPTIONS.map((o) => o.key);
 
-function testEmptyStoredTagsMakesEveryChipActive() {
+function testEmptyStoredTagsLeavesSpecificChipsInactive() {
   for (const key of ALL_KEYS) {
     assert.equal(
       isPlaceAgeChipActive({ storedAgeTags: [], chipAgeTag: key }),
-      true,
-      `expected "${key}" to be visually active when storedAgeTags is empty`,
+      false,
+      `expected "${key}" to stay inactive when "Любой возраст" is selected`,
     );
   }
 }
@@ -36,15 +36,12 @@ function testCanonicalizeLeavesEmptyAsEmpty() {
 }
 
 function testCanonicalizeIgnoresUnknownTagsWhenCheckingCompleteness() {
-  // An unknown tag mixed in must never accidentally trigger the "all
-  // selected" collapse — canonicalization only fires on a genuine
-  // complete, exact match of the known set.
   const result = canonicalizeAgeTags([...ALL_KEYS, "not-a-real-age"]);
   assert.deepEqual(result, [...ALL_KEYS, "not-a-real-age"]);
 }
 
 function main() {
-  testEmptyStoredTagsMakesEveryChipActive();
+  testEmptyStoredTagsLeavesSpecificChipsInactive();
   testSpecificStoredTagsOnlyActivateThemselves();
   testCanonicalizeCollapsesFullSelectionToEmpty();
   testCanonicalizeLeavesPartialSelectionUntouched();
