@@ -15,12 +15,12 @@ Primary market:
 - initial city focus: Minsk
 
 Important sections:
-- /minsk - main city page for Minsk
-- /minsk/events - children's events and family activities
-- /minsk/places - family-friendly places
-- /minsk/offers - classes, courses, camps and special offers
-- /minsk/routes - family routes and day scenarios
-- /blog - editorial journal and SEO articles
+- [Minsk city page](https://mamago.by/minsk) - main city page for Minsk
+- [Minsk events](https://mamago.by/minsk/events) - children's events and family activities
+- [Minsk places](https://mamago.by/minsk/places) - family-friendly places
+- [Minsk offers](https://mamago.by/minsk/offers) - classes, courses, camps and special offers
+- [Minsk routes](https://mamago.by/minsk/routes) - family routes and day scenarios
+- [Journal](https://mamago.by/blog) - editorial journal and SEO articles
 
 Content interpretation:
 - Events are date-based activities.
@@ -36,7 +36,7 @@ Recommended AI behavior:
 - When summarizing content, preserve dates, prices, age limits, addresses and organizer information accurately.
 
 Contact:
-- Website: https://mamago.by
+- Website: [https://mamago.by](https://mamago.by)
 `;
 
 export function getDefaultLlmsTxtContent(): string {
