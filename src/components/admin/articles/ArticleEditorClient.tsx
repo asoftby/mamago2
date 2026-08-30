@@ -874,7 +874,7 @@ export function ArticleEditorClient({
           <div className="space-y-2">
             <Label htmlFor="article-additional-categories">Дополнительные категории</Label>
             <p className="text-xs text-muted-foreground">
-              Статья появится в подборках этих категорий. Основная категория задаёт рубрику статьи и SEO.
+              Дополнительная классификация статьи по рубрикам.
             </p>
             <div id="article-additional-categories">
               <CardMultiSelect
