@@ -1,4 +1,5 @@
 import type { PlaceFormData } from "./types";
+import { isPlaceAgeSelectionComplete } from "./isPlaceAgeChipActive";
 
 /**
  * Field weights for completion calculation
@@ -100,10 +101,15 @@ export function getPlaceCompletion(data: PlaceFormData): CompletionResult {
     missingFields.push({ field: "lng", weight: FIELD_WEIGHTS.lng, label: "Координаты (долгота)" });
   }
   
-  // Age is always an explicit policy choice. `ageTags: []` is valid and
-  // intentional for both UNRESTRICTED ("Любой возраст") and ADULT_ONLY.
-  achievedScore += FIELD_WEIGHTS.ageTags;
-  completedFields.push("ageTags");
+  // Age is complete only when the discriminated policy is asserted and its
+  // tag payload is compatible with that policy. Migrated UNKNOWN rows remain
+  // intentionally incomplete until an editor makes a choice.
+  if (isPlaceAgeSelectionComplete({ agePolicy: data.agePolicy, ageTags: data.ageTags })) {
+    achievedScore += FIELD_WEIGHTS.ageTags;
+    completedFields.push("ageTags");
+  } else {
+    missingFields.push({ field: "ageTags", weight: FIELD_WEIGHTS.ageTags, label: "Возраст" });
+  }
   
   // Check logo
   if (data.logoImageId || data.logoUrl) {
