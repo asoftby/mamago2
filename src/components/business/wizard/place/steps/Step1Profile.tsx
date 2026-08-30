@@ -19,6 +19,8 @@ const MAX_SUBCATEGORIES = 3;
 
 /** UI-only chip id — never stored. "Любой возраст" is represented by `ageTags: []`. */
 const ANY_AGE_CHIP_ID = "__any_age__";
+/** Global 18+ age key is represented in Place Wizard by the dedicated ADULT_ONLY policy chip. */
+const ADULT_ONLY_AGE_TAG = "18+";
 
 type PlaceCategoryChild = {
   id: string;
@@ -150,15 +152,19 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   };
 
   const toggleAgeTag = (tag: string) => {
-    const rawTags = ageTags.includes(tag)
-      ? ageTags.filter((t) => t !== tag)
-      : [...ageTags, tag];
-    // If every known age ended up selected, that's the same thing as "any
-    // age" — collapse back to [] so storage never has two representations
-    // of the same "no restriction" meaning.
+    // `18+` is represented by ADULT_ONLY in this wizard. Drop a legacy
+    // specific `18+` value as soon as the user chooses a child-age range so
+    // the two semantics cannot be mixed in one selection.
+    const specificAgeTags = ageTags.filter((value) => value !== ADULT_ONLY_AGE_TAG);
+    const rawTags = specificAgeTags.includes(tag)
+      ? specificAgeTags.filter((value) => value !== tag)
+      : [...specificAgeTags, tag];
     const newTags = canonicalizeAgeTags(rawTags);
     setAgeTags(newTags);
-    onChange({ ageTags: newTags, agePolicy: newTags.length ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED });
+    onChange({
+      ageTags: newTags,
+      agePolicy: newTags.length ? AgePolicy.SPECIFIC : AgePolicy.UNRESTRICTED,
+    });
   };
 
   const toggleVisitFormat = (format: string) => {
@@ -184,7 +190,7 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   const subCategoryItems: ChipItem[] = useMemo(() => {
     if (!primaryRoot || primaryRoot.children.length === 0) return [];
     const atMax = subcategoryIds.length >= MAX_SUBCATEGORIES;
-    return primaryRoot.children.map((child, idx) => {
+    return primaryRoot.children.map((child) => {
       const isSelected = subcategoryIds.includes(child.id);
       const isMain = subcategoryIds[0] === child.id;
       const isDisabled = !isEditable || (!isSelected && atMax);
@@ -339,31 +345,36 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
               {
                 id: ANY_AGE_CHIP_ID,
                 label: "Любой возраст",
-                // Derived, not separate state — ageTags=[] *is* "Любой возраст".
-                // Selecting a specific age naturally clears this (ageTags becomes
-                // non-empty); selecting this chip clears ageTags, which naturally
-                // deactivates every specific-age chip. No dual-selection is possible.
                 active: data.agePolicy === AgePolicy.UNRESTRICTED,
                 disabled: !isEditable,
                 onClick: () => {
-                  if (!isEditable || ageTags.length === 0) return;
+                  if (!isEditable) return;
+                  if (data.agePolicy === AgePolicy.UNRESTRICTED && ageTags.length === 0) return;
                   setAgeTags([]);
                   onChange({ ageTags: [], agePolicy: AgePolicy.UNRESTRICTED });
                 },
               },
-              ...AGE_OPTIONS.map((ageOption): ChipItem => ({
-                id: ageOption.key,
-                label: ageOption.shortLabel,
-                active: isPlaceAgeChipActive({ storedAgeTags: ageTags, chipAgeTag: ageOption.key }),
-                disabled: !isEditable,
-                onClick: () => isEditable && toggleAgeTag(ageOption.key),
-              })),
+              ...AGE_OPTIONS
+                .filter((ageOption) => ageOption.key !== ADULT_ONLY_AGE_TAG)
+                .map((ageOption): ChipItem => ({
+                  id: ageOption.key,
+                  label: ageOption.shortLabel,
+                  active: isPlaceAgeChipActive({
+                    storedAgeTags: ageTags,
+                    chipAgeTag: ageOption.key,
+                  }),
+                  disabled: !isEditable,
+                  onClick: () => isEditable && toggleAgeTag(ageOption.key),
+                })),
               {
                 id: "adult-only",
                 label: "#nokids",
-                active: data.agePolicy === AgePolicy.ADULT_ONLY,
+                active:
+                  data.agePolicy === AgePolicy.ADULT_ONLY ||
+                  ageTags.includes(ADULT_ONLY_AGE_TAG),
                 disabled: !isEditable,
                 onClick: () => {
+                  if (!isEditable) return;
                   setAgeTags([]);
                   onChange({ ageTags: [], agePolicy: AgePolicy.ADULT_ONLY });
                 },
