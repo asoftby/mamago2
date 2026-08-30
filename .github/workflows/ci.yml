@@ -46,8 +46,11 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
-      - name: Place wizard structure regressions
-        run: pnpm exec tsx src/components/business/wizard/place/config.test.ts
+      - name: Place wizard regressions
+        run: |
+          pnpm exec tsx src/components/business/wizard/place/config.test.ts
+          pnpm exec tsx src/components/business/wizard/place/isPlaceAgeChipActive.test.ts
+          pnpm exec tsx src/components/business/wizard/place/completion.test.ts
 
       - name: Event timezone contract regressions
         run: pnpm exec tsx src/lib/event/eventTimezoneContract.test.ts
