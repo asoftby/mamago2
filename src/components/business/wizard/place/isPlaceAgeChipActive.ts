@@ -1,4 +1,5 @@
-import { AGE_OPTIONS } from "@/lib/config/ages";
+import { AgePolicy } from "@prisma/client";
+import { AGE_OPTIONS, isValidAgeKey } from "@/lib/config/ages";
 
 /**
  * Whether a specific age chip should render as visually selected.
@@ -15,15 +16,34 @@ export function isPlaceAgeChipActive(params: {
 }
 
 /**
+ * Canonical completeness check for the Place age state.
+ *
+ * The policy is discriminated: unrestricted/strict policies must not carry
+ * suitability buckets, SPECIFIC must carry only valid buckets, and UNKNOWN is
+ * deliberately incomplete until an editor asserts the intended semantics.
+ */
+export function isPlaceAgeSelectionComplete(params: {
+  agePolicy: AgePolicy;
+  ageTags: readonly string[];
+}): boolean {
+  switch (params.agePolicy) {
+    case AgePolicy.UNRESTRICTED:
+    case AgePolicy.ADULT_ONLY:
+      return params.ageTags.length === 0;
+    case AgePolicy.SPECIFIC:
+      return params.ageTags.length > 0 && params.ageTags.every(isValidAgeKey);
+    case AgePolicy.UNKNOWN:
+    default:
+      return false;
+  }
+}
+
+/**
  * Canonicalizes a just-toggled age-tag list: if every known age option
  * ended up selected, that's semantically identical to "no restriction",
  * so collapse it back to `[]` rather than persisting a full list —
  * `ageTags: []` stays the one and only representation of "any age",
  * never a redundant "all of them" array.
- *
- * The Place Wizard currently renders the global `18+` option through the
- * dedicated ADULT_ONLY chip, so this helper mainly protects legacy callers
- * and imported full selections.
  */
 export function canonicalizeAgeTags(tags: readonly string[]): string[] {
   const uniqueKnown = new Set(tags.filter((tag) => AGE_OPTIONS.some((option) => option.key === tag)));
