@@ -9,12 +9,14 @@ export const runtime = "nodejs";
 /**
  * Справочники для редактора статьи: города, области (регионы) + пользователи, которые могут быть системными авторами.
  */
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireAdminOrModerator();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const selectedCategoryIds = new URL(request.url).searchParams.get("selectedCategoryIds")
+    ?.split(",").filter(Boolean) ?? [];
   const [cities, regions, authors, categories] = await Promise.all([
     prisma.city.findMany({
       where: { isLegacyNonCity: false },
@@ -41,9 +43,11 @@ export async function GET() {
     prisma.eventCategory.findMany({
       where: {
         publicationType: "ARTICLE",
-        isActive: true,
-        archivedAt: null,
         parentId: null,
+        OR: [
+          { isActive: true, archivedAt: null },
+          ...(selectedCategoryIds.length ? [{ id: { in: selectedCategoryIds } }] : []),
+        ],
       },
       orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }],
       select: { id: true, nameRu: true, slug: true },
