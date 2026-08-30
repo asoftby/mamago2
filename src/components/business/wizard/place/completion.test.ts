@@ -4,10 +4,10 @@ import { AgePolicy } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
 import { getPlaceCompletion } from "./completion";
 
-function testUnrestrictedAgeCountsAsComplete() {
+function assertAgeComplete(agePolicy: AgePolicy, ageTags: string[]) {
   const data = getDefaultFormData();
-  data.ageTags = [];
-  data.agePolicy = AgePolicy.UNRESTRICTED;
+  data.ageTags = ageTags;
+  data.agePolicy = agePolicy;
 
   const result = getPlaceCompletion(data);
 
@@ -15,32 +15,34 @@ function testUnrestrictedAgeCountsAsComplete() {
   assert.equal(result.missingFields.some((item) => item.field === "ageTags"), false);
 }
 
-function testAdultOnlyAgeCountsAsComplete() {
+function assertAgeMissing(agePolicy: AgePolicy, ageTags: string[]) {
   const data = getDefaultFormData();
-  data.ageTags = [];
-  data.agePolicy = AgePolicy.ADULT_ONLY;
+  data.ageTags = ageTags;
+  data.agePolicy = agePolicy;
 
   const result = getPlaceCompletion(data);
 
-  assert.equal(result.completedFields.includes("ageTags"), true);
-  assert.equal(result.missingFields.some((item) => item.field === "ageTags"), false);
+  assert.equal(result.completedFields.includes("ageTags"), false);
+  assert.equal(result.missingFields.some((item) => item.field === "ageTags"), true);
 }
 
-function testSpecificAgeCountsAsComplete() {
-  const data = getDefaultFormData();
-  data.ageTags = ["3-5"];
-  data.agePolicy = AgePolicy.SPECIFIC;
+function testValidAgePoliciesCountAsComplete() {
+  assertAgeComplete(AgePolicy.UNRESTRICTED, []);
+  assertAgeComplete(AgePolicy.ADULT_ONLY, []);
+  assertAgeComplete(AgePolicy.SPECIFIC, ["3-5"]);
+  assertAgeComplete(AgePolicy.SPECIFIC, ["18+"]);
+}
 
-  const result = getPlaceCompletion(data);
-
-  assert.equal(result.completedFields.includes("ageTags"), true);
-  assert.equal(result.missingFields.some((item) => item.field === "ageTags"), false);
+function testUnknownAndContradictoryAgeStatesRemainIncomplete() {
+  assertAgeMissing(AgePolicy.UNKNOWN, []);
+  assertAgeMissing(AgePolicy.SPECIFIC, []);
+  assertAgeMissing(AgePolicy.UNRESTRICTED, ["3-5"]);
+  assertAgeMissing(AgePolicy.ADULT_ONLY, ["18+"]);
 }
 
 function main() {
-  testUnrestrictedAgeCountsAsComplete();
-  testAdultOnlyAgeCountsAsComplete();
-  testSpecificAgeCountsAsComplete();
+  testValidAgePoliciesCountAsComplete();
+  testUnknownAndContradictoryAgeStatesRemainIncomplete();
 }
 
 main();
