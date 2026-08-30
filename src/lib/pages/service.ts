@@ -2,6 +2,10 @@ import prisma from "@/lib/prisma";
 import { Page, PageStatus, Prisma } from "@prisma/client";
 import type { CreatePageInput, UpdatePageInput, ListPagesQuery } from "./validation";
 import { normalizeSlug } from "./validation";
+import {
+  getPublicPageDetailWhere,
+  getPublicPageIndexWhere,
+} from "@/server/public/publicContentVisibility";
 
 /**
  * Создание страницы
@@ -79,11 +83,8 @@ export async function getPageById(id: string): Promise<Page | null> {
 export async function getPublishedPageBySlug(slug: string): Promise<Page | null> {
   return prisma.page.findFirst({
     where: {
+      ...getPublicPageDetailWhere(),
       slug,
-      status: "PUBLISHED",
-      visibility: {
-        in: ["PUBLIC", "UNLISTED"],
-      },
     },
   });
 }
@@ -220,10 +221,7 @@ export async function listPages(query: ListPagesQuery) {
  */
 export async function getPublishedPagesForSitemap() {
   return prisma.page.findMany({
-    where: {
-      status: "PUBLISHED",
-      visibility: "PUBLIC", // Только PUBLIC, не UNLISTED
-    },
+    where: getPublicPageIndexWhere(),
     select: {
       slug: true,
       type: true,

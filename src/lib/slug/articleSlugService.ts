@@ -22,6 +22,7 @@ import {
   resolveSlugCandidateForSave,
 } from "@/lib/slug/publicSlug";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
 export type ArticleSlugTransactionClient = Prisma.TransactionClient;
 
@@ -222,9 +223,9 @@ export async function updateArticleSlug(
  */
 export function articlePublicSlugWhere(slug: string, cityId: string | null) {
   return {
+    ...getPublicPublishedArticleWhere(),
     slug,
     cityId: cityId ?? null,
-    status: "PUBLISHED" as const,
   };
 }
 
@@ -232,9 +233,7 @@ export function articlePublicSlugHistoryWhere(slug: string, cityId: string | nul
   return {
     slug,
     cityId: cityId ?? null,
-    article: {
-      status: "PUBLISHED" as const,
-    },
+    article: getPublicPublishedArticleWhere(),
   };
 }
 

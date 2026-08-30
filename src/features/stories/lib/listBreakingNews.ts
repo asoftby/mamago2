@@ -3,6 +3,7 @@ import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
 export type BreakingNewsItem = {
   id: string;
@@ -27,6 +28,7 @@ export async function listBreakingNewsArticles(
 
   const rows = await prisma.article.findMany({
     where: {
+      ...getPublicPublishedArticleWhere(),
       AND: [
         {
           OR: [
@@ -36,7 +38,6 @@ export async function listBreakingNewsArticles(
         },
       ],
       subtitle: BREAKING_NEWS_SUBTITLE,
-      status: "PUBLISHED",
       publishedAt: { not: null, lte: now },
     },
     orderBy: { publishedAt: "desc" },
