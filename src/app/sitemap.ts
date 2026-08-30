@@ -6,6 +6,8 @@ import {
   getPublicPublishedPlaceWhere,
   getPublicPublishedOfferWhere,
   getPublicActivityDetailWhere,
+  getPublicPublishedArticleWhere,
+  getPublicRouteIndexWhere,
 } from "@/server/public/publicContentVisibility";
 import { ActivityType } from "@prisma/client";
 import { resolvePlaceCanonicalUrl } from "@/lib/seo/resolvePlaceCanonicalUrl";
@@ -210,7 +212,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const routes = await prisma.route.findMany({
-      where: { status: "PUBLISHED", visibility: "PUBLIC" },
+      where: getPublicRouteIndexWhere(),
       select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true, seoRobots: true },
     });
     for (const route of routes) {
@@ -234,7 +236,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const articles = await prisma.article.findMany({
       where: {
-        status: "PUBLISHED",
+        ...getPublicPublishedArticleWhere(),
         noindex: false,
         OR: [{ cityId: null }, { city: { isActive: true } }],
       },

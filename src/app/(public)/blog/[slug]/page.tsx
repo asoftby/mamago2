@@ -45,27 +45,30 @@ import {
 import { buildContinuousArticleSeed } from "@/lib/article/buildContinuousArticleSeed";
 import { resolveArticleGeoHeaderLabel } from "@/lib/article/articleGeoHeaderLabel";
 import { ArticleGeoLabelSync } from "@/components/article/ArticleGeoLabelSync";
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
 /**
  * Redirect to canonical city-scoped URL if the article is CITY-scoped.
  * Returns null if no redirect needed.
  */
 async function resolveCityRedirect(slug: string): Promise<string | null> {
-  // Look up by slug without cityId scope — use raw DB lookup to detect geoScope
+  // Only a publicly visible CITY article may redirect a public request.
   const article = await prisma.article.findFirst({
-    where: { slug },
+    where: { ...getPublicPublishedArticleWhere(), slug },
     select: { geoScope: true, city: { select: { slug: true } } },
   });
   if (!article) {
-    // Check history (any scope)
+    // Check public slug history (any scope). Draft/archived articles must not
+    // reveal their existence through a redirect.
     const hist = await prisma.articleSlugHistory.findFirst({
-      where: { slug },
+      where: { slug, article: getPublicPublishedArticleWhere() },
       include: { article: { select: { geoScope: true, city: { select: { slug: true } } } } },
     });
     if (hist?.article.geoScope === "CITY" && hist.article.city?.slug) {
-      // Redirect old slug → current city-scoped slug via the article's current slug
-      const current = await prisma.article.findUnique({
-        where: { id: hist.articleId },
+      // Redirect old slug → current city-scoped slug via the article's current slug.
+      // Re-check visibility to make the second read race-safe as well.
+      const current = await prisma.article.findFirst({
+        where: { id: hist.articleId, ...getPublicPublishedArticleWhere() },
         select: { slug: true, city: { select: { slug: true } } },
       });
       if (current?.slug && current.city?.slug) {
@@ -92,8 +95,8 @@ async function getArticle(slug: string): Promise<ArticleVm | null> {
   // REGION/COUNTRY scope: cityId IS NULL
   const resolved = await findArticleBySlug(slug, null);
   if (resolved) {
-    const a = await prisma.article.findUnique({
-      where: { id: resolved.articleId },
+    const a = await prisma.article.findFirst({
+      where: { id: resolved.articleId, ...getPublicPublishedArticleWhere() },
       select: {
         id: true,
         slug: true,
@@ -150,8 +153,8 @@ async function getArticle(slug: string): Promise<ArticleVm | null> {
 }
 
 async function getArticleSchemaData(articleId: string) {
-  return prisma.article.findUnique({
-    where: { id: articleId },
+  return prisma.article.findFirst({
+    where: { id: articleId, ...getPublicPublishedArticleWhere() },
     select: {
       slug: true,
       updatedAt: true,
@@ -181,8 +184,8 @@ export async function generateMetadata({
   // REGION/COUNTRY scope (cityId = null)
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
-    const article = await prisma.article.findUnique({
-      where: { id: mvp.id },
+    const article = await prisma.article.findFirst({
+      where: { id: mvp.id, ...getPublicPublishedArticleWhere() },
       select: {
         seoTitle: true,
         seoDescription: true,
@@ -323,6 +326,9 @@ export default async function ArticlePage({
   const mvp = await loadArticleMvpBySlugPublic(slug, null);
   if (mvp) {
     const schemaArticle = await getArticleSchemaData(mvp.id);
+    if (!schemaArticle) {
+      notFound();
+    }
     const publicBase = getCanonicalPublicAppUrl();
     const canonicalPath = buildNationalArticlePath(mvp.slug ?? slug);
     /** Header geo context: REGION → article's region, COUNTRY (incl. Breaking News) → «Беларусь». Never the URL-fallback city. */

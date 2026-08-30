@@ -35,6 +35,7 @@ import {
   loadArticleContinuousContext,
 } from "@/lib/article/nextArticleInSection";
 import { buildContinuousArticleSeed } from "@/lib/article/buildContinuousArticleSeed";
+import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
 interface PageProps {
   params: Promise<{ city: string; slug: string }>;
@@ -59,8 +60,8 @@ export async function generateMetadata({ params }: PageProps) {
   const mvp = await loadArticleMvpBySlugPublic(slug, city.id);
   if (!mvp) notFound();
 
-  const article = await prisma.article.findUnique({
-    where: { id: mvp.id },
+  const article = await prisma.article.findFirst({
+    where: { id: mvp.id, ...getPublicPublishedArticleWhere() },
     select: {
       geoScope: true,
       city: { select: { slug: true } },
@@ -121,8 +122,8 @@ export default async function CityArticlePage({ params }: PageProps) {
   if (!mvp) notFound();
 
   // Verify this article is CITY-scoped for this city; if COUNTRY → redirect to /blog
-  const articleRow = await prisma.article.findUnique({
-    where: { id: mvp.id },
+  const articleRow = await prisma.article.findFirst({
+    where: { id: mvp.id, ...getPublicPublishedArticleWhere() },
     select: {
       geoScope: true,
       slug: true,
