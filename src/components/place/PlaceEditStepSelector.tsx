@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { businessFormCopy } from "@/components/business/wizard/businessFormLabels";
-import { getPlaceWizardStepConfigs } from "@/components/business/wizard/place/placeWizardSteps.config";
-import { getPlaceWizardTotalSteps } from "@/components/business/wizard/place/config";
+import { getPlaceWizardSteps } from "@/components/business/wizard/place/config";
 import { isPlaceCtaStepFeatureEnabled } from "@/components/business/wizard/place/ctaStepFeatureFlag";
 import {
   Dialog,
@@ -15,16 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  User, 
-  MapPin, 
-  Camera, 
-  Phone, 
-  Clock, 
+import {
+  User,
+  MapPin,
+  Camera,
+  Phone,
+  Clock,
   ListChecks,
   CircleHelp,
   CheckCircle,
-  Edit3
+  Edit3,
 } from "lucide-react";
 
 interface PlaceEditStepSelectorProps {
@@ -47,22 +45,12 @@ export function PlaceEditStepSelector({ placeId, className }: PlaceEditStepSelec
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const ctaStepEnabled = isPlaceCtaStepFeatureEnabled(process.env);
-  const contentSteps = getPlaceWizardStepConfigs(ctaStepEnabled);
-  const totalSteps = getPlaceWizardTotalSteps(ctaStepEnabled);
-  const steps = [
-    ...contentSteps.map((step) => ({
-      step: step.id,
-      title: step.title,
-      description: step.description ?? step.title,
-      icon: STEP_ICONS[step.key as keyof typeof STEP_ICONS] ?? Edit3,
-    })),
-    {
-      step: totalSteps,
-      title: businessFormCopy.reviewStepShortTitle,
-      description: "Финальная проверка изменений",
-      icon: CheckCircle,
-    },
-  ];
+  const steps = getPlaceWizardSteps(ctaStepEnabled).map((step) => ({
+    step: step.id,
+    title: step.title,
+    description: step.description,
+    icon: STEP_ICONS[step.key] ?? Edit3,
+  }));
 
   const handleStepSelect = (step: number) => {
     setOpen(false);
@@ -72,8 +60,8 @@ export function PlaceEditStepSelector({ placeId, className }: PlaceEditStepSelec
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="default" 
+        <Button
+          variant="default"
           size="sm"
           className={className}
         >
