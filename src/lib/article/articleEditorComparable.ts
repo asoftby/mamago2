@@ -34,6 +34,7 @@ export function buildEditorComparable(input: {
   authorLabel: string | null;
   cityContext: string | null;
   categoryId: string | null;
+  additionalCategoryIds?: string[];
   tagIds: string[];
   geoScope: GeoScope | null;
   cityId: string | null;
@@ -55,6 +56,7 @@ export function buildEditorComparable(input: {
     authorLabel: input.authorLabel ?? "",
     cityContext: input.cityContext ?? "",
     categoryId: input.categoryId ?? "",
+    additionalCategoryIds: input.additionalCategoryIds ?? [],
     tagIds: input.tagIds,
     geoScope: input.geoScope ?? null,
     cityId: input.cityId ?? "",
@@ -80,6 +82,7 @@ export function buildSavedComparable(snap: ArticleEditorSnapshot): string {
     authorLabel: snap.authorLabel,
     cityContext: snap.cityContext,
     categoryId: snap.categoryId,
+    additionalCategoryIds: snap.additionalCategoryIds,
     tagIds: snap.tagIds,
     geoScope: snap.geoScope,
     cityId: snap.cityId,

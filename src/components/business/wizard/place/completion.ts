@@ -1,4 +1,5 @@
 import type { PlaceFormData } from "./types";
+import { isPlaceAgeSelectionComplete } from "./isPlaceAgeChipActive";
 
 /**
  * Field weights for completion calculation
@@ -100,8 +101,10 @@ export function getPlaceCompletion(data: PlaceFormData): CompletionResult {
     missingFields.push({ field: "lng", weight: FIELD_WEIGHTS.lng, label: "Координаты (долгота)" });
   }
   
-  // Check age tags
-  if (data.ageTags && data.ageTags.length > 0) {
+  // Age is complete only when the discriminated policy is asserted and its
+  // tag payload is compatible with that policy. Migrated UNKNOWN rows remain
+  // intentionally incomplete until an editor makes a choice.
+  if (isPlaceAgeSelectionComplete({ agePolicy: data.agePolicy, ageTags: data.ageTags })) {
     achievedScore += FIELD_WEIGHTS.ageTags;
     completedFields.push("ageTags");
   } else {

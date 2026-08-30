@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
+import { AgePolicy } from "@prisma/client";
 
 import { AGE_OPTIONS } from "@/lib/config/ages";
-import { canonicalizeAgeTags, isPlaceAgeChipActive } from "./isPlaceAgeChipActive";
+import {
+  canonicalizeAgeTags,
+  isPlaceAgeChipActive,
+  isPlaceAgeSelectionComplete,
+} from "./isPlaceAgeChipActive";
 
 const ALL_KEYS = AGE_OPTIONS.map((o) => o.key);
 
-function testEmptyStoredTagsMakesEveryChipActive() {
+function testEmptyStoredTagsLeavesSpecificChipsInactive() {
   for (const key of ALL_KEYS) {
     assert.equal(
       isPlaceAgeChipActive({ storedAgeTags: [], chipAgeTag: key }),
-      true,
-      `expected "${key}" to be visually active when storedAgeTags is empty`,
+      false,
+      `expected "${key}" to stay inactive when "Любой возраст" is selected`,
     );
   }
 }
@@ -19,6 +24,33 @@ function testSpecificStoredTagsOnlyActivateThemselves() {
   assert.equal(isPlaceAgeChipActive({ storedAgeTags: ["3-5"], chipAgeTag: "3-5" }), true);
   assert.equal(isPlaceAgeChipActive({ storedAgeTags: ["3-5"], chipAgeTag: "5-7" }), false);
   assert.equal(isPlaceAgeChipActive({ storedAgeTags: ["3-5"], chipAgeTag: "0-1" }), false);
+}
+
+function testAgePolicyCompleteness() {
+  assert.equal(
+    isPlaceAgeSelectionComplete({ agePolicy: AgePolicy.UNRESTRICTED, ageTags: [] }),
+    true,
+  );
+  assert.equal(
+    isPlaceAgeSelectionComplete({ agePolicy: AgePolicy.ADULT_ONLY, ageTags: [] }),
+    true,
+  );
+  assert.equal(
+    isPlaceAgeSelectionComplete({ agePolicy: AgePolicy.SPECIFIC, ageTags: ["18+"] }),
+    true,
+  );
+  assert.equal(
+    isPlaceAgeSelectionComplete({ agePolicy: AgePolicy.UNKNOWN, ageTags: [] }),
+    false,
+  );
+  assert.equal(
+    isPlaceAgeSelectionComplete({ agePolicy: AgePolicy.SPECIFIC, ageTags: [] }),
+    false,
+  );
+  assert.equal(
+    isPlaceAgeSelectionComplete({ agePolicy: AgePolicy.UNRESTRICTED, ageTags: ["3-5"] }),
+    false,
+  );
 }
 
 function testCanonicalizeCollapsesFullSelectionToEmpty() {
@@ -36,16 +68,14 @@ function testCanonicalizeLeavesEmptyAsEmpty() {
 }
 
 function testCanonicalizeIgnoresUnknownTagsWhenCheckingCompleteness() {
-  // An unknown tag mixed in must never accidentally trigger the "all
-  // selected" collapse — canonicalization only fires on a genuine
-  // complete, exact match of the known set.
   const result = canonicalizeAgeTags([...ALL_KEYS, "not-a-real-age"]);
   assert.deepEqual(result, [...ALL_KEYS, "not-a-real-age"]);
 }
 
 function main() {
-  testEmptyStoredTagsMakesEveryChipActive();
+  testEmptyStoredTagsLeavesSpecificChipsInactive();
   testSpecificStoredTagsOnlyActivateThemselves();
+  testAgePolicyCompleteness();
   testCanonicalizeCollapsesFullSelectionToEmpty();
   testCanonicalizeLeavesPartialSelectionUntouched();
   testCanonicalizeLeavesEmptyAsEmpty();

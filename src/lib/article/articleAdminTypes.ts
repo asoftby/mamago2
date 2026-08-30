@@ -17,6 +17,7 @@ export type ArticleEditorSnapshot = {
   cityContext: string | null;
   /** EventCategory с publicationType=ARTICLE */
   categoryId: string | null;
+  additionalCategoryIds?: string[];
   /** null in UI = охват ещё не выбран (черновик). */
   geoScope: GeoScope | null;
   cityId: string | null;
@@ -51,6 +52,7 @@ export type ArticleSaveInput = {
   authorUserId: string | null;
   cityContext: string | null;
   categoryId: string | null;
+  additionalCategoryIds?: string[];
   /** undefined = не менять в БД; null = охват не выбран. */
   geoScope?: GeoScope | null;
   cityId?: string | null;

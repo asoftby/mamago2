@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import prisma, { searchIndexer } from "@/lib/prisma";
 import type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 import {
-  articleStarterContent,
   parseArticleContentJson,
   serializeArticleContent,
 } from "@/lib/publications/articleMvp";
@@ -20,6 +19,7 @@ import {
   runArticleCriticalWrite,
   runBestEffortArticleEffect,
 } from "@/lib/article/articleWriteAtomicity";
+import { assertArticleCategorySelectionShape } from "@/lib/article/articleCategorySelection";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -41,6 +41,7 @@ function toSnapshot(row: {
   authorLabel: string | null;
   cityContext: string | null;
   categoryId: string | null;
+  additionalCategoryLinks: Array<{ categoryId: string }>;
   geoScope: GeoScope | null;
   cityId: string | null;
   regionId: string | null;
@@ -75,6 +76,7 @@ function toSnapshot(row: {
     authorLabel: row.authorLabel,
     cityContext: row.cityContext,
     categoryId: row.categoryId,
+    additionalCategoryIds: row.additionalCategoryLinks.map((link) => link.categoryId),
     geoScope: row.geoScope,
     cityId: row.cityId,
     regionId: row.regionId,
@@ -122,6 +124,10 @@ const articleSelect = {
   cityId: true,
   regionId: true,
   categoryId: true,
+  additionalCategoryLinks: {
+    orderBy: { position: "asc" as const },
+    select: { categoryId: true },
+  },
   tags: {
     select: { id: true },
   },
@@ -136,12 +142,34 @@ async function assertArticleCategoryValid(categoryId: string | null): Promise<vo
       publicationType: "ARTICLE",
       isActive: true,
       archivedAt: null,
+      parentId: null,
     },
     select: { id: true },
   });
   if (!category) {
     throw new Error("Выберите действительную категорию статьи");
   }
+}
+
+async function assertAdditionalCategoriesValid(
+  tx: Prisma.TransactionClient,
+  primaryCategoryId: string | null,
+  additionalCategoryIds: string[],
+  existingIds: Set<string>,
+): Promise<void> {
+  assertArticleCategorySelectionShape(primaryCategoryId, additionalCategoryIds);
+  if (additionalCategoryIds.length === 0) return;
+  const categories = await tx.eventCategory.findMany({
+    where: { id: { in: additionalCategoryIds } },
+    select: { id: true, publicationType: true, isActive: true, archivedAt: true, parentId: true },
+  });
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const invalid = additionalCategoryIds.some((id) => {
+    const category = byId.get(id);
+    if (!category || category.publicationType !== "ARTICLE" || category.parentId !== null) return true;
+    return (!category.isActive || category.archivedAt !== null) && !existingIds.has(id);
+  });
+  if (invalid) throw new Error("Выберите действительные дополнительные категории статьи");
 }
 
 function resolvedGeoScope(input: ArticleSaveInput): {
@@ -368,6 +396,8 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
   await assertArticleCategoryValid(input.categoryId);
 
   const created = await runArticleCriticalWrite(prisma, async (tx) => {
+    const additionalCategoryIds = input.additionalCategoryIds ?? [];
+    await assertAdditionalCategoriesValid(tx, input.categoryId, additionalCategoryIds, new Set());
     const row = await tx.article.create({
       data: {
         title: input.title,
@@ -393,6 +423,9 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
         cityId: resolvedGeo.cityId,
         regionId: resolvedGeo.regionId,
         categoryId: input.categoryId,
+        additionalCategoryLinks: additionalCategoryIds.length
+          ? { create: additionalCategoryIds.map((categoryId, position) => ({ categoryId, position })) }
+          : undefined,
         noindex: input.noindex,
         tags:
           input.tagIds && input.tagIds.length > 0
@@ -459,6 +492,17 @@ export async function saveArticleDraft(
       : input.cityContext;
 
   await runArticleCriticalWrite(prisma, async (tx) => {
+    const additionalCategoryIds = input.additionalCategoryIds ?? [];
+    const existingLinks = await tx.articleCategoryLink.findMany({
+      where: { articleId: id },
+      select: { categoryId: true },
+    });
+    await assertAdditionalCategoriesValid(
+      tx,
+      input.categoryId,
+      additionalCategoryIds,
+      new Set(existingLinks.map((link) => link.categoryId)),
+    );
     await tx.article.update({
       where: { id },
       data: {
@@ -494,6 +538,12 @@ export async function saveArticleDraft(
       },
       select: { id: true },
     });
+    await tx.articleCategoryLink.deleteMany({ where: { articleId: id } });
+    if (additionalCategoryIds.length > 0) {
+      await tx.articleCategoryLink.createMany({
+        data: additionalCategoryIds.map((categoryId, position) => ({ articleId: id, categoryId, position })),
+      });
+    }
     await resolveArticleSlugOnSaveInTransaction(tx, id, input.title, input.slug);
     await syncArticleCanonicalInTransaction(tx, id);
   });
