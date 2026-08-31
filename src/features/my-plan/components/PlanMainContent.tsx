@@ -1239,7 +1239,7 @@ export function PlanMainContent({
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
-        ) : suggestionsGeneration === 0 ? (
+        ) : showDecisionFork ? (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
             onCatalog={handleOpenCatalog}

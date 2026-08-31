@@ -21,6 +21,34 @@ interface PlanItemRowProps {
 }
 
 /**
+ * The concealed "Убрать" panel sits underneath the row at all times; while
+ * it's not revealed it must be unreachable by keyboard and invisible to
+ * assistive tech, or a Tab press lands on a destructive action the user
+ * can't see. `tabIndex`/`aria-hidden` are the pair that make both true.
+ */
+export function getConcealedDeleteA11yProps(revealed: boolean): { tabIndex: number; "aria-hidden": boolean } {
+  return { tabIndex: revealed ? 0 : -1, "aria-hidden": !revealed };
+}
+
+/**
+ * A long-press that opens the reveal panel is followed by a browser-
+ * synthesized click on touchend (no pointer movement to suppress it). That
+ * synthetic click must not immediately re-close the panel it just opened —
+ * it should be consumed once, silently. Any other click while revealed
+ * (a deliberate follow-up tap, or a click while the swipe-opened panel is
+ * showing) should still close it as before.
+ */
+export function decideRowClickCapture(
+  revealed: boolean,
+  suppressNextClick: boolean,
+): { consumeSuppress: boolean; shouldClose: boolean } {
+  if (suppressNextClick) {
+    return { consumeSuppress: true, shouldClose: false };
+  }
+  return { consumeSuppress: false, shouldClose: revealed };
+}
+
+/**
  * Compact plan-item row (~72px): time -> title/location -> ticket CTA if
  * the activity has one. No persistent delete button in the resting state —
  * deletion reveals via swipe-left / long-press on touch, and via
@@ -51,6 +79,7 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const draggingRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
+  const suppressNextClickRef = useRef(false);
 
   const clearLongPress = () => {
     if (longPressTimerRef.current != null) {
@@ -69,10 +98,12 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
     if (!t) return;
     touchStartRef.current = { x: t.clientX, y: t.clientY };
     draggingRef.current = false;
+    suppressNextClickRef.current = false;
     clearLongPress();
     longPressTimerRef.current = window.setTimeout(() => {
       setDragX(-REVEAL_WIDTH);
       setRevealed(true);
+      suppressNextClickRef.current = true;
     }, LONG_PRESS_MS);
   };
 
@@ -132,6 +163,7 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
       >
         <button
           type="button"
+          {...getConcealedDeleteA11yProps(revealed)}
           onClick={() => {
             onRemove();
             closeReveal();
@@ -162,7 +194,13 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onClickCapture={(e) => {
-          if (revealed) {
+          const decision = decideRowClickCapture(revealed, suppressNextClickRef.current);
+          if (decision.consumeSuppress) {
+            suppressNextClickRef.current = false;
+            e.preventDefault();
+            return;
+          }
+          if (decision.shouldClose) {
             e.preventDefault();
             closeReveal();
           }
