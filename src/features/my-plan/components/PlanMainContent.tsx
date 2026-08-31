@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RecommendationCard } from "./RecommendationCard";
+import { PlanItemRow } from "./PlanItemRow";
 import type { PlanItemWithActivity } from "../types/event";
 import type { PlanSlotType } from "../hooks/useMyPlan";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
@@ -289,6 +290,23 @@ function buildAutoPlanHint(input: {
 
 const RECOMMENDATIONS_BLOCK_SUBTITLE =
   "Подобрано на основании ваших интересов и предпочтений";
+
+function pluralizeActivities(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return "активность";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "активности";
+  return "активностей";
+}
+
+/** Short day label for the compact "day context" line above the plan-item list. */
+function formatDayContextLabel(selectedDate: string, todayKey: string): string {
+  if (selectedDate === todayKey) return "Сегодня";
+  if (selectedDate === addDaysIso(todayKey, 1)) return "Завтра";
+  const d = new Date(selectedDate + "T12:00:00");
+  const label = d.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 function formatRecommendationHeading(selectedDate: string, todayKey: string): string {
   const d = new Date(selectedDate + "T12:00:00");
@@ -942,6 +960,14 @@ export function PlanMainContent({
   const showRecommendationResults = dayPartSections.length > 0 || hasRequestedSuggestions;
   /** Пул закончился раньше лимита подборок (включая «пусто уже с первой попытки»). */
   const suggestionsExhausted = suggestionsGeneration > 0 && !isFetchingSuggestions && suggestions.length === 0;
+  /**
+   * «Реши за меня / Сама решу» показывается только пока на выбранный день
+   * ничего не запланировано и подборка ещё не запрошена — а не «раз за
+   * сессию», как раньше. Так фор больше не всплывает поверх уже заполненного
+   * дня и не пропадает навсегда для дня, который снова опустел.
+   */
+  const showDecisionFork = dayPartSections.length === 0 && !hasRequestedSuggestions;
+  const dayContextLabel = formatDayContextLabel(selectedDate, todayKey);
 
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
@@ -965,19 +991,25 @@ export function PlanMainContent({
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
         {dayPartSections.length > 0 ? (
-          <section className={compact ? "space-y-3" : "space-y-3"} aria-label="В вашем плане">
-            {dayPartSections.map((section) => (
-              <div key={section.slot} className="space-y-3">
-                {section.items.map((item) => (
-                  <RecommendationCard
-                    key={item.id}
-                    item={item}
-                    isInPlan
-                    onRemoveFromPlan={() => handleRemoveFromPlan(item.id)}
-                  />
-                ))}
-              </div>
-            ))}
+          <section className="space-y-2" aria-label="В вашем плане">
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13,
+                color: "rgba(20,18,16,.55)",
+              }}
+            >
+              <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
+              {" · "}
+              {totalPlannedCount} {pluralizeActivities(totalPlannedCount)}
+            </p>
+            <div className="space-y-2">
+              {dayPartSections.map((section) =>
+                section.items.map((item) => (
+                  <PlanItemRow key={item.id} item={item} onRemove={() => handleRemoveFromPlan(item.id)} />
+                )),
+              )}
+            </div>
           </section>
         ) : null}
 
@@ -1112,7 +1144,7 @@ export function PlanMainContent({
 
           {awaitingAgeAnswer ? (
             <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
-          ) : suggestionsGeneration === 0 ? (
+          ) : showDecisionFork ? (
             <RecommendationDecisionBlock
               onDecide={handleDecideClick}
               onCatalog={handleOpenCatalog}
@@ -1207,7 +1239,7 @@ export function PlanMainContent({
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
-        ) : suggestionsGeneration === 0 ? (
+        ) : showDecisionFork ? (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
             onCatalog={handleOpenCatalog}

@@ -133,13 +133,22 @@ export class SearchIndexerService {
     }
   }
 
+  private async upsertArticleNow(articleId: string): Promise<void> {
+    const doc = await buildArticleDocument(this.db, articleId);
+    await this.upsertDoc(doc, "article", articleId);
+  }
+
   async upsertArticle(articleId: string): Promise<void> {
-    try {
-      const doc = await buildArticleDocument(this.db, articleId);
-      await this.upsertDoc(doc, "article", articleId);
-    } catch (e) {
-      logIndexerError(`upsertArticle ${articleId}`, e);
-    }
+    return this.enqueue("article", articleId, () => this.upsertArticleNow(articleId), false);
+  }
+
+  /**
+   * Strict variant: errors propagate instead of being caught/logged. For
+   * callers (e.g. a repair/recovery CLI) where "silently failed to index"
+   * must become "the run failed, retry" rather than a swallowed log line.
+   */
+  async upsertArticleStrict(articleId: string): Promise<void> {
+    return this.enqueue("article", articleId, () => this.upsertArticleNow(articleId), true);
   }
 
   async remove(entityType: string, entityId: string): Promise<void> {
