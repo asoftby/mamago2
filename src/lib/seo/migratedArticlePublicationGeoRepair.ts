@@ -43,6 +43,7 @@ export type PublicationGeoPlanRow = {
     status: string;
     geoScope: string | null;
     cityId: string | null;
+    regionId: string | null;
     updatedAt: string | null;
     /** The title PLAN read — for audited-state drift detection. */
     dbTitle: string | null;
@@ -76,16 +77,17 @@ export function targetState(
  * Classification order:
  * 1. not_found — article row missing.
  * 2. slug conflict — slug differs from expected.
- * 3. already_applied — publication state already matches target. For these
+ * 3. region conflict — regionId must be null for every CITY/COUNTRY target.
+ * 4. already_applied — publication state already matches target. For these
  *    rows, non-updatedAt audited fields (title, publishedAt, noindex,
  *    seoRobots, blocksCount) are still validated; only updatedAt is exempt
  *    because a successful APPLY legitimately advances it via @updatedAt.
- * 4. audited-state drift — for rows NOT yet in the target state (pre-repair),
+ * 5. audited-state drift — for rows NOT yet in the target state (pre-repair),
  *    every audited field including updatedAt must exactly match the PROD
  *    snapshot. If any drifted, the row is classified as conflict and APPLY
  *    is blocked.
- * 5. precondition violated — publication fields not in expected PENDING/null/null.
- * 6. apply — all checks pass, ready for atomic repair.
+ * 6. precondition violated — publication fields are not PENDING/null/null/null.
+ * 7. apply — all checks pass, ready for atomic repair.
  */
 export async function buildPublicationGeoPlan(
   prisma: PrismaClient,
@@ -106,6 +108,7 @@ export async function buildPublicationGeoPlan(
         status: true,
         geoScope: true,
         cityId: true,
+        regionId: true,
         title: true,
         updatedAt: true,
         publishedAt: true,
@@ -135,6 +138,7 @@ export async function buildPublicationGeoPlan(
       status: article.status,
       geoScope: article.geoScope,
       cityId: article.cityId,
+      regionId: article.regionId,
       updatedAt: article.updatedAt?.toISOString() ?? null,
       dbTitle: article.title,
       publishedAt: article.publishedAt?.toISOString() ?? null,
@@ -162,6 +166,23 @@ export async function buildPublicationGeoPlan(
       continue;
     }
 
+    // CITY and COUNTRY recovery targets must never retain a primary region.
+    // This is an audited precondition, not a field this repair may normalize.
+    if (before.regionId !== null) {
+      plan.push({
+        articleId: recovery.articleId,
+        title: recovery.title,
+        expectedSlug: recovery.currentSlug,
+        expectedUpdatedAt: recovery.expectedUpdatedAt,
+        before,
+        after,
+        finalCanonicalPath,
+        action: "conflict",
+        reason: `unexpected regionId: db=${before.regionId} expected=null`,
+      });
+      continue;
+    }
+
     // ---------- already applied / idempotent check (FIRST, before audited-state) ----------
     // After a successful APPLY, Article.updatedAt advances via @updatedAt. The audited
     // expectedUpdatedAt timestamp is then stale. We must detect already_applied by the
@@ -173,7 +194,8 @@ export async function buildPublicationGeoPlan(
     const matchesTargetPubState =
       before.status === after.status &&
       before.geoScope === after.geoScope &&
-      before.cityId === after.cityId;
+      before.cityId === after.cityId &&
+      before.regionId === null;
 
     if (matchesTargetPubState) {
       // Row already matches the target state. Check non-updatedAt audited fields for
@@ -288,7 +310,10 @@ export async function buildPublicationGeoPlan(
 
     // ---------- precondition violated (publication-state fields) ----------
     const matchesPrecondition =
-      before.status === "PENDING" && before.geoScope === null && before.cityId === null;
+      before.status === "PENDING" &&
+      before.geoScope === null &&
+      before.cityId === null &&
+      before.regionId === null;
 
     if (!matchesPrecondition) {
       plan.push({
@@ -300,7 +325,9 @@ export async function buildPublicationGeoPlan(
         after,
         finalCanonicalPath,
         action: "conflict",
-        reason: `unexpected current state: status=${before.status} geoScope=${before.geoScope} cityId=${before.cityId}`,
+        reason:
+          `unexpected current state: status=${before.status} geoScope=${before.geoScope} ` +
+          `cityId=${before.cityId} regionId=${before.regionId}`,
       });
       continue;
     }
@@ -455,6 +482,7 @@ export async function applyPublicationGeoPlan(
             status: "PENDING",
             geoScope: null,
             cityId: null,
+            regionId: null,
             // Audited-state guard: fail-closed if content was edited after the PROD audit
             updatedAt: new Date(row.expectedUpdatedAt),
           },
@@ -467,7 +495,8 @@ export async function applyPublicationGeoPlan(
         if (result.count !== 1) {
           throw new Error(
             `[migratedArticlePublicationGeoRepair] Precondition no longer holds for ${row.articleId} ` +
-              `(expected PENDING/null/null slug=${row.expectedSlug} updatedAt=${row.expectedUpdatedAt}); ` +
+              `(expected status=PENDING geoScope=null cityId=null regionId=null ` +
+              `slug=${row.expectedSlug} updatedAt=${row.expectedUpdatedAt}); ` +
               `aborting transaction, no partial writes`,
           );
         }

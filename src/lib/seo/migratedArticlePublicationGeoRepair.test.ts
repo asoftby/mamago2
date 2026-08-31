@@ -5,6 +5,7 @@
  * Run: set -a; source .env; set +a; pnpm exec tsx src/lib/seo/migratedArticlePublicationGeoRepair.test.ts
  */
 import assert from "node:assert/strict";
+import type { PrismaClient } from "@prisma/client";
 import { prismaBase as prisma, searchIndexer } from "@/lib/prisma";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
 import {
@@ -35,11 +36,21 @@ async function getOtherCity(excludeCityId: string) {
   return city;
 }
 
+async function getValidRegion() {
+  const region = await prisma.region.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+  });
+  assert.ok(region, "expected an active region in the local DB");
+  return region;
+}
+
 async function createPendingArticle(opts: {
   slug: string;
   cityId?: string | null;
   geoScope?: "CITY" | "COUNTRY" | null;
   status?: "PENDING" | "PUBLISHED";
+  regionId?: string | null;
 }) {
   return prisma.article.create({
     data: {
@@ -48,6 +59,7 @@ async function createPendingArticle(opts: {
       status: opts.status ?? "PENDING",
       geoScope: opts.geoScope ?? null,
       cityId: opts.cityId ?? null,
+      regionId: opts.regionId ?? null,
       publishedAt: new Date("2024-06-01T00:00:00Z"),
       contentJson: {
         version: 1,
@@ -67,6 +79,7 @@ async function getArticleFull(id: string) {
       status: true,
       geoScope: true,
       cityId: true,
+      regionId: true,
       title: true,
       updatedAt: true,
       publishedAt: true,
@@ -252,6 +265,154 @@ async function testWrongCityConflictFailsClosed() {
     assert.equal(after?.cityId, otherCity.id, "conflict row must not be written");
   } finally {
     await cleanup(fixture.id);
+  }
+}
+
+async function testRegionPresentBeforePlanFailsClosed() {
+  const minsk = await getMinskCity();
+  const region = await getValidRegion();
+  const slug = `pub-geo-region-preplan-${Date.now().toString(36)}`;
+  const fixture = await createPendingArticle({ slug, regionId: region.id });
+
+  try {
+    const recovery = makeRecovery(fixture, "CITY");
+    recovery.expectedUpdatedAt = fixture.updatedAt.toISOString();
+
+    const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan[0].action, "conflict");
+    assert.match(plan[0].reason ?? "", /unexpected regionId/);
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
+
+    const after = await getArticleFull(fixture.id);
+    assert.equal(after?.status, "PENDING");
+    assert.equal(after?.geoScope, null);
+    assert.equal(after?.cityId, null);
+    assert.equal(after?.regionId, region.id, "repair must not normalize regionId");
+  } finally {
+    await cleanup(fixture.id);
+  }
+}
+
+async function testRegionDriftBetweenPlanAndApplyRollsBackWholeTransaction() {
+  const minsk = await getMinskCity();
+  const region = await getValidRegion();
+  const suffix = Date.now().toString(36);
+  const validFixture = await createPendingArticle({ slug: `pub-geo-region-valid-${suffix}` });
+  const driftFixture = await createPendingArticle({ slug: `pub-geo-region-drift-${suffix}` });
+
+  try {
+    const validRecovery = makeRecovery(validFixture, "CITY");
+    const driftRecovery = makeRecovery(driftFixture, "CITY");
+    validRecovery.expectedUpdatedAt = validFixture.updatedAt.toISOString();
+    driftRecovery.expectedUpdatedAt = driftFixture.updatedAt.toISOString();
+
+    const plan = await buildPublicationGeoPlan(
+      prisma,
+      [validRecovery, driftRecovery],
+      minsk.id,
+    );
+    assert.deepEqual(
+      plan.map((row) => row.action),
+      ["apply", "apply"],
+    );
+
+    await prisma.article.update({
+      where: { id: driftFixture.id },
+      data: { regionId: region.id },
+    });
+
+    let indexCalls = 0;
+    const countingIndexer = {
+      async upsertArticleStrict(): Promise<void> {
+        indexCalls += 1;
+      },
+    };
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, countingIndexer));
+    assert.equal(indexCalls, 0, "search indexing must not run after transaction rollback");
+
+    const validAfter = await getArticleFull(validFixture.id);
+    assert.equal(validAfter?.status, "PENDING", "valid sibling publication must roll back");
+    assert.equal(validAfter?.geoScope, null);
+    assert.equal(validAfter?.cityId, null);
+    assert.equal(validAfter?.regionId, null);
+
+    const driftAfter = await getArticleFull(driftFixture.id);
+    assert.equal(driftAfter?.status, "PENDING");
+    assert.equal(driftAfter?.geoScope, null);
+    assert.equal(driftAfter?.cityId, null);
+    assert.equal(driftAfter?.regionId, region.id, "drifted regionId must remain untouched");
+  } finally {
+    await cleanup(validFixture.id);
+    await cleanup(driftFixture.id);
+  }
+}
+
+async function testInvalidAlreadyAppliedRegionFailsClosed() {
+  const minsk = await getMinskCity();
+  const region = await getValidRegion();
+  const suffix = Date.now().toString(36);
+  const cityFixture = await createPendingArticle({
+    slug: `pub-geo-region-city-target-${suffix}`,
+    status: "PUBLISHED",
+    geoScope: "CITY",
+    cityId: minsk.id,
+  });
+  const countryFixture = await createPendingArticle({
+    slug: `pub-geo-region-country-target-${suffix}`,
+    status: "PUBLISHED",
+    geoScope: "COUNTRY",
+  });
+
+  try {
+    const cityRecovery = makeRecovery(cityFixture, "CITY");
+    const countryRecovery = makeRecovery(countryFixture, "COUNTRY");
+    cityRecovery.expectedUpdatedAt = cityFixture.updatedAt.toISOString();
+    countryRecovery.expectedUpdatedAt = countryFixture.updatedAt.toISOString();
+
+    // The current DB CHECK constraint rejects CITY/COUNTRY + regionId at
+    // write time. Simulate a legacy/drifted row at the planner read boundary
+    // so the application guard is independently covered as well.
+    await assert.rejects(() =>
+      prisma.article.update({
+        where: { id: cityFixture.id },
+        data: { regionId: region.id },
+      }),
+    );
+    await assert.rejects(() =>
+      prisma.article.update({
+        where: { id: countryFixture.id },
+        data: { regionId: region.id },
+      }),
+    );
+
+    const citySnapshot = await getArticleFull(cityFixture.id);
+    const countrySnapshot = await getArticleFull(countryFixture.id);
+    assert.ok(citySnapshot);
+    assert.ok(countrySnapshot);
+    const snapshots = new Map([
+      [cityFixture.id, { ...citySnapshot, regionId: region.id }],
+      [countryFixture.id, { ...countrySnapshot, regionId: region.id }],
+    ]);
+    const driftedReadClient = {
+      article: {
+        findUnique: async ({ where }: { where: { id: string } }) => snapshots.get(where.id) ?? null,
+      },
+    } as unknown as PrismaClient;
+
+    const plan = await buildPublicationGeoPlan(
+      driftedReadClient,
+      [cityRecovery, countryRecovery],
+      minsk.id,
+    );
+    assert.deepEqual(
+      plan.map((row) => row.action),
+      ["conflict", "conflict"],
+    );
+    for (const row of plan) assert.match(row.reason ?? "", /unexpected regionId/);
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
+  } finally {
+    await cleanup(cityFixture.id);
+    await cleanup(countryFixture.id);
   }
 }
 
@@ -727,6 +888,9 @@ async function main() {
   await testCityRecoveryApply();
   await testCountryRecoveryApply();
   await testWrongCityConflictFailsClosed();
+  await testRegionPresentBeforePlanFailsClosed();
+  await testRegionDriftBetweenPlanAndApplyRollsBackWholeTransaction();
+  await testInvalidAlreadyAppliedRegionFailsClosed();
   await testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction();
   await testSlugDriftBetweenPlanAndApplyFailsClosed();
   await testMissingArticleFailsClosed();
