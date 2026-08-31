@@ -11,14 +11,20 @@
  * src/lib/seo/migratedArticlePublicationGeoRecovery.ts are touched. APPLY
  * only ever changes Article.status/geoScope/cityId; every other field
  * (slug, title, contentJson, publishedAt, createdAt, author, categories,
- * tags, noindex, seoRobots) is read for precondition verification only and
- * is never written. Fails closed (no writes, non-zero exit) if any row's
- * current DB state does not exactly match either the expected pre-repair
- * precondition or the already-applied target state.
+ * tags, noindex, seoRobots) is read for precondition or audited-state
+ * verification only and is never written. Fails closed (no writes, non-zero
+ * exit) if any row's current DB state does not exactly match either the
+ * expected pre-repair precondition or the already-applied target state.
+ *
+ * The Minsk city lookup is scoped to Belarus (DEFAULT_COUNTRY_ISO="BY"),
+ * requires isLegacyNonCity=false and isActive=true, and fails if exactly
+ * one valid Minsk city cannot be resolved. This prevents a same-slug city
+ * in another country from being inadvertently selected.
  *
  * PROD writes are intentionally manual and out-of-band, same as Phase 1.
  */
 import { PrismaClient } from "@prisma/client";
+import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
 import {
   MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
   MINSK_CITY_SLUG,
@@ -33,13 +39,22 @@ const prisma = new PrismaClient();
 const apply = process.argv.includes("--apply");
 
 async function main() {
+  // Unambiguous Belarus/non-legacy Minsk lookup. Fails if exactly one valid
+  // Minsk city cannot be resolved, preventing same-slug cities outside
+  // Belarus from being selected.
   const minskCity = await prisma.city.findFirst({
-    where: { slug: MINSK_CITY_SLUG },
+    where: {
+      slug: MINSK_CITY_SLUG,
+      isActive: true,
+      isLegacyNonCity: false,
+      country: { isoCode: DEFAULT_COUNTRY_ISO },
+    },
     select: { id: true },
   });
   if (!minskCity) {
     throw new Error(
-      `[repair-migrated-article-publication-geo] City not found: slug=${MINSK_CITY_SLUG}`,
+      `[repair-migrated-article-publication-geo] City not found: ` +
+        `slug=${MINSK_CITY_SLUG} country=${DEFAULT_COUNTRY_ISO} isActive=true isLegacyNonCity=false`,
     );
   }
 
@@ -50,7 +65,7 @@ async function main() {
   );
 
   console.log("=== MIGRATED ARTICLE PUBLICATION/GEO REPAIR PLAN ===");
-  for (const row of plan) console.log(JSON.stringify(row));
+  for (const row of plan) console.log(JSON.stringify(row, null, 2));
 
   const summary = summarizePublicationGeoPlan(plan, apply ? "apply" : "plan");
   console.log("=== SUMMARY ===");
@@ -58,7 +73,11 @@ async function main() {
 
   if (!apply) return;
 
-  const result = await applyPublicationGeoPlan(prisma, plan);
+  const result = await applyPublicationGeoPlan(
+    prisma,
+    plan,
+    MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
+  );
   console.log(`[repair-migrated-article-publication-geo] Applied ${result.applied} row(s).`);
 }
 

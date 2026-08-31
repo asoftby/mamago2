@@ -3,6 +3,8 @@
  * matrix: the legacy redirect target for each article in
  * scripts/data/wp-redirect-map.json must respect that article's reviewed
  * geoScope (CITY -> /minsk/blog/{slug}, COUNTRY -> /blog/{slug}).
+ * Also validates the audited-state fingerprint fields exist and are
+ * self-consistent.
  * Run: pnpm exec tsx src/lib/seo/migratedArticlePublicationGeoRecovery.test.ts
  */
 import assert from "node:assert/strict";
@@ -44,6 +46,42 @@ function testMatrixShape() {
   }
 }
 
+function testAuditedStateFingerprint() {
+  for (const recovery of MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES) {
+    // expectedUpdatedAt must be a valid ISO-8601 UTC timestamp
+    assert.ok(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(recovery.expectedUpdatedAt),
+      `${recovery.articleId} expectedUpdatedAt must be ISO-8601 UTC with milliseconds: ${recovery.expectedUpdatedAt}`,
+    );
+    assert.equal(
+      recovery.expectedUpdatedAt.endsWith("Z"),
+      true,
+      `${recovery.articleId} expectedUpdatedAt must be in UTC (ending Z)`,
+    );
+    // auditedTitle must match matrix title
+    assert.equal(
+      recovery.auditedTitle,
+      recovery.title,
+      `${recovery.articleId} auditedTitle must equal matrix title`,
+    );
+    // auditedPublishedAt must be valid ISO-8601 UTC
+    assert.ok(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(recovery.auditedPublishedAt),
+      `${recovery.articleId} auditedPublishedAt must be ISO-8601 UTC with milliseconds: ${recovery.auditedPublishedAt}`,
+    );
+    assert.equal(
+      typeof recovery.auditedNoindex,
+      "boolean",
+      `${recovery.articleId} auditedNoindex must be boolean`,
+    );
+    // blocksCount must be a positive integer
+    assert.ok(
+      Number.isInteger(recovery.auditedBlocksCount) && recovery.auditedBlocksCount > 0,
+      `${recovery.articleId} auditedBlocksCount must be a positive integer, got ${recovery.auditedBlocksCount}`,
+    );
+  }
+}
+
 function testLegacyRedirectTargetRespectsGeoScope() {
   for (const recovery of MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES) {
     const entry = wpRedirectMap.find((row) => row.source === recovery.legacyUrl);
@@ -69,6 +107,7 @@ function testCountryArticlesUseNationalPath() {
 }
 
 testMatrixShape();
+testAuditedStateFingerprint();
 testLegacyRedirectTargetRespectsGeoScope();
 testCountryArticlesUseNationalPath();
 

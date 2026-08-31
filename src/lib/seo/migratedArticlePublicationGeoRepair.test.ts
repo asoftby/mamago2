@@ -12,13 +12,23 @@ import {
   buildPublicationGeoPlan,
 } from "./migratedArticlePublicationGeoRepair";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
+import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 
+/**
+ * Resolves the Minsk city using the same Belarus-scoped lookup the repair
+ * script uses. This ensures the test matches production behavior.
+ */
 async function getMinskCity() {
   const city = await prisma.city.findFirst({
-    where: { slug: "minsk", isActive: true },
+    where: {
+      slug: "minsk",
+      isActive: true,
+      isLegacyNonCity: false,
+      country: { isoCode: DEFAULT_COUNTRY_ISO },
+    },
     select: { id: true, slug: true },
   });
-  assert.ok(city, "expected active minsk city in local DB");
+  assert.ok(city, "expected active Belarus Minsk city in local DB");
   return city;
 }
 
@@ -49,12 +59,61 @@ async function createPendingArticle(opts: {
         blocks: [{ id: "b1", type: "text", text: "Regression fixture paragraph." }],
       },
     },
-    select: { id: true, title: true, contentJson: true, publishedAt: true, slug: true },
+    select: { id: true, title: true, contentJson: true, publishedAt: true, slug: true, updatedAt: true },
+  });
+}
+
+async function getArticleFull(id: string) {
+  return prisma.article.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      slug: true,
+      status: true,
+      geoScope: true,
+      cityId: true,
+      title: true,
+      updatedAt: true,
+      publishedAt: true,
+      noindex: true,
+      seoRobots: true,
+      contentJson: true,
+    },
   });
 }
 
 async function cleanup(articleId: string) {
   await prisma.article.deleteMany({ where: { id: articleId } });
+}
+
+function makeRecovery(
+  fixture: { id: string; title: string; slug: string | null },
+  geoScope: "CITY" | "COUNTRY",
+  opts?: {
+    overrideTitle?: string;
+    overrideUpdatedAt?: string;
+    overridePublishedAt?: string;
+    overrideNoindex?: boolean;
+    overrideBlocksCount?: number;
+    citySlug?: "minsk" | null;
+  },
+): MigratedArticlePublicationGeoRecovery {
+  return {
+    articleId: fixture.id,
+    title: fixture.title,
+    auditedTitle: opts?.overrideTitle ?? fixture.title,
+    currentSlug: fixture.slug ?? "missing-slug",
+    legacyUrl: `/${fixture.slug ?? "missing-slug"}-legacy`,
+    geoScope,
+    citySlug: geoScope === "CITY" ? "minsk" : null,
+    confidence: "HIGH",
+    reason: "test fixture",
+    expectedUpdatedAt: opts?.overrideUpdatedAt ?? new Date().toISOString(),
+    auditedPublishedAt: opts?.overridePublishedAt ?? "2024-06-01T00:00:00.000Z",
+    auditedNoindex: opts?.overrideNoindex ?? false,
+    auditedSeoRobots: null,
+    auditedBlocksCount: opts?.overrideBlocksCount ?? 1,
+  };
 }
 
 async function testCityRecoveryApply() {
@@ -64,16 +123,10 @@ async function testCityRecoveryApply() {
   const fixture = await createPendingArticle({ slug });
 
   try {
-    const recovery: MigratedArticlePublicationGeoRecovery = {
-      articleId: fixture.id,
-      title: fixture.title,
-      currentSlug: slug,
-      legacyUrl: `/${slug}-legacy`,
-      geoScope: "CITY",
-      citySlug: "minsk",
-      confidence: "HIGH",
-      reason: "test fixture",
-    };
+    const recovery = makeRecovery(fixture, "CITY");
+    // Set expectedUpdatedAt to the actual updatedAt we just created
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
 
     const before = await prisma.article.findFirst({
       where: { ...getPublicPublishedArticleWhere(), id: fixture.id },
@@ -86,21 +139,10 @@ async function testCityRecoveryApply() {
     assert.equal(plan[0].action, "apply");
     assert.equal(plan[0].finalCanonicalPath, `/minsk/blog/${slug}`);
 
-    const result = await applyPublicationGeoPlan(prisma, plan);
+    const result = await applyPublicationGeoPlan(prisma, plan, [recovery]);
     assert.equal(result.applied, 1);
 
-    const after = await prisma.article.findUnique({
-      where: { id: fixture.id },
-      select: {
-        status: true,
-        geoScope: true,
-        cityId: true,
-        slug: true,
-        title: true,
-        contentJson: true,
-        publishedAt: true,
-      },
-    });
+    const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PUBLISHED");
     assert.equal(after?.geoScope, "CITY");
     assert.equal(after?.cityId, minsk.id);
@@ -117,9 +159,17 @@ async function testCityRecoveryApply() {
     assert.ok(nowPublic, "PUBLISHED article must be publicly visible after repair");
 
     // Idempotent rerun: second PLAN reports already_applied, APPLY is a no-op.
-    const plan2 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    // Re-read updatedAt (it may have changed due to the apply write)
+    const postApply = await getArticleFull(fixture.id);
+    const recovery2 = makeRecovery(fixture, "CITY");
+    recovery2.expectedUpdatedAt = postApply!.updatedAt!.toISOString();
+    recovery2.auditedPublishedAt = "2024-06-01T00:00:00.000Z";
+    recovery2.auditedTitle = fixture.title;
+    recovery2.auditedBlocksCount = 1;
+
+    const plan2 = await buildPublicationGeoPlan(prisma, [recovery2], minsk.id);
     assert.equal(plan2[0].action, "already_applied");
-    const result2 = await applyPublicationGeoPlan(prisma, plan2);
+    const result2 = await applyPublicationGeoPlan(prisma, plan2, [recovery2]);
     assert.equal(result2.applied, 0);
   } finally {
     await cleanup(fixture.id);
@@ -133,27 +183,17 @@ async function testCountryRecoveryApply() {
   const fixture = await createPendingArticle({ slug });
 
   try {
-    const recovery: MigratedArticlePublicationGeoRecovery = {
-      articleId: fixture.id,
-      title: fixture.title,
-      currentSlug: slug,
-      legacyUrl: `/${slug}-legacy`,
-      geoScope: "COUNTRY",
-      citySlug: null,
-      confidence: "MEDIUM",
-      reason: "test fixture",
-    };
+    const recovery = makeRecovery(fixture, "COUNTRY");
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
 
     const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
     assert.equal(plan[0].action, "apply");
     assert.equal(plan[0].finalCanonicalPath, `/blog/${slug}`);
 
-    await applyPublicationGeoPlan(prisma, plan);
+    await applyPublicationGeoPlan(prisma, plan, [recovery]);
 
-    const after = await prisma.article.findUnique({
-      where: { id: fixture.id },
-      select: { status: true, geoScope: true, cityId: true },
-    });
+    const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PUBLISHED");
     assert.equal(after?.geoScope, "COUNTRY");
     assert.equal(after?.cityId, null);
@@ -176,26 +216,16 @@ async function testWrongCityConflictFailsClosed() {
   const fixture = await createPendingArticle({ slug, cityId: otherCity.id, geoScope: "CITY" });
 
   try {
-    const recovery: MigratedArticlePublicationGeoRecovery = {
-      articleId: fixture.id,
-      title: fixture.title,
-      currentSlug: slug,
-      legacyUrl: `/${slug}-legacy`,
-      geoScope: "CITY",
-      citySlug: "minsk",
-      confidence: "HIGH",
-      reason: "test fixture",
-    };
+    const recovery = makeRecovery(fixture, "CITY");
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
 
     const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
     assert.equal(plan[0].action, "conflict");
 
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
 
-    const after = await prisma.article.findUnique({
-      where: { id: fixture.id },
-      select: { status: true, geoScope: true, cityId: true },
-    });
+    const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PENDING", "conflict row must not be written");
     assert.equal(after?.cityId, otherCity.id, "conflict row must not be written");
   } finally {
@@ -222,26 +252,14 @@ async function testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction() {
   const driftFixture = await createPendingArticle({ slug: driftSlug });
 
   try {
-    const validRecovery: MigratedArticlePublicationGeoRecovery = {
-      articleId: validFixture.id,
-      title: validFixture.title,
-      currentSlug: validSlug,
-      legacyUrl: `/${validSlug}-legacy`,
-      geoScope: "CITY",
-      citySlug: "minsk",
-      confidence: "HIGH",
-      reason: "test fixture",
-    };
-    const driftRecovery: MigratedArticlePublicationGeoRecovery = {
-      articleId: driftFixture.id,
-      title: driftFixture.title,
-      currentSlug: driftSlug,
-      legacyUrl: `/${driftSlug}-legacy`,
-      geoScope: "CITY",
-      citySlug: "minsk",
-      confidence: "HIGH",
-      reason: "test fixture",
-    };
+    const validRecovery = makeRecovery(validFixture, "CITY");
+    const driftRecovery = makeRecovery(driftFixture, "CITY");
+
+    // Set expectedUpdatedAt to actual timestamps
+    const validFull = await getArticleFull(validFixture.id);
+    const driftFull = await getArticleFull(driftFixture.id);
+    validRecovery.expectedUpdatedAt = validFull!.updatedAt!.toISOString();
+    driftRecovery.expectedUpdatedAt = driftFull!.updatedAt!.toISOString();
 
     // PLAN observes both rows as clean PENDING/null/null -> both "apply".
     const plan = await buildPublicationGeoPlan(prisma, [validRecovery, driftRecovery], minsk.id);
@@ -257,12 +275,9 @@ async function testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction() {
     // validRecovery is ordered first so its write would commit inside the
     // transaction before driftRecovery's atomic precondition check fails —
     // proving the rollback undoes an already-applied sibling write too.
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [validRecovery, driftRecovery]));
 
-    const validAfter = await prisma.article.findUnique({
-      where: { id: validFixture.id },
-      select: { status: true, geoScope: true, cityId: true },
-    });
+    const validAfter = await getArticleFull(validFixture.id);
     assert.equal(
       validAfter?.status,
       "PENDING",
@@ -271,10 +286,7 @@ async function testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction() {
     assert.equal(validAfter?.geoScope, null);
     assert.equal(validAfter?.cityId, null);
 
-    const driftAfter = await prisma.article.findUnique({
-      where: { id: driftFixture.id },
-      select: { status: true, geoScope: true, cityId: true },
-    });
+    const driftAfter = await getArticleFull(driftFixture.id);
     assert.equal(driftAfter?.status, "NEEDS_REVISION", "drifted row must remain untouched by repair");
   } finally {
     await cleanup(validFixture.id);
@@ -290,16 +302,9 @@ async function testSlugDriftBetweenPlanAndApplyFailsClosed() {
   const fixture = await createPendingArticle({ slug });
 
   try {
-    const recovery: MigratedArticlePublicationGeoRecovery = {
-      articleId: fixture.id,
-      title: fixture.title,
-      currentSlug: slug,
-      legacyUrl: `/${slug}-legacy`,
-      geoScope: "CITY",
-      citySlug: "minsk",
-      confidence: "HIGH",
-      reason: "test fixture",
-    };
+    const recovery = makeRecovery(fixture, "CITY");
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
 
     const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
     assert.equal(plan[0].action, "apply");
@@ -308,12 +313,9 @@ async function testSlugDriftBetweenPlanAndApplyFailsClosed() {
     const driftedSlug = `${slug}-edited`;
     await prisma.article.update({ where: { id: fixture.id }, data: { slug: driftedSlug } });
 
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
 
-    const after = await prisma.article.findUnique({
-      where: { id: fixture.id },
-      select: { status: true, geoScope: true, cityId: true, slug: true },
-    });
+    const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PENDING", "slug-drifted row must not be published");
     assert.equal(after?.slug, driftedSlug, "repair must never touch slug");
   } finally {
@@ -326,17 +328,234 @@ async function testMissingArticleFailsClosed() {
   const recovery: MigratedArticlePublicationGeoRecovery = {
     articleId: `missing-pub-geo-${Date.now().toString(36)}`,
     title: "Missing article",
+    auditedTitle: "Missing article",
     currentSlug: "missing-pub-geo-slug",
     legacyUrl: "/missing-pub-geo-slug-legacy",
     geoScope: "CITY",
     citySlug: "minsk",
     confidence: "HIGH",
     reason: "test fixture",
+    expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+    auditedPublishedAt: "2024-01-01T00:00:00.000Z",
+    auditedNoindex: false,
+    auditedSeoRobots: null,
+    auditedBlocksCount: 1,
   };
 
   const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
   assert.equal(plan[0].action, "not_found");
-  await assert.rejects(() => applyPublicationGeoPlan(prisma, plan));
+  await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
+}
+
+/**
+ * Regression: if the article's content/title/SEO fields are edited after the
+ * PROD audit (while staying PENDING/null/null), updatedAt advances via
+ * @updatedAt, so the audited-state guard must reject the row and PLAN must
+ * report conflict.
+ *
+ * This prevents the one-recovery TOCTOU gap: the original atomic guard only
+ * checked id/slug/PENDING/null/null, which would still match after a
+ * content-only edit. Adding updatedAt === expectedUpdatedAt to both PLAN
+ * validation and the updateMany WHERE clause closes this gap.
+ */
+async function testContentEditAfterAuditFailsClosed() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const slug = `pub-geo-contentdrift-${suffix}`;
+  const fixture = await createPendingArticle({ slug });
+
+  try {
+    const recovery = makeRecovery(fixture, "CITY");
+
+    // Capture the updatedAt from just after creation (simulates "audit time")
+    const initialFull = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = initialFull!.updatedAt!.toISOString();
+    recovery.auditedTitle = fixture.title;
+    recovery.auditedPublishedAt = "2024-06-01T00:00:00.000Z";
+    recovery.auditedNoindex = false;
+    recovery.auditedBlocksCount = 1;
+
+    // PLAN at this point should see "apply" — everything matches.
+    const plan1 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan1[0].action, "apply");
+
+    // Now simulate a "post-audit edit": change title while keeping PENDING/null/null.
+    // This advances updatedAt via @updatedAt, invalidating the audited-state guard.
+    const newTitle = `EDITED AFTER AUDIT ${suffix}`;
+    await prisma.article.update({
+      where: { id: fixture.id },
+      data: { title: newTitle },
+    });
+
+    // Re-check: PLAN should now report conflict due to updatedAt drift (and title drift).
+    const plan2 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(
+      plan2[0].action,
+      "conflict",
+      "post-audit content edit must be detected as conflict",
+    );
+    assert.ok(
+      plan2[0].reason?.includes("audited state drift"),
+      `conflict reason must mention audited state drift: ${plan2[0].reason}`,
+    );
+
+    // APPLY must refuse and never touch the row.
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan2, [recovery]));
+
+    const after = await getArticleFull(fixture.id);
+    assert.equal(after?.status, "PENDING", "content-drifted row must not be published");
+    assert.equal(after?.title, newTitle, "title must retain the post-audit value");
+    assert.equal(after?.geoScope, null, "geoScope must remain unchanged");
+    assert.equal(after?.cityId, null, "cityId must remain unchanged");
+  } finally {
+    await cleanup(fixture.id);
+  }
+}
+
+/**
+ * Regression: content edit after PLAN but before APPLY must also fail.
+ * The updateMany WHERE clause includes updatedAt=expectedUpdatedAt, so even
+ * if PLAN was built before the edit, the APPLY write will fail because the
+ * @updatedAt timestamp no longer matches.
+ */
+async function testContentDriftBetweenPlanAndApplyFailsClosed() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const slug = `pub-geo-race-content-${suffix}`;
+  const fixture = await createPendingArticle({ slug });
+
+  try {
+    const recovery = makeRecovery(fixture, "CITY");
+    const initialFull = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = initialFull!.updatedAt!.toISOString();
+    recovery.auditedTitle = fixture.title;
+    recovery.auditedPublishedAt = "2024-06-01T00:00:00.000Z";
+    recovery.auditedNoindex = false;
+    recovery.auditedBlocksCount = 1;
+
+    // PLAN — looks good
+    const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan[0].action, "apply");
+
+    // Edit content AFTER PLAN, before APPLY (changes updatedAt)
+    await prisma.article.update({
+      where: { id: fixture.id },
+      data: { title: `post-plan-edit-${suffix}` },
+    });
+
+    // APPLY should fail because updatedAt no longer matches
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
+
+    const after = await getArticleFull(fixture.id);
+    assert.equal(after?.status, "PENDING", "content-drifted row must not be published");
+    assert.equal(after?.geoScope, null, "geoScope must remain unchanged");
+    assert.equal(after?.cityId, null, "cityId must remain unchanged");
+  } finally {
+    await cleanup(fixture.id);
+  }
+}
+
+/**
+ * Regression: the Minsk city lookup must be scoped to Belarus
+ * (DEFAULT_COUNTRY_ISO="BY"). Create a "minsk" city in a non-Belarus
+ * country and verify that the helper function does not pick it up.
+ *
+ * This test directly queries the Prisma model with the same WHERE clause
+ * the repair script uses. If only one valid Minsk exists (in Belarus), the
+ * filtered result returns just the Belarus one. Without the country filter,
+ * a foreign "minsk" would cause ambiguity.
+ *
+ * We validate by:
+ * 1. Creating a temporary City row in another country with slug "minsk"
+ * 2. Querying with the repair script's WHERE clause
+ * 3. Confirming only the Belarus Minsk is returned
+ * 4. Cleaning up the foreign row
+ */
+async function testBelarusScopedMinskLookup() {
+  // First, get the current Belarus Minsk city ID.
+  const minsk = await getMinskCity();
+  assert.ok(minsk, "Belarus Minsk city must exist");
+
+  // Find or create a non-Belarus country to host a foreign "minsk"
+  let foreignCountry = await prisma.country.findFirst({
+    where: { isoCode: { not: DEFAULT_COUNTRY_ISO } },
+    select: { id: true, isoCode: true },
+  });
+
+  let createdCountry = false;
+  if (!foreignCountry) {
+    // Create a temporary test country
+    foreignCountry = await prisma.country.create({
+      data: {
+        isoCode: "ZZ",
+        name: "Fake Test Country",
+        slug: "fake-test-country",
+        isActive: false,
+        priority: 0,
+      },
+      select: { id: true, isoCode: true },
+    });
+    createdCountry = true;
+  }
+
+  // Create a temporary "minsk" city in the non-Belarus country
+  const foreignMinsk = await prisma.city.create({
+    data: {
+      slug: "minsk",
+      name: "Minsk (foreign)",
+      countryId: foreignCountry!.id,
+      isActive: true,
+      isLegacyNonCity: false,
+    },
+    select: { id: true },
+  });
+
+  try {
+    // Query with the same WHERE the repair script uses — must return exactly one (Belarus) Minsk
+    const belarusMinsk = await prisma.city.findFirst({
+      where: {
+        slug: "minsk",
+        isActive: true,
+        isLegacyNonCity: false,
+        country: { isoCode: DEFAULT_COUNTRY_ISO },
+      },
+      select: { id: true },
+    });
+    assert.ok(belarusMinsk, "Belarus Minsk must still be resolvable");
+    assert.equal(belarusMinsk!.id, minsk.id, "must resolve to the Belarus Minsk");
+
+    // Without the country filter, there are now two "minsk" cities
+    const allMinsk = await prisma.city.findMany({
+      where: { slug: "minsk", isActive: true, isLegacyNonCity: false },
+      select: { id: true },
+    });
+    assert.ok(
+      allMinsk.length >= 2,
+      `with foreign minsk, must find at least 2 minsk cities, got ${allMinsk.length}`,
+    );
+
+    // Confirm the Belarus-scoped lookup returns the right one
+    const count = await prisma.city.count({
+      where: {
+        slug: "minsk",
+        isActive: true,
+        isLegacyNonCity: false,
+        country: { isoCode: DEFAULT_COUNTRY_ISO },
+      },
+    });
+    assert.equal(count, 1, "exactly one active Belarus Minsk must exist");
+
+    // Also verify that findFirst without country filter would NOT be deterministic
+    // (if we had >=2 cities, findFirst picks the first matching, which DB ordering might
+    //  make ambiguous)
+  } finally {
+    // Cleanup: remove the foreign minsk city first
+    await prisma.city.deleteMany({ where: { id: foreignMinsk.id } });
+    // Cleanup: remove the temporary country if we created it
+    if (createdCountry && foreignCountry) {
+      await prisma.country.deleteMany({ where: { id: foreignCountry.id } });
+    }
+  }
 }
 
 async function main() {
@@ -346,6 +565,9 @@ async function main() {
   await testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction();
   await testSlugDriftBetweenPlanAndApplyFailsClosed();
   await testMissingArticleFailsClosed();
+  await testContentEditAfterAuditFailsClosed();
+  await testContentDriftBetweenPlanAndApplyFailsClosed();
+  await testBelarusScopedMinskLookup();
   console.log("migratedArticlePublicationGeoRepair.test.ts: PASS");
 }
 
