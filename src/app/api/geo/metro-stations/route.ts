@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
+        lat: true,
+        lng: true,
       },
     });
 
