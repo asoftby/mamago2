@@ -6,6 +6,7 @@ import {
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
+import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 
 export type CityHomeJournalArticle = {
   id: string;
@@ -74,10 +75,7 @@ export async function listCityHomeArticles(city: {
       slug: { not: null },
       publishedAt: { not: null },
       OR: [
-        // CITY-scoped articles for this city
-        { geoScope: "CITY", cityId: city.id },
-        // REGION-scoped articles relevant to this city's region
-        ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
+        ...(buildArticleCityDiscoveryWhere(city).OR ?? []),
         // Breaking news: country-scope articles shown on every city home
         { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" },
       ],
@@ -88,6 +86,7 @@ export async function listCityHomeArticles(city: {
       id: true,
       slug: true,
       geoScope: true,
+      city: { select: { slug: true } },
       title: true,
       subtitle: true,
       excerpt: true,
@@ -111,7 +110,7 @@ export async function listCityHomeArticles(city: {
       slug: row.slug,
       href:
         row.geoScope === "CITY"
-          ? buildCityPublicPath({ citySlug: city.slug, type: "article", slug: row.slug })
+          ? buildCityPublicPath({ citySlug: row.city?.slug ?? city.slug, type: "article", slug: row.slug })
           : buildNationalArticlePath(row.slug),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,

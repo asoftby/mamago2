@@ -64,6 +64,33 @@ async function main() {
     });
     createdArticleIds.push(regionArticle.id);
 
+    const primaryCity = await prisma.city.create({
+      data: {
+        countryId: vitebskOblast.countryId,
+        regionId: vitebskOblast.id,
+        name: `Primary City ${marker}`,
+        slug: `primary-city-${marker}`,
+      },
+      select: { id: true, slug: true },
+    });
+    createdCityIds.push(primaryCity.id);
+    const additionalArticle = await prisma.article.create({
+      data: {
+        title: `Additional geography article ${marker}`,
+        slug: `additional-geography-${marker}`,
+        geoScope: "CITY",
+        cityId: primaryCity.id,
+        status: "PUBLISHED",
+        publishedAt: new Date(),
+        additionalGeographyTargets: { create: [
+          { type: "CITY", cityId: cityInGomelRegion.id, position: 0 },
+          { type: "REGION", regionId: gomelOblast.id, position: 1 },
+        ] },
+      },
+      select: { id: true },
+    });
+    createdArticleIds.push(additionalArticle.id);
+
     // Visible for a city in the SAME region.
     const forVitebskCity = await listCityHomeArticles(cityInVitebskRegion);
     assert.ok(
@@ -78,6 +105,13 @@ async function main() {
     assert.ok(
       !forGomelCity.some((a) => a.id === regionArticle.id),
       "REGION article must NOT be visible for a city in a different region",
+    );
+    const additionalMatches = forGomelCity.filter((a) => a.id === additionalArticle.id);
+    assert.equal(additionalMatches.length, 1, "multiple matching additional targets must return one article");
+    assert.equal(
+      additionalMatches[0]?.href,
+      `/${primaryCity.slug}/blog/additional-geography-${marker}`,
+      "an additionally discovered article must keep its primary CITY URL",
     );
 
     console.log("listCityHomeArticles REGION discovery tests: OK");

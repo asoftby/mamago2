@@ -6,6 +6,11 @@ import {
 } from "@/lib/publications/articleMvp";
 import type { ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 
+const ArticleGeographyTargetSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("CITY"), cityId: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("REGION"), regionId: z.string().min(1) }).strict(),
+]);
+
 /** Тело PUT /api/admin/articles/[id] и POST /api/admin/articles — одна и та же форма. */
 export const ArticleAdminPutBodySchema = z.object({
   title: z.string().min(1),
@@ -19,6 +24,7 @@ export const ArticleAdminPutBodySchema = z.object({
   cityContext: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   additionalCategoryIds: z.array(z.string()).optional(),
+  additionalGeographyTargets: z.array(ArticleGeographyTargetSchema).optional(),
   geoScope: z.nativeEnum(GeoScope).nullable().optional(),
   cityId: z.string().nullable().optional(),
   regionId: z.string().nullable().optional(),
@@ -49,7 +55,8 @@ export function articleSaveInputFromPutBody(
     authorUserId: data.authorUserId ?? null,
     cityContext: data.cityContext ?? null,
     categoryId: data.categoryId ?? null,
-    additionalCategoryIds: data.additionalCategoryIds ?? [],
+    additionalCategoryIds: data.additionalCategoryIds,
+    additionalGeographyTargets: data.additionalGeographyTargets,
     geoScope: data.geoScope,
     cityId: data.cityId,
     regionId: data.regionId,

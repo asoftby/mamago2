@@ -693,6 +693,11 @@ enum RegionType {
   DISTRICT
 }
 
+enum ArticleGeographyTargetType {
+  CITY
+  REGION
+}
+
 model Country {
   id        String   @id @default(cuid())
   name      String
@@ -717,6 +722,7 @@ model Region {
   priority  Int        @default(0)
   cities    City[]
   articles  Article[]  @relation("ArticleRegion")
+  articleGeographyTargets ArticleGeographyTarget[] @relation("ArticleAdditionalRegion")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -763,6 +769,7 @@ model City {
   placeSlugHistories    PlaceSlugHistory[]
   offerSlugHistories    OfferSlugHistory[]
   articles              Article[]             @relation("ArticleCity")
+  articleGeographyTargets ArticleGeographyTarget[] @relation("ArticleAdditionalCity")
   editorialRequests     EditorialRequest[]    @relation("EditorialRequestCity")
   articleSlugHistories  ArticleSlugHistory[]
 
@@ -2766,6 +2773,7 @@ model Article {
   categoryId         String?
   category           EventCategory?       @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   additionalCategoryLinks ArticleCategoryLink[]
+  additionalGeographyTargets ArticleGeographyTarget[]
 
   /// Managed Discovery tags attached to this publication (many-to-many).
   tags DiscoveryTag[]
@@ -2802,6 +2810,24 @@ model ArticleCategoryLink {
   @@id([articleId, categoryId])
   @@unique([articleId, position])
   @@index([categoryId, articleId])
+}
+
+/// Ordered secondary discovery geography. Article.geoScope/cityId/regionId remains primary.
+model ArticleGeographyTarget {
+  id        String                     @id @default(cuid())
+  articleId String
+  type      ArticleGeographyTargetType
+  cityId    String?
+  regionId  String?
+  position  Int
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  city    City?   @relation("ArticleAdditionalCity", fields: [cityId], references: [id], onDelete: Cascade)
+  region  Region? @relation("ArticleAdditionalRegion", fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, position])
+  @@index([cityId, articleId])
+  @@index([regionId, articleId])
 }
 
 model ArticleSlugHistory {
