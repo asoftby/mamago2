@@ -203,6 +203,124 @@ async function testWrongCityConflictFailsClosed() {
   }
 }
 
+/**
+ * PLAN and APPLY are separate round-trips. If an article's state drifts in
+ * between (another process/editor writes to it after PLAN read it but
+ * before APPLY runs), APPLY must not blindly trust the stale PLAN snapshot
+ * and overwrite whatever is there now. It must re-check the precondition
+ * atomically at write time and, if it no longer holds, abort the *entire*
+ * transaction — including any row in the same APPLY call that was still
+ * genuinely valid.
+ */
+async function testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const validSlug = `pub-geo-race-valid-${suffix}`;
+  const driftSlug = `pub-geo-race-drift-${suffix}`;
+
+  const validFixture = await createPendingArticle({ slug: validSlug });
+  const driftFixture = await createPendingArticle({ slug: driftSlug });
+
+  try {
+    const validRecovery: MigratedArticlePublicationGeoRecovery = {
+      articleId: validFixture.id,
+      title: validFixture.title,
+      currentSlug: validSlug,
+      legacyUrl: `/${validSlug}-legacy`,
+      geoScope: "CITY",
+      citySlug: "minsk",
+      confidence: "HIGH",
+      reason: "test fixture",
+    };
+    const driftRecovery: MigratedArticlePublicationGeoRecovery = {
+      articleId: driftFixture.id,
+      title: driftFixture.title,
+      currentSlug: driftSlug,
+      legacyUrl: `/${driftSlug}-legacy`,
+      geoScope: "CITY",
+      citySlug: "minsk",
+      confidence: "HIGH",
+      reason: "test fixture",
+    };
+
+    // PLAN observes both rows as clean PENDING/null/null -> both "apply".
+    const plan = await buildPublicationGeoPlan(prisma, [validRecovery, driftRecovery], minsk.id);
+    assert.equal(plan[0].action, "apply");
+    assert.equal(plan[1].action, "apply");
+
+    // Simulate external drift on driftFixture AFTER PLAN was built, before APPLY runs.
+    await prisma.article.update({
+      where: { id: driftFixture.id },
+      data: { status: "NEEDS_REVISION" },
+    });
+
+    // validRecovery is ordered first so its write would commit inside the
+    // transaction before driftRecovery's atomic precondition check fails —
+    // proving the rollback undoes an already-applied sibling write too.
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan));
+
+    const validAfter = await prisma.article.findUnique({
+      where: { id: validFixture.id },
+      select: { status: true, geoScope: true, cityId: true },
+    });
+    assert.equal(
+      validAfter?.status,
+      "PENDING",
+      "sibling row in the same transaction must be rolled back, not partially applied",
+    );
+    assert.equal(validAfter?.geoScope, null);
+    assert.equal(validAfter?.cityId, null);
+
+    const driftAfter = await prisma.article.findUnique({
+      where: { id: driftFixture.id },
+      select: { status: true, geoScope: true, cityId: true },
+    });
+    assert.equal(driftAfter?.status, "NEEDS_REVISION", "drifted row must remain untouched by repair");
+  } finally {
+    await cleanup(validFixture.id);
+    await cleanup(driftFixture.id);
+  }
+}
+
+/** Same TOCTOU scenario, but the drift is a slug change rather than a status change. */
+async function testSlugDriftBetweenPlanAndApplyFailsClosed() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const slug = `pub-geo-slugdrift-${suffix}`;
+  const fixture = await createPendingArticle({ slug });
+
+  try {
+    const recovery: MigratedArticlePublicationGeoRecovery = {
+      articleId: fixture.id,
+      title: fixture.title,
+      currentSlug: slug,
+      legacyUrl: `/${slug}-legacy`,
+      geoScope: "CITY",
+      citySlug: "minsk",
+      confidence: "HIGH",
+      reason: "test fixture",
+    };
+
+    const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan[0].action, "apply");
+
+    // Simulate a manual SEO-editor slug change between PLAN and APPLY.
+    const driftedSlug = `${slug}-edited`;
+    await prisma.article.update({ where: { id: fixture.id }, data: { slug: driftedSlug } });
+
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan));
+
+    const after = await prisma.article.findUnique({
+      where: { id: fixture.id },
+      select: { status: true, geoScope: true, cityId: true, slug: true },
+    });
+    assert.equal(after?.status, "PENDING", "slug-drifted row must not be published");
+    assert.equal(after?.slug, driftedSlug, "repair must never touch slug");
+  } finally {
+    await cleanup(fixture.id);
+  }
+}
+
 async function testMissingArticleFailsClosed() {
   const minsk = await getMinskCity();
   const recovery: MigratedArticlePublicationGeoRecovery = {
@@ -225,6 +343,8 @@ async function main() {
   await testCityRecoveryApply();
   await testCountryRecoveryApply();
   await testWrongCityConflictFailsClosed();
+  await testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction();
+  await testSlugDriftBetweenPlanAndApplyFailsClosed();
   await testMissingArticleFailsClosed();
   console.log("migratedArticlePublicationGeoRepair.test.ts: PASS");
 }

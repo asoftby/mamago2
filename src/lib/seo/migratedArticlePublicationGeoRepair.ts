@@ -11,6 +11,8 @@ export type PublicationGeoTargetState = {
 export type PublicationGeoPlanRow = {
   articleId: string;
   title: string;
+  /** The slug PLAN observed (and, on "apply" rows, the precondition APPLY re-checks atomically). */
+  expectedSlug: string;
   before: {
     status: string;
     geoScope: string | null;
@@ -58,6 +60,7 @@ export async function buildPublicationGeoPlan(
       plan.push({
         articleId: recovery.articleId,
         title: recovery.title,
+        expectedSlug: recovery.currentSlug,
         before: null,
         after,
         finalCanonicalPath,
@@ -71,6 +74,7 @@ export async function buildPublicationGeoPlan(
       plan.push({
         articleId: recovery.articleId,
         title: recovery.title,
+        expectedSlug: recovery.currentSlug,
         before: { status: article.status, geoScope: article.geoScope, cityId: article.cityId },
         after,
         finalCanonicalPath,
@@ -92,6 +96,7 @@ export async function buildPublicationGeoPlan(
       plan.push({
         articleId: recovery.articleId,
         title: recovery.title,
+        expectedSlug: recovery.currentSlug,
         before,
         after,
         finalCanonicalPath,
@@ -104,6 +109,7 @@ export async function buildPublicationGeoPlan(
       plan.push({
         articleId: recovery.articleId,
         title: recovery.title,
+        expectedSlug: recovery.currentSlug,
         before,
         after,
         finalCanonicalPath,
@@ -116,6 +122,7 @@ export async function buildPublicationGeoPlan(
     plan.push({
       articleId: recovery.articleId,
       title: recovery.title,
+      expectedSlug: recovery.currentSlug,
       before,
       after,
       finalCanonicalPath,
@@ -142,6 +149,16 @@ export function summarizePublicationGeoPlan(plan: PublicationGeoPlanRow[], mode:
  * (throws, no writes) if any conflict/not_found rows are present in the
  * plan — the caller must resolve those first. Re-running with an
  * already-applied plan is a no-op (idempotent).
+ *
+ * PLAN and APPLY are two separate round-trips, so the DB state PLAN read can
+ * go stale before APPLY runs (TOCTOU). Each row's write is therefore an
+ * `updateMany` whose WHERE clause re-asserts the *exact* expected
+ * precondition (id + slug + PENDING/null/null) atomically as part of the
+ * same UPDATE statement — not a separate read-then-write. If any row's
+ * `updated.count !== 1`, the current DB state no longer matches what PLAN
+ * saw; the whole transaction throws and every write in it (including any
+ * already-issued updates for other rows in this same APPLY call) rolls
+ * back. No partial mutations are possible.
  */
 export async function applyPublicationGeoPlan(prisma: PrismaClient, plan: PublicationGeoPlanRow[]) {
   const conflicts = plan.filter((row) => row.action === "conflict" || row.action === "not_found");
@@ -156,15 +173,26 @@ export async function applyPublicationGeoPlan(prisma: PrismaClient, plan: Public
 
   await prisma.$transaction(async (tx) => {
     for (const row of toApply) {
-      await tx.article.update({
-        where: { id: row.articleId },
+      const result = await tx.article.updateMany({
+        where: {
+          id: row.articleId,
+          slug: row.expectedSlug,
+          status: "PENDING",
+          geoScope: null,
+          cityId: null,
+        },
         data: {
           status: row.after.status,
           geoScope: row.after.geoScope,
           cityId: row.after.cityId,
         },
-        select: { id: true },
       });
+      if (result.count !== 1) {
+        throw new Error(
+          `[migratedArticlePublicationGeoRepair] Precondition no longer holds for ${row.articleId} ` +
+            `(expected PENDING/null/null slug=${row.expectedSlug}); aborting transaction, no partial writes`,
+        );
+      }
     }
   });
 
