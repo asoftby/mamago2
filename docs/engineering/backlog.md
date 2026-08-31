@@ -4015,3 +4015,154 @@ P3 — cleanup / polish / optional
   the underlying data.
 - Source: `feat/article-place-block-20260827` (Claude Design handoff —
   "Блок места в статье v2.html").
+
+## [BACKLOG-143] Stream/parallelize RootLayout auth + branding lookups
+
+- Status: OPEN
+- Priority: P1
+- Area: Performance / Auth
+- Added: 2026-08-30
+- Reason deferred: `fix/perf-pagespeed-p0-20260830` was scoped to the
+  city-home critical path (weather, duplicate city query, hero blocking).
+  `src/app/layout.tsx` already runs `getCurrentAuthState()` and
+  `getBrandingConfig()` via `Promise.all`, and both are cheap for a guest
+  request (`getCurrentUser`/session validation short-circuits on a missing
+  cookie with no DB call). Going further — e.g. streaming the branding
+  `<style>`/favicon via Suspense, or restructuring auth to not gate the
+  document `<head>` — touches the root layout that wraps every route and
+  the auth/branding context providers; that's a broader, higher-risk change
+  than this P0 task's mandate ("не ломать auth ради Lighthouse", "если
+  изменение auth architecture существенно расширяет scope — не делать").
+- Context: root layout awaits `[getCurrentAuthState(), getBrandingConfig()]`
+  before returning any JSX (`src/app/layout.tsx`); for a logged-in user this
+  is one extra DB roundtrip (session validation) in the render path, on top
+  of whatever the page itself awaits.
+- Current state: unchanged in this task — parallelized (not sequential) via
+  the pre-existing `Promise.all`, not further optimized.
+- Dependencies: none blocking; independent of the city-home changes in this
+  branch.
+- Acceptance criteria: measure actual contribution to TTFB/FCP with
+  production-like Lighthouse runs; if material, propose either (a)
+  Suspense-streaming branding/auth-dependent chrome separately from
+  `{children}`, or (b) a cached/edge-resolved auth check, with test coverage
+  for both the authenticated and guest paths before merging.
+- Source: `fix/perf-pagespeed-p0-20260830` PHASE 1 audit (item 6).
+
+## [BACKLOG-144] Restore real-weather Kuda ranking without a blocking fetch
+
+- Status: OPEN
+- Priority: P2
+- Area: Performance / Discovery ranking
+- Added: 2026-08-30
+- Reason deferred: `fix/perf-pagespeed-p0-20260830` removed the blocking
+  `getHeroContext()` (Open-Meteo) await from `CityHomePage`'s critical path
+  — Kuda's `weather` ranking hint now always uses the deterministic fallback
+  (`getFallbackHeroModel`: real time-of-day, neutral `cloudy_mixed`
+  scenario) instead of the actual forecast, per this task's explicit
+  instruction ("нельзя сохранять blocking weather fetch только ради
+  ranking"). This is a conscious ranking-quality trade for latency: designing
+  a genuinely non-blocking cached-weather-snapshot source for ranking is a
+  separate, scoped piece of work, not a P0 fix.
+- Context: `getKudaDiscoveryFeed(...)`'s `weather` option
+  (`src/server/discovery/kudaDiscoveryFeed.ts`) still exists and is honored;
+  only the source of the `{ scenario, timeOfDay }` passed to it changed.
+  `getWeatherRankingBoost` (`src/features/hero-weather/lib/weather-scenario-layer.ts`)
+  is unchanged.
+  Note: Open-Meteo responses are already cached via `next: { revalidate: 1800 }`
+  in `open-meteo-provider.ts`, so most requests to a given city within a
+  30-minute window would in fact hit a near-instant cache read rather than a
+  real network call — but the request path must not depend on that cache
+  being warm, hence the fallback-only design here.
+- Current state: Kuda ranking uses only real-time time-of-day + neutral
+  scenario; no request-path code reads real weather for ranking.
+- Dependencies: none blocking.
+- Acceptance criteria: if product wants weather-aware ranking back, add a
+  cheap, non-blocking shared weather snapshot (e.g. a short-interval cron
+  job populating a small cache table/KV, read synchronously with no network
+  call) and wire that into the existing `weather` option — do not
+  reintroduce a per-request blocking fetch, and do not fork a second ranking
+  engine (see `docs/architecture/recommendation-data-foundation.md`).
+- Source: `fix/perf-pagespeed-p0-20260830` PHASE 2 item 3.
+
+## [BACKLOG-145] Dedupe generateMetadata's city lookup from the page render
+
+- Status: OPEN
+- Priority: P3
+- Area: Performance / SEO
+- Added: 2026-08-30
+- Reason deferred: `fix/perf-pagespeed-p0-20260830` fixed the two duplicate
+  full-shape `findCityBySlug()` calls inside the render path (route page +
+  `CityHomePage` each doing their own lookup) by loading the city once in
+  `src/app/(public)/[city]/page.tsx` and passing it down. `generateMetadata`
+  (`buildCityHubMetadata` → `findCityBySlug(citySlug, { select: { name:
+  true } })` in `src/lib/seo/cityKudaListingMetadata.ts`) still runs its own
+  separate, lightweight (`select: { name: true }`) lookup — Next.js does
+  **not** automatically dedupe plain Prisma calls across
+  `generateMetadata`/page (only `fetch()` calls get that for free); doing so
+  reliably needs a `React.cache()`-wrapped `findCityBySlug` with
+  byte-identical argument shapes at every call site, which the three current
+  callers don't share (different `select`/`isActive` combinations). That's
+  a small but real refactor across `cityKudaListingMetadata.ts` and every
+  `findCityBySlug` call site, out of scope for this P0 pass.
+- Context: `findCityBySlug` (`src/server/geo/findCityBySlug.ts`) is a plain
+  `prisma.city.findFirst` wrapper, not React-cached.
+- Current state: `/{city}` now issues 1 full-shape city query (page.tsx,
+  reused by `CityHomePage`) + 1 lightweight `{ name: true }` query
+  (`generateMetadata`) per request — down from 2 full-shape + 1 lightweight
+  before this task.
+- Dependencies: none blocking.
+- Acceptance criteria: wrap `findCityBySlug` in `React.cache()` and
+  normalize call sites to share argument shapes (or otherwise thread the
+  metadata-relevant fields through a single request-scoped lookup), verified
+  to actually dedupe (e.g. a query-count assertion) rather than assumed.
+- Source: `fix/perf-pagespeed-p0-20260830` PHASE 2 item 5 audit note.
+
+## [BACKLOG-146] Cookie-consent banner is the dominant remaining LCP blocker on /minsk
+
+- Status: OPEN
+- Priority: P1
+- Area: Performance / Consent
+- Added: 2026-08-30
+- Reason deferred: `fix/perf-pagespeed-p0-20260830` was explicitly scoped to
+  the server/render critical path (weather, duplicate city query, parallel
+  data loading, viewport a11y) and explicitly excluded consent/analytics
+  changes ("Не менять analytics/consent semantics"). This finding is a
+  *product/legal-sensitive* UI (the cookie consent banner), not a safe
+  same-task fix — it needs a deliberate decision, not a P0 drive-by edit.
+- Context: after landing this task's fixes, 5x mobile Lighthouse runs
+  against a local production build (`next build` + `.next/standalone`, real
+  local Postgres, real Open-Meteo call) still show Performance ~63–70 and
+  LCP ~9.2–10s (vs. TTFB 10–40ms, FCP ~1.5–1.8s, TBT ~110–250ms, CLS
+  ~0.002–0.004 — all now healthy). Lighthouse's `lcp-breakdown-insight`
+  audit, under both `--throttling-method=simulate` and
+  `--throttling-method=devtools`, consistently identifies the LCP element as
+  `div.cm > div.cm__body > div.cm__texts > p#cm__desc` — the
+  `vanilla-cookieconsent` banner's description text — with an
+  `elementRenderDelay` of ~500ms (simulate) to ~9970ms (devtools, i.e. real
+  throttled CPU/network). `CookieConsentProvider`
+  (`src/components/providers/cookie-consent-provider.tsx`) is `"use client"`
+  and calls `initCookieConsent()` from a `useEffect` with no SSR — the
+  banner cannot paint before the client JS bundle has loaded, hydrated, and
+  run, so on a throttled mobile device it becomes both the largest and the
+  *latest* painted element, dominating LCP. This is consistent with the
+  original pre-task Lighthouse baseline (Performance ~52, LCP ~13.0s) — this
+  bottleneck almost certainly predates this task and was not solved by
+  fixing the weather/city-query/parallelization issues, because none of
+  those were ever the true LCP element.
+- Current state: unchanged in this task. Confirmed via reproducible local
+  Lighthouse runs (both simulate and devtools throttling agree on the same
+  DOM node); not fixed, not worked around.
+- Dependencies: none blocking; independent of the city-home changes in this
+  branch. Any fix must preserve current consent semantics/compliance
+  (`docs/...` — whatever governs cookie consent requirements) exactly.
+- Acceptance criteria: with product/legal sign-off, make the banner's first
+  paint not gate LCP — e.g. render its markup (or a lightweight
+  server-rendered placeholder shell) without waiting on full client
+  hydration, defer/prioritize its JS chunk, or exclude it from LCP
+  candidacy by ensuring a genuine content element (hero/Kuda card) paints
+  first and is visually larger. Verify with the same before/after Lighthouse
+  methodology used here (5x mobile runs, median reported) and confirm
+  consent still blocks non-essential cookies/analytics until accepted.
+- Source: `fix/perf-pagespeed-p0-20260830` PERFORMANCE VALIDATION step —
+  5x mobile Lighthouse against a local production build, both
+  `--throttling-method=simulate` and `--throttling-method=devtools`.
