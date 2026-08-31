@@ -268,8 +268,9 @@ export function ArticleEditorClient({
     let cancelled = false;
     (async () => {
       const selectedCategoryIds = [initial.categoryId, ...(initial.additionalCategoryIds ?? [])].filter(Boolean).join(",");
+      const selectedCityIds = [initial.cityId, ...(initial.additionalGeographyTargets ?? []).filter((target) => target.type === "CITY").map((target) => target.cityId)].filter(Boolean).join(",");
       const selectedRegionIds = (initial.additionalGeographyTargets ?? []).filter((target) => target.type === "REGION").map((target) => target.regionId).join(",");
-      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}`);
+      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedCityIds=${encodeURIComponent(selectedCityIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}`);
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
@@ -297,7 +298,7 @@ export function ArticleEditorClient({
     return () => {
       cancelled = true;
     };
-  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.tagIds]);
+  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.cityId, initial.tagIds]);
 
   const {
     previewSlug,
