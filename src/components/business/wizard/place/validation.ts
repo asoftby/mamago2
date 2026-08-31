@@ -1,6 +1,8 @@
+import { AgePolicy } from "@prisma/client";
 import type { PlaceFormData, StepValidation } from "./types";
 import { getPlaceWizardTotalSteps, getStepKey } from "./config";
 import { isValidAgeKey } from "@/lib/config/ages";
+import { isPlaceAgeSelectionComplete } from "./isPlaceAgeChipActive";
 
 export function validateStep1(data: PlaceFormData): StepValidation {
   const errors: string[] = [];
@@ -20,8 +22,16 @@ export function validateStep1(data: PlaceFormData): StepValidation {
   if (!data.description || data.description.trim().length === 0) {
     errors.push("Полное описание обязательно");
   }
-  // Empty ageTags is a valid, deliberate choice — "Любой возраст" (no age
-  // restriction), not an incomplete field. Only reject unknown tag values.
+
+  if (!isPlaceAgeSelectionComplete({ agePolicy: data.agePolicy, ageTags: data.ageTags })) {
+    if (data.agePolicy === AgePolicy.UNKNOWN) {
+      errors.push("Выберите возраст");
+    } else if (data.agePolicy === AgePolicy.SPECIFIC && data.ageTags.length === 0) {
+      errors.push("Выберите хотя бы один возраст");
+    } else {
+      errors.push("Проверьте возрастные ограничения");
+    }
+  }
   if (data.ageTags && data.ageTags.length > 0) {
     const unknownAgeTags = data.ageTags.filter((tag) => !isValidAgeKey(tag));
     if (unknownAgeTags.length > 0) {

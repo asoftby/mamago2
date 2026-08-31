@@ -1,19 +1,41 @@
-import { AGE_OPTIONS } from "@/lib/config/ages";
+import { AgePolicy } from "@prisma/client";
+import { AGE_OPTIONS, isValidAgeKey } from "@/lib/config/ages";
 
 /**
  * Whether a specific age chip should render as visually selected.
  *
- * Storage is unchanged by this: `ageTags: []` still means "no age
- * restriction" everywhere it's read. This only controls display — when
- * nothing is stored, every specific age chip renders active alongside
- * "Любой возраст", making the "suits every age" meaning visually obvious
- * instead of looking like nothing was picked.
+ * `ageTags: []` has its own explicit UI chip ("Любой возраст") and must not
+ * make every specific age chip look selected. Keeping these states exclusive
+ * makes the visual state match the stored AgePolicy semantics.
  */
 export function isPlaceAgeChipActive(params: {
   storedAgeTags: readonly string[];
   chipAgeTag: string;
 }): boolean {
-  return params.storedAgeTags.length === 0 || params.storedAgeTags.includes(params.chipAgeTag);
+  return params.storedAgeTags.includes(params.chipAgeTag);
+}
+
+/**
+ * Canonical completeness check for the Place age state.
+ *
+ * The policy is discriminated: unrestricted/strict policies must not carry
+ * suitability buckets, SPECIFIC must carry only valid buckets, and UNKNOWN is
+ * deliberately incomplete until an editor asserts the intended semantics.
+ */
+export function isPlaceAgeSelectionComplete(params: {
+  agePolicy: AgePolicy;
+  ageTags: readonly string[];
+}): boolean {
+  switch (params.agePolicy) {
+    case AgePolicy.UNRESTRICTED:
+    case AgePolicy.ADULT_ONLY:
+      return params.ageTags.length === 0;
+    case AgePolicy.SPECIFIC:
+      return params.ageTags.length > 0 && params.ageTags.every(isValidAgeKey);
+    case AgePolicy.UNKNOWN:
+    default:
+      return false;
+  }
 }
 
 /**
