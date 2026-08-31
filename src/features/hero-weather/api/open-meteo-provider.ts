@@ -142,7 +142,10 @@ export class OpenMeteoWeatherProvider implements WeatherProvider {
     const url = buildOpenMeteoUrl(params.latitude, params.longitude, tz);
     weatherDiagLog("Open-Meteo request:", url);
     const json = await fetchJsonWithTimeout<unknown>(url, {
-      timeoutMs: 10_000,
+      // Fail fast: this call must never hold up the public request path (see
+      // getHeroContext's Suspense boundary in CityHomePage). Cold-cache misses
+      // beyond this budget fall back to the deterministic hero model.
+      timeoutMs: 2_000,
       init: {
         next: { revalidate: 1800 },
       } as RequestInit,

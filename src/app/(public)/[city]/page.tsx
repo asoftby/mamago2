@@ -27,10 +27,18 @@ export default async function CityPage({ params, searchParams }: PageProps) {
 
   const city = await findCityBySlug(citySlug.toLowerCase(), {
     isActive: true,
-    select: { slug: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      centerLat: true,
+      centerLng: true,
+      lat: true,
+      lng: true,
+    },
   });
 
   if (!city) notFound();
 
-  return <CityHomePage citySlug={city.slug} />;
+  return <CityHomePage city={city} />;
 }

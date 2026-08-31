@@ -9,6 +9,7 @@ import { weatherDiagLog } from "./weather-diag-log";
 import { deriveWeatherSnapshot } from "./derive-weather-snapshot";
 import {
   getWeatherCopy,
+  resolveDayTime,
   resolveHomeWeatherScenario,
   type HomeWeatherScenario,
 } from "./weather-scenario-layer";
@@ -113,13 +114,27 @@ export function scenarioToPreferredContext(
   }
 }
 
-export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel, "cityName" | "personaMode">>): HeroGreetingModel {
+/**
+ * Deterministic, weather-free hero model: used as the initial/Suspense-fallback
+ * render and whenever the weather provider fails or times out. `timeOfDay` is
+ * still derived from the real clock (no network dependency) so copy/ranking
+ * stay time-accurate even without a weather reading.
+ */
+export function getFallbackHeroModel(
+  overrides?: Partial<Pick<HeroGreetingModel, "cityName" | "personaMode">> & {
+    citySlug?: string;
+    timezone?: string;
+    now?: Date;
+  },
+): HeroGreetingModel {
   const personaMode = overrides?.personaMode ?? "guest";
+  const timezone = overrides?.timezone ?? getCityCoordsBySlug(overrides?.citySlug)?.timezone;
+  const timeOfDay = resolveDayTime(overrides?.now ?? new Date(), timezone);
   return {
     microcopy: getWeatherCopy({
       emoji: "⛅",
       scenario: "cloudy_mixed",
-      timeOfDay: "day",
+      timeOfDay,
       maxTemperatureC: null,
     }),
     title: "Давай найдём что-нибудь для семьи",
@@ -128,7 +143,7 @@ export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel,
     weatherDayScenario: "cloudy_mixed",
     maxTemperatureC: null,
     activityBias: "mixed",
-    timeOfDay: "day",
+    timeOfDay,
     personaMode,
     cityName: overrides?.cityName,
     citySlug: undefined,
@@ -136,7 +151,7 @@ export function getFallbackHeroModel(overrides?: Partial<Pick<HeroGreetingModel,
     preferredContext: "mixed",
     debug: {
       scenario: "unknown",
-      timeOfDay: "day",
+      timeOfDay,
       personaMode,
       weatherSource: "fallback",
     },
@@ -192,7 +207,7 @@ export async function getHeroContext(input?: {
 
     if (!raw) {
       weatherDiagLog("fallback triggered", "reason:", "fetchWeather_returned_null");
-      return getFallbackHeroModel({ cityName, personaMode });
+      return getFallbackHeroModel({ cityName, personaMode, citySlug: input?.citySlug, timezone: tz });
     }
 
     const now = new Date();
@@ -261,6 +276,11 @@ export async function getHeroContext(input?: {
     };
   } catch (e) {
     weatherDiagLog("fallback triggered", "reason:", "exception", e);
-    return getFallbackHeroModel({ cityName, personaMode });
+    return getFallbackHeroModel({
+      cityName,
+      personaMode,
+      citySlug: input?.citySlug,
+      timezone: input?.timezone,
+    });
   }
 }
