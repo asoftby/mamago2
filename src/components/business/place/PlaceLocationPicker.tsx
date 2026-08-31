@@ -13,6 +13,15 @@ import { PlaceMapModal } from "./PlaceMapModal";
 import { PlaceDuplicateBlock } from "./PlaceDuplicateBlock";
 import { formatDistance } from "@/lib/formatDistance";
 import { FilterSelect } from "@/components/ui/filter-select";
+import {
+  computeEffectiveDistrictId,
+  computeEffectiveMetroDistanceM,
+  computeEffectiveMetroId,
+  computeManualMetroDistanceM,
+  MANUAL_GEO_OVERRIDE_RESET_PATCH,
+  shouldClearManualGeoOverrides,
+  type GeoPoint,
+} from "./placeLocationGeoOverrides";
 
 interface PlaceLocationPickerProps {
   placeId: string;
@@ -121,7 +130,9 @@ export function PlaceLocationPicker({
 
   // Options for selects
   const [districts, setDistricts] = useState<Array<{ id: string; name: string }>>([]);
-  const [metroStations, setMetroStations] = useState<Array<{ id: string; name: string }>>([]);
+  const [metroStations, setMetroStations] = useState<
+    Array<{ id: string; name: string; lat: number; lng: number }>
+  >([]);
   const [geoOptionsDebug, setGeoOptionsDebug] = useState<GeoOptionsDebugState | null>(null);
   const [geoOptionsWarning, setGeoOptionsWarning] = useState<string | null>(null);
 
@@ -155,7 +166,7 @@ export function PlaceLocationPicker({
       ]);
 
       let nextDistricts: Array<{ id: string; name: string }> = [];
-      let nextMetroStations: Array<{ id: string; name: string }> = [];
+      let nextMetroStations: Array<{ id: string; name: string; lat: number; lng: number }> = [];
 
       if (districtsRes.ok) {
         const data = await districtsRes.json();
@@ -267,6 +278,8 @@ export function PlaceLocationPicker({
     formattedAddr: string;
     addressJson: google.maps.GeocoderAddressComponent[];
   }) => {
+    const previousPoint: GeoPoint | null = location ? { lat: location.lat, lng: location.lng } : null;
+
     // Update location state
     setLocation({
       lat: data.lat,
@@ -277,7 +290,7 @@ export function PlaceLocationPicker({
     });
 
     // Trigger geo enrichment
-    await enrichLocation(data.lat, data.lng, data.addressJson);
+    await enrichLocation(data.lat, data.lng, data.addressJson, previousPoint);
 
     // Pass to parent for manual save
     onUpdate?.({
@@ -302,6 +315,8 @@ export function PlaceLocationPicker({
     lat: number;
     lng: number;
   }) => {
+    const previousPoint: GeoPoint | null = location ? { lat: location.lat, lng: location.lng } : null;
+
     // Update location state
     setLocation({
       lat: data.lat,
@@ -312,7 +327,7 @@ export function PlaceLocationPicker({
     });
 
     // Trigger geo enrichment (without addressJson)
-    await enrichLocation(data.lat, data.lng, null);
+    await enrichLocation(data.lat, data.lng, null, previousPoint);
 
     // Pass to parent for manual save
     onUpdate?.({
@@ -322,12 +337,19 @@ export function PlaceLocationPicker({
   };
 
   /**
-   * Call geo enrichment API and update state
+   * Call geo enrichment API and update state.
+   *
+   * `previousPoint` is the location on record BEFORE this call (null if
+   * there wasn't one yet) — used to decide whether this is a real move that
+   * should invalidate manual district/metro overrides, or a re-enrichment
+   * of essentially the same point (e.g. a re-render or marker snap) that
+   * must leave manual picks alone.
    */
   const enrichLocation = async (
     lat: number,
     lng: number,
-    addressJson: google.maps.GeocoderAddressComponent[] | null
+    addressJson: google.maps.GeocoderAddressComponent[] | null,
+    previousPoint: GeoPoint | null,
   ) => {
     console.log("[PlaceLocationPicker] Starting geo enrichment...", { lat, lng });
 
@@ -346,13 +368,21 @@ export function PlaceLocationPicker({
       const result = await response.json();
       console.log("[PlaceLocationPicker] Geo enrichment result:", result);
 
+      const clearManualOverrides = shouldClearManualGeoOverrides(previousPoint, { lat, lng });
+
       // Update state with enriched data
       if (result.cityId) {
         setCityId(result.cityId);
       }
 
+      // districtAutoId must always reflect the latest result, including a
+      // null one — otherwise a stale auto value from a previous point can
+      // keep showing after the point moved somewhere with no detectable
+      // district (mirrors the metro handling right below).
       if (result.districtAutoId) {
         setDistrictAutoId(result.districtAutoId);
+      } else {
+        setDistrictAutoId(null);
       }
 
       if (result.metroAutoId) {
@@ -364,12 +394,19 @@ export function PlaceLocationPicker({
         setMetroAutoDistanceM(null);
       }
 
+      if (clearManualOverrides) {
+        setDistrictManualId(null);
+        setMetroManualId(null);
+        setMetroManualDistanceM(null);
+      }
+
       // Pass enriched data to parent
       onUpdate?.({
         cityId: result.cityId,
-        districtAutoId: result.districtAutoId,
+        districtAutoId: result.districtAutoId ?? null,
         metroAutoId: result.metroAutoId,
         metroAutoDistanceM: result.metroAutoDistanceM,
+        ...(clearManualOverrides ? MANUAL_GEO_OVERRIDE_RESET_PATCH : {}),
       });
     } catch (err) {
       console.error("[PlaceLocationPicker] Geo enrichment error:", err);
@@ -608,18 +645,33 @@ export function PlaceLocationPicker({
     const newValue = value === "" ? null : value;
     setMetroManualId(newValue);
 
+    // Compute the distance for the manually-picked station, same as auto
+    // enrichment does — otherwise a manual pick would show no distance (or
+    // a stale one carried over from whatever was previously effective).
+    let distanceM: number | null = null;
+    if (newValue && location) {
+      const station = metroStations.find((m) => m.id === newValue);
+      if (station) {
+        distanceM = computeManualMetroDistanceM(
+          { lat: location.lat, lng: location.lng },
+          { lat: station.lat, lng: station.lng },
+        );
+      }
+    }
+    setMetroManualDistanceM(distanceM);
+
     // Pass to parent for manual save
-    onUpdate?.({ metroManualId: newValue });
-    
+    onUpdate?.({ metroManualId: newValue, metroManualDistanceM: distanceM });
+
     // Silent update - no toast notifications
   };
 
   const handleResetDistrict = () => {
     setDistrictManualId(null);
-    
+
     // Pass to parent for manual save
     onUpdate?.({ districtManualId: null });
-    
+
     // Silent update - no toast notifications
   };
 
@@ -628,15 +680,19 @@ export function PlaceLocationPicker({
     setMetroManualDistanceM(null);
 
     // Pass to parent for manual save
-    onUpdate?.({ metroManualId: null });
-    
+    onUpdate?.({ metroManualId: null, metroManualDistanceM: null });
+
     // Silent update - no toast notifications
   };
 
   // Computed values
-  const districtShown = districtManualId ?? districtAutoId;
-  const metroShown = metroManualId ?? metroAutoId;
-  const metroDistanceShown = metroManualId ? metroManualDistanceM : metroAutoDistanceM;
+  const districtShown = computeEffectiveDistrictId({ districtManualId, districtAutoId });
+  const metroShown = computeEffectiveMetroId({ metroManualId, metroAutoId });
+  const metroDistanceShown = computeEffectiveMetroDistanceM({
+    metroManualId,
+    metroManualDistanceM,
+    metroAutoDistanceM,
+  });
 
   // UI visibility logic
   const hasAutoEnrichment = !!(districtAutoId || metroAutoId);

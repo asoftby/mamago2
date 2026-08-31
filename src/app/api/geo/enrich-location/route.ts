@@ -10,37 +10,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveCityId } from "@/services/place/cityResolver.service";
 import prisma from "@/lib/prisma";
+import { haversineMeters } from "@/lib/geo/haversineMeters";
 
-const EARTH_RADIUS_KM = 6371;
 const METRO_SEARCH_RADIUS_METERS = 1500; // Fallback default when city.metroMaxDistanceM is unset
-
-/**
- * Calculate distance using Haversine formula
- * Returns distance in meters
- */
-function haversineMeters(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distanceKm = EARTH_RADIUS_KM * c;
-
-  return distanceKm * 1000; // Convert to meters
-}
 
 function extractNamedComponentFromAddressJson(
   addressJson: unknown,
