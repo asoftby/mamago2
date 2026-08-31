@@ -5,7 +5,7 @@
  * Run: set -a; source .env; set +a; pnpm exec tsx src/lib/seo/migratedArticlePublicationGeoRepair.test.ts
  */
 import assert from "node:assert/strict";
-import prisma, { searchIndexer } from "@/lib/prisma";
+import { prismaBase as prisma, searchIndexer } from "@/lib/prisma";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
 import {
   applyPublicationGeoPlan,
@@ -78,7 +78,24 @@ async function getArticleFull(id: string) {
 }
 
 async function cleanup(articleId: string) {
+  await prisma.searchDocument.deleteMany({
+    where: { entityType: "article", entityId: articleId },
+  });
   await prisma.article.deleteMany({ where: { id: articleId } });
+}
+
+async function assertSingleValidSearchDocument(
+  articleId: string,
+  expectedTitle: string,
+  expectedUrlPath: string,
+) {
+  const docs = await prisma.searchDocument.findMany({
+    where: { entityType: "article", entityId: articleId },
+  });
+  assert.equal(docs.length, 1, "expected exactly one article SearchDocument");
+  assert.equal(docs[0].isPublished, true);
+  assert.equal(docs[0].title, expectedTitle);
+  assert.equal(docs[0].urlPath, expectedUrlPath);
 }
 
 function makeRecovery(
@@ -136,8 +153,10 @@ async function testCityRecoveryApply() {
     assert.equal(plan[0].finalCanonicalPath, `/minsk/blog/${slug}`);
 
     // APPLY #1
-    const result = await applyPublicationGeoPlan(prisma, plan, [recovery]);
+    const result = await applyPublicationGeoPlan(prisma, plan, searchIndexer);
     assert.equal(result.applied, 1);
+    assert.equal(result.reindexed, 1);
+    await assertSingleValidSearchDocument(fixture.id, fixture.title, `/minsk/blog/${slug}`);
 
     const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PUBLISHED");
@@ -167,8 +186,10 @@ async function testCityRecoveryApply() {
     );
 
     // APPLY #2 using the SAME original recovery — no-op.
-    const result2 = await applyPublicationGeoPlan(prisma, plan2, [recovery]);
+    const result2 = await applyPublicationGeoPlan(prisma, plan2, searchIndexer);
     assert.equal(result2.applied, 0);
+    assert.equal(result2.reindexed, 1, "already_applied rerun must still reindex");
+    await assertSingleValidSearchDocument(fixture.id, fixture.title, `/minsk/blog/${slug}`);
   } finally {
     await cleanup(fixture.id);
   }
@@ -189,7 +210,10 @@ async function testCountryRecoveryApply() {
     assert.equal(plan[0].action, "apply");
     assert.equal(plan[0].finalCanonicalPath, `/blog/${slug}`);
 
-    await applyPublicationGeoPlan(prisma, plan, [recovery]);
+    const result = await applyPublicationGeoPlan(prisma, plan, searchIndexer);
+    assert.equal(result.applied, 1);
+    assert.equal(result.reindexed, 1);
+    await assertSingleValidSearchDocument(fixture.id, fixture.title, `/blog/${slug}`);
 
     const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PUBLISHED");
@@ -221,7 +245,7 @@ async function testWrongCityConflictFailsClosed() {
     const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
     assert.equal(plan[0].action, "conflict");
 
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
 
     const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PENDING", "conflict row must not be written");
@@ -273,7 +297,7 @@ async function testRaceDriftBetweenPlanAndApplyRollsBackWholeTransaction() {
     // validRecovery is ordered first so its write would commit inside the
     // transaction before driftRecovery's atomic precondition check fails —
     // proving the rollback undoes an already-applied sibling write too.
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [validRecovery, driftRecovery]));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
 
     const validAfter = await getArticleFull(validFixture.id);
     assert.equal(
@@ -311,7 +335,7 @@ async function testSlugDriftBetweenPlanAndApplyFailsClosed() {
     const driftedSlug = `${slug}-edited`;
     await prisma.article.update({ where: { id: fixture.id }, data: { slug: driftedSlug } });
 
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
 
     const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PENDING", "slug-drifted row must not be published");
@@ -342,7 +366,7 @@ async function testMissingArticleFailsClosed() {
 
   const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
   assert.equal(plan[0].action, "not_found");
-  await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
+  await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
 }
 
 /**
@@ -398,7 +422,7 @@ async function testContentEditAfterAuditFailsClosed() {
     );
 
     // APPLY must refuse and never touch the row.
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan2, [recovery]));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan2, searchIndexer));
 
     const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PENDING", "content-drifted row must not be published");
@@ -442,7 +466,7 @@ async function testContentDriftBetweenPlanAndApplyFailsClosed() {
     });
 
     // APPLY should fail because updatedAt no longer matches
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, [recovery]));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan, searchIndexer));
 
     const after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PENDING", "content-drifted row must not be published");
@@ -577,7 +601,7 @@ async function testPostRepairContentDriftFailsClosed() {
     assert.equal(plan1[0].action, "apply");
 
     // APPLY #1 — success
-    await applyPublicationGeoPlan(prisma, plan1, [recovery]);
+    await applyPublicationGeoPlan(prisma, plan1, searchIndexer);
     let after = await getArticleFull(fixture.id);
     assert.equal(after?.status, "PUBLISHED");
 
@@ -603,7 +627,7 @@ async function testPostRepairContentDriftFailsClosed() {
     );
 
     // APPLY must refuse
-    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan2, [recovery]));
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan2, searchIndexer));
 
     // Verify the row was NOT reverted by repair attempt
     after = await getArticleFull(fixture.id);
@@ -619,15 +643,7 @@ async function testPostRepairContentDriftFailsClosed() {
   }
 }
 
-/**
- * Regression for the "reindex articles after direct publication" Codex
- * finding: without a searchIndexer argument, APPLY must not silently index
- * anything (callers that don't need it stay side-effect-free). With one
- * passed — exactly as the CLI script does — the newly-published article
- * must be indexed and marked isPublished=true *before* applyPublicationGeoPlan
- * returns (awaited after the transaction commits, not fire-and-forget), so
- * a short-lived CLI process can safely $disconnect() right after.
- */
+/** Strict indexing is awaited after commit and verified before returning. */
 async function testApplyReindexesArticleForSearch() {
   const minsk = await getMinskCity();
   const suffix = Date.now().toString(36);
@@ -642,21 +658,67 @@ async function testApplyReindexesArticleForSearch() {
     const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
     assert.equal(plan[0].action, "apply");
 
-    // No searchIndexer passed — must not throw, and must not index.
     const docBefore = await prisma.searchDocument.findUnique({
       where: { entityType_entityId: { entityType: "article", entityId: fixture.id } },
     });
     assert.equal(docBefore, null, "no search document should exist before APPLY");
 
-    await applyPublicationGeoPlan(prisma, plan, [recovery], searchIndexer);
+    await applyPublicationGeoPlan(prisma, plan, searchIndexer);
 
-    const doc = await prisma.searchDocument.findUnique({
-      where: { entityType_entityId: { entityType: "article", entityId: fixture.id } },
-    });
-    assert.ok(doc, "search document must exist immediately after APPLY returns (awaited, not fire-and-forget)");
-    assert.equal(doc!.isPublished, true, "search document must reflect the newly-published state");
+    await assertSingleValidSearchDocument(fixture.id, fixture.title, `/minsk/blog/${slug}`);
   } finally {
-    await prisma.searchDocument.deleteMany({ where: { entityType: "article", entityId: fixture.id } });
+    await cleanup(fixture.id);
+  }
+}
+
+/**
+ * Run #1 commits publication and then fails strict indexing. Run #2 sees
+ * already_applied, performs zero publication writes, and repairs search.
+ */
+async function testPostCommitIndexFailureIsResumable() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const slug = `pub-geo-index-retry-${suffix}`;
+  const fixture = await createPendingArticle({ slug });
+
+  try {
+    const recovery = makeRecovery(fixture, "CITY");
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
+
+    const plan1 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan1[0].action, "apply");
+
+    const failingIndexer = {
+      async upsertArticleStrict(articleId: string): Promise<void> {
+        assert.equal(articleId, fixture.id);
+        throw new Error("injected strict article indexing failure");
+      },
+    };
+    await assert.rejects(
+      () => applyPublicationGeoPlan(prisma, plan1, failingIndexer),
+      /injected strict article indexing failure/,
+    );
+
+    const afterFailure = await getArticleFull(fixture.id);
+    assert.equal(afterFailure?.status, "PUBLISHED", "publication commit must survive index failure");
+    assert.equal(afterFailure?.geoScope, "CITY");
+    assert.equal(afterFailure?.cityId, minsk.id);
+    assert.equal(
+      await prisma.searchDocument.count({
+        where: { entityType: "article", entityId: fixture.id },
+      }),
+      0,
+      "failed strict index must not create a document",
+    );
+
+    const plan2 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan2[0].action, "already_applied");
+    const result2 = await applyPublicationGeoPlan(prisma, plan2, searchIndexer);
+    assert.equal(result2.applied, 0, "retry must perform zero publication writes");
+    assert.equal(result2.reindexed, 1, "retry must still perform strict reindex");
+    await assertSingleValidSearchDocument(fixture.id, fixture.title, `/minsk/blog/${slug}`);
+  } finally {
     await cleanup(fixture.id);
   }
 }
@@ -673,6 +735,7 @@ async function main() {
   await testBelarusScopedMinskLookup();
   await testPostRepairContentDriftFailsClosed();
   await testApplyReindexesArticleForSearch();
+  await testPostCommitIndexFailureIsResumable();
   console.log("migratedArticlePublicationGeoRepair.test.ts: PASS");
 }
 

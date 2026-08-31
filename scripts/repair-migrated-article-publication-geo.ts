@@ -21,18 +21,21 @@
  * one valid Minsk city cannot be resolved. This prevents a same-slug city
  * in another country from being inadvertently selected.
  *
- * Uses the app's shared `prisma`/`searchIndexer` (src/lib/prisma.ts), not a
- * bare `new PrismaClient()`. After a successful APPLY, each newly-published
- * article is explicitly reindexed via `searchIndexer.upsertArticle`
- * (awaited after the transaction commits — same pattern the normal
- * publication path uses in articleAdminService.ts), so the 9 recovered
- * articles are visible in site search immediately, not just after some
- * unrelated future full reindex.
+ * Writes go through the app's shared `prismaBase` — the plain, non-search-
+ * indexing-extended client (src/lib/prisma.ts) — and reindexing is a
+ * separate, explicit, STRICT step via `searchIndexer.upsertArticleStrict`,
+ * run for every `apply` AND `already_applied` row and immediately verified
+ * against SearchDocument. This makes the whole repair resumable: if a run
+ * publishes an article but the strict reindex then fails (throws, no
+ * silent swallow), the CLI exits non-zero while the Article publication
+ * write stays committed; the next `--apply` rerun sees that row as
+ * `already_applied` and retries indexing until it verifies clean — see
+ * applyPublicationGeoPlan's docstring for the full contract.
  *
  * PROD writes are intentionally manual and out-of-band, same as Phase 1.
  */
 import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
-import prisma, { searchIndexer } from "../src/lib/prisma";
+import { prismaBase, searchIndexer } from "../src/lib/prisma";
 import {
   MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
   MINSK_CITY_SLUG,
@@ -51,7 +54,7 @@ async function main() {
   // suite via resolveMinskCity — see migratedArticlePublicationGeoRepair.ts).
   // Fails if no valid Minsk city can be resolved; a same-slug city outside
   // Belarus can never be selected because slug is unique per-country.
-  const minskCity = await resolveMinskCity(prisma);
+  const minskCity = await resolveMinskCity(prismaBase);
   if (!minskCity) {
     throw new Error(
       `[repair-migrated-article-publication-geo] City not found: ` +
@@ -60,7 +63,7 @@ async function main() {
   }
 
   const plan = await buildPublicationGeoPlan(
-    prisma,
+    prismaBase,
     MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
     minskCity.id,
   );
@@ -74,13 +77,14 @@ async function main() {
 
   if (!apply) return;
 
-  const result = await applyPublicationGeoPlan(
-    prisma,
-    plan,
-    MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
-    searchIndexer,
+  const result = await applyPublicationGeoPlan(prismaBase, plan, searchIndexer);
+  console.log(
+    `[repair-migrated-article-publication-geo] Applied ${result.applied} row(s); ` +
+      `reindexed+verified ${result.reindexed} row(s).`,
   );
-  console.log(`[repair-migrated-article-publication-geo] Applied ${result.applied} row(s).`);
+  for (const verification of result.verifications) {
+    console.log(`SEARCH_INDEX articleId=${verification.articleId} PASS urlPath=${verification.urlPath}`);
+  }
 }
 
 main()
@@ -89,5 +93,5 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await prismaBase.$disconnect();
   });

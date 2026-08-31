@@ -37,6 +37,8 @@ export type PublicationGeoPlanRow = {
   title: string;
   /** The slug PLAN observed (and, on "apply" rows, the precondition APPLY re-checks atomically). */
   expectedSlug: string;
+  /** The audited updatedAt PLAN validated against (and, on "apply" rows, the precondition APPLY re-checks atomically). */
+  expectedUpdatedAt: string;
   before: {
     status: string;
     geoScope: string | null;
@@ -119,6 +121,7 @@ export async function buildPublicationGeoPlan(
         articleId: recovery.articleId,
         title: recovery.title,
         expectedSlug: recovery.currentSlug,
+        expectedUpdatedAt: recovery.expectedUpdatedAt,
         before: null,
         after,
         finalCanonicalPath,
@@ -149,6 +152,7 @@ export async function buildPublicationGeoPlan(
         articleId: recovery.articleId,
         title: recovery.title,
         expectedSlug: recovery.currentSlug,
+        expectedUpdatedAt: recovery.expectedUpdatedAt,
         before,
         after,
         finalCanonicalPath,
@@ -207,6 +211,7 @@ export async function buildPublicationGeoPlan(
           articleId: recovery.articleId,
           title: recovery.title,
           expectedSlug: recovery.currentSlug,
+          expectedUpdatedAt: recovery.expectedUpdatedAt,
           before,
           after,
           finalCanonicalPath,
@@ -221,6 +226,7 @@ export async function buildPublicationGeoPlan(
         articleId: recovery.articleId,
         title: recovery.title,
         expectedSlug: recovery.currentSlug,
+        expectedUpdatedAt: recovery.expectedUpdatedAt,
         before,
         after,
         finalCanonicalPath,
@@ -270,6 +276,7 @@ export async function buildPublicationGeoPlan(
         articleId: recovery.articleId,
         title: recovery.title,
         expectedSlug: recovery.currentSlug,
+        expectedUpdatedAt: recovery.expectedUpdatedAt,
         before,
         after,
         finalCanonicalPath,
@@ -288,6 +295,7 @@ export async function buildPublicationGeoPlan(
         articleId: recovery.articleId,
         title: recovery.title,
         expectedSlug: recovery.currentSlug,
+        expectedUpdatedAt: recovery.expectedUpdatedAt,
         before,
         after,
         finalCanonicalPath,
@@ -302,6 +310,7 @@ export async function buildPublicationGeoPlan(
       articleId: recovery.articleId,
       title: recovery.title,
       expectedSlug: recovery.currentSlug,
+      expectedUpdatedAt: recovery.expectedUpdatedAt,
       before,
       after,
       finalCanonicalPath,
@@ -323,44 +332,105 @@ export function summarizePublicationGeoPlan(plan: PublicationGeoPlanRow[], mode:
   };
 }
 
+export type StrictArticleSearchIndexer = {
+  upsertArticleStrict(articleId: string): Promise<void>;
+};
+
+export type SearchDocumentVerification = {
+  articleId: string;
+  status: "verified" | "missing" | "mismatch";
+  urlPath: string;
+  reason?: string;
+};
+
 /**
- * Applies only `action: "apply"` rows inside a single transaction. Refuses
- * (throws, no writes) if any conflict/not_found rows are present in the
- * plan — the caller must resolve those first. Re-running with an
- * already-applied plan is a no-op (idempotent).
+ * Reads the SearchDocument for one article back and confirms it reflects
+ * the repair: published, correct title, correct canonical urlPath. Never
+ * writes. Used right after a strict reindex to fail loudly (rather than
+ * trust the indexer's own success) if the document is missing or wrong.
+ */
+export async function verifySearchDocument(
+  prisma: PrismaClient,
+  row: PublicationGeoPlanRow,
+): Promise<SearchDocumentVerification> {
+  const expectedTitle = row.before?.dbTitle ?? row.title;
+  const doc = await prisma.searchDocument.findUnique({
+    where: { entityType_entityId: { entityType: "article", entityId: row.articleId } },
+  });
+  if (!doc) {
+    return {
+      articleId: row.articleId,
+      status: "missing",
+      urlPath: row.finalCanonicalPath,
+      reason: "SearchDocument not found",
+    };
+  }
+  const mismatches: string[] = [];
+  if (!doc.isPublished) mismatches.push("isPublished=false");
+  if (doc.title !== expectedTitle) {
+    mismatches.push(`title mismatch: doc="${doc.title}" expected="${expectedTitle}"`);
+  }
+  if (doc.urlPath !== row.finalCanonicalPath) {
+    mismatches.push(`urlPath mismatch: doc="${doc.urlPath}" expected="${row.finalCanonicalPath}"`);
+  }
+  if (mismatches.length > 0) {
+    return {
+      articleId: row.articleId,
+      status: "mismatch",
+      urlPath: doc.urlPath,
+      reason: mismatches.join("; "),
+    };
+  }
+  return { articleId: row.articleId, status: "verified", urlPath: doc.urlPath };
+}
+
+/**
+ * Applies `action: "apply"` rows inside a single transaction, then strictly
+ * reindexes and verifies search for every `"apply"` AND `"already_applied"`
+ * row. Refuses (throws, no writes, no reindex) if any conflict/not_found
+ * rows are present in the plan — the caller must resolve those first.
  *
+ * `prisma` should be a plain (non-search-indexing-extended) client for the
+ * transaction — e.g. `prismaBase` from `@/lib/prisma`, not the default
+ * extended `prisma` export. This repair's own strict, verified,
+ * post-commit reindex below is the sole authoritative indexing step; using
+ * the extended client here would additionally fire an un-awaited
+ * fire-and-forget reindex from inside the transaction, racing the commit
+ * and duplicating work the strict step already guarantees.
+ *
+ * ATOMICITY (publication write):
  * PLAN and APPLY are two separate round-trips, so the DB state PLAN read can
- * go stale before APPLY runs (TOCTOU). Each row's write is therefore an
- * `updateMany` whose WHERE clause re-asserts the *exact* expected
+ * go stale before APPLY runs (TOCTOU). Each apply-row's write is therefore
+ * an `updateMany` whose WHERE clause re-asserts the *exact* expected
  * precondition atomically as part of the same UPDATE statement — not a
- * separate read-then-write.
- *
- * The WHERE clause includes **both** guards:
+ * separate read-then-write. The WHERE clause includes both:
  * 1. Atomic publication-state guard: id + slug + PENDING/null/null
  * 2. Audited-state guard: updatedAt === expectedUpdatedAt
+ * If any row's `updated.count !== 1`, the current DB state no longer
+ * matches what PLAN saw; the whole transaction throws and every write in
+ * it (including any already-issued updates for other rows in this same
+ * APPLY call) rolls back. No partial mutations are possible.
  *
- * If any row's `updated.count !== 1`, the current DB state no longer matches
- * what PLAN saw; the whole transaction throws and every write in it (including
- * any already-issued updates for other rows in this same APPLY call) rolls
- * back. No partial mutations are possible.
- *
- * After the transaction commits, each newly-published row is reindexed via
- * `searchIndexer.upsertArticle` — explicitly awaited *after* commit, not
- * left to the Prisma search-indexing extension's fire-and-forget hook.
- * That hook fires from inside the transaction callback and can race the
- * commit (reading pre-commit PENDING state); the same
- * "reindex-after-commit" pattern is already used by the normal
- * publication path (see `runArticleDerivedSideEffects` in
- * articleAdminService.ts). Without an explicit `searchIndexer` argument
- * these rows are simply not reindexed by this function — the caller is
- * responsible for passing one when writes should actually take effect for
- * public search.
+ * RESUMABLE SEARCH REINDEX:
+ * `searchRows` = "apply" rows (just published) UNION "already_applied" rows
+ * (already published — by this run or a prior one). Reindex runs for both,
+ * and — critically — runs even when there are zero "apply" rows (an
+ * already-fully-applied rerun). This makes a post-commit indexing failure
+ * resumable: if run #1's transaction commits but `upsertArticleStrict`
+ * throws, the Article is left PUBLISHED with a stale/missing
+ * SearchDocument; PLAN then classifies it `already_applied` (not
+ * `conflict`) on the next run, and run #2's APPLY reaches the reindex step
+ * again with zero publication writes and repairs the index. Indexing uses
+ * `upsertArticleStrict`, which propagates errors instead of swallowing
+ * them (`SearchIndexerService.upsertArticle` catches/logs and would make
+ * this function falsely report success), and each reindex is immediately
+ * verified via `verifySearchDocument` — fails loudly (throws) if the
+ * document is still missing or wrong after the indexer claims success.
  */
 export async function applyPublicationGeoPlan(
   prisma: PrismaClient,
   plan: PublicationGeoPlanRow[],
-  recoveries?: MigratedArticlePublicationGeoRecovery[],
-  searchIndexer?: { upsertArticle(articleId: string): Promise<void> },
+  searchIndexer: StrictArticleSearchIndexer,
 ) {
   const conflicts = plan.filter((row) => row.action === "conflict" || row.action === "not_found");
   if (conflicts.length > 0) {
@@ -369,58 +439,57 @@ export async function applyPublicationGeoPlan(
     );
   }
 
-  const toApply = plan.filter((row) => row.action === "apply");
-  if (toApply.length === 0) return { applied: 0 };
+  const publicationRows = plan.filter((row) => row.action === "apply");
+  const searchRows = plan.filter(
+    (row) => row.action === "apply" || row.action === "already_applied",
+  );
 
-  // Build a lookup map for expectedUpdatedAt by articleId
-  const updatedAtMap = new Map<string, string>();
-  if (recoveries) {
-    for (const rec of recoveries) {
-      updatedAtMap.set(rec.articleId, rec.expectedUpdatedAt);
+  if (publicationRows.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      for (const row of publicationRows) {
+        const result = await tx.article.updateMany({
+          where: {
+            // Atomic publication-state guard
+            id: row.articleId,
+            slug: row.expectedSlug,
+            status: "PENDING",
+            geoScope: null,
+            cityId: null,
+            // Audited-state guard: fail-closed if content was edited after the PROD audit
+            updatedAt: new Date(row.expectedUpdatedAt),
+          },
+          data: {
+            status: row.after.status,
+            geoScope: row.after.geoScope,
+            cityId: row.after.cityId,
+          },
+        });
+        if (result.count !== 1) {
+          throw new Error(
+            `[migratedArticlePublicationGeoRepair] Precondition no longer holds for ${row.articleId} ` +
+              `(expected PENDING/null/null slug=${row.expectedSlug} updatedAt=${row.expectedUpdatedAt}); ` +
+              `aborting transaction, no partial writes`,
+          );
+        }
+      }
+    });
+  }
+
+  // Search reindex runs for apply + already_applied rows regardless of
+  // whether the transaction above ran — do NOT early-return when
+  // publicationRows is empty (see RESUMABLE SEARCH REINDEX above).
+  const verifications: SearchDocumentVerification[] = [];
+  for (const row of searchRows) {
+    await searchIndexer.upsertArticleStrict(row.articleId);
+    const verification = await verifySearchDocument(prisma, row);
+    verifications.push(verification);
+    if (verification.status !== "verified") {
+      throw new Error(
+        `[migratedArticlePublicationGeoRepair] SearchDocument verification failed for ${row.articleId}: ` +
+          `${verification.status} — ${verification.reason ?? "unknown"}`,
+      );
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const row of toApply) {
-      const expectedUpdatedAt = updatedAtMap.get(row.articleId);
-      if (!expectedUpdatedAt) {
-        throw new Error(
-          `[migratedArticlePublicationGeoRepair] Missing expectedUpdatedAt for ${row.articleId}`,
-        );
-      }
-
-      const result = await tx.article.updateMany({
-        where: {
-          // Atomic publication-state guard
-          id: row.articleId,
-          slug: row.expectedSlug,
-          status: "PENDING",
-          geoScope: null,
-          cityId: null,
-          // Audited-state guard: fail-closed if content was edited after the PROD audit
-          updatedAt: new Date(expectedUpdatedAt),
-        },
-        data: {
-          status: row.after.status,
-          geoScope: row.after.geoScope,
-          cityId: row.after.cityId,
-        },
-      });
-      if (result.count !== 1) {
-        throw new Error(
-          `[migratedArticlePublicationGeoRepair] Precondition no longer holds for ${row.articleId} ` +
-            `(expected PENDING/null/null slug=${row.expectedSlug} updatedAt=${expectedUpdatedAt}); ` +
-            `aborting transaction, no partial writes`,
-        );
-      }
-    }
-  });
-
-  if (searchIndexer) {
-    for (const row of toApply) {
-      await searchIndexer.upsertArticle(row.articleId);
-    }
-  }
-
-  return { applied: toApply.length };
+  return { applied: publicationRows.length, reindexed: searchRows.length, verifications };
 }
