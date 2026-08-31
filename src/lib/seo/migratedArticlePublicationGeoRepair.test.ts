@@ -134,11 +134,13 @@ async function testCityRecoveryApply() {
     });
     assert.equal(before, null, "PENDING article must not be publicly visible before repair");
 
+    // PLAN #1 — should classify as "apply"
     const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
     assert.equal(plan.length, 1);
     assert.equal(plan[0].action, "apply");
     assert.equal(plan[0].finalCanonicalPath, `/minsk/blog/${slug}`);
 
+    // APPLY #1
     const result = await applyPublicationGeoPlan(prisma, plan, [recovery]);
     assert.equal(result.applied, 1);
 
@@ -158,18 +160,19 @@ async function testCityRecoveryApply() {
     });
     assert.ok(nowPublic, "PUBLISHED article must be publicly visible after repair");
 
-    // Idempotent rerun: second PLAN reports already_applied, APPLY is a no-op.
-    // Re-read updatedAt (it may have changed due to the apply write)
-    const postApply = await getArticleFull(fixture.id);
-    const recovery2 = makeRecovery(fixture, "CITY");
-    recovery2.expectedUpdatedAt = postApply!.updatedAt!.toISOString();
-    recovery2.auditedPublishedAt = "2024-06-01T00:00:00.000Z";
-    recovery2.auditedTitle = fixture.title;
-    recovery2.auditedBlocksCount = 1;
+    // PLAN #2 using the SAME original recovery (NOT mutating expectedUpdatedAt).
+    // After APPLY, updatedAt has advanced. The fixed order checks already_applied
+    // FIRST (by publication state), exempting updatedAt drift. This must pass
+    // without touching recovery.expectedUpdatedAt.
+    const plan2 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(
+      plan2[0].action,
+      "already_applied",
+      `idempotent rerun must be already_applied, got ${plan2[0].action} (reason: ${plan2[0].reason ?? "none"})`,
+    );
 
-    const plan2 = await buildPublicationGeoPlan(prisma, [recovery2], minsk.id);
-    assert.equal(plan2[0].action, "already_applied");
-    const result2 = await applyPublicationGeoPlan(prisma, plan2, [recovery2]);
+    // APPLY #2 using the SAME original recovery — no-op.
+    const result2 = await applyPublicationGeoPlan(prisma, plan2, [recovery]);
     assert.equal(result2.applied, 0);
   } finally {
     await cleanup(fixture.id);
@@ -558,6 +561,77 @@ async function testBelarusScopedMinskLookup() {
   }
 }
 
+/**
+ * Regression: after a successful APPLY, an unrelated editor edit (e.g. title
+ * change) must be detected by the already_applied branch's post-repair checks.
+ * The row is PUBLISHED with correct geoScope/cityId, so it hits the
+ * already_applied branch first. But since title (or noindex, or blocksCount)
+ * drifted from the audited fingerprint, it must be classified as conflict
+ * rather than already_applied. This proves we only exempt repair-induced
+ * updatedAt drift, not real later content changes.
+ */
+async function testPostRepairContentDriftFailsClosed() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const slug = `pub-geo-postdrift-${suffix}`;
+  const fixture = await createPendingArticle({ slug });
+
+  try {
+    const recovery = makeRecovery(fixture, "CITY");
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
+    recovery.auditedTitle = fixture.title;
+    recovery.auditedPublishedAt = "2024-06-01T00:00:00.000Z";
+    recovery.auditedNoindex = false;
+    recovery.auditedBlocksCount = 1;
+
+    // PLAN #1 → apply
+    const plan1 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan1[0].action, "apply");
+
+    // APPLY #1 — success
+    await applyPublicationGeoPlan(prisma, plan1, [recovery]);
+    let after = await getArticleFull(fixture.id);
+    assert.equal(after?.status, "PUBLISHED");
+
+    // Simulate post-repair content drift: change title and noindex
+    await prisma.article.update({
+      where: { id: fixture.id },
+      data: {
+        title: `EDITED AFTER REPAIR ${suffix}`,
+        noindex: true,
+      },
+    });
+
+    // PLAN #2 with the SAME original recovery — must detect drift
+    const plan2 = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(
+      plan2[0].action,
+      "conflict",
+      `post-repair content edit must be detected as conflict, got ${plan2[0].action} (reason: ${plan2[0].reason ?? "none"})`,
+    );
+    assert.ok(
+      plan2[0].reason?.includes("post-repair drift"),
+      `reason must mention post-repair drift: ${plan2[0].reason}`,
+    );
+
+    // APPLY must refuse
+    await assert.rejects(() => applyPublicationGeoPlan(prisma, plan2, [recovery]));
+
+    // Verify the row was NOT reverted by repair attempt
+    after = await getArticleFull(fixture.id);
+    assert.equal(after?.status, "PUBLISHED", "already-published row must stay published");
+    assert.equal(
+      after?.title,
+      `EDITED AFTER REPAIR ${suffix}`,
+      "post-repair title edit must be preserved",
+    );
+    assert.equal(after?.noindex, true, "post-repair noindex edit must be preserved");
+  } finally {
+    await cleanup(fixture.id);
+  }
+}
+
 async function main() {
   await testCityRecoveryApply();
   await testCountryRecoveryApply();
@@ -568,6 +642,7 @@ async function main() {
   await testContentEditAfterAuditFailsClosed();
   await testContentDriftBetweenPlanAndApplyFailsClosed();
   await testBelarusScopedMinskLookup();
+  await testPostRepairContentDriftFailsClosed();
   console.log("migratedArticlePublicationGeoRepair.test.ts: PASS");
 }
 

@@ -47,11 +47,19 @@ export function targetState(
  * classifies it as apply / already_applied (idempotent no-op) / conflict
  * (fails closed) / not_found. Never writes.
  *
- * In addition to the publication-state precondition (PENDING/null/null),
- * PLAN validates every audited field against the PROD snapshot captured in
- * the recovery matrix: title, updatedAt, publishedAt, noindex, seoRobots,
- * and the content blocks count (sanity check). If any audited field
- * drifted, the row is classified as conflict and APPLY is blocked.
+ * Classification order:
+ * 1. not_found — article row missing.
+ * 2. slug conflict — slug differs from expected.
+ * 3. already_applied — publication state already matches target. For these
+ *    rows, non-updatedAt audited fields (title, publishedAt, noindex,
+ *    seoRobots, blocksCount) are still validated; only updatedAt is exempt
+ *    because a successful APPLY legitimately advances it via @updatedAt.
+ * 4. audited-state drift — for rows NOT yet in the target state (pre-repair),
+ *    every audited field including updatedAt must exactly match the PROD
+ *    snapshot. If any drifted, the row is classified as conflict and APPLY
+ *    is blocked.
+ * 5. precondition violated — publication fields not in expected PENDING/null/null.
+ * 6. apply — all checks pass, ready for atomic repair.
  */
 export async function buildPublicationGeoPlan(
   prisma: PrismaClient,
@@ -126,7 +134,80 @@ export async function buildPublicationGeoPlan(
       continue;
     }
 
+    // ---------- already applied / idempotent check (FIRST, before audited-state) ----------
+    // After a successful APPLY, Article.updatedAt advances via @updatedAt. The audited
+    // expectedUpdatedAt timestamp is then stale. We must detect already_applied by the
+    // publication-state fields FIRST, exempting updatedAt from the comparison because the
+    // repair legitimately moved it forward.
+    //
+    // For already_applied rows we still validate every other audited field (title,
+    // publishedAt, noindex, seoRobots, blocksCount) — only updatedAt is exempt.
+    const matchesTargetPubState =
+      before.status === after.status &&
+      before.geoScope === after.geoScope &&
+      before.cityId === after.cityId;
+
+    if (matchesTargetPubState) {
+      // Row already matches the target state. Check non-updatedAt audited fields for
+      // unrelated post-repair drift (e.g. an editor changed title after repair).
+      const postRepairChecks: string[] = [];
+      if (before.dbTitle !== recovery.auditedTitle) {
+        postRepairChecks.push(
+          `title mismatch: db="${before.dbTitle}" audited="${recovery.auditedTitle}"`,
+        );
+      }
+      if (before.publishedAt !== recovery.auditedPublishedAt) {
+        postRepairChecks.push(
+          `publishedAt mismatch: db=${before.publishedAt} audited=${recovery.auditedPublishedAt}`,
+        );
+      }
+      if (before.noindex !== recovery.auditedNoindex) {
+        postRepairChecks.push(
+          `noindex mismatch: db=${before.noindex} audited=${recovery.auditedNoindex}`,
+        );
+      }
+      if (before.seoRobots !== recovery.auditedSeoRobots) {
+        postRepairChecks.push(
+          `seoRobots mismatch: db="${before.seoRobots}" audited="${recovery.auditedSeoRobots}"`,
+        );
+      }
+      if (before.blocksCount !== recovery.auditedBlocksCount) {
+        postRepairChecks.push(
+          `blocksCount mismatch: db=${before.blocksCount} audited=${recovery.auditedBlocksCount} (sanity)`,
+        );
+      }
+
+      if (postRepairChecks.length > 0) {
+        // Non-updatedAt audited field drifted after repair — real content edit, fail closed.
+        plan.push({
+          articleId: recovery.articleId,
+          title: recovery.title,
+          expectedSlug: recovery.currentSlug,
+          before,
+          after,
+          finalCanonicalPath,
+          action: "conflict",
+          reason: `post-repair drift: ${postRepairChecks.join("; ")}`,
+        });
+        continue;
+      }
+
+      // All post-repair checks pass (or differed only in updatedAt, which is exempt).
+      plan.push({
+        articleId: recovery.articleId,
+        title: recovery.title,
+        expectedSlug: recovery.currentSlug,
+        before,
+        after,
+        finalCanonicalPath,
+        action: "already_applied",
+      });
+      continue;
+    }
+
     // ---------- audited-state drift: fail-closed against any PROD change ----------
+    // This block only runs for rows NOT yet in the target state (i.e. pre-repair).
+    // Full audited check including updatedAt — must match the exact PROD snapshot.
     const auditedStateChecks: string[] = [];
     if (before.dbTitle !== recovery.auditedTitle) {
       auditedStateChecks.push(
@@ -170,25 +251,6 @@ export async function buildPublicationGeoPlan(
         finalCanonicalPath,
         action: "conflict",
         reason: `audited state drift: ${auditedStateChecks.join("; ")}`,
-      });
-      continue;
-    }
-
-    // ---------- already applied (idempotent) ----------
-    const matchesTarget =
-      before.status === after.status &&
-      before.geoScope === after.geoScope &&
-      before.cityId === after.cityId;
-
-    if (matchesTarget) {
-      plan.push({
-        articleId: recovery.articleId,
-        title: recovery.title,
-        expectedSlug: recovery.currentSlug,
-        before,
-        after,
-        finalCanonicalPath,
-        action: "already_applied",
       });
       continue;
     }
