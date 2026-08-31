@@ -8,7 +8,6 @@
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import {
   buildCityPublicPath,
-  buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
 import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -16,6 +15,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/article/articleMvpRenderData";
+import { resolveCityArticlePublicRoute } from "@/lib/article/resolveCityArticlePublicRoute";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
@@ -50,14 +50,29 @@ async function resolveCity(citySlug: string) {
   });
 }
 
+function applyCityArticleRouteResolution(
+  resolution: Awaited<ReturnType<typeof resolveCityArticlePublicRoute>>,
+): { canonicalSlug: string; articleId: string } {
+  if (resolution.kind === "not_found") notFound();
+  if (resolution.kind === "national_redirect") permanentRedirect(resolution.path);
+  if (resolution.kind === "canonical_redirect") permanentRedirect(resolution.path);
+  return {
+    canonicalSlug: resolution.canonicalSlug,
+    articleId: resolution.articleId,
+  };
+}
+
 export async function generateMetadata({ params }: PageProps) {
   const { city: cityParam, slug } = await params;
   const city = await resolveCity(cityParam);
   if (!city) notFound();
 
   const publicBase = getCanonicalPublicAppUrl();
+  const route = applyCityArticleRouteResolution(
+    await resolveCityArticlePublicRoute(slug, city),
+  );
 
-  const mvp = await loadArticleMvpBySlugPublic(slug, city.id);
+  const mvp = await loadArticleMvpBySlugPublic(route.canonicalSlug, city.id);
   if (!mvp) notFound();
 
   const article = await prisma.article.findFirst({
@@ -77,16 +92,11 @@ export async function generateMetadata({ params }: PageProps) {
   });
   if (!article) notFound();
 
-  // If geoScope is COUNTRY, redirect to national URL
-  if (article.geoScope === "COUNTRY") {
-    permanentRedirect(buildNationalArticlePath(mvp.slug ?? slug));
-  }
-
   const title = article.seoTitle?.trim() || `${mvp.title} — mamaGo`;
   const description = article.seoDescription?.trim() || mvp.excerpt?.trim() || undefined;
   const canonical = resolveArticleCanonicalUrl({
     seoCanonicalUrl: article.seoCanonicalUrl,
-    slug,
+    slug: route.canonicalSlug,
     geoScope: "CITY",
     citySlug: city.slug,
     publicBase,
@@ -118,10 +128,13 @@ export default async function CityArticlePage({ params }: PageProps) {
   const user = await getCurrentUser();
   const canEdit = user?.role === "ADMIN" || user?.role === "MODERATOR";
 
-  const mvp = await loadArticleMvpBySlugPublic(slug, city.id);
+  const route = applyCityArticleRouteResolution(
+    await resolveCityArticlePublicRoute(slug, city),
+  );
+
+  const mvp = await loadArticleMvpBySlugPublic(route.canonicalSlug, city.id);
   if (!mvp) notFound();
 
-  // Verify this article is CITY-scoped for this city; if COUNTRY → redirect to /blog
   const articleRow = await prisma.article.findFirst({
     where: { id: mvp.id, ...getPublicPublishedArticleWhere() },
     select: {
@@ -134,25 +147,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       seoTitle: true,
     },
   });
-  if (!articleRow) notFound();
-
-  if (articleRow.geoScope === "COUNTRY") {
-    permanentRedirect(buildNationalArticlePath(articleRow.slug ?? slug));
-  }
-
-  // If article belongs to a different city, 404 (slug collision is per-city)
-  if (articleRow.cityId !== city.id) notFound();
-
-  // Redirect to current slug if we came in via an old slug
-  if (articleRow.slug && articleRow.slug !== slug) {
-    permanentRedirect(
-      buildCityPublicPath({
-        citySlug: city.slug,
-        type: "article",
-        slug: articleRow.slug,
-      }),
-    );
-  }
+  if (!articleRow?.slug) notFound();
 
   if (await shouldCountPublishedArticleViewRequest()) {
     await incrementPublishedArticleViews(mvp.id);
@@ -167,7 +162,7 @@ export default async function CityArticlePage({ params }: PageProps) {
   const canonicalPath = buildCityPublicPath({
     citySlug: city.slug,
     type: "article",
-    slug: articleRow.slug ?? slug,
+    slug: articleRow.slug,
   });
   const schemaJsonLd =
     articleRow.seoJsonLdOverride && typeof articleRow.seoJsonLdOverride === "object"
@@ -175,7 +170,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       : buildArticleJsonLd({
           canonicalUrl: resolveArticleCanonicalUrl({
             seoCanonicalUrl: articleRow.seoCanonicalUrl,
-            slug: articleRow.slug ?? slug,
+            slug: articleRow.slug,
             geoScope: "CITY",
             citySlug: city.slug,
             publicBase,
@@ -266,7 +261,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       title: mvp.title,
       excerpt: mvp.excerpt,
       subtitle: mvp.subtitle,
-      slug: articleRow.slug ?? slug,
+      slug: articleRow.slug,
       publishedAt: mvp.publishedAt,
       heroUrl: mvp.heroUrl,
       heroAlt: mvp.heroAlt,

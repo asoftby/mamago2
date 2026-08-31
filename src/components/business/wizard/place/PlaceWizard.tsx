@@ -231,6 +231,7 @@ export function PlaceWizard({
     schemaVersion: PLACE_WIZARD_SCHEMA_VERSION,
     data: {
       currentStep,
+      currentStepKey: getStepKey(currentStep, ctaStepEnabled) ?? undefined,
       formData,
     },
     enabled: mode === "create" ? hasMeaningfulContent(formData) : isDirty,
@@ -260,8 +261,8 @@ export function PlaceWizard({
     if (!restored) return;
 
     setFormData(restored.formData);
-    setCurrentStep(normalizeRestoredPlaceWizardStep(restored, totalSteps));
-  }, [draft, totalSteps]);
+    setCurrentStep(normalizeRestoredPlaceWizardStep(restored, totalSteps, ctaStepEnabled));
+  }, [draft, totalSteps, ctaStepEnabled]);
 
   // Wizard session for temp media
   const { wizardSessionId } = useWizardSession({

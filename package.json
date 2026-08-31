@@ -133,6 +133,8 @@
     "test:event-schedule-midnight-server": "tsx src/lib/business/validateEventScheduleTimeOrder.test.ts && tsx src/lib/event/materializeScheduleSessions.test.ts",
     "test:unp-verification": "tsx src/lib/verification/unpChecksum.test.ts && tsx src/lib/verification/companyNameMatch.test.ts && tsx src/server/egr/verifyUnp.test.ts",
     "test:redirect-manifest": "tsx src/lib/seo/redirectManifest.test.ts",
+    "test:migrated-article-slug-recovery": "tsx src/lib/seo/migratedArticleSlugRecovery.test.ts",
+    "test:city-article-public-route": "tsx src/lib/article/resolveCityArticlePublicRoute.test.ts",
     "test:wp-catch-all": "tsx src/lib/routing/wpLegacyCatchAll.test.ts",
     "test:rate-limit": "tsx src/lib/security/rateLimit.test.ts",
     "test:offer-published-edit-gate": "tsx src/lib/offers/offerPublishedEditGate.test.ts",
