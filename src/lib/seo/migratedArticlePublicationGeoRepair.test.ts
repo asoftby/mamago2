@@ -5,7 +5,7 @@
  * Run: set -a; source .env; set +a; pnpm exec tsx src/lib/seo/migratedArticlePublicationGeoRepair.test.ts
  */
 import assert from "node:assert/strict";
-import prisma from "@/lib/prisma";
+import prisma, { searchIndexer } from "@/lib/prisma";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
 import {
   applyPublicationGeoPlan,
@@ -619,6 +619,48 @@ async function testPostRepairContentDriftFailsClosed() {
   }
 }
 
+/**
+ * Regression for the "reindex articles after direct publication" Codex
+ * finding: without a searchIndexer argument, APPLY must not silently index
+ * anything (callers that don't need it stay side-effect-free). With one
+ * passed — exactly as the CLI script does — the newly-published article
+ * must be indexed and marked isPublished=true *before* applyPublicationGeoPlan
+ * returns (awaited after the transaction commits, not fire-and-forget), so
+ * a short-lived CLI process can safely $disconnect() right after.
+ */
+async function testApplyReindexesArticleForSearch() {
+  const minsk = await getMinskCity();
+  const suffix = Date.now().toString(36);
+  const slug = `pub-geo-reindex-${suffix}`;
+  const fixture = await createPendingArticle({ slug });
+
+  try {
+    const recovery = makeRecovery(fixture, "CITY");
+    const full = await getArticleFull(fixture.id);
+    recovery.expectedUpdatedAt = full!.updatedAt!.toISOString();
+
+    const plan = await buildPublicationGeoPlan(prisma, [recovery], minsk.id);
+    assert.equal(plan[0].action, "apply");
+
+    // No searchIndexer passed — must not throw, and must not index.
+    const docBefore = await prisma.searchDocument.findUnique({
+      where: { entityType_entityId: { entityType: "article", entityId: fixture.id } },
+    });
+    assert.equal(docBefore, null, "no search document should exist before APPLY");
+
+    await applyPublicationGeoPlan(prisma, plan, [recovery], searchIndexer);
+
+    const doc = await prisma.searchDocument.findUnique({
+      where: { entityType_entityId: { entityType: "article", entityId: fixture.id } },
+    });
+    assert.ok(doc, "search document must exist immediately after APPLY returns (awaited, not fire-and-forget)");
+    assert.equal(doc!.isPublished, true, "search document must reflect the newly-published state");
+  } finally {
+    await prisma.searchDocument.deleteMany({ where: { entityType: "article", entityId: fixture.id } });
+    await cleanup(fixture.id);
+  }
+}
+
 async function main() {
   await testCityRecoveryApply();
   await testCountryRecoveryApply();
@@ -630,6 +672,7 @@ async function main() {
   await testContentDriftBetweenPlanAndApplyFailsClosed();
   await testBelarusScopedMinskLookup();
   await testPostRepairContentDriftFailsClosed();
+  await testApplyReindexesArticleForSearch();
   console.log("migratedArticlePublicationGeoRepair.test.ts: PASS");
 }
 

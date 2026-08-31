@@ -21,10 +21,18 @@
  * one valid Minsk city cannot be resolved. This prevents a same-slug city
  * in another country from being inadvertently selected.
  *
+ * Uses the app's shared `prisma`/`searchIndexer` (src/lib/prisma.ts), not a
+ * bare `new PrismaClient()`. After a successful APPLY, each newly-published
+ * article is explicitly reindexed via `searchIndexer.upsertArticle`
+ * (awaited after the transaction commits — same pattern the normal
+ * publication path uses in articleAdminService.ts), so the 9 recovered
+ * articles are visible in site search immediately, not just after some
+ * unrelated future full reindex.
+ *
  * PROD writes are intentionally manual and out-of-band, same as Phase 1.
  */
-import { PrismaClient } from "@prisma/client";
 import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
+import prisma, { searchIndexer } from "../src/lib/prisma";
 import {
   MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
   MINSK_CITY_SLUG,
@@ -36,7 +44,6 @@ import {
   summarizePublicationGeoPlan,
 } from "../src/lib/seo/migratedArticlePublicationGeoRepair";
 
-const prisma = new PrismaClient();
 const apply = process.argv.includes("--apply");
 
 async function main() {
@@ -71,6 +78,7 @@ async function main() {
     prisma,
     plan,
     MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES,
+    searchIndexer,
   );
   console.log(`[repair-migrated-article-publication-geo] Applied ${result.applied} row(s).`);
 }

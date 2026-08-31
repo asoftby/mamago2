@@ -343,11 +343,24 @@ export function summarizePublicationGeoPlan(plan: PublicationGeoPlanRow[], mode:
  * what PLAN saw; the whole transaction throws and every write in it (including
  * any already-issued updates for other rows in this same APPLY call) rolls
  * back. No partial mutations are possible.
+ *
+ * After the transaction commits, each newly-published row is reindexed via
+ * `searchIndexer.upsertArticle` — explicitly awaited *after* commit, not
+ * left to the Prisma search-indexing extension's fire-and-forget hook.
+ * That hook fires from inside the transaction callback and can race the
+ * commit (reading pre-commit PENDING state); the same
+ * "reindex-after-commit" pattern is already used by the normal
+ * publication path (see `runArticleDerivedSideEffects` in
+ * articleAdminService.ts). Without an explicit `searchIndexer` argument
+ * these rows are simply not reindexed by this function — the caller is
+ * responsible for passing one when writes should actually take effect for
+ * public search.
  */
 export async function applyPublicationGeoPlan(
   prisma: PrismaClient,
   plan: PublicationGeoPlanRow[],
   recoveries?: MigratedArticlePublicationGeoRecovery[],
+  searchIndexer?: { upsertArticle(articleId: string): Promise<void> },
 ) {
   const conflicts = plan.filter((row) => row.action === "conflict" || row.action === "not_found");
   if (conflicts.length > 0) {
@@ -402,6 +415,12 @@ export async function applyPublicationGeoPlan(
       }
     }
   });
+
+  if (searchIndexer) {
+    for (const row of toApply) {
+      await searchIndexer.upsertArticle(row.articleId);
+    }
+  }
 
   return { applied: toApply.length };
 }
