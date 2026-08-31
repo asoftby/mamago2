@@ -1,5 +1,6 @@
 import type { ContentStatus, GeoScope } from "@prisma/client";
 import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
+import type { ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 
 /** Снимок для редактора статьи (админ API и клиент без Prisma runtime). */
 export type ArticleEditorSnapshot = {
@@ -18,6 +19,7 @@ export type ArticleEditorSnapshot = {
   /** EventCategory с publicationType=ARTICLE */
   categoryId: string | null;
   additionalCategoryIds?: string[];
+  additionalGeographyTargets?: ArticleGeographyTargetInput[];
   /** null in UI = охват ещё не выбран (черновик). */
   geoScope: GeoScope | null;
   cityId: string | null;
@@ -53,6 +55,7 @@ export type ArticleSaveInput = {
   cityContext: string | null;
   categoryId: string | null;
   additionalCategoryIds?: string[];
+  additionalGeographyTargets?: ArticleGeographyTargetInput[];
   /** undefined = не менять в БД; null = охват не выбран. */
   geoScope?: GeoScope | null;
   cityId?: string | null;

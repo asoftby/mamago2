@@ -17,6 +17,8 @@ export async function GET(request: Request) {
 
   const selectedCategoryIds = new URL(request.url).searchParams.get("selectedCategoryIds")
     ?.split(",").filter(Boolean) ?? [];
+  const selectedRegionIds = new URL(request.url).searchParams.get("selectedRegionIds")
+    ?.split(",").filter(Boolean) ?? [];
   const [cities, regions, authors, categories] = await Promise.all([
     prisma.city.findMany({
       where: { isLegacyNonCity: false },
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
     prisma.region.findMany({
       where: {
         type: "OBLAST",
-        isActive: true,
+        OR: [{ isActive: true }, ...(selectedRegionIds.length ? [{ id: { in: selectedRegionIds } }] : [])],
         country: { isoCode: DEFAULT_COUNTRY_ISO },
       },
       orderBy: [{ priority: "desc" }, { name: "asc" }],

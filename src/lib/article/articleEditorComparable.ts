@@ -35,6 +35,7 @@ export function buildEditorComparable(input: {
   cityContext: string | null;
   categoryId: string | null;
   additionalCategoryIds?: string[];
+  additionalGeographyTargets?: ArticleEditorSnapshot["additionalGeographyTargets"];
   tagIds: string[];
   geoScope: GeoScope | null;
   cityId: string | null;
@@ -57,6 +58,7 @@ export function buildEditorComparable(input: {
     cityContext: input.cityContext ?? "",
     categoryId: input.categoryId ?? "",
     additionalCategoryIds: input.additionalCategoryIds ?? [],
+    additionalGeographyTargets: input.additionalGeographyTargets ?? [],
     tagIds: input.tagIds,
     geoScope: input.geoScope ?? null,
     cityId: input.cityId ?? "",
@@ -83,6 +85,7 @@ export function buildSavedComparable(snap: ArticleEditorSnapshot): string {
     cityContext: snap.cityContext,
     categoryId: snap.categoryId,
     additionalCategoryIds: snap.additionalCategoryIds,
+    additionalGeographyTargets: snap.additionalGeographyTargets,
     tagIds: snap.tagIds,
     geoScope: snap.geoScope,
     cityId: snap.cityId,

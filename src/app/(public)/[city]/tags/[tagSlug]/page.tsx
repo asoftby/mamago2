@@ -9,6 +9,7 @@ import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { buildArticlePublicPath, buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 
 type PageProps = {
   params: Promise<{ city: string; tagSlug: string }>;
@@ -42,11 +43,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string) {
     where: {
       status: "PUBLISHED",
       tags: { some: { id: tag.id } },
-      OR: [
-        { geoScope: "COUNTRY" },
-        { geoScope: "CITY", cityId: city.id },
-        ...(city.regionId ? [{ geoScope: "REGION" as const, regionId: city.regionId }] : []),
-      ],
+      ...buildArticleCityDiscoveryWhere(city, true),
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
     take: 60,
@@ -85,7 +82,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string) {
         href: buildArticlePublicPath({
           slug: article.slug as string,
           geoScope: article.geoScope,
-          citySlug: article.geoScope === "CITY" ? city.slug : article.city?.slug ?? undefined,
+          citySlug: article.city?.slug ?? undefined,
         }),
       })),
   };
