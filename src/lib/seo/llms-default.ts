@@ -17,8 +17,7 @@ Primary market:
 Important sections:
 - [Minsk city page](https://mamago.by/minsk) - main city page for Minsk
 - [Minsk events](https://mamago.by/minsk/events) - children's events and family activities
-- [Minsk places](https://mamago.by/minsk/places) - family-friendly places
-- [Minsk offers](https://mamago.by/minsk/offers) - classes, courses, camps and special offers
+- [Minsk classes](https://mamago.by/minsk/classes) - kids' classes, courses and clubs
 - [Minsk routes](https://mamago.by/minsk/routes) - family routes and day scenarios
 - [Journal](https://mamago.by/blog) - editorial journal and SEO articles
 
