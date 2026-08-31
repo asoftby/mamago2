@@ -1,6 +1,30 @@
 import type { PrismaClient } from "@prisma/client";
+import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
-import { expectedFinalCanonicalPath } from "./migratedArticlePublicationGeoRecovery";
+import { expectedFinalCanonicalPath, MINSK_CITY_SLUG } from "./migratedArticlePublicationGeoRecovery";
+
+/**
+ * Resolves the Minsk city unambiguously, scoped to Belarus
+ * (DEFAULT_COUNTRY_ISO), excluding legacy/inactive rows. A same-slug city
+ * in another country can never be selected: `slug` is unique per-country
+ * (`@@unique([countryId, slug])` on City), so once the lookup is scoped by
+ * `country.isoCode`, at most one row can match — this is the single source
+ * of truth both the CLI script and its tests exercise, so they can never
+ * drift apart.
+ */
+export async function resolveMinskCity(
+  prisma: PrismaClient,
+): Promise<{ id: string } | null> {
+  return prisma.city.findFirst({
+    where: {
+      slug: MINSK_CITY_SLUG,
+      isActive: true,
+      isLegacyNonCity: false,
+      country: { isoCode: DEFAULT_COUNTRY_ISO },
+    },
+    select: { id: true },
+  });
+}
 
 export type PublicationGeoTargetState = {
   status: "PUBLISHED";

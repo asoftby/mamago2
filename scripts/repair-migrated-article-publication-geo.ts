@@ -32,6 +32,7 @@ import {
 import {
   applyPublicationGeoPlan,
   buildPublicationGeoPlan,
+  resolveMinskCity,
   summarizePublicationGeoPlan,
 } from "../src/lib/seo/migratedArticlePublicationGeoRepair";
 
@@ -39,18 +40,11 @@ const prisma = new PrismaClient();
 const apply = process.argv.includes("--apply");
 
 async function main() {
-  // Unambiguous Belarus/non-legacy Minsk lookup. Fails if exactly one valid
-  // Minsk city cannot be resolved, preventing same-slug cities outside
-  // Belarus from being selected.
-  const minskCity = await prisma.city.findFirst({
-    where: {
-      slug: MINSK_CITY_SLUG,
-      isActive: true,
-      isLegacyNonCity: false,
-      country: { isoCode: DEFAULT_COUNTRY_ISO },
-    },
-    select: { id: true },
-  });
+  // Unambiguous Belarus/non-legacy Minsk lookup (shared with the test
+  // suite via resolveMinskCity — see migratedArticlePublicationGeoRepair.ts).
+  // Fails if no valid Minsk city can be resolved; a same-slug city outside
+  // Belarus can never be selected because slug is unique per-country.
+  const minskCity = await resolveMinskCity(prisma);
   if (!minskCity) {
     throw new Error(
       `[repair-migrated-article-publication-geo] City not found: ` +

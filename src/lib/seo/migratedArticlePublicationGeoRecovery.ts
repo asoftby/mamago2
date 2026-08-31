@@ -141,8 +141,11 @@ export const MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES: MigratedArticlePublica
   },
   {
     articleId: "cmssu26ev00wcwsobwpy1glg0",
-    title: "4.8 млн.$ за первый детский сад «Северного берега»",
-    auditedTitle: "4.8 млн.$ за первый детский сад «Северного берега»",
+    // PROD title has a trailing space (confirmed via to_json(title) during the
+    // 2026-08-31 audit) — captured verbatim so the audited-state guard doesn't
+    // false-positive "drift" on an untouched row.
+    title: "4.8 млн.$ за первый детский сад «Северного берега» ",
+    auditedTitle: "4.8 млн.$ за первый детский сад «Северного берега» ",
     currentSlug: "4-8-mln-za-pervyj-detskij-sad-severnogo-berega",
     legacyUrl: "/pervyy-detskiy-sad-severnogo-berega",
     geoScope: "CITY",

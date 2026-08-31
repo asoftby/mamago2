@@ -10,24 +10,19 @@ import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePub
 import {
   applyPublicationGeoPlan,
   buildPublicationGeoPlan,
+  resolveMinskCity,
 } from "./migratedArticlePublicationGeoRepair";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 
 /**
- * Resolves the Minsk city using the same Belarus-scoped lookup the repair
- * script uses. This ensures the test matches production behavior.
+ * Resolves the Minsk city through the exact same helper the repair script
+ * calls (resolveMinskCity), rather than a hand-copied WHERE clause — so
+ * this test suite exercises production behavior directly and cannot drift
+ * from it.
  */
 async function getMinskCity() {
-  const city = await prisma.city.findFirst({
-    where: {
-      slug: "minsk",
-      isActive: true,
-      isLegacyNonCity: false,
-      country: { isoCode: DEFAULT_COUNTRY_ISO },
-    },
-    select: { id: true, slug: true },
-  });
+  const city = await resolveMinskCity(prisma);
   assert.ok(city, "expected active Belarus Minsk city in local DB");
   return city;
 }
@@ -514,16 +509,8 @@ async function testBelarusScopedMinskLookup() {
   });
 
   try {
-    // Query with the same WHERE the repair script uses — must return exactly one (Belarus) Minsk
-    const belarusMinsk = await prisma.city.findFirst({
-      where: {
-        slug: "minsk",
-        isActive: true,
-        isLegacyNonCity: false,
-        country: { isoCode: DEFAULT_COUNTRY_ISO },
-      },
-      select: { id: true },
-    });
+    // Call the actual production helper — must still resolve to exactly the Belarus Minsk.
+    const belarusMinsk = await resolveMinskCity(prisma);
     assert.ok(belarusMinsk, "Belarus Minsk must still be resolvable");
     assert.equal(belarusMinsk!.id, minsk.id, "must resolve to the Belarus Minsk");
 
