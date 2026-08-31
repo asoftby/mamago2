@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, Sparkles, BookOpen } from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type RecommendationDecisionBlockProps = {
@@ -23,157 +23,64 @@ export function RecommendationDecisionBlock({
   compact = false,
 }: RecommendationDecisionBlockProps) {
   return (
-    <section className={cn("space-y-3", compact && "space-y-2")} aria-label="Выбор действия">
-      {/* Two choice cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: compact ? 8 : 12 }}>
+    <section className={cn("space-y-3", compact && "space-y-2")} aria-label="Выбор действия" style={{ padding: compact ? "4px 4px 0" : "8px 4px 0" }}>
+      <button
+        type="button"
+        onClick={onDecide}
+        disabled={isGenerating}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 9,
+          width: "100%",
+          height: 52,
+          borderRadius: 999,
+          background: "#E86A3A",
+          color: "#fff",
+          fontSize: 15,
+          fontWeight: 600,
+          border: 0,
+          cursor: isGenerating ? "default" : "pointer",
+          transition: "background .18s",
+        }}
+        onMouseEnter={(e) => {
+          if (!isGenerating) (e.currentTarget as HTMLButtonElement).style.background = "#C24E22";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "#E86A3A";
+        }}
+      >
+        {isGenerating ? <RefreshCw className="h-[17px] w-[17px] animate-spin" /> : <Sparkles className="h-[17px] w-[17px]" />}
+        Подобрать за пару секунд
+      </button>
 
-        {/* Card 1 — Реши за меня (accent) */}
-        <button
-          type="button"
-          onClick={onDecide}
-          style={{
-            position: "relative",
-            overflow: "hidden",
-            padding: compact ? "18px 16px 16px" : "22px 20px 20px",
-            background: "linear-gradient(160deg, #FFE8DC, #FFF1E5)",
-            border: "1px solid rgba(232,106,58,.28)",
-            borderRadius: 18,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 12,
-            textAlign: "left",
-            cursor: "pointer",
-            transition: "all .22s",
-            minHeight: compact ? 140 : 160,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 16px 36px -18px rgba(232,106,58,.4)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = "none";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-          }}
-        >
-          {/* Decoration glow */}
-          <span style={{
-            position: "absolute", top: -28, right: -28, width: 110, height: 110, borderRadius: 99,
-            background: "radial-gradient(circle, rgba(232,106,58,.22), transparent 65%)",
-            pointerEvents: "none",
-          }} />
-
-          {/* Icon */}
-          <span style={{
-            width: 40, height: 40, borderRadius: 99,
-            background: "#fff",
-            color: "#C24E22",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            border: "1px solid rgba(232,106,58,.18)",
-            position: "relative", zIndex: 1,
-            flexShrink: 0,
-          }}>
-            {isGenerating
-              ? <RefreshCw className="h-4 w-4 animate-spin" />
-              : <Sparkles className="h-4 w-4" />}
-          </span>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, position: "relative", zIndex: 1 }}>
-            <span
-              className="font-mono uppercase"
-              style={{ fontSize: 10, letterSpacing: ".12em", color: "#C24E22", display: "inline-flex", alignItems: "center", gap: 5 }}
-            >
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#C24E22", flexShrink: 0 }} />
-              быстро
-            </span>
-            <span
-              style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
-            >
-              Реши за меня
-            </span>
-            <span style={{ fontSize: 12, lineHeight: 1.45, color: "#3A332B" }}>
-              Подберём идеи за пару секунд
-            </span>
-          </div>
-
-          <span style={{
-            marginTop: "auto",
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 13, fontWeight: 600,
-            color: "#C24E22",
-            position: "relative", zIndex: 1,
-          }}>
-            Выбрать <ArrowIcon />
-          </span>
-        </button>
-
-        {/* Card 2 — Сама решу (plain) */}
+      <div style={{ textAlign: "center" }}>
         <button
           type="button"
           onClick={onCatalog}
           style={{
-            padding: compact ? "18px 16px 16px" : "22px 20px 20px",
-            background: "#FAF7F1",
-            border: "1px solid rgba(20,18,16,.10)",
-            borderRadius: 18,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 12,
-            textAlign: "left",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#3A332B",
+            background: "none",
+            border: 0,
             cursor: "pointer",
-            transition: "all .22s",
-            minHeight: compact ? 140 : 160,
+            transition: "gap .15s, color .15s",
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-2px)";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 16px 36px -18px rgba(20,18,16,.18)";
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,18,16,.28)";
+            (e.currentTarget as HTMLButtonElement).style.gap = "11px";
+            (e.currentTarget as HTMLButtonElement).style.color = "#C24E22";
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = "none";
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(20,18,16,.10)";
+            (e.currentTarget as HTMLButtonElement).style.gap = "7px";
+            (e.currentTarget as HTMLButtonElement).style.color = "#3A332B";
           }}
         >
-          {/* Icon */}
-          <span style={{
-            width: 40, height: 40, borderRadius: 99,
-            background: "#F6F2EA",
-            color: "#3A332B",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            border: "1px solid rgba(20,18,16,.10)",
-            flexShrink: 0,
-          }}>
-            <BookOpen className="h-4 w-4" />
-          </span>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <span
-              className="font-mono uppercase"
-              style={{ fontSize: 10, letterSpacing: ".12em", color: "rgba(20,18,16,.55)", display: "inline-flex", alignItems: "center", gap: 5 }}
-            >
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(20,18,16,.45)", flexShrink: 0 }} />
-              самостоятельно
-            </span>
-            <span
-              style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 400, lineHeight: 1.2, color: "#141210" }}
-            >
-              Сама решу
-            </span>
-            <span style={{ fontSize: 12, lineHeight: 1.45, color: "rgba(20,18,16,.55)" }}>
-              Иду в каталог и выбираю под настроение
-            </span>
-          </div>
-
-          <span style={{
-            marginTop: "auto",
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 13, fontWeight: 600,
-            color: "#141210",
-          }}>
-            Выбрать <ArrowIcon />
-          </span>
+          Выбрать самой <ArrowIcon />
         </button>
       </div>
     </section>
