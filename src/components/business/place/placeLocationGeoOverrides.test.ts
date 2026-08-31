@@ -1,11 +1,13 @@
 import * as assert from "node:assert/strict";
 
 import {
+  buildLocationTransitionPatch,
   computeEffectiveDistrictId,
   computeEffectiveMetroDistanceM,
   computeEffectiveMetroId,
   computeManualMetroDistanceM,
   isSameGeoPoint,
+  isStaleEnrichmentResponse,
   MANUAL_GEO_OVERRIDE_RESET_PATCH,
   shouldClearManualGeoOverrides,
   type GeoPoint,
@@ -135,6 +137,110 @@ for (const key of ["districtManualId", "metroManualId", "metroManualDistanceM"] 
     MANUAL_GEO_OVERRIDE_RESET_PATCH[key],
     null,
     `reset patch's ${key} must be an explicit null`,
+  );
+}
+
+// ── Race contract: location transition vs. async enrichment ─────────────────────
+//
+// Regression coverage for the P1 review finding: manual overrides must be
+// invalidated SYNCHRONOUSLY when a real location move is accepted (before
+// enrichment even starts), never later from the async enrichment response —
+// otherwise a manual pick made for the new point while enrichment is still
+// in flight gets silently erased when that response lands.
+
+// 1. A → B immediately builds a reset patch, independent of any enrichment result.
+{
+  const patch = buildLocationTransitionPatch(
+    { lat: MINSK_2M_MOVE.lat, lng: MINSK_2M_MOVE.lng },
+    shouldClearManualGeoOverrides(MINSK, MINSK_2M_MOVE),
+  );
+  assert.deepEqual(
+    patch,
+    {
+      lat: MINSK_2M_MOVE.lat,
+      lng: MINSK_2M_MOVE.lng,
+      districtManualId: null,
+      metroManualId: null,
+      metroManualDistanceM: null,
+    },
+    "a real move's location patch carries the manual-override reset in the SAME object as the location fields",
+  );
+}
+
+// 2/6. Meaningful movement still produces the exact explicit-null shape,
+// regardless of whatever an (unrelated, not-yet-arrived) enrichment response
+// might contain — the reset is a pure function of the two points, not of
+// any network result.
+{
+  const patch = buildLocationTransitionPatch({ lat: ELSEWHERE.lat, lng: ELSEWHERE.lng }, true);
+  assert.equal(patch.districtManualId, null);
+  assert.equal(patch.metroManualId, null);
+  assert.equal(patch.metroManualDistanceM, null);
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(patch, "metroManualDistanceM"),
+    "the reset key is present (explicit null), not merely absent",
+  );
+}
+
+// 5. A same-point transition produces NO manual-override reset — the patch
+// is exactly the location fields, nothing more. This is what makes it safe
+// for a manual pick already in flight at the same point to survive.
+{
+  const patch = buildLocationTransitionPatch(
+    { lat: MINSK.lat, lng: MINSK.lng },
+    shouldClearManualGeoOverrides(MINSK, MINSK_SUB_METER_DRIFT),
+  );
+  assert.deepEqual(
+    patch,
+    { lat: MINSK.lat, lng: MINSK.lng },
+    "a same-point (sub-tolerance) transition must not include any manual-override reset",
+  );
+  assert.ok(
+    !Object.prototype.hasOwnProperty.call(patch, "districtManualId"),
+    "same-point patch omits districtManualId entirely — it must not silently null it either",
+  );
+}
+
+// 3/4. Overlapping requests B then C: only the response matching the LATEST
+// started request may apply. A late-arriving response for the superseded
+// request B must be treated as stale, even though it resolves AFTER C
+// started (out-of-order network resolution).
+{
+  let latestSeq = 0;
+
+  // Request B starts.
+  latestSeq += 1;
+  const requestSeqB = latestSeq;
+
+  // Request C starts before B's response has arrived.
+  latestSeq += 1;
+  const requestSeqC = latestSeq;
+
+  // B's response finally arrives — it must be rejected as stale.
+  assert.equal(
+    isStaleEnrichmentResponse(requestSeqB, latestSeq),
+    true,
+    "a late response for a superseded request (B, after C started) is stale and must be discarded",
+  );
+
+  // C's response arrives — it is the latest request and must be accepted.
+  assert.equal(
+    isStaleEnrichmentResponse(requestSeqC, latestSeq),
+    false,
+    "the response matching the latest-started request is not stale and may apply its auto patch",
+  );
+}
+
+// A request whose response arrives before any newer request has started is
+// never mistaken for stale.
+{
+  let latestSeq = 0;
+  latestSeq += 1;
+  const onlyRequestSeq = latestSeq;
+  assert.equal(
+    isStaleEnrichmentResponse(onlyRequestSeq, latestSeq),
+    false,
+    "a single in-flight request's own response is never stale",
   );
 }
 

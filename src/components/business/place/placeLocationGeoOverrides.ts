@@ -1,8 +1,9 @@
 /**
  * Pure helpers for `PlaceLocationPicker`'s manual/auto district & metro
  * override state — kept React-free so the transition logic (when a manual
- * override should survive a re-enrichment vs. be cleared) is testable
- * without mounting the component.
+ * override should survive a re-enrichment vs. be cleared, and whether an
+ * async enrichment response is still allowed to apply) is testable without
+ * mounting the component or mocking fetch/React state.
  */
 
 import { haversineMeters } from "@/lib/geo/haversineMeters";
@@ -70,6 +71,41 @@ export function shouldClearManualGeoOverrides(
   toleranceMeters: number = GEO_POINT_DRIFT_TOLERANCE_M,
 ): boolean {
   return !isSameGeoPoint(previousPoint, nextPoint, toleranceMeters);
+}
+
+/**
+ * Builds the `onUpdate` patch for a location transition: the new location
+ * fields, plus an explicit manual-override reset when the move invalidates
+ * prior manual picks.
+ *
+ * This exists so the reset — when needed — travels in the SAME logical
+ * patch as the location change, decided synchronously before enrichment
+ * ever starts. It must never arrive later, alone, from the async
+ * enrichment response: a user can pick a new manual district/metro for the
+ * new point WHILE that response is still in flight, and a reset arriving
+ * after that pick would silently erase it.
+ */
+export function buildLocationTransitionPatch(
+  locationFields: Record<string, unknown>,
+  clearManualOverrides: boolean,
+): Record<string, unknown> {
+  return clearManualOverrides
+    ? { ...locationFields, ...MANUAL_GEO_OVERRIDE_RESET_PATCH }
+    : locationFields;
+}
+
+/**
+ * Whether an in-flight enrichment response is stale and must not apply its
+ * auto-derived fields: true once a newer location request has started
+ * since this response's request was issued.
+ *
+ * Guards two races: a slow response for an OLD point overwriting state
+ * that's already moved on to a NEWER point, and two overlapping requests
+ * (e.g. B then C) resolving out of order — only the response matching the
+ * CURRENT (latest-started) request may ever apply.
+ */
+export function isStaleEnrichmentResponse(requestSeq: number, latestSeq: number): boolean {
+  return requestSeq !== latestSeq;
 }
 
 /** Distance (meters, rounded) from a point to a manually-picked metro station. */

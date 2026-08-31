@@ -58,6 +58,7 @@ jobs:
         run: |
           pnpm exec tsx src/lib/geo/haversineMeters.test.ts
           pnpm exec tsx src/components/business/place/placeLocationGeoOverrides.test.ts
+          pnpm exec tsx src/components/business/place/PlaceLocationPicker.raceContract.test.ts
 
       - name: Event timezone contract regressions
         run: pnpm exec tsx src/lib/event/eventTimezoneContract.test.ts
