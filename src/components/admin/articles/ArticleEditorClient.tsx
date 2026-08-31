@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
+import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
   deriveArticleExcerptFromContent,
   type ArticleContentPayload,
@@ -78,6 +79,7 @@ function applySnapshot(setters: {
   setCityContext: (v: string) => void;
   setCategoryId: (v: string | null) => void;
   setAdditionalCategoryIds: (v: string[]) => void;
+  setAdditionalGeographyTargets: (v: ArticleGeographyTargetInput[]) => void;
   setTagIds: (v: string[]) => void;
   setGeoScope: (v: GeoScope | null) => void;
   setCityId: (v: string | null) => void;
@@ -100,6 +102,7 @@ function applySnapshot(setters: {
   setters.setCityContext(snap.cityContext ?? "");
   setters.setCategoryId(snap.categoryId ?? null);
   setters.setAdditionalCategoryIds(snap.additionalCategoryIds ?? []);
+  setters.setAdditionalGeographyTargets(snap.additionalGeographyTargets ?? []);
   setters.setTagIds(snap.tagIds);
   setters.setGeoScope(snap.geoScope ?? null);
   setters.setCityId(snap.cityId ?? null);
@@ -149,6 +152,7 @@ export function ArticleEditorClient({
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(initial.categoryId ?? null);
   const [additionalCategoryIds, setAdditionalCategoryIds] = useState<string[]>(initial.additionalCategoryIds ?? []);
+  const [additionalGeographyTargets, setAdditionalGeographyTargets] = useState<ArticleGeographyTargetInput[]>(initial.additionalGeographyTargets ?? []);
   const [tagIds, setTagIds] = useState<string[]>(initial.tagIds);
   const [geoScope, setGeoScope] = useState<GeoScope | null>(initial.geoScope ?? null);
   const [cityId, setCityId] = useState<string | null>(initial.cityId ?? null);
@@ -200,6 +204,7 @@ export function ArticleEditorClient({
         cityContext,
         categoryId,
         additionalCategoryIds,
+        additionalGeographyTargets,
         tagIds,
         geoScope,
         cityId,
@@ -222,6 +227,7 @@ export function ArticleEditorClient({
       cityContext,
       categoryId,
       additionalCategoryIds,
+      additionalGeographyTargets,
       tagIds,
       geoScope,
       cityId,
@@ -262,7 +268,9 @@ export function ArticleEditorClient({
     let cancelled = false;
     (async () => {
       const selectedCategoryIds = [initial.categoryId, ...(initial.additionalCategoryIds ?? [])].filter(Boolean).join(",");
-      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}`);
+      const selectedCityIds = [initial.cityId, ...(initial.additionalGeographyTargets ?? []).filter((target) => target.type === "CITY").map((target) => target.cityId)].filter(Boolean).join(",");
+      const selectedRegionIds = (initial.additionalGeographyTargets ?? []).filter((target) => target.type === "REGION").map((target) => target.regionId).join(",");
+      const res = await fetch(`/api/admin/articles/editor-options?selectedCategoryIds=${encodeURIComponent(selectedCategoryIds)}&selectedCityIds=${encodeURIComponent(selectedCityIds)}&selectedRegionIds=${encodeURIComponent(selectedRegionIds)}`);
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
@@ -290,7 +298,7 @@ export function ArticleEditorClient({
     return () => {
       cancelled = true;
     };
-  }, [initial.categoryId, initial.additionalCategoryIds, initial.tagIds]);
+  }, [initial.categoryId, initial.additionalCategoryIds, initial.additionalGeographyTargets, initial.cityId, initial.tagIds]);
 
   const {
     previewSlug,
@@ -339,6 +347,7 @@ export function ArticleEditorClient({
       setCityContext,
       setCategoryId,
       setAdditionalCategoryIds,
+      setAdditionalGeographyTargets,
       setTagIds,
       setGeoScope,
       setCityId,
@@ -403,6 +412,7 @@ export function ArticleEditorClient({
       cityContext: cityContext.trim() || null,
       categoryId,
       additionalCategoryIds,
+      additionalGeographyTargets,
       tagIds,
       geoScope,
       cityId,
@@ -428,6 +438,7 @@ export function ArticleEditorClient({
       cityContext,
       categoryId,
       additionalCategoryIds,
+      additionalGeographyTargets,
       tagIds,
       geoScope,
       cityId,
@@ -1056,6 +1067,29 @@ export function ArticleEditorClient({
             {geoScopeError ? (
               <p className="text-xs text-red-600 sm:col-span-2">{geoScopeError}</p>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="article-additional-geography">Дополнительные города и регионы</Label>
+            <p className="text-xs text-muted-foreground">
+              Дополнительные города и регионы, где статья также релевантна.
+            </p>
+            <div id="article-additional-geography">
+              <CardMultiSelect
+                placeholder="Выберите города и регионы"
+                values={additionalGeographyTargets.map(geographyTargetKey)}
+                onChange={(values) => setAdditionalGeographyTargets(values.map((value) => {
+                  const [type, id] = value.split(":", 2);
+                  return type === "CITY"
+                    ? { type: "CITY" as const, cityId: id }
+                    : { type: "REGION" as const, regionId: id };
+                }))}
+                options={[
+                  ...cities.filter((city) => !(geoScope === "CITY" && city.id === cityId)).map((city) => ({ value: `CITY:${city.id}`, label: `${city.name} — город` })),
+                  ...regions.filter((region) => !(geoScope === "REGION" && region.id === regionId)).map((region) => ({ value: `REGION:${region.id}`, label: `${region.name} — регион` })),
+                ]}
+                allowClear
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

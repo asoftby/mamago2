@@ -20,6 +20,7 @@ import {
   runBestEffortArticleEffect,
 } from "@/lib/article/articleWriteAtomicity";
 import { assertArticleCategorySelectionShape } from "@/lib/article/articleCategorySelection";
+import { assertArticleGeographyTargetShape, geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -42,6 +43,7 @@ function toSnapshot(row: {
   cityContext: string | null;
   categoryId: string | null;
   additionalCategoryLinks: Array<{ categoryId: string }>;
+  additionalGeographyTargets: Array<{ type: "CITY" | "REGION"; cityId: string | null; regionId: string | null }>;
   geoScope: GeoScope | null;
   cityId: string | null;
   regionId: string | null;
@@ -77,6 +79,9 @@ function toSnapshot(row: {
     cityContext: row.cityContext,
     categoryId: row.categoryId,
     additionalCategoryIds: row.additionalCategoryLinks.map((link) => link.categoryId),
+    additionalGeographyTargets: row.additionalGeographyTargets.map((target) => target.type === "CITY"
+      ? { type: "CITY", cityId: target.cityId as string }
+      : { type: "REGION", regionId: target.regionId as string }),
     geoScope: row.geoScope,
     cityId: row.cityId,
     regionId: row.regionId,
@@ -128,6 +133,10 @@ const articleSelect = {
     orderBy: { position: "asc" as const },
     select: { categoryId: true },
   },
+  additionalGeographyTargets: {
+    orderBy: { position: "asc" as const },
+    select: { type: true, cityId: true, regionId: true },
+  },
   tags: {
     select: { id: true },
   },
@@ -170,6 +179,26 @@ async function assertAdditionalCategoriesValid(
     return (!category.isActive || category.archivedAt !== null) && !existingIds.has(id);
   });
   if (invalid) throw new Error("Выберите действительные дополнительные категории статьи");
+}
+
+async function assertAdditionalGeographyTargetsValid(
+  tx: Prisma.TransactionClient,
+  targets: ArticleGeographyTargetInput[],
+  primary: { geoScope: GeoScope | null; cityId: string | null; regionId: string | null },
+  existingKeys: Set<string> = new Set(),
+): Promise<void> {
+  assertArticleGeographyTargetShape(targets, primary);
+  const cityIds = targets.filter((t): t is Extract<ArticleGeographyTargetInput, { type: "CITY" }> => t.type === "CITY").map((t) => t.cityId);
+  const regionIds = targets.filter((t): t is Extract<ArticleGeographyTargetInput, { type: "REGION" }> => t.type === "REGION").map((t) => t.regionId);
+  const [cities, regions] = await Promise.all([
+    tx.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, isActive: true, isLegacyNonCity: true } }),
+    tx.region.findMany({ where: { id: { in: regionIds } }, select: { id: true, isActive: true } }),
+  ]);
+  const validCityIds = new Set(cities.filter((city) => (city.isActive && !city.isLegacyNonCity) || existingKeys.has(`CITY:${city.id}`)).map((city) => city.id));
+  const validRegionIds = new Set(regions.filter((region) => region.isActive || existingKeys.has(`REGION:${region.id}`)).map((region) => region.id));
+  if (cityIds.some((id) => !validCityIds.has(id)) || regionIds.some((id) => !validRegionIds.has(id))) {
+    throw new Error("Выберите действительные дополнительные города и регионы");
+  }
 }
 
 function resolvedGeoScope(input: ArticleSaveInput): {
@@ -397,7 +426,11 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
 
   const created = await runArticleCriticalWrite(prisma, async (tx) => {
     const additionalCategoryIds = input.additionalCategoryIds ?? [];
+    const additionalGeographyTargets = input.additionalGeographyTargets ?? [];
     await assertAdditionalCategoriesValid(tx, input.categoryId, additionalCategoryIds, new Set());
+    await assertAdditionalGeographyTargetsValid(tx, additionalGeographyTargets, {
+      geoScope: resolvedGeo.geoScope ?? null, cityId: resolvedGeo.cityId ?? null, regionId: resolvedGeo.regionId ?? null,
+    });
     const row = await tx.article.create({
       data: {
         title: input.title,
@@ -426,6 +459,9 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
         additionalCategoryLinks: additionalCategoryIds.length
           ? { create: additionalCategoryIds.map((categoryId, position) => ({ categoryId, position })) }
           : undefined,
+        additionalGeographyTargets: additionalGeographyTargets.length ? {
+          create: additionalGeographyTargets.map((target, position) => ({ ...target, position })),
+        } : undefined,
         noindex: input.noindex,
         tags:
           input.tagIds && input.tagIds.length > 0
@@ -492,17 +528,30 @@ export async function saveArticleDraft(
       : input.cityContext;
 
   await runArticleCriticalWrite(prisma, async (tx) => {
-    const additionalCategoryIds = input.additionalCategoryIds ?? [];
-    const existingLinks = await tx.articleCategoryLink.findMany({
-      where: { articleId: id },
-      select: { categoryId: true },
-    });
-    await assertAdditionalCategoriesValid(
-      tx,
-      input.categoryId,
-      additionalCategoryIds,
-      new Set(existingLinks.map((link) => link.categoryId)),
-    );
+    const additionalCategoryIds = input.additionalCategoryIds;
+    const additionalGeographyTargets = input.additionalGeographyTargets;
+    if (additionalCategoryIds !== undefined) {
+      const existingLinks = await tx.articleCategoryLink.findMany({
+        where: { articleId: id },
+        select: { categoryId: true },
+      });
+      await assertAdditionalCategoriesValid(
+        tx,
+        input.categoryId,
+        additionalCategoryIds,
+        new Set(existingLinks.map((link) => link.categoryId)),
+      );
+    }
+    if (additionalGeographyTargets !== undefined) {
+      const existingGeographyTargets = await tx.articleGeographyTarget.findMany({
+        where: { articleId: id }, select: { type: true, cityId: true, regionId: true },
+      });
+      await assertAdditionalGeographyTargetsValid(tx, additionalGeographyTargets, {
+        geoScope: effectiveGeoScope, cityId: effectiveCityId, regionId: effectiveRegionId,
+      }, new Set(existingGeographyTargets.map((target) => geographyTargetKey(target.type === "CITY"
+        ? { type: "CITY", cityId: target.cityId as string }
+        : { type: "REGION", regionId: target.regionId as string }))));
+    }
     await tx.article.update({
       where: { id },
       data: {
@@ -538,11 +587,21 @@ export async function saveArticleDraft(
       },
       select: { id: true },
     });
-    await tx.articleCategoryLink.deleteMany({ where: { articleId: id } });
-    if (additionalCategoryIds.length > 0) {
-      await tx.articleCategoryLink.createMany({
-        data: additionalCategoryIds.map((categoryId, position) => ({ articleId: id, categoryId, position })),
-      });
+    if (additionalCategoryIds !== undefined) {
+      await tx.articleCategoryLink.deleteMany({ where: { articleId: id } });
+      if (additionalCategoryIds.length > 0) {
+        await tx.articleCategoryLink.createMany({
+          data: additionalCategoryIds.map((categoryId, position) => ({ articleId: id, categoryId, position })),
+        });
+      }
+    }
+    if (additionalGeographyTargets !== undefined) {
+      await tx.articleGeographyTarget.deleteMany({ where: { articleId: id } });
+      if (additionalGeographyTargets.length > 0) {
+        await tx.articleGeographyTarget.createMany({
+          data: additionalGeographyTargets.map((target, position) => ({ articleId: id, ...target, position })),
+        });
+      }
     }
     await resolveArticleSlugOnSaveInTransaction(tx, id, input.title, input.slug);
     await syncArticleCanonicalInTransaction(tx, id);

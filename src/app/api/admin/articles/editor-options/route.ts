@@ -3,6 +3,7 @@ import { Role, UserStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
 import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
+import { buildArticleEditorCityOptionsWhere } from "@/lib/article/articleEditorOptions";
 
 export const runtime = "nodejs";
 
@@ -17,16 +18,20 @@ export async function GET(request: Request) {
 
   const selectedCategoryIds = new URL(request.url).searchParams.get("selectedCategoryIds")
     ?.split(",").filter(Boolean) ?? [];
+  const selectedRegionIds = new URL(request.url).searchParams.get("selectedRegionIds")
+    ?.split(",").filter(Boolean) ?? [];
+  const selectedCityIds = new URL(request.url).searchParams.get("selectedCityIds")
+    ?.split(",").filter(Boolean) ?? [];
   const [cities, regions, authors, categories] = await Promise.all([
     prisma.city.findMany({
-      where: { isLegacyNonCity: false },
+      where: buildArticleEditorCityOptionsWhere(selectedCityIds),
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },
     }),
     prisma.region.findMany({
       where: {
         type: "OBLAST",
-        isActive: true,
+        OR: [{ isActive: true }, ...(selectedRegionIds.length ? [{ id: { in: selectedRegionIds } }] : [])],
         country: { isoCode: DEFAULT_COUNTRY_ISO },
       },
       orderBy: [{ priority: "desc" }, { name: "asc" }],
