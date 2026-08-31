@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { Container } from "@/components/ui/Container";
 import { StoriesSection } from "@/features/stories/components/StoriesSection";
 import { CityHomeBirthdayCta } from "@/features/city-home/components/CityHomeBirthdayCta";
 import { ActivationBannerHost } from "@/features/city-home/components/ActivationBannerHost";
-import { getHeroContext } from "@/features/hero-weather/lib/get-hero-context";
+import { getFallbackHeroModel, getHeroContext } from "@/features/hero-weather/lib/get-hero-context";
+import { getCityCoordsBySlug, getDefaultBelarusFallbackCoords } from "@/features/hero-weather/lib/belarus-city-coordinates";
 import { HeroGreetingShell } from "@/features/hero-weather/ui/HeroGreetingShell";
 import {
   CityHomeClassesSection,
@@ -11,71 +12,149 @@ import {
   CityHomeKudaSection,
   CityHomeRoutesSection,
 } from "@/features/city-home/components/CityHomeContentRows";
-import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
-import { listNearbyCities } from "@/server/city/listNearbyCities";
+import { listNearbyCities, type NearbyCity } from "@/server/city/listNearbyCities";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
 
+export type CityHomePageCity = {
+  id: string;
+  slug: string;
+  name: string;
+  centerLat: number | null;
+  centerLng: number | null;
+  lat: number | null;
+  lng: number | null;
+};
+
 interface CityHomePageProps {
-  citySlug: string;
+  city: CityHomePageCity;
 }
 
-export default async function CityHomePage({ citySlug }: CityHomePageProps) {
-  const sectionAvailability = getHomeSectionAvailability();
-  const [city, user] = await Promise.all([
-    findCityBySlug(citySlug),
-    getCurrentUser(),
-  ]);
+type HeroPersonaMode = "self" | "guest";
 
-  if (!city) notFound();
-
+/**
+ * Weather is a slow, best-effort external call (Open-Meteo) — it must never
+ * hold up the rest of the page. This is rendered inside a Suspense boundary
+ * so the deterministic fallback hero (no weather) streams immediately and
+ * this swaps in once (and if) the real reading resolves.
+ */
+async function HeroWeatherSection({
+  cityId,
+  citySlug,
+  cityName,
+  cityCenterLat,
+  cityCenterLng,
+  userName,
+  personaMode,
+}: {
+  cityId: string;
+  citySlug: string;
+  cityName: string;
+  cityCenterLat?: number;
+  cityCenterLng?: number;
+  userName: string | null;
+  personaMode: HeroPersonaMode;
+}) {
   const heroModel = await getHeroContext({
-    cityId: city.id,
-    citySlug: city.slug,
-    cityName: city.name,
-    cityCenterLat: city.centerLat ?? city.lat ?? undefined,
-    cityCenterLng: city.centerLng ?? city.lng ?? undefined,
-    userName: user?.displayName?.trim() || user?.email?.split("@")[0] || null,
-    personaMode: user ? "self" : "guest",
+    cityId,
+    citySlug,
+    cityName,
+    cityCenterLat,
+    cityCenterLng,
+    userName,
+    personaMode,
   });
+  return <HeroGreetingShell initialModel={heroModel} />;
+}
 
-  const nearbyCities =
+export default async function CityHomePage({ city }: CityHomePageProps) {
+  const sectionAvailability = getHomeSectionAvailability();
+  const cityTimezone =
+    getCityCoordsBySlug(city.slug)?.timezone ?? getDefaultBelarusFallbackCoords().timezone;
+
+  // Independent server work starts immediately; nothing here waits on the
+  // external weather call (see HeroWeatherSection below).
+  const userPromise = getCurrentUser();
+  const nearbyCitiesPromise: Promise<NearbyCity[]> =
     sectionAvailability.classes || sectionAvailability.routes
-      ? await listNearbyCities(city)
-      : [];
-  const weatherRanking = {
-    scenario: heroModel.weatherDayScenario,
-    timeOfDay: heroModel.timeOfDay,
-  };
+      ? listNearbyCities(city)
+      : Promise.resolve([]);
+  const localRoutesPromise = sectionAvailability.routes
+    ? listPublicRoutesByCity(city.id).catch(() => [])
+    : Promise.resolve([]);
+  const journalArticlesPromise = listCityHomeArticles(city);
+  const localClassesPromise = sectionAvailability.classes
+    ? getClassesDiscoveryFeed(city.id, city.slug, { take: 8 }).catch(() => [])
+    : Promise.resolve([]);
 
-  const [kudaPreview, localRoutes, journalArticles, localClasses, nearbyRoutes, nearbyClasses] = await Promise.all([
-    getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
-      take: 8,
-      weather: weatherRanking,
-    }),
-    sectionAvailability.routes ? listPublicRoutesByCity(city.id).catch(() => []) : [],
-    listCityHomeArticles(city),
-    sectionAvailability.classes
-      ? getClassesDiscoveryFeed(city.id, city.slug, { take: 8 }).catch(() => [])
-      : [],
-    sectionAvailability.routes
-      ? listPublicRoutesByCityIds(nearbyCities.map((c) => c.id)).catch(() => [])
-      : [],
-    sectionAvailability.classes
-      ? Promise.all(
-          nearbyCities.map((nearbyCity) =>
+  const nearbyRoutesPromise = sectionAvailability.routes
+    ? nearbyCitiesPromise.then((nearby) =>
+        listPublicRoutesByCityIds(nearby.map((c) => c.id)).catch(() => []),
+      )
+    : Promise.resolve([]);
+  const nearbyClassesPromise = sectionAvailability.classes
+    ? nearbyCitiesPromise.then((nearby) =>
+        Promise.all(
+          nearby.map((nearbyCity) =>
             getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: 8 }).catch(() => []),
           ),
-        ).then((groups) => groups.flat())
-      : [],
+        ).then((groups) => groups.flat()),
+      )
+    : Promise.resolve([]);
+
+  // Kuda ranking wants a weather-shaped bias, but must not block on the real
+  // weather fetch. Use the same deterministic fallback (real time-of-day,
+  // neutral scenario) that the hero itself uses before weather resolves.
+  const kudaPreviewPromise = userPromise.then((user) => {
+    const rankingContext = getFallbackHeroModel({
+      cityName: city.name,
+      personaMode: user ? "self" : "guest",
+      citySlug: city.slug,
+      timezone: cityTimezone,
+    });
+    return getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
+      take: 8,
+      weather: {
+        scenario: rankingContext.weatherDayScenario,
+        timeOfDay: rankingContext.timeOfDay,
+      },
+    });
+  });
+
+  const [
+    user,
+    ,
+    kudaPreview,
+    localRoutes,
+    journalArticles,
+    localClasses,
+    nearbyRoutes,
+    nearbyClasses,
+  ] = await Promise.all([
+    userPromise,
+    nearbyCitiesPromise,
+    kudaPreviewPromise,
+    localRoutesPromise,
+    journalArticlesPromise,
+    localClassesPromise,
+    nearbyRoutesPromise,
+    nearbyClassesPromise,
   ]);
+
+  const personaMode: HeroPersonaMode = user ? "self" : "guest";
+  const heroFallbackModel = getFallbackHeroModel({
+    cityName: city.name,
+    personaMode,
+    citySlug: city.slug,
+    timezone: cityTimezone,
+  });
 
   const mapRoutePreview = (r: (typeof localRoutes)[number]): PublicRouteCardModel => {
     const budgetSummary = summarizeRouteBudget(r.stops);
@@ -123,7 +202,17 @@ export default async function CityHomePage({ citySlug }: CityHomePageProps) {
   return (
     <div className="min-h-screen pb-20">
       <Container className="space-y-10 pt-10">
-        <HeroGreetingShell initialModel={heroModel} />
+        <Suspense fallback={<HeroGreetingShell initialModel={heroFallbackModel} />}>
+          <HeroWeatherSection
+            cityId={city.id}
+            citySlug={city.slug}
+            cityName={city.name}
+            cityCenterLat={city.centerLat ?? city.lat ?? undefined}
+            cityCenterLng={city.centerLng ?? city.lng ?? undefined}
+            userName={user?.displayName?.trim() || user?.email?.split("@")[0] || null}
+            personaMode={personaMode}
+          />
+        </Suspense>
 
         <div className="px-1">
           <ActivationBannerHost />
