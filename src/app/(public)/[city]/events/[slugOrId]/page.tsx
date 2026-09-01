@@ -135,6 +135,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
             title: fromDb.title,
             description: fromDb.shortDesc,
             image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
+            startDate: fromDb.schemaStartDate,
             sessions: fromDb.sessions,
             format: fromDb.format,
             location:
