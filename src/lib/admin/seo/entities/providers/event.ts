@@ -272,6 +272,7 @@ export const eventProvider: SeoEntityProvider = {
       title: loaded.title,
       description: loaded.shortDesc,
       image: loaded.seoOgImage?.trim() || loaded.coverImageUrl,
+      startDate: loaded.schemaStartDate,
       sessions: loaded.sessions,
       format: loaded.format,
       location:
