@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
@@ -15,15 +14,11 @@ type ScheduleSourcePayload = {
 };
 
 function extractScheduleSourcePayload(value: unknown): ScheduleSourcePayload {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const raw = value as Record<string, unknown>;
   const occurrenceLines = Array.isArray(raw.occurrenceLines)
     ? raw.occurrenceLines.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     : undefined;
-
   return {
     startAt: typeof raw.startAt === "string" ? raw.startAt : undefined,
     endAt: typeof raw.endAt === "string" ? raw.endAt : undefined,
@@ -60,21 +55,13 @@ function formatScheduleRange(startAt: string, endAt?: string, scheduleText?: str
   const allDay = hasAllDayCue(scheduleText);
 
   const dateFormatter = new Intl.DateTimeFormat("ru-BY", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Minsk",
+    day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Minsk",
   });
   const shortDateFormatter = new Intl.DateTimeFormat("ru-BY", {
-    day: "numeric",
-    month: "long",
-    timeZone: "Europe/Minsk",
+    day: "numeric", month: "long", timeZone: "Europe/Minsk",
   });
   const timeFormatter = new Intl.DateTimeFormat("ru-BY", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Europe/Minsk",
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Minsk",
   });
 
   if (!validEnd) {
@@ -92,10 +79,7 @@ function formatScheduleRange(startAt: string, endAt?: string, scheduleText?: str
   const sameMonthAndYear =
     start.getUTCFullYear() === validEnd.getUTCFullYear() && start.getUTCMonth() === validEnd.getUTCMonth();
   const startLabel = sameMonthAndYear
-    ? new Intl.DateTimeFormat("ru-BY", {
-        day: "numeric",
-        timeZone: "Europe/Minsk",
-      }).format(start)
+    ? new Intl.DateTimeFormat("ru-BY", { day: "numeric", timeZone: "Europe/Minsk" }).format(start)
     : shortDateFormatter.format(start);
   const endLabel = dateFormatter.format(validEnd);
 
@@ -106,22 +90,15 @@ function formatScheduleRange(startAt: string, endAt?: string, scheduleText?: str
 
 function buildScheduleItems(source: ScheduleSourcePayload): string[] {
   const items: string[] = [];
-
   if (source.startAt) {
     const formatted = formatScheduleRange(source.startAt, source.endAt, source.scheduleText);
     if (formatted) items.push(formatted);
   }
-
   if (source.occurrenceLines && source.occurrenceLines.length > 0) {
     items.push(...source.occurrenceLines.map(cleanScheduleLine));
   } else if (source.scheduleText) {
-    const lines = source.scheduleText
-      .split("\n")
-      .map(cleanScheduleLine)
-      .filter(Boolean);
-    items.push(...lines);
+    items.push(...source.scheduleText.split("\n").map(cleanScheduleLine).filter(Boolean));
   }
-
   return items.filter((item, index, arr) => arr.indexOf(item) === index);
 }
 
@@ -130,9 +107,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user || !canCreateBusinessContent(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
   const { id: activityId } = await params;
   if (!(await canManageActivityById(user, activityId))) {
@@ -143,26 +118,16 @@ export async function GET(
     where: { id: activityId, type: ActivityType.EVENT },
     select: { id: true },
   });
-
-  if (!activity) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const linkedImport = await prisma.importedRecord.findFirst({
     where: { publishedActivityId: activityId },
     orderBy: { updatedAt: "desc" },
-    select: {
-      normalizedData: true,
-      rawPayload: true,
-    },
+    select: { normalizedData: true, rawPayload: true },
   });
 
   const normalizedSource = extractScheduleSourcePayload(linkedImport?.normalizedData);
   const rawSource = extractScheduleSourcePayload(linkedImport?.rawPayload);
   const items = buildScheduleItems(normalizedSource);
-  const fallbackItems = items.length > 0 ? items : buildScheduleItems(rawSource);
-
-  return NextResponse.json({
-    items: fallbackItems,
-  });
+  return NextResponse.json({ items: items.length > 0 ? items : buildScheduleItems(rawSource) });
 }
