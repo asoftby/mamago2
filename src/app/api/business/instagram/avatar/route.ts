@@ -1,3 +1,4 @@
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 /**
  * POST /api/business/instagram/avatar
  *
@@ -17,7 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import { normalizeInstagramUsername } from "@/lib/instagram/extractUsername";
 import { uploadImageFromUrl } from "@/lib/upload/uploadFromUrl";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
@@ -220,7 +221,7 @@ export async function POST(request: NextRequest) {
   try {
     // Auth
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user || !(await checkBusinessToolPermission(user, "content.create"))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -11,7 +11,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { MediaEntityType } from "@prisma/client";
 import { getActiveRevision } from "@/server/services/placeRevision.service";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
 import { assignPlaceSlugIfMissing } from "@/lib/slug/placeSlugService";
@@ -36,7 +36,7 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -148,7 +148,7 @@ export async function PATCH(
   try {
     const user = await getCurrentUser();
     perf.mark("auth");
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
         { status: 401 }
@@ -562,7 +562,7 @@ export async function DELETE(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
         { status: 401 }

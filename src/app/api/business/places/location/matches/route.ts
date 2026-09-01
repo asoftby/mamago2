@@ -1,3 +1,4 @@
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 /**
  * GET /api/business/places/location/matches
  * Find duplicate and nearby places by location
@@ -6,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 const NEARBY_RADIUS_METERS = 100;
 
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user || !(await checkBusinessToolPermission(user, "content.create"))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
