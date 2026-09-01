@@ -3,6 +3,7 @@
 import type { Role } from "@prisma/client";
 import {
   canAccessBusiness as canAccessBusinessMember,
+  checkUserBusinessPermission,
   getPartnerCabinetBusiness,
 } from "@/server/permissions/business-permissions";
 
@@ -32,7 +33,11 @@ export async function getUserBusinessId(userId: string): Promise<string | null> 
   return business?.id ?? null;
 }
 
-/** Full server-side Place management authorization. */
+/**
+ * Full server-side Place mutation authorization.
+ * Business-scoped places require content.update on an active business.
+ * Business-less legacy/orphan places retain creator ownership until migrated.
+ */
 export async function canManagePlaceAsync(
   user: { id: string; role: Role },
   place: { createdByUserId: string; ownerBusinessId: string | null } | null,
@@ -40,7 +45,7 @@ export async function canManagePlaceAsync(
   if (user.role === "ADMIN" || user.role === "MODERATOR") return true;
   if (!place) return false;
   if (place.ownerBusinessId) {
-    return canAccessBusiness(user.id, place.ownerBusinessId);
+    return checkUserBusinessPermission(user, place.ownerBusinessId, "content.update");
   }
   return user.id === place.createdByUserId;
 }
