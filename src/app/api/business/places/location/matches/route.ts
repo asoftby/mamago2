@@ -7,7 +7,6 @@ import { checkBusinessToolPermission } from "@/server/permissions/business-permi
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 const NEARBY_RADIUS_METERS = 100;
 
@@ -30,7 +29,6 @@ function calculateDistance(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
-
 
 
 type PlaceSummary = {
@@ -141,7 +139,7 @@ export async function GET(request: NextRequest) {
       for (const place of nearbyPlaces) {
         if (place.lat !== null && place.lng !== null) {
           const distance = calculateDistance(lat, lng, place.lat, place.lng);
-          
+
           if (distance <= NEARBY_RADIUS_METERS) {
             matchesMap.set(place.id, {
               ...place,
