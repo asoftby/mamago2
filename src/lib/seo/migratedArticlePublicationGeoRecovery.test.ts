@@ -106,8 +106,51 @@ function testCountryArticlesUseNationalPath() {
   }
 }
 
+function testNbspTrailingTitle() {
+  const nbspArticle = MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES.find(
+    (r) => r.articleId === "cmssu26ev00wcwsobwpy1glg0",
+  );
+  assert.ok(nbspArticle, "cmssu26ev00wcwsobwpy1glg0 must exist in recovery matrix");
+
+  // The PROD title ends with U+00A0 NO-BREAK SPACE, NOT U+0020 regular space.
+  // Verify the recovery fingerprint uses the correct character.
+  const expectedNbsp = "\u00A0";
+  const regularSpace = " ";
+
+  assert.equal(
+    nbspArticle.title.endsWith(expectedNbsp),
+    true,
+    `cmssu26ev00wcwsobwpy1glg0 title must end with U+00A0 (found last char code: ${nbspArticle.title.charCodeAt(nbspArticle.title.length - 1)})`,
+  );
+  assert.equal(
+    nbspArticle.title.endsWith(regularSpace),
+    false,
+    "cmssu26ev00wcwsobwpy1glg0 title must NOT end with a regular U+0020 space",
+  );
+
+  // Verify auditedTitle matches title (same as testAuditedStateFingerprint does for all)
+  assert.equal(
+    nbspArticle.auditedTitle,
+    nbspArticle.title,
+    "cmssu26ev00wcwsobwpy1glg0 auditedTitle must equal title",
+  );
+
+  // Prove that a regular space would NOT match — guards against accidental normalization.
+  const wrongTitle = nbspArticle.title.slice(0, -1) + regularSpace;
+  assert.notEqual(
+    wrongTitle,
+    nbspArticle.title,
+    "U+0020 variant must NOT match U+00A0 fingerprint — normalization guard verified",
+  );
+
+  console.log(
+    `  [NBSP] articleId=cmssu26ev00wcwsobwpy1glg0 last char=U+${nbspArticle.title.charCodeAt(nbspArticle.title.length - 1).toString(16).toUpperCase().padStart(4, "0")}`,
+  );
+}
+
 testMatrixShape();
 testAuditedStateFingerprint();
+testNbspTrailingTitle();
 testLegacyRedirectTargetRespectsGeoScope();
 testCountryArticlesUseNationalPath();
 
