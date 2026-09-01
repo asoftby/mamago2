@@ -46,6 +46,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Business event authorization regressions
+        run: pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
+
       - name: Place wizard regressions
         run: |
           pnpm exec tsx src/components/business/wizard/place/config.test.ts
