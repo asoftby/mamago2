@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { PlaceWizard } from "@/components/business/wizard/place/PlaceWizard";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
@@ -14,7 +13,6 @@ import { isPlaceCtaStepFeatureEnabled } from "@/components/business/wizard/place
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
-  // Editor is only available on business and admin surfaces
   return resolved === "admin" ? "admin" : "business";
 }
 
