@@ -131,18 +131,19 @@ export async function loadPublicActivityForCityPage(
 
   if (!activity) return null;
 
-  let schemaStartDate = activity.sessions[0]?.startsAt ?? null;
-  if (!schemaStartDate) {
-    const previousSession = await prisma.activitySession.findFirst({
-      where: {
-        activityId: activity.id,
-        startsAt: { lt: now },
-      },
-      orderBy: { startsAt: "desc" },
-      select: { startsAt: true },
-    });
-    schemaStartDate = previousSession?.startsAt ?? null;
-  }
+  const schemaStartDate =
+    activity.sessions[0]?.startsAt ??
+    (
+      await prisma.activitySession.findFirst({
+        where: {
+          activityId: activity.id,
+          startsAt: { lt: now },
+        },
+        orderBy: { startsAt: "desc" },
+        select: { startsAt: true },
+      })
+    )?.startsAt ??
+    null;
 
   const [place, venuePlace] = await Promise.all([
     enrichPlaceWithResolvedLogo(activity.place),
