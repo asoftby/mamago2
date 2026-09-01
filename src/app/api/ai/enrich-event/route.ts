@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 import { enrichEvent } from "@/lib/ai/enrichEvent";
 
 export const runtime = "nodejs";
@@ -15,8 +15,11 @@ const enrichEventRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "content.update"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const rawBody = await request.json().catch(() => null);
@@ -45,11 +48,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json({ error: "AI request timed out" }, { status: 504 });
     }
-
     console.error("AI event enrichment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -1,79 +1,63 @@
-/**
- * POST /api/business/activities-v2
- * Create new Activity (DRAFT)
- * 
- * GET /api/business/activities-v2
- * List my activities
- */
+/** Business Activity v2 collection endpoint. */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   buildActivityManageWhereForUser,
   coalesceActivityBusinessIdFromPlace,
   getBusinessIdsUserCanAccess,
 } from "@/lib/auth/activityAccess";
 import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
+import {
+  checkUserBusinessPermission,
+  isPlatformContentStaff,
+} from "@/server/permissions/business-permissions";
 
-/**
- * POST - Create new Activity in DRAFT status
- */
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const body = await req.json();
     const { type, placeId } = body;
-
-    // Validate type
     if (!type || !Object.values(ActivityType).includes(type)) {
-      return NextResponse.json(
-        { error: "Invalid activity type" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid activity type" }, { status: 400 });
     }
-
-    // Validate placeId requirement (required for all except ROUTE)
     if (type !== "ROUTE" && !placeId) {
       return NextResponse.json(
         { error: "placeId is required for this activity type" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     let resolvedBusinessId: string | null = null;
-
-    // If placeId provided, verify ownership and inherit business from place
     if (placeId) {
       const place = await prisma.place.findUnique({
         where: { id: placeId },
         select: { createdByUserId: true, ownerBusinessId: true },
       });
-
-      if (!place) {
-        return NextResponse.json({ error: "Place not found" }, { status: 404 });
-      }
-
+      if (!place) return NextResponse.json({ error: "Place not found" }, { status: 404 });
       if (!(await canManagePlaceAsync(user, place))) {
-        return NextResponse.json(
-          { error: "You don't own this place" },
-          { status: 403 }
-        );
+        return NextResponse.json({ error: "You don't own this place" }, { status: 403 });
       }
-
       resolvedBusinessId = coalesceActivityBusinessIdFromPlace(place, null);
     } else if (type === "ROUTE") {
       resolvedBusinessId = await getUserBusinessId(user.id);
     }
 
-    // Create activity with minimal required fields
+    if (!isPlatformContentStaff(user.role)) {
+      if (!resolvedBusinessId) {
+        return NextResponse.json({ error: "Business access required" }, { status: 403 });
+      }
+      if (!(await checkUserBusinessPermission(user, resolvedBusinessId, "content.create"))) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const activity = await prisma.activity.create({
       data: {
         ownerUserId: user.id,
@@ -83,63 +67,48 @@ export async function POST(req: NextRequest) {
         status: "DRAFT",
         title: "Новая активность",
         shortDesc: "",
-        scheduleMode: "ONE_TIME", // Default, will be updated by user
+        scheduleMode: "ONE_TIME",
         ageTags: [],
       },
       include: {
-        place: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        images: {
-          orderBy: { sortOrder: "asc" },
-        },
+        place: { select: { id: true, title: true } },
+        images: { orderBy: { sortOrder: "asc" } },
       },
     });
 
     return NextResponse.json({ activity });
   } catch (error) {
     console.error("Create activity error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-/**
- * GET - List my activities
- */
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const type = searchParams.get("type");
+    const businessIds = isPlatformContentStaff(user.role)
+      ? []
+      : await getBusinessIdsUserCanAccess(user.id);
 
-    const manageWhere =
-      user.role === "ADMIN" || user.role === "MODERATOR"
-        ? {}
-        : buildActivityManageWhereForUser(
-            user.id,
-            await getBusinessIdsUserCanAccess(user.id),
-          );
+    if (!isPlatformContentStaff(user.role) && businessIds.length === 0) {
+      return NextResponse.json({ error: "Business access required" }, { status: 403 });
+    }
 
-    const where: Prisma.ActivityWhereInput = {
-      ...manageWhere,
-    };
+    const manageWhere = isPlatformContentStaff(user.role)
+      ? {}
+      : buildActivityManageWhereForUser(user.id, businessIds);
+    const where: Prisma.ActivityWhereInput = { ...manageWhere };
 
     if (status && Object.values(ContentStatus).includes(status as ContentStatus)) {
       where.status = status as ContentStatus;
     }
-
     if (type && Object.values(ActivityType).includes(type as ActivityType)) {
       where.type = type as ActivityType;
     }
@@ -147,28 +116,15 @@ export async function GET(req: NextRequest) {
     const activities = await prisma.activity.findMany({
       where,
       include: {
-        place: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        images: {
-          orderBy: { sortOrder: "asc" },
-          take: 1, // Just cover image for list
-        },
+        place: { select: { id: true, title: true } },
+        images: { orderBy: { sortOrder: "asc" }, take: 1 },
       },
-      orderBy: {
-        updatedAt: "desc",
-      },
+      orderBy: { updatedAt: "desc" },
     });
 
     return NextResponse.json({ activities });
   } catch (error) {
     console.error("List activities error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

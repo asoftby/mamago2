@@ -1,21 +1,17 @@
 /**
  * POST /api/media/from-url
- * Скачивает изображение по публичному URL, прогоняет pipeline как /api/upload, создаёт MediaAsset.
- * Только по явному действию пользователя (импорт / редактор).
- *
- * Privacy boundary: source URL/hostname is internal provenance only. It must
- * never influence public filenames/metadata or be returned by this endpoint.
+ * Imports a public remote image into the media pipeline.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import {
+  checkBusinessToolPermission,
+  isPlatformContentStaff,
+} from "@/server/permissions/business-permissions";
 import { MediaSourceType } from "@prisma/client";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
-import {
-  processImage,
-  DEFAULT_IMAGE_CONFIG,
-} from "@/lib/media/imageProcessor";
+import { processImage, DEFAULT_IMAGE_CONFIG } from "@/lib/media/imageProcessor";
 import { buildMasterFilename, buildMediaStem, buildResponsiveFilename } from "@/server/media/mediaNaming";
 import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
 import { buildNeutralImportedMediaIdentity } from "@/lib/media/importedMediaPrivacy";
@@ -30,16 +26,9 @@ const FETCH_TIMEOUT_MS = 25_000;
 
 function mimeFromContentType(header: string | null | undefined): string {
   if (!header) return "application/octet-stream";
-  const base = header.split(";")[0]?.trim().toLowerCase() ?? "";
-  return base || "application/octet-stream";
+  return header.split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
 }
 
-/**
- * Every controlled error along the fetch/validation path (SSRF rejection,
- * redirect limit, size limit, TLS/network failure, timeout) is tagged with
- * `httpStatus` at the throw site — see safeRemoteImageUrl.ts and fetchHtml.ts
- * (`fetchBinary`). This avoids classifying errors by matching message text.
- */
 function errorHttpStatus(error: unknown): number | undefined {
   if (!error || typeof error !== "object") return undefined;
   const value = (error as { httpStatus?: unknown }).httpStatus;
@@ -49,15 +38,8 @@ function errorHttpStatus(error: unknown): number | undefined {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const allowed =
-      user.role === "ADMIN" ||
-      user.role === "MODERATOR" ||
-      canCreateBusinessContent(user.role);
-    if (!allowed) {
+    if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -65,9 +47,6 @@ export async function POST(req: NextRequest) {
     const urlRaw = body && typeof body.url === "string" ? body.url : "";
     const url = assertSafeRemoteImageUrl(urlRaw);
 
-    // `validateUrl` is called for the initial URL and again for every
-    // redirect hop inside fetchBinary, so a redirect can't be used to reach
-    // a private/reserved host that the initial check would have rejected.
     const remote = await fetchBinary(url.toString(), {
       timeoutMs: FETCH_TIMEOUT_MS,
       maxBytes: MAX_BYTES,
@@ -87,47 +66,37 @@ export async function POST(req: NextRequest) {
       else if (buf[0] === 0x89 && buf[1] === 0x50) mime = "image/png";
       else if (buf[0] === 0x52 && buf[1] === 0x49) mime = "image/webp";
     }
-
     if (!mime.startsWith("image/")) {
       return NextResponse.json({ error: "Ответ не является изображением" }, { status: 400 });
     }
 
     const processedImageSet = await processImage(buf, mime, DEFAULT_IMAGE_CONFIG);
     const mediaIdentity = buildNeutralImportedMediaIdentity(url);
-
     const uploadStem = buildMediaStem({ type: "CONTEXTLESS" });
     const masterSaved = await writeRuntimeUpload(
       buildMasterFilename(uploadStem),
       processedImageSet.master.buffer,
     );
-    const masterFilename = masterSaved.filename;
-    const masterUrl = masterSaved.publicUrl;
 
     for (const [sizeName, sizeData] of Object.entries(processedImageSet.sizes)) {
       if (sizeData) {
-        await writeRuntimeUpload(
-          buildResponsiveFilename(uploadStem, sizeName),
-          sizeData.buffer,
-        );
+        await writeRuntimeUpload(buildResponsiveFilename(uploadStem, sizeName), sizeData.buffer);
       }
     }
 
-    let sourceType: MediaSourceType = MediaSourceType.USER_UPLOAD;
-    if (user.role === "ADMIN" || user.role === "MODERATOR") {
-      sourceType = MediaSourceType.ADMIN_UPLOAD;
-    } else if (user.role === "BUSINESS_OWNER") {
-      sourceType = MediaSourceType.BUSINESS_UPLOAD;
-    }
+    const sourceType = isPlatformContentStaff(user.role)
+      ? MediaSourceType.ADMIN_UPLOAD
+      : MediaSourceType.BUSINESS_UPLOAD;
 
     const asset = await registerUploadedMedia({
-      filename: masterFilename,
+      filename: masterSaved.filename,
       originalName: mediaIdentity.originalName,
       mimeType: "image/webp",
       sizeBytes: processedImageSet.master.size,
       width: processedImageSet.master.width,
       height: processedImageSet.master.height,
-      storageKey: masterUrl,
-      publicUrl: masterUrl,
+      storageKey: masterSaved.publicUrl,
+      publicUrl: masterSaved.publicUrl,
       sourceType,
       uploadedById: user.id,
       title: uploadStem,
@@ -142,28 +111,15 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const httpStatus = errorHttpStatus(e);
     const msg = e instanceof Error ? e.message : "Import failed";
-
-    // 400: bad/unsafe URL, redirect to a private host, too many redirects,
-    // or the response exceeded MAX_BYTES — these messages are already
-    // user-safe (assertSafeRemoteImageUrl / fetchBinary never put upstream
-    // internals in them).
-    if (httpStatus === 400) {
-      return NextResponse.json({ error: msg }, { status: 400 });
-    }
-
+    if (httpStatus === 400) return NextResponse.json({ error: msg }, { status: 400 });
     if (httpStatus === 504 || (e instanceof Error && e.name === "AbortError")) {
       console.warn("media/from-url: timed out", { error: describeFetchError(e) });
       return NextResponse.json({ error: "Превышено время загрузки" }, { status: 504 });
     }
-
     if (httpStatus === 502) {
-      // Network/TLS failure or a non-2xx upstream response. Keep the
-      // response generic — the actionable cause (TLS error code, DNS
-      // failure, upstream status, etc.) goes to the server log only.
       console.error("media/from-url: upstream fetch failed", { error: describeFetchError(e) });
       return NextResponse.json({ error: "Не удалось скачать изображение" }, { status: 502 });
     }
-
     console.error("media/from-url:", e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 /**
  * GET /api/business/places/location/matches
  * Find duplicate and nearby places by location
@@ -6,7 +7,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 
 const NEARBY_RADIUS_METERS = 100;
 
@@ -31,7 +31,6 @@ function calculateDistance(
 }
 
 
-
 type PlaceSummary = {
   id: string;
   title: string;
@@ -48,8 +47,11 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -137,7 +139,7 @@ export async function GET(request: NextRequest) {
       for (const place of nearbyPlaces) {
         if (place.lat !== null && place.lng !== null) {
           const distance = calculateDistance(lat, lng, place.lat, place.lng);
-          
+
           if (distance <= NEARBY_RADIUS_METERS) {
             matchesMap.set(place.id, {
               ...place,

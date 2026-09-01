@@ -1,14 +1,13 @@
 /**
  * GET /api/business/places/[id]/revision
  * Get or create active revision for a published Place
- * 
+ *
  * PATCH /api/business/places/[id]/revision
  * Save revision draft
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   getOrCreatePlaceRevision,
   savePlaceRevisionDraft,
@@ -23,18 +22,16 @@ export async function GET(
     const { id: placeId } = await params;
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get or create revision
     try {
       const revision = await getOrCreatePlaceRevision(placeId, user);
       return NextResponse.json({ revision });
     } catch (serviceError) {
       const message = serviceError instanceof Error ? serviceError.message : "Failed to get revision";
-      
-      // Map service errors to appropriate HTTP status codes
+
       if (message.includes("not found")) {
         return NextResponse.json({ error: message }, { status: 404 });
       }
@@ -44,7 +41,7 @@ export async function GET(
       if (message.includes("only create revisions for published")) {
         return NextResponse.json({ error: message }, { status: 400 });
       }
-      
+
       return NextResponse.json({ error: message }, { status: 400 });
     }
   } catch (error) {
@@ -61,10 +58,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: placeId } = await params;
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -85,7 +81,6 @@ export async function PATCH(
       );
     }
 
-    // Save revision draft
     try {
       const updatedRevision = await savePlaceRevisionDraft(
         revisionId,
@@ -95,8 +90,7 @@ export async function PATCH(
       return NextResponse.json({ revision: updatedRevision });
     } catch (serviceError) {
       const message = serviceError instanceof Error ? serviceError.message : "Failed to save revision";
-      
-      // Map service errors to appropriate HTTP status codes
+
       if (message.includes("not found")) {
         return NextResponse.json({ error: message }, { status: 404 });
       }
@@ -106,7 +100,7 @@ export async function PATCH(
       if (message.includes("Cannot edit revision")) {
         return NextResponse.json({ error: message }, { status: 400 });
       }
-      
+
       return NextResponse.json({ error: message }, { status: 400 });
     }
   } catch (error) {

@@ -6,14 +6,12 @@ import {
   getPartnerCabinetBusiness,
 } from "@/server/permissions/business-permissions";
 
-/**
- * Business for the partner cabinet: active membership (OWNER/MANAGER), else owned row (no member yet).
- */
+/** Canonical partner cabinet business from active OWNER/MANAGER membership. */
 export async function getMyBusiness(userId: string): Promise<Business | null> {
   return getPartnerCabinetBusiness(userId);
 }
 
-/** Business the user owns (`ownerUserId`). Onboarding / billing — not team membership. */
+/** Ownership metadata for onboarding/billing only; never use as an auth guard. */
 export async function getOwnedBusinessProfile(userId: string): Promise<Business | null> {
   return getOwnedBusinessForUser(userId);
 }

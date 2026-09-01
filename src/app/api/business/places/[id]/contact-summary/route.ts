@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export const runtime = "nodejs";
@@ -11,9 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user || !canCreateBusinessContent(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
   const { id } = await params;
   const place = await prisma.place.findUnique({
@@ -42,11 +39,7 @@ export async function GET(
 
   const socialLinks = [place.instagramUrl]
     .filter((url): url is string => typeof url === "string" && url.trim().length > 0)
-    .map((url, index) => ({
-      id: `place-social-${index}`,
-      network: "instagram" as const,
-      url,
-    }));
+    .map((url, index) => ({ id: `place-social-${index}`, network: "instagram" as const, url }));
 
   return NextResponse.json({
     id: place.id,

@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType } from "@prisma/client";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { excludeDeletedEvents, excludeGhostEventDrafts } from "@/lib/business/eventListWhere";
 import { EventsList } from "@/app/business/(protected)/events/EventsList";
 import { Container } from "@/components/ui/Container";
+import { getPartnerCabinetBusiness } from "@/server/permissions/business-permissions";
 
 interface SearchParams {
   view?: "active" | "archived";
@@ -18,14 +18,11 @@ export default async function MeEventsPage({
 }) {
   const user = await getCurrentUser();
 
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect("/login");
   }
 
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-  });
-
+  const business = await getPartnerCabinetBusiness(user.id);
   if (!business) {
     redirect("/business/onboarding");
   }
@@ -35,7 +32,7 @@ export default async function MeEventsPage({
 
   const activities = await prisma.activity.findMany({
     where: {
-      ownerUserId: user.id,
+      businessId: business.id,
       type: ActivityType.EVENT,
       ...excludeDeletedEvents(),
       ...excludeGhostEventDrafts(),

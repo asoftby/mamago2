@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { ActivityType, ContentStatus } from "@prisma/client";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 import prisma from "@/lib/prisma";
 import { EventPageView } from "@/components/event-page/EventPageView";
@@ -15,7 +14,7 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function MeEventPreviewPage({ params }: PageProps) {
   const user = await getCurrentUser();
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect("/login");
   }
 

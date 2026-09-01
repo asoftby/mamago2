@@ -1,12 +1,11 @@
 /**
  * DELETE /api/business/places/[id]/delete
- * Delete a draft place (hard delete for now, can be changed to soft delete later)
+ * Delete a draft place
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { detachImportedRecordsForCatalogEntity } from "@/server/modules/import/services/import-link-reconciliation.service";
 import {
@@ -16,42 +15,34 @@ import {
 } from "@/server/services/contentLifecycleOperation.service";
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const { id } = await params;
-
-    // Check ownership and status
     const place = await prisma.place.findUnique({
       where: { id },
-      select: {
-        createdByUserId: true,
-        ownerBusinessId: true,
-        status: true,
-      },
+      select: { createdByUserId: true, ownerBusinessId: true, status: true },
     });
-
     if (!place) {
       return NextResponse.json(
         { error: "NOT_FOUND", message: "Place not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
-    const canManage = await canManagePlaceAsync(user, place);
-    if (!canManage) {
+    if (!(await canManagePlaceAsync(user, place))) {
       return NextResponse.json(
         { error: "FORBIDDEN", message: "You don't have access to this place" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -63,7 +54,6 @@ export async function DELETE(
       prisma,
     });
 
-    // Delete the place (hard delete for now)
     await detachImportedRecordsForCatalogEntity(
       {
         entityType: "PLACE",
@@ -72,27 +62,19 @@ export async function DELETE(
       },
       prisma,
     );
-    await prisma.place.delete({
-      where: { id },
-    });
+    await prisma.place.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     if (isContentLifecycleOperationError(error)) {
-      return NextResponse.json(
-        lifecycleErrorResponsePayload(error),
-        { status: error.statusCode },
-      );
+      return NextResponse.json(lifecycleErrorResponsePayload(error), {
+        status: error.statusCode,
+      });
     }
-    console.error("[place-delete] ❌ Error:", error);
-    console.error("[place-delete] Stack:", error instanceof Error ? error.stack : "No stack");
-
+    console.error("[place-delete] Error:", error);
     return NextResponse.json(
-      {
-        error: "INTERNAL_SERVER_ERROR",
-        message: "Internal server error",
-      },
-      { status: 500 }
+      { error: "INTERNAL_SERVER_ERROR", message: "Internal server error" },
+      { status: 500 },
     );
   }
 }

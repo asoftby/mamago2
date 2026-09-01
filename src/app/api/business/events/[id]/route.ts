@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { AgePolicy, ActivityType, ContentStatus, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import {
   canManageActivityById,
   coalesceActivityBusinessIdFromPlace,
@@ -69,7 +69,7 @@ export async function GET(
     const { id } = await params;
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -161,7 +161,7 @@ export async function PATCH(
     const user = await getCurrentUser();
     perf.mark("auth");
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -930,7 +930,7 @@ export async function DELETE(
     const { id } = await params;
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

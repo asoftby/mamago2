@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { updatePlaceLocation } from "@/services/place/placeLocation.service";
 import { Prisma } from "@prisma/client";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function POST(
@@ -19,7 +19,7 @@ export async function POST(
   
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
         { error: "UNAUTHORIZED", message: "Authentication required" },
         { status: 401 }

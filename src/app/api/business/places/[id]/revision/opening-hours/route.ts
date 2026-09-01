@@ -12,7 +12,7 @@ import {
   validateOpeningHours,
 } from "@/lib/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
@@ -25,7 +25,7 @@ export async function PUT(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

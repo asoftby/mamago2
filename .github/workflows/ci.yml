@@ -32,7 +32,6 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # postinstall запускает prisma generate — клиент нужен для tsc
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -41,13 +40,15 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
 
+      - name: Business authorization architecture regressions
+        run: |
+          pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
+          pnpm exec tsx src/lib/auth/businessAuthorizationArchitecture.test.ts
+
       - name: Type check
         run: pnpm tsc --noEmit
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-
-      - name: Business event authorization regressions
-        run: pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
 
       - name: Place wizard regressions
         run: |
