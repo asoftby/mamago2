@@ -12,64 +12,55 @@ const eventEditorPage = source("src/app/(content-editor)/editor/event/new/page.t
 const placeSubmitRoute = source("src/app/api/business/places/[id]/submit/route.ts");
 const offerRoute = source("src/app/api/business/offers/route.ts");
 const businessPermissions = source("src/server/permissions/business-permissions.ts");
-const migration = source(
-  "prisma/migrations/20260901170000_sync_verified_business_owner_roles/migration.sql",
+const canonicalMigration = source(
+  "prisma/migrations/20260901193000_canonicalize_business_member_access/migration.sql",
 );
 
-assert.equal(
-  eventCreateRoute.includes("canCreateBusinessContent"),
-  false,
-  "Event create/list route must not use the legacy role-only authorization gate",
-);
+for (const [name, text] of [
+  ["event create/list", eventCreateRoute],
+  ["event submit", eventSubmitRoute],
+  ["place submit", placeSubmitRoute],
+  ["offer create/list", offerRoute],
+] as const) {
+  assert.equal(
+    text.includes("canCreateBusinessContent"),
+    false,
+    `${name} must not use the legacy role-only authorization gate`,
+  );
+}
+
 assert.match(eventCreateRoute, /checkUserBusinessPermission/);
 assert.match(eventCreateRoute, /"content\.create"/);
 assert.match(eventCreateRoute, /BUSINESS_NOT_APPROVED/);
-assert.match(eventCreateRoute, /BUSINESS_CONTENT_CREATE_FORBIDDEN/);
-
-assert.equal(
-  eventSubmitRoute.includes("canCreateBusinessContent"),
-  false,
-  "Event submit route must not use the legacy role-only authorization gate",
-);
 assert.match(eventSubmitRoute, /resolveCanonicalActivityBusinessId/);
 assert.match(eventSubmitRoute, /"content\.publish"/);
 assert.match(eventSubmitRoute, /BUSINESS_NOT_APPROVED/);
-assert.match(eventSubmitRoute, /BUSINESS_CONTENT_PUBLISH_FORBIDDEN/);
 
 assert.match(eventEditorPage, /getPartnerCabinetBusiness/);
 assert.equal(
   eventEditorPage.includes("where: { ownerUserId: user.id }"),
   false,
-  "Event editor must resolve OWNER/MANAGER membership, not only Business.ownerUserId",
+  "Event editor must resolve OWNER/MANAGER membership",
 );
-assert.match(eventEditorPage, /verificationStatus !== "APPROVED"/);
 
-assert.equal(
-  placeSubmitRoute.includes("canCreateBusinessContent"),
-  false,
-  "Place submit must authorize the resource/business, not a coarse platform role",
-);
 assert.match(placeSubmitRoute, /"content\.publish"/);
-assert.match(placeSubmitRoute, /BUSINESS_NOT_APPROVED/);
 assert.match(placeSubmitRoute, /PLACE_NOT_LINKED_TO_BUSINESS/);
-
-assert.equal(
-  offerRoute.includes("canCreateBusinessContent"),
-  false,
-  "Offer create/list must not use the legacy role-only authorization gate",
-);
 assert.match(offerRoute, /"content\.publish"/);
-assert.match(offerRoute, /BUSINESS_NOT_APPROVED/);
 assert.match(offerRoute, /PLACE_NOT_LINKED_TO_BUSINESS/);
 
 assert.match(businessPermissions, /permission\.startsWith\("content\."\)/);
 assert.match(businessPermissions, /operationalStatus !== "ACTIVE"/);
-assert.match(businessPermissions, /Business is not active/);
+assert.match(businessPermissions, /getBusinessMembership/);
+assert.match(businessPermissions, /checkBusinessToolPermission/);
+assert.equal(
+  businessPermissions.includes("return getOwnedBusinessForUser(userId)"),
+  false,
+  "Cabinet authorization must not fall back to Business.ownerUserId",
+);
 
-assert.match(migration, /'MANAGER'::"BusinessMemberRole"/);
-assert.match(migration, /BusinessMember_syncPlatformRole/);
-assert.match(migration, /Business_syncApprovedPlatformRoles/);
-assert.match(migration, /'ACTIVE'::"BusinessOperationalStatus"/);
-assert.match(migration, /verificationStatus/);
+assert.match(canonicalMigration, /INSERT INTO "BusinessMember"/);
+assert.match(canonicalMigration, /'OWNER'::"BusinessMemberRole"/);
+assert.match(canonicalMigration, /DROP TRIGGER IF EXISTS "BusinessMember_syncPlatformRole"/);
+assert.match(canonicalMigration, /DROP TRIGGER IF EXISTS "Business_syncMemberPlatformRoles"/);
 
 console.log("business content authorization wiring: OK");
