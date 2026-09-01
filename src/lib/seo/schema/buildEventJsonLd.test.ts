@@ -45,6 +45,30 @@ assert.equal(
   "authoritative schema start date must win over UI session filtering",
 );
 
+const structuredLocation = buildEventJsonLd({
+  canonicalUrl,
+  title: "Structured location event",
+  startDate: "2026-09-01T12:00:00+03:00",
+  location: {
+    name: "Парк истории Сула",
+    address: "Сула, 14, Сула, Минская область 222664",
+  },
+});
+
+assert.ok(structuredLocation);
+assert.deepEqual(
+  structuredLocation.location,
+  {
+    "@type": "Place",
+    name: "Парк истории Сула",
+    address: {
+      "@type": "PostalAddress",
+      name: "Сула, 14, Сула, Минская область 222664",
+    },
+  },
+  "physical Event addresses must be emitted as PostalAddress without guessing address components",
+);
+
 assert.equal(
   buildEventJsonLd({
     canonicalUrl,
