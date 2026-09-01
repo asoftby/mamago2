@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 import { detectEventCategory } from "@/lib/ai/detectEventCategory";
 
 export const runtime = "nodejs";
@@ -23,8 +23,11 @@ const detectCategoryRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const rawBody = await request.json().catch(() => null);
@@ -36,15 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("[AI Category Detection API] Request:", {
-      title: parsed.data.title,
-      hasDescription: !!parsed.data.description,
-      hasVenue: !!parsed.data.venueName,
-      categoryCandidatesCount: parsed.data.categoryCandidates?.length ?? 0,
-    });
-
     const result = await detectEventCategory(parsed.data);
-
     if (!result) {
       return NextResponse.json(
         {
@@ -55,11 +50,6 @@ export async function POST(request: NextRequest) {
         { status: 200 },
       );
     }
-
-    console.log("[AI Category Detection API] Success:", {
-      categoryPath: result.categoryPath,
-      confidence: result.confidence,
-    });
 
     return NextResponse.json({
       success: true,
@@ -79,7 +69,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json({ error: "AI request timed out" }, { status: 504 });
     }
-
     console.error("[AI Category Detection API] Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
