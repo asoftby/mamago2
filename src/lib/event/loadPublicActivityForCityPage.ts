@@ -34,6 +34,7 @@ export async function loadPublicActivityForCityPage(
       seoJsonLdOverride: unknown | null;
       faqItems: unknown | null;
       ownerUserId: string;
+      schemaStartDate: Date | null;
       _redirectToSlug?: string;
     })
   | null
@@ -130,6 +131,20 @@ export async function loadPublicActivityForCityPage(
 
   if (!activity) return null;
 
+  const schemaStartDate =
+    activity.sessions[0]?.startsAt ??
+    (
+      await prisma.activitySession.findFirst({
+        where: {
+          activityId: activity.id,
+          startsAt: { lt: now },
+        },
+        orderBy: { startsAt: "desc" },
+        select: { startsAt: true },
+      })
+    )?.startsAt ??
+    null;
+
   const [place, venuePlace] = await Promise.all([
     enrichPlaceWithResolvedLogo(activity.place),
     enrichPlaceWithResolvedLogo(activity.venue?.place ?? null),
@@ -185,6 +200,7 @@ export async function loadPublicActivityForCityPage(
       height: img.height,
     })),
     sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
+    schemaStartDate,
     place: place
       ? {
           id: place.id,
