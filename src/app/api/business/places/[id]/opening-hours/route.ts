@@ -13,8 +13,6 @@ import {
   validateOpeningHours,
 } from "@/lib/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
-
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { canEditPendingPlace } from "@/lib/permissions/placeEditPermissions";
 
@@ -34,7 +32,6 @@ export async function GET(
 
     const { id: placeId } = await context.params;
 
-    // Get place with opening hours
     const place = await prisma.place.findUnique({
       where: { id: placeId },
       select: {
@@ -65,15 +62,11 @@ export async function GET(
       return NextResponse.json({ error: "Place not found" }, { status: 404 });
     }
 
-    // Check ownership
-    const canManage = await canManagePlaceAsync(user, place);
-    if (!canManage) {
+    if (!(await canManagePlaceAsync(user, place))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    return NextResponse.json({
-      openingHours: place.openingHours,
-    });
+    return NextResponse.json({ openingHours: place.openingHours });
   } catch (error) {
     console.error("[GET /api/business/places/[id]/opening-hours] Error:", error);
     return NextResponse.json(
@@ -101,14 +94,14 @@ export async function PUT(
     const body = await req.json();
     const { data } = body as { data: OpeningHoursData | null };
 
-    // Get place
     const place = await prisma.place.findUnique({
       where: { id: placeId },
       select: {
         id: true,
+        createdByUserId: true,
         ownerBusinessId: true,
         openingHoursId: true,
-        status: true, // Add status to check if place is published
+        status: true,
       },
     });
 
@@ -118,17 +111,11 @@ export async function PUT(
 
     const isAdminOrModerator = user.role === "ADMIN" || user.role === "MODERATOR";
 
-    // Admins/moderators can edit any place directly; others need ownership
     if (!isAdminOrModerator) {
-      if (!place.ownerBusinessId || !canManageOwnedContent(user, place.ownerBusinessId)) {
+      if (!(await canManagePlaceAsync(user, place))) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      // A PENDING place is under moderation review — same staff-only rule
-      // as the plain PATCH endpoint (src/app/api/business/places/[id]/route.ts),
-      // reusing the exact same helper so the two never drift into different
-      // policies. Must run before the data === null delete branch below —
-      // otherwise the owner could delete a PENDING place's schedule via a
-      // null-data PUT even though they can't edit it any other way.
+
       if (place.status === "PENDING" && !canEditPendingPlace(user.role)) {
         return NextResponse.json(
           {
@@ -138,7 +125,7 @@ export async function PUT(
           { status: 403 }
         );
       }
-      // For published places, non-admins must use the revision flow
+
       if (place.status === "PUBLISHED") {
         return NextResponse.json(
           {
@@ -150,7 +137,6 @@ export async function PUT(
       }
     }
 
-    // If data is null, delete existing opening hours
     if (!data) {
       if (place.openingHoursId) {
         await prisma.openingHours.delete({
@@ -169,7 +155,6 @@ export async function PUT(
       });
     }
 
-    // Validate data
     const validation = validateOpeningHours(data);
     if (!validation.valid) {
       return NextResponse.json(
@@ -184,7 +169,6 @@ export async function PUT(
     let openingHours;
 
     if (place.openingHoursId) {
-      // Update existing opening hours
       const updatePayload = mapToUpdatePayload(data);
       openingHours = await prisma.openingHours.update({
         where: { id: place.openingHoursId },
@@ -207,7 +191,6 @@ export async function PUT(
         },
       });
     } else {
-      // Create new opening hours
       const createPayload = mapToCreatePayload(data);
       openingHours = await prisma.openingHours.create({
         data: createPayload,
@@ -229,7 +212,6 @@ export async function PUT(
         },
       });
 
-      // Link to place
       await prisma.place.update({
         where: { id: placeId },
         data: { openingHoursId: openingHours.id },
