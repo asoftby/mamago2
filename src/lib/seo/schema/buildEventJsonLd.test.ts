@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { buildEventJsonLd, pickEventStartDate } from "./buildEventJsonLd";
+import {
+  buildEventJsonLd,
+  eventJsonLdOverrideHasMissingStartDate,
+  pickEventStartDate,
+} from "./buildEventJsonLd";
 
 const canonicalUrl = "https://mamago.by/minsk/events/test-event";
 
@@ -49,6 +53,41 @@ assert.equal(
   }),
   null,
   "Event JSON-LD without a valid startDate must not be emitted",
+);
+
+assert.equal(
+  eventJsonLdOverrideHasMissingStartDate({
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: "Broken override",
+  }),
+  true,
+  "direct Event overrides without startDate must be rejected",
+);
+
+assert.equal(
+  eventJsonLdOverrideHasMissingStartDate({
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Event",
+        name: "Broken graph override",
+      },
+    ],
+  }),
+  true,
+  "Event nodes inside @graph must also be checked",
+);
+
+assert.equal(
+  eventJsonLdOverrideHasMissingStartDate({
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: "Valid override",
+    startDate: "2026-09-01T12:00:00+03:00",
+  }),
+  false,
+  "Event overrides with a valid startDate must remain usable",
 );
 
 console.log("buildEventJsonLd tests: OK");
