@@ -12,7 +12,17 @@ function walk(dir: string): string[] {
   });
 }
 
-const sourceFiles = walk(root).filter((path) => /\.(ts|tsx)$/.test(path));
+function isProductionSource(path: string): boolean {
+  const rel = relative(process.cwd(), path);
+  return (
+    /\.(ts|tsx)$/.test(path) &&
+    !/\.(test|spec)\.(ts|tsx)$/.test(path) &&
+    !rel.includes("/__tests__/")
+  );
+}
+
+const sourceFiles = walk(root).filter(isProductionSource);
+
 const legacyUsers = sourceFiles
   .filter((path) => relative(process.cwd(), path) !== legacyDefinition)
   .filter((path) => readFileSync(path, "utf8").includes("canCreateBusinessContent"))
@@ -21,7 +31,25 @@ const legacyUsers = sourceFiles
 assert.deepEqual(
   legacyUsers,
   [],
-  `Legacy role-only B2B authorization remains in:\n${legacyUsers.join("\n")}`,
+  `Legacy role-only B2B authorization remains in production code:\n${legacyUsers.join("\n")}`,
+);
+
+const businessOwnerRoleUsers = sourceFiles
+  .filter((path) => relative(process.cwd(), path) !== legacyDefinition)
+  .filter((path) => {
+    const source = readFileSync(path, "utf8");
+    return (
+      source.includes('role === "BUSINESS_OWNER"') ||
+      source.includes('role !== "BUSINESS_OWNER"') ||
+      source.includes('role: "BUSINESS_OWNER"')
+    );
+  })
+  .map((path) => relative(process.cwd(), path));
+
+assert.deepEqual(
+  businessOwnerRoleUsers,
+  [],
+  `Direct BUSINESS_OWNER authorization/state coupling remains in production code:\n${businessOwnerRoleUsers.join("\n")}`,
 );
 
 const permissions = readFileSync(
