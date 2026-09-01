@@ -221,8 +221,11 @@ export async function POST(request: NextRequest) {
   try {
     // Auth
     const user = await getCurrentUser();
-    if (!user || !(await checkBusinessToolPermission(user, "content.create"))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Parse body

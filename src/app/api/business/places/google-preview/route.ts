@@ -6,9 +6,12 @@ import { getPlaceDetails } from "@/lib/google-places/client";
 
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || !(await checkBusinessToolPermission(user, "content.create"))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
   const googlePlaceId = request.nextUrl.searchParams.get("googlePlaceId");
   if (!googlePlaceId) {
