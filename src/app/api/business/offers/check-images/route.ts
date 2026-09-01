@@ -1,40 +1,25 @@
-// API endpoint to check which images are already used in offers
-// Used for photo uniqueness validation in MVP wizard
+// API endpoint to check which images are already used in offers.
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
     const placeId = searchParams.get("placeId");
-    const currentOfferId = searchParams.get("currentOfferId"); // Exclude current offer in edit mode
-
-    if (!placeId) {
-      return NextResponse.json(
-        { error: "placeId is required" },
-        { status: 400 }
-      );
-    }
+    const currentOfferId = searchParams.get("currentOfferId");
+    if (!placeId) return NextResponse.json({ error: "placeId is required" }, { status: 400 });
 
     const place = await prisma.place.findUnique({
       where: { id: placeId },
       select: { ownerBusinessId: true, createdByUserId: true },
     });
-
-    if (!place) {
-      return NextResponse.json({ error: "Place not found" }, { status: 404 });
-    }
-
+    if (!place) return NextResponse.json({ error: "Place not found" }, { status: 404 });
     if (!(await canManagePlaceAsync(user, place))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -44,29 +29,17 @@ export async function GET(request: NextRequest) {
         placeId,
         id: currentOfferId ? { not: currentOfferId } : undefined,
       },
-      select: {
-        id: true,
-        coverImage: true,
-      },
+      select: { id: true, coverImage: true },
     });
 
     const usedImages: Record<string, string> = {};
-
     for (const offer of offers) {
-      if (offer.coverImage) {
-        usedImages[offer.coverImage] = offer.id;
-      }
+      if (offer.coverImage) usedImages[offer.coverImage] = offer.id;
     }
 
-    return NextResponse.json({
-      usedImages,
-      count: Object.keys(usedImages).length,
-    });
+    return NextResponse.json({ usedImages, count: Object.keys(usedImages).length });
   } catch (error) {
     console.error("Check images error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
