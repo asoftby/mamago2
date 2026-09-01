@@ -1,101 +1,46 @@
-/**
- * Place Access Control
- * Business-based ownership model for Places
- */
+/** Place access control backed by canonical BusinessMember authorization. */
 
 import type { Role } from "@prisma/client";
-import prisma from "@/lib/prisma";
 import {
-  canAccessBusiness as canAccessBusinessMemberOrOwner,
+  canAccessBusiness as canAccessBusinessMember,
   getPartnerCabinetBusiness,
 } from "@/server/permissions/business-permissions";
 
 /**
- * Check if user can manage a place
- *
- * Rules:
- * - Admin/Moderator: full access to all places
- * - If place has business owner: user must own that business
- * - If place has no business owner: only creator can manage (or admin/moderator)
- *
- * @deprecated Use canManagePlaceAsync for any server-side authorization.
- *             The sync version bypasses business member checks and must not
- *             be used for access control decisions on the server.
+ * @deprecated Server authorization must use canManagePlaceAsync.
+ * This helper is presentation-only because membership lookup is asynchronous.
  */
 export function canManagePlace(
   user: { id: string; role: Role },
-  place: { createdByUserId: string; ownerBusinessId: string | null }
+  place: { createdByUserId: string; ownerBusinessId: string | null },
 ): boolean {
-  // Admin/Moderator - full access
-  if (user.role === "ADMIN" || user.role === "MODERATOR") {
-    return true;
-  }
-
-  // If place has business owner
-  if (place.ownerBusinessId) {
-    // User must own this business (checked separately via canAccessBusiness)
-    // This is a sync check, actual business ownership verified in async context
-    return true; // Will be verified by canAccessBusinessSync or in endpoint
-  }
-
-  // If place has no business owner (unowned)
-  // Only creator can manage
+  if (user.role === "ADMIN" || user.role === "MODERATOR") return true;
+  if (place.ownerBusinessId) return false;
   return user.id === place.createdByUserId;
 }
 
-/**
- * Business-scoped access: membership + transitional owner (see business-permissions).
- * Re-exported for existing call sites (activity, places).
- */
 export async function canAccessBusiness(
   userId: string,
   businessId: string,
 ): Promise<boolean> {
-  return canAccessBusinessMemberOrOwner(userId, businessId);
+  return canAccessBusinessMember(userId, businessId);
 }
 
-/**
- * Transitional sync check: canonical owner only (no BusinessMember lookup).
- */
-export function canAccessBusinessSync(
-  userId: string,
-  business: { ownerUserId: string }
-): boolean {
-  return business.ownerUserId === userId;
-}
-
-/** Cabinet business id (owner or team member). */
+/** Canonical cabinet business id from active OWNER/MANAGER membership. */
 export async function getUserBusinessId(userId: string): Promise<string | null> {
-  const b = await getPartnerCabinetBusiness(userId);
-  return b?.id ?? null;
+  const business = await getPartnerCabinetBusiness(userId);
+  return business?.id ?? null;
 }
 
-/**
- * Check if user can manage place (async version with business check)
- * Use in API endpoints where you need full verification
- */
+/** Full server-side Place management authorization. */
 export async function canManagePlaceAsync(
   user: { id: string; role: Role },
-  place: { createdByUserId: string; ownerBusinessId: string | null } | null
+  place: { createdByUserId: string; ownerBusinessId: string | null } | null,
 ): Promise<boolean> {
-  // Admin/Moderator - full access
-  if (user.role === "ADMIN" || user.role === "MODERATOR") {
-    return true;
-  }
-
-  // No place (e.g. an unassigned DRAFT Offer): nothing links it to a
-  // business/creator yet, so only Admin/Moderator can manage it until a
-  // Place is assigned.
-  if (!place) {
-    return false;
-  }
-
-  // If place has business owner
+  if (user.role === "ADMIN" || user.role === "MODERATOR") return true;
+  if (!place) return false;
   if (place.ownerBusinessId) {
-    return await canAccessBusiness(user.id, place.ownerBusinessId);
+    return canAccessBusiness(user.id, place.ownerBusinessId);
   }
-
-  // If place has no business owner (unowned)
-  // Only creator can manage
   return user.id === place.createdByUserId;
 }
