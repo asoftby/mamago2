@@ -144,6 +144,13 @@ export async function approve(
     prisma.businessVerificationLog.create({
       data: { businessId, statusFrom, statusTo, note: note || "Approved", reviewedByUserId: actorUserId },
     }),
+    // `User.role` remains the coarse platform eligibility gate for legacy business routes.
+    // Keep it synchronized with the canonical BusinessMember ownership created below,
+    // but never downgrade privileged ADMIN/MODERATOR users.
+    prisma.user.updateMany({
+      where: { id: business.ownerUserId, role: "USER" },
+      data: { role: "BUSINESS_OWNER" },
+    }),
     // Establish the canonical OWNER membership so cabinet access no longer
     // depends on the transitional Business.ownerUserId fallback in
     // getPartnerCabinetBusiness. Idempotent on the [businessId, userId] unique.
