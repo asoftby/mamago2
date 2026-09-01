@@ -9,7 +9,6 @@ const resourceFiles = [
   "src/app/api/business/places/[id]/opening-hours/route.ts",
   "src/app/api/business/places/[id]/revision/images/route.ts",
   "src/app/api/business/places/[id]/revision/opening-hours/route.ts",
-  "src/app/api/business/places/[id]/revision/submit/route.ts",
   "src/app/api/business/places/[id]/route.ts",
 ];
 
