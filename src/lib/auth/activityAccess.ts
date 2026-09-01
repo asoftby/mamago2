@@ -43,7 +43,7 @@ export async function getBusinessIdsUserCanAccess(userId: string): Promise<strin
 
 export async function canManageActivityContent(
   user: AuthActor,
-  params: { canonicalBusinessId: string | null },
+  params: { canonicalBusinessId: string | null; ownerUserId?: string },
 ): Promise<boolean> {
   if (user.role === "ADMIN" || user.role === "MODERATOR") return true;
   if (!params.canonicalBusinessId) return false;
