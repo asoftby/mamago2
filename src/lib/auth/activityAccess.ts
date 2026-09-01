@@ -1,66 +1,36 @@
-/**
- * Activity access: canonical business ownership for business flows.
- *
- * Resolution order (see PR3):
- * 1) If activity has placeId and the Place has ownerBusinessId → that business.
- * 2) Else Activity.businessId when set.
- * 3) If no business scope is resolvable, fall back to legacy ownerUserId (transitional).
- */
+/** Canonical Activity authorization for business flows. */
 
 import type { AuthActor } from "@/lib/auth/safeUser";
 import { BusinessMemberRole } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 
 export function resolveCanonicalActivityBusinessId(
   activity: { placeId: string | null; businessId: string | null },
   place: { ownerBusinessId: string | null } | null | undefined,
 ): string | null {
-  if (activity.placeId) {
-    if (place?.ownerBusinessId) {
-      return place.ownerBusinessId;
-    }
-  }
-  if (activity.businessId) {
-    return activity.businessId;
-  }
-  return null;
+  if (activity.placeId && place?.ownerBusinessId) return place.ownerBusinessId;
+  return activity.businessId ?? null;
 }
 
-/**
- * When place changes, keep denormalized Activity.businessId aligned:
- * prefer the linked place's business; otherwise keep previous value.
- */
 export function coalesceActivityBusinessIdFromPlace(
   place: { ownerBusinessId: string | null } | null | undefined,
   previousBusinessId: string | null,
 ): string | null {
-  if (place?.ownerBusinessId) {
-    return place.ownerBusinessId;
-  }
-  return previousBusinessId ?? null;
+  return place?.ownerBusinessId ?? previousBusinessId ?? null;
 }
 
-/**
- * When a place is business-owned, denormalized Activity.businessId must not contradict Place.ownerBusinessId.
- */
 export function isActivityBusinessIdAlignedWithPlace(
   place: { ownerBusinessId: string | null } | null | undefined,
   activityBusinessId: string | null,
 ): boolean {
-  if (!place?.ownerBusinessId || !activityBusinessId) {
-    return true;
-  }
+  if (!place?.ownerBusinessId || !activityBusinessId) return true;
   return activityBusinessId === place.ownerBusinessId;
 }
 
+/** Canonical business scopes available through active OWNER/MANAGER memberships. */
 export async function getBusinessIdsUserCanAccess(userId: string): Promise<string[]> {
-  const owned = await prisma.business.findMany({
-    where: { ownerUserId: userId },
-    select: { id: true },
-  });
-  const member = await prisma.businessMember.findMany({
+  const memberships = await prisma.businessMember.findMany({
     where: {
       userId,
       isActive: true,
@@ -68,32 +38,16 @@ export async function getBusinessIdsUserCanAccess(userId: string): Promise<strin
     },
     select: { businessId: true },
   });
-  return [...new Set([...owned.map((b) => b.id), ...member.map((m) => m.businessId)])];
+  return [...new Set(memberships.map((membership) => membership.businessId))];
 }
 
 export async function canManageActivityContent(
   user: AuthActor,
-  params: {
-    ownerUserId: string;
-    canonicalBusinessId: string | null;
-  },
+  params: { canonicalBusinessId: string | null },
 ): Promise<boolean> {
-  // Platform moderation: full access regardless of business membership (legacy behaviour).
-  if (user.role === "ADMIN" || user.role === "MODERATOR") {
-    return true;
-  }
-
-  if (params.canonicalBusinessId) {
-    // PR2+PR3: business cabinet access via BusinessMember (+ transitional owner in business-permissions).
-    return checkUserBusinessPermission(
-      user,
-      params.canonicalBusinessId,
-      "content.update",
-    );
-  }
-
-  // Transitional legacy: activity without resolvable business scope — ownerUserId-only (pre–businessId / orphan rows).
-  return canManageOwnedContent(user, params.ownerUserId);
+  if (user.role === "ADMIN" || user.role === "MODERATOR") return true;
+  if (!params.canonicalBusinessId) return false;
+  return checkUserBusinessPermission(user, params.canonicalBusinessId, "content.update");
 }
 
 export async function canManageActivityById(
@@ -103,35 +57,30 @@ export async function canManageActivityById(
   const activity = await prisma.activity.findUnique({
     where: { id: activityId },
     select: {
-      ownerUserId: true,
       businessId: true,
       placeId: true,
       place: { select: { ownerBusinessId: true } },
     },
   });
+  if (!activity) return false;
 
-  if (!activity) {
-    return false;
-  }
-
-  const canonical = resolveCanonicalActivityBusinessId(activity, activity.place);
   return canManageActivityContent(user, {
-    ownerUserId: activity.ownerUserId,
-    canonicalBusinessId: canonical,
+    canonicalBusinessId: resolveCanonicalActivityBusinessId(activity, activity.place),
   });
 }
 
-/** For list queries: activities the user may manage (legacy owner OR business scope). */
+/** List query restricted to canonical business scopes. */
 export function buildActivityManageWhereForUser(
-  userId: string,
+  _userId: string,
   businessIds: string[],
 ): { OR: object[] } {
-  const or: object[] = [{ ownerUserId: userId }];
-  if (businessIds.length > 0) {
-    or.push(
+  if (businessIds.length === 0) {
+    return { OR: [{ id: "__no_business_access__" }] };
+  }
+  return {
+    OR: [
       { businessId: { in: businessIds } },
       { place: { ownerBusinessId: { in: businessIds } } },
-    );
-  }
-  return { OR: or };
+    ],
+  };
 }
