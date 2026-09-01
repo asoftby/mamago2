@@ -23,33 +23,25 @@ function isProductionSource(path: string): boolean {
 
 const sourceFiles = walk(root).filter(isProductionSource);
 
-const legacyUsers = sourceFiles
-  .filter((path) => relative(process.cwd(), path) !== legacyDefinition)
-  .filter((path) => readFileSync(path, "utf8").includes("canCreateBusinessContent"))
-  .map((path) => relative(process.cwd(), path));
+function productionUsersOf(symbol: string): string[] {
+  return sourceFiles
+    .filter((path) => relative(process.cwd(), path) !== legacyDefinition)
+    .filter((path) => readFileSync(path, "utf8").includes(symbol))
+    .map((path) => relative(process.cwd(), path));
+}
 
+const legacyCreateUsers = productionUsersOf("canCreateBusinessContent");
 assert.deepEqual(
-  legacyUsers,
+  legacyCreateUsers,
   [],
-  `Legacy role-only B2B authorization remains in production code:\n${legacyUsers.join("\n")}`,
+  `Legacy role-only B2B create authorization remains in production code:\n${legacyCreateUsers.join("\n")}`,
 );
 
-const businessOwnerRoleUsers = sourceFiles
-  .filter((path) => relative(process.cwd(), path) !== legacyDefinition)
-  .filter((path) => {
-    const source = readFileSync(path, "utf8");
-    return (
-      source.includes('role === "BUSINESS_OWNER"') ||
-      source.includes('role !== "BUSINESS_OWNER"') ||
-      source.includes('role: "BUSINESS_OWNER"')
-    );
-  })
-  .map((path) => relative(process.cwd(), path));
-
+const legacyOwnedUsers = productionUsersOf("canManageOwnedContent");
 assert.deepEqual(
-  businessOwnerRoleUsers,
+  legacyOwnedUsers,
   [],
-  `Direct BUSINESS_OWNER authorization/state coupling remains in production code:\n${businessOwnerRoleUsers.join("\n")}`,
+  `Legacy role/creator-only B2B ownership authorization remains in production code:\n${legacyOwnedUsers.join("\n")}`,
 );
 
 const permissions = readFileSync(
@@ -68,6 +60,15 @@ assert.equal(
 );
 assert.match(permissions, /getBusinessMembership/);
 assert.match(permissions, /checkBusinessToolPermission/);
+assert.match(permissions, /permission\.startsWith\("content\."\)/);
+assert.match(permissions, /operationalStatus !== "ACTIVE"/);
+
+const placeAccess = readFileSync(
+  resolve(process.cwd(), "src/lib/auth/placeAccess.ts"),
+  "utf8",
+);
+assert.match(placeAccess, /checkUserBusinessPermission/);
+assert.match(placeAccess, /"content\.update"/);
 
 const verification = readFileSync(
   resolve(process.cwd(), "src/server/services/businessVerification.service.ts"),
