@@ -1,0 +1,35 @@
+name: B2B auth codemod
+
+on:
+  push:
+    branches:
+      - refactor/b2b-auth-cleanup-20260901
+
+permissions:
+  contents: write
+
+jobs:
+  codemod:
+    if: github.event.head_commit.message != 'chore(auth): apply canonical B2B gate codemod'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/b2b-auth-cleanup-20260901
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply canonical B2B gate codemod
+        run: node scripts/auth/canonicalize-b2b-legacy-gates.mjs
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No codemod changes"
+            exit 0
+          fi
+          git config user.name "asoftby"
+          git config user.email "asoftby@gmail.com"
+          git add src/app/api/business
+          git commit -m "chore(auth): apply canonical B2B gate codemod"
+          git push origin HEAD:refactor/b2b-auth-cleanup-20260901
