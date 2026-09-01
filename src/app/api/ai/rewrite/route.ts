@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 import {
   normalizeAiDescriptionContext,
   type AiDescriptionAction,
@@ -94,9 +94,7 @@ const ACTION_PROMPTS: Record<AiDescriptionAction, string> = {
 
 type OpenRouterResponse = {
   choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
+    message?: { content?: string | null };
     text?: string | null;
   }>;
 };
@@ -143,7 +141,6 @@ function buildUserPrompt(input: z.infer<typeof rewriteRequestSchema>) {
 
 function extractRewriteResult(content: string): string | null {
   if (!content || content.trim().length === 0) return null;
-
   try {
     const parsed = JSON.parse(content) as { result?: unknown };
     if (typeof parsed.result === "string" && parsed.result.trim().length > 0) {
@@ -182,16 +179,14 @@ function mapOpenRouterError(status: number, body: string): string {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const rawBody = await request.json().catch(() => null);
     const parsed = rewriteRequestSchema.safeParse(rawBody);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-    }
-
+    if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     if (parsed.data.sourceText.length > MAX_SOURCE_LENGTH) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
@@ -257,7 +252,6 @@ export async function POST(request: NextRequest) {
       });
     } catch (fetchError) {
       clearTimeout(timeout);
-
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
         console.error("[AI Rewrite] request timeout after 25s");
         return NextResponse.json(
@@ -265,12 +259,10 @@ export async function POST(request: NextRequest) {
           { status: 504 },
         );
       }
-
       console.error("[AI Rewrite] fetch error", {
         error: fetchError instanceof Error ? fetchError.message : String(fetchError),
         provider: "openrouter",
       });
-
       return NextResponse.json(
         { error: "Не удалось сгенерировать текст. Попробуйте ещё раз.", code: "NETWORK_ERROR" },
         { status: 503 },
@@ -280,7 +272,6 @@ export async function POST(request: NextRequest) {
     }
 
     const rawResponseText = await response.text();
-
     if (!response.ok) {
       const message = mapOpenRouterError(response.status, rawResponseText);
       console.error("[AI Rewrite] provider error", {
@@ -288,7 +279,6 @@ export async function POST(request: NextRequest) {
         status: response.status,
         errorMessage: message,
       });
-
       return NextResponse.json(
         {
           error: "Не удалось сгенерировать текст. Попробуйте ещё раз.",
@@ -342,7 +332,6 @@ export async function POST(request: NextRequest) {
     console.error("[AI Rewrite] unexpected error", {
       error: error instanceof Error ? error.message : String(error),
     });
-
     return NextResponse.json(
       { error: "Не удалось сгенерировать текст. Попробуйте ещё раз.", code: "INTERNAL_ERROR" },
       { status: 500 },
