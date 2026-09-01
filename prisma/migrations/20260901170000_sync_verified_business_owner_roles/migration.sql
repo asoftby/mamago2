@@ -2,7 +2,7 @@
 -- as a coarse eligibility gate. Canonical resource access remains BusinessMember
 -- + business permissions. Never overwrite ADMIN or MODERATOR.
 
--- Backfill approved canonical owners and active OWNER/MANAGER memberships.
+-- Backfill approved, operationally active canonical owners and active OWNER/MANAGER memberships.
 UPDATE "User" AS u
 SET "role" = 'BUSINESS_OWNER'::"Role"
 WHERE u."role" = 'USER'::"Role"
@@ -12,6 +12,7 @@ WHERE u."role" = 'USER'::"Role"
       FROM "Business" AS b
       WHERE b."ownerUserId" = u."id"
         AND b."verificationStatus" = 'APPROVED'::"BusinessVerificationStatus"
+        AND b."operationalStatus" = 'ACTIVE'::"BusinessOperationalStatus"
     )
     OR EXISTS (
       SELECT 1
@@ -24,6 +25,7 @@ WHERE u."role" = 'USER'::"Role"
           'MANAGER'::"BusinessMemberRole"
         )
         AND b."verificationStatus" = 'APPROVED'::"BusinessVerificationStatus"
+        AND b."operationalStatus" = 'ACTIVE'::"BusinessOperationalStatus"
     )
   );
 
@@ -45,6 +47,7 @@ BEGIN
        FROM "Business" AS b
        WHERE b."id" = NEW."businessId"
          AND b."verificationStatus" = 'APPROVED'::"BusinessVerificationStatus"
+         AND b."operationalStatus" = 'ACTIVE'::"BusinessOperationalStatus"
      )
   THEN
     UPDATE "User"
@@ -66,14 +69,18 @@ FOR EACH ROW
 EXECUTE FUNCTION "syncBusinessMemberPlatformRole"();
 
 -- If OWNER/MANAGER membership already exists before verification is approved,
--- synchronize those users at the moment the business becomes APPROVED.
+-- synchronize those users at the moment the business becomes APPROVED and ACTIVE.
 CREATE OR REPLACE FUNCTION "syncApprovedBusinessPlatformRoles"()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
   IF NEW."verificationStatus" = 'APPROVED'::"BusinessVerificationStatus"
-     AND OLD."verificationStatus" IS DISTINCT FROM NEW."verificationStatus"
+     AND NEW."operationalStatus" = 'ACTIVE'::"BusinessOperationalStatus"
+     AND (
+       OLD."verificationStatus" IS DISTINCT FROM NEW."verificationStatus"
+       OR OLD."operationalStatus" IS DISTINCT FROM NEW."operationalStatus"
+     )
   THEN
     UPDATE "User" AS u
     SET "role" = 'BUSINESS_OWNER'::"Role"
@@ -101,7 +108,7 @@ $$;
 DROP TRIGGER IF EXISTS "Business_syncApprovedPlatformRoles" ON "Business";
 
 CREATE TRIGGER "Business_syncApprovedPlatformRoles"
-AFTER UPDATE OF "verificationStatus"
+AFTER UPDATE OF "verificationStatus", "operationalStatus"
 ON "Business"
 FOR EACH ROW
 EXECUTE FUNCTION "syncApprovedBusinessPlatformRoles"();
