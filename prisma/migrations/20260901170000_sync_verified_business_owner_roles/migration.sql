@@ -64,3 +64,44 @@ AFTER INSERT OR UPDATE OF "isActive", "role", "businessId", "userId"
 ON "BusinessMember"
 FOR EACH ROW
 EXECUTE FUNCTION "syncBusinessMemberPlatformRole"();
+
+-- If OWNER/MANAGER membership already exists before verification is approved,
+-- synchronize those users at the moment the business becomes APPROVED.
+CREATE OR REPLACE FUNCTION "syncApprovedBusinessPlatformRoles"()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW."verificationStatus" = 'APPROVED'::"BusinessVerificationStatus"
+     AND OLD."verificationStatus" IS DISTINCT FROM NEW."verificationStatus"
+  THEN
+    UPDATE "User" AS u
+    SET "role" = 'BUSINESS_OWNER'::"Role"
+    WHERE u."role" = 'USER'::"Role"
+      AND (
+        u."id" = NEW."ownerUserId"
+        OR EXISTS (
+          SELECT 1
+          FROM "BusinessMember" AS bm
+          WHERE bm."businessId" = NEW."id"
+            AND bm."userId" = u."id"
+            AND bm."isActive" = TRUE
+            AND bm."role" IN (
+              'OWNER'::"BusinessMemberRole",
+              'MANAGER'::"BusinessMemberRole"
+            )
+        )
+      );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS "Business_syncApprovedPlatformRoles" ON "Business";
+
+CREATE TRIGGER "Business_syncApprovedPlatformRoles"
+AFTER UPDATE OF "verificationStatus"
+ON "Business"
+FOR EACH ROW
+EXECUTE FUNCTION "syncApprovedBusinessPlatformRoles"();
