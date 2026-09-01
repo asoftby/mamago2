@@ -11,6 +11,7 @@ const eventSubmitRoute = source("src/app/api/business/events/[id]/submit/route.t
 const eventEditorPage = source("src/app/(content-editor)/editor/event/new/page.tsx");
 const placeSubmitRoute = source("src/app/api/business/places/[id]/submit/route.ts");
 const offerRoute = source("src/app/api/business/offers/route.ts");
+const businessPermissions = source("src/server/permissions/business-permissions.ts");
 const migration = source(
   "prisma/migrations/20260901170000_sync_verified_business_owner_roles/migration.sql",
 );
@@ -61,8 +62,14 @@ assert.match(offerRoute, /"content\.publish"/);
 assert.match(offerRoute, /BUSINESS_NOT_APPROVED/);
 assert.match(offerRoute, /PLACE_NOT_LINKED_TO_BUSINESS/);
 
+assert.match(businessPermissions, /permission\.startsWith\("content\."\)/);
+assert.match(businessPermissions, /operationalStatus !== "ACTIVE"/);
+assert.match(businessPermissions, /Business is not active/);
+
 assert.match(migration, /'MANAGER'::"BusinessMemberRole"/);
 assert.match(migration, /BusinessMember_syncPlatformRole/);
+assert.match(migration, /Business_syncApprovedPlatformRoles/);
+assert.match(migration, /'ACTIVE'::"BusinessOperationalStatus"/);
 assert.match(migration, /verificationStatus/);
 
 console.log("business content authorization wiring: OK");
