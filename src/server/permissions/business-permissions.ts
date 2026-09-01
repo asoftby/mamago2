@@ -225,7 +225,7 @@ export async function requireBusinessPermission(
 
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { id: true },
+    select: { id: true, operationalStatus: true },
   });
   if (!business) {
     throw new BusinessAccessHttpError(404, "Business not found");
@@ -237,6 +237,12 @@ export async function requireBusinessPermission(
 
   if (user.role === "MODERATOR") {
     throw new BusinessAccessHttpError(403, "Forbidden");
+  }
+
+  // A suspended/archived business may still be inspected through business.view,
+  // but it must not create, update, or submit content through direct API calls.
+  if (permission.startsWith("content.") && business.operationalStatus !== "ACTIVE") {
+    throw new BusinessAccessHttpError(403, "Business is not active");
   }
 
   const effectiveRole = await getEffectiveMemberRole(user.id, businessId);

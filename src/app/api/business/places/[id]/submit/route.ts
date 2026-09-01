@@ -8,11 +8,9 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ContentStatus, MediaEntityType, PlaceKind } from "@prisma/client";
 import { publishPlaceFromDraft, submitPlace } from "@/server/services/moderation.service";
-import {
-  canCreateBusinessContent,
-  canPublishContentDirectly,
-} from "@/lib/auth/businessContentAccess";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
+import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 import { createPublishTimer } from "@/server/utils/publishPipeline";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
@@ -25,6 +23,10 @@ interface ValidationError {
   fields: Record<string, string>;
 }
 
+function isPlatformContentStaff(role: string): boolean {
+  return role === "ADMIN" || role === "MODERATOR";
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -33,8 +35,8 @@ export async function POST(
   try {
     const { id } = await params;
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     // Get only fields needed for publish validation. Opening hours are not required
@@ -76,6 +78,44 @@ export async function POST(
     const canManage = await canManagePlaceAsync(user, place);
     if (!canManage) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (!isPlatformContentStaff(user.role)) {
+      if (!place.ownerBusinessId) {
+        return NextResponse.json(
+          {
+            error: "Место не привязано к бизнес-профилю",
+            code: "PLACE_NOT_LINKED_TO_BUSINESS",
+          },
+          { status: 422 },
+        );
+      }
+
+      const canPublish = await checkUserBusinessPermission(
+        user,
+        place.ownerBusinessId,
+        "content.publish",
+      );
+      if (!canPublish) {
+        return NextResponse.json(
+          { error: "Forbidden", code: "BUSINESS_CONTENT_PUBLISH_FORBIDDEN" },
+          { status: 403 },
+        );
+      }
+
+      const business = await prisma.business.findUnique({
+        where: { id: place.ownerBusinessId },
+        select: { verificationStatus: true },
+      });
+      if (!business || business.verificationStatus !== "APPROVED") {
+        return NextResponse.json(
+          {
+            error: "Business must be verified before submitting publications",
+            code: "BUSINESS_NOT_APPROVED",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // Check current status (can only submit from DRAFT, REJECTED, NEEDS_REVISION)
@@ -259,7 +299,7 @@ export async function POST(
     }
     timer.mark("media");
 
-    // All validations passed — moderation queue or direct publish (admin)
+    // All validations passed — moderation queue or direct publish (admin/moderator)
     if (canPublishContentDirectly(user.role)) {
       await publishPlaceFromDraft(id, user.id);
     } else {
