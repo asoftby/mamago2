@@ -1,10 +1,4 @@
-/**
- * POST /api/business/places/[id]/images
- * Add image to place (logo or gallery)
- * 
- * DELETE /api/business/places/[id]/images/[imageId]
- * Remove image from place
- */
+/** POST /api/business/places/[id]/images */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -13,73 +7,42 @@ import { PlaceImageKind, MediaEntityType } from "@prisma/client";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
-/**
- * POST - Add image to place
- */
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const user = await getCurrentUser();
-
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
     const { id: placeId } = await params;
-
-    // Check ownership
     const place = await prisma.place.findUnique({
       where: { id: placeId },
-      select: { 
-        createdByUserId: true,
-        ownerBusinessId: true,
-      },
+      select: { createdByUserId: true, ownerBusinessId: true },
     });
-
-    if (!place) {
-      return NextResponse.json({ error: "Place not found" }, { status: 404 });
-    }
-
-    const canManage = await canManagePlaceAsync(user, place);
-    if (!canManage) {
+    if (!place) return NextResponse.json({ error: "Place not found" }, { status: 404 });
+    if (!(await canManagePlaceAsync(user, place))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await req.json();
     const { url, width, height, blurhash, kind, sortOrder } = body;
-
-    // Validate required fields
     if (!url || !kind) {
-      return NextResponse.json(
-        { error: "url and kind are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "url and kind are required" }, { status: 400 });
     }
-
-    // Validate kind
     if (!Object.values(PlaceImageKind).includes(kind)) {
       return NextResponse.json(
         { error: "Invalid kind. Must be LOGO or GALLERY" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // If kind is LOGO, remove existing logo
     if (kind === "LOGO") {
-      await prisma.placeImage.deleteMany({
-        where: {
-          placeId,
-          kind: "LOGO",
-        },
-      });
+      await prisma.placeImage.deleteMany({ where: { placeId, kind: "LOGO" } });
     }
 
-    // Get next sort order if not provided
     let finalSortOrder = sortOrder;
     if (finalSortOrder === undefined) {
       const lastImage = await prisma.placeImage.findFirst({
@@ -90,7 +53,6 @@ export async function POST(
       finalSortOrder = (lastImage?.sortOrder || 0) + 1;
     }
 
-    // Create image
     const image = await prisma.placeImage.create({
       data: {
         placeId,
@@ -103,17 +65,11 @@ export async function POST(
       },
     });
 
-    // Register usage in media library
     try {
       let mediaAsset = await prisma.mediaAsset.findFirst({
         where: { OR: [{ storageKey: url }, { publicUrl: url }] },
       });
-
-      if (
-        !mediaAsset &&
-        typeof url === "string" &&
-        extractMediaRelativePathFromUrl(url)
-      ) {
+      if (!mediaAsset && typeof url === "string" && extractMediaRelativePathFromUrl(url)) {
         mediaAsset = await ensureMediaAssetForStoredFileUrl({
           publicUrl: url,
           uploadedById: user.id,
@@ -123,7 +79,6 @@ export async function POST(
           originalName: kind === "LOGO" ? "place-logo.webp" : "place-gallery.webp",
         });
       }
-
       if (mediaAsset) {
         await attachMediaToEntity({
           mediaId: mediaAsset.id,
@@ -134,32 +89,19 @@ export async function POST(
       }
     } catch (mediaError) {
       console.error("Failed to register media usage:", mediaError);
-      // Don't fail the request if media registration fails
     }
 
-    // If LOGO, update place.logoImageId
     if (kind === "LOGO") {
-      await prisma.place.update({
-        where: { id: placeId },
-        data: { logoImageId: image.id },
-      });
+      await prisma.place.update({ where: { id: placeId }, data: { logoImageId: image.id } });
     }
 
-    // Return image and updated images list for wizard state sync
     const allImages = await prisma.placeImage.findMany({
       where: { placeId },
-      orderBy: [
-        { kind: "asc" }, // LOGO first, then GALLERY
-        { sortOrder: "asc" },
-      ],
+      orderBy: [{ kind: "asc" }, { sortOrder: "asc" }],
     });
-
     return NextResponse.json({ image, images: allImages });
   } catch (error) {
     console.error("Add place image error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
