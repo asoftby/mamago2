@@ -5,7 +5,12 @@
  */
 
 import prisma from "@/lib/prisma";
-import { BusinessMemberRole, BusinessVerificationStatus } from "@prisma/client";
+import {
+  BusinessMemberRole,
+  BusinessVerificationStatus,
+  type User,
+} from "@prisma/client";
+import { requireBusinessPermission } from "@/server/permissions/business-permissions";
 
 /**
  * Submit business for verification
@@ -13,22 +18,20 @@ import { BusinessMemberRole, BusinessVerificationStatus } from "@prisma/client";
  */
 export async function submitForVerification(
   businessId: string,
-  actorUserId: string
+  actor: Pick<User, "id" | "role">
 ): Promise<void> {
+  await requireBusinessPermission(actor, businessId, "business.update");
+
   const business = await prisma.business.findUnique({
     where: { id: businessId },
     select: {
       verificationStatus: true,
-      ownerUserId: true,
       phone: true,
       contactPhoneVerifiedAt: true,
     },
   });
 
   if (!business) throw new Error("Business not found");
-  if (business.ownerUserId !== actorUserId) {
-    throw new Error("Unauthorized: not business owner");
-  }
   if (
     business.verificationStatus !== "DRAFT" &&
     business.verificationStatus !== "REJECTED" &&
