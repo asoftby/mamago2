@@ -9,7 +9,6 @@ const resourceFiles = [
   "src/app/api/business/places/[id]/opening-hours/route.ts",
   "src/app/api/business/places/[id]/revision/images/route.ts",
   "src/app/api/business/places/[id]/revision/opening-hours/route.ts",
-  "src/app/api/business/places/[id]/revision/route.ts",
   "src/app/api/business/places/[id]/revision/submit/route.ts",
   "src/app/api/business/places/[id]/route.ts",
 ];
@@ -50,7 +49,14 @@ function ensureImport(source, statement) {
   if (source.includes(statement)) return source;
   const lines = source.split("\n");
   let index = 0;
-  while (index < lines.length && (lines[index].startsWith("import ") || lines[index].trim() === "" || lines[index].startsWith("/**") || lines[index].startsWith(" *") || lines[index].startsWith(" */"))) {
+  while (
+    index < lines.length &&
+    (lines[index].startsWith("import ") ||
+      lines[index].trim() === "" ||
+      lines[index].startsWith("/**") ||
+      lines[index].startsWith(" *") ||
+      lines[index].startsWith(" */"))
+  ) {
     index += 1;
   }
   lines.splice(index, 0, statement);
