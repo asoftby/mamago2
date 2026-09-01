@@ -141,11 +141,12 @@ export const MIGRATED_ARTICLE_PUBLICATION_GEO_RECOVERIES: MigratedArticlePublica
   },
   {
     articleId: "cmssu26ev00wcwsobwpy1glg0",
-    // PROD title has a trailing space (confirmed via to_json(title) during the
-    // 2026-08-31 audit) — captured verbatim so the audited-state guard doesn't
-    // false-positive "drift" on an untouched row.
-    title: "4.8 млн.$ за первый детский сад «Северного берега» ",
-    auditedTitle: "4.8 млн.$ за первый детский сад «Северного берега» ",
+    // PROD title ends with U+00A0 NO-BREAK SPACE, confirmed by raw/hex
+    // PROD audit (2026-09-01, read-only). The explicit \u00A0 escape is used
+    // so the distinction from a regular 0x20 space is visible in source and
+    // cannot be silently normalized by an editor. Do not replace with U+0020.
+    title: "4.8 млн.$ за первый детский сад «Северного берега»\u00A0",
+    auditedTitle: "4.8 млн.$ за первый детский сад «Северного берега»\u00A0",
     currentSlug: "4-8-mln-za-pervyj-detskij-sad-severnogo-berega",
     legacyUrl: "/pervyy-detskiy-sad-severnogo-berega",
     geoScope: "CITY",
