@@ -36,6 +36,10 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 const wpRedirectMap: WpRedirectMapRecord[] = JSON.parse(
   readFileSync(join(repoRoot, "scripts", "data", "wp-redirect-map.json"), "utf8"),
 );
+const ownerReviewQueue = readFileSync(
+  join(repoRoot, "docs", "seo", "migration", "phase2a-owner-review-queue.md"),
+  "utf8",
+);
 
 function testMatrixShape() {
   // Expect exactly 52 entries (the P2-A batch)
@@ -136,7 +140,7 @@ function testReadinessBreakdown() {
   );
 
   // BLOCKED_OWNER_REVIEW must be a subset of the 52, not additional
-  assert.ok(allBlocked.length <= 5, `BLOCKED_OWNER_REVIEW must be <=5, got ${allBlocked.length}`);
+  assert.equal(allBlocked.length, 7, `expected 7 fail-closed owner-review rows, got ${allBlocked.length}`);
 }
 
 function testBlockedRowsHaveOwnerReviewBatch() {
@@ -144,7 +148,7 @@ function testBlockedRowsHaveOwnerReviewBatch() {
   for (const entry of blocked) {
     assert.ok(entry.ownerReviewBatch, `position ${entry.position}: BLOCKED row missing ownerReviewBatch`);
     assert.ok(
-      ["p2a-non-minsk-cities", "p2a-ambiguous-scope", "p2a-event-semantic-destination"].includes(entry.ownerReviewBatch ?? ""),
+      ["p2a-non-minsk-cities", "p2a-ambiguous-scope", "p2a-event-semantic-destination", "p2a-missing-target-id"].includes(entry.ownerReviewBatch ?? ""),
       `position ${entry.position}: unexpected ownerReviewBatch: ${entry.ownerReviewBatch}`,
     );
   }
@@ -189,6 +193,25 @@ function testExpectedTravelPaths() {
   }
 }
 
+function testCountryBirthdayGuide() {
+  const entry = PHASE_2A_PRIORITY_RECOVERIES.find((row) => row.position === 14);
+  assert.equal(entry?.targetArticleId, "cmsswvwih029qwsqh1es4dlf9");
+  assert.equal(entry?.geoScope, "COUNTRY");
+  assert.equal(entry?.citySlug, null);
+  assert.equal(entry?.currentDestination, "/blog/detskiy-den-rozhdeniya-na-prirode");
+  const redirect = wpRedirectMap.find((row) => row.source === entry?.legacySourcePath);
+  assert.equal(redirect?.destination, "/blog/detskiy-den-rozhdeniya-na-prirode");
+}
+
+function testAutomatedRowsHaveExactIds() {
+  const ready = PHASE_2A_PRIORITY_RECOVERIES.filter((row) =>
+    row.entityType === "article" && row.action === "RESTORE_EXISTING_CONTENT" && row.readiness === "READY_AUTOMATED",
+  );
+  assert.ok(ready.length > 0);
+  assert.ok(ready.every((row) => row.targetArticleId), "every automated article requires audited targetArticleId");
+  assert.equal(new Set(ready.map((row) => row.targetArticleId)).size, ready.length);
+}
+
 function testNoGenericMinskFallback() {
   // Verify no READY_AUTOMATED article redirects to a generic /minsk fallback
   const readyArticles = PHASE_2A_PRIORITY_RECOVERIES.filter(
@@ -199,11 +222,8 @@ function testNoGenericMinskFallback() {
       !entry.currentDestination.endsWith("/minsk") && !entry.currentDestination.endsWith("/minsk/"),
       `position ${entry.position}: article must not redirect to generic /minsk`,
     );
-    // Must redirect to /minsk/blog/{slug}
-    assert.ok(
-      entry.currentDestination.startsWith("/minsk/blog/"),
-      `position ${entry.position}: expected /minsk/blog/ prefix, got ${entry.currentDestination}`,
-    );
+    const prefix = entry.geoScope === "COUNTRY" ? "/blog/" : "/minsk/blog/";
+    assert.ok(entry.currentDestination.startsWith(prefix), `position ${entry.position}: expected ${prefix}`);
   }
 }
 
@@ -232,6 +252,12 @@ function testOwnerReviewBatches() {
   }
 }
 
+function testNoGenericEventHubRecommendation() {
+  assert.ok(ownerReviewQueue.includes("A generic `/minsk/events` hub is **not** a semantic equivalent"));
+  assert.ok(!ownerReviewQueue.includes("redirect to `/minsk/events` if no"));
+  assert.ok(!ownerReviewQueue.includes("If not → redirect to `/minsk/events`"));
+}
+
 // === RUN ===
 testMatrixShape();
 testRequiredFields();
@@ -242,8 +268,11 @@ testBlockedRowsHaveOwnerReviewBatch();
 testNonMinskCityScopeArticles();
 testGeoScopeCITYArticlesHaveCitySlug();
 testExpectedTravelPaths();
+testCountryBirthdayGuide();
+testAutomatedRowsHaveExactIds();
 testNoGenericMinskFallback();
 testEventSemanticRedirectDestination();
 testOwnerReviewBatches();
+testNoGenericEventHubRecommendation();
 
 console.log("phase2aPriorityRecovery.test.ts: PASS");

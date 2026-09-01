@@ -32,9 +32,7 @@ import {
  * Returns only entries classified READY_AUTOMATED with RESTORE_EXISTING_CONTENT
  * action and entityType=article.
  */
-export function buildArticleRecoveryRecords(
-  minskCityId: string,
-): MigratedArticlePublicationGeoRecovery[] {
+export function buildArticleRecoveryRecords(): MigratedArticlePublicationGeoRecovery[] {
   const articleEntries = PHASE_2A_PRIORITY_RECOVERIES.filter(
     (e) =>
       e.entityType === "article" &&
@@ -44,7 +42,7 @@ export function buildArticleRecoveryRecords(
   );
 
   return articleEntries.map((entry) => ({
-    articleId: "", // Filled in by PROD PLAN via slug lookup
+    articleId: entry.targetArticleId!,
     title: "", // Filled in by PROD PLAN
     auditedTitle: "", // Filled in by PROD PLAN
     currentSlug: entry.currentSlug,

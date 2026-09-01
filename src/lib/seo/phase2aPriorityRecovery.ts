@@ -65,6 +65,8 @@ export type Phase2ARecoveryEntry = {
   currentDestination: string;
   /** Slug for current PROD entity. */
   currentSlug: string;
+  /** Exact Article.id from the committed migration geography audit. */
+  targetArticleId?: string;
   /** Readiness for automated implementation. */
   readiness: ReadinessLevel;
   /** Evidence-based geo classification for articles. */
@@ -106,18 +108,20 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     entityType: "article",
     gscClicks: 12535,
     action: "RESTORE_EXISTING_CONTENT",
-    readiness: "READY_AUTOMATED",
+    readiness: "BLOCKED_OWNER_REVIEW",
     geoScope: "CITY",
     citySlug: "minsk",
     confidence: "HIGH",
     evidence:
-      "Title explicitly states 'в Минске'; Kupala is a major annual celebration with perennial search intent. Article exists with WP content, needs PENDING->PUBLISHED + CITY scope.",
+      "Title explicitly states 'в Минске', but the committed migration geography audits contain no exact targetArticleId for this slug. Automated recovery must fail closed until the target ID is audited.",
+    ownerReviewBatch: "p2a-missing-target-id",
   },
   {
     position: 2,
     legacySourcePath: "/gde-otmetit-den-rozhdeniya-rebenka-10-krutyh-mest-v-gorode",
     currentDestination: "/minsk/blog/gde-otmetit-den-rozhdeniya-rebenka-10-krutyh-mest-v-gorode",
     currentSlug: "gde-otmetit-den-rozhdeniya-rebenka-10-krutyh-mest-v-gorode",
+    targetArticleId: "cmsswxmyw02viwsqh3yederzv",
     entityType: "article",
     gscClicks: 8355,
     action: "RESTORE_EXISTING_CONTENT",
@@ -133,6 +137,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/lyubimye-plyazhi-i-otkrytye-basseyny-v-minske-i-nepodalyoku",
     currentDestination: "/minsk/blog/lyubimye-plyazhi-i-otkrytye-basseyny-v-minske-i-nepodalyoku",
     currentSlug: "lyubimye-plyazhi-i-otkrytye-basseyny-v-minske-i-nepodalyoku",
+    targetArticleId: "cmsswzhug03liwsqhinljyzat",
     entityType: "article",
     gscClicks: 6329,
     action: "RESTORE_EXISTING_CONTENT",
@@ -148,6 +153,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/gde-otmetit-den-rozhdeniya-rebenka-7",
     currentDestination: "/minsk/blog/gde-otmetit-den-rozhdeniya-rebenka-7",
     currentSlug: "gde-otmetit-den-rozhdeniya-rebenka-7",
+    targetArticleId: "cmsswt2ux017qwsqhz5wses40",
     entityType: "article",
     gscClicks: 4202,
     action: "RESTORE_EXISTING_CONTENT",
@@ -163,6 +169,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/park-ugo-chavesa-samyy-bolshoy-skeyt-park-zamok-i-attrakciony",
     currentDestination: "/minsk/blog/park-ugo-chavesa-samyy-bolshoy-skeyt-park-zamok-i-attrakciony",
     currentSlug: "park-ugo-chavesa-samyy-bolshoy-skeyt-park-zamok-i-attrakciony",
+    targetArticleId: "cmsswz2qn03eewsqh4jjfwnyp",
     entityType: "article",
     gscClicks: 4040,
     action: "RESTORE_EXISTING_CONTENT",
@@ -178,6 +185,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/maslenicza-2026-v-minske-kuda-pojti-s-detmi-i-gde-otmetit-prazdnik",
     currentDestination: "/minsk/blog/maslenicza-2026-v-minske-kuda-pojti-s-detmi-i-gde-otmetit-prazdnik",
     currentSlug: "maslenicza-2026-v-minske-kuda-pojti-s-detmi-i-gde-otmetit-prazdnik",
+    targetArticleId: "cmssu87h700j6ws3f9pfvedqx",
     entityType: "article",
     gscClicks: 3683,
     action: "RESTORE_EXISTING_CONTENT",
@@ -193,6 +201,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/mashiny-pomoshhniki-v-minske-otkrylsya-detskij-gorod-professij",
     currentDestination: "/minsk/blog/mashiny-pomoshhniki-v-minske-otkrylsya-detskij-gorod-professij",
     currentSlug: "mashiny-pomoshhniki-v-minske-otkrylsya-detskij-gorod-professij",
+    targetArticleId: "cmssx0z0w045mwsqhjk4khd0c",
     entityType: "article",
     gscClicks: 2964,
     action: "RESTORE_EXISTING_CONTENT",
@@ -208,6 +217,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/kuda-shodit-s-rebenkom-v-minske-v-den-zashhity-detej-1-iyunya",
     currentDestination: "/minsk/blog/kuda-shodit-s-rebenkom-v-minske-v-den-zashhity-detej-1-iyunya",
     currentSlug: "kuda-shodit-s-rebenkom-v-minske-v-den-zashhity-detej-1-iyunya",
+    targetArticleId: "cmssx0yzs045iwsqhztlqbaty",
     entityType: "article",
     gscClicks: 2451,
     action: "RESTORE_EXISTING_CONTENT",
@@ -223,6 +233,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/bassejny-minsk-i-ne-tolko-ili-akvazony-na-vse-sluchai-zhizni",
     currentDestination: "/minsk/blog/bassejny-minsk-i-ne-tolko-ili-akvazony-na-vse-sluchai-zhizni",
     currentSlug: "bassejny-minsk-i-ne-tolko-ili-akvazony-na-vse-sluchai-zhizni",
+    targetArticleId: "cmssx0e8l03yewsqhwpgxssmh",
     entityType: "article",
     gscClicks: 2110,
     action: "RESTORE_EXISTING_CONTENT",
@@ -238,6 +249,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/novyj-god-2026-ili-kuda-shodit-na-novogodnih-kanikulah-v-minske",
     currentDestination: "/minsk/blog/novyj-god-2026-ili-kuda-shodit-na-novogodnih-kanikulah-v-minske",
     currentSlug: "novyj-god-2026-ili-kuda-shodit-na-novogodnih-kanikulah-v-minske",
+    targetArticleId: "cmssu7oz600c6ws3fwvsis0lm",
     entityType: "article",
     gscClicks: 2092,
     action: "RESTORE_EXISTING_CONTENT",
@@ -269,21 +281,24 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/kuda-shodit-14-go-fevralya-raznym-tipam-parochek",
     currentDestination: "/minsk/blog/kuda-shodit-14-go-fevralya-raznym-tipam-parochek",
     currentSlug: "kuda-shodit-14-go-fevralya-raznym-tipam-parochek",
+    // No targetArticleId exists for this slug in the committed geography audits.
     entityType: "article",
     gscClicks: 1033,
     action: "RESTORE_EXISTING_CONTENT",
-    readiness: "READY_AUTOMATED",
+    readiness: "BLOCKED_OWNER_REVIEW",
     geoScope: "CITY",
     citySlug: "minsk",
     confidence: "HIGH",
     evidence:
-      "Valentine's Day guide. Current redirect is /minsk/blog/. Annual content with local venues. Same CITY pattern.",
+      "Valentine's Day guide, but the committed migration geography audits contain no exact targetArticleId for this slug. Automated recovery must fail closed until the target ID is audited.",
+    ownerReviewBatch: "p2a-missing-target-id",
   },
   {
     position: 13,
     legacySourcePath: "/kruzhki-i-sekczii-dlya-detej-v-minske",
     currentDestination: "/minsk/blog/kruzhki-i-sekczii-dlya-detej-v-minske",
     currentSlug: "kruzhki-i-sekczii-dlya-detej-v-minske",
+    targetArticleId: "cmssx1t6r04gqwsqh5m5xl8d3",
     entityType: "article",
     gscClicks: 836,
     action: "RESTORE_EXISTING_CONTENT",
@@ -297,23 +312,25 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
   {
     position: 14,
     legacySourcePath: "/detskiy-den-rozhdeniya-na-prirode",
-    currentDestination: "/minsk/blog/detskiy-den-rozhdeniya-na-prirode",
+    currentDestination: "/blog/detskiy-den-rozhdeniya-na-prirode",
     currentSlug: "detskiy-den-rozhdeniya-na-prirode",
+    targetArticleId: "cmsswvwih029qwsqh1es4dlf9",
     entityType: "article",
     gscClicks: 804,
     action: "RESTORE_EXISTING_CONTENT",
     readiness: "READY_AUTOMATED",
-    geoScope: "CITY",
-    citySlug: "minsk",
+    geoScope: "COUNTRY",
+    citySlug: null,
     confidence: "HIGH",
     evidence:
-      "Outdoor birthday guide. Current redirect /minsk/blog/. Same pattern as other birthday articles. CITY by redirect destination.",
+      "Authoritative geography audit classifies this general outdoor birthday guide GLOBAL/HIGH: no venue or city dependency.",
   },
   {
     position: 15,
     legacySourcePath: "/besedki-dlya-dnya-rozhdeniya-na-prirode",
     currentDestination: "/minsk/blog/besedki-dlya-dnya-rozhdeniya-na-prirode",
     currentSlug: "besedki-dlya-dnya-rozhdeniya-na-prirode",
+    targetArticleId: "cmssww3vh02cewsqhng38x353",
     entityType: "article",
     gscClicks: 743,
     action: "RESTORE_EXISTING_CONTENT",
@@ -332,6 +349,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
       "/minsk/blog/kuda-otvesti-malchishek-otkrylas-pervaya-v-minske-ogromnaya-krytaya-pesochnica-so-spectehnikoy-mama-ya-sam",
     currentSlug:
       "kuda-otvesti-malchishek-otkrylas-pervaya-v-minske-ogromnaya-krytaya-pesochnica-so-spectehnikoy-mama-ya-sam",
+    targetArticleId: "cmsswskgb010qwsqhjlfnon3t",
     entityType: "article",
     gscClicks: 726,
     action: "RESTORE_EXISTING_CONTENT",
@@ -363,6 +381,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/kak-otmetit-detskij-den-rozhdeniya-10-idej-dlya-neobychnogo-prazdnika",
     currentDestination: "/minsk/blog/kak-otmetit-detskij-den-rozhdeniya-10-idej-dlya-neobychnogo-prazdnika",
     currentSlug: "kak-otmetit-detskij-den-rozhdeniya-10-idej-dlya-neobychnogo-prazdnika",
+    targetArticleId: "cmssx19v204a2wsqhtcobt2ye",
     entityType: "article",
     gscClicks: 582,
     action: "RESTORE_EXISTING_CONTENT",
@@ -378,6 +397,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/chem-zanjat-podrostka-10-sovmestnyh-dnej-letom-v-minske",
     currentDestination: "/minsk/blog/chem-zanjat-podrostka-10-sovmestnyh-dnej-letom-v-minske",
     currentSlug: "chem-zanjat-podrostka-10-sovmestnyh-dnej-letom-v-minske",
+    targetArticleId: "cmsswyoc0039mwsqhae6xu955",
     entityType: "article",
     gscClicks: 543,
     action: "RESTORE_EXISTING_CONTENT",
@@ -393,6 +413,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/leto-2026-zagorodnyy-i-gorodskoy-otdyh-dlya-detey",
     currentDestination: "/minsk/blog/leto-2026-zagorodnyy-i-gorodskoy-otdyh-dlya-detey",
     currentSlug: "leto-2026-zagorodnyy-i-gorodskoy-otdyh-dlya-detey",
+    targetArticleId: "cmssx0ttq043ewsqhyzzcpx7u",
     entityType: "article",
     gscClicks: 537,
     action: "RESTORE_EXISTING_CONTENT",
@@ -408,6 +429,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/gde-ostavit-rebenka-s-nyaney",
     currentDestination: "/minsk/blog/gde-ostavit-rebenka-s-nyaney",
     currentSlug: "gde-ostavit-rebenka-s-nyaney",
+    targetArticleId: "cmsswtnwj01fiwsqhglz4e7xb",
     entityType: "article",
     gscClicks: 523,
     action: "RESTORE_EXISTING_CONTENT",
@@ -423,6 +445,7 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     legacySourcePath: "/kosmos-novyy-park-i-zona-otdyha-mezhdu-sportivnoy-i-kuncevshchinoy",
     currentDestination: "/minsk/blog/kosmos-novyy-park-i-zona-otdyha-mezhdu-sportivnoy-i-kuncevshchinoy",
     currentSlug: "kosmos-novyy-park-i-zona-otdyha-mezhdu-sportivnoy-i-kuncevshchinoy",
+    targetArticleId: "cmsswz3ll03euwsqhvmzwi8r2",
     entityType: "article",
     gscClicks: 463,
     action: "RESTORE_EXISTING_CONTENT",
@@ -974,6 +997,16 @@ export function validatePhase2AIntegrity(): string[] {
   }
   if (positions[0] !== 1) {
     errors.push(`First position is ${positions[0]} instead of 1`);
+  }
+  const automatedArticles = PHASE_2A_PRIORITY_RECOVERIES.filter((entry) =>
+    entry.entityType === "article" && entry.action === "RESTORE_EXISTING_CONTENT" &&
+    entry.readiness === "READY_AUTOMATED",
+  );
+  for (const entry of automatedArticles) {
+    if (!entry.targetArticleId) errors.push(`Position ${entry.position}: missing audited targetArticleId`);
+  }
+  if (new Set(automatedArticles.map((entry) => entry.targetArticleId)).size !== automatedArticles.length) {
+    errors.push("Automated article targetArticleId values must be unique");
   }
   return errors;
 }
