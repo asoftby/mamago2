@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, MediaAssetKind, MediaAssetStatus, MediaEntityType } from "@prisma/client";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { canManageActivityById } from "@/lib/auth/activityAccess";
 import { getEntityMediaUsages } from "@/server/services/media/media-usage.service";
 
@@ -33,7 +32,6 @@ function extractImportedEventMedia(normalizedData: unknown): {
   if (!normalizedData || typeof normalizedData !== "object" || Array.isArray(normalizedData)) {
     return { coverUrl: null, galleryUrls: [] };
   }
-
   const raw = normalizedData as Record<string, unknown>;
   const mainImageUrl = normalizeImportedImageUrl(raw.mainImageUrl);
   const galleryUrls = Array.isArray(raw.imageUrls)
@@ -41,16 +39,12 @@ function extractImportedEventMedia(normalizedData: unknown): {
         .map((item) => normalizeImportedImageUrl(item))
         .filter((item): item is string => Boolean(item))
     : [];
-
   const fallbackCoverUrl = mainImageUrl ?? galleryUrls[0] ?? null;
-
-  const dedupedGallery = galleryUrls.filter(
-    (url, index, arr) => arr.indexOf(url) === index && url !== fallbackCoverUrl,
-  );
-
   return {
     coverUrl: fallbackCoverUrl,
-    galleryUrls: dedupedGallery,
+    galleryUrls: galleryUrls.filter(
+      (url, index, arr) => arr.indexOf(url) === index && url !== fallbackCoverUrl,
+    ),
   };
 }
 
@@ -61,7 +55,6 @@ function extractImportedEventMediaFromRawPayload(rawPayload: unknown): {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return { coverUrl: null, galleryUrls: [] };
   }
-
   const raw = rawPayload as Record<string, unknown>;
   const coverCandidates = [
     raw.mainImageUrl,
@@ -71,44 +64,32 @@ function extractImportedEventMediaFromRawPayload(rawPayload: unknown): {
     raw.poster,
     raw.posterUrl,
   ];
-
   const coverUrl =
     coverCandidates.map((value) => normalizeImportedImageUrl(value)).find((value): value is string => Boolean(value)) ??
     null;
-
   const galleryCandidates = [raw.images, raw.imageUrls, raw.photos, raw.gallery].find((value) => Array.isArray(value));
   const galleryUrls = Array.isArray(galleryCandidates)
     ? galleryCandidates
         .map((value) => normalizeImportedImageUrl(value))
         .filter((value): value is string => Boolean(value))
     : [];
-
   const fallbackCoverUrl = coverUrl ?? galleryUrls[0] ?? null;
-  const dedupedGallery = galleryUrls.filter(
-    (url, index, arr) => arr.indexOf(url) === index && url !== fallbackCoverUrl,
-  );
-
   return {
     coverUrl: fallbackCoverUrl,
-    galleryUrls: dedupedGallery,
+    galleryUrls: galleryUrls.filter(
+      (url, index, arr) => arr.indexOf(url) === index && url !== fallbackCoverUrl,
+    ),
   };
 }
 
-/**
- * GET /api/business/events/[id]/media-library
- * Медиа, связанные с событием: usages, обложка, галерея (по совпадению publicUrl).
- */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user || !canCreateBusinessContent(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
   const { id: activityId } = await params;
-
   if (!(await canManageActivityById(user, activityId))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -124,10 +105,7 @@ export async function GET(
       },
     },
   });
-
-  if (!activity) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const linkedImport = await prisma.importedRecord.findFirst({
     where: { publishedActivityId: activityId },
@@ -150,9 +128,7 @@ export async function GET(
   };
 
   const usages = await getEntityMediaUsages(MediaEntityType.EVENT, activityId);
-
   const itemsMap = new Map<string, EventMediaLibraryItem>();
-
   const upsert = (
     media: {
       id: string;
@@ -187,12 +163,10 @@ export async function GET(
     });
   };
 
-  for (const u of usages) {
-    upsert(u.media, u.field, true);
-  }
+  for (const usage of usages) upsert(usage.media, usage.field, true);
 
   if (activity.coverImageId) {
-    const m = await prisma.mediaAsset.findFirst({
+    const media = await prisma.mediaAsset.findFirst({
       where: {
         id: activity.coverImageId,
         kind: MediaAssetKind.IMAGE,
@@ -200,7 +174,7 @@ export async function GET(
       },
       select: { id: true, publicUrl: true, alt: true, title: true, sourceType: true },
     });
-    if (m) upsert(m, "cover", true);
+    if (media) upsert(media, "cover", true);
   }
 
   const galleryMediaIds = [
@@ -219,12 +193,10 @@ export async function GET(
       },
       select: { id: true, publicUrl: true, alt: true, title: true, sourceType: true },
     });
-    for (const m of fromGalleryIds) {
-      upsert(m, "gallery", true);
-    }
+    for (const media of fromGalleryIds) upsert(media, "gallery", true);
   }
 
-  const urls = [...new Set(activity.images.map((i) => i.url).filter(Boolean))];
+  const urls = [...new Set(activity.images.map((image) => image.url).filter(Boolean))];
   if (urls.length > 0) {
     const fromGallery = await prisma.mediaAsset.findMany({
       where: {
@@ -234,15 +206,11 @@ export async function GET(
       },
       select: { id: true, publicUrl: true, alt: true, title: true, sourceType: true },
     });
-    for (const m of fromGallery) {
-      upsert(m, "gallery", true);
-    }
+    for (const media of fromGallery) upsert(media, "gallery", true);
   }
 
-  const items = [...itemsMap.values()].filter((i) => i.publicUrl);
-
   return NextResponse.json({
-    items,
+    items: [...itemsMap.values()].filter((item) => item.publicUrl),
     linkedImport: Boolean(linkedImport),
     importedMedia,
   });
