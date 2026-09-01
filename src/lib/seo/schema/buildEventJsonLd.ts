@@ -25,6 +25,32 @@ function normalizeSessionDate(value: Date | string | null | undefined): Date | n
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasEventType(value: unknown): boolean {
+  if (value === "Event") return true;
+  return Array.isArray(value) && value.includes("Event");
+}
+
+function hasValidStructuredStartDate(value: unknown): boolean {
+  return typeof value === "string" && normalizeSessionDate(value) !== null;
+}
+
+export function eventJsonLdOverrideHasMissingStartDate(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => eventJsonLdOverrideHasMissingStartDate(item));
+  }
+  if (!isRecord(value)) return false;
+
+  if (hasEventType(value["@type"]) && !hasValidStructuredStartDate(value.startDate)) {
+    return true;
+  }
+
+  return eventJsonLdOverrideHasMissingStartDate(value["@graph"]);
+}
+
 export function pickEventStartDate(
   sessions: Array<{ startsAt?: Date | string | null }>,
 ): string | undefined {
