@@ -7,7 +7,10 @@ import { ContentStatus } from "@prisma/client";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { editorEventEditHref } from "@/lib/content-editor/types";
-import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
+import {
+  buildEventJsonLd,
+  eventJsonLdOverrideHasMissingStartDate,
+} from "@/lib/seo/schema/buildEventJsonLd";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -127,25 +130,31 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       fromDb.place?.formattedAddr ||
       fromDb.place?.customAddress ||
       undefined;
-    const jsonLd =
+    const generatedJsonLd = buildEventJsonLd({
+      canonicalUrl,
+      title: fromDb.title,
+      description: fromDb.shortDesc,
+      image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
+      startDate: fromDb.schemaStartDate,
+      sessions: fromDb.sessions,
+      format: fromDb.format,
+      location:
+        locationName || locationAddress
+          ? {
+              name: locationName,
+              address: locationAddress,
+            }
+          : undefined,
+      publicBaseUrl: publicBase,
+    });
+    const overrideJsonLd =
       fromDb.seoJsonLdOverride && typeof fromDb.seoJsonLdOverride === "object"
         ? (fromDb.seoJsonLdOverride as Record<string, unknown>)
-        : buildEventJsonLd({
-            canonicalUrl,
-            title: fromDb.title,
-            description: fromDb.shortDesc,
-            image: fromDb.seoOgImage?.trim() || fromDb.coverImageUrl,
-            sessions: fromDb.sessions,
-            format: fromDb.format,
-            location:
-              locationName || locationAddress
-                ? {
-                    name: locationName,
-                    address: locationAddress,
-                  }
-                : undefined,
-            publicBaseUrl: publicBase,
-          });
+        : null;
+    const jsonLd =
+      overrideJsonLd && !eventJsonLdOverrideHasMissingStartDate(overrideJsonLd)
+        ? overrideJsonLd
+        : generatedJsonLd;
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
       [
         { name: "Главная", path: "/" },
