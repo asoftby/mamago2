@@ -7,6 +7,7 @@ export type BuildEventJsonLdInput = {
   title: string;
   description?: string | null;
   image?: string | null;
+  startDate?: Date | string | null;
   sessions?: Array<{
     startsAt?: Date | string | null;
   }> | null;
@@ -36,7 +37,13 @@ export function pickEventStartDate(
 
   const nowTs = Date.now();
   const nextUpcoming = normalized.find((date) => date.getTime() >= nowTs);
-  return (nextUpcoming ?? normalized[0])?.toISOString();
+  const mostRecentPast = normalized[normalized.length - 1];
+  return (nextUpcoming ?? mostRecentPast)?.toISOString();
+}
+
+function resolveEventStartDate(input: BuildEventJsonLdInput): string | undefined {
+  const explicitStartDate = normalizeSessionDate(input.startDate);
+  return explicitStartDate?.toISOString() ?? pickEventStartDate(input.sessions ?? []);
 }
 
 function mapAttendanceMode(format: EventAttendanceFormat): string | undefined {
@@ -52,7 +59,10 @@ function mapAttendanceMode(format: EventAttendanceFormat): string | undefined {
   }
 }
 
-export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, unknown> {
+export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, unknown> | null {
+  const startDate = resolveEventStartDate(input);
+  if (!startDate) return null;
+
   const image = absolutePublicImageUrl(input.image, input.publicBaseUrl);
   const locationName = input.location?.name?.trim() || undefined;
   const locationAddress = input.location?.address?.trim() || undefined;
@@ -65,7 +75,7 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
     name: input.title,
     description: input.description?.trim() || undefined,
     image: image ? [image] : undefined,
-    startDate: pickEventStartDate(input.sessions ?? []),
+    startDate,
     location:
       locationName || locationAddress
         ? {
