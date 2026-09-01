@@ -158,7 +158,12 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
         ? {
             "@type": "Place",
             name: locationName,
-            address: locationAddress,
+            address: locationAddress
+              ? {
+                  "@type": "PostalAddress",
+                  name: locationAddress,
+                }
+              : undefined,
           }
         : undefined,
     eventAttendanceMode: mapAttendanceMode(input.format),
