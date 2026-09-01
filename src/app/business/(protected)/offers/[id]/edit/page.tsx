@@ -4,7 +4,6 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 
@@ -17,7 +16,7 @@ export default async function EditOfferPage({ params, searchParams }: EditOfferP
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
 
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "public",
@@ -30,12 +29,11 @@ export default async function EditOfferPage({ params, searchParams }: EditOfferP
   const { id } = await params;
   const sp = await searchParams;
   const qs = new URLSearchParams();
-  // Use provided returnTo or default to business offers list
-  const returnTo = typeof sp.returnTo === "string" 
-    ? sp.returnTo 
+  const returnTo = typeof sp.returnTo === "string"
+    ? sp.returnTo
     : "/business/offers";
   qs.set("returnTo", returnTo);
-  
+
   const q = qs.toString();
   redirect(
     buildSurfaceRedirectDestination({
