@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { isEmailVerified, jsonEmailNotVerified } from "@/lib/auth/requireVerifiedEmail";
 import { submitForVerification } from "@/server/services/businessVerification.service";
-import prisma from "@/lib/prisma";
+import {
+  getPartnerCabinetBusiness,
+  nextResponseFromBusinessAccessError,
+} from "@/server/permissions/business-permissions";
 
 export const runtime = "nodejs";
 
@@ -24,21 +27,16 @@ export async function POST() {
       return jsonEmailNotVerified();
     }
 
-    // Find business for current user
-    const business = await prisma.business.findUnique({
-      where: { ownerUserId: user.id },
-      select: { id: true },
-    });
-
+    // Resolve the partner business only through canonical active membership.
+    const business = await getPartnerCabinetBusiness(user.id);
     if (!business) {
       return NextResponse.json(
-        { ok: false, error: "Бизнес не найден" },
-        { status: 404 }
+        { ok: false, error: "Нет доступа к бизнесу" },
+        { status: 403 }
       );
     }
 
-    // Submit for verification
-    await submitForVerification(business.id, user.id);
+    await submitForVerification(business.id, user);
 
     return NextResponse.json({
       ok: true,
@@ -46,6 +44,9 @@ export async function POST() {
     });
   } catch (error) {
     console.error("[verification/submit] Error:", error);
+
+    const accessResponse = nextResponseFromBusinessAccessError(error);
+    if (accessResponse) return accessResponse;
 
     const errorMessage =
       error instanceof Error ? error.message : "Внутренняя ошибка сервера";

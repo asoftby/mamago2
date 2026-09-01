@@ -79,7 +79,42 @@ assert.equal(
   false,
   "Business approval must not mutate User.role",
 );
+assert.equal(
+  verification.includes("business.ownerUserId !== actorUserId"),
+  false,
+  "Verification submission must not authorize via Business.ownerUserId",
+);
+assert.match(
+  verification,
+  /requireBusinessPermission\(actor, businessId, "business\.update"\)/,
+  "Verification submission must use canonical BusinessMember permission checks",
+);
 assert.match(verification, /businessMember\.upsert/);
+
+const verificationSubmitRoute = readFileSync(
+  resolve(process.cwd(), "src/app/api/business/verification/submit/route.ts"),
+  "utf8",
+);
+assert.equal(
+  verificationSubmitRoute.includes("ownerUserId: user.id"),
+  false,
+  "Verification submit route must not resolve business by ownerUserId",
+);
+assert.match(
+  verificationSubmitRoute,
+  /getPartnerCabinetBusiness\(user\.id\)/,
+  "Verification submit route must resolve business through active membership",
+);
+assert.match(
+  verificationSubmitRoute,
+  /status: 403/,
+  "Authenticated user without active business membership must be forbidden",
+);
+assert.match(
+  verificationSubmitRoute,
+  /nextResponseFromBusinessAccessError/,
+  "Canonical business access errors must preserve their HTTP status",
+);
 
 const canonicalMigration = readFileSync(
   resolve(
