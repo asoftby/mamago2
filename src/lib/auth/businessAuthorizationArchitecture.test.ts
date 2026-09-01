@@ -90,6 +90,26 @@ const canonicalMigration = readFileSync(
 );
 assert.match(canonicalMigration, /INSERT INTO "BusinessMember"/);
 assert.match(canonicalMigration, /DROP TRIGGER IF EXISTS "BusinessMember_syncPlatformRole"/);
-assert.match(canonicalMigration, /DROP TRIGGER IF EXISTS "Business_syncMemberPlatformRoles"/);
+
+const finalRoleSyncCleanup = readFileSync(
+  resolve(
+    process.cwd(),
+    "prisma/migrations/20260901203000_drop_legacy_business_role_sync/migration.sql",
+  ),
+  "utf8",
+);
+for (const expected of [
+  'DROP TRIGGER IF EXISTS "BusinessMember_syncPlatformRole" ON "BusinessMember"',
+  'DROP FUNCTION IF EXISTS "syncBusinessMemberPlatformRole"()',
+  'DROP TRIGGER IF EXISTS "Business_syncApprovedPlatformRoles" ON "Business"',
+  'DROP FUNCTION IF EXISTS "syncApprovedBusinessPlatformRoles"()',
+  'DROP TRIGGER IF EXISTS "Business_syncMemberPlatformRoles" ON "Business"',
+  'DROP FUNCTION IF EXISTS "syncApprovedBusinessMemberPlatformRoles"()',
+]) {
+  assert.ok(
+    finalRoleSyncCleanup.includes(expected),
+    `Final B2B role-sync cleanup is missing: ${expected}`,
+  );
+}
 
 console.log("canonical B2B authorization architecture: OK");
