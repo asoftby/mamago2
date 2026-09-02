@@ -12,11 +12,13 @@ import { NorthStarBlock } from "./blocks/NorthStarBlock";
 import { HabitBlock } from "./blocks/HabitBlock";
 import { FunnelBlock } from "./blocks/FunnelBlock";
 import { GrowthBlock } from "./blocks/GrowthBlock";
+import { GscSeoBlock } from "./blocks/GscSeoBlock";
 import { SearchDiscoveryBlock } from "./blocks/SearchDiscoveryBlock";
 import { SupplyHealthBlock } from "./blocks/SupplyHealthBlock";
 import { B2BHealthBlock } from "./blocks/B2BHealthBlock";
 import { OperationalLoadBlock } from "./blocks/OperationalLoadBlock";
 import { DataQualityBlock } from "./blocks/DataQualityBlock";
+import type { GscSeoViewModel } from "@/lib/admin/gscSeoViewModel";
 import type {
   ProductPulseViewModel,
   NorthStarViewModel,
@@ -33,7 +35,6 @@ import type {
 const AUTO_REFRESH_MS = 60_000;
 
 export interface AdminDashboardShellProps {
-  // Operations (unchanged semantics — see OperationsBlock).
   stale: boolean;
   generatedAt: Date | null;
   nodes: { key: NodeKey; state: NodeState }[];
@@ -42,17 +43,13 @@ export interface AdminDashboardShellProps {
   previousLastViewedAt: Date | null;
   canResolve: boolean;
   serverNow: Date;
-  /** Server-computed via isProductionAppEnv() — never inferred client-side. */
   isDev: boolean;
-  // Product blocks — pre-derived view-models, sourced entirely from the
-  // SAME single getOperationsView() call's kpis/queues. Never re-fetched
-  // client-side; a refresh re-runs the whole Server Component tree via
-  // router.refresh().
   product: ProductPulseViewModel;
   northStar: NorthStarViewModel;
   habit: HabitViewModel;
   funnel: EngagementFunnelViewModel;
   growth: GrowthViewModel;
+  seo: GscSeoViewModel;
   search: DiscoveryQualityViewModel;
   supply: SupplyHealthViewModel;
   b2b: B2BHealthViewModel;
@@ -75,6 +72,7 @@ export function AdminDashboardShell({
   habit,
   funnel,
   growth,
+  seo,
   search,
   supply,
   b2b,
@@ -92,9 +90,7 @@ export function AdminDashboardShell({
   }, []);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      router.refresh();
-    }, AUTO_REFRESH_MS);
+    intervalRef.current = setInterval(() => router.refresh(), AUTO_REFRESH_MS);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -108,7 +104,6 @@ export function AdminDashboardShell({
 
   return (
     <div className="p-6 md:p-4 space-y-6">
-      {/* Page header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-xl font-bold">Панель управления</h1>
@@ -130,7 +125,6 @@ export function AdminDashboardShell({
         </div>
       </div>
 
-      {/* System status — critical health is visible first */}
       <OperationsBlock
         stale={stale}
         nodes={nodes}
@@ -142,7 +136,6 @@ export function AdminDashboardShell({
         isDev={isDev}
       />
 
-      {/* Row 1 — Company Pulse: audience + North Star */}
       <div>
         <h2 className="text-base font-semibold text-gray-700 mb-3">Company Pulse</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -151,16 +144,11 @@ export function AdminDashboardShell({
         </div>
       </div>
 
-      {/* Row 2 — Habit & retention */}
       <HabitBlock model={habit} />
-
-      {/* Row 3 — Core value funnel */}
       <FunnelBlock model={funnel} />
-
-      {/* Row 4 — Growth */}
       <GrowthBlock model={growth} />
+      <GscSeoBlock model={seo} />
 
-      {/* Row 5 — Discovery + Supply */}
       <div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SearchDiscoveryBlock model={search} />
@@ -168,10 +156,8 @@ export function AdminDashboardShell({
         </div>
       </div>
 
-      {/* Row 6 — B2B health */}
       <B2BHealthBlock model={b2b} />
 
-      {/* Row 7 — Operations + Data Quality */}
       <div>
         <h2 className="text-base font-semibold text-gray-700 mb-3">Operations & Data Quality</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
