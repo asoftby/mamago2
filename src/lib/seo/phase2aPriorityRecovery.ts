@@ -947,7 +947,9 @@ const PHASE_2A_PRIORITY_RECOVERY_SOURCE: Phase2ARecoveryEntry[] = [
   },
 ];
 
-/** Conditional recurring rows have no committed concrete replacement target. */
+const HUB_ONLY_EVENT_POSITIONS = new Set([34, 35, 38, 44, 47, 52]);
+
+/** Conditional recurring and hub-only rows have no committed concrete replacement target. */
 export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] =
   PHASE_2A_PRIORITY_RECOVERY_SOURCE.map((entry) =>
     entry.action === "UPDATE_RECURRING_OR_SEASONAL"
@@ -956,6 +958,12 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] =
           readiness: "BLOCKED_OWNER_REVIEW",
           ownerReviewBatch: "p2a-recurring-exact-target",
         }
+      : HUB_ONLY_EVENT_POSITIONS.has(entry.position)
+        ? {
+            ...entry,
+            readiness: "BLOCKED_OWNER_REVIEW",
+            ownerReviewBatch: "p2a-event-semantic-destination",
+          }
       : entry,
   );
 

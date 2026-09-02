@@ -1,6 +1,6 @@
 # Phase 2A — Owner Review Queue
 
-These 31 URLs cannot currently proceed automatically because their
+These 37 URLs cannot currently proceed automatically because their
 geographic scope or semantic destination is ambiguous from the
 available evidence. Each needs a short owner decision to proceed.
 
@@ -91,10 +91,10 @@ committed. A current detail URL or generic event hub is not an exact mapping.
 | Missing audited target ID | 2 | 13,568 | Keep blocked until exact IDs are audited |
 | Non-Minsk cities (COUNTRY default) | 2 | 1,833 | Reclassify as COUNTRY, update redirect to `/blog/{slug}` |
 | Ambiguous scope | 4 | 2,259 | Keep blocked pending content-based geography decision |
-| Event destinations | 3 | 9,531 | Exact equivalent only; otherwise retain owner review |
+| Event destinations | 9 | 14,193 | Exact equivalent only; otherwise retain owner review |
 | Recurring/seasonal without exact target | 20 | 24,647 | Commit exact replacement entity/path before readiness |
-| **Total** | **31** | **51,838** | |
+| **Total** | **37** | **56,500** | |
 
-**Note**: The remaining 21 URLs are `READY_AUTOMATED` or
+**Note**: The remaining 15 URLs are `READY_AUTOMATED` or
 `READY_WITH_EXACT_MAPPING`
 and can proceed independently of these decisions.

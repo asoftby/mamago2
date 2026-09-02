@@ -131,7 +131,7 @@ function testReadinessBreakdown() {
     allReady.length,
   );
   assert.equal(
-    summary.readinessBreakdown["READY_WITH_EXACT_MAPPING"],
+    summary.readinessBreakdown["READY_WITH_EXACT_MAPPING"] ?? 0,
     allReadyMapping.length,
   );
   assert.equal(
@@ -140,7 +140,7 @@ function testReadinessBreakdown() {
   );
 
   // BLOCKED_OWNER_REVIEW must be a subset of the 52, not additional
-  assert.equal(allBlocked.length, 31, `expected 31 fail-closed owner-review rows, got ${allBlocked.length}`);
+  assert.equal(allBlocked.length, 37, `expected 37 fail-closed owner-review rows, got ${allBlocked.length}`);
 }
 
 function testBlockedRowsHaveOwnerReviewBatch() {
@@ -209,6 +209,14 @@ function testAuditedUnclearArticlesFailClosed() {
     assert.equal(entry?.readiness, "BLOCKED_OWNER_REVIEW", `position ${position} must fail closed`);
     assert.equal(entry?.geoScope, null);
     assert.equal(entry?.citySlug, null);
+  }
+}
+
+function testHubOnlyEventsFailClosed() {
+  for (const position of [34, 35, 38, 44, 47, 52]) {
+    const entry = PHASE_2A_PRIORITY_RECOVERIES.find((row) => row.position === position);
+    assert.equal(entry?.readiness, "BLOCKED_OWNER_REVIEW", `position ${position} must fail closed`);
+    assert.equal(entry?.ownerReviewBatch, "p2a-event-semantic-destination");
   }
 }
 
@@ -291,6 +299,7 @@ testGeoScopeCITYArticlesHaveCitySlug();
 testExpectedTravelPaths();
 testCountryBirthdayGuide();
 testAuditedUnclearArticlesFailClosed();
+testHubOnlyEventsFailClosed();
 testAutomatedRowsHaveExactIds();
 testNoGenericMinskFallback();
 testEventSemanticRedirectDestination();
