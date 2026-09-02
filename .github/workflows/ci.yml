@@ -32,7 +32,6 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # postinstall запускает prisma generate — клиент нужен для tsc
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -40,6 +39,11 @@ jobs:
         run: pnpm exec prisma validate
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
+
+      - name: Business authorization architecture regressions
+        run: |
+          pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
+          pnpm exec tsx src/lib/auth/businessAuthorizationArchitecture.test.ts
 
       - name: Type check
         run: pnpm tsc --noEmit
@@ -53,6 +57,12 @@ jobs:
           pnpm exec tsx src/components/business/wizard/place/completion.test.ts
           pnpm exec tsx src/components/business/wizard/place/agePolicyValidation.test.ts
           pnpm exec tsx src/components/business/wizard/place/draftState.test.ts
+
+      - name: Place geo overrides regressions
+        run: |
+          pnpm exec tsx src/lib/geo/haversineMeters.test.ts
+          pnpm exec tsx src/components/business/place/placeLocationGeoOverrides.test.ts
+          pnpm exec tsx src/components/business/place/PlaceLocationPicker.raceContract.test.ts
 
       - name: Event timezone contract regressions
         run: pnpm exec tsx src/lib/event/eventTimezoneContract.test.ts
@@ -77,16 +87,19 @@ jobs:
 
       - name: SEO indexing regressions
         run: |
+          pnpm exec tsx src/server/ops/metrics/collectors/googleSearchConsole.test.ts
           pnpm exec tsx src/lib/seo/globalNoindex.test.ts
           pnpm exec tsx src/app/robots.test.ts
           pnpm exec tsx src/lib/seo/indexingPolicy.test.ts
           pnpm exec tsx src/server/public/publicContentVisibility.test.ts
           pnpm exec tsx src/lib/slug/slugFlow.test.ts
           pnpm exec tsx src/lib/seo/schema/buildPlaceJsonLd.test.ts
+          pnpm exec tsx src/lib/seo/schema/buildEventJsonLd.test.ts
           pnpm exec tsx src/lib/routing/legacyProdPreviewRedirect.test.ts
           pnpm exec tsx src/lib/routing/subdomainMiddleware.test.ts
           pnpm exec tsx scripts/verify-prelaunch-seo.test.ts
           pnpm exec tsx scripts/verify-indexing-release.test.ts
+          pnpm exec tsx src/lib/seo/migratedArticlePublicationGeoRecovery.test.ts
 
       - name: Imported media source privacy regression
         run: pnpm exec tsx src/lib/media/importedMediaPrivacy.test.ts

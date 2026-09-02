@@ -2,9 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import Link from "next/link";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
+import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 export default async function PlaceSubmittedPage({
   params,
@@ -15,7 +15,7 @@ export default async function PlaceSubmittedPage({
 }) {
   const user = await getCurrentUser();
 
-  if (!user || !canCreateBusinessContent(user.role)) {
+  if (!user) {
     redirect("/login");
   }
 
@@ -30,6 +30,7 @@ export default async function PlaceSubmittedPage({
       title: true,
       status: true,
       createdByUserId: true,
+      ownerBusinessId: true,
     },
   });
 
@@ -37,11 +38,10 @@ export default async function PlaceSubmittedPage({
     notFound();
   }
 
-  if (place.createdByUserId !== user.id) {
+  if (!(await canManagePlaceAsync(user, place))) {
     redirect("/business/places");
   }
 
-  // Determine content based on scenario
   const isNewSubmission = place.status === "PENDING" && !isRevision;
   const isRevisionSubmission = isRevision;
 

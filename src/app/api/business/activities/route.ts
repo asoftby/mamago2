@@ -3,17 +3,16 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { createActivity, listBusinessActivities } from "@/server/services/activity.service";
 import { ActivityType, ScheduleMode } from "@prisma/client";
-import { canCreateBusinessContent, canManageOwnedContent } from "@/lib/auth/businessContentAccess";
 import {
   nextResponseFromBusinessAccessError,
   requireBusinessPermission,
 } from "@/server/permissions/business-permissions";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const business = await getMyBusiness(user.id);
@@ -23,29 +22,24 @@ export async function GET(request: NextRequest) {
 
     try {
       await requireBusinessPermission(user, business.id, "business.view");
-    } catch (e) {
-      const denied = nextResponseFromBusinessAccessError(e);
+    } catch (error) {
+      const denied = nextResponseFromBusinessAccessError(error);
       if (denied) return denied;
-      throw e;
+      throw error;
     }
 
-    const activities = await listBusinessActivities(business.id);
-
-    return NextResponse.json({ activities });
+    return NextResponse.json({ activities: await listBusinessActivities(business.id) });
   } catch (error) {
     console.error("List activities error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const business = await getMyBusiness(user.id);
@@ -55,35 +49,30 @@ export async function POST(request: NextRequest) {
 
     try {
       await requireBusinessPermission(user, business.id, "content.create");
-    } catch (e) {
-      const denied = nextResponseFromBusinessAccessError(e);
+    } catch (error) {
+      const denied = nextResponseFromBusinessAccessError(error);
       if (denied) return denied;
-      throw e;
+      throw error;
     }
 
     const body = await request.json();
-    const { 
-      title, 
-      shortDesc, 
-      description, 
-      cityId, 
-      coverImageUrl, 
-      priceFrom, 
-      currency, 
-      ageLabel, 
+    const {
+      title,
+      shortDesc,
+      description,
+      cityId,
+      coverImageUrl,
+      priceFrom,
+      currency,
+      ageLabel,
       sessions,
       type = ActivityType.EVENT,
-      scheduleMode = ScheduleMode.ONE_TIME
+      scheduleMode = ScheduleMode.ONE_TIME,
     } = body;
 
-    // Use name as title if title is missing (backward compat)
     const finalTitle = title || body.name;
-
     if (!finalTitle || !cityId) {
-      return NextResponse.json(
-        { error: "title and cityId are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "title and cityId are required" }, { status: 400 });
     }
 
     const activity = await createActivity({
@@ -97,7 +86,7 @@ export async function POST(request: NextRequest) {
       ageLabel,
       businessId: business.id,
       createdBy: user.id,
-      sessions: sessions ? sessions.map((s: string) => new Date(s)) : undefined,
+      sessions: sessions ? sessions.map((session: string) => new Date(session)) : undefined,
       type,
       scheduleMode,
     });
@@ -105,9 +94,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, activity });
   } catch (error) {
     console.error("Create activity error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

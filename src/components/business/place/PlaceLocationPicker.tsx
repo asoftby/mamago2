@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,16 @@ import { PlaceMapModal } from "./PlaceMapModal";
 import { PlaceDuplicateBlock } from "./PlaceDuplicateBlock";
 import { formatDistance } from "@/lib/formatDistance";
 import { FilterSelect } from "@/components/ui/filter-select";
+import {
+  buildLocationTransitionPatch,
+  computeEffectiveDistrictId,
+  computeEffectiveMetroDistanceM,
+  computeEffectiveMetroId,
+  computeManualMetroDistanceM,
+  isStaleEnrichmentResponse,
+  shouldClearManualGeoOverrides,
+  type GeoPoint,
+} from "./placeLocationGeoOverrides";
 
 interface PlaceLocationPickerProps {
   placeId: string;
@@ -98,6 +108,16 @@ export function PlaceLocationPicker({
   const [metroManualId, setMetroManualId] = useState<string | null>(initialLocation?.metroManualId || null);
   const [metroManualDistanceM, setMetroManualDistanceM] = useState<number | null>(initialLocation?.metroManualDistanceM || null);
 
+  /**
+   * Monotonic token for the in-flight geo-enrichment request. Guards
+   * against two races: a slow response for a point the user has since
+   * moved away from, and two overlapping enrichment requests resolving out
+   * of order — only the response whose token still matches this ref when
+   * it resolves (i.e. the latest-started request) may apply its
+   * auto-derived fields. See `isStaleEnrichmentResponse`.
+   */
+  const enrichmentRequestSeqRef = useRef(0);
+
   // Sync geo enrichment state when initialLocation changes (e.g., after enrichment API call)
   useEffect(() => {
     if (initialLocation) {
@@ -121,7 +141,9 @@ export function PlaceLocationPicker({
 
   // Options for selects
   const [districts, setDistricts] = useState<Array<{ id: string; name: string }>>([]);
-  const [metroStations, setMetroStations] = useState<Array<{ id: string; name: string }>>([]);
+  const [metroStations, setMetroStations] = useState<
+    Array<{ id: string; name: string; lat: number; lng: number }>
+  >([]);
   const [geoOptionsDebug, setGeoOptionsDebug] = useState<GeoOptionsDebugState | null>(null);
   const [geoOptionsWarning, setGeoOptionsWarning] = useState<string | null>(null);
 
@@ -155,7 +177,7 @@ export function PlaceLocationPicker({
       ]);
 
       let nextDistricts: Array<{ id: string; name: string }> = [];
-      let nextMetroStations: Array<{ id: string; name: string }> = [];
+      let nextMetroStations: Array<{ id: string; name: string; lat: number; lng: number }> = [];
 
       if (districtsRes.ok) {
         const data = await districtsRes.json();
@@ -267,6 +289,10 @@ export function PlaceLocationPicker({
     formattedAddr: string;
     addressJson: google.maps.GeocoderAddressComponent[];
   }) => {
+    const previousPoint: GeoPoint | null = location ? { lat: location.lat, lng: location.lng } : null;
+    const nextPoint: GeoPoint = { lat: data.lat, lng: data.lng };
+    const clearManualOverrides = shouldClearManualGeoOverrides(previousPoint, nextPoint);
+
     // Update location state
     setLocation({
       lat: data.lat,
@@ -276,32 +302,54 @@ export function PlaceLocationPicker({
       source: "google",
     });
 
-    // Trigger geo enrichment
-    await enrichLocation(data.lat, data.lng, data.addressJson);
+    // Manual overrides belong to the user-interaction layer, not to the
+    // async enrichment response: invalidate them HERE, synchronously, in
+    // the same transaction as accepting the new point. Doing this only
+    // after `enrichLocation` resolves would let it race a manual pick the
+    // user makes for the NEW point while that request is still in flight.
+    if (clearManualOverrides) {
+      setDistrictManualId(null);
+      setMetroManualId(null);
+      setMetroManualDistanceM(null);
+    }
 
-    // Pass to parent for manual save
-    onUpdate?.({
-      lat: data.lat,
-      lng: data.lng,
-      googlePlaceId: data.googlePlaceId,
-      formattedAddr: data.formattedAddr,
-      addressJson: data.addressJson,
-      googleReviewsJson: {
-        meta: {
-          enabled: false,
-          matchStatus: "ADDRESS_ONLY",
-          disabledReason: "pending_verification",
-          googlePlaceName: data.placeName || placeTitle || null,
-          googlePlaceAddress: data.formattedAddr || null,
+    // Pass to parent for manual save — location and (if applicable) the
+    // explicit manual-override reset travel in the SAME patch, before
+    // enrichment even starts.
+    onUpdate?.(
+      buildLocationTransitionPatch(
+        {
+          lat: data.lat,
+          lng: data.lng,
+          googlePlaceId: data.googlePlaceId,
+          formattedAddr: data.formattedAddr,
+          addressJson: data.addressJson,
+          googleReviewsJson: {
+            meta: {
+              enabled: false,
+              matchStatus: "ADDRESS_ONLY",
+              disabledReason: "pending_verification",
+              googlePlaceName: data.placeName || placeTitle || null,
+              googlePlaceAddress: data.formattedAddr || null,
+            },
+          },
         },
-      },
-    });
+        clearManualOverrides,
+      ),
+    );
+
+    // Trigger geo enrichment — auto-derived fields only; see enrichLocation.
+    await enrichLocation(data.lat, data.lng, data.addressJson);
   };
 
   const handleMapConfirm = async (data: {
     lat: number;
     lng: number;
   }) => {
+    const previousPoint: GeoPoint | null = location ? { lat: location.lat, lng: location.lng } : null;
+    const nextPoint: GeoPoint = { lat: data.lat, lng: data.lng };
+    const clearManualOverrides = shouldClearManualGeoOverrides(previousPoint, nextPoint);
+
     // Update location state
     setLocation({
       lat: data.lat,
@@ -311,24 +359,41 @@ export function PlaceLocationPicker({
       source: "manual",
     });
 
-    // Trigger geo enrichment (without addressJson)
-    await enrichLocation(data.lat, data.lng, null);
+    // See the identical comment in handlePlaceSelect above.
+    if (clearManualOverrides) {
+      setDistrictManualId(null);
+      setMetroManualId(null);
+      setMetroManualDistanceM(null);
+    }
 
     // Pass to parent for manual save
-    onUpdate?.({
-      lat: data.lat,
-      lng: data.lng,
-    });
+    onUpdate?.(buildLocationTransitionPatch({ lat: data.lat, lng: data.lng }, clearManualOverrides));
+
+    // Trigger geo enrichment (without addressJson) — auto-derived fields only.
+    await enrichLocation(data.lat, data.lng, null);
   };
 
   /**
-   * Call geo enrichment API and update state
+   * Call geo enrichment API and update AUTO-derived state only
+   * (cityId/districtAutoId/metroAutoId/metroAutoDistanceM).
+   *
+   * This function must NEVER touch manual overrides — that decision is made
+   * synchronously by the caller (handlePlaceSelect/handleMapConfirm) before
+   * this request is even sent, specifically so a manual pick the user makes
+   * WHILE this request is in flight can't be erased by its response.
+   *
+   * A monotonic request token (`enrichmentRequestSeqRef`) guards against a
+   * stale response applying: if a newer location request has started since
+   * this one was issued, this response is discarded — this covers both a
+   * slow response for a point the user has moved away from, and two
+   * overlapping requests resolving out of order.
    */
   const enrichLocation = async (
     lat: number,
     lng: number,
-    addressJson: google.maps.GeocoderAddressComponent[] | null
+    addressJson: google.maps.GeocoderAddressComponent[] | null,
   ) => {
+    const requestSeq = ++enrichmentRequestSeqRef.current;
     console.log("[PlaceLocationPicker] Starting geo enrichment...", { lat, lng });
 
     try {
@@ -344,15 +409,30 @@ export function PlaceLocationPicker({
       }
 
       const result = await response.json();
+
+      if (isStaleEnrichmentResponse(requestSeq, enrichmentRequestSeqRef.current)) {
+        // A newer location request has started since this one was issued —
+        // this response no longer describes the current point. Discard it
+        // rather than let it apply auto-derived fields for the wrong point.
+        console.log("[PlaceLocationPicker] Discarding stale enrichment response", { lat, lng });
+        return;
+      }
+
       console.log("[PlaceLocationPicker] Geo enrichment result:", result);
 
-      // Update state with enriched data
+      // Update state with enriched data — auto fields only.
       if (result.cityId) {
         setCityId(result.cityId);
       }
 
+      // districtAutoId must always reflect the latest result, including a
+      // null one — otherwise a stale auto value from a previous point can
+      // keep showing after the point moved somewhere with no detectable
+      // district (mirrors the metro handling right below).
       if (result.districtAutoId) {
         setDistrictAutoId(result.districtAutoId);
+      } else {
+        setDistrictAutoId(null);
       }
 
       if (result.metroAutoId) {
@@ -364,10 +444,11 @@ export function PlaceLocationPicker({
         setMetroAutoDistanceM(null);
       }
 
-      // Pass enriched data to parent
+      // Pass enriched data to parent — auto-derived fields only. Manual
+      // overrides are never included here (see the function doc comment).
       onUpdate?.({
         cityId: result.cityId,
-        districtAutoId: result.districtAutoId,
+        districtAutoId: result.districtAutoId ?? null,
         metroAutoId: result.metroAutoId,
         metroAutoDistanceM: result.metroAutoDistanceM,
       });
@@ -608,18 +689,33 @@ export function PlaceLocationPicker({
     const newValue = value === "" ? null : value;
     setMetroManualId(newValue);
 
+    // Compute the distance for the manually-picked station, same as auto
+    // enrichment does — otherwise a manual pick would show no distance (or
+    // a stale one carried over from whatever was previously effective).
+    let distanceM: number | null = null;
+    if (newValue && location) {
+      const station = metroStations.find((m) => m.id === newValue);
+      if (station) {
+        distanceM = computeManualMetroDistanceM(
+          { lat: location.lat, lng: location.lng },
+          { lat: station.lat, lng: station.lng },
+        );
+      }
+    }
+    setMetroManualDistanceM(distanceM);
+
     // Pass to parent for manual save
-    onUpdate?.({ metroManualId: newValue });
-    
+    onUpdate?.({ metroManualId: newValue, metroManualDistanceM: distanceM });
+
     // Silent update - no toast notifications
   };
 
   const handleResetDistrict = () => {
     setDistrictManualId(null);
-    
+
     // Pass to parent for manual save
     onUpdate?.({ districtManualId: null });
-    
+
     // Silent update - no toast notifications
   };
 
@@ -628,15 +724,19 @@ export function PlaceLocationPicker({
     setMetroManualDistanceM(null);
 
     // Pass to parent for manual save
-    onUpdate?.({ metroManualId: null });
-    
+    onUpdate?.({ metroManualId: null, metroManualDistanceM: null });
+
     // Silent update - no toast notifications
   };
 
   // Computed values
-  const districtShown = districtManualId ?? districtAutoId;
-  const metroShown = metroManualId ?? metroAutoId;
-  const metroDistanceShown = metroManualId ? metroManualDistanceM : metroAutoDistanceM;
+  const districtShown = computeEffectiveDistrictId({ districtManualId, districtAutoId });
+  const metroShown = computeEffectiveMetroId({ metroManualId, metroAutoId });
+  const metroDistanceShown = computeEffectiveMetroDistanceM({
+    metroManualId,
+    metroManualDistanceM,
+    metroAutoDistanceM,
+  });
 
   // UI visibility logic
   const hasAutoEnrichment = !!(districtAutoId || metroAutoId);

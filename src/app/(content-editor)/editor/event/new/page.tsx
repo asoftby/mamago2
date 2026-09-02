@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
-import prisma from "@/lib/prisma";
 import { EventWizard } from "@/components/business/wizard/event/EventWizard";
 import { isEventCtaStepFeatureEnabled } from "@/components/business/wizard/event/ctaStepFeatureFlag";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
@@ -13,6 +11,7 @@ import {
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
+import { getPartnerCabinetBusiness } from "@/server/permissions/business-permissions";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
@@ -38,16 +37,6 @@ export default async function EditorNewEventPage({
     );
   }
 
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-    select: {
-      id: true,
-      name: true,
-      legalName: true,
-      phone: true,
-    },
-  });
-
   const { returnTo } = await searchParams;
   const initialStep1Taxonomies = await getEventStep1Taxonomies();
   const surface = surfaceFromHostAndPath(routing.currentHost, "/editor/event/new");
@@ -59,17 +48,32 @@ export default async function EditorNewEventPage({
     ...routing,
   });
   const ctaStepEnabled = isEventCtaStepFeatureEnabled(process.env);
+  const isPlatformContentStaff = user.role === "ADMIN" || user.role === "MODERATOR";
 
-  if (!business) {
+  const business = isPlatformContentStaff
+    ? null
+    : await getPartnerCabinetBusiness(user.id);
+
+  if (!isPlatformContentStaff && !business) {
     redirect("/business");
   }
 
-  const businessProps = {
-    id: business.id,
-    name: business.name,
-    description: business.legalName || undefined,
-    phone: business.phone || undefined,
-  };
+  if (
+    !isPlatformContentStaff &&
+    business &&
+    business.verificationStatus !== "APPROVED"
+  ) {
+    redirect("/business");
+  }
+
+  const businessProps = business
+    ? {
+        id: business.id,
+        name: business.name,
+        description: business.legalName || undefined,
+        phone: business.phone || undefined,
+      }
+    : undefined;
 
   return (
     <ContentEditorChrome

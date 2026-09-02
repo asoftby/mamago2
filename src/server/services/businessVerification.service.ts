@@ -5,7 +5,12 @@
  */
 
 import prisma from "@/lib/prisma";
-import { BusinessMemberRole, BusinessVerificationStatus } from "@prisma/client";
+import {
+  BusinessMemberRole,
+  BusinessVerificationStatus,
+  type User,
+} from "@prisma/client";
+import { requireBusinessPermission } from "@/server/permissions/business-permissions";
 
 /**
  * Submit business for verification
@@ -13,36 +18,27 @@ import { BusinessMemberRole, BusinessVerificationStatus } from "@prisma/client";
  */
 export async function submitForVerification(
   businessId: string,
-  actorUserId: string
+  actor: Pick<User, "id" | "role">
 ): Promise<void> {
+  await requireBusinessPermission(actor, businessId, "business.update");
+
   const business = await prisma.business.findUnique({
     where: { id: businessId },
     select: {
       verificationStatus: true,
-      ownerUserId: true,
       phone: true,
       contactPhoneVerifiedAt: true,
     },
   });
 
-  if (!business) {
-    throw new Error("Business not found");
-  }
-
-  if (business.ownerUserId !== actorUserId) {
-    throw new Error("Unauthorized: not business owner");
-  }
-
+  if (!business) throw new Error("Business not found");
   if (
     business.verificationStatus !== "DRAFT" &&
     business.verificationStatus !== "REJECTED" &&
     business.verificationStatus !== "NEEDS_INFO"
   ) {
-    throw new Error(
-      `Cannot submit from status: ${business.verificationStatus}`
-    );
+    throw new Error(`Cannot submit from status: ${business.verificationStatus}`);
   }
-
   if (!business.phone || !business.contactPhoneVerifiedAt) {
     throw new Error("Подтвердите номер телефона, чтобы отправить профиль на проверку");
   }
@@ -52,7 +48,6 @@ export async function submitForVerification(
   const statusTo: BusinessVerificationStatus = "PENDING";
 
   await prisma.$transaction([
-    // Update business status
     prisma.business.update({
       where: { id: businessId },
       data: {
@@ -65,8 +60,6 @@ export async function submitForVerification(
         rejectedAt: null,
       },
     }),
-
-    // Create log entry
     prisma.businessVerificationLog.create({
       data: {
         businessId,
@@ -98,10 +91,7 @@ export async function submitForVerification(
   }
 }
 
-/**
- * Approve business verification
- * Allowed only if status is PENDING
- */
+/** Approve business verification. User.role is intentionally not modified. */
 export async function approve(
   businessId: string,
   actorUserId: string,
@@ -112,14 +102,9 @@ export async function approve(
     select: { verificationStatus: true, ownerUserId: true },
   });
 
-  if (!business) {
-    throw new Error("Business not found");
-  }
-
+  if (!business) throw new Error("Business not found");
   if (business.verificationStatus !== "PENDING") {
-    throw new Error(
-      `Cannot approve from status: ${business.verificationStatus}`
-    );
+    throw new Error(`Cannot approve from status: ${business.verificationStatus}`);
   }
 
   const now = new Date();
@@ -142,11 +127,14 @@ export async function approve(
       },
     }),
     prisma.businessVerificationLog.create({
-      data: { businessId, statusFrom, statusTo, note: note || "Approved", reviewedByUserId: actorUserId },
+      data: {
+        businessId,
+        statusFrom,
+        statusTo,
+        note: note || "Approved",
+        reviewedByUserId: actorUserId,
+      },
     }),
-    // Establish the canonical OWNER membership so cabinet access no longer
-    // depends on the transitional Business.ownerUserId fallback in
-    // getPartnerCabinetBusiness. Idempotent on the [businessId, userId] unique.
     prisma.businessMember.upsert({
       where: { businessId_userId: { businessId, userId: business.ownerUserId } },
       create: {
@@ -159,7 +147,6 @@ export async function approve(
     }),
   ]);
 
-  // Notify business owner
   const full = await prisma.business.findUnique({
     where: { id: businessId },
     select: { name: true, ownerUserId: true },
@@ -172,11 +159,6 @@ export async function approve(
   }
 }
 
-/**
- * Reject business verification
- * Allowed only if status is PENDING
- * Note is required
- */
 export async function reject(
   businessId: string,
   actorUserId: string,
@@ -190,15 +172,9 @@ export async function reject(
     where: { id: businessId },
     select: { verificationStatus: true },
   });
-
-  if (!business) {
-    throw new Error("Business not found");
-  }
-
+  if (!business) throw new Error("Business not found");
   if (business.verificationStatus !== "PENDING") {
-    throw new Error(
-      `Cannot reject from status: ${business.verificationStatus}`
-    );
+    throw new Error(`Cannot reject from status: ${business.verificationStatus}`);
   }
 
   const now = new Date();
@@ -234,11 +210,6 @@ export async function reject(
   }
 }
 
-/**
- * Request more information from business owner
- * Allowed only if status is PENDING
- * Note is required
- */
 export async function needsInfo(
   businessId: string,
   actorUserId: string,
@@ -252,15 +223,9 @@ export async function needsInfo(
     where: { id: businessId },
     select: { verificationStatus: true },
   });
-
-  if (!business) {
-    throw new Error("Business not found");
-  }
-
+  if (!business) throw new Error("Business not found");
   if (business.verificationStatus !== "PENDING") {
-    throw new Error(
-      `Cannot request info from status: ${business.verificationStatus}`
-    );
+    throw new Error(`Cannot request info from status: ${business.verificationStatus}`);
   }
 
   const now = new Date();
@@ -296,12 +261,7 @@ export async function needsInfo(
   }
 }
 
-/**
- * Check if business can publish content (Place/Offer/Event)
- * Only APPROVED businesses can publish
- */
-export function canPublish(
-  status: BusinessVerificationStatus
-): boolean {
+/** Only APPROVED businesses can publish. */
+export function canPublish(status: BusinessVerificationStatus): boolean {
   return status === "APPROVED";
 }

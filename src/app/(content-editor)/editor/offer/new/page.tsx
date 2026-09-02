@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
@@ -12,10 +11,13 @@ import {
 } from "@/lib/content-editor/types";
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
+import {
+  getPartnerCabinetBusiness,
+  isPlatformContentStaff,
+} from "@/server/permissions/business-permissions";
 
 function surfaceFromHostAndPath(host: string | undefined, pathname: string): ContentEditorSurface {
   const resolved = resolveSurfaceFromHostAndPathname(host, pathname);
-  // Editor is only available on business and admin surfaces
   return resolved === "admin" ? "admin" : "business";
 }
 
@@ -37,16 +39,8 @@ export default async function EditorNewOfferPage({
     );
   }
 
-  const business = await prisma.business.findUnique({
-    where: { ownerUserId: user.id },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  });
-
-  if (!business && user.role === "BUSINESS_OWNER") {
+  const business = await getPartnerCabinetBusiness(user.id);
+  if (!business && !isPlatformContentStaff(user.role)) {
     redirect(
       buildSurfaceRedirectDestination({
         targetSurface: "business",
@@ -61,12 +55,7 @@ export default async function EditorNewOfferPage({
   let defaultPlaceId: string | null = placeIdParam ?? null;
   if (!defaultPlaceId && business) {
     const firstPlace = await prisma.place.findFirst({
-      where: { 
-        OR: [
-          { createdByUserId: user.id },
-          { ownerBusinessId: business.id },
-        ],
-      },
+      where: { ownerBusinessId: business.id },
       select: { id: true },
       orderBy: { updatedAt: "desc" },
     });

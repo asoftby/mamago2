@@ -8,7 +8,10 @@ import {
 import { buildEventEntityDiagnostics } from "../buildEntityDiagnostics";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { applyActivitySeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoUpdate";
-import { buildEventJsonLd } from "@/lib/seo/schema/buildEventJsonLd";
+import {
+  buildEventJsonLd,
+  eventJsonLdOverrideHasMissingStartDate,
+} from "@/lib/seo/schema/buildEventJsonLd";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
 import {
   SEO_ROBOTS_INDEX_FOLLOW,
@@ -227,7 +230,11 @@ export const eventProvider: SeoEntityProvider = {
       },
     });
     if (!a?.slug) return null;
-    if (a.seoJsonLdOverride && typeof a.seoJsonLdOverride === "object") {
+    if (
+      a.seoJsonLdOverride &&
+      typeof a.seoJsonLdOverride === "object" &&
+      !eventJsonLdOverrideHasMissingStartDate(a.seoJsonLdOverride)
+    ) {
       return a.seoJsonLdOverride as Record<string, unknown>;
     }
     const [activityCity, venueCity] = await Promise.all([
@@ -272,6 +279,7 @@ export const eventProvider: SeoEntityProvider = {
       title: loaded.title,
       description: loaded.shortDesc,
       image: loaded.seoOgImage?.trim() || loaded.coverImageUrl,
+      startDate: loaded.schemaStartDate,
       sessions: loaded.sessions,
       format: loaded.format,
       location:

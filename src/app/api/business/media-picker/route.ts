@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 import { queryMediaPickerPage } from "@/lib/media/mediaPickerQuery";
 import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
 
@@ -9,8 +9,11 @@ import { MEDIA_PICKER_PAGE_SIZE } from "@/lib/media/mediaPickerConstants";
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || !canCreateBusinessContent(user.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+  if (!(await checkBusinessToolPermission(user, "content.create"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = req.nextUrl;

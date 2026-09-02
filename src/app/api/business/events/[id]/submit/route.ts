@@ -3,11 +3,12 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { ActivityType, ContentStatus, Prisma } from "@prisma/client";
 import { fetchActivityEventRowSummary } from "@/lib/activity/fetchActivityEventRowSummary";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import {
-  canCreateBusinessContent,
-  canPublishContentDirectly,
-} from "@/lib/auth/businessContentAccess";
-import { canManageActivityById } from "@/lib/auth/activityAccess";
+  canManageActivityById,
+  resolveCanonicalActivityBusinessId,
+} from "@/lib/auth/activityAccess";
+import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { ensurePublishedActivityHasSlug } from "@/lib/slug/publishSlugGuards";
 import { revalidateEventMutationPaths } from "@/lib/business/eventMutationSideEffects";
@@ -22,6 +23,10 @@ import {
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
 import { collectEventScheduleTimeOrderErrors } from "@/lib/business/validateEventScheduleTimeOrder";
+
+function isPlatformContentStaff(role: string): boolean {
+  return role === "ADMIN" || role === "MODERATOR";
+}
 
 /**
  * POST /api/business/events/[id]/submit
@@ -39,10 +44,10 @@ export async function POST(
     const user = await getCurrentUser();
     perf.mark("auth");
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        { error: "Authentication required" },
+        { status: 401 },
       );
     }
 
@@ -76,6 +81,8 @@ export async function POST(
         ageTags: true,
         scheduleJson: true,
         businessId: true,
+        placeId: true,
+        place: { select: { ownerBusinessId: true } },
         status: true,
         slug: true,
         nextOccurrenceAt: true,
@@ -88,6 +95,46 @@ export async function POST(
         { error: "Event not found" },
         { status: 404 }
       );
+    }
+
+    if (!isPlatformContentStaff(user.role)) {
+      const canonicalBusinessId = resolveCanonicalActivityBusinessId(
+        existing,
+        existing.place,
+      );
+
+      if (!canonicalBusinessId) {
+        return NextResponse.json(
+          { error: "Business access required", code: "BUSINESS_ACCESS_REQUIRED" },
+          { status: 403 },
+        );
+      }
+
+      const canPublish = await checkUserBusinessPermission(
+        user,
+        canonicalBusinessId,
+        "content.publish",
+      );
+      if (!canPublish) {
+        return NextResponse.json(
+          { error: "Forbidden", code: "BUSINESS_CONTENT_PUBLISH_FORBIDDEN" },
+          { status: 403 },
+        );
+      }
+
+      const business = await prisma.business.findUnique({
+        where: { id: canonicalBusinessId },
+        select: { verificationStatus: true },
+      });
+      if (!business || business.verificationStatus !== "APPROVED") {
+        return NextResponse.json(
+          {
+            error: "Business must be verified before submitting publications",
+            code: "BUSINESS_NOT_APPROVED",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     const errors: string[] = [];

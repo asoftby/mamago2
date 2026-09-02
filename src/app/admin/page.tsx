@@ -14,6 +14,7 @@ import {
   deriveWorkload,
   deriveDataQuality,
 } from "@/lib/admin/dashboardViewModels";
+import { deriveGscSeo } from "@/lib/admin/gscSeoViewModel";
 import { AdminDashboardShell } from "./_components/AdminDashboardShell";
 import type { DashboardSignal } from "./_components/OperationsBlock";
 import { OperationsLoadErrorState } from "./_components/OperationsLoadErrorState";
@@ -43,19 +44,13 @@ function staleSyntheticTitle(synthetic: OperationsSyntheticSignal[]): string | n
 export default async function AdminDashboardPage() {
   const user = await getCurrentUser();
   if (!user) {
-    // layout.tsx already redirects unauthenticated/unauthorized users before
-    // this Server Component can render — defensive only, never reachable.
     return <OperationsLoadErrorState />;
   }
 
   let view: OperationsView;
   try {
-    // Exactly ONE authoritative getOperationsView() call per page load — it
-    // updates lastViewedAt as a side effect, so calling it twice here (or
-    // again via a client-side fetch on mount) would destroy correct NEW
-    // signal semantics for this render. Product Pulse/Engagement/Search/
-    // Operational Load below are derived purely from this SAME call's
-    // kpis/queues — no second Operations read.
+    // Exactly one authoritative Operations read per page load. All product
+    // and SEO blocks below are derived from this same materialized snapshot.
     view = await getOperationsView(user.id);
   } catch (err) {
     console.error("[admin] Failed to load Operations Center view:", err);
@@ -63,13 +58,13 @@ export default async function AdminDashboardPage() {
   }
 
   const now = new Date();
-
   const signals = view.signals.map((signal) => toDashboardSignal(signal, view));
   const product = deriveProductPulse(view.kpis);
   const northStar = deriveNorthStar(view.kpis);
   const habit = deriveHabit(view.kpis);
   const funnel = deriveEngagementFunnel(view.kpis);
   const growth = deriveGrowth(view.kpis);
+  const seo = deriveGscSeo(view.kpis);
   const search = deriveDiscoveryQuality(view.kpis);
   const supply = deriveSupplyHealth(view.kpis);
   const b2b = deriveB2BHealth(view.kpis);
@@ -92,6 +87,7 @@ export default async function AdminDashboardPage() {
       habit={habit}
       funnel={funnel}
       growth={growth}
+      seo={seo}
       search={search}
       supply={supply}
       b2b={b2b}

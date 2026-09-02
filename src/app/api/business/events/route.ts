@@ -3,13 +3,13 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { AgePolicy, ContentStatus, ActivityType, ScheduleMode, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import {
   buildActivityManageWhereForUser,
   coalesceActivityBusinessIdFromPlace,
   getBusinessIdsUserCanAccess,
 } from "@/lib/auth/activityAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
+import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
 import { syncEventVenueAndActivityCity } from "@/lib/business/syncEventVenueFromWizard";
 import { computeEventShortDesc } from "@/lib/business/eventShortDesc";
@@ -41,6 +41,10 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { validateSchedulingCompleteness } from "@/lib/event/schedulingCompleteness";
 import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
 
+function isPlatformContentStaff(role: string): boolean {
+  return role === "ADMIN" || role === "MODERATOR";
+}
+
 /**
  * POST /api/business/events
  * Create new event (draft)
@@ -51,10 +55,10 @@ export async function POST(request: NextRequest) {
     const user = await getCurrentUser();
     perf.mark("auth");
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        { error: "Authentication required" },
+        { status: 401 },
       );
     }
 
@@ -185,6 +189,41 @@ export async function POST(request: NextRequest) {
       );
     } else if (!resolvedBusinessId) {
       resolvedBusinessId = await getUserBusinessId(user.id);
+    }
+
+    if (!isPlatformContentStaff(user.role)) {
+      if (!resolvedBusinessId) {
+        return NextResponse.json(
+          { error: "Business access required", code: "BUSINESS_ACCESS_REQUIRED" },
+          { status: 403 },
+        );
+      }
+
+      const canCreate = await checkUserBusinessPermission(
+        user,
+        resolvedBusinessId,
+        "content.create",
+      );
+      if (!canCreate) {
+        return NextResponse.json(
+          { error: "Forbidden", code: "BUSINESS_CONTENT_CREATE_FORBIDDEN" },
+          { status: 403 },
+        );
+      }
+
+      const business = await prisma.business.findUnique({
+        where: { id: resolvedBusinessId },
+        select: { verificationStatus: true },
+      });
+      if (!business || business.verificationStatus !== "APPROVED") {
+        return NextResponse.json(
+          {
+            error: "Business must be verified before creating publications",
+            code: "BUSINESS_NOT_APPROVED",
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // Create event as draft
@@ -338,20 +377,28 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
+    const businessIds = isPlatformContentStaff(user.role)
+      ? []
+      : await getBusinessIdsUserCanAccess(user.id);
+
+    if (!isPlatformContentStaff(user.role) && businessIds.length === 0) {
+      return NextResponse.json(
+        { error: "Business access required", code: "BUSINESS_ACCESS_REQUIRED" },
+        { status: 403 },
       );
     }
 
     const manageWhere =
-      user.role === "ADMIN" || user.role === "MODERATOR"
+      isPlatformContentStaff(user.role)
         ? {}
-        : buildActivityManageWhereForUser(
-            user.id,
-            await getBusinessIdsUserCanAccess(user.id),
-          );
+        : buildActivityManageWhereForUser(user.id, businessIds);
     const view = normalizeBusinessEventListView(
       request.nextUrl.searchParams.get("view"),
     );

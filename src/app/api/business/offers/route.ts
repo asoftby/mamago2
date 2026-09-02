@@ -4,11 +4,9 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { AgePolicy, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
-import {
-  canCreateBusinessContent,
-  canPublishContentDirectly,
-} from "@/lib/auth/businessContentAccess";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync, getUserBusinessId } from "@/lib/auth/placeAccess";
+import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
@@ -149,14 +147,18 @@ const createOfferSchema = z.object({
   whatToBring: z.string().optional(),
 });
 
+function isPlatformContentStaff(role: string): boolean {
+  return role === "ADMIN" || role === "MODERATOR";
+}
+
 // Re-trigger build for schema updates
 export async function POST(request: NextRequest) {
   const timer = createPublishTimer("publish:offer");
   try {
     const user = await getCurrentUser();
     
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -184,7 +186,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verify place access (владелец или админ/модератор)
+    // Verify place access (business member/owner or platform staff)
     if (data.source === "PLACE" && data.selectedPlace) {
       const place = await prisma.place.findUnique({
         where: { id: data.selectedPlace.id },
@@ -205,8 +207,47 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Публикация business-owner оффера требует привязки места к бизнесу.
-      // ADMIN / MODERATOR проходят без этого ограничения.
+      // PENDING/PUBLISHED business mutations require a linked, verified business
+      // and explicit publish permission. DRAFT may remain editable before verification.
+      if (!isPlatformContentStaff(user.role) && data.status !== "DRAFT") {
+        if (!place.ownerBusinessId) {
+          return NextResponse.json(
+            {
+              error: "Место не привязано к бизнес-профилю",
+              code: "PLACE_NOT_LINKED_TO_BUSINESS",
+            },
+            { status: 422 },
+          );
+        }
+
+        const canPublish = await checkUserBusinessPermission(
+          user,
+          place.ownerBusinessId,
+          "content.publish",
+        );
+        if (!canPublish) {
+          return NextResponse.json(
+            { error: "Forbidden", code: "BUSINESS_CONTENT_PUBLISH_FORBIDDEN" },
+            { status: 403 },
+          );
+        }
+
+        const business = await prisma.business.findUnique({
+          where: { id: place.ownerBusinessId },
+          select: { verificationStatus: true },
+        });
+        if (!business || business.verificationStatus !== "APPROVED") {
+          return NextResponse.json(
+            {
+              error: "Business must be verified before submitting publications",
+              code: "BUSINESS_NOT_APPROVED",
+            },
+            { status: 403 },
+          );
+        }
+      }
+
+      // Keep existing mutation contract explicit for unlinked places.
       if (shouldRejectUnlinkedPlaceForOfferMutation({
         role: user.role,
         status: data.status,
@@ -460,11 +501,11 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    if (user.role === "ADMIN" || user.role === "MODERATOR") {
+    if (isPlatformContentStaff(user.role)) {
       const offers = await prisma.offer.findMany({
         include: {
           place: {

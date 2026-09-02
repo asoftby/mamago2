@@ -4,10 +4,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { AgePolicy, Prisma } from "@prisma/client";
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
-import {
-  canCreateBusinessContent,
-  canPublishContentDirectly,
-} from "@/lib/auth/businessContentAccess";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
@@ -160,7 +157,7 @@ export async function GET(
   try {
     const user = await getCurrentUser();
     
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -212,7 +209,7 @@ export async function PATCH(
   try {
     const user = await getCurrentUser();
     
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -670,7 +667,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
     
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

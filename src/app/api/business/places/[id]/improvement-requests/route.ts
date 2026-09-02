@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listImprovementRequestsForEntity } from "@/server/services/improvementRequest.service";
 import { prisma } from "@/lib/prisma";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

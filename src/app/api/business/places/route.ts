@@ -1,3 +1,4 @@
+import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 /**
  * POST /api/business/places - Create new Place (DRAFT or PENDING)
  * GET /api/business/places - List my Places
@@ -21,10 +22,7 @@ import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { isMediaAssetCuid } from "@/lib/media/isMediaAssetCuid";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
-import {
-  canCreateBusinessContent,
-  canPublishContentDirectly,
-} from "@/lib/auth/businessContentAccess";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import {
   nextResponseFromBusinessAccessError,
@@ -55,8 +53,11 @@ export async function POST(request: NextRequest) {
   const timer = createPublishTimer("publish:place");
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "UNAUTHORIZED", message: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+      return NextResponse.json({ error: "FORBIDDEN", message: "Business content access required" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -579,8 +580,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!(await checkBusinessToolPermission(user, "business.view"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

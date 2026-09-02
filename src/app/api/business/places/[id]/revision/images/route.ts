@@ -10,7 +10,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { PlaceImageKind } from "@prisma/client";
 import { getOrCreatePlaceRevision } from "@/server/services/placeRevision.service";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
+
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 
 /**
@@ -23,7 +23,7 @@ export async function POST(
   try {
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -155,7 +155,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
 
-    if (!user || !canCreateBusinessContent(user.role)) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -1,6 +1,8 @@
 /**
- * Business access via BusinessMember (+ transitional Business.ownerUserId).
- * Platform roles alone (e.g. BUSINESS_OWNER) do not grant access to arbitrary businesses.
+ * Canonical business authorization.
+ *
+ * BusinessMember is the source of truth for partner access. Platform roles are
+ * only staff capabilities; BUSINESS_OWNER is not an authorization primitive.
  */
 
 import type { Business, BusinessMember, User } from "@prisma/client";
@@ -57,6 +59,10 @@ export function nextResponseFromBusinessAccessError(error: unknown): NextRespons
   return null;
 }
 
+export function isPlatformContentStaff(role: string | undefined): boolean {
+  return role === "ADMIN" || role === "MODERATOR";
+}
+
 export function hasBusinessPermission(
   role: BusinessMemberRole,
   permission: BusinessPermission,
@@ -64,9 +70,7 @@ export function hasBusinessPermission(
   return rolePermissions[role].includes(permission);
 }
 
-/**
- * Active membership row, or null if none.
- */
+/** Active membership row, or null if none. */
 export async function getBusinessMembership(
   userId: string,
   businessId: string,
@@ -76,22 +80,17 @@ export async function getBusinessMembership(
       userId,
       businessId,
       isActive: true,
+      role: { in: [BusinessMemberRole.OWNER, BusinessMemberRole.MANAGER] },
     },
   });
 }
 
-/**
- * Owned business only (canonical billing / onboarding owner). Not team membership.
- */
+/** Owned business metadata only. Do not use this as an authorization check. */
 export async function getOwnedBusinessForUser(userId: string): Promise<Business | null> {
-  return prisma.business.findUnique({
-    where: { ownerUserId: userId },
-  });
+  return prisma.business.findUnique({ where: { ownerUserId: userId } });
 }
 
-/**
- * Partner cabinet: active BusinessMember (OWNER/MANAGER) is the source of truth; then legacy owned row.
- */
+/** Partner cabinet business resolved only through canonical active membership. */
 export async function getPartnerCabinetBusiness(userId: string): Promise<Business | null> {
   const member = await prisma.businessMember.findFirst({
     where: {
@@ -102,78 +101,25 @@ export async function getPartnerCabinetBusiness(userId: string): Promise<Busines
     orderBy: { createdAt: "asc" },
     include: { business: true },
   });
-
-  if (member?.business) {
-    return member.business;
-  }
-
-  // @deprecated transitional fallback — ticket "BusinessMember backfill".
-  // Approve now creates the OWNER membership (businessVerification.service.ts)
-  // and the backfill (prisma/scripts/backfill-business-members.ts) ensures every
-  // existing business has one, so this branch should no longer be reachable.
-  // DO NOT REMOVE until the backfill has run on prod and lived a week without
-  // partners losing cabinet access.
-  return getOwnedBusinessForUser(userId);
+  return member?.business ?? null;
 }
 
-/**
- * Membership or legacy owner row (transitional: Business.ownerUserId when no BusinessMember yet).
- */
 async function getEffectiveMemberRole(
   userId: string,
   businessId: string,
 ): Promise<BusinessMemberRole | null> {
   const member = await getBusinessMembership(userId, businessId);
-  if (member) return member.role;
-
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { ownerUserId: true },
-  });
-  // Transitional legacy: treat canonical owner as OWNER-equivalent for permissions
-  if (business?.ownerUserId === userId) {
-    return BusinessMemberRole.OWNER;
-  }
-
-  return null;
+  return member?.role ?? null;
 }
 
-/**
- * Core check: active membership OR transitional owner match. No platform-role bypass.
- * Use inside guards that already excluded ADMIN / handled MODERATOR.
- */
+/** Canonical resource access: active membership only (ADMIN ops bypass). */
 export async function canAccessBusiness(
   userId: string,
   businessId: string,
 ): Promise<boolean> {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { id: true, ownerUserId: true },
-  });
-
-  if (!business) return false;
-
-  if (business.ownerUserId === userId) {
-    return true;
-  }
-
-  const member = await prisma.businessMember.findFirst({
-    where: {
-      businessId,
-      userId,
-      isActive: true,
-      role: { in: [BusinessMemberRole.OWNER, BusinessMemberRole.MANAGER] },
-    },
-    select: { id: true },
-  });
-
-  return member !== null;
+  return (await getBusinessMembership(userId, businessId)) !== null;
 }
 
-/**
- * Resource guard: ADMIN may access any business for ops; MODERATOR does not get automatic cabinet access here.
- * Transitional: membership + legacy owner via {@link canAccessBusiness}.
- */
 export async function canAccessBusinessResource(
   user: Pick<User, "id" | "role"> | null,
   businessId: string,
@@ -200,16 +146,12 @@ export async function requireBusinessAccess(
     throw new BusinessAccessHttpError(404, "Business not found");
   }
 
-  if (user.role === "ADMIN") {
-    return;
-  }
-
+  if (user.role === "ADMIN") return;
   if (user.role === "MODERATOR") {
     throw new BusinessAccessHttpError(403, "Forbidden");
   }
 
-  const ok = await canAccessBusiness(user.id, businessId);
-  if (!ok) {
+  if (!(await canAccessBusiness(user.id, businessId))) {
     throw new BusinessAccessHttpError(403, "Forbidden");
   }
 }
@@ -225,18 +167,20 @@ export async function requireBusinessPermission(
 
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { id: true },
+    select: { id: true, operationalStatus: true },
   });
   if (!business) {
     throw new BusinessAccessHttpError(404, "Business not found");
   }
 
-  if (user.role === "ADMIN") {
-    return;
-  }
-
+  if (user.role === "ADMIN") return;
   if (user.role === "MODERATOR") {
     throw new BusinessAccessHttpError(403, "Forbidden");
+  }
+
+  // Suspended/archived businesses may be inspected but cannot mutate content.
+  if (permission.startsWith("content.") && business.operationalStatus !== "ACTIVE") {
+    throw new BusinessAccessHttpError(403, "Business is not active");
   }
 
   const effectiveRole = await getEffectiveMemberRole(user.id, businessId);
@@ -245,10 +189,6 @@ export async function requireBusinessPermission(
   }
 }
 
-/**
- * Same rules as {@link requireBusinessPermission}, returns boolean (no throw).
- * Use for guards that must not allocate on the failure path beyond one try/catch.
- */
 export async function checkUserBusinessPermission(
   user: Pick<User, "id" | "role"> | null,
   businessId: string,
@@ -258,9 +198,24 @@ export async function checkUserBusinessPermission(
     await requireBusinessPermission(user, businessId, permission);
     return true;
   } catch (e) {
-    if (isBusinessAccessHttpError(e)) {
-      return false;
-    }
+    if (isBusinessAccessHttpError(e)) return false;
     throw e;
   }
+}
+
+/**
+ * Canonical gate for non-resource-specific B2B tools (media picker, AI helpers,
+ * temp uploads, etc.). Staff may use editorial tools; partners need an active
+ * BusinessMember with the requested permission on their cabinet business.
+ */
+export async function checkBusinessToolPermission(
+  user: Pick<User, "id" | "role"> | null,
+  permission: BusinessPermission = "content.create",
+): Promise<boolean> {
+  if (!user) return false;
+  if (isPlatformContentStaff(user.role)) return true;
+
+  const business = await getPartnerCabinetBusiness(user.id);
+  if (!business) return false;
+  return checkUserBusinessPermission(user, business.id, permission);
 }

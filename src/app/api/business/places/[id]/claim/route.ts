@@ -1,58 +1,41 @@
-/**
- * POST /api/business/places/[id]/claim
- * Request ownership/access to an existing place
- * Requires user to have a business (businessId is required)
- */
+/** POST /api/business/places/[id]/claim */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { isEmailVerified, jsonEmailNotVerified } from "@/lib/auth/requireVerifiedEmail";
 import prisma from "@/lib/prisma";
-import { canCreateBusinessContent } from "@/lib/auth/businessContentAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
+import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: placeId } = await params;
     const user = await getCurrentUser();
-
-    if (!user || !canCreateBusinessContent(user.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
+    if (!isEmailVerified(user)) return jsonEmailNotVerified();
 
-    if (!isEmailVerified(user)) {
-      return jsonEmailNotVerified();
-    }
-
-    // Get user's business ID (required for claim)
     const businessId = await getUserBusinessId(user.id);
-
     if (!businessId) {
       return NextResponse.json(
         { error: "Business required. You must have a business to claim a place." },
-        { status: 400 },
+        { status: 403 },
       );
     }
-
-    // Check if place exists
-    const place = await prisma.place.findUnique({
-      where: { id: placeId },
-      select: {
-        id: true,
-        title: true,
-        ownerBusinessId: true,
-        createdByUserId: true,
-      },
-    });
-
-    if (!place) {
-      return NextResponse.json({ error: "Place not found" }, { status: 404 });
+    if (!(await checkUserBusinessPermission(user, businessId, "content.create"))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check if business already owns this place
+    const place = await prisma.place.findUnique({
+      where: { id: placeId },
+      select: { id: true, title: true, ownerBusinessId: true, createdByUserId: true },
+    });
+    if (!place) return NextResponse.json({ error: "Place not found" }, { status: 404 });
+
     if (place.ownerBusinessId === businessId) {
       return NextResponse.json(
         { error: "Your business already owns this place" },
@@ -60,15 +43,9 @@ export async function POST(
       );
     }
 
-    // Check if there's already a pending request (idempotent)
     const existingRequest = await prisma.placeClaimRequest.findFirst({
-      where: {
-        placeId,
-        businessId,
-        status: "PENDING",
-      },
+      where: { placeId, businessId, status: "PENDING" },
     });
-
     if (existingRequest) {
       return NextResponse.json({
         ok: true,
@@ -77,14 +54,8 @@ export async function POST(
       });
     }
 
-    // Create claim request
     const claimRequest = await prisma.placeClaimRequest.create({
-      data: {
-        placeId,
-        userId: user.id,
-        businessId, // Required
-        status: "PENDING",
-      },
+      data: { placeId, userId: user.id, businessId, status: "PENDING" },
     });
 
     return NextResponse.json({
@@ -94,9 +65,6 @@ export async function POST(
     });
   } catch (error) {
     console.error("[API] Place claim error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
