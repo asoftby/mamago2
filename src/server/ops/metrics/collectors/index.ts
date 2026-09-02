@@ -15,6 +15,9 @@
  *   weekly_planning_families (60min), retention (24h), habit (24h),
  *   engagement_funnel (60min), supply_health (30min), b2b_health (60min)
  *
+ * External SEO health (read-only, fail-closed):
+ *   google_search_console (6h)
+ *
  * db.latency_ms / db.connection_capacity_pct are NOT collectors — they
  * remain owned exclusively by the db_degraded detector (Step 3), written
  * via DetectorResult.samples / persistDetectorResult. This registry is
@@ -29,6 +32,7 @@ import { b2bQueueMetricsCollector } from "./b2bQueue";
 import { commsMetricsCollector } from "./comms";
 import { engagementFunnelCollector } from "./engagementFunnel";
 import { funnelMetricsCollector } from "./funnel";
+import { googleSearchConsoleCollector } from "./googleSearchConsole";
 import { habitCollector } from "./habit";
 import { importMetricsCollector } from "./importMetrics";
 import { moderationQueueMetricsCollector } from "./moderationQueues";
@@ -54,4 +58,5 @@ export function registerCoreMetricCollectors(): void {
   registerMetricCollector(engagementFunnelCollector);
   registerMetricCollector(supplyHealthCollector);
   registerMetricCollector(b2bHealthCollector);
+  registerMetricCollector(googleSearchConsoleCollector);
 }

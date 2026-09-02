@@ -1,18 +1,12 @@
 /**
  * MetricSample -> snapshot projection (§21 Step 5, Phase N).
  *
- * O(1)-style point lookups only — one indexed `findFirst` per
- * (metric, dimKey) pair via the `[metric, dimKey, collectedAt DESC]`
- * index, never an aggregation. This runs ONLY inside the async worker's
- * snapshot builder (collectSnapshotPayload); /api/admin/ops itself must
- * never query MetricSample directly (INV-03).
+ * The admin read path never scans MetricSample. Projection runs only in the
+ * async worker that materializes OperationsSnapshot.
  *
  * A missing sample projects to `null`, never 0 — a collector that hasn't
  * run yet (or whose last run failed) must not be indistinguishable from a
  * genuinely observed zero.
- *
- * Node colors are never touched here — MetricSample values are current-
- * value KPIs/queue gauges only, driven by nothing but the latest sample.
  */
 import type { PrismaClient } from "@prisma/client";
 
@@ -23,6 +17,18 @@ async function latestMetricValue(prisma: PrismaClient, metric: string, dimKey = 
     select: { value: true },
   });
   return row ? row.value : null;
+}
+
+async function latestMetricSample(
+  prisma: PrismaClient,
+  metric: string,
+): Promise<{ dimKey: string; value: number } | null> {
+  const row = await prisma.metricSample.findFirst({
+    where: { metric },
+    orderBy: { collectedAt: "desc" },
+    select: { dimKey: true, value: true },
+  });
+  return row ?? null;
 }
 
 export interface ModerationQueueProjection {
@@ -94,8 +100,6 @@ const KPI_METRIC_NAMES = [
   "funnel.plan_adds",
   "funnel.cta_clicks",
   "telemetry.events_written_5m",
-  // Dashboard rework (North Star + habit + funnel + growth + supply + B2B) —
-  // see docs/engineering/backlog.md and the /admin dashboard plan.
   "planning.wpf",
   "planning.wpf_prev",
   "retention.w1",
@@ -115,11 +119,49 @@ const KPI_METRIC_NAMES = [
   "b2b.active_businesses",
   "b2b.new_businesses_30d",
   "b2b.meaningful_action_rate",
+  // Google Search Console MVP — two complete 7-day windows.
+  "gsc.clicks_7d",
+  "gsc.clicks_prev_7d",
+  "gsc.impressions_7d",
+  "gsc.impressions_prev_7d",
+  "gsc.ctr_7d",
+  "gsc.ctr_prev_7d",
+  "gsc.position_7d",
+  "gsc.position_prev_7d",
 ] as const;
 
-export async function projectOperationsKpis(prisma: PrismaClient): Promise<Record<string, number | null>> {
-  const entries = await Promise.all(
-    KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const),
-  );
-  return Object.fromEntries(entries);
+export interface GscPageMoverProjection {
+  page: string;
+  deltaClicks: number;
+}
+
+async function projectGscPageMovers(prisma: PrismaClient): Promise<{
+  rising: GscPageMoverProjection[];
+  falling: GscPageMoverProjection[];
+}> {
+  const [rise1, rise2, rise3, fall1, fall2, fall3] = await Promise.all([
+    latestMetricSample(prisma, "gsc.page.rise.1"),
+    latestMetricSample(prisma, "gsc.page.rise.2"),
+    latestMetricSample(prisma, "gsc.page.rise.3"),
+    latestMetricSample(prisma, "gsc.page.fall.1"),
+    latestMetricSample(prisma, "gsc.page.fall.2"),
+    latestMetricSample(prisma, "gsc.page.fall.3"),
+  ]);
+  const toMover = (row: { dimKey: string; value: number } | null): GscPageMoverProjection | null =>
+    row && row.dimKey ? { page: row.dimKey, deltaClicks: row.value } : null;
+  return {
+    rising: [rise1, rise2, rise3].map(toMover).filter((row): row is GscPageMoverProjection => row !== null),
+    falling: [fall1, fall2, fall3].map(toMover).filter((row): row is GscPageMoverProjection => row !== null),
+  };
+}
+
+export async function projectOperationsKpis(prisma: PrismaClient): Promise<Record<string, unknown>> {
+  const [entries, pageMovers] = await Promise.all([
+    Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const)),
+    projectGscPageMovers(prisma),
+  ]);
+  return {
+    ...Object.fromEntries(entries),
+    "gsc.page_movers": pageMovers,
+  };
 }
