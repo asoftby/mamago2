@@ -5,14 +5,16 @@ function formatCount(value: number | null): string {
   return value === null ? "Нет данных" : new Intl.NumberFormat("ru-RU").format(Math.round(value));
 }
 
-function formatPercent(value: number | null): string {
-  return value === null ? "—" : `${value > 0 ? "+" : ""}${value}%`;
+function formatDelta(value: number | null, unit: "%" | " п.п." | ""): string {
+  if (value === null) return "—";
+  return `${value > 0 ? "+" : ""}${value}${unit}`;
 }
 
-function Metric({ label, value, delta, improvementIsNegative = false }: {
+function Metric({ label, value, delta, deltaUnit = "%", improvementIsNegative = false }: {
   label: string;
   value: string;
   delta: number | null;
+  deltaUnit?: "%" | " п.п." | "";
   improvementIsNegative?: boolean;
 }) {
   const isGood = delta === null ? null : improvementIsNegative ? delta <= 0 : delta >= 0;
@@ -21,7 +23,7 @@ function Metric({ label, value, delta, improvementIsNegative = false }: {
       <div className="text-lg font-bold text-gray-900">{value}</div>
       <div className="text-xs text-gray-500 mt-1">{label}</div>
       <div className={`text-xs mt-1 ${isGood === null ? "text-gray-400" : isGood ? "text-green-600" : "text-red-600"}`}>
-        {formatPercent(delta)}
+        {formatDelta(delta, deltaUnit)}
       </div>
     </div>
   );
@@ -59,11 +61,13 @@ export function GscSeoBlock({ model }: { model: GscSeoViewModel }) {
           label="CTR · изменение, п.п."
           value={model.ctr === null ? "Нет данных" : `${(model.ctr * 100).toFixed(1)}%`}
           delta={model.ctrDeltaPp}
+          deltaUnit=" п.п."
         />
         <Metric
           label="Средняя позиция · изменение"
           value={model.position === null ? "Нет данных" : model.position.toFixed(1)}
           delta={model.positionDelta}
+          deltaUnit=""
           improvementIsNegative
         />
       </div>
