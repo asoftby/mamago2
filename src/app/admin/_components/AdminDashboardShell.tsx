@@ -12,11 +12,13 @@ import { NorthStarBlock } from "./blocks/NorthStarBlock";
 import { HabitBlock } from "./blocks/HabitBlock";
 import { FunnelBlock } from "./blocks/FunnelBlock";
 import { GrowthBlock } from "./blocks/GrowthBlock";
+import { GscSeoBlock } from "./blocks/GscSeoBlock";
 import { SearchDiscoveryBlock } from "./blocks/SearchDiscoveryBlock";
 import { SupplyHealthBlock } from "./blocks/SupplyHealthBlock";
 import { B2BHealthBlock } from "./blocks/B2BHealthBlock";
 import { OperationalLoadBlock } from "./blocks/OperationalLoadBlock";
 import { DataQualityBlock } from "./blocks/DataQualityBlock";
+import type { GscSeoViewModel } from "@/lib/admin/gscSeoViewModel";
 import type {
   ProductPulseViewModel,
   NorthStarViewModel,
@@ -53,6 +55,7 @@ export interface AdminDashboardShellProps {
   habit: HabitViewModel;
   funnel: EngagementFunnelViewModel;
   growth: GrowthViewModel;
+  seo: GscSeoViewModel;
   search: DiscoveryQualityViewModel;
   supply: SupplyHealthViewModel;
   b2b: B2BHealthViewModel;
@@ -75,6 +78,7 @@ export function AdminDashboardShell({
   habit,
   funnel,
   growth,
+  seo,
   search,
   supply,
   b2b,
@@ -159,6 +163,7 @@ export function AdminDashboardShell({
 
       {/* Row 4 — Growth */}
       <GrowthBlock model={growth} />
+      <GscSeoBlock model={seo} />
 
       {/* Row 5 — Discovery + Supply */}
       <div>
