@@ -40,10 +40,15 @@ test("adapts current Place scalar contacts without Prisma coupling", () => {
     phone2: "+375 17 200-00-00",
     website: "https://example.com",
     instagramUrl: "https://instagram.com/example",
-    latitude: 53.9,
-    longitude: 27.56,
+    lat: 53.9,
+    lng: 27.56,
   });
   assert.equal(contacts.phones.length, 2);
   assert.deepEqual(contacts.socials, [{ kind: "instagram", url: "https://instagram.com/example" }]);
   assert.deepEqual(contacts.coordinates, { latitude: 53.9, longitude: 27.56 });
+});
+
+test("does not synthesize coordinates from null or partial Place pairs", () => {
+  assert.equal(contactsFromPlace({ lat: null, lng: null }).coordinates, undefined);
+  assert.equal(contactsFromPlace({ lat: 53.9, lng: null }).coordinates, undefined);
 });

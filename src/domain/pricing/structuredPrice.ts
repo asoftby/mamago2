@@ -4,7 +4,7 @@ import {
   normalizePublicationPrice,
   type PublicationPriceMode,
 } from "./normalizedPrice";
-import { PriceItemSchema, parsePriceData } from "@/lib/priceItems";
+import { PriceItemSchema, parsePriceData, type PriceItem } from "@/lib/priceItems";
 import { BYN_SYMBOL, formatPrice, formatPriceFrom, formatPriceRange } from "@/lib/formatters/format-price";
 
 const amount = z.number().finite().nonnegative();
@@ -40,8 +40,40 @@ export type PublicationPriceSource = {
   priceText?: unknown;
 };
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+export function priceItemsFromPublication(raw: unknown, currency: string): PriceItem[] {
+  const canonical = parsePriceData(raw).items;
+  if (canonical.length > 0 || !Array.isArray(raw)) return canonical;
+
+  return raw.flatMap((item, index) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const title = optionalString(row.title);
+    const price = typeof row.price === "number" && Number.isFinite(row.price) && row.price >= 0
+      ? String(row.price)
+      : undefined;
+    if (!title || price == null) return [];
+    const description = optionalString(row.description);
+    const oldPrice = typeof row.oldPrice === "number" && Number.isFinite(row.oldPrice) && row.oldPrice >= 0
+      ? String(row.oldPrice)
+      : undefined;
+    return [{
+      id: optionalString(row.id) ?? `offer-price-${index}`,
+      label: title,
+      price,
+      unit: optionalString(row.unit) ?? currency,
+      ...(description ? { description } : {}),
+      ...(oldPrice ? { oldPrice } : {}),
+    }];
+  });
+}
+
 export function sharedPriceFromPublication(source: PublicationPriceSource): SharedPriceData {
   const priceData = parsePriceData(source.priceItems);
+  const currency = source.currency?.trim() || "BYN";
   const normalized = normalizePublicationPrice({
     mode: source.priceMode,
     min: source.priceFrom,
@@ -52,10 +84,10 @@ export function sharedPriceFromPublication(source: PublicationPriceSource): Shar
 
   return SharedPriceDataSchema.parse({
     mode: normalized.mode,
-    currency: source.currency?.trim() || normalized.currency,
+    currency,
     min: normalized.min,
     max: normalized.max,
-    items: priceData.items,
+    items: priceItemsFromPublication(source.priceItems, currency),
     note: priceData.note.trim(),
   });
 }

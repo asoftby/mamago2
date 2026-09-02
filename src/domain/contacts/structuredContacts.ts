@@ -49,6 +49,8 @@ export type PlaceContactsSource = {
   phone3Label?: string | null;
   website?: string | null;
   instagramUrl?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   latitude?: number | null;
   longitude?: number | null;
   mapUrl?: string | null;
@@ -86,8 +88,8 @@ export function contactsFromPlace(source: PlaceContactsSource): SharedContactsDa
     { value: clean(source.phone3), label: clean(source.phone3Label) },
   ].flatMap((phone) => (phone.value ? [{ value: phone.value, label: phone.label }] : []));
 
-  const latitude = source.latitude;
-  const longitude = source.longitude;
+  const latitude = typeof source.lat === "number" ? source.lat : source.latitude;
+  const longitude = typeof source.lng === "number" ? source.lng : source.longitude;
 
   return normalizeSharedContactsData({
     address: clean(source.address),

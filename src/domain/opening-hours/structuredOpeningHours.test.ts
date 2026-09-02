@@ -44,6 +44,26 @@ test("feeds the existing open-now path without a Prisma-shaped snapshot", () => 
   assert.equal(status.message, "Открыто до 13:00");
 });
 
+test("accepts runtime-supported timezones and rejects invalid identifiers", () => {
+  for (const timezone of ["Europe/Minsk", "UTC"]) {
+    const value = openingHoursFromRelational({ ...source, timezone });
+    assert.doesNotThrow(() => getOpeningStatus(value, new Date("2026-08-31T07:30:00.000Z")));
+  }
+  assert.throws(() => openingHoursFromRelational({ ...source, timezone: "not/a-zone" }));
+});
+
+test("validates real calendar exception dates including leap years", () => {
+  const withDate = (date: string) => openingHoursFromRelational({
+    ...source,
+    exceptions: [{ date, isClosed: true, allDay: false, intervals: [], note: null }],
+  });
+  assert.doesNotThrow(() => withDate("2026-02-28"));
+  assert.throws(() => withDate("2026-02-29"));
+  assert.doesNotThrow(() => withDate("2028-02-29"));
+  assert.throws(() => withDate("2026-02-31"));
+  assert.throws(() => withDate("2026-13-01"));
+});
+
 test("survives JSON serialization", () => {
   const value = openingHoursFromRelational(source);
   assert.deepEqual(SharedOpeningHoursDataSchema.parse(JSON.parse(JSON.stringify(value))), value);

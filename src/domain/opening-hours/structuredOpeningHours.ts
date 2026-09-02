@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTimeZone } from "@/lib/notifications/userNotificationSchedule";
 
 export const OPENING_HOURS_MODES = [
   "WEEKLY",
@@ -10,6 +11,16 @@ export const OPENING_HOURS_DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SU
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const interval = z.object({ startTime: time, endTime: time });
+
+function isRealDateKey(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
 
 const scheduleEntry = z
   .object({
@@ -33,12 +44,12 @@ const scheduleEntry = z
 
 export const SharedOpeningHoursDataSchema = z.object({
   mode: z.enum(OPENING_HOURS_MODES),
-  timezone: z.string().trim().min(1),
+  timezone: z.string().trim().min(1).refine(isValidTimeZone, "Invalid IANA timezone"),
   note: z.string().trim().optional(),
   rules: z.array(scheduleEntry.extend({ dayOfWeek: z.enum(OPENING_HOURS_DAYS) })),
   exceptions: z.array(
     z.object({
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      date: z.string().refine(isRealDateKey, "Invalid calendar date"),
       isClosed: z.boolean(),
       allDay: z.boolean(),
       intervals: z.array(interval),
