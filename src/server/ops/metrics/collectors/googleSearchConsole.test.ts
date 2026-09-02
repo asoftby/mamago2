@@ -30,8 +30,8 @@ const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 
 {
   const ranges = searchConsoleComparisonRanges(new Date("2026-09-02T12:00:00Z"));
-  assert.deepEqual(ranges.current, { startDate: "2026-08-25", endDate: "2026-08-31" });
-  assert.deepEqual(ranges.previous, { startDate: "2026-08-18", endDate: "2026-08-24" });
+  assert.deepEqual(ranges.current, { startDate: "2026-08-24", endDate: "2026-08-30" });
+  assert.deepEqual(ranges.previous, { startDate: "2026-08-17", endDate: "2026-08-23" });
 }
 
 {
