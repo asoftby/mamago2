@@ -3,6 +3,7 @@ import * as assert from "node:assert/strict";
 import {
   addAdditionalSubcategory,
   deriveSubcategorySelection,
+  isAdditionalSubcategoryChipDisabled,
   MAX_ADDITIONAL_SUBCATEGORIES,
   MAX_SUBCATEGORIES,
   removeAdditionalSubcategory,
@@ -120,5 +121,70 @@ assert.deepEqual(setPrimarySubcategory(["a", "b", "c"], null), []);
   assert.equal(new Set(next).size, next.length);
   assert.deepEqual(next, ["z", "a", "b"], "old primary rejoins first, then old additional entries in order, capped");
 }
+
+// ── isAdditionalSubcategoryChipDisabled: UX contract for the P2 review fix ───────
+// Prevents chips from advertising an action (addAdditionalSubcategory) that
+// silently no-ops while there is no primary subcategory yet.
+
+// 1. No primary → every additional chip is disabled, regardless of selection/limit.
+assert.equal(
+  isAdditionalSubcategoryChipDisabled({
+    isEditable: true,
+    isSelected: false,
+    hasPrimary: false,
+    additionalLimitReached: false,
+  }),
+  true,
+  "no primary subcategory yet -> the additional chip action is unavailable",
+);
+
+// 2. Primary selected, not at the limit, unselected chip → available.
+assert.equal(
+  isAdditionalSubcategoryChipDisabled({
+    isEditable: true,
+    isSelected: false,
+    hasPrimary: true,
+    additionalLimitReached: false,
+  }),
+  false,
+  "once a primary is set, an unselected additional chip under the cap is available",
+);
+
+// 3. Max 2 additional reached → remaining unselected chips are disabled.
+assert.equal(
+  isAdditionalSubcategoryChipDisabled({
+    isEditable: true,
+    isSelected: false,
+    hasPrimary: true,
+    additionalLimitReached: true,
+  }),
+  true,
+  "at the additional cap, unselected chips become disabled",
+);
+
+// 4. An already-selected additional chip stays available for removal, even
+//    at the cap (it must be togglable OFF, otherwise the user is stuck).
+assert.equal(
+  isAdditionalSubcategoryChipDisabled({
+    isEditable: true,
+    isSelected: true,
+    hasPrimary: true,
+    additionalLimitReached: true,
+  }),
+  false,
+  "an already-selected chip remains available so it can be removed even at the cap",
+);
+
+// Not editable always wins, regardless of any other state.
+assert.equal(
+  isAdditionalSubcategoryChipDisabled({
+    isEditable: false,
+    isSelected: true,
+    hasPrimary: true,
+    additionalLimitReached: false,
+  }),
+  true,
+  "a non-editable step disables every chip unconditionally",
+);
 
 console.log("placeSubcategorySelection tests: OK");

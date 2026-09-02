@@ -17,6 +17,7 @@ import { AgePolicy } from "@prisma/client";
 import {
   addAdditionalSubcategory,
   deriveSubcategorySelection,
+  isAdditionalSubcategoryChipDisabled,
   MAX_ADDITIONAL_SUBCATEGORIES,
   removeAdditionalSubcategory,
   setPrimarySubcategory,
@@ -218,7 +219,12 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
           id: child.id,
           label: child.nameRu,
           active: isSelected,
-          disabled: !isEditable || (!isSelected && atMax),
+          disabled: isAdditionalSubcategoryChipDisabled({
+            isEditable,
+            isSelected,
+            hasPrimary: Boolean(subcategorySelection.primary),
+            additionalLimitReached: atMax,
+          }),
           onClick: () => handleToggleAdditionalSubcategory(child.id, isSelected),
           className: "!min-h-[2.25rem] !px-3 !text-[13px]",
         };
@@ -282,7 +288,9 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
             <div className="space-y-2">
               <Label className="text-xs">Дополнительные подкатегории</Label>
               <p className="text-xs text-muted-foreground -mt-1">
-                Можно добавить ещё до {MAX_ADDITIONAL_SUBCATEGORIES} подходящих вариантов.
+                {subcategorySelection.primary
+                  ? `Можно добавить ещё до ${MAX_ADDITIONAL_SUBCATEGORIES} подходящих вариантов.`
+                  : "Сначала выберите основную подкатегорию."}
               </p>
               <ChipsRow
                 layout="masonry"

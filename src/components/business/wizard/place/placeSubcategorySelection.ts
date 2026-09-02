@@ -106,3 +106,28 @@ export function removeAdditionalSubcategory(current: string[], id: string): stri
   if (!additional.includes(id)) return current;
   return [primary, ...additional.filter((existing) => existing !== id)];
 }
+
+/**
+ * Whether an "additional subcategory" chip should render disabled.
+ *
+ * `addAdditionalSubcategory()` is a no-op while there's no primary yet, so
+ * every chip — not just unselected ones — is disabled until a primary is
+ * set, rather than advertising an action that would silently do nothing.
+ * This is provably safe for an already-selected chip too: `additional` is
+ * `subcategoryIds.slice(1)`, so it can only be non-empty once
+ * `subcategoryIds[0]` (primary) already exists — "selected but no primary"
+ * is not a reachable state, so this never disables a chip a user actually
+ * needs to remove.
+ */
+export function isAdditionalSubcategoryChipDisabled(params: {
+  isEditable: boolean;
+  isSelected: boolean;
+  hasPrimary: boolean;
+  additionalLimitReached: boolean;
+}): boolean {
+  return (
+    !params.isEditable ||
+    !params.hasPrimary ||
+    (!params.isSelected && params.additionalLimitReached)
+  );
+}
