@@ -38,14 +38,16 @@ const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const current = [
     { keys: ["https://mamago.by/a"], clicks: 20, impressions: 100, ctr: 0.2, position: 3 },
     { keys: ["https://mamago.by/b"], clicks: 5, impressions: 30, ctr: 0.16, position: 5 },
+    { keys: ["https://mamago.by/new"], clicks: 50, impressions: 150, ctr: 0.33, position: 2 },
   ];
   const previous = [
     { keys: ["https://mamago.by/a"], clicks: 10, impressions: 80, ctr: 0.125, position: 4 },
-    { keys: ["https://mamago.by/c"], clicks: 12, impressions: 50, ctr: 0.24, position: 2 },
+    { keys: ["https://mamago.by/b"], clicks: 12, impressions: 50, ctr: 0.24, position: 2 },
+    { keys: ["https://mamago.by/missing-now"], clicks: 40, impressions: 120, ctr: 0.33, position: 2 },
   ];
   const movers = pageClickMovers(current, previous);
-  assert.deepEqual(movers.rising[0], { page: "https://mamago.by/a", delta: 10 });
-  assert.deepEqual(movers.falling[0], { page: "https://mamago.by/c", delta: -12 });
+  assert.deepEqual(movers.rising, [{ page: "https://mamago.by/a", delta: 10 }]);
+  assert.deepEqual(movers.falling, [{ page: "https://mamago.by/b", delta: -7 }]);
 }
 
 console.log("googleSearchConsole.test.ts: OK");
