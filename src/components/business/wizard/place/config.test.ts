@@ -68,12 +68,36 @@ function testStepCopyComesFromCanonicalDefinitions() {
   }
 }
 
+/**
+ * Pins the Step 1 rename: the semantic key stays `profile` (existing drafts
+ * are keyed on it — see draftState.ts / PLACE_WIZARD_SCHEMA_VERSION), but
+ * everything the user actually sees now reads "О месте" instead of the old
+ * "Профиль" / "Профиль места".
+ */
+function testProfileStepIsRenamedToAboutThePlace() {
+  assert.equal(
+    PLACE_WIZARD_STEP_DEFINITIONS.profile.shortLabel,
+    "О месте",
+    "semantic key must stay 'profile' — only the visible copy changes",
+  );
+  assert.equal(PLACE_WIZARD_STEP_DEFINITIONS.profile.title, "О месте");
+
+  // Position/order in the layout is unchanged — still step 1 in both layouts.
+  assert.equal(getPlaceWizardStepKeys(false)[0], "profile");
+  assert.equal(getPlaceWizardStepKeys(true)[0], "profile");
+  assert.equal(getStepKey(1, false), "profile");
+  assert.equal(getStepKey(1, true), "profile");
+  assert.equal(getPlaceWizardStepNumber("profile", false), 1);
+  assert.equal(getPlaceWizardStepNumber("profile", true), 1);
+}
+
 function main() {
   testLegacyLayoutIsStable();
   testCtaLayoutIsStable();
   testNumericIdsAreDerivedFromSemanticOrder();
   testSemanticLookupDoesNotDependOnNumericPosition();
   testStepCopyComesFromCanonicalDefinitions();
+  testProfileStepIsRenamedToAboutThePlace();
 }
 
 main();

@@ -57,6 +57,8 @@ jobs:
           pnpm exec tsx src/components/business/wizard/place/completion.test.ts
           pnpm exec tsx src/components/business/wizard/place/agePolicyValidation.test.ts
           pnpm exec tsx src/components/business/wizard/place/draftState.test.ts
+          pnpm exec tsx src/components/business/wizard/place/placeSubcategorySelection.test.ts
+          pnpm exec tsx src/components/business/wizard/place/steps/Step1Profile.test.tsx
 
       - name: Place geo overrides regressions
         run: |
