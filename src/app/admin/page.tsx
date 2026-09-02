@@ -14,6 +14,7 @@ import {
   deriveWorkload,
   deriveDataQuality,
 } from "@/lib/admin/dashboardViewModels";
+import { deriveGscSeo } from "@/lib/admin/gscSeoViewModel";
 import { AdminDashboardShell } from "./_components/AdminDashboardShell";
 import type { DashboardSignal } from "./_components/OperationsBlock";
 import { OperationsLoadErrorState } from "./_components/OperationsLoadErrorState";
@@ -70,6 +71,7 @@ export default async function AdminDashboardPage() {
   const habit = deriveHabit(view.kpis);
   const funnel = deriveEngagementFunnel(view.kpis);
   const growth = deriveGrowth(view.kpis);
+  const seo = deriveGscSeo(view.kpis);
   const search = deriveDiscoveryQuality(view.kpis);
   const supply = deriveSupplyHealth(view.kpis);
   const b2b = deriveB2BHealth(view.kpis);
@@ -92,6 +94,7 @@ export default async function AdminDashboardPage() {
       habit={habit}
       funnel={funnel}
       growth={growth}
+      seo={seo}
       search={search}
       supply={supply}
       b2b={b2b}
