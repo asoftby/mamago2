@@ -25,6 +25,18 @@ async function latestMetricValue(prisma: PrismaClient, metric: string, dimKey = 
   return row ? row.value : null;
 }
 
+async function latestMetricSample(
+  prisma: PrismaClient,
+  metric: string,
+): Promise<{ dimKey: string; value: number } | null> {
+  const row = await prisma.metricSample.findFirst({
+    where: { metric },
+    orderBy: { collectedAt: "desc" },
+    select: { dimKey: true, value: true },
+  });
+  return row ?? null;
+}
+
 export interface ModerationQueueProjection {
   size: number | null;
   oldestAgeSec: number | null;
@@ -115,11 +127,48 @@ const KPI_METRIC_NAMES = [
   "b2b.active_businesses",
   "b2b.new_businesses_30d",
   "b2b.meaningful_action_rate",
+  "gsc.clicks_7d",
+  "gsc.clicks_prev_7d",
+  "gsc.impressions_7d",
+  "gsc.impressions_prev_7d",
+  "gsc.ctr_7d",
+  "gsc.ctr_prev_7d",
+  "gsc.position_7d",
+  "gsc.position_prev_7d",
 ] as const;
 
-export async function projectOperationsKpis(prisma: PrismaClient): Promise<Record<string, number | null>> {
-  const entries = await Promise.all(
-    KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const),
-  );
-  return Object.fromEntries(entries);
+export interface GscPageMoverProjection {
+  page: string;
+  deltaClicks: number;
+}
+
+async function projectGscPageMovers(prisma: PrismaClient): Promise<{
+  rising: GscPageMoverProjection[];
+  falling: GscPageMoverProjection[];
+}> {
+  const [rise1, rise2, rise3, fall1, fall2, fall3] = await Promise.all([
+    latestMetricSample(prisma, "gsc.page.rise.1"),
+    latestMetricSample(prisma, "gsc.page.rise.2"),
+    latestMetricSample(prisma, "gsc.page.rise.3"),
+    latestMetricSample(prisma, "gsc.page.fall.1"),
+    latestMetricSample(prisma, "gsc.page.fall.2"),
+    latestMetricSample(prisma, "gsc.page.fall.3"),
+  ]);
+  const toMover = (row: { dimKey: string; value: number } | null): GscPageMoverProjection | null =>
+    row && row.dimKey ? { page: row.dimKey, deltaClicks: row.value } : null;
+  return {
+    rising: [rise1, rise2, rise3].map(toMover).filter((row): row is GscPageMoverProjection => row !== null),
+    falling: [fall1, fall2, fall3].map(toMover).filter((row): row is GscPageMoverProjection => row !== null),
+  };
+}
+
+export async function projectOperationsKpis(prisma: PrismaClient): Promise<Record<string, unknown>> {
+  const [entries, pageMovers] = await Promise.all([
+    Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const)),
+    projectGscPageMovers(prisma),
+  ]);
+  return {
+    ...Object.fromEntries(entries),
+    "gsc.page_movers": pageMovers,
+  };
 }
