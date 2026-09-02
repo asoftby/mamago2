@@ -1,7 +1,10 @@
+import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
 import { expectedFinalCanonicalPath, MINSK_CITY_SLUG } from "./migratedArticlePublicationGeoRecovery";
+import { renderedMetadataSha256 } from "./phase2aPlanArtifact";
 
 /**
  * Resolves the Minsk city unambiguously, scoped to Belarus
@@ -51,6 +54,8 @@ export type PublicationGeoPlanRow = {
     noindex: boolean | null;
     seoRobots: string | null;
     blocksCount: number | null;
+    contentSha256: string | null;
+    renderedMetadataSha256: string | null;
   } | null;
   after: PublicationGeoTargetState;
   finalCanonicalPath: string;
@@ -115,6 +120,11 @@ export async function buildPublicationGeoPlan(
         noindex: true,
         seoRobots: true,
         contentJson: true,
+        subtitle: true, excerpt: true, heroImage: true, coverImageId: true,
+        authorUserId: true, authorLabel: true, cityContext: true, expiresAt: true, scheduledAt: true,
+        seoTitle: true, seoDescription: true, seoH1: true, seoCanonicalUrl: true,
+        seoOgTitle: true, seoOgDescription: true, seoOgImage: true, seoImageId: true,
+        seoJsonLdOverride: true, seoCanonicalSource: true, relatedPlaceId: true, categoryId: true,
       },
     });
 
@@ -134,6 +144,7 @@ export async function buildPublicationGeoPlan(
       continue;
     }
 
+    const parsedContent = parseArticleContentJson(article.contentJson);
     const before = {
       status: article.status,
       geoScope: article.geoScope,
@@ -144,10 +155,21 @@ export async function buildPublicationGeoPlan(
       publishedAt: article.publishedAt?.toISOString() ?? null,
       noindex: article.noindex,
       seoRobots: article.seoRobots,
-      blocksCount: article.contentJson
-        ? ((article.contentJson as Record<string, unknown>)?.blocks as unknown[] | undefined)
-            ?.length ?? null
-        : null,
+      blocksCount: parsedContent.blocks.length,
+      contentSha256: createHash("sha256").update(JSON.stringify(parsedContent)).digest("hex"),
+      renderedMetadataSha256: renderedMetadataSha256({
+        subtitle: article.subtitle, excerpt: article.excerpt, heroImage: article.heroImage,
+        coverImageId: article.coverImageId, authorUserId: article.authorUserId,
+        authorLabel: article.authorLabel, cityContext: article.cityContext,
+        expiresAt: article.expiresAt?.toISOString() ?? null,
+        scheduledAt: article.scheduledAt?.toISOString() ?? null,
+        seoTitle: article.seoTitle, seoDescription: article.seoDescription, seoH1: article.seoH1,
+        seoCanonicalUrl: article.seoCanonicalUrl, seoOgTitle: article.seoOgTitle,
+        seoOgDescription: article.seoOgDescription, seoOgImage: article.seoOgImage,
+        seoImageId: article.seoImageId, seoJsonLdOverride: article.seoJsonLdOverride,
+        seoCanonicalSource: article.seoCanonicalSource, relatedPlaceId: article.relatedPlaceId,
+        categoryId: article.categoryId,
+      }),
     };
 
     // ---------- slug drift ----------
@@ -226,6 +248,15 @@ export async function buildPublicationGeoPlan(
           `blocksCount mismatch: db=${before.blocksCount} audited=${recovery.auditedBlocksCount} (sanity)`,
         );
       }
+      if (recovery.auditedContentSha256 && before.contentSha256 !== recovery.auditedContentSha256) {
+        postRepairChecks.push(
+          `contentSha256 mismatch: db=${before.contentSha256} audited=${recovery.auditedContentSha256}`,
+        );
+      }
+      if (recovery.auditedRenderedMetadataSha256 &&
+          before.renderedMetadataSha256 !== recovery.auditedRenderedMetadataSha256) {
+        postRepairChecks.push("rendered metadata fingerprint mismatch");
+      }
 
       if (postRepairChecks.length > 0) {
         // Non-updatedAt audited field drifted after repair — real content edit, fail closed.
@@ -291,6 +322,15 @@ export async function buildPublicationGeoPlan(
       auditedStateChecks.push(
         `blocksCount mismatch: db=${before.blocksCount} audited=${recovery.auditedBlocksCount} (sanity)`,
       );
+    }
+    if (recovery.auditedContentSha256 && before.contentSha256 !== recovery.auditedContentSha256) {
+      auditedStateChecks.push(
+        `contentSha256 mismatch: db=${before.contentSha256} audited=${recovery.auditedContentSha256}`,
+      );
+    }
+    if (recovery.auditedRenderedMetadataSha256 &&
+        before.renderedMetadataSha256 !== recovery.auditedRenderedMetadataSha256) {
+      auditedStateChecks.push("rendered metadata fingerprint mismatch");
     }
 
     if (auditedStateChecks.length > 0) {
