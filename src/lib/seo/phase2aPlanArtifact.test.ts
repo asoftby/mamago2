@@ -89,6 +89,11 @@ for (const contentJson of [null, { version: 1, blocks: [] }, { blocks: [{ invali
     prismaReturning({ ...observed, contentJson }), [entry], "minsk-id",
   );
   assert.equal(unrenderableArtifact.rows[0]?.action, "conflict", "unrenderable content must fail closed");
+  assert.throws(
+    () => recoveriesFromReviewedArtifact(unrenderableArtifact),
+    /conflict\/not_found/,
+    "APPLY must reject a reviewed artifact that recorded a conflict",
+  );
 }
 
 for (const indexingState of [{ noindex: true }, { seoRobots: "index, NOINDEX, follow" }]) {
@@ -112,6 +117,16 @@ const driftedPlan = await buildPublicationGeoPlan(
   prismaReturning({ ...observed, title: "Edited after PLAN" }), reviewedRecoveries, "minsk-id",
 );
 assert.equal(driftedPlan[0]?.action, "conflict", "APPLY-time read cannot refresh reviewed fingerprint");
+
+const sameCountContentDrift = await buildPublicationGeoPlan(
+  prismaReturning({
+    ...observed,
+    contentJson: { version: 1, blocks: [{ id: "text-1", type: "text", text: "Edited after PLAN" }] },
+  }),
+  reviewedRecoveries,
+  "minsk-id",
+);
+assert.equal(sameCountContentDrift[0]?.action, "conflict", "content digest catches same-block-count drift");
 
 console.log("phase2aPlanArtifact.test.ts: PASS");
 }

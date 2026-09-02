@@ -48,6 +48,8 @@ export type MigratedArticlePublicationGeoRecovery = {
   auditedSeoRobots: string | null;
   /** Audited content blocks count — PLAN sanity check only. */
   auditedBlocksCount: number;
+  /** Stable SHA-256 of the parsed article content when a reviewed PLAN artifact supplies it. */
+  auditedContentSha256?: string;
 };
 
 export const MINSK_CITY_SLUG = "minsk";

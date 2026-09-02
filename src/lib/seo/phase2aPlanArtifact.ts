@@ -15,6 +15,7 @@ export type Phase2APlanArtifactRow = {
   noindex: boolean | null;
   seoRobots: string | null;
   blocksCount: number | null;
+  contentSha256: string | null;
   current: {
     status: string | null;
     geoScope: string | null;
@@ -59,7 +60,8 @@ export function validatePhase2APlanArtifact(value: unknown): Phase2APlanArtifact
   if (!Array.isArray(artifact.rows) || artifact.rows.length !== artifact.expectedAutomated) {
     throw new Error("invalid PLAN artifact: incomplete expected row set");
   }
-  if (!artifact.rows.every((row) => row.articleId && row.slug && row.target && row.canonicalPath)) {
+  if (!artifact.rows.every((row) => row.articleId && row.slug && row.target && row.canonicalPath &&
+    (row.action === "not_found" ? row.contentSha256 === null : /^[a-f0-9]{64}$/.test(row.contentSha256 ?? "")))) {
     throw new Error("invalid PLAN artifact: malformed row");
   }
   const { sha256, ...unsigned } = artifact;
@@ -132,13 +134,16 @@ export async function createPhase2APlanArtifact(
     if (!article) {
       rows.push({ articleId: entry.targetArticleId, slug: entry.currentSlug, rawTitle: null,
         updatedAt: null, publishedAt: null, noindex: null, seoRobots: null, blocksCount: null,
+        contentSha256: null,
         current: { status: null, geoScope: null, cityId: null, regionId: null }, target,
         canonicalPath, legacyUrl: entry.legacySourcePath,
         confidence: entry.confidence as "HIGH" | "MEDIUM", action: "not_found",
         reason: "audited articleId not found" });
       continue;
     }
-    const blocksCount = parseArticleContentJson(article.contentJson).blocks.length;
+    const parsedContent = parseArticleContentJson(article.contentJson);
+    const blocksCount = parsedContent.blocks.length;
+    const contentSha256 = createHash("sha256").update(JSON.stringify(parsedContent)).digest("hex");
     const hasRenderableContent = blocksCount > 0;
     const allowsIndexing = article.noindex !== true && !/\bnoindex\b/i.test(article.seoRobots ?? "");
     const slugMatches = article.slug === entry.currentSlug;
@@ -149,7 +154,7 @@ export async function createPhase2APlanArtifact(
     rows.push({
       articleId: article.id, slug: entry.currentSlug, rawTitle: article.title,
       updatedAt: article.updatedAt.toISOString(), publishedAt: article.publishedAt?.toISOString() ?? null,
-      noindex: article.noindex, seoRobots: article.seoRobots, blocksCount,
+      noindex: article.noindex, seoRobots: article.seoRobots, blocksCount, contentSha256,
       current: { status: article.status, geoScope: article.geoScope, cityId: article.cityId, regionId: article.regionId },
       target, canonicalPath, legacyUrl: entry.legacySourcePath,
       confidence: entry.confidence as "HIGH" | "MEDIUM",
@@ -166,6 +171,10 @@ export async function createPhase2APlanArtifact(
 }
 
 export function recoveriesFromReviewedArtifact(artifact: Phase2APlanArtifact): MigratedArticlePublicationGeoRecovery[] {
+  const blocked = artifact.rows.filter((row) => row.action === "conflict" || row.action === "not_found");
+  if (blocked.length > 0) {
+    throw new Error(`APPLY refused: reviewed PLAN contains ${blocked.length} conflict/not_found row(s)`);
+  }
   return artifact.rows.map((row) => ({
     articleId: row.articleId,
     title: row.rawTitle ?? "",
@@ -181,5 +190,6 @@ export function recoveriesFromReviewedArtifact(artifact: Phase2APlanArtifact): M
     auditedNoindex: row.noindex ?? false,
     auditedSeoRobots: row.seoRobots,
     auditedBlocksCount: row.blocksCount ?? 0,
+    auditedContentSha256: row.contentSha256 ?? undefined,
   }));
 }

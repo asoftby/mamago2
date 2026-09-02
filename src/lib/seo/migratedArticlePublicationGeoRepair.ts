@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
 import { expectedFinalCanonicalPath, MINSK_CITY_SLUG } from "./migratedArticlePublicationGeoRecovery";
@@ -51,6 +53,7 @@ export type PublicationGeoPlanRow = {
     noindex: boolean | null;
     seoRobots: string | null;
     blocksCount: number | null;
+    contentSha256: string | null;
   } | null;
   after: PublicationGeoTargetState;
   finalCanonicalPath: string;
@@ -134,6 +137,7 @@ export async function buildPublicationGeoPlan(
       continue;
     }
 
+    const parsedContent = parseArticleContentJson(article.contentJson);
     const before = {
       status: article.status,
       geoScope: article.geoScope,
@@ -144,10 +148,8 @@ export async function buildPublicationGeoPlan(
       publishedAt: article.publishedAt?.toISOString() ?? null,
       noindex: article.noindex,
       seoRobots: article.seoRobots,
-      blocksCount: article.contentJson
-        ? ((article.contentJson as Record<string, unknown>)?.blocks as unknown[] | undefined)
-            ?.length ?? null
-        : null,
+      blocksCount: parsedContent.blocks.length,
+      contentSha256: createHash("sha256").update(JSON.stringify(parsedContent)).digest("hex"),
     };
 
     // ---------- slug drift ----------
@@ -226,6 +228,11 @@ export async function buildPublicationGeoPlan(
           `blocksCount mismatch: db=${before.blocksCount} audited=${recovery.auditedBlocksCount} (sanity)`,
         );
       }
+      if (recovery.auditedContentSha256 && before.contentSha256 !== recovery.auditedContentSha256) {
+        postRepairChecks.push(
+          `contentSha256 mismatch: db=${before.contentSha256} audited=${recovery.auditedContentSha256}`,
+        );
+      }
 
       if (postRepairChecks.length > 0) {
         // Non-updatedAt audited field drifted after repair — real content edit, fail closed.
@@ -290,6 +297,11 @@ export async function buildPublicationGeoPlan(
     if (before.blocksCount !== recovery.auditedBlocksCount) {
       auditedStateChecks.push(
         `blocksCount mismatch: db=${before.blocksCount} audited=${recovery.auditedBlocksCount} (sanity)`,
+      );
+    }
+    if (recovery.auditedContentSha256 && before.contentSha256 !== recovery.auditedContentSha256) {
+      auditedStateChecks.push(
+        `contentSha256 mismatch: db=${before.contentSha256} audited=${recovery.auditedContentSha256}`,
       );
     }
 
