@@ -41,7 +41,7 @@ export type MigratedArticlePublicationGeoRecovery = {
    * PLAN and APPLY will fail closed. */
   expectedUpdatedAt: string;
   /** Audited PROD publishedAt — PLAN validates against the DB. */
-  auditedPublishedAt: string;
+  auditedPublishedAt: string | null;
   /** Audited noindex — PLAN validates against the DB. */
   auditedNoindex: boolean;
   /** Audited seoRobots — PLAN validates against the DB. */

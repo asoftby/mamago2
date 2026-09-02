@@ -96,7 +96,7 @@ export type Phase2ARecoveryEntry = {
  *   works, the destination article is still PENDING/soft-404 (it needs content
  *   restoration). Its high 12,535 clicks make it the #1 priority.
  */
-export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
+const PHASE_2A_PRIORITY_RECOVERY_SOURCE: Phase2ARecoveryEntry[] = [
   // ============================================================
   // 1-25: RESTORE_EXISTING_CONTENT articles
   // ============================================================
@@ -946,6 +946,18 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     isRecurring: false,
   },
 ];
+
+/** Conditional recurring rows have no committed concrete replacement target. */
+export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] =
+  PHASE_2A_PRIORITY_RECOVERY_SOURCE.map((entry) =>
+    entry.action === "UPDATE_RECURRING_OR_SEASONAL"
+      ? {
+          ...entry,
+          readiness: "BLOCKED_OWNER_REVIEW",
+          ownerReviewBatch: "p2a-recurring-exact-target",
+        }
+      : entry,
+  );
 
 export function summarizePhase2A(): {
   total: number;

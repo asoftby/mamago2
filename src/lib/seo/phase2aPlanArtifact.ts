@@ -172,7 +172,7 @@ export function recoveriesFromReviewedArtifact(artifact: Phase2APlanArtifact): M
     confidence: row.confidence,
     reason: `Reviewed PLAN ${artifact.sha256}`,
     expectedUpdatedAt: row.updatedAt ?? "",
-    auditedPublishedAt: row.publishedAt ?? "",
+    auditedPublishedAt: row.publishedAt,
     auditedNoindex: row.noindex ?? false,
     auditedSeoRobots: row.seoRobots,
     auditedBlocksCount: row.blocksCount ?? 0,

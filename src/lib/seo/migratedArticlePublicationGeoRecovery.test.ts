@@ -66,7 +66,8 @@ function testAuditedStateFingerprint() {
     );
     // auditedPublishedAt must be valid ISO-8601 UTC
     assert.ok(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(recovery.auditedPublishedAt),
+      recovery.auditedPublishedAt !== null &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(recovery.auditedPublishedAt),
       `${recovery.articleId} auditedPublishedAt must be ISO-8601 UTC with milliseconds: ${recovery.auditedPublishedAt}`,
     );
     assert.equal(

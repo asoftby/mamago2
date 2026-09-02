@@ -140,7 +140,7 @@ function testReadinessBreakdown() {
   );
 
   // BLOCKED_OWNER_REVIEW must be a subset of the 52, not additional
-  assert.equal(allBlocked.length, 11, `expected 11 fail-closed owner-review rows, got ${allBlocked.length}`);
+  assert.equal(allBlocked.length, 31, `expected 31 fail-closed owner-review rows, got ${allBlocked.length}`);
 }
 
 function testBlockedRowsHaveOwnerReviewBatch() {
@@ -148,7 +148,7 @@ function testBlockedRowsHaveOwnerReviewBatch() {
   for (const entry of blocked) {
     assert.ok(entry.ownerReviewBatch, `position ${entry.position}: BLOCKED row missing ownerReviewBatch`);
     assert.ok(
-      ["p2a-non-minsk-cities", "p2a-ambiguous-scope", "p2a-event-semantic-destination", "p2a-missing-target-id"].includes(entry.ownerReviewBatch ?? ""),
+      ["p2a-non-minsk-cities", "p2a-ambiguous-scope", "p2a-event-semantic-destination", "p2a-missing-target-id", "p2a-recurring-exact-target"].includes(entry.ownerReviewBatch ?? ""),
       `position ${entry.position}: unexpected ownerReviewBatch: ${entry.ownerReviewBatch}`,
     );
   }
@@ -270,6 +270,15 @@ function testNoGenericEventHubRecommendation() {
   assert.equal(kosmopark?.ownerReviewBatch, "p2a-event-semantic-destination");
 }
 
+function testConditionalRecurringRowsFailClosed() {
+  const recurring = PHASE_2A_PRIORITY_RECOVERIES.filter(
+    (row) => row.action === "UPDATE_RECURRING_OR_SEASONAL",
+  );
+  assert.equal(recurring.length, 20);
+  assert.ok(recurring.every((row) => row.readiness === "BLOCKED_OWNER_REVIEW"));
+  assert.ok(recurring.every((row) => row.ownerReviewBatch === "p2a-recurring-exact-target"));
+}
+
 // === RUN ===
 testMatrixShape();
 testRequiredFields();
@@ -287,5 +296,6 @@ testNoGenericMinskFallback();
 testEventSemanticRedirectDestination();
 testOwnerReviewBatches();
 testNoGenericEventHubRecommendation();
+testConditionalRecurringRowsFailClosed();
 
 console.log("phase2aPriorityRecovery.test.ts: PASS");

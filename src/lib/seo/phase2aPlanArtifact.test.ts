@@ -33,7 +33,9 @@ const observed = {
   status: "PENDING", geoScope: null, cityId: null, regionId: null,
 };
 
-function prismaReturning(article: typeof observed | null): PrismaClient {
+type ObservedArticle = Omit<typeof observed, "publishedAt"> & { publishedAt: Date | null };
+
+function prismaReturning(article: ObservedArticle | null): PrismaClient {
   return { article: { findUnique: async () => article } } as unknown as PrismaClient;
 }
 
@@ -76,6 +78,15 @@ assert.equal(wrongSlugArtifact.rows[0]?.action, "conflict", "incorrect ID/slug p
 const missingArtifact = await createPhase2APlanArtifact(prismaReturning(null), [entry], "minsk-id");
 assert.equal(missingArtifact.rows[0]?.action, "not_found", "missing expected ID is represented");
 assert.equal(missingArtifact.rows.length, missingArtifact.expectedAutomated);
+
+const nullPublished = await createPhase2APlanArtifact(
+  prismaReturning({ ...observed, publishedAt: null }), [entry], "minsk-id",
+);
+assert.equal(recoveriesFromReviewedArtifact(nullPublished)[0]?.auditedPublishedAt, null);
+const nullPublishedPlan = await buildPublicationGeoPlan(
+  prismaReturning({ ...observed, publishedAt: null }), recoveriesFromReviewedArtifact(nullPublished), "minsk-id",
+);
+assert.equal(nullPublishedPlan[0]?.action, "apply", "nullable publishedAt must survive fingerprint conversion");
 
 const reviewedRecoveries = recoveriesFromReviewedArtifact(artifact);
 const driftedPlan = await buildPublicationGeoPlan(

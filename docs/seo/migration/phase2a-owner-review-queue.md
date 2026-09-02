@@ -1,6 +1,6 @@
 # Phase 2A — Owner Review Queue
 
-These 11 URLs could not be automatically classified because their
+These 31 URLs cannot currently proceed automatically because their
 geographic scope or semantic destination is ambiguous from the
 available evidence. Each needs a short owner decision to proceed.
 
@@ -75,6 +75,15 @@ A generic `/minsk/events` hub is **not** a semantic equivalent and must not be r
 
 ---
 
+## Batch 4: Recurring/Seasonal Rows Without Exact Targets (20 entries)
+
+These rows describe conditional work such as “use the 2026 edition if it
+exists,” but the matrix does not record a concrete replacement entity and
+canonical path. All 20 remain `BLOCKED_OWNER_REVIEW` until exact mappings are
+committed. A current detail URL or generic event hub is not an exact mapping.
+
+---
+
 ## Summary
 
 | Batch | Count | Clicks | Recommended default |
@@ -83,8 +92,9 @@ A generic `/minsk/events` hub is **not** a semantic equivalent and must not be r
 | Non-Minsk cities (COUNTRY default) | 2 | 1,833 | Reclassify as COUNTRY, update redirect to `/blog/{slug}` |
 | Ambiguous scope | 4 | 2,259 | Keep blocked pending content-based geography decision |
 | Event destinations | 3 | 9,531 | Exact equivalent only; otherwise retain owner review |
-| **Total** | **11** | **27,191** | |
+| Recurring/seasonal without exact target | 20 | 24,647 | Commit exact replacement entity/path before readiness |
+| **Total** | **31** | **51,838** | |
 
-**Note**: These 11 URLs represent ~27,191 of the ~104,243 P2-A click mass.
-The remaining 41 URLs are all `READY_AUTOMATED` or `READY_WITH_EXACT_MAPPING`
+**Note**: The remaining 21 URLs are `READY_AUTOMATED` or
+`READY_WITH_EXACT_MAPPING`
 and can proceed independently of these decisions.
