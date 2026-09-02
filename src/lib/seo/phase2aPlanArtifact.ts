@@ -74,6 +74,32 @@ export function requireReviewedPlanForApply(apply: boolean, artifactPath: string
   }
 }
 
+export function assertArtifactMatchesConfiguration(
+  artifact: Phase2APlanArtifact,
+  entries: Phase2ARecoveryEntry[],
+  minskCityId: string,
+): void {
+  const configured = new Map(entries.map((entry) => {
+    const target = {
+      status: "PUBLISHED",
+      geoScope: entry.geoScope,
+      cityId: entry.geoScope === "CITY" ? minskCityId : null,
+    };
+    const canonicalPath = entry.geoScope === "CITY"
+      ? `/${entry.citySlug}/blog/${entry.currentSlug}`
+      : `/blog/${entry.currentSlug}`;
+    return [entry.targetArticleId!, { slug: entry.currentSlug, target, canonicalPath }];
+  }));
+  if (configured.size !== artifact.expectedAutomated || artifact.rows.some((row) => {
+    const expected = configured.get(row.articleId);
+    return !expected || expected.slug !== row.slug || expected.canonicalPath !== row.canonicalPath ||
+      expected.target.status !== row.target.status || expected.target.geoScope !== row.target.geoScope ||
+      expected.target.cityId !== row.target.cityId;
+  })) {
+    throw new Error("APPLY refused: reviewed PLAN targets do not match current configuration");
+  }
+}
+
 export async function createPhase2APlanArtifact(
   prisma: PrismaClient,
   entries: Phase2ARecoveryEntry[],

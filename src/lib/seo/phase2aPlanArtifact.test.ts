@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import type { PrismaClient } from "@prisma/client";
 import { buildPublicationGeoPlan } from "./migratedArticlePublicationGeoRepair";
 import {
+  assertArtifactMatchesConfiguration,
   createPhase2APlanArtifact,
   recoveriesFromReviewedArtifact,
   requireReviewedPlanForApply,
@@ -47,6 +48,12 @@ assert.equal(artifact.rows[0]?.action, "apply");
 assert.deepEqual(validatePhase2APlanArtifact(artifact), artifact);
 assert.throws(() => requireReviewedPlanForApply(true, null), /plan-artifact/);
 assert.doesNotThrow(() => requireReviewedPlanForApply(true, "/reviewed/plan.json"));
+assert.doesNotThrow(() => assertArtifactMatchesConfiguration(artifact, [entry], "minsk-id"));
+assert.throws(
+  () => assertArtifactMatchesConfiguration(artifact, [{ ...entry, geoScope: "CITY", citySlug: "minsk" }], "minsk-id"),
+  /targets do not match/,
+  "stale reviewed geography/canonical target must fail closed",
+);
 
 assert.throws(() => validatePhase2APlanArtifact({ ...artifact, sha256: "0".repeat(64) }), /checksum/);
 assert.throws(() => validatePhase2APlanArtifact({ ...artifact, rows: [] }), /incomplete/);

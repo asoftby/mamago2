@@ -1,6 +1,6 @@
 # Phase 2A — Owner Review Queue
 
-These 7 URLs could not be automatically classified because their
+These 10 URLs could not be automatically classified because their
 geographic scope or semantic destination is ambiguous from the
 available evidence. Each needs a short owner decision to proceed.
 
@@ -49,11 +49,14 @@ content infrastructure (likely not available yet).
 
 ---
 
-## Batch 2: Ambiguous Geographic Scope (1 article)
+## Batch 2: Ambiguous Geographic Scope (4 articles)
 
 | # | Legacy URL | Clicks | Title | Evidence | Decision needed |
 |---|---|---|---|---|---|
 | 3 | `/ekotropy` | 456 | "Экотропы" (Eco-trails) | Generic topic — could be Minsk eco-trails (CITY) or national eco-trails (COUNTRY). No geographic signal in slug. | **CITY or COUNTRY?** If article lists specific Minsk-trails → CITY. If generic list across Belarus → COUNTRY. |
+| 4 | `/besedki-dlya-dnya-rozhdeniya-na-prirode` | 743 | Birthday gazebos guide | Committed geography audit is `UNCLEAR`; redirect destination is not evidence. | **CITY or COUNTRY after content review?** |
+| 5 | `/leto-2026-zagorodnyy-i-gorodskoy-otdyh-dlya-detey` | 537 | City and out-of-town summer recreation | Committed geography audit is `UNCLEAR` due mixed coverage. | **CITY or COUNTRY after content review?** |
+| 6 | `/gde-ostavit-rebenka-s-nyaney` | 523 | Generic nanny guide | Committed geography audit is `UNCLEAR`; insufficient city evidence. | **CITY or COUNTRY after content review?** |
 
 ---
 
@@ -77,10 +80,10 @@ A generic `/minsk/events` hub is **not** a semantic equivalent and must not be r
 |---|---|---|---|
 | Missing audited target ID | 2 | 13,568 | Keep blocked until exact IDs are audited |
 | Non-Minsk cities (COUNTRY default) | 2 | 1,833 | Reclassify as COUNTRY, update redirect to `/blog/{slug}` |
-| Ambiguous scope (ekotropy) | 1 | 456 | Reclassify as COUNTRY if no Minsk-only signal |
+| Ambiguous scope | 4 | 2,259 | Keep blocked pending content-based geography decision |
 | Event destinations | 2 | 6,084 | Exact equivalent only; otherwise retain owner review |
-| **Total** | **7** | **21,941** | |
+| **Total** | **10** | **23,744** | |
 
-**Note**: These 7 URLs represent ~21,941 of the ~104,243 P2-A click mass.
-The remaining 45 URLs are all `READY_AUTOMATED` or `READY_WITH_EXACT_MAPPING`
+**Note**: These 10 URLs represent ~23,744 of the ~104,243 P2-A click mass.
+The remaining 42 URLs are all `READY_AUTOMATED` or `READY_WITH_EXACT_MAPPING`
 and can proceed independently of these decisions.

@@ -9,7 +9,7 @@ import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
 import { prismaBase, searchIndexer } from "../src/lib/prisma";
 import { MINSK_CITY_SLUG } from "../src/lib/seo/migratedArticlePublicationGeoRecovery";
 import { applyPublicationGeoPlan, buildPublicationGeoPlan, resolveMinskCity, summarizePublicationGeoPlan } from "../src/lib/seo/migratedArticlePublicationGeoRepair";
-import { createPhase2APlanArtifact, recoveriesFromReviewedArtifact, requireReviewedPlanForApply, validatePhase2APlanArtifact } from "../src/lib/seo/phase2aPlanArtifact";
+import { assertArtifactMatchesConfiguration, createPhase2APlanArtifact, recoveriesFromReviewedArtifact, requireReviewedPlanForApply, validatePhase2APlanArtifact } from "../src/lib/seo/phase2aPlanArtifact";
 import { PHASE_2A_PRIORITY_RECOVERIES, summarizePhase2A, validatePhase2AIntegrity } from "../src/lib/seo/phase2aPriorityRecovery";
 
 const apply = process.argv.includes("--apply");
@@ -47,10 +47,7 @@ async function main() {
     artifactPath = resolve(artifactArg!);
     artifact = validatePhase2APlanArtifact(JSON.parse(readFileSync(artifactPath, "utf8")));
     if (artifact.minskCityId !== minsk.id) throw new Error("APPLY refused: PLAN city ID drift");
-    const configured = new Map(ready.map((entry) => [entry.targetArticleId!, entry.currentSlug]));
-    if (configured.size !== artifact.expectedAutomated || artifact.rows.some((row) => configured.get(row.articleId) !== row.slug)) {
-      throw new Error("APPLY refused: reviewed PLAN does not match configured exact ID/slug set");
-    }
+    assertArtifactMatchesConfiguration(artifact, ready, minsk.id);
   } else {
     artifact = await createPhase2APlanArtifact(prismaBase, ready, minsk.id);
     const directory = resolve("scripts/tmp/prod-verify");

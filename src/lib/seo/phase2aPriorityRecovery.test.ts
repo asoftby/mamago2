@@ -140,7 +140,7 @@ function testReadinessBreakdown() {
   );
 
   // BLOCKED_OWNER_REVIEW must be a subset of the 52, not additional
-  assert.equal(allBlocked.length, 7, `expected 7 fail-closed owner-review rows, got ${allBlocked.length}`);
+  assert.equal(allBlocked.length, 10, `expected 10 fail-closed owner-review rows, got ${allBlocked.length}`);
 }
 
 function testBlockedRowsHaveOwnerReviewBatch() {
@@ -201,6 +201,15 @@ function testCountryBirthdayGuide() {
   assert.equal(entry?.currentDestination, "/blog/detskiy-den-rozhdeniya-na-prirode");
   const redirect = wpRedirectMap.find((row) => row.source === entry?.legacySourcePath);
   assert.equal(redirect?.destination, "/blog/detskiy-den-rozhdeniya-na-prirode");
+}
+
+function testAuditedUnclearArticlesFailClosed() {
+  for (const position of [15, 20, 21]) {
+    const entry = PHASE_2A_PRIORITY_RECOVERIES.find((row) => row.position === position);
+    assert.equal(entry?.readiness, "BLOCKED_OWNER_REVIEW", `position ${position} must fail closed`);
+    assert.equal(entry?.geoScope, null);
+    assert.equal(entry?.citySlug, null);
+  }
 }
 
 function testAutomatedRowsHaveExactIds() {
@@ -269,6 +278,7 @@ testNonMinskCityScopeArticles();
 testGeoScopeCITYArticlesHaveCitySlug();
 testExpectedTravelPaths();
 testCountryBirthdayGuide();
+testAuditedUnclearArticlesFailClosed();
 testAutomatedRowsHaveExactIds();
 testNoGenericMinskFallback();
 testEventSemanticRedirectDestination();
