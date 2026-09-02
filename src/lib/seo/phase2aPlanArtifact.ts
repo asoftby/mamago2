@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
+import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import type { MigratedArticlePublicationGeoRecovery } from "./migratedArticlePublicationGeoRecovery";
 import type { Phase2ARecoveryEntry } from "./phase2aPriorityRecovery";
 
@@ -137,9 +138,9 @@ export async function createPhase2APlanArtifact(
         reason: "audited articleId not found" });
       continue;
     }
-    const blocksCount = article.contentJson
-      ? ((article.contentJson as Record<string, unknown>).blocks as unknown[] | undefined)?.length ?? 0
-      : 0;
+    const blocksCount = parseArticleContentJson(article.contentJson).blocks.length;
+    const hasRenderableContent = blocksCount > 0;
+    const allowsIndexing = article.noindex !== true && !/\bnoindex\b/i.test(article.seoRobots ?? "");
     const slugMatches = article.slug === entry.currentSlug;
     const matchesTarget = article.status === target.status && article.geoScope === target.geoScope &&
       article.cityId === target.cityId && article.regionId === null;
@@ -152,8 +153,12 @@ export async function createPhase2APlanArtifact(
       current: { status: article.status, geoScope: article.geoScope, cityId: article.cityId, regionId: article.regionId },
       target, canonicalPath, legacyUrl: entry.legacySourcePath,
       confidence: entry.confidence as "HIGH" | "MEDIUM",
-      action: !slugMatches ? "conflict" : matchesTarget ? "already_applied" : matchesPrecondition ? "apply" : "conflict",
+      action: !slugMatches || !hasRenderableContent || !allowsIndexing
+        ? "conflict"
+        : matchesTarget ? "already_applied" : matchesPrecondition ? "apply" : "conflict",
       ...(!slugMatches ? { reason: `slug/ID mismatch: db=${article.slug} expected=${entry.currentSlug}` } :
+        !hasRenderableContent ? { reason: "contentJson has no renderable article blocks" } :
+        !allowsIndexing ? { reason: "article is configured noindex" } :
         !matchesTarget && !matchesPrecondition ? { reason: "unexpected current publication/geography state" } : {}),
     });
   }

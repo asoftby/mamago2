@@ -29,11 +29,16 @@ const entry: Phase2ARecoveryEntry = {
 const observed = {
   id: "article-reviewed-id", slug: "birthday", title: "Raw title",
   updatedAt: new Date("2026-09-01T00:00:00.000Z"), publishedAt: new Date("2024-01-01T00:00:00.000Z"),
-  noindex: false, seoRobots: null, contentJson: { blocks: [{}, {}] },
+  noindex: false, seoRobots: null,
+  contentJson: { version: 1, blocks: [{ id: "text-1", type: "text", text: "Renderable" }] },
   status: "PENDING", geoScope: null, cityId: null, regionId: null,
 };
 
-type ObservedArticle = Omit<typeof observed, "publishedAt"> & { publishedAt: Date | null };
+type ObservedArticle = Omit<typeof observed, "publishedAt" | "seoRobots" | "contentJson"> & {
+  publishedAt: Date | null;
+  seoRobots: string | null;
+  contentJson: unknown;
+};
 
 function prismaReturning(article: ObservedArticle | null): PrismaClient {
   return { article: { findUnique: async () => article } } as unknown as PrismaClient;
@@ -78,6 +83,20 @@ assert.equal(wrongSlugArtifact.rows[0]?.action, "conflict", "incorrect ID/slug p
 const missingArtifact = await createPhase2APlanArtifact(prismaReturning(null), [entry], "minsk-id");
 assert.equal(missingArtifact.rows[0]?.action, "not_found", "missing expected ID is represented");
 assert.equal(missingArtifact.rows.length, missingArtifact.expectedAutomated);
+
+for (const contentJson of [null, { version: 1, blocks: [] }, { blocks: [{ invalid: true }] }]) {
+  const unrenderableArtifact = await createPhase2APlanArtifact(
+    prismaReturning({ ...observed, contentJson }), [entry], "minsk-id",
+  );
+  assert.equal(unrenderableArtifact.rows[0]?.action, "conflict", "unrenderable content must fail closed");
+}
+
+for (const indexingState of [{ noindex: true }, { seoRobots: "index, NOINDEX, follow" }]) {
+  const noindexArtifact = await createPhase2APlanArtifact(
+    prismaReturning({ ...observed, ...indexingState }), [entry], "minsk-id",
+  );
+  assert.equal(noindexArtifact.rows[0]?.action, "conflict", "noindex recovery must fail closed");
+}
 
 const nullPublished = await createPhase2APlanArtifact(
   prismaReturning({ ...observed, publishedAt: null }), [entry], "minsk-id",
