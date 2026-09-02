@@ -209,11 +209,13 @@ export function pageClickMovers(currentRows: GscRow[], previousRows: GscRow[]) {
     if (key) previous.set(key, row.clicks);
   }
 
-  const keys = new Set([...current.keys(), ...previous.keys()]);
-  const deltas = [...keys].map((page) => ({
-    page,
-    delta: (current.get(page) ?? 0) - (previous.get(page) ?? 0),
-  }));
+  // Search Analytics rows are capped. Absence from one top-N response does
+  // not mean zero clicks, so only compare pages whose values are known in
+  // both periods. This intentionally favors correctness over completeness.
+  const deltas = [...current.entries()].flatMap(([page, currentClicks]) => {
+    const previousClicks = previous.get(page);
+    return previousClicks === undefined ? [] : [{ page, delta: currentClicks - previousClicks }];
+  });
   return {
     rising: deltas.filter((item) => item.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, MOVERS_LIMIT),
     falling: deltas.filter((item) => item.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, MOVERS_LIMIT),
