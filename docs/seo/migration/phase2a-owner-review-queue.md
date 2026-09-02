@@ -1,6 +1,6 @@
 # Phase 2A — Owner Review Queue
 
-These 10 URLs could not be automatically classified because their
+These 11 URLs could not be automatically classified because their
 geographic scope or semantic destination is ambiguous from the
 available evidence. Each needs a short owner decision to proceed.
 
@@ -60,7 +60,7 @@ content infrastructure (likely not available yet).
 
 ---
 
-## Batch 3: Event Semantic Destination (2 entries)
+## Batch 3: Event Semantic Destination (3 entries)
 
 These are events where the current redirect maps to `/minsk/events/{slug}`
 but the event is expired and the slug doesn't clearly map to a 2026 edition.
@@ -69,6 +69,7 @@ but the event is expired and the slug doesn't clearly map to a 2026 edition.
 |---|---|---|---|---|
 | 4 | `/events/festival-lidbeer-2025-lidbir` | 4,587 | Lidbeer 2025 festival. | If an exact current equivalent exists, use a semantic redirect. Otherwise choose historical restoration, a genuinely equivalent target, or `410_GONE` after owner review. |
 | 5 | `/events/detskaja-zheleznaja-doroga-raspisanie` | 1,497 | Children's railway schedule. This is a venue/attraction, not a generic event intent. | If an exact Place/current entity exists, use it. Otherwise choose historical restoration, a genuinely equivalent target, or `410_GONE` after owner review. |
+| 6 | `/events/bolshaya-kosmicheskaya-vystavka-kosmopark` | 3,447 | Past single-edition exhibition at Kosmopark. | Find an exact current equivalent, restore historical content, or decide `410_GONE`; do not use the generic event hub. |
 
 A generic `/minsk/events` hub is **not** a semantic equivalent and must not be recommended as a fallback. No `410_GONE` decision is automated.
 
@@ -81,9 +82,9 @@ A generic `/minsk/events` hub is **not** a semantic equivalent and must not be r
 | Missing audited target ID | 2 | 13,568 | Keep blocked until exact IDs are audited |
 | Non-Minsk cities (COUNTRY default) | 2 | 1,833 | Reclassify as COUNTRY, update redirect to `/blog/{slug}` |
 | Ambiguous scope | 4 | 2,259 | Keep blocked pending content-based geography decision |
-| Event destinations | 2 | 6,084 | Exact equivalent only; otherwise retain owner review |
-| **Total** | **10** | **23,744** | |
+| Event destinations | 3 | 9,531 | Exact equivalent only; otherwise retain owner review |
+| **Total** | **11** | **27,191** | |
 
-**Note**: These 10 URLs represent ~23,744 of the ~104,243 P2-A click mass.
-The remaining 42 URLs are all `READY_AUTOMATED` or `READY_WITH_EXACT_MAPPING`
+**Note**: These 11 URLs represent ~27,191 of the ~104,243 P2-A click mass.
+The remaining 41 URLs are all `READY_AUTOMATED` or `READY_WITH_EXACT_MAPPING`
 and can proceed independently of these decisions.

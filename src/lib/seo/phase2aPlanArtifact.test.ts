@@ -54,6 +54,16 @@ assert.throws(
   /targets do not match/,
   "stale reviewed geography/canonical target must fail closed",
 );
+const duplicateRowsArtifact = {
+  ...artifact,
+  expectedAutomated: 2,
+  rows: [artifact.rows[0]!, artifact.rows[0]!],
+};
+assert.throws(
+  () => assertArtifactMatchesConfiguration(duplicateRowsArtifact, [entry, { ...entry, currentSlug: "second", targetArticleId: "second-id" }], "minsk-id"),
+  /targets do not match/,
+  "duplicate artifact IDs with an omitted configured row must fail closed",
+);
 
 assert.throws(() => validatePhase2APlanArtifact({ ...artifact, sha256: "0".repeat(64) }), /checksum/);
 assert.throws(() => validatePhase2APlanArtifact({ ...artifact, rows: [] }), /incomplete/);

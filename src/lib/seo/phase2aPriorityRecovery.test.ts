@@ -140,7 +140,7 @@ function testReadinessBreakdown() {
   );
 
   // BLOCKED_OWNER_REVIEW must be a subset of the 52, not additional
-  assert.equal(allBlocked.length, 10, `expected 10 fail-closed owner-review rows, got ${allBlocked.length}`);
+  assert.equal(allBlocked.length, 11, `expected 11 fail-closed owner-review rows, got ${allBlocked.length}`);
 }
 
 function testBlockedRowsHaveOwnerReviewBatch() {
@@ -265,6 +265,9 @@ function testNoGenericEventHubRecommendation() {
   assert.ok(ownerReviewQueue.includes("A generic `/minsk/events` hub is **not** a semantic equivalent"));
   assert.ok(!ownerReviewQueue.includes("redirect to `/minsk/events` if no"));
   assert.ok(!ownerReviewQueue.includes("If not → redirect to `/minsk/events`"));
+  const kosmopark = PHASE_2A_PRIORITY_RECOVERIES.find((row) => row.position === 27);
+  assert.equal(kosmopark?.readiness, "BLOCKED_OWNER_REVIEW");
+  assert.equal(kosmopark?.ownerReviewBatch, "p2a-event-semantic-destination");
 }
 
 // === RUN ===

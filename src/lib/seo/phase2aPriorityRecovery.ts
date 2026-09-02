@@ -535,12 +535,13 @@ export const PHASE_2A_PRIORITY_RECOVERIES: Phase2ARecoveryEntry[] = [
     entityType: "event",
     gscClicks: 3447,
     action: "SEMANTIC_REDIRECT",
-    readiness: "READY_WITH_EXACT_MAPPING",
+    readiness: "BLOCKED_OWNER_REVIEW",
     geoScope: null,
     citySlug: null,
     confidence: "HIGH",
     evidence:
-      "Past space exhibition at Kosmopark. Single-edition exhibition. Redirect /minsk/events as semantic hub.",
+      "Past space exhibition at Kosmopark. No exact current equivalent is configured; a generic /minsk/events hub is not a semantic equivalent.",
+    ownerReviewBatch: "p2a-event-semantic-destination",
     isRecurring: false,
   },
   {

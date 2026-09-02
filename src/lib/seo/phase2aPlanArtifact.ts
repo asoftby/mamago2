@@ -90,7 +90,13 @@ export function assertArtifactMatchesConfiguration(
       : `/blog/${entry.currentSlug}`;
     return [entry.targetArticleId!, { slug: entry.currentSlug, target, canonicalPath }];
   }));
-  if (configured.size !== artifact.expectedAutomated || artifact.rows.some((row) => {
+  const artifactIds = artifact.rows.map((row) => row.articleId);
+  const uniqueArtifactIds = new Set(artifactIds);
+  if (configured.size !== artifact.expectedAutomated ||
+      uniqueArtifactIds.size !== artifact.rows.length ||
+      configured.size !== uniqueArtifactIds.size ||
+      [...configured.keys()].some((id) => !uniqueArtifactIds.has(id)) ||
+      artifact.rows.some((row) => {
     const expected = configured.get(row.articleId);
     return !expected || expected.slug !== row.slug || expected.canonicalPath !== row.canonicalPath ||
       expected.target.status !== row.target.status || expected.target.geoScope !== row.target.geoScope ||
