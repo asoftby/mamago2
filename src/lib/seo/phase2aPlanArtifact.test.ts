@@ -128,6 +128,13 @@ const sameCountContentDrift = await buildPublicationGeoPlan(
 );
 assert.equal(sameCountContentDrift[0]?.action, "conflict", "content digest catches same-block-count drift");
 
+const renderedMetadataDrift = await buildPublicationGeoPlan(
+  prismaReturning({ ...observed, subtitle: "Edited after PLAN" } as ObservedArticle),
+  reviewedRecoveries,
+  "minsk-id",
+);
+assert.equal(renderedMetadataDrift[0]?.action, "conflict", "rendered metadata drift must fail closed");
+
 console.log("phase2aPlanArtifact.test.ts: PASS");
 }
 

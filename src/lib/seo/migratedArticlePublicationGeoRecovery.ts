@@ -50,6 +50,8 @@ export type MigratedArticlePublicationGeoRecovery = {
   auditedBlocksCount: number;
   /** Stable SHA-256 of the parsed article content when a reviewed PLAN artifact supplies it. */
   auditedContentSha256?: string;
+  /** Stable SHA-256 of rendered/indexed metadata supplied by a reviewed PLAN artifact. */
+  auditedRenderedMetadataSha256?: string;
 };
 
 export const MINSK_CITY_SLUG = "minsk";

@@ -6,6 +6,12 @@ import type { Phase2ARecoveryEntry } from "./phase2aPriorityRecovery";
 
 export const PHASE_2A_PLAN_SCHEMA = "mamago.phase2a.article-recovery-plan.v1" as const;
 
+export type ArticleRenderedMetadataFingerprint = Record<string, unknown>;
+
+export function renderedMetadataSha256(metadata: ArticleRenderedMetadataFingerprint): string {
+  return createHash("sha256").update(JSON.stringify(metadata)).digest("hex");
+}
+
 export type Phase2APlanArtifactRow = {
   articleId: string;
   slug: string;
@@ -16,6 +22,7 @@ export type Phase2APlanArtifactRow = {
   seoRobots: string | null;
   blocksCount: number | null;
   contentSha256: string | null;
+  renderedMetadataSha256: string | null;
   current: {
     status: string | null;
     geoScope: string | null;
@@ -61,7 +68,10 @@ export function validatePhase2APlanArtifact(value: unknown): Phase2APlanArtifact
     throw new Error("invalid PLAN artifact: incomplete expected row set");
   }
   if (!artifact.rows.every((row) => row.articleId && row.slug && row.target && row.canonicalPath &&
-    (row.action === "not_found" ? row.contentSha256 === null : /^[a-f0-9]{64}$/.test(row.contentSha256 ?? "")))) {
+    (row.action === "not_found"
+      ? row.contentSha256 === null && row.renderedMetadataSha256 === null
+      : /^[a-f0-9]{64}$/.test(row.contentSha256 ?? "") &&
+        /^[a-f0-9]{64}$/.test(row.renderedMetadataSha256 ?? "")))) {
     throw new Error("invalid PLAN artifact: malformed row");
   }
   const { sha256, ...unsigned } = artifact;
@@ -130,11 +140,17 @@ export async function createPhase2APlanArtifact(
       id: true, slug: true, title: true, updatedAt: true, publishedAt: true,
       noindex: true, seoRobots: true, contentJson: true, status: true,
       geoScope: true, cityId: true, regionId: true,
+      subtitle: true, excerpt: true, heroImage: true, coverImageId: true,
+      authorUserId: true, authorLabel: true, cityContext: true, expiresAt: true, scheduledAt: true,
+      seoTitle: true, seoDescription: true, seoH1: true, seoCanonicalUrl: true,
+      seoOgTitle: true, seoOgDescription: true, seoOgImage: true, seoImageId: true,
+      seoJsonLdOverride: true, seoCanonicalSource: true, relatedPlaceId: true, categoryId: true,
     } });
     if (!article) {
       rows.push({ articleId: entry.targetArticleId, slug: entry.currentSlug, rawTitle: null,
         updatedAt: null, publishedAt: null, noindex: null, seoRobots: null, blocksCount: null,
         contentSha256: null,
+        renderedMetadataSha256: null,
         current: { status: null, geoScope: null, cityId: null, regionId: null }, target,
         canonicalPath, legacyUrl: entry.legacySourcePath,
         confidence: entry.confidence as "HIGH" | "MEDIUM", action: "not_found",
@@ -144,6 +160,19 @@ export async function createPhase2APlanArtifact(
     const parsedContent = parseArticleContentJson(article.contentJson);
     const blocksCount = parsedContent.blocks.length;
     const contentSha256 = createHash("sha256").update(JSON.stringify(parsedContent)).digest("hex");
+    const renderedMetadata = renderedMetadataSha256({
+      subtitle: article.subtitle, excerpt: article.excerpt, heroImage: article.heroImage,
+      coverImageId: article.coverImageId, authorUserId: article.authorUserId,
+      authorLabel: article.authorLabel, cityContext: article.cityContext,
+      expiresAt: article.expiresAt?.toISOString() ?? null,
+      scheduledAt: article.scheduledAt?.toISOString() ?? null,
+      seoTitle: article.seoTitle, seoDescription: article.seoDescription, seoH1: article.seoH1,
+      seoCanonicalUrl: article.seoCanonicalUrl, seoOgTitle: article.seoOgTitle,
+      seoOgDescription: article.seoOgDescription, seoOgImage: article.seoOgImage,
+      seoImageId: article.seoImageId, seoJsonLdOverride: article.seoJsonLdOverride,
+      seoCanonicalSource: article.seoCanonicalSource, relatedPlaceId: article.relatedPlaceId,
+      categoryId: article.categoryId,
+    });
     const hasRenderableContent = blocksCount > 0;
     const allowsIndexing = article.noindex !== true && !/\bnoindex\b/i.test(article.seoRobots ?? "");
     const slugMatches = article.slug === entry.currentSlug;
@@ -155,6 +184,7 @@ export async function createPhase2APlanArtifact(
       articleId: article.id, slug: entry.currentSlug, rawTitle: article.title,
       updatedAt: article.updatedAt.toISOString(), publishedAt: article.publishedAt?.toISOString() ?? null,
       noindex: article.noindex, seoRobots: article.seoRobots, blocksCount, contentSha256,
+      renderedMetadataSha256: renderedMetadata,
       current: { status: article.status, geoScope: article.geoScope, cityId: article.cityId, regionId: article.regionId },
       target, canonicalPath, legacyUrl: entry.legacySourcePath,
       confidence: entry.confidence as "HIGH" | "MEDIUM",
@@ -191,5 +221,6 @@ export function recoveriesFromReviewedArtifact(artifact: Phase2APlanArtifact): M
     auditedSeoRobots: row.seoRobots,
     auditedBlocksCount: row.blocksCount ?? 0,
     auditedContentSha256: row.contentSha256 ?? undefined,
+    auditedRenderedMetadataSha256: row.renderedMetadataSha256 ?? undefined,
   }));
 }
