@@ -91,6 +91,30 @@ function testProfileStepIsRenamedToAboutThePlace() {
   assert.equal(getPlaceWizardStepNumber("profile", true), 1);
 }
 
+/**
+ * Pins the Step 2 UX-copy update: the semantic key stays `location` and the
+ * short/title copy stays "Локация" — only the description becomes
+ * user-facing ("Укажите адрес — район и метро определим автоматически"
+ * instead of the old bare "Где находится ваше место"). Order/position is
+ * unchanged.
+ */
+function testLocationStepDescriptionIsUserFacing() {
+  assert.equal(PLACE_WIZARD_STEP_DEFINITIONS.location.shortLabel, "Локация");
+  assert.equal(PLACE_WIZARD_STEP_DEFINITIONS.location.title, "Локация");
+  assert.equal(
+    PLACE_WIZARD_STEP_DEFINITIONS.location.description,
+    "Укажите адрес — район и метро определим автоматически",
+  );
+
+  // Position/order in the layout is unchanged — still step 2 in both layouts.
+  assert.equal(getPlaceWizardStepKeys(false)[1], "location");
+  assert.equal(getPlaceWizardStepKeys(true)[1], "location");
+  assert.equal(getStepKey(2, false), "location");
+  assert.equal(getStepKey(2, true), "location");
+  assert.equal(getPlaceWizardStepNumber("location", false), 2);
+  assert.equal(getPlaceWizardStepNumber("location", true), 2);
+}
+
 function main() {
   testLegacyLayoutIsStable();
   testCtaLayoutIsStable();
@@ -98,6 +122,7 @@ function main() {
   testSemanticLookupDoesNotDependOnNumericPosition();
   testStepCopyComesFromCanonicalDefinitions();
   testProfileStepIsRenamedToAboutThePlace();
+  testLocationStepDescriptionIsUserFacing();
 }
 
 main();
