@@ -9,6 +9,8 @@ import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
 import { getPlacePreviewPath } from "@/lib/content-preview/paths";
 import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
 import { AdminContentRelationsIndicator } from "@/components/admin/content/AdminContentRelationsIndicator";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { getAdminPagination, parseAdminPage } from "@/lib/admin/pagination";
 import {
   blockingDependencyItems,
   nonBlockingDependencyItems,
@@ -48,8 +50,10 @@ function parseContentStatusFilter(
 }
 
 interface SearchParams {
+  q?: string;
   status?: string;
   cityId?: string;
+  page?: string;
   [key: string]: string | undefined;
 }
 
@@ -78,7 +82,24 @@ async function getPlaces(params: SearchParams) {
     where.cityId = params.cityId;
   }
 
-  const places = await prisma.place.findMany({
+  const q = params.q?.trim();
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { slug: { contains: q, mode: "insensitive" } },
+      { formattedAddr: { contains: q, mode: "insensitive" } },
+      { customAddress: { contains: q, mode: "insensitive" } },
+      { ownerBusiness: { name: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+
+  const total = await prisma.place.count({ where });
+  const pagination = getAdminPagination({
+    page: parseAdminPage(params.page),
+    total,
+  });
+
+  const items = await prisma.place.findMany({
     where,
     include: {
       city: {
@@ -120,10 +141,11 @@ async function getPlaces(params: SearchParams) {
     orderBy: {
       createdAt: "desc",
     },
-    take: 100, // Limit for performance
+    skip: pagination.skip,
+    take: pagination.take,
   });
 
-  return places;
+  return { items, pagination };
 }
 
 const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
@@ -148,12 +170,14 @@ type PlaceRowMeta = {
   archivedDeletePreflight: ReturnType<typeof derivePlaceArchivedDeletePreflight>;
 };
 
+type PlaceListItem = Awaited<ReturnType<typeof getPlaces>>["items"][number];
+
 function PlacesTable({
   places,
   returnTo,
   placeMetaById,
 }: {
-  places: Awaited<ReturnType<typeof getPlaces>>;
+  places: PlaceListItem[];
   returnTo: string;
   placeMetaById: Map<string, PlaceRowMeta>;
 }) {
@@ -180,7 +204,7 @@ function PlacesTable({
     const viewPlaceHref = publicPlaceHref ?? getPlacePreviewPath(place.id);
 
     const fullAddress = place.formattedAddr || place.customAddress || "";
-    const addressParts = fullAddress.split(",").map(p => p.trim());
+    const addressParts = fullAddress.split(",").map((p) => p.trim());
     const streetAddress = addressParts[0] || "";
     const rowMeta = placeMetaById.get(place.id) ?? {
       dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
@@ -195,9 +219,7 @@ function PlacesTable({
         dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
       },
     };
-    const blockingItems = blockingDependencyItems(
-      rowMeta.dependencySummary,
-    );
+    const blockingItems = blockingDependencyItems(rowMeta.dependencySummary);
     const lifecycleViewModel = buildAdminLifecycleViewModel({
       ...buildAdminPlaceLifecycleInput({
         status: place.status,
@@ -215,7 +237,8 @@ function PlacesTable({
     const businessLabel =
       place.ownerBusiness?.name ||
       place.ownerBusiness?.owner?.email ||
-      place.createdBy?.email || "—";
+      place.createdBy?.email ||
+      "—";
 
     const actionsMenu = (
       <ContentLifecycleActionsMenu
@@ -269,97 +292,113 @@ function PlacesTable({
       />
     );
 
-    return { place, streetAddress, businessLabel, rowMeta, lifecycleViewModel, actionsMenu };
+    return {
+      place,
+      streetAddress,
+      businessLabel,
+      rowMeta,
+      lifecycleViewModel,
+      actionsMenu,
+    };
   });
 
   return (
     <>
-      {/* Desktop: table */}
       <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
-        <TableContainer minWidthClassName="min-w-[960px]" scrollLabel="Список мест, прокручивается по горизонтали">
+        <TableContainer
+          minWidthClassName="min-w-[960px]"
+          scrollLabel="Список мест, прокручивается по горизонтали"
+        >
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Название
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Город
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Бизнес
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Статус
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Связи
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Создано
-                </th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">
-                  Действия
-                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Связи</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {rows.map(({ place, streetAddress, businessLabel, rowMeta, lifecycleViewModel, actionsMenu }) => (
-                <tr key={place.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {place.title}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    <div>
-                      <div className="font-medium">{place.city?.name || "-"}</div>
-                      {streetAddress && (
-                        <div className="text-xs text-gray-500 mt-0.5">{streetAddress}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{businessLabel}</td>
-                  <td className="px-4 py-3">
-                    <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <AdminContentRelationsIndicator
-                      summary={rowMeta.dependencySummary}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
-                  </td>
-                  <td className="px-4 py-3">{actionsMenu}</td>
-                </tr>
-              ))}
+              {rows.map(
+                ({
+                  place,
+                  streetAddress,
+                  businessLabel,
+                  rowMeta,
+                  lifecycleViewModel,
+                  actionsMenu,
+                }) => (
+                  <tr key={place.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{place.title}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      <div>
+                        <div className="font-medium">{place.city?.name || "-"}</div>
+                        {streetAddress && (
+                          <div className="text-xs text-gray-500 mt-0.5">{streetAddress}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{businessLabel}</td>
+                    <td className="px-4 py-3">
+                      <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <AdminContentRelationsIndicator summary={rowMeta.dependencySummary} />
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
+                    </td>
+                    <td className="px-4 py-3">{actionsMenu}</td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         </TableContainer>
       </div>
 
-      {/* Mobile: cards — same rows, same actions menu */}
       <DataCardList>
-        {rows.map(({ place, streetAddress, businessLabel, rowMeta, lifecycleViewModel, actionsMenu }) => (
-          <DataCard key={place.id}>
-            <DataCardHeader
-              title={place.title}
-              subtitle={[place.city?.name, streetAddress].filter(Boolean).join(", ") || undefined}
-              badge={<ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />}
-            />
-            <DataCardBody>
-              <DataCardRow label="Бизнес" value={businessLabel === "—" ? null : businessLabel} />
-              <DataCardRow
-                label="Связи"
-                value={<AdminContentRelationsIndicator summary={rowMeta.dependencySummary} />}
+        {rows.map(
+          ({
+            place,
+            streetAddress,
+            businessLabel,
+            rowMeta,
+            lifecycleViewModel,
+            actionsMenu,
+          }) => (
+            <DataCard key={place.id}>
+              <DataCardHeader
+                title={place.title}
+                subtitle={
+                  [place.city?.name, streetAddress].filter(Boolean).join(", ") || undefined
+                }
+                badge={<ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />}
               />
-              <DataCardRow
-                label="Создано"
-                value={formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
-              />
-            </DataCardBody>
-            <DataCardActions>{actionsMenu}</DataCardActions>
-          </DataCard>
-        ))}
+              <DataCardBody>
+                <DataCardRow
+                  label="Бизнес"
+                  value={businessLabel === "—" ? null : businessLabel}
+                />
+                <DataCardRow
+                  label="Связи"
+                  value={<AdminContentRelationsIndicator summary={rowMeta.dependencySummary} />}
+                />
+                <DataCardRow
+                  label="Создано"
+                  value={formatDistanceToNow(place.createdAt, {
+                    addSuffix: true,
+                    locale: ru,
+                  })}
+                />
+              </DataCardBody>
+              <DataCardActions>{actionsMenu}</DataCardActions>
+            </DataCard>
+          ),
+        )}
       </DataCardList>
     </>
   );
@@ -371,11 +410,13 @@ export default async function PlacesListPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  
-  const [places, cities] = await Promise.all([
+
+  const [placesResult, cities] = await Promise.all([
     getPlaces(params),
     getModerationFilterCities(),
   ]);
+  const { items: places, pagination } = placesResult;
+
   const dependencySummaries = await getPlacesDependencySummariesBatch(
     places.map((place) => place.id),
     prisma,
@@ -405,20 +446,15 @@ export default async function PlacesListPage({
 
   return (
     <div className="p-6 md:p-4 space-y-6">
-      {/* AdminPageHeader */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-xl font-bold">Места</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Все места, добавленные бизнесами
-          </p>
+          <p className="text-sm text-gray-600 mt-1">Все места, добавленные бизнесами</p>
         </div>
       </div>
 
-      {/* AdminPageToolbar */}
       <PlacesFilters cities={cities} />
 
-      {/* AdminPageContent */}
       <Suspense fallback={<div>Загрузка...</div>}>
         <PlacesTable
           places={places}
@@ -426,6 +462,16 @@ export default async function PlacesListPage({
           placeMetaById={placeMetaById}
         />
       </Suspense>
+
+      <AdminPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        start={pagination.start}
+        end={pagination.end}
+        basePath="/admin/content/places"
+        params={params}
+      />
     </div>
   );
 }
