@@ -4,6 +4,7 @@
  */
 
 import type { OpeningHoursMode, DayOfWeek } from "@prisma/client";
+import { OPENING_HOURS_DAYS } from "@/domain/opening-hours/structuredOpeningHours";
 
 /**
  * Time interval for UI
@@ -72,7 +73,7 @@ export const MODE_LABELS: Record<OpeningHoursMode, string> = {
 /**
  * All days of week in order
  */
-export const ALL_DAYS: DayOfWeek[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+export const ALL_DAYS: DayOfWeek[] = [...OPENING_HOURS_DAYS];
 
 /**
  * Weekdays
