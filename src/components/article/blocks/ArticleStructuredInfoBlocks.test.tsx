@@ -9,6 +9,9 @@ import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } fro
   assert.match(html, /mailto:hi@example.by/);
   assert.match(html, /target="_blank"/);
   assert.equal(renderToStaticMarkup(<ArticleContactsBlock data={{ phones: [], socials: [] }} />), "");
+  assert.match(renderToStaticMarkup(<ArticleContactsBlock data={{ phones: [], socials: [], mapUrl: "https://maps.example/place" }} />), /Открыть на карте/);
+  assert.match(renderToStaticMarkup(<ArticleContactsBlock data={{ phones: [], socials: [], mapUrl: "https://maps.example/place" }} />), /rel="noreferrer"/);
+  assert.match(renderToStaticMarkup(<ArticleContactsBlock data={{ address: "Минск", phones: [], socials: [] }} />), /Минск/);
 }
 
 {

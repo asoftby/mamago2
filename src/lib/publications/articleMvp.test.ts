@@ -7,13 +7,21 @@
  * Run: npx tsx src/lib/publications/articleMvp.test.ts
  */
 import assert from "node:assert/strict";
-import { ArticleContentPayloadSchema, extractArticleMediaIds, extractArticleMediaUsage, newBlock, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
+import { ArticleContentPayloadSchema, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
 
 // newBlock()'s return type is the full ArticleBlockMvp union (not narrowed to
 // the requested variant), so spreading it and overriding mediaId/mediaIds
 // doesn't typecheck — build the image/gallery variants directly instead.
 function imageBlock(mediaId: string): ArticleBlockMvp {
   return { id: "img-block", type: "image", mediaId, alt: "", caption: "" };
+}
+
+{
+  const content = { version: 1 as const, blocks: [{ id: "price", type: "price" as const, data: { mode: "FREE" as const, currency: " BYN ", min: 0, max: 0, items: [{ id: "blank", label: " ", price: "", unit: "BYN" }, { id: "adult", label: " Adult ", price: " 20 ", unit: " BYN " }], note: " note " } }] };
+  const prepared = prepareArticleContentForSave(content);
+  assert.deepEqual(prepared.blocks[0]?.type === "price" ? prepared.blocks[0].data.items : [], [{ id: "adult", label: "Adult", price: "20", unit: "BYN" }]);
+  assert.equal(ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave({ ...content, blocks: [{ ...content.blocks[0], data: { ...content.blocks[0].data, items: [{ id: "partial", label: "Adult", price: "", unit: "BYN" }] } }] })).success, false);
+  assert.equal(ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave({ ...content, blocks: [{ ...content.blocks[0], data: { ...content.blocks[0].data, items: [{ id: "partial", label: "", price: "20", unit: "BYN" }] } }] })).success, false);
 }
 
 function galleryBlock(mediaIds: string[]): ArticleBlockMvp {
