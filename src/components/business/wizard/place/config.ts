@@ -16,7 +16,7 @@ export const PLACE_WIZARD_STEP_DEFINITIONS = {
   location: {
     shortLabel: "Локация",
     title: "Локация",
-    description: "Где находится ваше место",
+    description: "Укажите адрес — район и метро определим автоматически",
   },
   contacts: {
     shortLabel: "Контакты",

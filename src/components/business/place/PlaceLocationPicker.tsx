@@ -23,6 +23,14 @@ import {
   shouldClearManualGeoOverrides,
   type GeoPoint,
 } from "./placeLocationGeoOverrides";
+import { buildGeoFilterOptions, getGeoFieldPresentation } from "./placeLocationPresentation";
+
+const DISTRICT_UNAVAILABLE_COPY = "Список районов для этого города пока недоступен.";
+const METRO_UNAVAILABLE_COPY = "Список станций метро для этого города пока недоступен.";
+const GEO_FULL_FAILURE_COPY =
+  "Район и метро сейчас определить не удалось. Можно продолжить — адрес и точка на карте сохранены.";
+const GEO_DISTRICTS_FAILED_COPY = "Не удалось загрузить список районов. Адрес всё равно сохранится.";
+const GEO_METRO_FAILED_COPY = "Не удалось загрузить список станций метро. Адрес всё равно сохранится.";
 
 interface PlaceLocationPickerProps {
   placeId: string;
@@ -218,23 +226,28 @@ export function PlaceLocationPicker({
         count: nextMetroStations.length,
       });
 
-      const warnings: string[] = [];
-      if (nextDistricts.length === 0) {
+      // User-facing copy stays plain-language, no internal/DB terminology
+      // — console logging below can stay technical.
+      const districtsFailed = nextDistricts.length === 0;
+      const metroFailed = nextMetroStations.length === 0;
+      if (districtsFailed) {
         console.warn(`[PlaceLocationPicker] No districts found for cityId: ${cityId}`);
-        warnings.push("Для этого города не загружены районы.");
       }
-      if (nextMetroStations.length === 0) {
+      if (metroFailed) {
         console.warn(`[PlaceLocationPicker] No metro stations found for cityId: ${cityId}`);
-        warnings.push("Для этого города не загружены станции метро.");
       }
-      if (warnings.length > 0) {
-        setGeoOptionsWarning(`${warnings.join(" ")} Можно выбрать вручную после настройки справочника.`);
+      if (districtsFailed && metroFailed) {
+        setGeoOptionsWarning(GEO_FULL_FAILURE_COPY);
+      } else if (districtsFailed) {
+        setGeoOptionsWarning(GEO_DISTRICTS_FAILED_COPY);
+      } else if (metroFailed) {
+        setGeoOptionsWarning(GEO_METRO_FAILED_COPY);
       }
     } catch (err) {
       console.error("[PlaceLocationPicker] Load geo options error:", err);
       setDistricts([]);
       setMetroStations([]);
-      setGeoOptionsWarning("Не удалось загрузить справочники районов и метро. Проверьте geo API и данные города.");
+      setGeoOptionsWarning(GEO_FULL_FAILURE_COPY);
       setGeoOptionsDebug({
         cityId,
         districtsUrl,
@@ -739,24 +752,64 @@ export function PlaceLocationPicker({
   });
 
   // UI visibility logic
-  const hasAutoEnrichment = !!(districtAutoId || metroAutoId);
   const showSelects = !!(location && cityId);
-  const showReadOnlyEnrichment = !!(location && hasAutoEnrichment);
 
-  const metroFilterOptions = useMemo(() => {
-    const out: { value: string; label: string }[] = [];
-    if (
-      metroShown &&
-      metroStations.length === 0 &&
-      initialLocation?.metroName
-    ) {
-      out.push({ value: metroShown, label: initialLocation.metroName });
-    }
-    for (const m of metroStations) {
-      out.push({ value: m.id, label: m.name });
-    }
-    return out;
-  }, [metroShown, metroStations, initialLocation?.metroName]);
+  const metroFilterOptions = useMemo(
+    () =>
+      buildGeoFilterOptions({
+        shownId: metroShown,
+        referenceList: metroStations,
+        fallbackName: initialLocation?.metroName,
+      }),
+    [metroShown, metroStations, initialLocation?.metroName],
+  );
+
+  // Symmetric to metroFilterOptions: when the district reference list hasn't
+  // loaded (or never will, without a cityId), still show the previously
+  // saved district's readable name instead of a raw id or blank select.
+  const districtFilterOptions = useMemo(
+    () =>
+      buildGeoFilterOptions({
+        shownId: districtShown,
+        referenceList: districts,
+        fallbackName: initialLocation?.districtName,
+      }),
+    [districtShown, districts, initialLocation?.districtName],
+  );
+
+  // District/metro field presentation — the district/metro FilterSelect
+  // fields are the single source of truth for this state; there is no
+  // separate "auto-detected" card duplicating the same values (see
+  // placeLocationPresentation.ts for the state/copy decision).
+  const districtPresentation = getGeoFieldPresentation({
+    manualId: districtManualId,
+    autoId: districtAutoId,
+    optionsAvailable: districtFilterOptions.length > 0,
+    unavailableCopy: DISTRICT_UNAVAILABLE_COPY,
+  });
+  const metroPresentation = getGeoFieldPresentation({
+    manualId: metroManualId,
+    autoId: metroAutoId,
+    optionsAvailable: metroFilterOptions.length > 0,
+    unavailableCopy: METRO_UNAVAILABLE_COPY,
+  });
+  const metroStatusCopy =
+    metroShown && metroDistanceShown !== null
+      ? `${formatDistance(metroDistanceShown)} · ${metroPresentation.statusCopy}`
+      : metroPresentation.statusCopy;
+
+  // Readable district/metro names for the (rare) cityId-missing fallback
+  // below — falls back to the enrichment-provided name hint when the
+  // reference lists haven't loaded (they can't, without a cityId), and to
+  // a neutral status rather than ever showing a raw database id.
+  const districtNameForFallback =
+    districts.find((d) => d.id === (districtManualId || districtAutoId))?.name ||
+    initialLocation?.districtName ||
+    null;
+  const metroNameForFallback =
+    metroStations.find((m) => m.id === (metroManualId || metroAutoId))?.name ||
+    initialLocation?.metroName ||
+    null;
 
   return (
     <div className="space-y-6">
@@ -784,9 +837,10 @@ export function PlaceLocationPicker({
         </div>
       )}
 
-      {/* Search Input */}
+      {/* Address */}
       <div>
-        <Label>Адрес или название места</Label>
+        <Label>Адрес *</Label>
+        <p className="text-xs text-muted-foreground mt-0.5">Начните вводить адрес или название места.</p>
         <div className="mt-2 space-y-2">
           <PlaceSearchInput
             onPlaceSelect={handlePlaceSelect}
@@ -799,31 +853,35 @@ export function PlaceLocationPicker({
             disabled={disabled}
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Выбрать точку на карте
+            Указать точку на карте
           </button>
         </div>
       </div>
 
-      {/* Map Preview (only show if location is set) */}
+      {/* Map (only once a location is set) — the readable address is the
+          primary label here; raw coordinates are only a fallback when no
+          address string is available at all. */}
       {location && (
-        <div>
-          <Label>Выбранное местоположение</Label>
-          <div className="mt-2 space-y-2">
-            <PlaceMapPreview
-              lat={location.lat}
-              lng={location.lng}
-              onOpenMap={() => setIsMapModalOpen(true)}
-            />
-            <p className="text-sm text-gray-600">
-              Выбрано: {location.address || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}
-            </p>
-          </div>
+        <div className="space-y-2">
+          <PlaceMapPreview
+            lat={location.lat}
+            lng={location.lng}
+            onOpenMap={() => setIsMapModalOpen(true)}
+            actionLabel="Изменить точку"
+          />
+          <p className="text-sm text-gray-600">
+            {location.address || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}
+          </p>
         </div>
       )}
 
-      {/* District & Metro Selects (only show if location is set and cityId available) */}
+      {/* Район и метро — the selects below are the ONLY source of truth for
+          this state; there is no separate "auto-detected" card repeating
+          the same values (see placeLocationPresentation.ts). */}
       {showSelects && (
         <div id="geo-selects" className="space-y-4">
+          <h3 className="text-base font-semibold">Район и метро</h3>
+
           {geoOptionsWarning && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {geoOptionsWarning}
@@ -837,31 +895,23 @@ export function PlaceLocationPicker({
               id="district"
               value={districtShown || ""}
               placeholder="Не выбрано"
-              options={districts.map((d) => ({ value: d.id, label: d.name }))}
+              options={districtFilterOptions}
               onChange={handleDistrictChange}
               disabled={districts.length === 0 || disabled}
             />
-            
-            {/* Helper text */}
-            <div className="mt-1 text-xs text-muted-foreground">
-              {districtManualId ? (
-                <div className="flex items-center justify-between">
-                  <span>Вы выбрали вручную</span>
-                  <button
-                    type="button"
-                    onClick={handleResetDistrict}
-                    disabled={disabled}
-                    className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Сбросить
-                  </button>
-                </div>
-              ) : districtAutoId ? (
-                <span>Определено автоматически</span>
-              ) : districts.length === 0 ? (
-                <span>Для этого города не загружены районы. Выбор станет доступен после настройки справочника.</span>
-              ) : (
-                <span>Не удалось определить район автоматически — выберите вручную</span>
+
+            {/* Status + reset action */}
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>{districtPresentation.statusCopy}</span>
+              {districtPresentation.resetLabel && (
+                <button
+                  type="button"
+                  onClick={handleResetDistrict}
+                  disabled={disabled}
+                  className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {districtPresentation.resetLabel}
+                </button>
               )}
             </div>
           </div>
@@ -877,120 +927,44 @@ export function PlaceLocationPicker({
               onChange={handleMetroChange}
               disabled={metroFilterOptions.length === 0 || disabled}
             />
-            
-            {/* Distance display */}
-            {metroShown && metroDistanceShown !== null && (
-              <p className="mt-1 text-sm text-gray-700">
-                Расстояние: {formatDistance(metroDistanceShown)}
-              </p>
-            )}
-            
-            {/* Helper text */}
-            <div className="mt-1 text-xs text-muted-foreground">
-              {metroManualId ? (
-                <div className="flex items-center justify-between">
-                  <span>Вы выбрали вручную</span>
-                  <button
-                    type="button"
-                    onClick={handleResetMetro}
-                    disabled={disabled}
-                    className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Сбросить
-                  </button>
-                </div>
-              ) : metroAutoId ? (
-                <span>Определено автоматически</span>
-              ) : metroFilterOptions.length === 0 ? (
-                <span>Для этого города не загружены станции метро. Выбор станет доступен после настройки справочника.</span>
-              ) : (
-                <span>Не удалось определить метро автоматически — выберите вручную</span>
+
+            {/* Status (+ distance, compact) + reset action */}
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>{metroStatusCopy}</span>
+              {metroPresentation.resetLabel && (
+                <button
+                  type="button"
+                  onClick={handleResetMetro}
+                  disabled={disabled}
+                  className="text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {metroPresentation.resetLabel}
+                </button>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Read-only display when location exists but cityId is missing */}
+      {/* Rare fallback: a location was enriched previously but cityId isn't
+          resolvable right now, so the selects above can't render at all.
+          Show what's already saved without exposing raw database ids. */}
       {location && !cityId && (districtAutoId || districtManualId || metroAutoId || metroManualId) && (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
-          <h4 className="text-sm font-medium text-gray-900">Район и метро</h4>
-          <p className="text-xs text-gray-600 mb-3">
-            Данные сохранены, но редактирование недоступно (отсутствует cityId)
-          </p>
-          
-          {(districtAutoId || districtManualId) && (
-            <div className="text-sm">
-              <span className="text-gray-600">Район:</span>{" "}
-              <span className="text-gray-900">
-                {districtManualId || districtAutoId}
-                {districtManualId && " (выбрано вручную)"}
-                {!districtManualId && districtAutoId && " (автоматически)"}
-              </span>
-            </div>
-          )}
-          
-          {(metroAutoId || metroManualId) && (
-            <div className="text-sm">
-              <span className="text-gray-600">Метро:</span>{" "}
-              <span className="text-gray-900">
-                {metroStations.find(m => m.id === (metroManualId || metroAutoId))?.name || (metroManualId || metroAutoId)}
-                {metroDistanceShown !== null && ` · ${formatDistance(metroDistanceShown)}`}
-                {metroManualId && " (выбрано вручную)"}
-                {!metroManualId && metroAutoId && " (автоматически)"}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+          <h4 className="text-sm font-medium text-gray-900">Район и метро сохранены</h4>
+          <p className="text-xs text-gray-600 mb-3">Изменить их сейчас нельзя.</p>
 
-      {/* Read-only display for enriched data */}
-      {showReadOnlyEnrichment && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-blue-900">📍 Определено автоматически</h4>
-            {cityId && (
-              <button
-                type="button"
-                onClick={() => {
-                  // Scroll to selects section
-                  const selectsSection = document.getElementById("geo-selects");
-                  selectsSection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                }}
-                className="text-xs text-blue-700 hover:text-blue-800 hover:underline"
-              >
-                Изменить вручную
-              </button>
-            )}
-          </div>
-          
-          {districtAutoId && (
-            <div className="text-sm">
-              <span className="text-blue-700">Район:</span>{" "}
-              <span className="text-blue-900 font-medium">
-                {districts.find(d => d.id === districtAutoId)?.name || 
-                 initialLocation?.districtName || 
-                 districtAutoId}
-              </span>
+          {(districtAutoId || districtManualId) && (
+            <div className="text-sm text-gray-900">
+              Район{districtNameForFallback ? `: ${districtNameForFallback}` : " определён"}
             </div>
           )}
-          
-          {metroAutoId && (
-            <div className="text-sm">
-              <span className="text-blue-700">Метро:</span>{" "}
-              <span className="text-blue-900 font-medium">
-                {metroStations.find(m => m.id === metroAutoId)?.name || 
-                 initialLocation?.metroName || 
-                 metroAutoId}
-                {metroAutoDistanceM !== null && ` · ${formatDistance(metroAutoDistanceM)}`}
-              </span>
+
+          {(metroAutoId || metroManualId) && (
+            <div className="text-sm text-gray-900">
+              Метро{metroNameForFallback ? `: ${metroNameForFallback}` : " определено"}
+              {metroDistanceShown !== null && ` · ${formatDistance(metroDistanceShown)}`}
             </div>
-          )}
-          
-          {!districtAutoId && !metroAutoId && (
-            <p className="text-xs text-blue-700">
-              Не удалось определить район и метро автоматически
-            </p>
           )}
         </div>
       )}

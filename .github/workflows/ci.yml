@@ -59,12 +59,15 @@ jobs:
           pnpm exec tsx src/components/business/wizard/place/draftState.test.ts
           pnpm exec tsx src/components/business/wizard/place/placeSubcategorySelection.test.ts
           pnpm exec tsx src/components/business/wizard/place/steps/Step1Profile.test.tsx
+          pnpm exec tsx src/components/business/wizard/place/steps/Step2Location.test.ts
 
       - name: Place geo overrides regressions
         run: |
           pnpm exec tsx src/lib/geo/haversineMeters.test.ts
           pnpm exec tsx src/components/business/place/placeLocationGeoOverrides.test.ts
           pnpm exec tsx src/components/business/place/PlaceLocationPicker.raceContract.test.ts
+          pnpm exec tsx src/components/business/place/placeLocationPresentation.test.ts
+          pnpm exec tsx src/components/business/place/PlaceLocationPicker.presentationWiring.test.ts
 
       - name: Event timezone contract regressions
         run: pnpm exec tsx src/lib/event/eventTimezoneContract.test.ts
