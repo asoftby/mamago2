@@ -6,6 +6,8 @@ import { Prisma, RouteStatus, RouteVisibility } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { TableContainer } from "@/components/ui/table";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { getAdminPagination, parseAdminPage } from "@/lib/admin/pagination";
 import {
   blockingDependencyItems,
   buildContentDependencySummary,
@@ -26,6 +28,8 @@ type SearchParams = {
   cityId?: string;
   visibility?: string;
   authorId?: string;
+  page?: string;
+  [key: string]: string | undefined;
 };
 
 const EDITORIAL_AUTHOR_FILTER = "__editorial";
@@ -77,10 +81,17 @@ async function getRoutes(params: SearchParams) {
     ];
   }
 
-  return prisma.route.findMany({
+  const total = await prisma.route.count({ where });
+  const pagination = getAdminPagination({
+    page: parseAdminPage(params.page),
+    total,
+  });
+
+  const items = await prisma.route.findMany({
     where,
     orderBy: { updatedAt: "desc" },
-    take: 100,
+    skip: pagination.skip,
+    take: pagination.take,
     select: {
       id: true,
       title: true,
@@ -101,9 +112,13 @@ async function getRoutes(params: SearchParams) {
       },
     },
   });
+
+  return { items, pagination };
 }
 
-function routeDependencySummary(route: Awaited<ReturnType<typeof getRoutes>>[number]) {
+type RouteListItem = Awaited<ReturnType<typeof getRoutes>>["items"][number];
+
+function routeDependencySummary(route: RouteListItem) {
   return buildContentDependencySummary([
     {
       type: "planItems",
@@ -126,7 +141,7 @@ function routeDependencySummary(route: Awaited<ReturnType<typeof getRoutes>>[num
   ]);
 }
 
-function routeDeletePreflight(route: Awaited<ReturnType<typeof getRoutes>>[number]) {
+function routeDeletePreflight(route: RouteListItem) {
   const dependencySummary = routeDependencySummary(route);
   const reasons = [
     ...(route.status !== RouteStatus.DRAFT ? ["statusNotDraft"] : []),
@@ -276,7 +291,7 @@ function RoutesTable({
   routes,
   returnTo,
 }: {
-  routes: Awaited<ReturnType<typeof getRoutes>>;
+  routes: RouteListItem[];
   returnTo: string;
 }) {
   if (routes.length === 0) {
@@ -289,106 +304,109 @@ function RoutesTable({
 
   return (
     <div className="rounded-lg border border-gray-200 overflow-hidden">
-      <TableContainer minWidthClassName="min-w-[1120px]" scrollLabel="Таблица маршрутов, прокручивается по горизонтали">
+      <TableContainer
+        minWidthClassName="min-w-[1120px]"
+        scrollLabel="Таблица маршрутов, прокручивается по горизонтали"
+      >
         <table className="w-full text-sm">
-        <thead className="border-b border-gray-200 bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Slug</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Видимость</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Точки</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Автор</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Обновлено</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {routes.map((route) => {
-            const deletePreflight = routeDeletePreflight(route);
-            const blockingItems = blockingDependencyItems(deletePreflight.dependencySummary);
-            const lifecycleViewModel = buildAdminLifecycleViewModel({
-              ...buildAdminRouteLifecycleInput({
-                status: route.status,
-                deletePreflight,
-              }),
-              navigationLinks: {
-                edit: true,
-                preview: true,
-                review: false,
-              },
-            });
-            const authorLabel =
-              route.author?.displayName?.trim() ||
-              route.author?.email ||
-              (route.authorId === null ? "Редакция" : "—");
+          <thead className="border-b border-gray-200 bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Название</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Slug</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Город</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Видимость</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Точки</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Автор</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Обновлено</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {routes.map((route) => {
+              const deletePreflight = routeDeletePreflight(route);
+              const blockingItems = blockingDependencyItems(deletePreflight.dependencySummary);
+              const lifecycleViewModel = buildAdminLifecycleViewModel({
+                ...buildAdminRouteLifecycleInput({
+                  status: route.status,
+                  deletePreflight,
+                }),
+                navigationLinks: {
+                  edit: true,
+                  preview: true,
+                  review: false,
+                },
+              });
+              const authorLabel =
+                route.author?.displayName?.trim() ||
+                route.author?.email ||
+                (route.authorId === null ? "Редакция" : "—");
 
-            return (
-              <tr key={route.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  <div className="max-w-[260px] truncate" title={route.title}>
-                    {route.title}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  <code className="text-xs">{route.slug}</code>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{route.city?.name ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
-                </td>
-                <td className="px-4 py-3 text-gray-600">{visibilityLabel(route.visibility)}</td>
-                <td className="px-4 py-3 text-gray-600">{route._count.stops}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  <div className="max-w-[180px] truncate" title={authorLabel}>
-                    {authorLabel}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {formatDistanceToNow(route.updatedAt, { addSuffix: true, locale: ru })}
-                </td>
-                <td className="px-4 py-3">
-                  <ContentLifecycleActionsMenu
-                    viewModel={lifecycleViewModel}
-                    contentId={route.id}
-                    contentType="route"
-                    surface="admin"
-                    links={{
-                      edit: {
-                        href: `/routes/${route.slug}/edit?returnTo=${encodeURIComponent(returnTo)}`,
-                        label: "Редактировать в route flow",
-                      },
-                      preview: {
-                        href: `/routes/${route.slug}`,
-                        newTab: true,
-                        label: "Открыть публичную страницу",
-                      },
-                    }}
-                    deletePreflight={{
-                      deleteDraft: {
-                        blockedDialog: !deletePreflight.allowed
-                          ? {
-                              title: "Нельзя удалить маршрут",
-                              description: deletePreflight.message,
-                              items: blockingItems,
-                            }
-                          : null,
-                      },
-                    }}
-                  />
-                  <Link
-                    href={`/admin/seo/pages/route/${route.id}`}
-                    className="ml-2 inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  >
-                    SEO
-                  </Link>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              return (
+                <tr key={route.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    <div className="max-w-[260px] truncate" title={route.title}>
+                      {route.title}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <code className="text-xs">{route.slug}</code>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{route.city?.name ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{visibilityLabel(route.visibility)}</td>
+                  <td className="px-4 py-3 text-gray-600">{route._count.stops}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    <div className="max-w-[180px] truncate" title={authorLabel}>
+                      {authorLabel}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {formatDistanceToNow(route.updatedAt, { addSuffix: true, locale: ru })}
+                  </td>
+                  <td className="px-4 py-3">
+                    <ContentLifecycleActionsMenu
+                      viewModel={lifecycleViewModel}
+                      contentId={route.id}
+                      contentType="route"
+                      surface="admin"
+                      links={{
+                        edit: {
+                          href: `/routes/${route.slug}/edit?returnTo=${encodeURIComponent(returnTo)}`,
+                          label: "Редактировать в route flow",
+                        },
+                        preview: {
+                          href: `/routes/${route.slug}`,
+                          newTab: true,
+                          label: "Открыть публичную страницу",
+                        },
+                      }}
+                      deletePreflight={{
+                        deleteDraft: {
+                          blockedDialog: !deletePreflight.allowed
+                            ? {
+                                title: "Нельзя удалить маршрут",
+                                description: deletePreflight.message,
+                                items: blockingItems,
+                              }
+                            : null,
+                        },
+                      }}
+                    />
+                    <Link
+                      href={`/admin/seo/pages/route/${route.id}`}
+                      className="ml-2 inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    >
+                      SEO
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </TableContainer>
     </div>
   );
@@ -400,7 +418,7 @@ export default async function AdminRoutesPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const [routes, cities, authors] = await Promise.all([
+  const [routesResult, cities, authors] = await Promise.all([
     getRoutes(params),
     prisma.city.findMany({
       where: { isLegacyNonCity: false },
@@ -414,6 +432,7 @@ export default async function AdminRoutesPage({
       take: 200,
     }),
   ]);
+  const { items: routes, pagination } = routesResult;
 
   const authorOptions = authors.map((author) => ({
     id: author.id,
@@ -440,6 +459,16 @@ export default async function AdminRoutesPage({
       <Suspense fallback={<div>Загрузка…</div>}>
         <RoutesTable routes={routes} returnTo={returnTo} />
       </Suspense>
+
+      <AdminPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        start={pagination.start}
+        end={pagination.end}
+        basePath="/admin/content/routes"
+        params={params}
+      />
     </div>
   );
 }
