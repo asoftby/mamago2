@@ -4,6 +4,7 @@
  */
 
 import type { Prisma } from "@prisma/client";
+import type { SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
 
 /**
  * OpeningHours with all relations loaded
@@ -22,6 +23,14 @@ export type OpeningHoursWithRelations = Prisma.OpeningHoursGetPayload<{
     };
   };
 }>;
+
+/** Minimal structural schedule consumed by pure status calculations. */
+type PortableOpeningHoursException = SharedOpeningHoursData["exceptions"][number];
+
+export type OpeningHoursScheduleLike = Pick<SharedOpeningHoursData, "mode" | "timezone" | "rules"> & {
+  note?: string | null;
+  exceptions: Array<Omit<PortableOpeningHoursException, "note"> & { note?: string | null }>;
+};
 
 /**
  * Time interval (HH:MM format)

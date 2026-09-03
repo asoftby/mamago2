@@ -3,10 +3,10 @@
  * Business logic for calculating opening hours status
  */
 
-import prisma from "@/lib/prisma";
 import type { PrismaClient, Place, Offer } from "../../types";
 import {
   type OpeningHoursWithRelations,
+  type OpeningHoursScheduleLike,
   type OpeningStatus,
   type TimeInterval,
   JS_DAY_TO_DAY_OF_WEEK,
@@ -93,7 +93,7 @@ export async function getEffectiveOpeningHours(
  * @returns Array of time intervals for today
  */
 export function getTodayIntervals(
-  openingHours: OpeningHoursWithRelations,
+  openingHours: OpeningHoursScheduleLike,
   now: Date
 ): TimeInterval[] {
   const timezone = openingHours.timezone;
@@ -147,7 +147,7 @@ export function getTodayIntervals(
  * @returns True if open now
  */
 export function isOpenNow(
-  openingHours: OpeningHoursWithRelations,
+  openingHours: OpeningHoursScheduleLike,
   now: Date
 ): boolean {
   const mode = openingHours.mode;
@@ -185,7 +185,7 @@ export function isOpenNow(
  * @returns Next opening time or null if not applicable
  */
 export function getNextOpeningTime(
-  openingHours: OpeningHoursWithRelations,
+  openingHours: OpeningHoursScheduleLike,
   now: Date
 ): Date | null {
   const mode = openingHours.mode;
@@ -245,7 +245,7 @@ export function getNextOpeningTime(
  * @returns Opening status with human-readable message
  */
 export function getOpeningStatus(
-  openingHours: OpeningHoursWithRelations,
+  openingHours: OpeningHoursScheduleLike,
   now: Date
 ): OpeningStatus {
   const mode = openingHours.mode;
