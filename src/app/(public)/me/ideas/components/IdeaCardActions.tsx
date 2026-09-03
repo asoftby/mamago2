@@ -9,6 +9,7 @@ import { C } from "../theme";
 type IdeaCardActionsProps = {
   isPlanned: boolean;
   isPast?: boolean;
+  canSchedule?: boolean;
   publicHref?: string | null;
   onSchedule?: () => void;
   onRemove?: () => void;
@@ -20,6 +21,7 @@ type IdeaCardActionsProps = {
 export function IdeaCardActions({
   isPlanned,
   isPast = false,
+  canSchedule = true,
   publicHref,
   onSchedule,
   onRemove,
@@ -29,10 +31,11 @@ export function IdeaCardActions({
 }: IdeaCardActionsProps) {
   const scheduleDisabled = disabled || isScheduling;
   const removeDisabled = disabled || isRemoving;
+  const showOpenAction = !canSchedule || isPast;
 
   return (
     <div className="flex items-center gap-2">
-      {isPast && publicHref ? (
+      {showOpenAction && publicHref ? (
         <Button
           type="button"
           asChild
