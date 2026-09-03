@@ -9,9 +9,11 @@ interface PlaceMapPreviewProps {
   lat: number | null;
   lng: number | null;
   onOpenMap: () => void;
+  /** Label for the floating action button. Defaults to "Открыть карту". */
+  actionLabel?: string;
 }
 
-export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
+export function PlaceMapPreview({ lat, lng, onOpenMap, actionLabel = "Открыть карту" }: PlaceMapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null>(null);
@@ -136,7 +138,7 @@ export function PlaceMapPreview({ lat, lng, onOpenMap }: PlaceMapPreviewProps) {
         style={{ backgroundColor: "#EF8759" }}
       >
         <Maximize2 className="h-4 w-4 mr-2" />
-        Открыть карту
+        {actionLabel}
       </Button>
     </div>
   );
