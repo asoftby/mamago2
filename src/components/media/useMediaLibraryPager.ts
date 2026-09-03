@@ -13,6 +13,50 @@ export type MediaLibraryPageLoader<T> = (args: {
   limit: number;
 }) => Promise<MediaLibraryPage<T>>;
 
+/**
+ * Keep picker data warm for an editor session, but not indefinitely: another
+ * tab/user can still change the library, so a stale snapshot is refreshed.
+ */
+export const MEDIA_LIBRARY_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const invalidationVersionByOwner = new Map<string, number>();
+
+function normalizeOwnerKey(ownerKey?: string | null): string {
+  const normalized = ownerKey?.trim();
+  return normalized || "__current-user__";
+}
+
+function getInvalidationVersion(ownerKey?: string | null): number {
+  return invalidationVersionByOwner.get(normalizeOwnerKey(ownerKey)) ?? 0;
+}
+
+/**
+ * Mark every mounted picker for this owner stale. The next open performs one
+ * fresh initial-page request instead of serving the old snapshot.
+ */
+export function invalidateMediaLibraryClientCache(ownerKey?: string | null): void {
+  const key = normalizeOwnerKey(ownerKey);
+  invalidationVersionByOwner.set(key, getInvalidationVersion(ownerKey) + 1);
+}
+
+export function shouldReuseMediaLibrarySnapshot(args: {
+  loadedOwnerKey: string | null;
+  ownerKey?: string | null;
+  loadedAt: number;
+  now: number;
+  loadedInvalidationVersion: number;
+  currentInvalidationVersion: number;
+  ttlMs?: number;
+}): boolean {
+  const ttlMs = args.ttlMs ?? MEDIA_LIBRARY_CLIENT_CACHE_TTL_MS;
+  return (
+    args.loadedOwnerKey === normalizeOwnerKey(args.ownerKey) &&
+    args.loadedAt > 0 &&
+    args.now - args.loadedAt < ttlMs &&
+    args.loadedInvalidationVersion === args.currentInvalidationVersion
+  );
+}
+
 /** Appends `next` to `prev`, skipping any id already present. Exported for unit testing. */
 export function mergeMediaLibraryItems<T extends { id: string }>(prev: T[], next: T[]): T[] {
   const seen = new Set(prev.map((item) => item.id));
@@ -27,8 +71,13 @@ export function mergeMediaLibraryItems<T extends { id: string }>(prev: T[], next
 }
 
 /**
- * Cursor-paginated media library state: initial load + infinite-scroll append,
- * with request-guard refs so a stray extra sentinel trigger can't double-fetch.
+ * Cursor-paginated media library state: initial load + infinite-scroll append.
+ *
+ * Reopening the same picker within the TTL reuses the already loaded pages
+ * instead of clearing state and hitting the API/DB again. A stale snapshot is
+ * refreshed on open. Upload flows can explicitly invalidate by owner so newly
+ * created media appears on the next open without waiting for the TTL.
+ *
  * Resets automatically when `ownerKey` changes (e.g. article author switched).
  */
 export function useMediaLibraryPager<T extends { id: string }>(options: {
@@ -48,6 +97,9 @@ export function useMediaLibraryPager<T extends { id: string }>(options: {
   const hasMoreRef = useRef(false);
   const requestIdRef = useRef(0);
   const loadPageRef = useRef(loadPage);
+  const loadedOwnerKeyRef = useRef<string | null>(null);
+  const loadedAtRef = useRef(0);
+  const loadedInvalidationVersionRef = useRef(-1);
   loadPageRef.current = loadPage;
 
   const reset = useCallback(() => {
@@ -55,6 +107,9 @@ export function useMediaLibraryPager<T extends { id: string }>(options: {
     cursorRef.current = null;
     inFlightRef.current = false;
     hasMoreRef.current = false;
+    loadedOwnerKeyRef.current = null;
+    loadedAtRef.current = 0;
+    loadedInvalidationVersionRef.current = -1;
     setItems([]);
     setHasMore(false);
     setLoadingInitial(false);
@@ -63,13 +118,38 @@ export function useMediaLibraryPager<T extends { id: string }>(options: {
 
   const loadInitial = useCallback(async () => {
     const loader = loadPageRef.current;
-    if (!loader) return;
+    if (!loader || inFlightRef.current) return;
+
+    const currentInvalidationVersion = getInvalidationVersion(ownerKey);
+    const now = Date.now();
+    if (
+      shouldReuseMediaLibrarySnapshot({
+        loadedOwnerKey: loadedOwnerKeyRef.current,
+        ownerKey,
+        loadedAt: loadedAtRef.current,
+        now,
+        loadedInvalidationVersion: loadedInvalidationVersionRef.current,
+        currentInvalidationVersion,
+      })
+    ) {
+      return;
+    }
+
+    const normalizedOwnerKey = normalizeOwnerKey(ownerKey);
+    const hasSnapshotForOwner =
+      loadedOwnerKeyRef.current === normalizedOwnerKey && loadedAtRef.current > 0;
     const requestId = ++requestIdRef.current;
     cursorRef.current = null;
     inFlightRef.current = true;
-    setItems([]);
-    setHasMore(false);
-    setLoadingInitial(true);
+
+    // First load still shows the normal loading state. A stale snapshot stays
+    // visible while it is refreshed, avoiding the "empty grid -> reload" flash.
+    if (!hasSnapshotForOwner) {
+      setItems([]);
+      setHasMore(false);
+      setLoadingInitial(true);
+    }
+
     try {
       const page = await loader({ cursor: null, limit: pageSize });
       if (requestId !== requestIdRef.current) return;
@@ -77,13 +157,16 @@ export function useMediaLibraryPager<T extends { id: string }>(options: {
       cursorRef.current = page.nextCursor;
       hasMoreRef.current = page.hasMore;
       setHasMore(page.hasMore);
+      loadedOwnerKeyRef.current = normalizedOwnerKey;
+      loadedAtRef.current = Date.now();
+      loadedInvalidationVersionRef.current = currentInvalidationVersion;
     } finally {
       if (requestId === requestIdRef.current) {
         setLoadingInitial(false);
         inFlightRef.current = false;
       }
     }
-  }, [pageSize]);
+  }, [ownerKey, pageSize]);
 
   const loadMore = useCallback(async () => {
     const loader = loadPageRef.current;
