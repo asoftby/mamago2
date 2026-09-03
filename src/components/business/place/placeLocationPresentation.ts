@@ -74,3 +74,42 @@ export function getGeoFieldPresentation(params: {
     resetLabel: null,
   };
 }
+
+export interface GeoFilterOption {
+  value: string;
+  label: string;
+}
+
+export interface GeoReferenceItem {
+  id: string;
+  name: string;
+}
+
+/**
+ * Builds the option list for a district/metro FilterSelect.
+ *
+ * When the live reference list hasn't loaded (or, without a cityId, never
+ * will) but a previously saved value's readable name is known — from the
+ * enrichment response's name hint — keep that value visible as a real
+ * labeled option instead of a raw database id or a select with no matching
+ * option at all. Once the reference list does load, its entries are used
+ * as-is; the fallback only ever fills the gap while it hasn't.
+ *
+ * Shared by both the district and metro fields so their fallback behavior
+ * stays symmetric.
+ */
+export function buildGeoFilterOptions(params: {
+  shownId: string | null;
+  referenceList: GeoReferenceItem[];
+  fallbackName: string | null | undefined;
+}): GeoFilterOption[] {
+  const { shownId, referenceList, fallbackName } = params;
+  const out: GeoFilterOption[] = [];
+  if (shownId && referenceList.length === 0 && fallbackName) {
+    out.push({ value: shownId, label: fallbackName });
+  }
+  for (const item of referenceList) {
+    out.push({ value: item.id, label: item.name });
+  }
+  return out;
+}

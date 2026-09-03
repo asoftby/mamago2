@@ -95,7 +95,8 @@ assert.doesNotMatch(
 // ── 3. District/metro wired through the shared presentation helper ──────────────
 assert.match(
   source,
-  /import \{ getGeoFieldPresentation \} from "\.\/placeLocationPresentation";/,
+  /from "\.\/placeLocationPresentation";/,
+  "the district/metro fields must import from the shared presentation helper module",
 );
 assert.match(source, /const districtPresentation = getGeoFieldPresentation\(\{/);
 assert.match(source, /const metroPresentation = getGeoFieldPresentation\(\{/);
@@ -108,6 +109,36 @@ assert.match(
   source,
   /\{metroStatusCopy\}/,
   "the metro field's status line (distance + status) must come from the derived metroStatusCopy",
+);
+
+// ── 3b. District readable fallback is symmetric to metro's ─────────────────────
+// Both fields must build their FilterSelect options through the same shared
+// helper, so a saved district's readable name survives an empty/not-yet-
+// loaded reference list exactly like metro's already did.
+assert.match(
+  source,
+  /import \{ buildGeoFilterOptions, getGeoFieldPresentation \} from "\.\/placeLocationPresentation";/,
+  "buildGeoFilterOptions must be imported from the shared presentation helper module",
+);
+assert.match(
+  source,
+  /const metroFilterOptions = useMemo\(\s*\(\) =>\s*buildGeoFilterOptions\(\{/,
+  "metroFilterOptions must be built via the shared buildGeoFilterOptions helper",
+);
+assert.match(
+  source,
+  /const districtFilterOptions = useMemo\(\s*\(\) =>\s*buildGeoFilterOptions\(\{/,
+  "districtFilterOptions must be built via the shared buildGeoFilterOptions helper, symmetric to metroFilterOptions",
+);
+assert.match(
+  source,
+  /options=\{districtFilterOptions\}/,
+  "the district FilterSelect must render districtFilterOptions (readable-fallback aware), not a bare districts.map(...)",
+);
+assert.doesNotMatch(
+  source,
+  /options=\{districts\.map/,
+  "the district FilterSelect must not build its options inline from districts.map — that loses the readable fallback for an empty/not-yet-loaded list",
 );
 
 // ── 4. #162 correctness contract untouched — every listed helper is still

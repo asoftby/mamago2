@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 
-import { getGeoFieldPresentation } from "./placeLocationPresentation";
+import { buildGeoFilterOptions, getGeoFieldPresentation } from "./placeLocationPresentation";
 
 const DISTRICT_UNAVAILABLE_COPY = "Список районов для этого города пока недоступен.";
 const METRO_UNAVAILABLE_COPY = "Список станций метро для этого города пока недоступен.";
@@ -127,6 +127,79 @@ const METRO_UNAVAILABLE_COPY = "Список станций метро для э
   assert.equal(presentation.mode, "manual");
   assert.equal(presentation.statusCopy, "Изменено вручную");
   assert.equal(presentation.resetLabel, "Очистить выбор");
+}
+
+// ── buildGeoFilterOptions ─────────────────────────────────────────────────────────
+// Shared by the district and metro FilterSelects — must keep an already-saved
+// value's readable name visible even when its reference list hasn't loaded.
+
+// Existing saved district/metro + empty reference list + readable fallback
+// name → the readable option is present (not a raw id, not a blank select).
+{
+  const options = buildGeoFilterOptions({
+    shownId: "district-1",
+    referenceList: [],
+    fallbackName: "Центральный",
+  });
+  assert.deepEqual(options, [{ value: "district-1", label: "Центральный" }]);
+}
+
+// The raw id must never become the label — the human name is always used
+// when a fallback name is known.
+{
+  const options = buildGeoFilterOptions({
+    shownId: "cmqpohiyt006fwss63n2p2jti",
+    referenceList: [],
+    fallbackName: "Центральный",
+  });
+  assert.equal(options.length, 1);
+  assert.equal(options[0].value, "cmqpohiyt006fwss63n2p2jti");
+  assert.notEqual(
+    options[0].label,
+    "cmqpohiyt006fwss63n2p2jti",
+    "the raw database id must never be used as the option's display label",
+  );
+  assert.equal(options[0].label, "Центральный");
+}
+
+// No fallback name known (e.g. a brand-new place, nothing saved yet) and the
+// reference list is empty → no options at all, never a raw id either.
+{
+  const options = buildGeoFilterOptions({
+    shownId: null,
+    referenceList: [],
+    fallbackName: undefined,
+  });
+  assert.deepEqual(options, []);
+}
+
+// A shownId with no fallback name available still doesn't leak the raw id —
+// there is simply nothing to show yet.
+{
+  const options = buildGeoFilterOptions({
+    shownId: "district-1",
+    referenceList: [],
+    fallbackName: null,
+  });
+  assert.deepEqual(options, []);
+}
+
+// Normal case: the reference list has loaded → its real entries are used
+// as-is, unaffected by the fallback (which only fills the gap while the
+// list hasn't loaded).
+{
+  const options = buildGeoFilterOptions({
+    shownId: "district-1",
+    referenceList: [
+      { id: "district-1", name: "Центральный" },
+      { id: "district-2", name: "Октябрьский" },
+    ],
+    fallbackName: "Центральный",
+  });
+  assert.deepEqual(options, [
+    { value: "district-1", label: "Центральный" },
+    { value: "district-2", label: "Октябрьский" },
+  ]);
 }
 
 console.log("placeLocationPresentation tests: OK");

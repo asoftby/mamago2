@@ -23,7 +23,7 @@ import {
   shouldClearManualGeoOverrides,
   type GeoPoint,
 } from "./placeLocationGeoOverrides";
-import { getGeoFieldPresentation } from "./placeLocationPresentation";
+import { buildGeoFilterOptions, getGeoFieldPresentation } from "./placeLocationPresentation";
 
 const DISTRICT_UNAVAILABLE_COPY = "Список районов для этого города пока недоступен.";
 const METRO_UNAVAILABLE_COPY = "Список станций метро для этого города пока недоступен.";
@@ -754,20 +754,28 @@ export function PlaceLocationPicker({
   // UI visibility logic
   const showSelects = !!(location && cityId);
 
-  const metroFilterOptions = useMemo(() => {
-    const out: { value: string; label: string }[] = [];
-    if (
-      metroShown &&
-      metroStations.length === 0 &&
-      initialLocation?.metroName
-    ) {
-      out.push({ value: metroShown, label: initialLocation.metroName });
-    }
-    for (const m of metroStations) {
-      out.push({ value: m.id, label: m.name });
-    }
-    return out;
-  }, [metroShown, metroStations, initialLocation?.metroName]);
+  const metroFilterOptions = useMemo(
+    () =>
+      buildGeoFilterOptions({
+        shownId: metroShown,
+        referenceList: metroStations,
+        fallbackName: initialLocation?.metroName,
+      }),
+    [metroShown, metroStations, initialLocation?.metroName],
+  );
+
+  // Symmetric to metroFilterOptions: when the district reference list hasn't
+  // loaded (or never will, without a cityId), still show the previously
+  // saved district's readable name instead of a raw id or blank select.
+  const districtFilterOptions = useMemo(
+    () =>
+      buildGeoFilterOptions({
+        shownId: districtShown,
+        referenceList: districts,
+        fallbackName: initialLocation?.districtName,
+      }),
+    [districtShown, districts, initialLocation?.districtName],
+  );
 
   // District/metro field presentation — the district/metro FilterSelect
   // fields are the single source of truth for this state; there is no
@@ -776,7 +784,7 @@ export function PlaceLocationPicker({
   const districtPresentation = getGeoFieldPresentation({
     manualId: districtManualId,
     autoId: districtAutoId,
-    optionsAvailable: districts.length > 0,
+    optionsAvailable: districtFilterOptions.length > 0,
     unavailableCopy: DISTRICT_UNAVAILABLE_COPY,
   });
   const metroPresentation = getGeoFieldPresentation({
@@ -887,7 +895,7 @@ export function PlaceLocationPicker({
               id="district"
               value={districtShown || ""}
               placeholder="Не выбрано"
-              options={districts.map((d) => ({ value: d.id, label: d.name }))}
+              options={districtFilterOptions}
               onChange={handleDistrictChange}
               disabled={districts.length === 0 || disabled}
             />
