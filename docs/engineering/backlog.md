@@ -4119,7 +4119,7 @@ P3 — cleanup / polish / optional
 
 ## [BACKLOG-146] Cookie-consent banner is the dominant remaining LCP blocker on /minsk
 
-- Status: OPEN
+- Status: DONE (2026-09-03, `fix/perf-cookie-consent-lcp-20260903`)
 - Priority: P1
 - Area: Performance / Consent
 - Added: 2026-08-30
@@ -4166,3 +4166,106 @@ P3 — cleanup / polish / optional
 - Source: `fix/perf-pagespeed-p0-20260830` PERFORMANCE VALIDATION step —
   5x mobile Lighthouse against a local production build, both
   `--throttling-method=simulate` and `--throttling-method=devtools`.
+- Resolution: `fix/perf-cookie-consent-lcp-20260903` adds
+  `CookieConsentShell` (`src/components/providers/CookieConsentShell.tsx`),
+  a plain server/client-rendered banner using the same `BANNER` copy as
+  vanilla-cookieconsent (`consent-config.ts`), so the consent text is part
+  of the *initial* server-rendered HTML instead of appearing only after
+  hydration + a dynamic `import("vanilla-cookieconsent")`. `autoShow` is
+  now `false`; `ensureConsentModalShown()` (consent-manager.ts) owns
+  showing the real library modal once ready, and the shell hides itself in
+  that same promise turn — vanilla-cookieconsent remains the only consent
+  state machine. A returning visitor with a valid `cc_cookie_mamago` never
+  sees it: a render-blocking inline script in `src/app/layout.tsx`
+  (`no-flash-cookie-shell-script.ts`) checks `document.cookie` before first
+  paint and sets `data-cc-consent-known` on `<html>`, which
+  `cookie-consent-mamago.css` uses to hide `#mamago-cookie-shell` — no
+  `cookies()`/`headers()` server API involved, so no route's rendering mode
+  changed. Result: 5x mobile Lighthouse (devtools throttling) on a clean
+  first visit now shows LCP median ~1.6s (was ~9.4s), FCP == LCP (the
+  banner text paints as part of first contentful paint, gated only by
+  normal CSS/font loading, not by JS hydration). See
+  `fix/perf-cookie-consent-lcp-20260903`'s task report for the full
+  before/after table, consent-contract verification, and the two follow-ups
+  (BACKLOG-147, BACKLOG-148) it left open.
+
+## [BACKLOG-147] TBT on /minsk is not clearly improved (high run-to-run variance)
+
+- Status: OPEN
+- Priority: P2
+- Area: Performance
+- Added: 2026-09-03
+- Reason deferred: `fix/perf-cookie-consent-lcp-20260903` was scoped to the
+  LCP-causing render *path* of the cookie-consent banner, not general TBT/
+  main-thread work — the task's own scope exclusions rule out a broader JS
+  refactor. TBT wasn't regressed in a way traceable to a specific line of
+  this change (the added `CookieConsentShell` is a small, cheap component:
+  one `useState`, one `useEffect`, one small cookie-string parse), so
+  chasing it further belongs in its own profiling pass, not a same-task fix.
+- Context: 5x mobile Lighthouse (`--throttling-method=devtools`, clean
+  first visit) after this fix: TBT 390/1350/530/570/420 ms (median 530ms) —
+  still above the P0 task's own <=200ms target and not clearly better than
+  pre-fix devtools TBT (~390ms observed in a single earlier reference run;
+  no clean 5-run devtools TBT baseline exists to compare against directly).
+  The 1350ms outlier in particular suggests either real variance from
+  hydrating the full public page tree under 4x CPU throttle, or noise from
+  other processes on the (shared) machine these runs were measured on —
+  this branch's runs were not isolated from other concurrent builds/sessions
+  on the host.
+- Current state: unresolved; LCP is fixed (median ~1.6s, was ~9.4s), CLS is
+  healthy (~0.001), but TBT remains an open question mark, not a confirmed
+  regression.
+- Dependencies: none blocking.
+- Acceptance criteria: re-measure TBT specifically (ideally on an isolated/
+  quiet machine, 10+ runs for a stable median) both with and without this
+  branch's changes to determine whether there's a real regression; if so,
+  profile what's actually blocking the main thread during hydration
+  (React DevTools Profiler / Chrome performance trace) rather than guessing.
+- Source: `fix/perf-cookie-consent-lcp-20260903` PERFORMANCE VALIDATION step.
+
+## [BACKLOG-148] Pin the exact post-fix LCP element with a proper trace tool
+
+- Status: OPEN
+- Priority: P3
+- Area: Performance / Tooling
+- Added: 2026-09-03
+- Reason deferred: pinning the LCP element precisely needs either a full
+  Chrome DevTools Performance trace decode or a `PerformanceObserver`
+  registered *before* navigation completes; neither was practical to wire
+  up further within `fix/perf-cookie-consent-lcp-20260903`'s scope once the
+  faster, more decisive evidence (below) was already in hand.
+- Context: post-fix, Lighthouse's `lcp-breakdown-insight` audit (Lighthouse
+  13.4.1) omitted the `type: "node"` detail in every 5x mobile run this task
+  captured (it reliably included it pre-fix, when the LCP element was the
+  library's `p#cm__desc`) — likely because the insight's node-attribution
+  logic behaves differently once the LCP candidate's `elementRenderDelay`
+  drops low enough, or because FCP and LCP now coincide. Separately,
+  `performance.getEntriesByType('largest-contentful-paint')` queried via
+  both the Browser MCP tool and a raw CDP `Runtime.evaluate` call
+  consistently returned `[]` post-load in this environment — the entries
+  clearly exist (Lighthouse's own numeric LCP timings are non-zero and
+  consistent, ~1.6s), just not retrievable this way without a `buffered:
+  true` `PerformanceObserver` registered *during* page load, which neither
+  of these ad hoc tool calls could arrange (both connect to an
+  already-loading or already-loaded page).
+  A Lighthouse screenshot thumbnail captured within ~450ms of the reported
+  LCP timestamp shows only the "в Минске" header, the "Куда пойти в
+  Минске" heading, and `CookieConsentShell`'s banner text on screen — of
+  those, the banner's description paragraph is visually the largest text
+  block, making it the most likely (but not conclusively DOM-confirmed)
+  current LCP element. If so, this is the *same conceptual* content as
+  before (the cookie-consent description) — consistent with the task's own
+  framing ("баннер НЕ нужно убирать... нужно изменить только технический
+  способ первого рендера") — just now painting as part of the initial HTML
+  instead of a multi-second post-hydration JS chain.
+- Current state: LCP timing itself is solidly measured and reproducible
+  (median ~1.6s over 5 runs); the exact DOM node is a reasoned inference
+  from a screenshot, not a tool-confirmed selector.
+- Dependencies: none blocking.
+- Acceptance criteria: capture a real Chrome trace (`lighthouse --save-
+  assets` or `chrome-launcher` + `Tracing.start`) and decode the
+  `largestContentfulPaint::Candidate` trace event's backend node id to a
+  DOM selector, or register a `PerformanceObserver({type:
+  'largest-contentful-paint', buffered: true})` early enough (e.g. via a
+  CDP `Page.addScriptToEvaluateOnNewDocument`) to read `element` directly.
+- Source: `fix/perf-cookie-consent-lcp-20260903` PERFORMANCE VALIDATION step.
