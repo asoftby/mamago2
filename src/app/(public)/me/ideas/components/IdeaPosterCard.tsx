@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { SaveHeart } from "@/features/save/SaveHeart";
+import { ArticleSaveHeart } from "@/features/save/ArticleSaveHeart";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPrice, formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
@@ -42,6 +43,7 @@ export function IdeaPosterCard({
   const activity = idea.activity;
   const href = activity.publicHref ?? "#";
   const isPastEvent = idea.ideaType === "ACTIVITY" && activity.temporalState === "PAST";
+  const isArticle = idea.ideaType === "ARTICLE";
   const tone = TONES[toneForId(idea.id)];
 
   const ageBounds =
@@ -73,7 +75,11 @@ export function IdeaPosterCard({
         : null;
 
   const categoryLabel =
-    idea.ideaType === "ROUTE" ? "маршрут" : (activity.categoryLabel ?? null);
+    idea.ideaType === "ROUTE"
+      ? "маршрут"
+      : idea.ideaType === "ARTICLE"
+        ? (activity.categoryLabel ?? "статья")
+        : (activity.categoryLabel ?? null);
 
   const metaLine = [ageLabel, dateLabel].filter(Boolean).join(" · ");
 
@@ -172,6 +178,23 @@ export function IdeaPosterCard({
             >
               <Heart className="h-4 w-4 fill-current" />
             </span>
+          ) : isArticle ? (
+            <ArticleSaveHeart
+              articleId={activity.id}
+              articleTitle={activity.title}
+              coverImageUrl={activity.coverImageUrl}
+              source="ideas"
+              initialStatus={{
+                isIdea: true,
+                inPlan: false,
+                planDate: null,
+                planStartsAt: null,
+                planItemId: null,
+              }}
+              skipOwnFetch
+              className="h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
+              iconClassName="h-4 w-4"
+            />
           ) : (
             <SaveHeart
               activityId={activity.id}
@@ -200,6 +223,7 @@ export function IdeaPosterCard({
       <IdeaCardActions
         isPlanned={idea.isPlanned}
         isPast={isPastEvent}
+        canSchedule={!isArticle}
         publicHref={activity.publicHref ?? null}
         onSchedule={onSchedule}
         onRemove={onRemove}
