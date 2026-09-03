@@ -38,7 +38,6 @@ export function StoryModal({
   onItemShown,
 }: StoryModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartY = useRef<number | null>(null);
   const touchStartX = useRef<number | null>(null);
 
@@ -67,20 +66,19 @@ export function StoryModal({
     [onClose],
   );
 
-  // ── mobile: hold → pause, swipe down → close ─────────────────────────────
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      touchStartX.current = e.touches[0].clientX;
-      touchStartY.current = e.touches[0].clientY;
-      holdTimer.current = setTimeout(onPause, 180);
-    },
-    [onPause],
-  );
+  const handleTogglePause = useCallback(() => {
+    if (paused) onResume();
+    else onPause();
+  }, [onPause, onResume, paused]);
+
+  // ── mobile: swipe down → close ───────────────────────────────────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
-      if (holdTimer.current) clearTimeout(holdTimer.current);
-      onResume();
       if (touchStartY.current === null || touchStartX.current === null) return;
       const dy = e.changedTouches[0].clientY - touchStartY.current;
       const dx = e.changedTouches[0].clientX - touchStartX.current;
@@ -88,7 +86,7 @@ export function StoryModal({
       touchStartX.current = null;
       touchStartY.current = null;
     },
-    [onClose, onResume],
+    [onClose],
   );
 
   if (!currentItem) return null;
@@ -152,6 +150,7 @@ export function StoryModal({
             paused={paused}
             onNext={onNext}
             onPrev={onPrev}
+            onTogglePause={handleTogglePause}
             onProgressComplete={onNext}
           />
         </div>

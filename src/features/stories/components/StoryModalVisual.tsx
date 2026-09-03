@@ -17,6 +17,7 @@ interface StoryModalVisualProps {
   paused: boolean;
   onNext: () => void;
   onPrev: () => void;
+  onTogglePause: () => void;
   onProgressComplete: () => void;
 }
 
@@ -30,6 +31,7 @@ export function StoryModalVisual({
   paused,
   onNext,
   onPrev,
+  onTogglePause,
   onProgressComplete,
 }: StoryModalVisualProps) {
   const isFirst = !prevItem && activeItemIndex === 0;
@@ -94,13 +96,14 @@ export function StoryModalVisual({
         />
       </div>
 
-
-
-      {/* ── Invisible nav zones ── */}
-      <div className="absolute inset-0 z-[6] flex" style={{ top: "72px" }}>
-        <div className="w-[40%] h-full cursor-pointer" onClick={onPrev} />
-        <div className="flex-1 h-full cursor-pointer" onClick={onNext} />
-      </div>
+      {/* ── Tap visual to pause / resume ── */}
+      <button
+        type="button"
+        className="absolute inset-x-0 bottom-0 top-[72px] z-[6] cursor-pointer"
+        onClick={onTogglePause}
+        aria-label={paused ? "Продолжить сторис" : "Поставить сторис на паузу"}
+        aria-pressed={paused}
+      />
 
       {/* ── Nav arrows ── */}
       <button
