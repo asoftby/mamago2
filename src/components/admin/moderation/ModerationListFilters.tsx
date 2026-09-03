@@ -1,8 +1,10 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export type ModerationStatusFilterKind = "content" | "offer";
@@ -14,6 +16,7 @@ export interface ModerationListFiltersProps {
   /** `content` — как у мест (ContentStatus); `offer` — OfferStatus */
   statusFilter: ModerationStatusFilterKind;
   showTemporalFilter?: boolean;
+  searchPlaceholder?: string;
 }
 
 const STATUS_CONTENT: FilterSelectOption[] = [
@@ -38,16 +41,30 @@ const TEMPORAL_OPTIONS: FilterSelectOption[] = [
 ];
 
 /**
- * Фильтры статуса и города — те же опции и стиль, что на списках контента (например `/admin/content/places`).
+ * Единая панель поиска и фильтров для списков контента.
+ * Любое изменение фильтра сбрасывает `page`, чтобы пользователь не попадал
+ * на пустую страницу старой пагинации после сужения выборки.
  */
 function ModerationListFiltersInner({
   cities,
   basePath,
   statusFilter,
   showTemporalFilter = false,
+  searchPlaceholder = "Название или slug",
 }: ModerationListFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+
+  useEffect(() => {
+    setQuery(searchParams.get("q") || "");
+  }, [searchParams]);
+
+  const pushParams = (params: URLSearchParams) => {
+    params.delete("page");
+    const search = params.toString();
+    router.push(search ? `${basePath}?${search}` : basePath);
+  };
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -56,14 +73,44 @@ function ModerationListFiltersInner({
     } else {
       params.delete(key);
     }
-    router.push(`${basePath}?${params.toString()}`);
+    pushParams(params);
+  };
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const params = new URLSearchParams(searchParams.toString());
+    const normalized = query.trim();
+    if (normalized) {
+      params.set("q", normalized);
+    } else {
+      params.delete("q");
+    }
+    pushParams(params);
   };
 
   const statusOptions = statusFilter === "content" ? STATUS_CONTENT : STATUS_OFFER;
-  const columnsClass = showTemporalFilter ? "md:grid-cols-3" : "md:grid-cols-2";
+  const columnsClass = showTemporalFilter ? "md:grid-cols-4" : "md:grid-cols-3";
 
   return (
     <div className={cn("grid grid-cols-1 gap-3", columnsClass)}>
+      <form onSubmit={handleSearchSubmit}>
+        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor={`${basePath}-search`}>
+          Поиск
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id={`${basePath}-search`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={searchPlaceholder}
+            className="min-w-0"
+          />
+          <Button type="submit" variant="outline" className="h-10 shrink-0">
+            Найти
+          </Button>
+        </div>
+      </form>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Статус
@@ -106,12 +153,13 @@ function ModerationListFiltersInner({
 }
 
 export function ModerationListFilters(props: ModerationListFiltersProps) {
-  const columnsClass = props.showTemporalFilter ? "md:grid-cols-3" : "md:grid-cols-2";
+  const columnsClass = props.showTemporalFilter ? "md:grid-cols-4" : "md:grid-cols-3";
 
   return (
     <Suspense
       fallback={
         <div className={cn("grid grid-cols-1 gap-3", columnsClass)}>
+          <div className="h-10 rounded-[12px] bg-muted/40 animate-pulse" />
           <div className="h-10 rounded-[12px] bg-muted/40 animate-pulse" />
           <div className="h-10 rounded-[12px] bg-muted/40 animate-pulse" />
           {props.showTemporalFilter ? (
