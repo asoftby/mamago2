@@ -3,18 +3,18 @@ import type { IdeaPlanStatus } from "@/lib/plan/ideaPlanStatus";
 
 export type IdeaItem = {
   id: string;
-  ideaType: "ACTIVITY" | "OFFER" | "ROUTE";
+  ideaType: "ACTIVITY" | "OFFER" | "ROUTE" | "ARTICLE";
   activity: {
     id: string;
     title: string;
-    type: "EVENT" | "PLACE" | "ROUTE" | "OFFER";
+    type: "EVENT" | "PLACE" | "ROUTE" | "OFFER" | "ARTICLE";
     /** resolved cover image url */
     coverImageUrl?: string | null;
     /** for ActivityCard: activity.slug */
     slug?: string | null;
     /** for ActivityCard: city slug for public path */
     citySlug?: string | null;
-    /** direct href (for offers / routes) */
+    /** direct href (for offers / routes / articles) */
     publicHref?: string | null;
     /** ActivityFormat enum value */
     format?: string | null;
