@@ -1,7 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-
 interface StoryProgressProps {
   total: number;
   current: number;
@@ -37,12 +35,13 @@ export function StoryProgress({
           {i === current && (
             <div
               key={progressKey}
-              className={cn(
-                "h-full bg-white rounded-full origin-left",
-                paused ? "[animation-play-state:paused]" : "[animation-play-state:running]",
-              )}
+              className="h-full bg-white rounded-full origin-left"
               style={{
-                animation: `storyFill ${durationMs}ms linear forwards`,
+                animationName: "storyFill",
+                animationDuration: `${durationMs}ms`,
+                animationTimingFunction: "linear",
+                animationFillMode: "forwards",
+                animationPlayState: paused ? "paused" : "running",
               }}
               onAnimationEnd={onComplete}
             />

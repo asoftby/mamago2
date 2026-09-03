@@ -120,13 +120,6 @@ export function StoryModal({
           "max-md:max-h-[92dvh]",
         )}
         onClick={(e) => e.stopPropagation()}
-        onMouseEnter={() => {
-          // Pause on hover only on pointer devices (desktop), not on touch
-          if (window.matchMedia("(pointer: fine)").matches) onPause();
-        }}
-        onMouseLeave={() => {
-          if (window.matchMedia("(pointer: fine)").matches) onResume();
-        }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
