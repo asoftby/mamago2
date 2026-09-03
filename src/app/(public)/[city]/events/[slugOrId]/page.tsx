@@ -5,6 +5,7 @@ import { EventPageView } from "@/components/event-page";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
 import { ContentStatus } from "@prisma/client";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
+import { withEventPagePriceData } from "@/lib/event/withEventPagePriceData";
 import { getCurrentUser } from "@/lib/auth/server";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 import {
@@ -189,12 +190,15 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       ? await fetchReelsThumbnail(rawReelsUrl)
       : null;
 
-    const data = buildEventPageDataFromPrismaActivity(fromDb, {
-      citySlug: city,
-      ownerEditHref,
-      previewBannerLabel,
-      reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
-    });
+    const data = withEventPagePriceData(
+      buildEventPageDataFromPrismaActivity(fromDb, {
+        citySlug: city,
+        ownerEditHref,
+        previewBannerLabel,
+        reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
+      }),
+      fromDb.priceItems,
+    );
     const faqJsonLd = buildFaqJsonLd(data.faqItems);
 
     // Direct CTA — omitted when the event has no resolvable owning Business (rule 5).

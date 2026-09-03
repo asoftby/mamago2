@@ -8,6 +8,7 @@ import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
 import type { FaqItem } from "@/lib/faq/faqItems";
 import type { CanonicalCtaObject } from "@/lib/cta-platform";
+import type { PriceItem } from "@/lib/priceItems";
 
 export type EventPageBreadcrumb = {
   label: string;
@@ -140,6 +141,10 @@ export type EventPageData = {
   breadcrumbs: EventPageBreadcrumb[];
   priceLabel: string;
   priceDetails?: string;
+  /** Structured price rows filled in the Event wizard. */
+  priceItems?: PriceItem[];
+  /** Optional note attached to the structured price list. */
+  priceNote?: string;
   /** Registration / tickets utility copy. */
   bookingNotes?: string;
   faqItems?: FaqItem[];

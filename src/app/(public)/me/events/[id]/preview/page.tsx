@@ -7,6 +7,7 @@ import { canManageActivityById } from "@/lib/auth/activityAccess";
 import prisma from "@/lib/prisma";
 import { EventPageView } from "@/components/event-page/EventPageView";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
+import { withEventPagePriceData } from "@/lib/event/withEventPagePriceData";
 import { enrichPlaceWithResolvedLogo } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 import { editorEventEditHref } from "@/lib/content-editor/types";
 
@@ -98,23 +99,26 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
         ? "На модерации"
         : undefined;
 
-  const data = buildEventPageDataFromPrismaActivity(
-    {
-      ...activity,
-      place,
-      venue: activity.venue
-        ? {
-            ...activity.venue,
-            place: venuePlace,
-          }
-        : null,
-    },
-    {
-      citySlug,
-      previewBannerLabel,
-      hidePublicationStats: true,
-      ownerEditHref: editorEventEditHref(activity.id),
-    },
+  const data = withEventPagePriceData(
+    buildEventPageDataFromPrismaActivity(
+      {
+        ...activity,
+        place,
+        venue: activity.venue
+          ? {
+              ...activity.venue,
+              place: venuePlace,
+            }
+          : null,
+      },
+      {
+        citySlug,
+        previewBannerLabel,
+        hidePublicationStats: true,
+        ownerEditHref: editorEventEditHref(activity.id),
+      },
+    ),
+    activity.priceItems,
   );
 
   return (
