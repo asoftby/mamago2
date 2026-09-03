@@ -39,7 +39,6 @@ function authorLineFromUser(u: { displayName: string | null; email: string } | n
 export async function listArticlesForPublicationsIndex(): Promise<PublicationListRow[]> {
   const rows = await prisma.article.findMany({
     orderBy: { updatedAt: "desc" },
-    take: 200,
     select: {
       id: true,
       title: true,

@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-import { ActivityType, ContentStatus } from "@prisma/client";
+import { ActivityType, ContentStatus, ScheduleMode } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ModerationListFilters } from "@/components/admin/moderation/ModerationListFilters";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { getAdminPagination, parseAdminPage } from "@/lib/admin/pagination";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { activityStatusesExcludingDeleted } from "@/lib/business/eventListWhere";
 import { getEventTemporalState } from "@/lib/events/eventTemporalState";
@@ -50,9 +52,12 @@ function parseContentStatusFilter(
 }
 
 interface SearchParams {
+  q?: string;
   status?: string;
   cityId?: string;
   temporal?: string;
+  page?: string;
+  [key: string]: string | undefined;
 }
 
 function parseTemporalFilter(
@@ -62,23 +67,105 @@ function parseTemporalFilter(
   return undefined;
 }
 
+function buildReturnTo(params: SearchParams): string {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (typeof value === "string" && value.length > 0) {
+      query.set(key, value);
+    }
+  });
+  const search = query.toString();
+  return `/admin/content/events${search ? `?${search}` : ""}`;
+}
+
+function buildTemporalWhere(
+  temporal: "active" | "past" | undefined,
+): Prisma.ActivityWhereInput | null {
+  if (!temporal) return null;
+
+  const now = new Date();
+
+  if (temporal === "past") {
+    return {
+      OR: [
+        {
+          sessions: {
+            some: {},
+            none: { startsAt: { gte: now } },
+          },
+        },
+        {
+          sessions: { none: {} },
+          nextOccurrenceAt: { lt: now },
+        },
+      ],
+    };
+  }
+
+  return {
+    OR: [
+      { sessions: { some: { startsAt: { gte: now } } } },
+      {
+        sessions: { none: {} },
+        nextOccurrenceAt: { gte: now },
+      },
+      {
+        sessions: { none: {} },
+        nextOccurrenceAt: null,
+        scheduleMode: {
+          in: [ScheduleMode.ALWAYS, ScheduleMode.ON_DEMAND, ScheduleMode.RECURRING],
+        },
+      },
+    ],
+  };
+}
+
 async function getActivities(params: SearchParams) {
   const status = parseContentStatusFilter(params.status);
   const temporal = parseTemporalFilter(params.temporal);
+  const q = params.q?.trim();
 
   const where: Prisma.ActivityWhereInput = {
     type: ActivityType.EVENT,
     ...(status ? { status } : { status: { in: activityStatusesExcludingDeleted() } }),
   };
+  const and: Prisma.ActivityWhereInput[] = [];
 
   if (params.cityId) {
-    where.OR = [
-      { cityId: params.cityId },
-      { place: { cityId: params.cityId } },
-    ];
+    and.push({
+      OR: [
+        { cityId: params.cityId },
+        { place: { cityId: params.cityId } },
+      ],
+    });
   }
 
-  const activities = await prisma.activity.findMany({
+  if (q) {
+    and.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { slug: { contains: q, mode: "insensitive" } },
+        { place: { title: { contains: q, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const temporalWhere = buildTemporalWhere(temporal);
+  if (temporalWhere) {
+    and.push(temporalWhere);
+  }
+
+  if (and.length > 0) {
+    where.AND = and;
+  }
+
+  const total = await prisma.activity.count({ where });
+  const pagination = getAdminPagination({
+    page: parseAdminPage(params.page),
+    total,
+  });
+
+  const items = await prisma.activity.findMany({
     where,
     include: {
       sessions: {
@@ -100,26 +187,11 @@ async function getActivities(params: SearchParams) {
       },
     },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    skip: pagination.skip,
+    take: pagination.take,
   });
 
-  if (!temporal) {
-    return activities;
-  }
-
-  return activities.filter((activity) => {
-    const temporalState = getEventTemporalState({
-      scheduleMode: activity.scheduleMode,
-      nextOccurrenceAt: activity.nextOccurrenceAt,
-      sessions: activity.sessions,
-    });
-
-    if (temporal === "past") {
-      return temporalState === "PAST";
-    }
-
-    return temporalState === "UPCOMING" || temporalState === "ONGOING";
-  });
+  return { items, pagination };
 }
 
 const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
@@ -134,14 +206,18 @@ type ActivityRowMeta = {
   archivedDeletePreflight: ReturnType<typeof deriveActivityArchivedDeletePreflight>;
 };
 
+type ActivityListItem = Awaited<ReturnType<typeof getActivities>>["items"][number];
+
 function ActivitiesTable({
   activities,
   cityNameById,
   activityMetaById,
+  returnTo,
 }: {
-  activities: Awaited<ReturnType<typeof getActivities>>;
+  activities: ActivityListItem[];
   cityNameById: Map<string, string>;
   activityMetaById: Map<string, ActivityRowMeta>;
+  returnTo: string;
 }) {
   if (activities.length === 0) {
     return (
@@ -238,7 +314,7 @@ function ActivitiesTable({
         surface="admin"
         links={{
           edit: {
-            href: `/editor/event/${activity.id}/edit?returnTo=${encodeURIComponent("/admin/content/events")}`,
+            href: `/editor/event/${activity.id}/edit?returnTo=${encodeURIComponent(returnTo)}`,
             label: "Редактировать",
           },
           preview: publicHref
@@ -282,9 +358,11 @@ function ActivitiesTable({
 
   return (
     <>
-      {/* Desktop: table */}
       <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
-        <TableContainer minWidthClassName="min-w-[880px]" scrollLabel="Список событий, прокручивается по горизонтали">
+        <TableContainer
+          minWidthClassName="min-w-[880px]"
+          scrollLabel="Список событий, прокручивается по горизонтали"
+        >
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -304,7 +382,11 @@ function ActivitiesTable({
                   <td className="px-4 py-3 text-gray-600">{cityLabel}</td>
                   <td className="px-4 py-3 text-gray-600">{businessLabel}</td>
                   <td className="px-4 py-3">{statusBadge}</td>
-                  <td className="px-4 py-3 text-gray-600">{activity.agePolicy === "SPECIFIC" ? (activity.ageLabel || activity.ageTags.join(", ")) : agePolicyLabel(activity.agePolicy)}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {activity.agePolicy === "SPECIFIC"
+                      ? activity.ageLabel || activity.ageTags.join(", ")
+                      : agePolicyLabel(activity.agePolicy)}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">
                     {formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
                   </td>
@@ -316,17 +398,33 @@ function ActivitiesTable({
         </TableContainer>
       </div>
 
-      {/* Mobile: cards — same rows, same actions menu */}
       <DataCardList>
         {rows.map(({ activity, cityLabel, businessLabel, statusBadge, actionsMenu }) => (
           <DataCard key={activity.id}>
-            <DataCardHeader title={activity.title} subtitle={cityLabel === "—" ? undefined : cityLabel} badge={statusBadge} />
+            <DataCardHeader
+              title={activity.title}
+              subtitle={cityLabel === "—" ? undefined : cityLabel}
+              badge={statusBadge}
+            />
             <DataCardBody>
-              <DataCardRow label="Бизнес" value={businessLabel === "—" ? null : businessLabel} />
-              <DataCardRow label="Возраст" value={activity.agePolicy === "SPECIFIC" ? (activity.ageLabel || activity.ageTags.join(", ")) : agePolicyLabel(activity.agePolicy)} />
+              <DataCardRow
+                label="Бизнес"
+                value={businessLabel === "—" ? null : businessLabel}
+              />
+              <DataCardRow
+                label="Возраст"
+                value={
+                  activity.agePolicy === "SPECIFIC"
+                    ? activity.ageLabel || activity.ageTags.join(", ")
+                    : agePolicyLabel(activity.agePolicy)
+                }
+              />
               <DataCardRow
                 label="Создано"
-                value={formatDistanceToNow(activity.createdAt, { addSuffix: true, locale: ru })}
+                value={formatDistanceToNow(activity.createdAt, {
+                  addSuffix: true,
+                  locale: ru,
+                })}
               />
             </DataCardBody>
             <DataCardActions>{actionsMenu}</DataCardActions>
@@ -344,10 +442,11 @@ export default async function ModerationEventsPage({
 }) {
   const params = await searchParams;
 
-  const [activities, cities] = await Promise.all([
+  const [activitiesResult, cities] = await Promise.all([
     getActivities(params),
     getModerationFilterCities(),
   ]);
+  const { items: activities, pagination } = activitiesResult;
 
   const dependencySummaries = await getActivitiesDependencySummariesBatch(
     activities.map((activity) => activity.id),
@@ -375,6 +474,7 @@ export default async function ModerationEventsPage({
   );
 
   const cityNameById = new Map(cities.map((c) => [c.id, c.name]));
+  const returnTo = buildReturnTo(params);
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -399,8 +499,19 @@ export default async function ModerationEventsPage({
           activities={activities}
           cityNameById={cityNameById}
           activityMetaById={activityMetaById}
+          returnTo={returnTo}
         />
       </Suspense>
+
+      <AdminPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        start={pagination.start}
+        end={pagination.end}
+        basePath="/admin/content/events"
+        params={params}
+      />
     </div>
   );
 }

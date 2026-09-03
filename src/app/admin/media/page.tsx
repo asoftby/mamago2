@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
 import { getAdminMediaList } from "@/server/services/media/media-query.service";
@@ -9,6 +10,8 @@ import { AdminMediaTableClient } from "@/components/admin/media/AdminMediaTableC
 import { MediaStatusFilter } from "@/components/admin/media/MediaStatusFilter";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { parseAdminPage } from "@/lib/admin/pagination";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // Force dynamic rendering to avoid caching issues
 export const dynamic = "force-dynamic";
@@ -17,7 +20,7 @@ export const revalidate = 0;
 export default async function AdminMediaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const user = await getCurrentUser();
 
@@ -28,6 +31,7 @@ export default async function AdminMediaPage({
   const params = await searchParams;
   const statusFilter = params.status || "active";
   const page = parseAdminPage(params.page);
+  const search = params.q?.trim() || undefined;
 
   // Determine which statuses to show
   let statusesToShow: string[];
@@ -40,13 +44,15 @@ export default async function AdminMediaPage({
   }
 
   const [mediaList, stats] = await Promise.all([
-    getAdminMediaList({ status: statusesToShow }, { page, limit: 50 }),
+    getAdminMediaList({ status: statusesToShow, search }, { page, limit: 50 }),
     getMediaStats(),
   ]);
 
   const { limit, total, totalPages } = mediaList.pagination;
   const start = total === 0 ? 0 : (mediaList.pagination.page - 1) * limit + 1;
   const end = total === 0 ? 0 : Math.min(mediaList.pagination.page * limit, total);
+  const resetHref =
+    statusFilter === "active" ? "/admin/media" : `/admin/media?status=${encodeURIComponent(statusFilter)}`;
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -64,6 +70,33 @@ export default async function AdminMediaPage({
       >
         <MediaStatusFilter />
       </Suspense>
+
+      <form action="/admin/media" className="flex w-full max-w-2xl flex-col gap-2 sm:flex-row sm:items-end">
+        {statusFilter !== "active" ? (
+          <input type="hidden" name="status" value={statusFilter} />
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="media-search">
+            Поиск
+          </label>
+          <Input
+            id="media-search"
+            name="q"
+            defaultValue={params.q ?? ""}
+            placeholder="Имя файла или storage key"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button type="submit" variant="outline" className="h-10">
+            Найти
+          </Button>
+          {search ? (
+            <Button type="button" variant="ghost" className="h-10" asChild>
+              <Link href={resetHref}>Сбросить</Link>
+            </Button>
+          ) : null}
+        </div>
+      </form>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

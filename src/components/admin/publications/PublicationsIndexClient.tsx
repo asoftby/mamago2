@@ -30,6 +30,8 @@ import type { PublicationStatsDrawerProps } from "./PublicationStatsDrawer";
 import { resolveContentLinks } from "@/lib/content-success/resolver";
 import { ContentLifecycleStatusBadge } from "@/components/contentLifecycle/ContentLifecycleStatusBadge";
 import { ContentLifecycleActionsMenu } from "@/components/contentLifecycle/ContentLifecycleActionsMenu";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { getAdminPagination } from "@/lib/admin/pagination";
 import {
   buildAdminArticleLifecycleInput,
   buildAdminLifecycleViewModel,
@@ -140,6 +142,7 @@ export function PublicationsIndexClient({
   const [quickNoSlug, setQuickNoSlug] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
+  const [page, setPage] = useState(1);
 
   // Drawer статистики
   const [statsDrawer, setStatsDrawer] = useState<PublicationStatsDrawerProps["publication"] | null>(null);
@@ -177,10 +180,21 @@ export function PublicationsIndexClient({
     const q = titleSearch.trim().toLowerCase();
     return initialRows.filter((row) => {
       if (!matchesTab(row, tab)) return false;
-      if (tab === PublicationTabFilter.ALL && typeQuick === "ARTICLE" && row.type !== PublicationType.ARTICLE) {
+      if (
+        tab === PublicationTabFilter.ALL &&
+        typeQuick === "ARTICLE" &&
+        row.type !== PublicationType.ARTICLE
+      ) {
         return false;
       }
-      if (q && !row.title.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        ![row.title, row.slug, row.authorLabel, row.cityOrContext]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(q))
+      ) {
+        return false;
+      }
       if (quickNoCover && row.hasCover) return false;
       if (quickNoSlug && row.hasSlug) return false;
       if (quickDrafts && row.status !== PublicationStatus.DRAFT) return false;
@@ -233,6 +247,32 @@ export function PublicationsIndexClient({
     });
     return arr;
   }, [filtered, sort]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    tab,
+    status,
+    authorUserIdFilter,
+    cityId,
+    dateFrom,
+    typeQuick,
+    sort,
+    titleSearch,
+    quickNoCover,
+    quickNoSlug,
+    quickDrafts,
+    quickPublished,
+  ]);
+
+  const pagination = useMemo(
+    () => getAdminPagination({ page, total: sorted.length }),
+    [page, sorted.length],
+  );
+  const pageRows = useMemo(
+    () => sorted.slice(pagination.skip, pagination.skip + pagination.take),
+    [sorted, pagination.skip, pagination.take],
+  );
 
   /** Пустой список: куда вести «Создать публикацию» — по текущей вкладке */
   const emptyListCreate = useMemo(() => {
@@ -317,7 +357,7 @@ export function PublicationsIndexClient({
       el.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [sorted.length]);
+  }, [pageRows.length]);
 
   return (
     <div className="p-6 md:p-4 space-y-6">
@@ -330,11 +370,12 @@ export function PublicationsIndexClient({
         </div>
       </div>
 
-      {/* ── Drawer статистики ── */}
       {statsDrawer && (
         <PublicationStatsDrawer
           open={statsDrawer !== null}
-          onOpenChange={(open) => { if (!open) setStatsDrawer(null); }}
+          onOpenChange={(open) => {
+            if (!open) setStatsDrawer(null);
+          }}
           publication={statsDrawer}
         />
       )}
@@ -364,12 +405,15 @@ export function PublicationsIndexClient({
 
       <div className="min-w-0 space-y-4">
         <div className="w-full min-w-0 sm:max-w-md">
-          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="publications-title-search">
-            Поиск по заголовку
+          <label
+            className="block text-sm font-medium text-gray-700 mb-1"
+            htmlFor="publications-title-search"
+          >
+            Поиск
           </label>
           <Input
             id="publications-title-search"
-            placeholder="Начните вводить…"
+            placeholder="Заголовок, slug, автор или город"
             value={titleSearch}
             onChange={(e) => setTitleSearch(e.target.value)}
             className="w-full min-w-0"
@@ -416,100 +460,105 @@ export function PublicationsIndexClient({
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 [&>*]:min-w-0">
           <div className="min-w-0">
             <span className="block text-sm font-medium text-gray-700 mb-1">Статус</span>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-full min-w-0">
-              <SelectValue placeholder="Статус" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все статусы</SelectItem>
-              {Object.values(PublicationStatus).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {PUBLICATION_STATUS_LABEL[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="w-full min-w-0">
+                <SelectValue placeholder="Статус" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все статусы</SelectItem>
+                {Object.values(PublicationStatus).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {PUBLICATION_STATUS_LABEL[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="min-w-0">
             <span className="block text-sm font-medium text-gray-700 mb-1">Сортировка</span>
-          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-            <SelectTrigger className="w-full min-w-0">
-              <SelectValue placeholder="Сортировка" />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-                <SelectItem key={k} value={k}>
-                  {SORT_LABEL[k]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <SelectTrigger className="w-full min-w-0">
+                <SelectValue placeholder="Сортировка" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {SORT_LABEL[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="min-w-0">
-            <span className="block text-sm font-medium text-gray-700 mb-1">Тип на вкладке «Все»</span>
-          <Select
-            value={typeQuick}
-            onValueChange={(v) => setTypeQuick(v as "all" | "ARTICLE")}
-            disabled={tab !== PublicationTabFilter.ALL}
-          >
-            <SelectTrigger className="w-full min-w-0">
-              <SelectValue placeholder="Тип (см. табы)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все типы</SelectItem>
-              <SelectItem value="ARTICLE">Только статьи</SelectItem>
-            </SelectContent>
-          </Select>
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              Тип на вкладке «Все»
+            </span>
+            <Select
+              value={typeQuick}
+              onValueChange={(v) => setTypeQuick(v as "all" | "ARTICLE")}
+              disabled={tab !== PublicationTabFilter.ALL}
+            >
+              <SelectTrigger className="w-full min-w-0">
+                <SelectValue placeholder="Тип (см. табы)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все типы</SelectItem>
+                <SelectItem value="ARTICLE">Только статьи</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="min-w-0">
             <span className="block text-sm font-medium text-gray-700 mb-1">Автор</span>
-          <Select
-            value={authorUserIdFilter || "__all_authors__"}
-            onValueChange={(v) => setAuthorUserIdFilter(v === "__all_authors__" ? "" : v)}
-          >
-            <SelectTrigger className="w-full min-w-0">
-              <SelectValue placeholder="Автор" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all_authors__">Все авторы</SelectItem>
-              {authorOptions.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.email ? `${a.label} (${a.email})` : a.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select
+              value={authorUserIdFilter || "__all_authors__"}
+              onValueChange={(v) => setAuthorUserIdFilter(v === "__all_authors__" ? "" : v)}
+            >
+              <SelectTrigger className="w-full min-w-0">
+                <SelectValue placeholder="Автор" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all_authors__">Все авторы</SelectItem>
+                {authorOptions.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.email ? `${a.label} (${a.email})` : a.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="min-w-0">
             <span className="block text-sm font-medium text-gray-700 mb-1">Город</span>
-          <Select
-            value={cityId || "__all_cities__"}
-            onValueChange={(v) => setCityId(v === "__all_cities__" ? "" : v)}
-          >
-            <SelectTrigger className="w-full min-w-0">
-              <SelectValue placeholder="Город" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all_cities__">Все города</SelectItem>
-              {cities.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select
+              value={cityId || "__all_cities__"}
+              onValueChange={(v) => setCityId(v === "__all_cities__" ? "" : v)}
+            >
+              <SelectTrigger className="w-full min-w-0">
+                <SelectValue placeholder="Город" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all_cities__">Все города</SelectItem>
+                {cities.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="min-w-0">
-            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="publications-updated-from">
+            <label
+              className="block text-sm font-medium text-gray-700 mb-1"
+              htmlFor="publications-updated-from"
+            >
               Обновлено не раньше
             </label>
-          <Input
-            id="publications-updated-from"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full min-w-0"
-          />
+            <Input
+              id="publications-updated-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full min-w-0"
+            />
           </div>
         </div>
         {tab !== PublicationTabFilter.ALL ? (
@@ -555,171 +604,171 @@ export function PublicationsIndexClient({
                 >
                   <div className="min-w-[900px]">
                     <table className="w-full table-auto text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="sticky left-0 z-20 bg-gray-50 px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] w-[min(200px,28vw)] sm:min-w-[180px] xl:w-auto">
-                    Заголовок
-                  </th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[88px] xl:w-auto">
-                    Тип
-                  </th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 whitespace-nowrap w-[112px] xl:w-auto">
-                    Статус
-                  </th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[120px] xl:max-w-[140px]">
-                    Автор
-                  </th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[140px] xl:max-w-[180px]">
-                    Город / контекст
-                  </th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 whitespace-nowrap w-[104px] xl:w-auto">
-                    Дата публикации
-                  </th>
-                  <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-right font-medium text-gray-700 whitespace-nowrap w-[72px] xl:w-auto">
-                    Просмотры
-                  </th>
-                  <th
-                    className="sticky right-0 z-20 bg-gray-50 px-1.5 sm:px-3 py-2 sm:py-2.5 text-right font-medium text-gray-700 w-[48px] sm:w-[52px] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]"
-                    aria-label="Действия"
-                  />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sorted.map((row) => {
-                  const editHref = publicationEditHref(row);
-                  const links = resolveArticleLikeLinks(row);
-                  const viewHref =
-                    row.status === PublicationStatus.PUBLISHED
-                      ? links.publicUrl
-                      : links.previewUrl;
-                  const rowMeta = articleLifecycleMeta[row.id] ?? {
-                    deletePreflight: {
-                      allowed: row.status === PublicationStatus.DRAFT,
-                      reasons: [],
-                      message: undefined,
-                      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-                    },
-                    archivedDeletePreflight: {
-                      allowed: row.status === PublicationStatus.ARCHIVED,
-                      reasons: [],
-                      message: undefined,
-                      dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
-                    },
-                  };
-                  const blockingItems = blockingDependencyItems(
-                    rowMeta.deletePreflight.dependencySummary,
-                  );
-                  const lifecycleViewModel = buildAdminLifecycleViewModel({
-                    ...buildAdminArticleLifecycleInput({
-                      status: row.status,
-                      deletePreflight: rowMeta.deletePreflight,
-                      archivedDeletePreflight: rowMeta.archivedDeletePreflight,
-                    }),
-                    navigationLinks: {
-                      edit: Boolean(editHref),
-                      preview: Boolean(viewHref),
-                    },
-                    actorRoles: ["ADMIN", "MODERATOR"],
-                  });
-                  return (
-                  <tr key={row.id} className="hover:bg-gray-50/80 group">
-                    <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50/80 px-2 py-2 sm:px-3 sm:py-2.5 font-medium text-gray-900 max-w-[min(200px,40vw)] sm:max-w-[220px] truncate shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
-                      {editHref ? (
-                        <Link
-                          href={editHref}
-                          className="text-primary hover:text-primary/90 hover:underline"
-                        >
-                          {row.title}
-                        </Link>
-                      ) : (
-                        row.title
-                      )}
-                    </td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-700 align-top">
-                      {PUBLICATION_TYPE_LABEL[row.type]}
-                    </td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
-                      <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
-                    </td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 max-w-[140px] truncate align-top">
-                      {row.authorLabel}
-                    </td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 max-w-[180px] truncate align-top">
-                      {row.cityOrContext}
-                    </td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 whitespace-nowrap align-top">
-                      {row.publishedAt
-                        ? format(new Date(row.publishedAt), "d MMM yyyy", { locale: ru })
-                        : "—"}
-                    </td>
-                    <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-right tabular-nums text-gray-800 align-top">
-                      {row.views.toLocaleString("ru-RU")}
-                    </td>
-                    <td className="sticky right-0 z-10 bg-white group-hover:bg-gray-50/80 px-1.5 sm:px-3 py-1.5 sm:py-2 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
-                      {hasArticleLikeActions(row) ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label="Статистика"
-                            title="Статистика"
-                            onClick={() => openStatsDrawer(row)}
-                          >
-                            <BarChart2 className="h-4 w-4" />
-                          </Button>
-                          <ContentLifecycleActionsMenu
-                            viewModel={lifecycleViewModel}
-                            contentId={row.id}
-                            contentType="article"
-                            surface="admin"
-                            align="end"
-                            shortcutIcons={false}
-                            links={{
-                              edit: editHref
-                                ? { href: editHref, label: "Редактировать" }
-                                : undefined,
-                              preview: viewHref
-                                ? {
-                                    href: viewHref,
-                                    newTab: true,
-                                    label:
-                                      row.status === PublicationStatus.PUBLISHED
-                                        ? "Открыть публичную страницу"
-                                        : "Открыть предпросмотр",
-                                  }
-                                : undefined,
-                            }}
-                            deletePreflight={{
-                              deleteDraft: {
-                                blockedDialog: !rowMeta.deletePreflight.allowed
-                                  ? {
-                                      title: "Нельзя удалить черновик",
-                                      description: rowMeta.deletePreflight.message,
-                                      items: blockingItems,
-                                    }
-                                  : null,
-                              },
-                              deleteArchived: {
-                                blockedDialog: !rowMeta.archivedDeletePreflight.allowed
-                                  ? {
-                                      title: "Нельзя удалить из архива",
-                                      description:
-                                        rowMeta.archivedDeletePreflight.message,
-                                      items: blockingItems,
-                                    }
-                                  : null,
-                              },
-                            }}
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="sticky left-0 z-20 bg-gray-50 px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] w-[min(200px,28vw)] sm:min-w-[180px] xl:w-auto">
+                            Заголовок
+                          </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[88px] xl:w-auto">
+                            Тип
+                          </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 whitespace-nowrap w-[112px] xl:w-auto">
+                            Статус
+                          </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[120px] xl:max-w-[140px]">
+                            Автор
+                          </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[140px] xl:max-w-[180px]">
+                            Город / контекст
+                          </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 whitespace-nowrap w-[104px] xl:w-auto">
+                            Дата публикации
+                          </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-right font-medium text-gray-700 whitespace-nowrap w-[72px] xl:w-auto">
+                            Просмотры
+                          </th>
+                          <th
+                            className="sticky right-0 z-20 bg-gray-50 px-1.5 sm:px-3 py-2 sm:py-2.5 text-right font-medium text-gray-700 w-[48px] sm:w-[52px] shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]"
+                            aria-label="Действия"
                           />
-                        </div>
-                      ) : null}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {pageRows.map((row) => {
+                          const editHref = publicationEditHref(row);
+                          const links = resolveArticleLikeLinks(row);
+                          const viewHref =
+                            row.status === PublicationStatus.PUBLISHED
+                              ? links.publicUrl
+                              : links.previewUrl;
+                          const rowMeta = articleLifecycleMeta[row.id] ?? {
+                            deletePreflight: {
+                              allowed: row.status === PublicationStatus.DRAFT,
+                              reasons: [],
+                              message: undefined,
+                              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+                            },
+                            archivedDeletePreflight: {
+                              allowed: row.status === PublicationStatus.ARCHIVED,
+                              reasons: [],
+                              message: undefined,
+                              dependencySummary: EMPTY_DEPENDENCY_SUMMARY,
+                            },
+                          };
+                          const blockingItems = blockingDependencyItems(
+                            rowMeta.deletePreflight.dependencySummary,
+                          );
+                          const lifecycleViewModel = buildAdminLifecycleViewModel({
+                            ...buildAdminArticleLifecycleInput({
+                              status: row.status,
+                              deletePreflight: rowMeta.deletePreflight,
+                              archivedDeletePreflight: rowMeta.archivedDeletePreflight,
+                            }),
+                            navigationLinks: {
+                              edit: Boolean(editHref),
+                              preview: Boolean(viewHref),
+                            },
+                            actorRoles: ["ADMIN", "MODERATOR"],
+                          });
+                          return (
+                            <tr key={row.id} className="hover:bg-gray-50/80 group">
+                              <td className="sticky left-0 z-10 bg-white group-hover:bg-gray-50/80 px-2 py-2 sm:px-3 sm:py-2.5 font-medium text-gray-900 max-w-[min(200px,40vw)] sm:max-w-[220px] truncate shadow-[4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
+                                {editHref ? (
+                                  <Link
+                                    href={editHref}
+                                    className="text-primary hover:text-primary/90 hover:underline"
+                                  >
+                                    {row.title}
+                                  </Link>
+                                ) : (
+                                  row.title
+                                )}
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-700 align-top">
+                                {PUBLICATION_TYPE_LABEL[row.type]}
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
+                                <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 max-w-[140px] truncate align-top">
+                                {row.authorLabel}
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 max-w-[180px] truncate align-top">
+                                {row.cityOrContext}
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-600 whitespace-nowrap align-top">
+                                {row.publishedAt
+                                  ? format(new Date(row.publishedAt), "d MMM yyyy", { locale: ru })
+                                  : "—"}
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-right tabular-nums text-gray-800 align-top">
+                                {row.views.toLocaleString("ru-RU")}
+                              </td>
+                              <td className="sticky right-0 z-10 bg-white group-hover:bg-gray-50/80 px-1.5 sm:px-3 py-1.5 sm:py-2 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)] align-top">
+                                {hasArticleLikeActions(row) ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      aria-label="Статистика"
+                                      title="Статистика"
+                                      onClick={() => openStatsDrawer(row)}
+                                    >
+                                      <BarChart2 className="h-4 w-4" />
+                                    </Button>
+                                    <ContentLifecycleActionsMenu
+                                      viewModel={lifecycleViewModel}
+                                      contentId={row.id}
+                                      contentType="article"
+                                      surface="admin"
+                                      align="end"
+                                      shortcutIcons={false}
+                                      links={{
+                                        edit: editHref
+                                          ? { href: editHref, label: "Редактировать" }
+                                          : undefined,
+                                        preview: viewHref
+                                          ? {
+                                              href: viewHref,
+                                              newTab: true,
+                                              label:
+                                                row.status === PublicationStatus.PUBLISHED
+                                                  ? "Открыть публичную страницу"
+                                                  : "Открыть предпросмотр",
+                                            }
+                                          : undefined,
+                                      }}
+                                      deletePreflight={{
+                                        deleteDraft: {
+                                          blockedDialog: !rowMeta.deletePreflight.allowed
+                                            ? {
+                                                title: "Нельзя удалить черновик",
+                                                description: rowMeta.deletePreflight.message,
+                                                items: blockingItems,
+                                              }
+                                            : null,
+                                        },
+                                        deleteArchived: {
+                                          blockedDialog: !rowMeta.archivedDeletePreflight.allowed
+                                            ? {
+                                                title: "Нельзя удалить из архива",
+                                                description:
+                                                  rowMeta.archivedDeletePreflight.message,
+                                                items: blockingItems,
+                                              }
+                                            : null,
+                                        },
+                                      }}
+                                    />
+                                  </div>
+                                ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
                     </table>
                   </div>
                 </div>
@@ -737,6 +786,17 @@ export function PublicationsIndexClient({
           </div>
         </div>
       )}
+
+      {sorted.length > 0 ? (
+        <AdminPagination
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          start={pagination.start}
+          end={pagination.end}
+          onPageChange={setPage}
+        />
+      ) : null}
     </div>
   );
 }
