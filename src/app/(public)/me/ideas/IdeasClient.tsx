@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
 import type { IdeaItem, Filter } from "./types";
@@ -24,9 +24,22 @@ type RemoveIdeaOptions = {
   silentSuccess?: boolean;
 };
 
+function ideaEntityKey(idea: IdeaItem): string {
+  return `${idea.ideaType}:${idea.activity.id}`;
+}
+
+function mergeIdeas(current: IdeaItem[], incoming: IdeaItem[]): IdeaItem[] {
+  const byEntity = new Map<string, IdeaItem>();
+  for (const idea of [...current, ...incoming]) {
+    byEntity.set(ideaEntityKey(idea), idea);
+  }
+  return [...byEntity.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 function buildRemoveQuery(idea: IdeaItem): string {
   if (idea.ideaType === "OFFER") return `offerId=${idea.activity.id}`;
   if (idea.ideaType === "ROUTE") return `routeId=${idea.activity.id}`;
+  if (idea.ideaType === "ARTICLE") return `articleId=${idea.activity.id}`;
   return `activityId=${idea.activity.id}`;
 }
 
@@ -35,6 +48,27 @@ export function IdeasClient({ initialIdeas, discoveryHref = "/minsk" }: Props) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [planModalId, setPlanModalId] = useState<string | null>(null);
   const [removingIdeaId, setRemovingIdeaId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadArticleIdeas() {
+      try {
+        const response = await fetch("/api/ideas/articles", { signal: controller.signal });
+        if (!response.ok) return;
+        const data = (await response.json()) as { items?: IdeaItem[] };
+        if (!Array.isArray(data.items) || data.items.length === 0) return;
+        setIdeas((current) => mergeIdeas(current, data.items ?? []));
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          console.error("Failed to load article ideas:", error);
+        }
+      }
+    }
+
+    void loadArticleIdeas();
+    return () => controller.abort();
+  }, []);
 
   const counts = useMemo(
     () => ({
