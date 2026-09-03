@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
-import type { MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
+import {
+  invalidateMediaLibraryClientCache,
+  type MediaLibraryPage,
+} from "@/components/media/useMediaLibraryPager";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 
@@ -102,6 +105,7 @@ export function ArticleEditorGalleryField({
         title: file.name,
         alt: null,
       });
+      invalidateMediaLibraryClientCache(authorUserId ?? null);
     }
 
     return uploaded;
