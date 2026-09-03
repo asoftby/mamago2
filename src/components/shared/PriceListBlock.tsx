@@ -6,6 +6,8 @@ interface PriceListBlockProps {
   items: PriceItem[];
   note?: string;
   updatedAt?: Date | string | null;
+  /** Внутренний заголовок "Сколько стоит / N позиций". Скрывается, когда его уже даёт секция-обёртка. */
+  showHeader?: boolean;
 }
 
 function renderInline(text: string): React.ReactNode {
@@ -54,7 +56,7 @@ function renderNote(text: string): React.ReactNode {
   return result;
 }
 
-export function PriceListBlock({ items, note, updatedAt }: PriceListBlockProps) {
+export function PriceListBlock({ items, note, updatedAt, showHeader = true }: PriceListBlockProps) {
   if (items.length === 0 && !note?.trim()) return null;
 
   const dateLabel = updatedAt
@@ -66,23 +68,30 @@ export function PriceListBlock({ items, note, updatedAt }: PriceListBlockProps) 
     : null;
 
   return (
-    <div className="my-8 rounded-xl border border-border/70 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3.5 bg-muted/40 border-b border-border/60">
-        <span className="text-xs font-semibold uppercase tracking-[0.1em] text-foreground/70">
-          Сколько стоит
-        </span>
-        <span className="text-xs text-muted-foreground">{items.length} позиций</span>
-      </div>
-      <div className="divide-y divide-border/50">
+    <div className="my-8 rounded-xl border border-[rgba(20,18,16,0.14)] overflow-hidden bg-white">
+      {showHeader && (
+        <div className="flex items-center justify-between px-5 py-3.5 bg-[#FAF7F1] border-b border-[rgba(20,18,16,0.10)]">
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]"
+            style={{ fontFamily: "Menlo, monospace" }}
+          >
+            Сколько стоит
+          </span>
+          <span className="text-xs text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+            {items.length} позиций
+          </span>
+        </div>
+      )}
+      <div className="divide-y divide-[rgba(20,18,16,0.08)]">
         {items.map((item, index) => (
           <div key={item.id} className="flex items-baseline gap-3 px-5 py-3">
-            <span className="text-xs text-muted-foreground w-4 shrink-0">{index + 1}.</span>
-            <span className="flex-1 text-sm text-foreground">{item.label}</span>
-            <span className="font-serif text-base font-medium text-foreground tabular-nums">
+            <span className="text-xs text-[rgba(20,18,16,0.45)] w-4 shrink-0">{index + 1}.</span>
+            <span className="flex-1 text-sm text-[#141210]">{item.label}</span>
+            <span className="font-serif text-base font-medium text-[#141210] tabular-nums">
               {renderCurrencyText(normalizeUiCurrencyText(item.price))}
             </span>
             {item.unit && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-[rgba(20,18,16,0.55)]">
                 {renderCurrencyText(normalizeUiCurrencyText(item.unit), { iconSize: "sm" })}
               </span>
             )}
@@ -90,15 +99,15 @@ export function PriceListBlock({ items, note, updatedAt }: PriceListBlockProps) 
         ))}
       </div>
       {note?.trim() ? (
-        <div className="px-5 py-3 border-t border-border/50">
-          <div className="text-sm text-muted-foreground leading-relaxed space-y-1">
+        <div className="px-5 py-3 border-t border-[rgba(20,18,16,0.08)]">
+          <div className="text-sm text-[rgba(20,18,16,0.65)] leading-relaxed space-y-1">
             {renderNote(note.trim())}
           </div>
         </div>
       ) : null}
       {dateLabel && (
-        <div className="px-5 py-2.5 bg-muted/20 border-t border-border/40">
-          <span className="text-[11px] text-muted-foreground/70">Обновлено: {dateLabel}</span>
+        <div className="px-5 py-2.5 bg-[#FAF7F1]/60 border-t border-[rgba(20,18,16,0.06)]">
+          <span className="text-[11px] text-[rgba(20,18,16,0.45)]">Обновлено: {dateLabel}</span>
         </div>
       )}
     </div>

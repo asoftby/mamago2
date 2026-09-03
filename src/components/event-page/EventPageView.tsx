@@ -67,6 +67,10 @@ function formatSessionCount(count: number): string {
   return `${count} ${pluralizeRu(count, ["сеанс", "сеанса", "сеансов"])}`;
 }
 
+function formatPriceItemCount(count: number): string {
+  return `${count} ${pluralizeRu(count, ["позиция", "позиции", "позиций"])}`;
+}
+
 /* ── Marquee ticker ───────────────────────────────────────── */
 function EventMarquee({ items }: { items: string[] }) {
   const row = [...items, ...items, ...items];
@@ -676,11 +680,32 @@ export function EventPageView({
 
       {/* ── Structured pricing from Event wizard ─── */}
       {((data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-8 md:py-10">
+        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <div className="mb-3 flex items-center gap-3.5">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                    Стоимость
+                  </span>
+                  <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
+                </div>
+                <h2
+                  style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+                >
+                  <span style={{ fontFamily: "var(--font-sans)" }}>Сколько это </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>стоит.</span>
+                </h2>
+              </div>
+              {(data.priceItems?.length ?? 0) > 0 && (
+                <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
+                  {formatPriceItemCount(data.priceItems!.length)}
+                </span>
+              )}
+            </div>
             <PriceListBlock
               items={data.priceItems ?? []}
               note={data.priceNote}
+              showHeader={false}
             />
           </div>
         </section>
