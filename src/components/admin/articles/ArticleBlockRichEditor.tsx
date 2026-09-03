@@ -37,27 +37,6 @@ interface ArticleBlockRichEditorProps {
 function buildExtensions(variant: ArticleBlockRichEditorVariant, placeholder: string) {
   const placeholderExt = Placeholder.configure({ placeholder });
 
-  if (variant === "intro") {
-    return [
-      StarterKit.configure({
-        heading: false,
-        blockquote: false,
-        code: false,
-        codeBlock: false,
-        horizontalRule: false,
-        strike: false,
-        underline: false,
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
-        listKeymap: false,
-        link: false,
-        paragraph: {},
-      }),
-      placeholderExt,
-    ];
-  }
-
   if (variant === "quote") {
     return [
       StarterKit.configure({
@@ -234,10 +213,11 @@ export function ArticleBlockRichEditor({
 
   if (!editor) return null;
 
-  const showLists = variant === "text";
-  const showLink = variant === "text";
-  // Inline QuoteBlock node for text editors (no prop needed — command is built in)
-  const showQuoteBlock = variant === "text";
+  const showRichTextTools = variant !== "quote";
+  const showLists = showRichTextTools;
+  const showLink = showRichTextTools;
+  // Inline QuoteBlock node for text and intro editors (no prop needed — command is built in)
+  const showQuoteBlock = showRichTextTools;
   // Legacy whole-block toggle for ArticleBlocksMvpEditor quote blocks
   const showQuoteToggle = variant === "quote" && Boolean(onToggleQuote);
 

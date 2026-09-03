@@ -9,15 +9,18 @@
 
 export type ArticleBlockHtmlVariant = "intro" | "text" | "quote";
 
+const RICH_TEXT_TAGS = ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a", "div"];
+const RICH_TEXT_ATTRS = ["href", "target", "rel", "class", "data-sponsored"];
+
 const TAGS: Record<ArticleBlockHtmlVariant, string[]> = {
-  intro: ["p", "br", "strong", "b", "em", "i"],
-  text: ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a", "div"],
+  intro: RICH_TEXT_TAGS,
+  text: RICH_TEXT_TAGS,
   quote: ["p", "br", "em", "i"],
 };
 
 const ALLOWED_ATTRS_BY_VARIANT: Record<ArticleBlockHtmlVariant, string[]> = {
-  intro: [],
-  text: ["href", "target", "rel", "class", "data-sponsored"],
+  intro: RICH_TEXT_ATTRS,
+  text: RICH_TEXT_ATTRS,
   quote: [],
 };
 
@@ -223,6 +226,6 @@ export function articleBlockHtmlForPublic(
   variant: ArticleBlockHtmlVariant,
 ): string {
   const sanitized = articleBlockHtmlForEditor(raw, variant);
-  if (variant !== "text") return sanitized;
+  if (variant === "quote") return sanitized;
   return renderInlineQuoteBlocks(sanitized);
 }

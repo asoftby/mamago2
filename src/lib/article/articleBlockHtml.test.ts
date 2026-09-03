@@ -1,5 +1,9 @@
 import assert from "node:assert";
-import { sanitizeHtmlAllowlist } from "./articleBlockHtml";
+import {
+  articleBlockHtmlForPublic,
+  sanitizeArticleBlockHtml,
+  sanitizeHtmlAllowlist,
+} from "./articleBlockHtml";
 
 const TEXT_TAGS = ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a"];
 const TEXT_ATTRS = ["href", "target", "rel", "class"];
@@ -82,6 +86,26 @@ assert.ok(!r14.includes("<div>"), "div removed");
 assert.ok(!r14.includes("iframe"), "iframe removed");
 assert.ok(r14.includes("content"), "text content preserved");
 console.log("OK 14: disallowed tags removed");
+
+// 15. Lead/intro preserves the same rich formatting as a regular text block
+const introRichHtml = sanitizeArticleBlockHtml(
+  '<p><strong>Лид</strong> <a href="/blog/example">ссылка</a></p><ul><li>Пункт</li></ul><div data-type="quote-block"><p>Цитата</p></div>',
+  "intro",
+);
+assert.ok(introRichHtml.includes("<strong>Лид</strong>"), "intro bold preserved");
+assert.ok(introRichHtml.includes('<a href="/blog/example">ссылка</a>'), "intro link preserved");
+assert.ok(introRichHtml.includes("<ul><li>Пункт</li></ul>"), "intro list preserved");
+assert.ok(introRichHtml.includes('data-type="quote-block"'), "intro quote block preserved");
+console.log("OK 15: intro preserves rich-text formatting");
+
+// 16. Inline quote from the lead renders the same way as in a text block
+const introPublicHtml = articleBlockHtmlForPublic(
+  '<div data-type="quote-block"><p>Цитата в лиде</p></div>',
+  "intro",
+);
+assert.ok(introPublicHtml.includes("<blockquote"), "intro quote rendered as blockquote");
+assert.ok(!introPublicHtml.includes('data-type="quote-block"'), "editor quote node removed from public HTML");
+console.log("OK 16: intro quote renders for public article");
 
 console.log("");
 console.log("All articleBlockHtml sanitizer tests passed!");
