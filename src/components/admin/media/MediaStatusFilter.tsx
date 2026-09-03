@@ -21,8 +21,10 @@ export function MediaStatusFilter() {
     } else {
       params.set("status", next);
     }
+    params.delete("page");
 
-    router.push(`/admin/media?${params.toString()}`);
+    const search = params.toString();
+    router.push(search ? `/admin/media?${search}` : "/admin/media");
   };
 
   return (
