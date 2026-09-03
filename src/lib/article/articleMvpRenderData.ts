@@ -146,7 +146,8 @@ export type ArticleMvpResolvedBlock =
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & {
       card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null;
     })
-  | Extract<ArticleBlockMvp, { type: "embed" }>;
+  | Extract<ArticleBlockMvp, { type: "embed" }>
+  | Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }>;
 
 function parseRuDateToTimestamp(value?: string | null): number {
   if (!value) return Number.POSITIVE_INFINITY;
@@ -395,7 +396,7 @@ export async function buildArticleMvpResolvedBlocks(
       out.push({ ...b, card });
       continue;
     }
-    if (b.type === "embed") {
+    if (b.type === "embed" || b.type === "contacts" || b.type === "price" || b.type === "openingHours") {
       out.push(b);
     }
   }

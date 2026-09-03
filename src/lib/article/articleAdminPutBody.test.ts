@@ -25,3 +25,16 @@ assert.deepEqual(empty.additionalGeographyTargets, []);
 assert.deepEqual(empty.additionalCategoryIds, []);
 
 console.log("articleAdminPutBody.test.ts: OK");
+
+const structured = ArticleAdminPutBodySchema.parse({
+  ...base,
+  content: {
+    version: 1,
+    blocks: [
+      { id: "contacts", type: "contacts", data: { address: "Минск", phones: [], socials: [] } },
+      { id: "price", type: "price", data: { mode: "FREE", currency: "BYN", min: 0, max: 0, items: [], note: "" } },
+      { id: "hours", type: "openingHours", data: { mode: "ALWAYS_OPEN", timezone: "Europe/Minsk", rules: [], exceptions: [] } },
+    ],
+  },
+});
+assert.deepEqual(articleSaveInputFromPutBody(structured).content, structured.content, "structured snapshots remain part of the single Article critical write");

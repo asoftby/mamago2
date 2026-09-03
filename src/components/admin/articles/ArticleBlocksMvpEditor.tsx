@@ -25,6 +25,7 @@ import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEd
 import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
+import { ArticleContactsBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
 
 /** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
 export function convertImageBlockToGallery(block: Extract<ArticleBlockMvp, { type: "image" }>): ArticleBlockMvp {
@@ -61,6 +62,9 @@ const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   gallery: "Галерея",
   activityCard: "Карточка сущности",
   embed: "Вставка",
+  contacts: "Контакты",
+  price: "Стоимость",
+  openingHours: "Режим работы",
 };
 
 /** Пункты picker: один intro на статью — в список попадает только если лида ещё нет. */
@@ -73,6 +77,9 @@ const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: 
   { type: "gallery", label: "Галерея" },
   { type: "activityCard", label: "Карточка активности" },
   { type: "embed", label: "Вставка" },
+  { type: "contacts", label: "Контакты" },
+  { type: "price", label: "Стоимость" },
+  { type: "openingHours", label: "Режим работы" },
 ];
 
 function SelectSkeleton({ className }: { className?: string }) {
@@ -428,6 +435,9 @@ export function ArticleBlocksMvpEditor({
           }
         />
       )}
+      {block.type === "contacts" && <ArticleContactsBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
+      {block.type === "price" && <ArticlePriceBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
+      {block.type === "openingHours" && <ArticleOpeningHoursBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
     </>
   );
 

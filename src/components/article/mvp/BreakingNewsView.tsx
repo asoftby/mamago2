@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
+import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
@@ -472,10 +473,12 @@ function HeroGallery({ urls, title }: { urls: string[]; title: string }) {
 
 // ─── Article body ─────────────────────────────────────────────────────────────
 
-type ContentBlock = Extract<ArticleMvpResolvedBlock, { type: "text" }> | Extract<ArticleMvpResolvedBlock, { type: "quote" }>;
+type ContentBlock = Extract<ArticleMvpResolvedBlock, { type: "text" | "quote" | "contacts" | "price" | "openingHours" }>;
 
 function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
-  const contentBlocks = blocks.filter((b): b is ContentBlock => b.type === "text" || b.type === "quote");
+  const contentBlocks = blocks.filter((b): b is ContentBlock =>
+    b.type === "text" || b.type === "quote" || b.type === "contacts" || b.type === "price" || b.type === "openingHours",
+  );
 
   if (contentBlocks.length === 0) return null;
 
@@ -524,6 +527,9 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
                   </div>
                 </blockquote>
               )}
+              {block.type === "contacts" && <ArticleContactsBlock data={block.data} />}
+              {block.type === "price" && <ArticlePriceBlock data={block.data} />}
+              {block.type === "openingHours" && <ArticleOpeningHoursBlock data={block.data} />}
             </div>
             );
           })}

@@ -7,7 +7,7 @@
  * Run: npx tsx src/lib/publications/articleMvp.test.ts
  */
 import assert from "node:assert/strict";
-import { extractArticleMediaIds, extractArticleMediaUsage, newBlock, type ArticleBlockMvp } from "./articleMvp";
+import { ArticleContentPayloadSchema, extractArticleMediaIds, extractArticleMediaUsage, newBlock, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
 
 // newBlock()'s return type is the full ArticleBlockMvp union (not narrowed to
 // the requested variant), so spreading it and overriding mediaId/mediaIds
@@ -105,3 +105,22 @@ function galleryBlock(mediaIds: string[]): ArticleBlockMvp {
 }
 
 console.log("articleMvp.test.ts (extractArticleMediaUsage/extractArticleMediaIds): OK");
+
+// Phase 4 is additive to content version 1: old and structured blocks share the
+// authoritative union and survive a JSON persistence roundtrip without loss.
+{
+  const payload = {
+    version: 1 as const,
+    blocks: [
+      { id: "old", type: "text" as const, text: "Existing article" },
+      { id: "contacts", type: "contacts" as const, data: { address: "Минск", phones: [{ value: "+375291112233" }], socials: [{ kind: "telegram" as const, url: "https://t.me/mamago" }] } },
+      { id: "price", type: "price" as const, data: { mode: "RANGE" as const, currency: "BYN", min: 10, max: 20, items: [{ id: "child", label: "Детский", price: "10", unit: "BYN" }], note: "" } },
+      { id: "hours", type: "openingHours" as const, data: { mode: "WEEKLY" as const, timezone: "Europe/Minsk", rules: [{ dayOfWeek: "MON" as const, isOpen: true, allDay: false, intervals: [{ startTime: "10:00", endTime: "18:00" }] }], exceptions: [{ date: "2028-02-29", isClosed: true, allDay: false, intervals: [] }] } },
+    ],
+  };
+  const parsed = ArticleContentPayloadSchema.parse(payload);
+  assert.deepEqual(ArticleContentPayloadSchema.parse(serializeArticleContent(parsed)), parsed);
+  assert.equal(parsed.version, 1, "additive union does not rewrite existing content version");
+  assert.equal(ArticleContentPayloadSchema.safeParse({ ...payload, blocks: [{ id: "bad", type: "contacts", data: { phones: [], socials: [], email: "bad" } }] }).success, false);
+  assert.equal(ArticleContentPayloadSchema.safeParse({ ...payload, blocks: [{ id: "bad", type: "openingHours", data: { mode: "WEEKLY", timezone: "Mars/Olympus", rules: [], exceptions: [] } }] }).success, false);
+}

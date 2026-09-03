@@ -5,6 +5,9 @@ import {
 } from "@/lib/richtext/utils";
 import { articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { randomId } from "@/lib/utils/randomId";
+import { SharedContactsDataSchema } from "@/domain/contacts/structuredContacts";
+import { SharedPriceDataSchema } from "@/domain/pricing/structuredPrice";
+import { SharedOpeningHoursDataSchema, OPENING_HOURS_DAYS } from "@/domain/opening-hours/structuredOpeningHours";
 
 /** Версия формата `Article.contentJson` */
 export const ARTICLE_CONTENT_VERSION = 1 as const;
@@ -60,6 +63,9 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     embedHtml: z.string(),
     caption: z.string().optional(),
   }),
+  base.extend({ type: z.literal("contacts"), data: SharedContactsDataSchema }),
+  base.extend({ type: z.literal("price"), data: SharedPriceDataSchema }),
+  base.extend({ type: z.literal("openingHours"), data: SharedOpeningHoursDataSchema }),
 ]);
 
 export type ArticleBlockMvp = z.infer<typeof ArticleBlockMvpSchema>;
@@ -211,6 +217,21 @@ export function newBlock(
       return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "" };
     case "embed":
       return { id: bid, type: "embed", embedHtml: "", caption: "" };
+    case "contacts":
+      return { id: bid, type: "contacts", data: { phones: [], socials: [] } };
+    case "price":
+      return { id: bid, type: "price", data: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" } };
+    case "openingHours":
+      return {
+        id: bid,
+        type: "openingHours",
+        data: {
+          mode: "WEEKLY",
+          timezone: "Europe/Minsk",
+          rules: OPENING_HOURS_DAYS.map((dayOfWeek) => ({ dayOfWeek, isOpen: false, allDay: false, intervals: [] })),
+          exceptions: [],
+        },
+      };
     default: {
       const _x: never = type;
       return _x;
