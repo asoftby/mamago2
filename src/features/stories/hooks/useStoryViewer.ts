@@ -60,6 +60,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
     (storyIndex: number) => {
       const story = stories[storyIndex];
       if (!story) return;
+      setPaused(false);
       setActiveItems(orderBySeen(story.items, seenIds));
       setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
       setActiveStoryIndex(storyIndex);
@@ -70,6 +71,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
   );
 
   const close = useCallback(() => {
+    setPaused(false);
     setActiveStoryIndex(null);
     setActiveItemIndex(0);
     setActiveItems([]);
@@ -78,6 +80,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   const next = useCallback(() => {
     if (activeStoryIndex === null || !activeStory) return;
+    setPaused(false);
     setProgressKey((k) => k + 1);
 
     const isLastItem = activeItemIndex >= activeStory.items.length - 1;
@@ -98,6 +101,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   const prev = useCallback(() => {
     if (activeStoryIndex === null || !activeStory) return;
+    setPaused(false);
     setProgressKey((k) => k + 1);
 
     if (activeItemIndex > 0) {
