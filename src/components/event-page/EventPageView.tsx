@@ -23,6 +23,7 @@ import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 import { LocationBlock } from "@/components/shared/LocationBlock";
+import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { EventRichDescription } from "./EventRichDescription";
 import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventSessionSelector } from "./EventSessionSelector";
@@ -672,6 +673,18 @@ export function EventPageView({
         about={data.about}
         descriptionHtml={data.about.descriptionHtml}
       />
+
+      {/* ── Structured pricing from Event wizard ─── */}
+      {((data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
+        <section className="border-b border-[rgba(20,18,16,0.10)] py-8 md:py-10">
+          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+            <PriceListBlock
+              items={data.priceItems ?? []}
+              note={data.priceNote}
+            />
+          </div>
+        </section>
+      )}
 
       <FaqSection items={data.faqItems} />
 
