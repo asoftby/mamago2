@@ -9,9 +9,9 @@
 
 export const PLACE_WIZARD_STEP_DEFINITIONS = {
   profile: {
-    shortLabel: "Профиль",
-    title: "Профиль места",
-    description: "Основная информация о вашем месте",
+    shortLabel: "О месте",
+    title: "О месте",
+    description: "Расскажите главное о вашем месте",
   },
   location: {
     shortLabel: "Локация",

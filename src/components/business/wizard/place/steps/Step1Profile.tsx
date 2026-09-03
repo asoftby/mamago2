@@ -14,8 +14,14 @@ import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import { generateSummary } from "@/lib/openingHours/openingHoursMapper";
 import type { PlaceFormData } from "../types";
 import { AgePolicy } from "@prisma/client";
-
-const MAX_SUBCATEGORIES = 3;
+import {
+  addAdditionalSubcategory,
+  deriveSubcategorySelection,
+  isAdditionalSubcategoryChipDisabled,
+  MAX_ADDITIONAL_SUBCATEGORIES,
+  removeAdditionalSubcategory,
+  setPrimarySubcategory,
+} from "../placeSubcategorySelection";
 
 /** UI-only chip id — never stored. "Любой возраст" is represented by `ageTags: []`. */
 const ANY_AGE_CHIP_ID = "__any_age__";
@@ -53,7 +59,6 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
   const [title, setTitle] = useState(() => data.title);
   const [shortDesc, setShortDesc] = useState(() => data.shortDesc);
   const [description, setDescription] = useState(() => normalizeDescriptionForEditor(data.description));
-  const [showFullDescription, setShowFullDescription] = useState(false);
   const [ageTags, setAgeTags] = useState<string[]>(() => data.ageTags || []);
   // Normalize legacy values (indoor → format-indoor) on init
   const [visitFormats, setVisitFormats] = useState<string[]>(() =>
@@ -117,7 +122,8 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
 
   const handlePrimaryCategoryChange = (id: string) => {
     setPrimaryCategoryId(id);
-    // Reset subcategories when root changes
+    // Reset subcategory selection when the root category changes — a
+    // subcategory only makes sense within its own root.
     setSubcategoryIds([]);
     const root = dbCategories?.find((r) => r.id === id);
     onChange({
@@ -128,14 +134,20 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
     });
   };
 
-  const handleToggleSubcategory = (categoryId: string) => {
+  const handlePrimarySubcategoryChange = (id: string) => {
     if (!isEditable) return;
-    const next = subcategoryIds.includes(categoryId)
-      ? subcategoryIds.filter((id) => id !== categoryId)
-      : subcategoryIds.length >= MAX_SUBCATEGORIES
-        ? subcategoryIds // guard — no change
-        : [...subcategoryIds, categoryId];
-    if (next === subcategoryIds) return; // nothing changed
+    const next = setPrimarySubcategory(subcategoryIds, id || null);
+    if (next === subcategoryIds) return;
+    setSubcategoryIds(next);
+    onChange({ subcategoryIds: next });
+  };
+
+  const handleToggleAdditionalSubcategory = (id: string, isSelected: boolean) => {
+    if (!isEditable) return;
+    const next = isSelected
+      ? removeAdditionalSubcategory(subcategoryIds, id)
+      : addAdditionalSubcategory(subcategoryIds, id);
+    if (next === subcategoryIds) return; // no-op — nothing changed (cap reached, duplicate, etc.)
     setSubcategoryIds(next);
     onChange({ subcategoryIds: next });
   };
@@ -181,228 +193,264 @@ export function Step1Profile({ data, onChange, isEditable = true }: Step1Profile
     [dbCategories, primaryCategoryId],
   );
 
-  // Subcategory chips
-  const subCategoryItems: ChipItem[] = useMemo(() => {
+  // Primary/additional split of the stored subcategoryIds array — index 0
+  // is always primary, the rest are additional (see placeSubcategorySelection.ts).
+  const subcategorySelection = useMemo(
+    () => deriveSubcategorySelection(subcategoryIds),
+    [subcategoryIds],
+  );
+
+  // "Основная подкатегория" dropdown offers every child of the selected root.
+  const primarySubcategoryOptions = useMemo(
+    () => (primaryRoot?.children ?? []).map((c) => ({ value: c.id, label: c.nameRu })),
+    [primaryRoot],
+  );
+
+  // "Дополнительные подкатегории" chips — every child except whichever is
+  // currently primary.
+  const additionalSubcategoryItems: ChipItem[] = useMemo(() => {
     if (!primaryRoot || primaryRoot.children.length === 0) return [];
-    const atMax = subcategoryIds.length >= MAX_SUBCATEGORIES;
-    return primaryRoot.children.map((child) => {
-      const isSelected = subcategoryIds.includes(child.id);
-      const isMain = subcategoryIds[0] === child.id;
-      const isDisabled = !isEditable || (!isSelected && atMax);
-
-      const label = isMain ? (
-        <span className="flex items-center gap-1.5">
-          {child.nameRu}
-          <span className="text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-white/95 rounded px-1 py-0.5 leading-none">
-            Основная
-          </span>
-        </span>
-      ) : (
-        child.nameRu
-      );
-
-      return {
-        id: child.id,
-        label,
-        active: isSelected,
-        disabled: isDisabled,
-        onClick: () => handleToggleSubcategory(child.id),
-        className: "!min-h-[2.25rem] !px-3 !text-[13px]",
-      };
-    });
+    const atMax = subcategorySelection.additional.length >= MAX_ADDITIONAL_SUBCATEGORIES;
+    return primaryRoot.children
+      .filter((child) => child.id !== subcategorySelection.primary)
+      .map((child) => {
+        const isSelected = subcategorySelection.additional.includes(child.id);
+        return {
+          id: child.id,
+          label: child.nameRu,
+          active: isSelected,
+          disabled: isAdditionalSubcategoryChipDisabled({
+            isEditable,
+            isSelected,
+            hasPrimary: Boolean(subcategorySelection.primary),
+            additionalLimitReached: atMax,
+          }),
+          onClick: () => handleToggleAdditionalSubcategory(child.id, isSelected),
+          className: "!min-h-[2.25rem] !px-3 !text-[13px]",
+        };
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [primaryRoot, subcategoryIds, isEditable]);
+  }, [primaryRoot, subcategorySelection, isEditable]);
 
   return (
     <div className="space-y-6">
-      {/* Title */}
+      {/* Название */}
       <div>
         <Label htmlFor="title">Название *</Label>
+        <p className="text-xs text-muted-foreground mt-0.5">Как место называется для посетителей</p>
         <Input
           id="title"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Например: Кофейня на Ленина"
+          placeholder="Детский центр «Совёнок»"
           className="mt-2"
           disabled={!isEditable}
         />
       </div>
 
-      {/* Category */}
+      {/* Тип места */}
       <div className="space-y-3">
+        <h3 className="text-base font-semibold">Тип места</h3>
+
         <div>
           <Label htmlFor="place-category">Категория *</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">Основной тип места</p>
+          <FilterSelect
+            id="place-category"
+            aria-label="Категория места"
+            value={primaryCategoryId}
+            options={rootSelectOptions}
+            onChange={handlePrimaryCategoryChange}
+            placeholder="Выберите категорию"
+            disabled={!isEditable || !dbCategories}
+            className="mt-2"
+          />
         </div>
 
-        <FilterSelect
-          id="place-category"
-          aria-label="Основная категория места"
-          value={primaryCategoryId}
-          options={rootSelectOptions}
-          onChange={handlePrimaryCategoryChange}
-          placeholder="Выберите категорию"
-          disabled={!isEditable || !dbCategories}
-        />
-
-        {/* Subcategories */}
         {primaryRoot && primaryRoot.children.length > 0 && (
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">
-                Подкатегории <span className="text-red-500">*</span>
-              </Label>
-              <span className="text-xs text-muted-foreground">
-                {subcategoryIds.length}/{MAX_SUBCATEGORIES} выбрано
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground -mt-1">
-              Выберите от 1 до {MAX_SUBCATEGORIES} подкатегорий. Первая выбранная — основная.
-            </p>
-            <ChipsRow
-              layout="masonry"
-              aria-label="Подкатегории места"
-              items={subCategoryItems}
-            />
-            {subcategoryIds.length >= MAX_SUBCATEGORIES && (
-              <p className="text-xs text-amber-600">
-                Можно выбрать не больше {MAX_SUBCATEGORIES} подкатегорий
+          <>
+            <div>
+              <Label htmlFor="primary-subcategory">Основная подкатегория *</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Это главный тип места — он влияет на то, как место показывается пользователям.
               </p>
-            )}
-          </div>
+              <FilterSelect
+                id="primary-subcategory"
+                aria-label="Основная подкатегория места"
+                value={subcategorySelection.primary ?? ""}
+                options={primarySubcategoryOptions}
+                onChange={handlePrimarySubcategoryChange}
+                placeholder="Выберите основную подкатегорию"
+                disabled={!isEditable}
+                className="mt-2"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Дополнительные подкатегории</Label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                {subcategorySelection.primary
+                  ? `Можно добавить ещё до ${MAX_ADDITIONAL_SUBCATEGORIES} подходящих вариантов.`
+                  : "Сначала выберите основную подкатегорию."}
+              </p>
+              <ChipsRow
+                layout="masonry"
+                aria-label="Дополнительные подкатегории места"
+                items={additionalSubcategoryItems}
+              />
+            </div>
+          </>
         )}
       </div>
 
-      {/* Short description */}
-      <div>
-        <Label htmlFor="shortDesc">Короткое описание *</Label>
-        <Input
-          id="shortDesc"
-          value={shortDesc}
-          onChange={(e) => handleShortDescChange(e.target.value)}
-          placeholder=""
-          className="mt-2"
-          maxLength={100}
-          disabled={!isEditable}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          {shortDesc.length}/100 символов
-        </p>
-      </div>
+      {/* Описание */}
+      <div className="space-y-4">
+        <h3 className="text-base font-semibold">Описание</h3>
 
-      {/* Description */}
-      <div>
-        <Label htmlFor="description">Описание *</Label>
-        <div className="mt-2">
-          <AiDescriptionAssistant
-            entityType="place"
-            title={title}
-            value={description}
-            isEditable={isEditable}
-            onApply={handleDescriptionChange}
-            filledActions={["improve", "shorten", "warm"]}
-            context={{
-              shortDescription: shortDesc,
-              category: primaryRoot?.nameRu || data.category,
-              subcategories: primaryRoot?.children
-                .filter((child) => subcategoryIds.includes(child.id))
-                .map((child) => child.nameRu),
-              ageRange: ageTags,
-              visitFormats,
-              address: data.customAddress || data.formattedAddr,
-              workingHours: data.openingHoursData ? generateSummary(data.openingHoursData) : "",
-              amenities: data.priceItems.items.map((item) => item.label),
-              website: data.website,
-              instagram: data.instagramHandle || data.instagramUrl,
-              phone: data.phone,
-            }}
-          />
-          <RichDescriptionEditor
-            value={description}
-            onChange={handleDescriptionChange}
-            placeholder="Подробное описание места — расскажите о том, что здесь можно делать, какая атмосфера, что особенного..."
+        <div>
+          <Label htmlFor="shortDesc">Коротко о месте *</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            1–2 предложения, которые помогут быстро понять, зачем сюда идти.
+          </p>
+          <Input
+            id="shortDesc"
+            value={shortDesc}
+            onChange={(e) => handleShortDescChange(e.target.value)}
+            placeholder=""
+            className="mt-2"
+            maxLength={100}
             disabled={!isEditable}
-            minHeight={180}
           />
+          <p className="text-[11px] text-muted-foreground/70 mt-1">
+            {shortDesc.length}/100 символов
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Используйте форматирование для лучшей читаемости. Минимум 20 символов.
-        </p>
+
+        <div>
+          <Label htmlFor="description">Подробнее о месте *</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Расскажите, чем здесь можно заняться, что особенно понравится семьям и что стоит знать
+            перед посещением.
+          </p>
+          <div className="mt-2">
+            <RichDescriptionEditor
+              value={description}
+              onChange={handleDescriptionChange}
+              placeholder="Чем здесь можно заняться, какая атмосфера, что особенного..."
+              disabled={!isEditable}
+              minHeight={180}
+            />
+            <div className="mt-3">
+              <AiDescriptionAssistant
+                entityType="place"
+                title={title}
+                value={description}
+                isEditable={isEditable}
+                onApply={handleDescriptionChange}
+                filledActions={["improve", "shorten", "warm"]}
+                context={{
+                  shortDescription: shortDesc,
+                  category: primaryRoot?.nameRu || data.category,
+                  subcategories: primaryRoot?.children
+                    .filter((child) => subcategoryIds.includes(child.id))
+                    .map((child) => child.nameRu),
+                  ageRange: ageTags,
+                  visitFormats,
+                  address: data.customAddress || data.formattedAddr,
+                  workingHours: data.openingHoursData ? generateSummary(data.openingHoursData) : "",
+                  amenities: data.priceItems.items.map((item) => item.label),
+                  website: data.website,
+                  instagram: data.instagramHandle || data.instagramUrl,
+                  phone: data.phone,
+                }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Используйте форматирование для лучшей читаемости. Минимум 20 символов.
+          </p>
+        </div>
       </div>
 
-      {/* Age */}
-      <div>
-        <Label>Возраст *</Label>
-        <div className="mt-2">
-          <ChipsRow
-            layout="masonry"
-            items={[
-              {
-                id: ANY_AGE_CHIP_ID,
-                label: "Любой возраст",
-                active: data.agePolicy === AgePolicy.UNRESTRICTED,
-                disabled: !isEditable,
-                onClick: () => {
-                  if (!isEditable) return;
-                  if (data.agePolicy === AgePolicy.UNRESTRICTED && ageTags.length === 0) return;
-                  setAgeTags([]);
-                  onChange({ ageTags: [], agePolicy: AgePolicy.UNRESTRICTED });
-                },
-              },
-              ...AGE_OPTIONS.map((ageOption): ChipItem => ({
-                id: ageOption.key,
-                // The shared catalog historically labels 18+ as #nokids, but
-                // in the discriminated Place policy 18+ is ordinary suitability.
-                label:
-                  ageOption.key === ADULT_SUITABILITY_AGE_TAG
-                    ? "18+"
-                    : ageOption.shortLabel,
-                active:
-                  data.agePolicy === AgePolicy.SPECIFIC &&
-                  isPlaceAgeChipActive({
-                    storedAgeTags: ageTags,
-                    chipAgeTag: ageOption.key,
-                  }),
-                disabled: !isEditable,
-                onClick: () => isEditable && toggleAgeTag(ageOption.key),
-              })),
-              {
-                id: "adult-only",
-                label: "Только 18+",
-                active: data.agePolicy === AgePolicy.ADULT_ONLY,
-                disabled: !isEditable,
-                onClick: () => {
-                  if (!isEditable) return;
-                  setAgeTags([]);
-                  onChange({ ageTags: [], agePolicy: AgePolicy.ADULT_ONLY });
-                },
-              },
-            ]}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          «18+» — подходит взрослым; «Только 18+» — строгая возрастная граница.
-        </p>
-      </div>
+      {/* Для кого */}
+      <div className="space-y-4">
+        <h3 className="text-base font-semibold">Для кого</h3>
 
-      {/* Visit formats */}
-      <div>
-        <Label>Формат посещения *</Label>
-        <div className="mt-2">
-          <ChipsRow
-            layout="masonry"
-            items={visitFormatOptions.map((option): ChipItem => ({
-              id: option.value,
-              label: option.label,
-              active: visitFormats.includes(option.value),
-              disabled: !isEditable || formatsLoading,
-              onClick: () => isEditable && toggleVisitFormat(option.value),
-            }))}
-          />
+        <div>
+          <Label>Для какого возраста подходит? *</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Выберите общий возраст посетителей. У отдельных событий и предложений возраст может
+            отличаться.
+          </p>
+          <div className="mt-2">
+            <ChipsRow
+              layout="masonry"
+              items={[
+                {
+                  id: ANY_AGE_CHIP_ID,
+                  label: "Любой возраст",
+                  active: data.agePolicy === AgePolicy.UNRESTRICTED,
+                  disabled: !isEditable,
+                  onClick: () => {
+                    if (!isEditable) return;
+                    if (data.agePolicy === AgePolicy.UNRESTRICTED && ageTags.length === 0) return;
+                    setAgeTags([]);
+                    onChange({ ageTags: [], agePolicy: AgePolicy.UNRESTRICTED });
+                  },
+                },
+                ...AGE_OPTIONS.map((ageOption): ChipItem => ({
+                  id: ageOption.key,
+                  // The shared catalog historically labels 18+ as #nokids, but
+                  // in the discriminated Place policy 18+ is ordinary suitability.
+                  label:
+                    ageOption.key === ADULT_SUITABILITY_AGE_TAG
+                      ? "18+"
+                      : ageOption.shortLabel,
+                  active:
+                    data.agePolicy === AgePolicy.SPECIFIC &&
+                    isPlaceAgeChipActive({
+                      storedAgeTags: ageTags,
+                      chipAgeTag: ageOption.key,
+                    }),
+                  disabled: !isEditable,
+                  onClick: () => isEditable && toggleAgeTag(ageOption.key),
+                })),
+                {
+                  id: "adult-only",
+                  label: "Только 18+",
+                  active: data.agePolicy === AgePolicy.ADULT_ONLY,
+                  disabled: !isEditable,
+                  onClick: () => {
+                    if (!isEditable) return;
+                    setAgeTags([]);
+                    onChange({ ageTags: [], agePolicy: AgePolicy.ADULT_ONLY });
+                  },
+                },
+              ]}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            «18+» — подходит взрослым; «Только 18+» — строгая возрастная граница.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Выберите хотя бы один формат посещения
-        </p>
+
+        <div>
+          <Label>Как можно посетить место? *</Label>
+          <div className="mt-2">
+            <ChipsRow
+              layout="masonry"
+              items={visitFormatOptions.map((option): ChipItem => ({
+                id: option.value,
+                label: option.label,
+                active: visitFormats.includes(option.value),
+                disabled: !isEditable || formatsLoading,
+                onClick: () => isEditable && toggleVisitFormat(option.value),
+              }))}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Выберите хотя бы один формат посещения
+          </p>
+        </div>
       </div>
     </div>
   );

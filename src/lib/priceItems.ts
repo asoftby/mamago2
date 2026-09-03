@@ -5,6 +5,8 @@ export const PriceItemSchema = z.object({
   label: z.string(),
   price: z.string(),
   unit: z.string(),
+  description: z.string().optional(),
+  oldPrice: z.string().optional(),
 });
 
 export type PriceItem = z.infer<typeof PriceItemSchema>;
