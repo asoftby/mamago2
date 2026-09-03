@@ -9,6 +9,20 @@
  * Поэтому включаем pointer-events только для реально показанного consent/preferences UI.
  */
 
+/**
+ * CookieConsentShell (fast SSR first-paint banner, see
+ * components/providers/CookieConsentShell.tsx): hidden purely via CSS for a
+ * returning visitor with already-valid consent. `data-cc-consent-known` is
+ * set by the render-blocking inline script in src/app/layout.tsx
+ * (buildNoFlashCookieShellScript) *before* first paint, so this never
+ * flashes visible and never causes a hydration mismatch (the shell's own
+ * server/client DOM output is unchanged either way — only this unrelated
+ * ancestor attribute differs).
+ */
+html[data-cc-consent-known="1"] #mamago-cookie-shell {
+  display: none !important;
+}
+
 #cc-main {
   /* Бренд primary #EF8759 */
   --cc-bg: #ffffff;

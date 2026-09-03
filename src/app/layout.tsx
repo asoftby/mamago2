@@ -18,6 +18,7 @@ import {
   getBrandingFaviconRouteHref,
 } from "@/lib/brandingFavicon";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
+import { buildNoFlashCookieShellScript } from "@/lib/cookies/no-flash-cookie-shell-script";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "mamaGo — помощник для семейного отдыха и развития",
@@ -42,8 +43,22 @@ export default async function RootLayout({
   const faviconHref = getBrandingFaviconRouteHref(branding);
 
   return (
-    <html lang="ru" className={`${ntSomic.variable} ${ptSerif.variable}`}>
+    <html
+      lang="ru"
+      className={`${ntSomic.variable} ${ptSerif.variable}`}
+      // The no-flash cookie-shell script below sets `data-cc-consent-known`
+      // on this element before React hydrates it — an expected, intentional
+      // one-attribute diff from the server-rendered markup, not a real
+      // mismatch. See CookieConsentShell.tsx.
+      suppressHydrationWarning
+    >
       <head>
+        {/* Render-blocking (no async/defer): must run before first paint so
+            a returning, already-consented visitor never sees the cookie
+            shell flash. See no-flash-cookie-shell-script.ts. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: buildNoFlashCookieShellScript() }}
+        />
         <style>{`
           :root {
             --color-primary: ${branding.colorPrimary};
