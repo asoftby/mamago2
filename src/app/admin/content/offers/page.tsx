@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
-import { OfferStatus } from "@prisma/client";
+import { OfferStatus, Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { ModerationListFilters } from "@/components/admin/moderation/ModerationListFilters";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { getAdminPagination, parseAdminPage } from "@/lib/admin/pagination";
 import { getModerationFilterCities } from "@/lib/admin/moderationAdminQueries";
 import { getOfferPublicUrl } from "@/lib/offers/offerPublicUrl";
 import { getOfferPreviewPath } from "@/lib/content-preview/paths";
@@ -46,9 +48,11 @@ function parseOfferStatusFilter(raw: string | undefined): OfferStatus | undefine
 }
 
 interface SearchParams {
+  q?: string;
   status?: string;
   cityId?: string;
   placeId?: string;
+  page?: string;
   [key: string]: string | undefined;
 }
 
@@ -66,11 +70,7 @@ function buildReturnTo(params: SearchParams): string {
 }
 
 async function getOffers(params: SearchParams) {
-  const where: {
-    status?: OfferStatus;
-    placeId?: string;
-    place?: { cityId: string };
-  } = {};
+  const where: Prisma.OfferWhereInput = {};
 
   const status = parseOfferStatusFilter(params.status);
   if (status) {
@@ -85,7 +85,22 @@ async function getOffers(params: SearchParams) {
     where.place = { cityId: params.cityId };
   }
 
-  return prisma.offer.findMany({
+  const q = params.q?.trim();
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { slug: { contains: q, mode: "insensitive" } },
+      { place: { title: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+
+  const total = await prisma.offer.count({ where });
+  const pagination = getAdminPagination({
+    page: parseAdminPage(params.page),
+    total,
+  });
+
+  const items = await prisma.offer.findMany({
     where,
     include: {
       place: {
@@ -103,8 +118,11 @@ async function getOffers(params: SearchParams) {
       },
     },
     orderBy: { createdAt: "desc" },
-    take: 100,
+    skip: pagination.skip,
+    take: pagination.take,
   });
+
+  return { items, pagination };
 }
 
 const EMPTY_DEPENDENCY_SUMMARY: ContentDependencySummary = {
@@ -119,12 +137,14 @@ type OfferRowMeta = {
   archivedDeletePreflight: ReturnType<typeof deriveOfferArchivedDeletePreflight>;
 };
 
+type OfferListItem = Awaited<ReturnType<typeof getOffers>>["items"][number];
+
 function OffersTable({
   offers,
   returnTo,
   offerMetaById,
 }: {
-  offers: Awaited<ReturnType<typeof getOffers>>;
+  offers: OfferListItem[];
   returnTo: string;
   offerMetaById: Map<string, OfferRowMeta>;
 }) {
@@ -192,7 +212,9 @@ function OffersTable({
           preview: {
             href: viewOfferHref,
             newTab: true,
-            label: publicOfferHref ? "Открыть публичную страницу" : "Открыть предпросмотр",
+            label: publicOfferHref
+              ? "Открыть публичную страницу"
+              : "Открыть предпросмотр",
           },
         }}
         deletePreflight={{
@@ -223,9 +245,11 @@ function OffersTable({
 
   return (
     <>
-      {/* Desktop: table */}
       <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
-        <TableContainer minWidthClassName="min-w-[920px]" scrollLabel="Список предложений, прокручивается по горизонтали">
+        <TableContainer
+          minWidthClassName="min-w-[920px]"
+          scrollLabel="Список предложений, прокручивается по горизонтали"
+        >
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -262,7 +286,11 @@ function OffersTable({
                   <td className="px-4 py-3">
                     <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{offer.agePolicy === "SPECIFIC" ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths) : agePolicyLabel(offer.agePolicy)}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {offer.agePolicy === "SPECIFIC"
+                      ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths)
+                      : agePolicyLabel(offer.agePolicy)}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">
                     {formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
                   </td>
@@ -274,7 +302,6 @@ function OffersTable({
         </TableContainer>
       </div>
 
-      {/* Mobile: cards — same rows, same actions menu */}
       <DataCardList>
         {rows.map(({ offer, lifecycleViewModel, actionsMenu }) => (
           <DataCard key={offer.id}>
@@ -296,7 +323,14 @@ function OffersTable({
                   }
                 />
               )}
-              <DataCardRow label="Возраст" value={offer.agePolicy === "SPECIFIC" ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths) : agePolicyLabel(offer.agePolicy)} />
+              <DataCardRow
+                label="Возраст"
+                value={
+                  offer.agePolicy === "SPECIFIC"
+                    ? formatAgeRange(offer.ageMinMonths, offer.ageMaxMonths)
+                    : agePolicyLabel(offer.agePolicy)
+                }
+              />
               <DataCardRow label="Город" value={offer.place?.city?.name} />
               <DataCardRow
                 label="Бизнес"
@@ -304,7 +338,10 @@ function OffersTable({
               />
               <DataCardRow
                 label="Создано"
-                value={formatDistanceToNow(offer.createdAt, { addSuffix: true, locale: ru })}
+                value={formatDistanceToNow(offer.createdAt, {
+                  addSuffix: true,
+                  locale: ru,
+                })}
               />
             </DataCardBody>
             <DataCardActions>{actionsMenu}</DataCardActions>
@@ -322,10 +359,12 @@ export default async function ModerationOffersPage({
 }) {
   const params = await searchParams;
 
-  const [offers, cities] = await Promise.all([
+  const [offersResult, cities] = await Promise.all([
     getOffers(params),
     getModerationFilterCities(),
   ]);
+  const { items: offers, pagination } = offersResult;
+
   const dependencySummaries = await getOffersDependencySummariesBatch(
     offers.map((offer) => offer.id),
     prisma,
@@ -374,6 +413,16 @@ export default async function ModerationOffersPage({
       <Suspense fallback={<div>Загрузка…</div>}>
         <OffersTable offers={offers} returnTo={returnTo} offerMetaById={offerMetaById} />
       </Suspense>
+
+      <AdminPagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        total={pagination.total}
+        start={pagination.start}
+        end={pagination.end}
+        basePath="/admin/content/offers"
+        params={params}
+      />
     </div>
   );
 }
