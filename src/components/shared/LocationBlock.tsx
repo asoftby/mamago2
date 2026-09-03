@@ -3,6 +3,7 @@
 import { Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { resolveLocationMapUrl } from "@/lib/maps/locationMapUrl";
 
 /** Строит HTML-страницу для srcDoc-iframe: CartoDB Positron + кастомный пulsing-пин */
 function buildMapHtml(lat: number, lng: number): string {
@@ -74,7 +75,7 @@ export interface LocationBlockProps {
   /** Координаты для OSM-карты */
   lat?: number;
   lng?: number;
-  /** Статичная картинка карты (fallback если нет координат) */
+  /** Статичная картинка карты (fallback если нет координат). Legacy navigation URLs are handled safely. */
   mapUrl?: string;
   /** Прямой URL для маршрута (если не задан — генерируется из координат / адреса) */
   routeUrl?: string;
@@ -106,6 +107,7 @@ export function LocationBlock({
     ? `${lat!.toFixed(4)}° N, ${lng!.toFixed(4)}° E`
     : null;
   const coordsClipboard = hasCoords ? `${lat}, ${lng}` : null;
+  const { mapImageUrl, navigationUrl: legacyMapNavigationUrl } = resolveLocationMapUrl(mapUrl);
 
   const copyCoords = async () => {
     if (!coordsClipboard) return;
@@ -141,6 +143,7 @@ export function LocationBlock({
 
   const mapsHref =
     routeUrl ??
+    legacyMapNavigationUrl ??
     (hasCoords
       ? `https://www.google.com/maps?q=${lat},${lng}`
       : address
@@ -155,7 +158,7 @@ export function LocationBlock({
     ...tags,
   ];
 
-  const hasMap = mapDoc || mapUrl;
+  const hasMap = mapDoc || mapImageUrl;
 
   return (
     <section className={cn("border-t border-[rgba(20,18,16,0.10)] py-14 md:py-16", className)}>
@@ -299,9 +302,9 @@ export function LocationBlock({
                     className="absolute inset-0 h-full w-full border-0"
                     title={`Карта: ${name}`}
                   />
-                ) : mapUrl ? (
+                ) : mapImageUrl ? (
                   <img
-                    src={mapUrl}
+                    src={mapImageUrl}
                     alt={`Карта: ${name}`}
                     className="h-full w-full object-cover"
                   />
