@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { ContentStatus, GeoScope } from "@prisma/client";
+import { PHASE_2A_PRIORITY_RECOVERIES } from "./phase2aPriorityRecovery";
 
 export const GRODNO_REGION_ARTICLE_RECOVERY = {
   articleId: "cmssu87vb00jews3fk0gbskm1",
@@ -42,6 +43,23 @@ function blocksCount(contentJson: unknown): number | null {
   return Array.isArray(blocks) ? blocks.length : null;
 }
 
+function canonicalOwnerDecisionIsCommitted(): boolean {
+  const expected = GRODNO_REGION_ARTICLE_RECOVERY;
+  const entry = PHASE_2A_PRIORITY_RECOVERIES.find(
+    (candidate) => candidate.legacySourcePath === `/${expected.slug}`,
+  );
+  return Boolean(
+    entry &&
+      entry.targetArticleId === expected.articleId &&
+      entry.readiness === "READY_WITH_EXACT_MAPPING" &&
+      entry.geoScope === null &&
+      entry.resolvedGeoScope === "REGION" &&
+      entry.regionSlug === expected.regionSlug &&
+      entry.ownerReviewBatch === undefined &&
+      entry.ownerDecision,
+  );
+}
+
 function auditedDrift(before: RecoveryBefore, includeUpdatedAt: boolean): string[] {
   const expected = GRODNO_REGION_ARTICLE_RECOVERY;
   const drift: string[] = [];
@@ -61,6 +79,14 @@ export async function buildGrodnoRegionRecoveryPlan(
   prisma: PrismaClient,
 ): Promise<GrodnoRegionRecoveryPlan> {
   const expected = GRODNO_REGION_ARTICLE_RECOVERY;
+  if (!canonicalOwnerDecisionIsCommitted()) {
+    return {
+      action: "conflict",
+      before: null,
+      reason: "canonical Phase 2A owner decision for Grodno REGION is missing or inconsistent",
+    };
+  }
+
   const region = await prisma.region.findUnique({
     where: { id: expected.regionId },
     select: { id: true, slug: true, countryId: true },
@@ -143,6 +169,9 @@ export async function applyGrodnoRegionRecovery(
   indexer: StrictArticleIndexer,
 ): Promise<void> {
   const expected = GRODNO_REGION_ARTICLE_RECOVERY;
+  if (!canonicalOwnerDecisionIsCommitted()) {
+    throw new Error("[grodno-region-recovery] refusing apply: canonical owner decision is missing or inconsistent");
+  }
   if (plan.action === "conflict" || plan.action === "not_found") {
     throw new Error(`[grodno-region-recovery] refusing apply: ${plan.action}: ${plan.reason ?? "unknown"}`);
   }
