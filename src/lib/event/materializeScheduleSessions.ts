@@ -5,6 +5,9 @@ export type ScheduleJsonLike = {
   dates?: unknown;
   startTime?: unknown;
   scheduleItems?: unknown;
+  repeatEnabled?: unknown;
+  repeatUnit?: unknown;
+  repeatUntil?: unknown;
 };
 
 export type ScheduleOccurrence = {
@@ -38,7 +41,13 @@ function normalizeRecurrenceUnit(value: unknown): RecurrenceUnit | null {
 }
 
 function normalizeRecurrenceInterval(value: unknown): number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 1;
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+$/.test(value.trim())
+        ? Number(value)
+        : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
 function parseLocalDateParts(value: string): { year: number; month: number; day: number } {
@@ -136,18 +145,47 @@ function expandScheduleItemOccurrences(
 export function extractScheduleOccurrences(scheduleJson: unknown): ScheduleOccurrence[] {
   const j = scheduleJson as ScheduleJsonLike | null | undefined;
   const fallbackStartTime = normalizeStartTime(j?.startTime);
+  const legacyRecurrenceDefaults: ScheduleItemLike = {
+    recurringEnabled: j?.repeatEnabled === true,
+    recurrenceInterval: 1,
+    recurrenceUnit: j?.repeatUnit,
+    recurrenceUntil: j?.repeatUntil,
+  };
 
   let occurrences: ScheduleOccurrence[] = [];
 
   if (j && Array.isArray(j.scheduleItems) && j.scheduleItems.length > 0) {
     occurrences = (j.scheduleItems as ScheduleItemLike[]).flatMap((item) =>
-      expandScheduleItemOccurrences(item, fallbackStartTime),
+      expandScheduleItemOccurrences(
+        {
+          ...legacyRecurrenceDefaults,
+          ...item,
+          recurringEnabled:
+            typeof item.recurringEnabled === "boolean"
+              ? item.recurringEnabled
+              : legacyRecurrenceDefaults.recurringEnabled,
+          recurrenceInterval:
+            item.recurrenceInterval ?? legacyRecurrenceDefaults.recurrenceInterval,
+          recurrenceUnit: item.recurrenceUnit ?? legacyRecurrenceDefaults.recurrenceUnit,
+          recurrenceUntil: item.recurrenceUntil ?? legacyRecurrenceDefaults.recurrenceUntil,
+        },
+        fallbackStartTime,
+      ),
     );
   }
 
   if (occurrences.length === 0 && j && Array.isArray(j.dates)) {
     const dates = (j.dates as unknown[]).filter(isLocalDateString);
-    occurrences = dates.map((date) => ({ date, startTime: fallbackStartTime }));
+    occurrences = dates.flatMap((date) =>
+      expandScheduleItemOccurrences(
+        {
+          date,
+          startTime: fallbackStartTime,
+          ...legacyRecurrenceDefaults,
+        },
+        fallbackStartTime,
+      ),
+    );
   }
 
   const unique = new Map<string, ScheduleOccurrence>();
