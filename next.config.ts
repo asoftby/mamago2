@@ -5,6 +5,7 @@ import {
   deriveAllowedSectionsFromAppDir,
   loadRedirectManifest,
 } from "./src/lib/seo/redirectManifest";
+import { resolveLegacySeoDestination } from "./src/lib/seo/eventCategoryHub";
 
 const defaultDevOrigins = [
   "http://localhost:3000",
@@ -53,12 +54,17 @@ function loadManifestRedirects(): Array<{ source: string; destination: string; p
     allowedSections: deriveAllowedSectionsFromAppDir(join(process.cwd(), "src", "app")),
   });
 
+  const effectiveRules = rules.map((rule) => ({
+    ...rule,
+    destination: resolveLegacySeoDestination(rule.source, rule.destination),
+  }));
+
   console.info(
-    `[redirect-manifest] Loaded ${rules.length} redirect rules ` +
+    `[redirect-manifest] Loaded ${effectiveRules.length} redirect rules ` +
       `(${totalRedirectRows} redirect rows in manifest.csv)`,
   );
 
-  return rules;
+  return effectiveRules;
 }
 
 const nextConfig: NextConfig = {
@@ -82,7 +88,9 @@ const nextConfig: NextConfig = {
       // Static legacy redirects (pre-mamaGo 2.0 paths)
       { source: "/birthday", destination: "/minsk/birthday/make", permanent: true },
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
-      // SEO migration: wp_journal + slug_history + wp_map from manifest.csv
+      // SEO migration: wp_journal + slug_history + wp_map from manifest.csv.
+      // A tiny traffic-prioritized override layer may preserve high-value
+      // category-hub intent when the historic manifest target was too broad.
       // Regenerate: pnpm build-migration-manifest → pnpm build
       ...manifestRedirects,
     ];
