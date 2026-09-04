@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
+import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { getActivityOccasionBoosts } from "@/lib/discovery/occasions";
@@ -15,6 +16,19 @@ import {
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+
+function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
+  return Boolean(
+    filters.categorySlugs?.length ||
+      filters.genreSlugs?.length ||
+      filters.dateRange ||
+      filters.free ||
+      filters.priceMax !== null && filters.priceMax !== undefined ||
+      filters.districtId ||
+      filters.metroId ||
+      filters.adultOnly,
+  );
+}
 
 export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters }) {
   const now = new Date();
@@ -45,6 +59,7 @@ export async function getKudaDiscoveryFeed(
     };
   },
 ): Promise<ActivityMock[]> {
+  const perf = createDiscoveryPerf("kuda-feed");
   /** Больше кандидатов в ответе — клиент ранжирует по возрасту + показывает второй слой по engagement. */
   const take = options?.take ?? 80;
   const now = new Date();
@@ -59,6 +74,7 @@ export async function getKudaDiscoveryFeed(
         adultOnly: false,
       };
   const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters });
+  perf.mark("where");
 
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
   const GALLERY_FOR_COVER = 40;
@@ -84,6 +100,7 @@ export async function getKudaDiscoveryFeed(
       },
     },
   });
+  perf.mark("candidates");
 
   const cityIds = Array.from(
     new Set(
@@ -100,12 +117,15 @@ export async function getKudaDiscoveryFeed(
         })
       : [];
   const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+  perf.mark("cityLookup");
 
   const scoreMap = await getEventEngagementScores(rows.map((r) => r.id));
   const ownerUserIdById = new Map(rows.map((row) => [row.id, row.ownerUserId]));
+  perf.mark("engagement");
 
   // Occasion boost is a soft contextual ranking signal, not a visibility rule.
   const occasionBoostMap = await getActivityOccasionBoosts(rows.map((r) => r.id));
+  perf.mark("occasion");
 
   // Business quality boost — soft multiplier based on booking reputation.
   // Only applied when bookingCount30d >= 5. Max +10% to engagement score.
@@ -113,6 +133,7 @@ export async function getKudaDiscoveryFeed(
     new Set(rows.map((r) => r.businessId).filter((id): id is string => id !== null)),
   );
   const qualityBoostMap = await getBusinessQualityBoostMap(businessIds);
+  perf.mark("businessQuality");
   // Map activityId → quality multiplier via businessId
   const activityQualityBoost = new Map<string, number>(
     rows.map((r) => [
@@ -155,7 +176,24 @@ export async function getKudaDiscoveryFeed(
     return tb - ta;
   });
 
-  return cards.slice(0, take);
+  const result = cards.slice(0, take);
+  perf.mark("mapSort");
+  perf.log({
+    citySlug,
+    take,
+    candidates: rows.length,
+    resultCount: result.length,
+    cityCount: cityRows.length,
+    businessCount: businessIds.length,
+    personalized: Boolean(currentUserId),
+    weather: Boolean(options?.weather),
+    filtered:
+      hasActiveEventRuntimeFilters(runtimeFilters) ||
+      Boolean(options?.format) ||
+      Boolean(options?.nearby),
+  });
+
+  return result;
 }
 
 export async function countKudaDiscoveryEvents(
@@ -163,6 +201,15 @@ export async function countKudaDiscoveryEvents(
   citySlug: string,
   options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters },
 ): Promise<number> {
+  const perf = createDiscoveryPerf("kuda-count");
   const { where } = await buildKudaDiscoveryWhere(cityId, citySlug, options);
-  return prisma.activity.count({ where });
+  perf.mark("where");
+  const count = await prisma.activity.count({ where });
+  perf.mark("count");
+  perf.log({
+    citySlug,
+    count,
+    filtered: hasActiveEventRuntimeFilters(options.eventFilters) || Boolean(options.format),
+  });
+  return count;
 }
