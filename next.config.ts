@@ -144,7 +144,7 @@ export default withSentryConfig(nextConfig, {
   // Upload a larger set of source maps for better stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Automatically annotate React components to show their full name in breadcrumbs and breadcrumbs
+  // Automatically annotate React components to show their full name in breadcrumbs
   reactComponentAnnotation: {
     enabled: true,
   },
