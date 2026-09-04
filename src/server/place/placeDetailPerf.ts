@@ -10,32 +10,44 @@ function normalizeEnv(value: string | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
+const NON_PRODUCTION_APP_ENVS = new Set([
+  "dev",
+  "development",
+  "staging",
+  "preview",
+  "local",
+]);
+
 /**
- * Place detail timing logs are diagnostics for non-PROD environments only.
- * Deployed DEV uses `next start`, so NODE_ENV alone cannot distinguish DEV
- * from PROD; APP_ENV remains the primary safety boundary.
+ * Place detail timing logs are diagnostics for recognized non-PROD
+ * environments only. Production fails closed even when APP_ENV is missing or
+ * DEBUG_PLACE_DETAIL_PERF=true is accidentally retained.
  */
 export function isPlaceDetailPerfEnabled(
   env: PlaceDetailPerfEnv = process.env,
 ): boolean {
   const appEnv = normalizeEnv(env.APP_ENV);
+  const nodeEnv = normalizeEnv(env.NODE_ENV);
+  const explicit = normalizeEnv(env.DEBUG_PLACE_DETAIL_PERF);
+
   if (appEnv === "production" || appEnv === "prod") return false;
 
-  const explicit = normalizeEnv(env.DEBUG_PLACE_DETAIL_PERF);
-  if (explicit === "false") return false;
-  if (explicit === "true") return true;
+  if (NON_PRODUCTION_APP_ENVS.has(appEnv)) {
+    return explicit !== "false";
+  }
 
-  if (
-    appEnv === "dev" ||
-    appEnv === "development" ||
-    appEnv === "staging" ||
-    appEnv === "preview" ||
-    appEnv === "local"
-  ) {
+  // Current PROD can run without APP_ENV=production. Never let a debug flag
+  // override NODE_ENV=production unless APP_ENV explicitly identified a known
+  // non-production environment above.
+  if (nodeEnv === "production") return false;
+
+  if (!appEnv) {
+    if (explicit === "false") return false;
     return true;
   }
 
-  return !appEnv && env.NODE_ENV !== "production";
+  // Unknown APP_ENV values fail closed rather than silently enabling logging.
+  return false;
 }
 
 export function createPlaceDetailPerf(scope: string) {
