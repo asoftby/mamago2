@@ -79,6 +79,13 @@ export function normalizePublicationPrice(input: {
   priceItems?: unknown;
   priceText?: unknown;
 }): PriceNormalizationResult {
+  const rawMode = typeof input.mode === "string" ? input.mode.toUpperCase() : "";
+
+  // Explicit semantic modes are authoritative. A user switching a publication
+  // to FREE/NONE must not be overridden by stale tariff rows left in priceItems.
+  if (rawMode === "NONE") return result("NONE", null, null, "NONE");
+  if (rawMode === "FREE") return result("FREE", 0, 0, "NUMERIC");
+
   const values = extractStructuredPriceValues(input.priceItems);
   if (values.length > 0) {
     const min = Math.min(...values);
@@ -87,9 +94,6 @@ export function normalizePublicationPrice(input: {
     return result(values.length === 1 ? "EXACT" : "RANGE", min, max, "STRUCTURED");
   }
 
-  const rawMode = typeof input.mode === "string" ? input.mode.toUpperCase() : "";
-  if (rawMode === "NONE") return result("NONE", null, null, "NONE");
-  if (rawMode === "FREE") return result("FREE", 0, 0, "NUMERIC");
   const min = finiteNonNegative(input.min);
   const max = finiteNonNegative(input.max);
   if (min != null && max != null && max < min) {

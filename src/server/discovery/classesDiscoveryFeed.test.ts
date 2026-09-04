@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
-import { projectCanonicalOfferPrice } from "./classesDiscoveryFeed";
+import {
+  buildCanonicalOfferPriceWhere,
+  projectCanonicalOfferPrice,
+} from "./classesDiscoveryFeed";
 
 test("classes discovery preserves canonical Offer prices through card projection", () => {
   const cases = [
@@ -25,4 +28,16 @@ test("classes discovery preserves canonical Offer prices through card projection
       input.expected,
     );
   }
+});
+
+test("classes discovery price filters use the same canonical semantics as events", () => {
+  assert.deepEqual(buildCanonicalOfferPriceWhere({ free: true, priceMax: 50 }), {
+    priceMode: "FREE",
+  });
+  assert.deepEqual(buildCanonicalOfferPriceWhere({ priceMax: 50 }), {
+    priceMode: { in: ["FREE", "EXACT", "FROM", "RANGE"] },
+    priceFrom: { lte: 50 },
+  });
+  assert.equal(buildCanonicalOfferPriceWhere({ priceMax: null }), null);
+  assert.equal(buildCanonicalOfferPriceWhere({ priceMax: -1 }), null);
 });
