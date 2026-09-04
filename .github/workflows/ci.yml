@@ -50,8 +50,10 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
-      - name: Article public cache regressions
-        run: pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
+      - name: Cache architecture regressions
+        run: |
+          pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
+          pnpm exec tsx src/server/discovery/discoveryHubExpandCacheWiring.test.ts
 
       - name: Stories playback regressions
         run: pnpm exec tsx src/features/stories/components/StoryProgress.test.tsx
