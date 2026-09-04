@@ -144,7 +144,7 @@ export default withSentryConfig(nextConfig, {
   // Upload a larger set of source maps for better stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Automatically annotate React components to show their full name in breadcrumbs
+  // Automatically annotate React components to show their full name in breadcrumbs and error reports
   reactComponentAnnotation: {
     enabled: true,
   },
@@ -161,6 +161,7 @@ export default withSentryConfig(nextConfig, {
 
   // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
   // See the following for more information:
+  // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
 });
