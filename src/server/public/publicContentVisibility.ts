@@ -110,24 +110,23 @@ export function getActivityNotExpiredForPublicWhere(
       {
         sessions: { some: { startsAt: { gte: now } } },
       },
+      /**
+       * Long-lived schedules without a materialized next occurrence remain public.
+       * Keep this independent from the future-session fallback above so Prisma emits
+       * only one ActivitySession existence subquery instead of a duplicate correlated
+       * subplan for the same `startsAt >= now` predicate.
+       */
       {
         AND: [
           { nextOccurrenceAt: null },
           {
-            OR: [
-              {
-                scheduleMode: {
-                  in: [
-                    ScheduleMode.ALWAYS,
-                    ScheduleMode.ON_DEMAND,
-                    ScheduleMode.RECURRING,
-                  ],
-                },
-              },
-              {
-                sessions: { some: { startsAt: { gte: now } } },
-              },
-            ],
+            scheduleMode: {
+              in: [
+                ScheduleMode.ALWAYS,
+                ScheduleMode.ON_DEMAND,
+                ScheduleMode.RECURRING,
+              ],
+            },
           },
         ],
       },
