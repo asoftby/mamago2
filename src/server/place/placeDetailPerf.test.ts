@@ -11,8 +11,27 @@ assert.equal(
   isPlaceDetailPerfEnabled({ APP_ENV: "prod", DEBUG_PLACE_DETAIL_PERF: "true" }),
   false,
 );
+assert.equal(
+  isPlaceDetailPerfEnabled({ NODE_ENV: "production", DEBUG_PLACE_DETAIL_PERF: "true" }),
+  false,
+  "current PROD without APP_ENV must fail closed even when the debug flag is retained",
+);
+assert.equal(
+  isPlaceDetailPerfEnabled({
+    APP_ENV: "unknown",
+    NODE_ENV: "production",
+    DEBUG_PLACE_DETAIL_PERF: "true",
+  }),
+  false,
+  "unknown APP_ENV values must not override production runtime safety",
+);
 assert.equal(isPlaceDetailPerfEnabled({ APP_ENV: "dev" }), true);
 assert.equal(isPlaceDetailPerfEnabled({ APP_ENV: "staging" }), true);
+assert.equal(
+  isPlaceDetailPerfEnabled({ APP_ENV: "dev", DEBUG_PLACE_DETAIL_PERF: "true" }),
+  true,
+  "recognized DEV may explicitly enable diagnostics even under next start",
+);
 assert.equal(
   isPlaceDetailPerfEnabled({ APP_ENV: "dev", DEBUG_PLACE_DETAIL_PERF: "false" }),
   false,
