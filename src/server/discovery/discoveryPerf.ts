@@ -1,4 +1,8 @@
-type DiscoveryPerfEnv = Pick<NodeJS.ProcessEnv, "APP_ENV" | "NODE_ENV" | "DEBUG_DISCOVERY_PERF">;
+type DiscoveryPerfEnv = {
+  APP_ENV?: string;
+  NODE_ENV?: string;
+  DEBUG_DISCOVERY_PERF?: string;
+};
 
 type DiscoveryPerfMetaValue = string | number | boolean | null | undefined;
 
