@@ -117,11 +117,28 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
     const requestedChip = Array.isArray(searchParams.chip)
       ? searchParams.chip[0]
       : searchParams.chip;
+    const freeParam = Array.isArray(searchParams.free)
+      ? searchParams.free[0]
+      : searchParams.free;
+    const priceMaxParam = Array.isArray(searchParams.priceMax)
+      ? searchParams.priceMax[0]
+      : searchParams.priceMax;
+    const classFree = freeParam === "true";
+    const classPriceMax =
+      classFree || priceMaxParam == null
+        ? null
+        : (() => {
+            const value = Number(priceMaxParam);
+            return Number.isFinite(value) && value >= 0 ? value : null;
+          })();
+
     classChips = await listDiscoveryClassChips();
     activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, classChips);
     discoveryActivities = await getClassesDiscoveryFeed(city.id, city.slug, {
       chipSlug: activeClassChipSlug,
       chipTitleBySlug: new Map(classChips.map((chip) => [chip.slug, chip.title])),
+      free: classFree,
+      priceMax: classPriceMax,
     });
     if (budgetEnabled && discoveryActivities) {
       const max = computeMaxBudget(discoveryActivities);
