@@ -1,9 +1,12 @@
 import type { PriceItem } from "@/lib/priceItems";
-import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { BelarusianRubleIcon, renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { extractPlainTextLinesFromHtml } from "@/lib/richtext/utils";
 
 interface PriceListBlockProps {
   items: PriceItem[];
+  /** Rich-text details from the main Event price editor. */
+  detailsHtml?: string;
   note?: string;
   updatedAt?: Date | string | null;
   /** Внутренний заголовок "Сколько стоит / N позиций". Скрывается, когда его уже даёт секция-обёртка. */
@@ -56,8 +59,22 @@ function renderNote(text: string): React.ReactNode {
   return result;
 }
 
-export function PriceListBlock({ items, note, updatedAt, showHeader = true }: PriceListBlockProps) {
-  if (items.length === 0 && !note?.trim()) return null;
+function priceAmountText(raw: string): string {
+  return normalizeUiCurrencyText(raw).replaceAll(BYN_SYMBOL, "").trim();
+}
+
+export function PriceListBlock({
+  items,
+  detailsHtml,
+  note,
+  updatedAt,
+  showHeader = true,
+}: PriceListBlockProps) {
+  const detailsLines = detailsHtml?.trim()
+    ? extractPlainTextLinesFromHtml(detailsHtml)
+    : [];
+
+  if (items.length === 0 && detailsLines.length === 0 && !note?.trim()) return null;
 
   const dateLabel = updatedAt
     ? new Date(updatedAt).toLocaleDateString("ru-RU", {
@@ -82,22 +99,48 @@ export function PriceListBlock({ items, note, updatedAt, showHeader = true }: Pr
           </span>
         </div>
       )}
-      <div className="divide-y divide-[rgba(20,18,16,0.08)]">
-        {items.map((item, index) => (
-          <div key={item.id} className="flex items-baseline gap-3 px-5 py-3">
-            <span className="text-xs text-[rgba(20,18,16,0.45)] w-4 shrink-0">{index + 1}.</span>
-            <span className="flex-1 text-sm text-[#141210]">{item.label}</span>
-            <span className="font-serif text-base font-medium text-[#141210] tabular-nums">
-              {renderCurrencyText(normalizeUiCurrencyText(item.price))}
-            </span>
-            {item.unit && (
-              <span className="text-xs text-[rgba(20,18,16,0.55)]">
-                {renderCurrencyText(normalizeUiCurrencyText(item.unit), { iconSize: "sm" })}
-              </span>
-            )}
+
+      {detailsLines.length > 0 && (
+        <div className="border-b border-[rgba(20,18,16,0.08)] px-5 py-4">
+          <div className="space-y-2 text-[15px] leading-relaxed text-[#141210]">
+            {detailsLines.map((line, index) => (
+              <p key={`${index}-${line.slice(0, 24)}`}>
+                {renderCurrencyText(normalizeUiCurrencyText(line), { iconSize: "sm" })}
+              </p>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="divide-y divide-[rgba(20,18,16,0.08)]">
+          {items.map((item, index) => {
+            const amount = priceAmountText(item.price);
+            const showCurrency = Boolean(amount) && /\d/.test(amount);
+
+            return (
+              <div key={item.id} className="flex items-center gap-3 px-5 py-3.5">
+                <span className="w-4 shrink-0 text-xs text-[rgba(20,18,16,0.45)]">{index + 1}.</span>
+                <span className="min-w-0 flex-1 text-sm leading-snug text-[#141210]">{item.label}</span>
+                <span className="ml-auto inline-flex min-w-[88px] shrink-0 items-baseline justify-end gap-1 whitespace-nowrap pl-3">
+                  <span className="font-pt-serif text-[28px] font-normal leading-none tracking-[-0.5px] text-[#141210] tabular-nums">
+                    {amount}
+                  </span>
+                  {showCurrency && (
+                    <span
+                      className="inline-flex items-center text-[13px] text-[rgba(20,18,16,0.55)]"
+                      aria-label="Белорусский рубль"
+                    >
+                      <BelarusianRubleIcon size="sm" />
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {note?.trim() ? (
         <div className="px-5 py-3 border-t border-[rgba(20,18,16,0.08)]">
           <div className="text-sm text-[rgba(20,18,16,0.65)] leading-relaxed space-y-1">
