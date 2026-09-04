@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
+import { prepareRichContentHtml } from "@/components/content/RichContentRenderer";
 import { cn } from "@/lib/utils";
 
 interface EventRichDescriptionProps {
@@ -18,10 +18,11 @@ interface EventRichDescriptionProps {
 
 /**
  * Expandable/collapsible rich text description block.
- * 
+ *
  * Features:
  * - Single source of truth (no duplication)
  * - Preserves HTML formatting from editor
+ * - Preserves legacy plain-text line breaks
  * - Clean collapsed/expanded states
  * - Smooth animations
  * - Accessible keyboard navigation
@@ -44,15 +45,15 @@ export function EventRichDescription({
       const contentHeight = contentRef.current.scrollHeight;
       setShouldShowButton(contentHeight > collapsedHeight + 20);
     }
-  }, [htmlContent, collapsedHeight]);
+  }, [htmlContent, plainTextSummary, collapsedHeight]);
 
   // Edge case: no content at all
   if (!htmlContent && !plainTextSummary) {
     return null;
   }
 
-  const rawDisplay = htmlContent || `<p>${plainTextSummary || ""}</p>`;
-  const displayContent = sanitizeRichContent(rawDisplay);
+  const rawDisplay = htmlContent || plainTextSummary || "";
+  const displayContent = prepareRichContentHtml(rawDisplay);
 
   return (
     <section className={cn("border-t border-border/40 py-10", className)}>
