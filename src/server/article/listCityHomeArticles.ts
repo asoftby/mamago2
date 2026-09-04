@@ -9,6 +9,7 @@ import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 import {
+  PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG,
   PUBLIC_ARTICLE_LIST_CACHE_TAG,
   PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
 } from "@/server/article/publicArticleCache";
@@ -43,6 +44,11 @@ type CityHomeArticleCity = {
   name: string;
   regionId?: string | null;
 };
+
+const PUBLIC_ARTICLE_LIST_CACHE_TAGS = [
+  PUBLIC_ARTICLE_LIST_CACHE_TAG,
+  PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG,
+];
 
 function estimateReadTimeMinutes(text: string): number {
   const words = text
@@ -154,7 +160,7 @@ export async function listCityHomeArticles(
     () => queryCityHomeArticles(city),
     ["public-article-list:city", city.id, city.slug, city.regionId ?? ""],
     {
-      tags: [PUBLIC_ARTICLE_LIST_CACHE_TAG],
+      tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
       revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
     },
   )();
@@ -223,7 +229,7 @@ async function queryNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
  */
 export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
   return unstable_cache(queryNationalBlogArticles, ["public-article-list:national"], {
-    tags: [PUBLIC_ARTICLE_LIST_CACHE_TAG],
+    tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
     revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
   })();
 }
