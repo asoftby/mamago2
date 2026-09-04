@@ -116,14 +116,7 @@ export function PriceListEditor({ value, onChange, disabled }: PriceListEditorPr
               onChange={(e) => updateItem(item.id, "price", e.target.value)}
               disabled={disabled}
             />
-            <Input
-              className="w-20"
-              placeholder=""
-              value={item.unit}
-              onChange={(e) => updateItem(item.id, "unit", e.target.value)}
-              disabled={disabled}
-            />
-            <span className="shrink-0 text-muted-foreground" aria-hidden>
+            <span className="shrink-0 text-muted-foreground" aria-label="Белорусский рубль">
               <BelarusianRubleIcon size="sm" />
             </span>
             <Button
