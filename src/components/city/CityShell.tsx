@@ -109,7 +109,18 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       eventFilters,
     });
     if (budgetEnabled && discoveryActivities) {
-      const max = computeMaxBudget(discoveryActivities);
+      let budgetActivities = discoveryActivities;
+      // The slider domain must come from the same candidate pool without its own
+      // ceiling, otherwise choosing 50 would collapse max to 50 and make it
+      // impossible to increase the budget again.
+      if (intent === "kuda" && eventFilters?.priceMax != null) {
+        budgetActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
+          format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
+          nearby: false,
+          eventFilters: { ...eventFilters, priceMax: null },
+        });
+      }
+      const max = computeMaxBudget(budgetActivities);
       if (max) budgetConfig = { max, step: getBudgetStep(max) };
     }
   }
@@ -134,14 +145,24 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
 
     classChips = await listDiscoveryClassChips();
     activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, classChips);
+    const chipTitleBySlug = new Map(classChips.map((chip) => [chip.slug, chip.title]));
     discoveryActivities = await getClassesDiscoveryFeed(city.id, city.slug, {
       chipSlug: activeClassChipSlug,
-      chipTitleBySlug: new Map(classChips.map((chip) => [chip.slug, chip.title])),
+      chipTitleBySlug,
       free: classFree,
       priceMax: classPriceMax,
     });
     if (budgetEnabled && discoveryActivities) {
-      const max = computeMaxBudget(discoveryActivities);
+      let budgetActivities = discoveryActivities;
+      if (classPriceMax != null) {
+        budgetActivities = await getClassesDiscoveryFeed(city.id, city.slug, {
+          chipSlug: activeClassChipSlug,
+          chipTitleBySlug,
+          free: false,
+          priceMax: null,
+        });
+      }
+      const max = computeMaxBudget(budgetActivities);
       if (max) budgetConfig = { max, step: getBudgetStep(max) };
     }
   }
