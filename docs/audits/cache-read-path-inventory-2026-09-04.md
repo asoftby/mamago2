@@ -14,7 +14,8 @@ Initial public read-path audit for Articles, Events, Offers and Places. The goal
 | City journal list / city-home journal (`listCityHomeArticles`) | Deterministic published Article query; no request user and no `now`; geography shapes membership | `PUBLIC_CATALOG` | Cache 1h safety TTL + explicit article invalidation + category mutation dependency tag |
 | National `/blog` list (`listNationalBlogArticles`) | Deterministic COUNTRY published Article query; no request user and no `now` | `PUBLIC_CATALOG` | Cache 1h safety TTL + same article list invalidation tag |
 | Article detail (`loadArticleMvpBySlugPublic` / resolved blocks) | Article + media + embedded Event/Offer/Place/Route/Article cards; Offer embeds can contain schedule/pricing data | mixed `PUBLIC_CATALOG` / `FAST_PUBLIC` | **Do not cache as one object yet.** Model dependency tags or split stable article body from embedded dynamic projections first |
-| Event discovery (`getKudaDiscoveryFeed`) | `now`-dependent visibility, sessions, active boosts, engagement, occasion boost, business quality, current-user owner-first ranking, optional weather ranking | mixed `FAST_PUBLIC` / contextual/private | **No broad cache.** Split stable/short-lived candidate pool from per-request contextual ranking first |
+| Event discovery (`getKudaDiscoveryFeed`) | `now`-dependent visibility, sessions, active boosts, engagement, occasion boost, business quality, current-user owner-first ranking, optional weather ranking | mixed `FAST_PUBLIC` / contextual/private | **Do not cache final feed.** Cache only isolated reference reads now; split candidate retrieval from contextual ranking before considering a short candidate cache |
+| Discovery hub city expansion (`resolveKudaDiscoveryCityIds`) | Stable `City` reference lookup driven by static hub configuration; shared by Event feed/count and Plan suggestions | `REFERENCE` | Cache expanded hubs for 1h; preserve zero-DB fast path for non-hub cities |
 | Offer detail (`getOfferPageData`) | Offer + Place + reviews + discovery signals + camp sessions/pricing + CTA/booking-related fields | mixed `PUBLIC_CATALOG` / mutable sub-data | **No broad cache yet.** Split stable offer core from mutable schedule/review/booking projections or define complete invalidation coverage |
 | Place detail / upcoming events | Stable place data combined with `now`-dependent upcoming Activity reads | mixed `PUBLIC_CATALOG` / `FAST_PUBLIC` | **No broad detail cache yet.** Separate base Place projection from upcoming Events before caching |
 
@@ -56,7 +57,44 @@ Draft/archived delete does not invalidate because the lifecycle route only delet
 - Article detail remains uncached in this phase.
 - No Redis or distributed result cache is introduced.
 
-## Why Events are not the first cache slice
+## Phase 2.2 implementation — Discovery hub reference lookup
+
+`resolveKudaDiscoveryCityIds` was identified as a safe repeated read inside the otherwise time/context-sensitive Event pipeline.
+
+### What is cached
+
+Only configured hub expansion, currently e.g. `minsk → minsk + marina-gorka`:
+
+- source table: `City`;
+- lookup fields: configured slugs;
+- filter: `isLegacyNonCity = false`;
+- result: `primaryCityId + expandedCityIds`.
+
+The same resolver is consumed by Event discovery, Event count filtering, and Plan suggestions, so one reference cache removes repeated identical City reads across several surfaces.
+
+### Cache key
+
+The key includes:
+
+- `hubCitySlug`;
+- `hubCityId`;
+- every configured extra city slug.
+
+Including the static configuration values explicitly prevents a changed hub definition from sharing the prior cache identity.
+
+### TTL and invalidation
+
+- TTL: `60 * 60` seconds;
+- no mutation tag in this phase, matching the existing `citySlug → cityId` reference-cache pattern;
+- City/hub configuration changes are rare and the one-hour TTL is the safety boundary.
+
+### Preserved behavior
+
+- cities without configured expansion still return immediately with `[hubCityId]` and perform **zero DB reads**;
+- final Event feed is not cached;
+- `now`, sessions, active boosts, engagement, occasion/business quality, owner-first ranking and weather remain evaluated per request exactly as before.
+
+## Why the final Event feed is not cached
 
 `getKudaDiscoveryFeed` combines several dimensions that change at different rates:
 
@@ -67,11 +105,11 @@ Draft/archived delete does not invalidate because the lifecycle route only delet
 5. current-user ownership ordering;
 6. optional weather ranking.
 
-Caching the final feed would either create a key explosion or serve stale/personalized ranking across requests. The correct next design is to separate a bounded candidate projection from request-context ranking, then measure whether a 1–5 minute candidate cache is worthwhile.
+Caching the final feed would either create a key explosion or serve stale/personalized ranking across requests. The correct next design is to separate a bounded candidate projection from request-context ranking, measure query/TTFB cost, and only then decide whether a 1–5 minute candidate cache is worthwhile.
 
 ## Next order
 
-1. Verify Article journal list cache on DEV with repeated requests and a publish/edit invalidation smoke.
+1. Verify Article journal list cache and Discovery hub reference cache on deployed DEV after the matching build identity is confirmed.
 2. Measure Event discovery query count/TTFB and decompose candidate retrieval vs contextual ranking.
 3. Split Place base data from upcoming-event reads.
 4. Split Offer stable core from mutable schedule/review/booking data.
