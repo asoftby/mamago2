@@ -25,7 +25,7 @@ type RecoveryBefore = {
   publishedAt: string | null;
   noindex: boolean;
   seoRobots: string | null;
-  slug: string;
+  slug: string | null;
   title: string;
   blocksCount: number | null;
 };
