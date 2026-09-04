@@ -12,9 +12,24 @@ assert.equal(
   false,
 );
 assert.equal(
+  isDiscoveryPerfEnabled({ APP_ENV: undefined, NODE_ENV: "production", DEBUG_DISCOVERY_PERF: "true" }),
+  false,
+  "current PROD without APP_ENV must fail closed even when the debug flag is retained",
+);
+assert.equal(
+  isDiscoveryPerfEnabled({ APP_ENV: "unknown", NODE_ENV: "production", DEBUG_DISCOVERY_PERF: "true" }),
+  false,
+  "unknown APP_ENV values must not override production runtime safety",
+);
+assert.equal(
   isDiscoveryPerfEnabled({ APP_ENV: "dev", NODE_ENV: "production", DEBUG_DISCOVERY_PERF: undefined }),
   true,
   "deployed DEV uses next start/NODE_ENV=production, so APP_ENV must drive diagnostics",
+);
+assert.equal(
+  isDiscoveryPerfEnabled({ APP_ENV: "dev", NODE_ENV: "production", DEBUG_DISCOVERY_PERF: "true" }),
+  true,
+  "recognized DEV may explicitly enable diagnostics under next start",
 );
 assert.equal(
   isDiscoveryPerfEnabled({ APP_ENV: "staging", NODE_ENV: "production", DEBUG_DISCOVERY_PERF: undefined }),
