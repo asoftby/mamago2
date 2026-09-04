@@ -16,15 +16,18 @@
  */
 
 import { cn } from "@/lib/utils";
-import { sanitizeHtmlAllowlist } from "@/lib/article/articleBlockHtml";
+import {
+  legacyPlainTextToEditorHtml,
+  sanitizeHtmlAllowlist,
+} from "@/lib/article/articleBlockHtml";
 
-// Tags and attributes allowed from our Tiptap editor output
+// Tags and attributes allowed from our Tiptap editor output and legacy rich HTML.
 const ALLOWED_TAGS = [
-  "p", "br",
+  "p", "br", "div",
   "h2", "h3",
-  "strong", "b", "em", "i",
+  "strong", "b", "em", "i", "u",
   "ul", "ol", "li",
-  "hr",
+  "blockquote", "hr",
   "a",
 ];
 
@@ -45,6 +48,20 @@ function looksLikeHtml(text: string): boolean {
 export function sanitizeRichContent(html: string): string {
   if (!html) return "";
   return sanitizeHtmlAllowlist(html, ALLOWED_TAGS, ALLOWED_ATTRS);
+}
+
+/**
+ * Prepare content for rich public rendering.
+ *
+ * Legacy events may still contain plain text instead of TipTap HTML. Converting
+ * that text before sanitization preserves line breaks while escaping markup.
+ */
+export function prepareRichContentHtml(content: string): string {
+  if (!content) return "";
+  const prepared = looksLikeHtml(content)
+    ? content
+    : legacyPlainTextToEditorHtml(content);
+  return sanitizeRichContent(prepared);
 }
 
 // ─── Prose class set ─────────────────────────────────────────────────────────
