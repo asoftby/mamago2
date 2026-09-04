@@ -7,6 +7,7 @@ import {
 import { getArticleForEditor, saveArticleDraft } from "@/lib/article/articleAdminService";
 import prisma from "@/lib/prisma";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 import {
   assertContentLifecycleOperationAllowed,
   isContentLifecycleOperationError,
@@ -65,6 +66,10 @@ export async function PUT(
   try {
     const snapshot = await saveArticleDraft(id, input);
     perf.mark("service");
+    // A save can publish, unpublish, move geography, or change list-facing
+    // title/category/tags. Invalidating once here is safer than trying to
+    // reconstruct old/new list membership after the transaction.
+    invalidatePublicArticleLists();
     perf.log({ articleId: id, status: snapshot.status });
     return NextResponse.json(snapshot);
   } catch (e) {
