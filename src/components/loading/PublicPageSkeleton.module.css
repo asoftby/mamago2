@@ -1,0 +1,31 @@
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  transform: translateX(-100%);
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.72) 50%,
+    transparent 80%
+  );
+  animation: public-page-shimmer 1.55s ease-in-out infinite;
+}
+
+@keyframes public-page-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    display: none;
+    animation: none;
+  }
+}
