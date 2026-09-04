@@ -679,7 +679,7 @@ export function EventPageView({
       />
 
       {/* ── Structured pricing from Event wizard ─── */}
-      {((data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
+      {(Boolean(data.priceDetails?.trim()) || (data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -704,6 +704,7 @@ export function EventPageView({
             </div>
             <PriceListBlock
               items={data.priceItems ?? []}
+              detailsHtml={data.priceDetails}
               note={data.priceNote}
               showHeader={false}
             />
@@ -797,7 +798,6 @@ export function EventPageView({
           booking={data.cta.simpleBooking}
         />
       )}
-
       {/* Save flow modal */}
       <SaveActivityFlowAdaptive
         open={saveModalOpen}
