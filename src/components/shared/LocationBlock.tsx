@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { resolveLocationMapUrl } from "@/lib/maps/locationMapUrl";
 
-/** Строит HTML-страницу для srcDoc-iframe: CartoDB Positron + кастомный пulsing-пин */
+/** Строит HTML-страницу для srcDoc-iframe: OpenStreetMap + кастомный pulsing-пин */
 function buildMapHtml(lat: number, lng: number): string {
   return `<!DOCTYPE html>
 <html>
@@ -16,7 +16,7 @@ function buildMapHtml(lat: number, lng: number): string {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
 <style>
   html,body,#map{height:100%;margin:0;padding:0;background:#f0ede8}
-  .leaflet-control-attribution{display:none}
+  .leaflet-control-attribution{font-size:9px;opacity:.7}
   .pin-wrap{position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center}
   .pin-ring{
     position:absolute;inset:0;border-radius:50%;
@@ -44,10 +44,11 @@ function buildMapHtml(lat: number, lng: number): string {
 <body>
 <div id="map"></div>
 <script>
-  const map = L.map('map',{zoomControl:true,scrollWheelZoom:false,attributionControl:false})
+  const map = L.map('map',{zoomControl:true,scrollWheelZoom:false,attributionControl:true})
     .setView([${lat},${lng}],15);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
-    subdomains:'abcd',maxZoom:19
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
   const html='<div class="pin-wrap"><div class="pin-ring"></div><div class="pin-ring2"></div><div class="pin-dot"></div></div>';
   const icon=L.divIcon({html,className:'',iconSize:[48,48],iconAnchor:[24,24]});

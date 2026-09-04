@@ -11,9 +11,10 @@ function finiteCoordinate(value: number | null | undefined): number | null {
 }
 
 /**
- * Keyless Event Wizard map based on the same Leaflet + CartoDB stack used by
- * the public LocationBlock. This keeps manual map picking operational even if
- * Google Maps browser-key/referrer configuration is temporarily broken.
+ * Keyless Event Wizard map based on Leaflet + the standard OpenStreetMap tile
+ * endpoint. This keeps manual map picking operational even if Google Maps
+ * browser-key/referrer configuration is temporarily broken and avoids a
+ * second API-key dependency for the basemap itself.
  */
 export function buildEventLocationLeafletMapHtml({
   lat,
@@ -49,8 +50,9 @@ export function buildEventLocationLeafletMapHtml({
 <script>
   const map=L.map('map',{zoomControl:true,scrollWheelZoom:${interactive ? "true" : "false"},attributionControl:true})
     .setView([${centerLat},${centerLng}],${zoom});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
-    subdomains:'abcd',maxZoom:19,attribution:'© OpenStreetMap © CARTO'
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
   const markerHtml='<div class="pin-wrap"><div class="pin-ring"></div><svg class="pin-dot" viewBox="0 0 40 52" fill="none" aria-hidden="true"><path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#E86A3A"/><circle cx="20" cy="20" r="7" fill="white"/></svg></div>';
