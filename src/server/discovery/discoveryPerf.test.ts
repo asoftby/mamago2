@@ -58,7 +58,11 @@ assert.doesNotMatch(
 
 const feedLogMeta = feedSource.match(/perf\.log\(\{([\s\S]*?)\}\);\n\n  return result;/)?.[1] ?? "";
 assert.ok(feedLogMeta, "feed timing metadata block must exist");
-assert.doesNotMatch(feedLogMeta, /currentUserId|ownerUserId|businessIds|activityIds/);
+assert.doesNotMatch(
+  feedLogMeta,
+  /\b(?:currentUserId|ownerUserId|businessIds|activityIds)\s*:/,
+  "raw identifiers must never be emitted as timing metadata fields",
+);
 assert.match(feedLogMeta, /personalized: Boolean\(currentUserId\)/);
 assert.match(feedLogMeta, /candidates: rows\.length/);
 assert.match(feedLogMeta, /businessCount: businessIds\.length/);
