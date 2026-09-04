@@ -3,14 +3,15 @@
  * a REGION-scoped article must surface on the city-home journal for cities
  * in the same region, and must NOT surface for cities in a different region.
  * Self-generated fixtures (2 cities + 1 article), cleaned up in a finally
- * block. Exercises the real function against the local dev DB.
+ * block. Exercises the real DB projection without requiring Next incremental
+ * cache context.
  *
  * Run: set -a; source .env; set +a; npx tsx src/server/article/listCityHomeArticles.test.ts
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { listCityHomeArticles } from "./listCityHomeArticles";
+import { queryCityHomeArticles } from "./listCityHomeArticles";
 
 async function main() {
   const marker = randomUUID();
@@ -92,7 +93,7 @@ async function main() {
     createdArticleIds.push(additionalArticle.id);
 
     // Visible for a city in the SAME region.
-    const forVitebskCity = await listCityHomeArticles(cityInVitebskRegion);
+    const forVitebskCity = await queryCityHomeArticles(cityInVitebskRegion);
     assert.ok(
       forVitebskCity.some((a) => a.id === regionArticle.id),
       "REGION article must be visible for a city in the same region",
@@ -101,7 +102,7 @@ async function main() {
     assert.equal(matched?.href, `/blog/braslav-region-article-${marker}`, "REGION article href = /blog/{slug}");
 
     // NOT visible for a city in a DIFFERENT region.
-    const forGomelCity = await listCityHomeArticles(cityInGomelRegion);
+    const forGomelCity = await queryCityHomeArticles(cityInGomelRegion);
     assert.ok(
       !forGomelCity.some((a) => a.id === regionArticle.id),
       "REGION article must NOT be visible for a city in a different region",

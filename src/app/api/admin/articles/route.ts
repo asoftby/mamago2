@@ -6,6 +6,7 @@ import {
 import { createArticleFromSaveInput } from "@/lib/article/articleAdminService";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
 import { createRequestPerf } from "@/server/utils/requestPerf";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 
 /** Первая запись статьи (явное «Сохранить черновик» / «Опубликовать»), не при открытии формы. */
 export async function POST(req: NextRequest) {
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
     const input = articleSaveInputFromPutBody(parsed.data);
     const snapshot = await createArticleFromSaveInput(input);
     perf.mark("service");
+    if (snapshot.status === "PUBLISHED") {
+      invalidatePublicArticleLists();
+    }
     perf.log({ status: snapshot.status, articleId: snapshot.id });
     return NextResponse.json(snapshot);
   } catch (e) {
