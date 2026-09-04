@@ -55,6 +55,7 @@ jobs:
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
           pnpm exec tsx src/server/discovery/discoveryHubExpandCacheWiring.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
+          pnpm exec tsx src/server/place/placeDetailPerf.test.ts
 
       - name: Stories playback regressions
         run: pnpm exec tsx src/features/stories/components/StoryProgress.test.tsx
