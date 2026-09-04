@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
-import { extractScheduleDatesAndStartTime } from "@/lib/event/materializeScheduleSessions";
+import { extractScheduleOccurrences } from "@/lib/event/materializeScheduleSessions";
 import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
 
@@ -13,35 +13,34 @@ type EventActivitySessionsPrisma = {
 };
 
 /**
- * Fingerprint of schedule fields that drive ActivitySession rows (dates + time).
- * Ignores organizer, pricing, etc. so PATCH can update JSON without deleteMany/createMany sessions.
+ * Fingerprint of the exact ActivitySession occurrences driven by scheduleJson.
+ * Recurrence and per-schedule-item times are already expanded by the canonical
+ * materializer, so PATCH guards cannot silently treat a changed recurrence as
+ * equivalent to the old base dates.
  */
 export function eventSessionScheduleFingerprint(scheduleJson: unknown): string {
-  const { dates, startTime } = extractScheduleDatesAndStartTime(scheduleJson);
-  const sortedDates = [...new Set(dates)].sort();
-  return stableJsonStringify({ dates: sortedDates, startTime });
+  const occurrences = extractScheduleOccurrences(scheduleJson);
+  return stableJsonStringify({ occurrences });
 }
 
 /**
- * Fingerprint ActivitySession instants as venue-local calendar/time values.
+ * Fingerprint ActivitySession instants as venue-local date+time occurrences.
  * The persisted Date is an absolute UTC instant; the schedule contract is a
  * Europe/Minsk wall clock, so ambient server timezone must never participate.
  */
 export function eventSessionFingerprintFromStoredSessions(
   sessions: { startsAt: Date }[],
 ): string {
-  if (sessions.length === 0) {
-    return stableJsonStringify({ dates: [], startTime: "10:00" });
-  }
+  const occurrences = sessions
+    .map((session) => ({
+      date: getLocalDateKey(session.startsAt),
+      startTime: formatHHMM(session.startsAt),
+    }))
+    .sort((a, b) =>
+      a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date),
+    );
 
-  const sortedSessions = [...sessions].sort(
-    (a, b) => a.startsAt.getTime() - b.startsAt.getTime(),
-  );
-  const dates = sortedSessions.map((session) => getLocalDateKey(session.startsAt));
-  const sortedDates = [...new Set(dates)].sort();
-  const startTime = formatHHMM(sortedSessions[0].startsAt);
-
-  return stableJsonStringify({ dates: sortedDates, startTime });
+  return stableJsonStringify({ occurrences });
 }
 
 export async function activitySessionsMatchScheduleJson(
@@ -62,12 +61,12 @@ export async function activitySessionsMatchScheduleJson(
 }
 
 /**
- * Replaces ActivitySession rows from wizard scheduleJson (dates + time).
- * Required for submit validation and listings that rely on sessions.
+ * Replaces ActivitySession rows from wizard scheduleJson.
  *
- * `scheduleJson` stores venue-local wall-clock values. Convert them to the
- * corresponding UTC instant explicitly instead of using `new Date(y, m, d,
- * hh, mm)`, which silently depends on the process timezone (UTC in prod).
+ * Every materialized occurrence carries its own date and start time. This is
+ * required for recurring schedules and for multiple schedule blocks with
+ * different times. Venue-local wall-clock values are converted explicitly to
+ * UTC; ambient server timezone never participates.
  */
 export async function replaceActivitySessionsFromScheduleJson(
   input: {
@@ -78,18 +77,17 @@ export async function replaceActivitySessionsFromScheduleJson(
 ): Promise<number> {
   const { prisma, activityId, scheduleJson } = input;
   const started = isServerSavePerfEnabled() ? performance.now() : 0;
-  const { dates, startTime } = extractScheduleDatesAndStartTime(scheduleJson);
+  const occurrences = extractScheduleOccurrences(scheduleJson);
 
   const deleteStarted = isServerSavePerfEnabled() ? performance.now() : 0;
   await prisma.activitySession.deleteMany({ where: { activityId } });
   const deleteMs = isServerSavePerfEnabled() ? Math.round(performance.now() - deleteStarted) : 0;
 
-  if (dates.length === 0) {
+  if (occurrences.length === 0) {
     if (isServerSavePerfEnabled()) {
       console.info("[event-sessions-sync]", {
         activityId,
-        datesCount: 0,
-        startTime,
+        sessionsCount: 0,
         deleteMs,
         createMs: 0,
         totalMs: Math.round(performance.now() - started),
@@ -98,8 +96,8 @@ export async function replaceActivitySessionsFromScheduleJson(
     return 0;
   }
 
-  const startsAtList = dates.map((dateStr) =>
-    localWallClockToUtc(dateStr, startTime),
+  const startsAtList = occurrences.map((occurrence) =>
+    localWallClockToUtc(occurrence.date, occurrence.startTime),
   );
 
   const createStarted = isServerSavePerfEnabled() ? performance.now() : 0;
@@ -111,8 +109,7 @@ export async function replaceActivitySessionsFromScheduleJson(
   if (isServerSavePerfEnabled()) {
     console.info("[event-sessions-sync]", {
       activityId,
-      datesCount: startsAtList.length,
-      startTime,
+      sessionsCount: startsAtList.length,
       deleteMs,
       createMs,
       totalMs: Math.round(performance.now() - started),

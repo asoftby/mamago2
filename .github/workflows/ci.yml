@@ -78,6 +78,9 @@ jobs:
       - name: Event timezone contract regressions
         run: pnpm exec tsx src/lib/event/eventTimezoneContract.test.ts
 
+      - name: Event recurring schedule regressions
+        run: pnpm exec tsx src/lib/event/recurringScheduleMaterialization.test.ts
+
       - name: Event map regressions
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
 

@@ -2,7 +2,7 @@ import {
   eventSessionFingerprintFromStoredSessions,
   eventSessionScheduleFingerprint,
 } from "@/lib/business/syncEventActivitySessions";
-import { extractScheduleDatesAndStartTime } from "@/lib/event/materializeScheduleSessions";
+import { extractScheduleOccurrences } from "@/lib/event/materializeScheduleSessions";
 import type { NormalizedEventScheduleDraft } from "../../adapters/wordpress-db/normalizeEvent";
 
 /**
@@ -63,9 +63,7 @@ export function computeEventScheduleResyncPlan(input: {
   }
 
   const desiredFingerprint = eventSessionScheduleFingerprint(input.scheduleDraft);
-  // The same date-expansion the real writer (`replaceActivitySessionsFromScheduleJson`)
-  // uses — `scheduleItems` ranges win over the flat `dates` list when present.
-  const desiredSessionCount = extractScheduleDatesAndStartTime(input.scheduleDraft).dates.length;
+  const desiredSessionCount = extractScheduleOccurrences(input.scheduleDraft).length;
 
   return {
     action: desiredFingerprint === actualFingerprint ? "NOOP_ALREADY_SYNCED" : "RESYNC",
