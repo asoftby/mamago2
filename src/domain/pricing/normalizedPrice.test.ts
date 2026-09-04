@@ -11,7 +11,28 @@ test("normalizes explicit free, exact, from and range modes", () => {
   assert.deepEqual(normalizePublicationPrice({ mode: "NONE" }), { mode: "NONE", min: null, max: null, currency: "BYN", source: "NONE", conflict: null });
 });
 
-test("structured tariffs are authoritative and ignore invalid entries", () => {
+test("explicit FREE and NONE override stale structured tariffs", () => {
+  const staleTariffs = { items: [{ price: "30" }, { price: "120" }] };
+
+  assert.deepEqual(normalizePublicationPrice({ mode: "FREE", priceItems: staleTariffs }), {
+    mode: "FREE",
+    min: 0,
+    max: 0,
+    currency: "BYN",
+    source: "NUMERIC",
+    conflict: null,
+  });
+  assert.deepEqual(normalizePublicationPrice({ mode: "NONE", priceItems: staleTariffs }), {
+    mode: "NONE",
+    min: null,
+    max: null,
+    currency: "BYN",
+    source: "NONE",
+    conflict: null,
+  });
+});
+
+test("structured tariffs are authoritative over numeric fallback and ignore invalid entries", () => {
   const price = normalizePublicationPrice({ min: 999, priceItems: { items: [{ price: "30" }, { price: "bad" }, { price: 120 }] } });
   assert.deepEqual({ mode: price.mode, min: price.min, max: price.max, source: price.source }, { mode: "RANGE", min: 30, max: 120, source: "STRUCTURED" });
 });

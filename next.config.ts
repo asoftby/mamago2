@@ -5,7 +5,7 @@ import {
   deriveAllowedSectionsFromAppDir,
   loadRedirectManifest,
 } from "./src/lib/seo/redirectManifest";
-import { resolveLegacySeoDestination } from "./src/lib/seo/eventCategoryHub";
+import { resolveLegacySeoDestination } from "./src/lib/seo/legacySeoRedirectOverrides";
 
 const defaultDevOrigins = [
   "http://localhost:3000",
@@ -90,7 +90,7 @@ const nextConfig: NextConfig = {
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
       // SEO migration: wp_journal + slug_history + wp_map from manifest.csv.
       // A tiny traffic-prioritized override layer may preserve high-value
-      // category-hub intent when the historic manifest target was too broad.
+      // category-hub intent or correct a confirmed migration geography error.
       // Regenerate: pnpm build-migration-manifest → pnpm build
       ...manifestRedirects,
     ];

@@ -58,10 +58,32 @@ function extractOfferDateRange(input: {
   };
 }
 
+const NUMERIC_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE"] as const;
+
+type CanonicalOfferPriceFilter = {
+  free?: boolean;
+  priceMax?: number | null;
+};
+
+export function buildCanonicalOfferPriceWhere(
+  input: CanonicalOfferPriceFilter,
+): Prisma.OfferWhereInput | null {
+  if (input.free) return { priceMode: "FREE" };
+  if (input.priceMax == null || !Number.isFinite(input.priceMax) || input.priceMax < 0) {
+    return null;
+  }
+  return {
+    priceMode: { in: [...NUMERIC_PRICE_MODES] },
+    priceFrom: { lte: input.priceMax },
+  };
+}
+
 type GetClassesDiscoveryFeedOptions = {
   take?: number;
   chipSlug?: string | null;
   chipTitleBySlug?: Map<string, string>;
+  free?: boolean;
+  priceMax?: number | null;
 };
 
 type CanonicalOfferPrice = {
@@ -89,6 +111,8 @@ export async function getClassesDiscoveryFeed(
 ): Promise<ActivityMock[]> {
   const take = options?.take ?? 80;
   const chipSlug = options?.chipSlug && options.chipSlug !== "all" ? options.chipSlug : null;
+  const free = options?.free === true;
+  const priceMax = free ? null : (options?.priceMax ?? null);
   const publicWhere = getPublicPublishedOfferWhere();
   const publicWhereParts = (publicWhere.AND ?? []) as Prisma.OfferWhereInput[];
   const now = new Date();
@@ -100,7 +124,7 @@ export async function getClassesDiscoveryFeed(
   let classChipSlugsAvailable = true;
 
   try {
-    rows = await runQuery({ publicWhereParts, cityId, chipSlug, now });
+    rows = await runQuery({ publicWhereParts, cityId, chipSlug, now, free, priceMax });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isMissingColumn =
@@ -112,7 +136,15 @@ export async function getClassesDiscoveryFeed(
       console.warn("[classesDiscoveryFeed] classChipSlugs column not found, falling back to unfiltered query");
       classChipSlugsAvailable = false;
       try {
-        rows = await runQuery({ publicWhereParts, cityId, chipSlug: null, now, skipChipSlugsSelect: true });
+        rows = await runQuery({
+          publicWhereParts,
+          cityId,
+          chipSlug: null,
+          now,
+          free,
+          priceMax,
+          skipChipSlugsSelect: true,
+        });
       } catch {
         return [];
       }
@@ -208,16 +240,29 @@ type RunQueryParams = {
   cityId: string;
   chipSlug: string | null;
   now: Date;
+  free: boolean;
+  priceMax: number | null;
   skipChipSlugsSelect?: boolean;
 };
 
-async function runQuery({ publicWhereParts, cityId, chipSlug, now, skipChipSlugsSelect = false }: RunQueryParams) {
+async function runQuery({
+  publicWhereParts,
+  cityId,
+  chipSlug,
+  now,
+  free,
+  priceMax,
+  skipChipSlugsSelect = false,
+}: RunQueryParams) {
+  const priceWhere = buildCanonicalOfferPriceWhere({ free, priceMax });
+
   return prisma.offer.findMany({
     where: {
       AND: [
         ...publicWhereParts,
         { kind: "SERVICE" },
         { place: { cityId } },
+        ...(priceWhere ? [priceWhere] : []),
         // Only add chip filter when column exists and chip is requested
         ...(chipSlug && !skipChipSlugsSelect
           ? [{ classChipSlugs: { has: chipSlug } } as Prisma.OfferWhereInput]
