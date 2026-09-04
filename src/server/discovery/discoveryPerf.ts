@@ -10,31 +10,44 @@ function normalizeEnv(value: string | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
+const NON_PRODUCTION_APP_ENVS = new Set([
+  "dev",
+  "development",
+  "staging",
+  "preview",
+  "local",
+]);
+
 /**
- * Discovery timing logs are a DEV/staging diagnostic only. Production stays
- * disabled even if DEBUG_DISCOVERY_PERF is accidentally set there.
+ * Discovery timing logs are diagnostics for recognized non-PROD environments
+ * only. Production fails closed even when APP_ENV is missing or
+ * DEBUG_DISCOVERY_PERF=true is accidentally retained.
  */
 export function isDiscoveryPerfEnabled(
   env: DiscoveryPerfEnv = process.env,
 ): boolean {
   const appEnv = normalizeEnv(env.APP_ENV);
+  const nodeEnv = normalizeEnv(env.NODE_ENV);
+  const explicit = normalizeEnv(env.DEBUG_DISCOVERY_PERF);
+
   if (appEnv === "production" || appEnv === "prod") return false;
 
-  const explicit = normalizeEnv(env.DEBUG_DISCOVERY_PERF);
-  if (explicit === "false") return false;
-  if (explicit === "true") return true;
+  if (NON_PRODUCTION_APP_ENVS.has(appEnv)) {
+    return explicit !== "false";
+  }
 
-  if (
-    appEnv === "dev" ||
-    appEnv === "development" ||
-    appEnv === "staging" ||
-    appEnv === "preview" ||
-    appEnv === "local"
-  ) {
+  // Current PROD can run without APP_ENV=production. A retained debug flag
+  // must never override NODE_ENV=production unless APP_ENV explicitly identifies
+  // a known non-production environment above.
+  if (nodeEnv === "production") return false;
+
+  if (!appEnv) {
+    if (explicit === "false") return false;
     return true;
   }
 
-  return !appEnv && env.NODE_ENV !== "production";
+  // Unknown APP_ENV values fail closed.
+  return false;
 }
 
 export function createDiscoveryPerf(scope: string) {
