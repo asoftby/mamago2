@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 
 /**
@@ -11,15 +12,22 @@ export const DISCOVERY_HUB_EXTRA_CITY_SLUGS: Readonly<Record<string, readonly st
   minsk: ["marina-gorka"],
 };
 
-export async function resolveKudaDiscoveryCityIds(
+export const DISCOVERY_HUB_CITY_IDS_REVALIDATE_SECONDS = 60 * 60;
+
+type DiscoveryHubCityIds = {
+  primaryCityId: string;
+  expandedCityIds: string[];
+};
+
+function fallbackHubCityIds(hubCityId: string): DiscoveryHubCityIds {
+  return { primaryCityId: hubCityId, expandedCityIds: [hubCityId] };
+}
+
+async function readKudaDiscoveryCityIds(
   hubCitySlug: string,
   hubCityId: string,
-): Promise<{ primaryCityId: string; expandedCityIds: string[] }> {
-  const extras = DISCOVERY_HUB_EXTRA_CITY_SLUGS[hubCitySlug];
-  if (!extras?.length) {
-    return { primaryCityId: hubCityId, expandedCityIds: [hubCityId] };
-  }
-
+  extras: readonly string[],
+): Promise<DiscoveryHubCityIds> {
   const slugs = [hubCitySlug, ...extras];
   const rows = await prisma.city.findMany({
     where: { slug: { in: slugs }, isLegacyNonCity: false },
@@ -34,11 +42,26 @@ export async function resolveKudaDiscoveryCityIds(
     const id = bySlug.get(s);
     if (id && !expandedCityIds.includes(id)) expandedCityIds.push(id);
   }
-  if (!primary) {
-    return { primaryCityId: hubCityId, expandedCityIds: [hubCityId] };
-  }
-  if (expandedCityIds.length === 0) {
-    return { primaryCityId: hubCityId, expandedCityIds: [hubCityId] };
+  if (!primary || expandedCityIds.length === 0) {
+    return fallbackHubCityIds(hubCityId);
   }
   return { primaryCityId: primary, expandedCityIds };
+}
+
+export async function resolveKudaDiscoveryCityIds(
+  hubCitySlug: string,
+  hubCityId: string,
+): Promise<DiscoveryHubCityIds> {
+  const extras = DISCOVERY_HUB_EXTRA_CITY_SLUGS[hubCitySlug];
+  if (!extras?.length) {
+    // Most cities are not hubs: preserve the zero-DB fast path and avoid even
+    // invoking the incremental cache for a value already present in the call.
+    return fallbackHubCityIds(hubCityId);
+  }
+
+  return unstable_cache(
+    () => readKudaDiscoveryCityIds(hubCitySlug, hubCityId, extras),
+    ["discovery-hub-city-ids", hubCitySlug, hubCityId, ...extras],
+    { revalidate: DISCOVERY_HUB_CITY_IDS_REVALIDATE_SECONDS },
+  )();
 }
