@@ -41,6 +41,7 @@ import {
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import type { StoredGoogleReview } from "@/types/google-places";
 import { resolveCanonicalCta } from "@/lib/cta-platform";
+import { createPlaceDetailPerf } from "@/server/place/placeDetailPerf";
 
 /**
  * `/{city}/places/{slug}` — the canonical Place detail page.
@@ -205,6 +206,7 @@ export async function generateMetadata({ params }: PlacePageProps): Promise<Meta
 }
 
 export default async function PlacePage({ params }: PlacePageProps) {
+  const perf = createPlaceDetailPerf("page");
   const { city: citySlug, slug } = await params;
 
   const city = await findCityBySlug(citySlug, { select: { id: true, slug: true } });
@@ -259,6 +261,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
       permanentRedirect(buildCityPublicPath({ citySlug: otherPlace.city.slug, type: "place", slug: otherPlace.slug }));
     }
   }
+  perf.mark("resolve");
 
   // Fetch full place data
   const place = await prisma.place.findUnique({
@@ -345,6 +348,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
   })) {
     notFound();
   }
+  perf.mark("placeCore");
 
   const relatedPlacesRaw = place.placeGroupId
     ? await prisma.place.findMany({
@@ -446,6 +450,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         relatedPlace.districtManual?.name || relatedPlace.districtAuto?.name || undefined,
       metro: relatedPlace.metroManual?.name || relatedPlace.metroAuto?.name || undefined,
     }));
+  perf.mark("relatedPlaces");
 
   // Get display title with duplicate check
   const displayTitle = await getPlaceDisplayTitle(prisma, {
@@ -456,6 +461,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     shortAddress: null,
     cityId: place.cityId,
   });
+  perf.mark("displayTitle");
 
   const googleReviewsEnabled = isGoogleReviewsEnabled(
     place.googlePlaceId,
@@ -474,6 +480,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     reelsThumbnailUrl,
     title: displayTitle,
   });
+  perf.mark("media");
 
   const now = new Date();
 
@@ -485,6 +492,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     now,
     take: 10,
   });
+  perf.mark("upcomingEvents");
 
   // Fetch active offers for this place
   const activeOffers = await prisma.offer.findMany({
@@ -506,6 +514,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     orderBy: { createdAt: "desc" },
     take: 10,
   });
+  perf.mark("offers");
 
   // Fetch published reviews from PlaceReview
   const placeReviews = await prisma.placeReview.findMany({
@@ -541,6 +550,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     },
     _count: true,
   });
+  perf.mark("reviews");
 
   const hasPersistedGoogleReviews = placeReviews.some((review) => review.source === "GOOGLE");
   const fallbackGoogleReviews = !hasPersistedGoogleReviews && googleReviewsEnabled
@@ -577,6 +587,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
       ownerBusinessId: place.ownerBusinessId,
       status: place.status,
     }));
+  perf.mark("authPermissions");
 
   // `place.cityId` is already verified to equal `city.id` (or this render
   // was reached via a same-city lookup) — city.slug is the source of
@@ -671,6 +682,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         .join(", ");
     }
   }
+  perf.mark("openingHours");
 
   const breadcrumbItems: Array<{ label: string; href?: string }> = [
     { label: "Главная", href: "/" },
@@ -773,6 +785,18 @@ export default async function PlacePage({ params }: PlacePageProps) {
         brandName: place.title,
       }
     : undefined;
+  perf.mark("directCta");
+  perf.log({
+    citySlug: placeCitySlug,
+    legacy: isLegacyId,
+    hasReels: Boolean(place.reelsUrl),
+    relatedCount: relatedPlaces.length,
+    eventCount: upcomingEvents.length,
+    offerCount: activeOffers.length,
+    reviewCount: combinedReviews.length,
+    authenticated: Boolean(currentUser),
+    editable: canShowPlaceEditor,
+  });
 
   return (
     <>
