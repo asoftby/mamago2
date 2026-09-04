@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
 import { syncArticleCanonical } from "@/lib/seo/syncEntityCanonical";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 import {
   assertContentLifecycleOperationAllowed,
   isContentLifecycleOperationError,
@@ -45,6 +46,7 @@ export async function POST(
       select: { id: true },
     });
     await syncArticleCanonical(id);
+    invalidatePublicArticleLists();
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (isContentLifecycleOperationError(e)) {
