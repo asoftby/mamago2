@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { slugifyLabelToValue } from "@/lib/slugifyLabelToValue";
+import { invalidatePublicArticleLists } from "@/server/article/publicArticleCache";
 
 export const runtime = "nodejs";
 
@@ -87,6 +88,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       where: { id },
       data,
     });
+    invalidatePublicArticleLists();
     return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -110,6 +112,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
       where: { id },
       data: { isActive: false },
     });
+    invalidatePublicArticleLists();
     return NextResponse.json({ ok: true, tag: disabled });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
