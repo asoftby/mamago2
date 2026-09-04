@@ -209,9 +209,13 @@ export function Step5PricingParticipation({
             <button
               key={mode.value}
               type="button"
-              onClick={() =>
-                onChange({ pricingMode: mode.value as EventFormData["pricingMode"] })
-              }
+              onClick={() => {
+                const pricingMode = mode.value as EventFormData["pricingMode"];
+                onChange({
+                  pricingMode,
+                  ...(pricingMode !== "from" ? { priceDetails: "" } : {}),
+                });
+              }}
               disabled={!isEditable}
               className={`px-4 py-3 rounded-lg border text-sm font-medium transition-colors ${
                 data.pricingMode === mode.value
