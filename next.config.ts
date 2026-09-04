@@ -5,7 +5,7 @@ import {
   deriveAllowedSectionsFromAppDir,
   loadRedirectManifest,
 } from "./src/lib/seo/redirectManifest";
-import { resolveLegacySeoDestination } from "./src/lib/seo/eventCategoryHub";
+import { resolveLegacySeoDestination } from "./src/lib/seo/legacySeoRedirectOverrides";
 
 const defaultDevOrigins = [
   "http://localhost:3000",
@@ -90,7 +90,7 @@ const nextConfig: NextConfig = {
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
       // SEO migration: wp_journal + slug_history + wp_map from manifest.csv.
       // A tiny traffic-prioritized override layer may preserve high-value
-      // category-hub intent when the historic manifest target was too broad.
+      // category-hub intent or correct a confirmed migration geography error.
       // Regenerate: pnpm build-migration-manifest → pnpm build
       ...manifestRedirects,
     ];
@@ -147,7 +147,7 @@ export default withSentryConfig(nextConfig, {
   // Upload a larger set of source maps for better stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Automatically annotate React components to show their full name in breadcrumbs and error reports
+  // Automatically annotate React components to show their full name in breadcrumbs
   reactComponentAnnotation: {
     enabled: true,
   },
@@ -165,6 +165,5 @@ export default withSentryConfig(nextConfig, {
   // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
   // See the following for more information:
   // https://docs.sentry.io/product/crons/
-  // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
 });
