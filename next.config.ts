@@ -82,6 +82,11 @@ const nextConfig: NextConfig = {
       // Static legacy redirects (pre-mamaGo 2.0 paths)
       { source: "/birthday", destination: "/minsk/birthday/make", permanent: true },
       { source: "/birthday/builder", destination: "/minsk/birthday/make", permanent: true },
+      {
+        source: "/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome",
+        destination: "/blog/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome",
+        permanent: true,
+      },
       // SEO migration: wp_journal + slug_history + wp_map from manifest.csv
       // Regenerate: pnpm build-migration-manifest → pnpm build
       ...manifestRedirects,
@@ -139,7 +144,7 @@ export default withSentryConfig(nextConfig, {
   // Upload a larger set of source maps for better stack traces (increases build time)
   widenClientFileUpload: true,
 
-  // Automatically annotate React components to show their full name in breadcrumbs and error reports
+  // Automatically annotate React components to show their full name in breadcrumbs and breadcrumbs
   reactComponentAnnotation: {
     enabled: true,
   },
@@ -156,7 +161,6 @@ export default withSentryConfig(nextConfig, {
 
   // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
   // See the following for more information:
-  // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   automaticVercelMonitors: true,
 });
