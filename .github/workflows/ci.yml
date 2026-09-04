@@ -78,6 +78,9 @@ jobs:
       - name: Event map regressions
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
 
+      - name: Event public rendering regressions
+        run: pnpm exec tsx src/components/content/RichContentRenderer.test.ts
+
       - name: Telegram plan notification regressions
         run: |
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
