@@ -125,11 +125,47 @@ export function serializeArticleContent(payload: ArticleContentPayload): object 
   return JSON.parse(JSON.stringify(payload)) as object;
 }
 
-/** Removes only completely blank Article price draft rows before API serialization. */
+export function prepareArticleContactsForSave(data: z.infer<typeof SharedContactsDataSchema>) {
+  return {
+    ...data,
+    phones: data.phones.flatMap((phone) => {
+      const value = phone.value.trim();
+      const label = phone.label?.trim();
+      if (!value && !label) return [];
+      return [{ value, ...(label ? { label } : {}) }];
+    }),
+    socials: data.socials.flatMap((social) => {
+      const url = social.url.trim();
+      if (!url) return [];
+      return [{ ...social, url }];
+    }),
+  };
+}
+
+export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): string {
+  const paths = issues.map((issue) => issue.path.map(String).join("."));
+  if (paths.some((path) => /\.phones\.\d+\.value$/.test(path))) return "Укажите номер телефона";
+  if (paths.some((path) => /\.socials\.\d+\.url$/.test(path))) return "Введите корректную ссылку";
+  if (paths.some((path) => /\.data\.email$/.test(path))) return "Введите корректный email";
+  if (paths.some((path) => /\.data\.website$/.test(path))) return "Введите корректный адрес сайта";
+  return "Проверьте заполнение блоков статьи";
+}
+
+/**
+ * Removes completely blank editor-only rows before API serialization.
+ * Partially filled invalid rows are deliberately preserved so the strict
+ * persisted schema can report them to the editor.
+ */
 export function prepareArticleContentForSave(payload: ArticleContentPayload): ArticleContentPayload {
   return {
     ...payload,
     blocks: payload.blocks.map((block) => {
+      if (block.type === "contacts") {
+        return {
+          ...block,
+          data: prepareArticleContactsForSave(block.data),
+        };
+      }
       if (block.type !== "price") return block;
       return {
         ...block,

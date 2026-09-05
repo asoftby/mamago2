@@ -26,6 +26,8 @@ import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
   deriveArticleExcerptFromContent,
+  ArticleContentPayloadSchema,
+  articleContentValidationMessage,
   prepareArticleContentForSave,
   type ArticleContentPayload,
 } from "@/lib/publications/articleMvp";
@@ -496,6 +498,13 @@ export function ArticleEditorClient({
   const save = useCallback(
     async (opts?: { silent?: boolean; skipLoading?: boolean }): Promise<boolean> => {
       if (!validateGeoScopeForWrite(isPublishLikeStatus(status))) return false;
+      const contentResult = ArticleContentPayloadSchema.safeParse(payload.content);
+      if (!contentResult.success) {
+        const msg = articleContentValidationMessage(contentResult.error.issues);
+        setError(msg);
+        toast.error(msg);
+        return false;
+      }
       if (!opts?.skipLoading) setSaving(true);
       setError(null);
       try {
@@ -601,6 +610,13 @@ export function ArticleEditorClient({
 
       if (!articleId) {
         setError(null);
+        const contentResult = ArticleContentPayloadSchema.safeParse(payload.content);
+        if (!contentResult.success) {
+          const msg = articleContentValidationMessage(contentResult.error.issues);
+          setError(msg);
+          toast.error(msg);
+          return;
+        }
         const res = await fetch("/api/admin/articles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

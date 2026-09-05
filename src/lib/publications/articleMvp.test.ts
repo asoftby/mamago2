@@ -7,7 +7,52 @@
  * Run: npx tsx src/lib/publications/articleMvp.test.ts
  */
 import assert from "node:assert/strict";
-import { ArticleContentPayloadSchema, DEFAULT_ARTICLE_PLACE_SECTIONS, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
+import { ArticleContentPayloadSchema, DEFAULT_ARTICLE_PLACE_SECTIONS, articleContentValidationMessage, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
+
+const allBlockTypes = ["intro", "text", "quote", "heading", "image", "gallery", "activityCard", "embed", "contacts", "price", "openingHours"] as const;
+
+// Every newly inserted empty block must remain saveable. In particular, the
+// blank PLACE reference is an intentional schema-valid editor draft, not a
+// fabricated entity reference.
+for (const type of allBlockTypes) {
+  const payload = { version: 1 as const, blocks: [newBlock(type, () => `new-${type}`)] };
+  assert.equal(ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave(payload)).success, true, `${type} default must be saveable`);
+}
+{
+  const payload = { version: 1 as const, blocks: allBlockTypes.map((type) => newBlock(type, () => `all-${type}`)) };
+  assert.equal(ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave(payload)).success, true, "all block defaults must be saveable together");
+}
+
+// Contacts rows are editor drafts until save preparation. Only completely
+// blank rows disappear; partial invalid input survives for actionable errors.
+{
+  const contacts = (phones: Array<{ value: string; label?: string }>, socials: Array<{ kind: "instagram" | "telegram"; url: string }>) => ({
+    version: 1 as const,
+    blocks: [{ id: "contacts", type: "contacts" as const, data: { phones, socials } }],
+  });
+  assert.deepEqual((prepareArticleContentForSave(contacts([{ value: "" }, { value: " ", label: " " }], [{ kind: "instagram", url: " " }])).blocks[0] as Extract<ArticleBlockMvp, { type: "contacts" }>).data, { phones: [], socials: [] });
+
+  const labelOnly = ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave(contacts([{ value: " ", label: " Справочная " }], [])));
+  assert.equal(labelOnly.success, false);
+  if (!labelOnly.success) {
+    assert.deepEqual(labelOnly.error.issues[0]?.path, ["blocks", 0, "data", "phones", 0, "value"]);
+    assert.equal(articleContentValidationMessage(labelOnly.error.issues), "Укажите номер телефона");
+  }
+
+  const malformedSocial = ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave(contacts([], [{ kind: "instagram", url: "not-a-url" }])));
+  assert.equal(malformedSocial.success, false);
+  if (!malformedSocial.success) assert.equal(articleContentValidationMessage(malformedSocial.error.issues), "Введите корректную ссылку");
+
+  const valid = prepareArticleContentForSave(contacts(
+    [{ value: " +375291112233 ", label: " " }, { value: " +375172223344 ", label: " Офис " }],
+    [{ kind: "instagram", url: " https://instagram.com/mamago " }, { kind: "telegram", url: "https://t.me/mamago" }],
+  ));
+  assert.equal(ArticleContentPayloadSchema.safeParse(valid).success, true);
+  assert.deepEqual((valid.blocks[0] as Extract<ArticleBlockMvp, { type: "contacts" }>).data, {
+    phones: [{ value: "+375291112233" }, { value: "+375172223344", label: "Офис" }],
+    socials: [{ kind: "instagram", url: "https://instagram.com/mamago" }, { kind: "telegram", url: "https://t.me/mamago" }],
+  });
+}
 
 // Phase 5 stays additive in content version 1. Legacy PLACE references remain
 // valid and receive defaults at resolution time; configured references roundtrip.

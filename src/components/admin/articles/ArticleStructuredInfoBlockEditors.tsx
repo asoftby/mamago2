@@ -11,27 +11,39 @@ import { CONTACT_SOCIAL_KINDS, SharedContactsDataSchema, type SharedContactsData
 import { SharedPriceDataSchema, type SharedPriceData } from "@/domain/pricing/structuredPrice";
 import { SharedOpeningHoursDataSchema, type SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
 import { randomId } from "@/lib/utils/randomId";
+import { prepareArticleContactsForSave } from "@/lib/publications/articleMvp";
+import { z } from "zod";
 
 const clean = (value: string) => value.trim() || undefined;
 const validationMessage = (value: unknown, schema: { safeParse: (value: unknown) => { success: boolean } }) =>
   schema.safeParse(value).success ? null : "Проверьте заполненные поля: email, ссылки, суммы и время должны быть корректными.";
 
 export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedContactsData; onChange: (value: SharedContactsData) => void }) {
-  const error = validationMessage(value, SharedContactsDataSchema);
+  const errors = contactsDraftFieldErrors(value);
+  const error = validationMessage(prepareArticleContactsForSave(value), SharedContactsDataSchema);
   return <div className="space-y-4">
     <Field label="Адрес"><Input aria-label="Адрес" value={value.address ?? ""} onChange={(e) => onChange({ ...value, address: clean(e.target.value) })} /></Field>
     <Field label="Телефоны">
-      {value.phones.map((phone, index) => <Row key={index}><Input aria-label={`Телефон ${index + 1}`} value={phone.value} onChange={(e) => onChange({ ...value, phones: value.phones.map((item, i) => i === index ? { ...item, value: e.target.value } : item) })} /><Delete onClick={() => onChange({ ...value, phones: value.phones.filter((_, i) => i !== index) })} label="Удалить телефон" /></Row>)}
+      {value.phones.map((phone, index) => <div className="space-y-1" key={index}><Row><Input aria-label={`Телефон ${index + 1}`} aria-invalid={Boolean(errors.phones[index])} value={phone.value} onChange={(e) => onChange({ ...value, phones: value.phones.map((item, i) => i === index ? { ...item, value: e.target.value } : item) })} /><Delete onClick={() => onChange({ ...value, phones: value.phones.filter((_, i) => i !== index) })} label="Удалить телефон" /></Row>{errors.phones[index] && <p role="alert" className="text-xs text-destructive">{errors.phones[index]}</p>}</div>)}
       <Add onClick={() => onChange({ ...value, phones: [...value.phones, { value: "" }] })}>Добавить телефон</Add>
     </Field>
-    <div className="grid gap-3 sm:grid-cols-2"><Field label="Email"><Input aria-label="Email" type="email" value={value.email ?? ""} onChange={(e) => onChange({ ...value, email: clean(e.target.value) })} /></Field><Field label="Сайт"><Input aria-label="Сайт" type="url" value={value.website ?? ""} onChange={(e) => onChange({ ...value, website: clean(e.target.value) })} /></Field></div>
+    <div className="grid gap-3 sm:grid-cols-2"><Field label="Email"><Input aria-label="Email" aria-invalid={Boolean(errors.email)} type="email" value={value.email ?? ""} onChange={(e) => onChange({ ...value, email: clean(e.target.value) })} />{errors.email && <p role="alert" className="text-xs text-destructive">{errors.email}</p>}</Field><Field label="Сайт"><Input aria-label="Сайт" aria-invalid={Boolean(errors.website)} type="url" value={value.website ?? ""} onChange={(e) => onChange({ ...value, website: clean(e.target.value) })} />{errors.website && <p role="alert" className="text-xs text-destructive">{errors.website}</p>}</Field></div>
     <Field label="Соцсети">
-      {value.socials.map((social, index) => <Row key={index}><Select value={social.kind} onValueChange={(kind) => onChange({ ...value, socials: value.socials.map((item, i) => i === index ? { ...item, kind: kind as typeof social.kind } : item) })}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{CONTACT_SOCIAL_KINDS.map((kind) => <SelectItem key={kind} value={kind}>{kind}</SelectItem>)}</SelectContent></Select><Input type="url" aria-label={`Ссылка соцсети ${index + 1}`} value={social.url} onChange={(e) => onChange({ ...value, socials: value.socials.map((item, i) => i === index ? { ...item, url: e.target.value } : item) })} /><Delete onClick={() => onChange({ ...value, socials: value.socials.filter((_, i) => i !== index) })} label="Удалить ссылку" /></Row>)}
+      {value.socials.map((social, index) => <div className="space-y-1" key={index}><Row><Select value={social.kind} onValueChange={(kind) => onChange({ ...value, socials: value.socials.map((item, i) => i === index ? { ...item, kind: kind as typeof social.kind } : item) })}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{CONTACT_SOCIAL_KINDS.map((kind) => <SelectItem key={kind} value={kind}>{kind}</SelectItem>)}</SelectContent></Select><Input type="url" aria-label={`Ссылка соцсети ${index + 1}`} aria-invalid={Boolean(errors.socials[index])} value={social.url} onChange={(e) => onChange({ ...value, socials: value.socials.map((item, i) => i === index ? { ...item, url: e.target.value } : item) })} /><Delete onClick={() => onChange({ ...value, socials: value.socials.filter((_, i) => i !== index) })} label="Удалить ссылку" /></Row>{errors.socials[index] && <p role="alert" className="text-xs text-destructive">{errors.socials[index]}</p>}</div>)}
       <Add onClick={() => onChange({ ...value, socials: [...value.socials, { kind: "instagram", url: "" }] })}>Добавить ссылку</Add>
     </Field>
     <Field label="Ссылка на карту"><Input aria-label="Ссылка на карту" type="url" value={value.mapUrl ?? ""} onChange={(e) => onChange({ ...value, mapUrl: clean(e.target.value) })} /></Field>
     {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
   </div>;
+}
+
+export function contactsDraftFieldErrors(value: SharedContactsData) {
+  return {
+    phones: value.phones.map((phone) => !phone.value.trim() && Boolean(phone.label?.trim()) ? "Укажите номер телефона" : null),
+    socials: value.socials.map((social) => social.url.trim() && !z.url().safeParse(social.url.trim()).success ? "Введите корректную ссылку" : null),
+    email: value.email?.trim() && !z.email().safeParse(value.email.trim()).success ? "Введите корректный email" : null,
+    website: value.website?.trim() && !z.url().safeParse(value.website.trim()).success ? "Введите корректный адрес сайта" : null,
+  };
 }
 
 const PRICE_LABELS: Record<SharedPriceData["mode"], string> = { FREE: "Бесплатно", EXACT: "Точная", FROM: "От", RANGE: "Диапазон", NONE: "Не применяется", UNKNOWN: "Не указана" };
