@@ -207,10 +207,16 @@ async function testOtherCityHistoricalSlugNotFound() {
   }
 }
 
-await testCurrentSlugRenders();
-await testHistoricalSlugRedirectsToCurrent();
-await testUnknownSlugNotFound();
-await testDraftHistoricalSlugNotFound();
-await testOtherCityHistoricalSlugNotFound();
+async function main() {
+  await testCurrentSlugRenders();
+  await testHistoricalSlugRedirectsToCurrent();
+  await testUnknownSlugNotFound();
+  await testDraftHistoricalSlugNotFound();
+  await testOtherCityHistoricalSlugNotFound();
+  console.log("resolveCityArticlePublicRoute.test.ts: PASS");
+}
 
-console.log("resolveCityArticlePublicRoute.test.ts: PASS");
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
