@@ -2,10 +2,47 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { ArrowRight, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
+
+function ExpandableDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [needsToggle, setNeedsToggle] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    setNeedsToggle(el.scrollHeight > el.clientHeight + 1);
+  }, [text]);
+
+  return (
+    <div>
+      <p
+        ref={textRef}
+        className={cn("text-sm text-muted-foreground leading-relaxed", !expanded && "line-clamp-5")}
+      >
+        {text}
+      </p>
+      {needsToggle ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          className="mt-1 text-sm font-semibold text-primary hover:text-primary/80"
+          aria-expanded={expanded}
+        >
+          {expanded ? "Свернуть" : "Показать полностью"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * ArticleEmbeddedCardShell — unified card template for all article product blocks.
@@ -23,12 +60,16 @@ export interface ArticleEmbeddedCardShellProps {
   placeholderIcon?: ReactNode;
   placeholderGradient?: string;
   imagePill?: ReactNode;
+  /** Inset the image with padding and its own rounded corners instead of a flush, edge-to-edge fill. */
+  imagePadded?: boolean;
 
   // Content
   typeLabel: string;
   title: string;
   metaItems?: ReactNode[];
   description?: string;
+  /** Clamp the description to 5 lines with a "Показать полностью" toggle instead of a fixed 2-line clamp. */
+  descriptionExpandable?: boolean;
 
   // CTA
   primaryCta: string;
@@ -47,10 +88,12 @@ export function ArticleEmbeddedCardShell({
   placeholderIcon,
   placeholderGradient = "from-slate-100 to-slate-200",
   imagePill,
+  imagePadded = false,
   typeLabel,
   title,
   metaItems,
   description,
+  descriptionExpandable = false,
   primaryCta,
   activityId,
   onSave,
@@ -78,12 +121,25 @@ export function ArticleEmbeddedCardShell({
             {/* ── Media area ── */}
             <div className="relative w-full h-40 sm:h-auto sm:aspect-square md:w-1/3 bg-muted overflow-hidden">
               {image ? (
-                <Image
-                  src={image}
-                  alt={imageAlt ?? title}
-                  fill
-                  className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                />
+                imagePadded ? (
+                  <div className="relative h-full w-full p-3">
+                    <div className="relative h-full w-full overflow-hidden rounded-xl bg-muted">
+                      <Image
+                        src={image}
+                        alt={imageAlt ?? title}
+                        fill
+                        className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <Image
+                    src={image}
+                    alt={imageAlt ?? title}
+                    fill
+                    className="object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                  />
+                )
               ) : (
                 <div className={`absolute inset-0 bg-gradient-to-br ${placeholderGradient} flex items-center justify-center`}>
                   {placeholderIcon}
@@ -193,9 +249,13 @@ export function ArticleEmbeddedCardShell({
               )}
 
               {description && (
-                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                  {description}
-                </p>
+                descriptionExpandable ? (
+                  <ExpandableDescription text={description} />
+                ) : (
+                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+                    {description}
+                  </p>
+                )
               )}
 
               <div className="pt-1 mt-0.5">
