@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
+import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import {
@@ -431,12 +432,15 @@ export async function buildArticleMvpResolvedBlocks(
     (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(blocks)),
     (dependencies.loadBasicCards ?? loadBasicActivityCards)(blocks),
   ]);
-  const offerCards = new Map<string, Promise<ResolvedOfferEmbedCard | ResolvedActivityCard | null>>();
-  for (const block of blocks) {
-    if (block.type !== "activityCard" || block.entityType !== "OFFER") continue;
-    const key = block.entityId.trim();
-    if (key && !offerCards.has(key)) offerCards.set(key, resolveActivityCard(block));
-  }
+  const offerBlocks = blocks.filter(
+    (block): block is Extract<ArticleBlockMvp, { type: "activityCard" }> =>
+      block.type === "activityCard" && block.entityType === "OFFER",
+  );
+  const offerCards = await resolveUniqueConcurrently(
+    offerBlocks,
+    (block) => block.entityId.trim() || null,
+    resolveActivityCard,
+  );
 
   for (const b of blocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading") {
@@ -473,12 +477,7 @@ export async function buildArticleMvpResolvedBlocks(
         card = resolveArticlePlaceCard(b, placesById);
       } else if (b.entityType === "OFFER") {
         const key = b.entityId.trim();
-        let pending = offerCards.get(key);
-        if (!pending) {
-          pending = resolveActivityCard(b);
-          offerCards.set(key, pending);
-        }
-        card = await pending;
+        card = offerCards.get(key) ?? null;
       } else {
         card = await resolveActivityCard(b, basicCards);
       }
