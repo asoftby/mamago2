@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
+import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import {
@@ -178,9 +179,13 @@ function sortShiftsNearestFirst(shifts: ArticleShiftPreview[]): ArticleShiftPrev
 
 async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
-): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null> {
+  prefetched?: Map<string, ResolvedActivityCard>,
+): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | null> {
   if (!b.entityId.trim()) return null;
   if (b.entityType === "PLACE") return null;
+  if (b.entityType !== "OFFER" && prefetched) {
+    return prefetched.get(`${b.entityType}:${b.entityId}`) ?? null;
+  }
   if (b.entityType === "EVENT") {
     const a = await prisma.activity.findFirst({
       where: { id: b.entityId, ...getPublicActivityDetailWhere() },
@@ -346,10 +351,66 @@ async function resolveActivityCard(
   };
 }
 
+async function loadBasicActivityCards(
+  blocks: ArticleBlockMvp[],
+): Promise<Map<string, ResolvedActivityCard>> {
+  const idsByType = {
+    EVENT: new Set<string>(),
+    ROUTE: new Set<string>(),
+    ARTICLE: new Set<string>(),
+  };
+  for (const block of blocks) {
+    if (block.type !== "activityCard" || block.entityType === "PLACE" || block.entityType === "OFFER") continue;
+    const entityId = block.entityId.trim();
+    if (entityId) idsByType[block.entityType].add(entityId);
+  }
+
+  const [events, routes, articles] = await Promise.all([
+    idsByType.EVENT.size
+      ? prisma.activity.findMany({
+          where: { id: { in: [...idsByType.EVENT] }, ...getPublicActivityDetailWhere() },
+          select: { id: true, title: true, slug: true, place: { select: { city: { select: { slug: true } } } } },
+        })
+      : [],
+    idsByType.ROUTE.size
+      ? prisma.route.findMany({
+          where: { id: { in: [...idsByType.ROUTE] }, ...getPublicRouteIndexWhere() },
+          select: { id: true, title: true, slug: true },
+        })
+      : [],
+    idsByType.ARTICLE.size
+      ? prisma.article.findMany({
+          where: { id: { in: [...idsByType.ARTICLE] }, ...getPublicPublishedArticleWhere() },
+          select: { id: true, title: true, slug: true, geoScope: true, city: { select: { slug: true } } },
+        })
+      : [],
+  ]);
+
+  const cards = new Map<string, ResolvedActivityCard>();
+  for (const event of events) {
+    const citySlug = event.place?.city?.slug ?? "minsk";
+    cards.set(`EVENT:${event.id}`, { kind: "basic", href: `/${citySlug}/events/${event.slug ?? event.id}`, title: event.title });
+  }
+  for (const route of routes) {
+    cards.set(`ROUTE:${route.id}`, { kind: "basic", href: `/routes/${route.slug}`, title: route.title });
+  }
+  for (const article of articles) {
+    let href = "#";
+    if (article.slug) {
+      href = article.geoScope === "CITY" && article.city?.slug
+        ? buildCityPublicPath({ citySlug: article.city.slug, type: "article", slug: article.slug })
+        : buildNationalArticlePath(article.slug);
+    }
+    cards.set(`ARTICLE:${article.id}`, { kind: "basic", href, title: article.title });
+  }
+  return cards;
+}
+
 export async function buildArticleMvpResolvedBlocks(
   blocks: ArticleBlockMvp[],
   dependencies: {
     loadPlaces?: (ids: string[]) => Promise<Map<string, ResolvedArticlePlace>>;
+    loadBasicCards?: (blocks: ArticleBlockMvp[]) => Promise<Map<string, ResolvedActivityCard>>;
   } = {},
 ): Promise<ArticleMvpResolvedBlock[]> {
   const out: ArticleMvpResolvedBlock[] = [];
@@ -367,7 +428,19 @@ export async function buildArticleMvpResolvedBlocks(
       : [];
   const urlById = new Map(assets.map((a) => [a.id, a.publicUrl]));
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
-  const placesById = await (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(blocks));
+  const [placesById, basicCards] = await Promise.all([
+    (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(blocks)),
+    (dependencies.loadBasicCards ?? loadBasicActivityCards)(blocks),
+  ]);
+  const offerBlocks = blocks.filter(
+    (block): block is Extract<ArticleBlockMvp, { type: "activityCard" }> =>
+      block.type === "activityCard" && block.entityType === "OFFER",
+  );
+  const offerCards = await resolveUniqueConcurrently(
+    offerBlocks,
+    (block) => block.entityId.trim() || null,
+    resolveActivityCard,
+  );
 
   for (const b of blocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading") {
@@ -399,9 +472,15 @@ export async function buildArticleMvpResolvedBlocks(
       continue;
     }
     if (b.type === "activityCard") {
-      const card = b.entityType === "PLACE"
-        ? resolveArticlePlaceCard(b, placesById)
-        : await resolveActivityCard(b);
+      let card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | ResolvedArticlePlaceCard | null;
+      if (b.entityType === "PLACE") {
+        card = resolveArticlePlaceCard(b, placesById);
+      } else if (b.entityType === "OFFER") {
+        const key = b.entityId.trim();
+        card = offerCards.get(key) ?? null;
+      } else {
+        card = await resolveActivityCard(b, basicCards);
+      }
       out.push({ ...b, card });
       continue;
     }

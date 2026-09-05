@@ -244,12 +244,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         id: true,
         slug: true,
         seoCanonicalUrl: true,
+        seoRobots: true,
         geoScope: true,
         updatedAt: true,
         city: { select: { slug: true } },
       },
     });
     for (const article of articles) {
+      if (hasNoindexRobots(article.seoRobots)) continue;
       const seg = article.slug?.trim() || article.id;
       entries.push({
         url: resolveArticleCanonicalUrl({

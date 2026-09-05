@@ -71,6 +71,18 @@ async function testSitemapContents() {
     },
     select: { id: true, slug: true },
   });
+  const noindexArticle = await prisma.article.create({
+    data: {
+      title: `Sitemap test noindex article ${marker}`,
+      slug: `sitemap-noindex-article-${marker}`,
+      status: "PUBLISHED",
+      geoScope: "COUNTRY",
+      noindex: false,
+      seoRobots: "noindex, follow",
+      publishedAt: new Date(),
+    },
+    select: { id: true, slug: true },
+  });
 
   try {
     const entries = await sitemap();
@@ -111,6 +123,10 @@ async function testSitemapContents() {
       !urls.some((url) => url.includes(noindexPlace.slug!)),
       "a place with seoRobots=noindex must never appear in the sitemap",
     );
+    assert.ok(
+      !urls.some((url) => url.includes(noindexArticle.slug!)),
+      "an article with seoRobots=noindex must never appear in the sitemap",
+    );
 
     // --- structural sanity ---
     assert.equal(urls.length, new Set(urls).size, "sitemap must not contain duplicate URLs");
@@ -121,6 +137,7 @@ async function testSitemapContents() {
 
     console.log(`sitemap (Task 8 / BACKLOG-064) tests: OK (${urls.length} entries)`);
   } finally {
+    await prisma.article.delete({ where: { id: noindexArticle.id } });
     await prisma.place.deleteMany({ where: { id: { in: [visiblePlace.id, noindexPlace.id] } } });
     await prisma.user.delete({ where: { id: user.id } });
   }
