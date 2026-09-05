@@ -2,13 +2,18 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
+import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import {
-  getArticlePlaceEmbedData,
   type PlaceCardExtra,
   type ResolvedPlaceEmbedCard,
 } from "@/lib/place/articlePlaceEmbedData";
+import {
+  loadArticlePlacesByIds,
+  type ResolvedArticlePlace,
+  type ResolvedArticlePlaceCard,
+} from "@/lib/place/articlePlaceLiveData";
 import {
   buildCityPublicPath,
   buildNationalArticlePath,
@@ -144,7 +149,7 @@ export type ArticleMvpResolvedBlock =
       }>;
     })
   | (Extract<ArticleBlockMvp, { type: "activityCard" }> & {
-      card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null;
+      card: ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | ResolvedArticlePlaceCard | null;
     })
   | Extract<ArticleBlockMvp, { type: "embed" }>
   | Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }>;
@@ -175,9 +180,7 @@ async function resolveActivityCard(
   b: Extract<ArticleBlockMvp, { type: "activityCard" }>,
 ): Promise<ResolvedActivityCard | ResolvedOfferEmbedCard | ResolvedPlaceEmbedCard | null> {
   if (!b.entityId.trim()) return null;
-  if (b.entityType === "PLACE") {
-    return getArticlePlaceEmbedData(b.entityId);
-  }
+  if (b.entityType === "PLACE") return null;
   if (b.entityType === "EVENT") {
     const a = await prisma.activity.findFirst({
       where: { id: b.entityId, ...getPublicActivityDetailWhere() },
@@ -345,6 +348,9 @@ async function resolveActivityCard(
 
 export async function buildArticleMvpResolvedBlocks(
   blocks: ArticleBlockMvp[],
+  dependencies: {
+    loadPlaces?: (ids: string[]) => Promise<Map<string, ResolvedArticlePlace>>;
+  } = {},
 ): Promise<ArticleMvpResolvedBlock[]> {
   const out: ArticleMvpResolvedBlock[] = [];
   const mediaIds = new Set<string>();
@@ -361,6 +367,7 @@ export async function buildArticleMvpResolvedBlocks(
       : [];
   const urlById = new Map(assets.map((a) => [a.id, a.publicUrl]));
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
+  const placesById = await (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(blocks));
 
   for (const b of blocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading") {
@@ -392,7 +399,9 @@ export async function buildArticleMvpResolvedBlocks(
       continue;
     }
     if (b.type === "activityCard") {
-      const card = await resolveActivityCard(b);
+      const card = b.entityType === "PLACE"
+        ? resolveArticlePlaceCard(b, placesById)
+        : await resolveActivityCard(b);
       out.push({ ...b, card });
       continue;
     }

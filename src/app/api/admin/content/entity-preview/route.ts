@@ -3,6 +3,7 @@ import { ActivityType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModerator } from "@/lib/article/requireAdminOrModerator";
 import type { ArticleBlockEntityType } from "@/lib/publications/articleMvp";
+import { loadArticlePlaceAdminPreview } from "@/lib/place/articlePlaceAdminPreview";
 
 export type EntityPreviewPayload = {
   entityType: ArticleBlockEntityType;
@@ -10,6 +11,7 @@ export type EntityPreviewPayload = {
   city: string | null;
   placeName?: string | null;
   address?: string | null;
+  publicAvailable?: boolean;
 };
 
 const VALID_TYPES: ArticleBlockEntityType[] = ["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"];
@@ -32,24 +34,7 @@ export async function GET(req: NextRequest) {
 
   try {
     if (type === "PLACE") {
-      const p = await prisma.place.findUnique({
-        where: { id },
-        select: {
-          title: true,
-          shortAddress: true,
-          formattedAddr: true,
-          city: { select: { name: true } },
-        },
-      });
-      if (!p) return NextResponse.json({ preview: null });
-      return NextResponse.json({
-        preview: {
-          entityType: "PLACE",
-          title: p.title,
-          city: p.city?.name ?? null,
-          address: p.shortAddress ?? p.formattedAddr ?? null,
-        },
-      });
+      return NextResponse.json({ preview: await loadArticlePlaceAdminPreview(id) });
     }
 
     if (type === "EVENT") {

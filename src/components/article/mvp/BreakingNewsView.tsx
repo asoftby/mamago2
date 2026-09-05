@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
+import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { SaveHeart } from "@/features/save/SaveHeart";
@@ -1060,13 +1061,19 @@ export function BreakingNewsView({
       ) : null}
       <ArticleBody blocks={blocks} />
 
+      {activityBlock?.card?.kind === "place-live" ? (
+        <div className="mx-auto w-full max-w-[760px] px-4 sm:px-6">
+          <ArticleLivePlaceBlock card={activityBlock.card} />
+        </div>
+      ) : null}
+
       {activityBlock?.card &&
         (activityBlock.card.kind === "basic" || activityBlock.card.kind === "place-embed") &&
         activityBlock.card.placeExtra && (
           <PriceSection placeExtra={activityBlock.card.placeExtra} />
         )}
 
-      {activityBlock?.card && (
+      {activityBlock?.card && activityBlock.card.kind !== "place-live" && (
         <LinkedEntityCard
           card={activityBlock.card}
           entityType={activityBlock.entityType}
