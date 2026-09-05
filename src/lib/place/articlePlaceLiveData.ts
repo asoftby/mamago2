@@ -1,7 +1,8 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
-import { contactsFromPlace, type SharedContactsData } from "@/domain/contacts/structuredContacts";
+import type { SharedContactsData } from "@/domain/contacts/structuredContacts";
+import { contactsFromArticlePlace } from "@/lib/place/articlePlaceContacts";
 import { sharedPriceFromPublication, type SharedPriceData } from "@/domain/pricing/structuredPrice";
 import { openingHoursFromRelational, type SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
 import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
@@ -84,7 +85,7 @@ export async function loadArticlePlacesByIds(ids: string[]): Promise<Map<string,
     const href = getPlacePublicPath({ id: place.id, slug: place.slug, citySlug: place.city?.slug });
     if (!href) return [];
     const address = formatMarketplaceHeroAddress(place) || null;
-    const contacts = contactsFromPlace({ ...place, address, mapUrl: place.googleMapsUri });
+    const contacts = contactsFromArticlePlace({ ...place, address, mapUrl: place.googleMapsUri });
     return [[place.id, {
       id: place.id,
       title: place.title,

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_ARTICLE_PLACE_SECTIONS } from "@/lib/publications/articleMvp";
 import { ArticleLivePlaceBlock, contactsForPlaceSections } from "./ArticleLivePlaceBlock";
 import type { ResolvedArticlePlaceCard } from "@/lib/place/articlePlaceLiveData";
+import { contactsFromArticlePlace } from "@/lib/place/articlePlaceContacts";
 
 const card: ResolvedArticlePlaceCard = {
   kind: "place-live",
@@ -20,6 +21,26 @@ const card: ResolvedArticlePlaceCard = {
   const html = renderToStaticMarkup(<ArticleLivePlaceBlock card={card} />);
   for (const value of ["Музей науки", "Короткое описание", "ул. Мира", "+375291112233", "Круглосуточно", "от 15", "Подробнее о месте", "/cover.jpg"]) assert.ok(html.includes(value), `missing ${value}`);
   assert.match(html, /\/minsk\/places\/museum/);
+}
+
+{
+  const malformedSourceCard = {
+    ...card,
+    place: {
+      ...card.place,
+      contacts: contactsFromArticlePlace({
+        address: card.place.address,
+        phone: "+375291112233",
+        website: "not absolute",
+        instagramUrl: "also invalid",
+        mapUrl: "invalid map",
+      }),
+    },
+  };
+  const html = renderToStaticMarkup(<ArticleLivePlaceBlock card={malformedSourceCard} />);
+  assert.ok(html.includes("Музей науки"));
+  assert.ok(html.includes("+375291112233"));
+  assert.ok(!html.includes("not absolute"));
 }
 
 {
