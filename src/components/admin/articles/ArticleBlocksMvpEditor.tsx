@@ -16,7 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { type ArticleBlockMvp, newBlock } from "@/lib/publications/articleMvp";
+import {
+  DEFAULT_ARTICLE_PLACE_SECTIONS,
+  type ArticleBlockMvp,
+  type ArticlePlaceSections,
+  newBlock,
+} from "@/lib/publications/articleMvp";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
@@ -80,6 +85,18 @@ const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: 
   { type: "contacts", label: "Контакты" },
   { type: "price", label: "Стоимость" },
   { type: "openingHours", label: "Режим работы" },
+];
+
+const PLACE_SECTION_LABELS: Array<[keyof ArticlePlaceSections, string]> = [
+  ["image", "Фото"],
+  ["description", "Описание"],
+  ["address", "Адрес"],
+  ["contacts", "Контакты"],
+  ["openingHours", "Режим работы"],
+  ["price", "Стоимость"],
+  ["events", "События"],
+  ["offers", "Предложения"],
+  ["cta", "Кнопка перехода"],
 ];
 
 function SelectSkeleton({ className }: { className?: string }) {
@@ -418,12 +435,44 @@ export function ArticleBlocksMvpEditor({
         </>
       )}
       {block.type === "activityCard" && (
-        <ActivityCardEntityPicker
-          entityType={block.entityType}
-          entityId={block.entityId}
-          onChangeType={(t) => updateAt(i, { ...block, entityType: t, entityId: "" })}
-          onChangeId={(id) => updateAt(i, { ...block, entityId: id })}
-        />
+        <>
+          <ActivityCardEntityPicker
+            entityType={block.entityType}
+            entityId={block.entityId}
+            onChangeType={(t) => updateAt(i, {
+              ...block,
+              entityType: t,
+              entityId: "",
+              placeSections: t === "PLACE" ? { ...DEFAULT_ARTICLE_PLACE_SECTIONS } : undefined,
+            })}
+            onChangeId={(id) => updateAt(i, { ...block, entityId: id })}
+          />
+          {block.entityType === "PLACE" ? (
+            <fieldset className="rounded-lg border border-border/60 p-3">
+              <legend className="px-1 text-sm font-medium">Показывать в карточке места</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {PLACE_SECTION_LABELS.map(([key, label]) => {
+                  const sections = block.placeSections ?? DEFAULT_ARTICLE_PLACE_SECTIONS;
+                  const unavailable = key === "events" || key === "offers";
+                  return (
+                    <label key={key} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={sections[key]}
+                        disabled={unavailable}
+                        onChange={(event) => updateAt(i, {
+                          ...block,
+                          placeSections: { ...sections, [key]: event.target.checked },
+                        })}
+                      />
+                      <span>{label}{unavailable ? " (скоро)" : ""}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+        </>
       )}
       {block.type === "embed" && (
         <EmbedBlockEditor

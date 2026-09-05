@@ -15,6 +15,31 @@ export const ARTICLE_CONTENT_VERSION = 1 as const;
 export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
 export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema>;
 
+export const DEFAULT_ARTICLE_PLACE_SECTIONS = {
+  image: true,
+  description: true,
+  address: true,
+  contacts: true,
+  openingHours: true,
+  price: true,
+  events: false,
+  offers: false,
+  cta: true,
+} as const;
+
+export const ArticlePlaceSectionsSchema = z.object({
+  image: z.boolean(),
+  description: z.boolean(),
+  address: z.boolean(),
+  contacts: z.boolean(),
+  openingHours: z.boolean(),
+  price: z.boolean(),
+  events: z.boolean(),
+  offers: z.boolean(),
+  cta: z.boolean(),
+});
+export type ArticlePlaceSections = z.infer<typeof ArticlePlaceSectionsSchema>;
+
 export const ArticleGalleryPresentationSchema = z.enum(["carousel", "mosaic", "sequential"]);
 export type ArticleGalleryPresentation = z.infer<typeof ArticleGalleryPresentationSchema>;
 export const LEGACY_ARTICLE_GALLERY_PRESENTATION: ArticleGalleryPresentation = "mosaic";
@@ -64,6 +89,7 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     type: z.literal("activityCard"),
     entityType: ArticleBlockEntityTypeSchema,
     entityId: z.string(),
+    placeSections: ArticlePlaceSectionsSchema.optional(),
   }),
   base.extend({
     type: z.literal("embed"),
@@ -73,7 +99,11 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({ type: z.literal("contacts"), data: SharedContactsDataSchema }),
   base.extend({ type: z.literal("price"), data: ArticlePriceDataSchema }),
   base.extend({ type: z.literal("openingHours"), data: SharedOpeningHoursDataSchema }),
-]);
+]).superRefine((block, ctx) => {
+  if (block.type === "activityCard" && block.entityType !== "PLACE" && block.placeSections) {
+    ctx.addIssue({ code: "custom", path: ["placeSections"], message: "Place sections are only valid for PLACE cards" });
+  }
+});
 
 export type ArticleBlockMvp = z.infer<typeof ArticleBlockMvpSchema>;
 
@@ -247,7 +277,13 @@ export function newBlock(
     case "gallery":
       return { id: bid, type: "gallery", mediaIds: [], presentation: "carousel", caption: "" };
     case "activityCard":
-      return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "" };
+      return {
+        id: bid,
+        type: "activityCard",
+        entityType: "PLACE",
+        entityId: "",
+        placeSections: { ...DEFAULT_ARTICLE_PLACE_SECTIONS },
+      };
     case "embed":
       return { id: bid, type: "embed", embedHtml: "", caption: "" };
     case "contacts":

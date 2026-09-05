@@ -7,7 +7,25 @@
  * Run: npx tsx src/lib/publications/articleMvp.test.ts
  */
 import assert from "node:assert/strict";
-import { ArticleContentPayloadSchema, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
+import { ArticleContentPayloadSchema, DEFAULT_ARTICLE_PLACE_SECTIONS, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
+
+// Phase 5 stays additive in content version 1. Legacy PLACE references remain
+// valid and receive defaults at resolution time; configured references roundtrip.
+{
+  const legacy = ArticleContentPayloadSchema.parse({ version: 1, blocks: [{ id: "p-old", type: "activityCard", entityType: "PLACE", entityId: "place-1" }] });
+  assert.equal(legacy.blocks[0]?.type === "activityCard" ? legacy.blocks[0].placeSections : null, undefined);
+
+  const configured = ArticleContentPayloadSchema.parse({ version: 1, blocks: [{ id: "p-new", type: "activityCard", entityType: "PLACE", entityId: "place-1", placeSections: DEFAULT_ARTICLE_PLACE_SECTIONS }] });
+  assert.deepEqual(ArticleContentPayloadSchema.parse(serializeArticleContent(configured)), configured);
+  assert.equal(configured.blocks[0]?.type === "activityCard" ? configured.blocks[0].placeSections?.events : true, false);
+  assert.equal(configured.blocks[0]?.type === "activityCard" ? configured.blocks[0].placeSections?.offers : true, false);
+
+  assert.equal(ArticleContentPayloadSchema.safeParse({ version: 1, blocks: [{ id: "bad", type: "activityCard", entityType: "PLACE", entityId: "p", placeSections: { ...DEFAULT_ARTICLE_PLACE_SECTIONS, image: "yes" } }] }).success, false);
+  for (const entityType of ["EVENT", "OFFER", "ROUTE", "ARTICLE"] as const) {
+    assert.equal(ArticleContentPayloadSchema.safeParse({ version: 1, blocks: [{ id: entityType, type: "activityCard", entityType, entityId: "id" }] }).success, true);
+    assert.equal(ArticleContentPayloadSchema.safeParse({ version: 1, blocks: [{ id: `${entityType}-bad`, type: "activityCard", entityType, entityId: "id", placeSections: DEFAULT_ARTICLE_PLACE_SECTIONS }] }).success, false);
+  }
+}
 
 // newBlock()'s return type is the full ArticleBlockMvp union (not narrowed to
 // the requested variant), so spreading it and overriding mediaId/mediaIds

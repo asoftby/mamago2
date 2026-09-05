@@ -10,6 +10,7 @@ export type EntityPreviewPayload = {
   city: string | null;
   placeName?: string | null;
   address?: string | null;
+  publicAvailable?: boolean;
 };
 
 const VALID_TYPES: ArticleBlockEntityType[] = ["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"];
@@ -38,6 +39,8 @@ export async function GET(req: NextRequest) {
           title: true,
           shortAddress: true,
           formattedAddr: true,
+          status: true,
+          archivedAt: true,
           city: { select: { name: true } },
         },
       });
@@ -48,6 +51,7 @@ export async function GET(req: NextRequest) {
           title: p.title,
           city: p.city?.name ?? null,
           address: p.shortAddress ?? p.formattedAddr ?? null,
+          publicAvailable: p.status === "PUBLISHED" && p.archivedAt == null,
         },
       });
     }

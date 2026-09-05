@@ -7,7 +7,7 @@ import { ArticleEventCardBlock } from "@/components/article/blocks/ArticleEventC
 import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferCardBlock";
 import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
-import { ArticlePlaceEmbed } from "@/components/article/blocks/ArticlePlaceEmbed";
+import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import {
   deriveArticleLeadHtml,
   deriveArticleLeadPlainText,
@@ -290,8 +290,8 @@ export function ArticleMvpView({
                 // A missing place-embed card is expected steady state (place
                 // not public, or nothing live in any of its tabs) — the block
                 // must render nothing at all, not an error message.
-                if (!c || c.kind !== "place-embed") return null;
-                return <ArticlePlaceEmbed card={c} />;
+                if (!c || c.kind !== "place-live") return null;
+                return <ArticleLivePlaceBlock card={c} />;
               }
               if (!c) {
                 return <p className="text-sm text-muted-foreground my-6">Карточка: сущность не найдена</p>;
@@ -312,6 +312,7 @@ export function ArticleMvpView({
                 return <ArticleOfferEmbed card={c} />;
               }
               if (c.kind === "place-embed") return null; // unreachable: PLACE handled above
+              if (c.kind === "place-live") return null; // unreachable: PLACE handled above
               return <ArticleOfferCardBlock title={c.title} href={c.href} image={c.imageUrl ?? undefined} />;
             }
             return null;

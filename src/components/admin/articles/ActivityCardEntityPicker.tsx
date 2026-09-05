@@ -24,6 +24,7 @@ type EntityPreviewPayload = {
   city: string | null;
   placeName?: string | null;
   address?: string | null;
+  publicAvailable?: boolean;
 };
 
 type SearchResult = {
@@ -215,6 +216,9 @@ export function ActivityCardEntityPicker({
           {preview ? (
             <>
               <p className="font-medium text-gray-900 leading-snug">{preview.title}</p>
+              {entityType === "PLACE" && preview.publicAvailable === false ? (
+                <p role="alert" className="text-xs font-medium text-amber-800">Место недоступно</p>
+              ) : null}
               {(preview.placeName || preview.city || preview.address) ? (
                 <p className="text-xs text-muted-foreground">
                   {[preview.placeName, preview.city, preview.address]
