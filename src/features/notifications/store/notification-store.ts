@@ -194,6 +194,8 @@ export const useNotificationStore = create<NotificationState & NotificationStore
             lastUserUnreadFetchAt = Date.now();
             set({ unreadCount: unified });
             bumpRevision(set);
+          } catch (err) {
+            devLog("refreshUnreadOnly: fetch failed", err);
           } finally {
             if (isStaleAuthEpoch(requestEpoch)) return;
             set((s) => ({
@@ -251,6 +253,8 @@ export const useNotificationStore = create<NotificationState & NotificationStore
             lastBusinessUnreadFetchAt = Date.now();
             set({ businessUnreadCount: business });
             bumpRevision(set);
+          } catch (err) {
+            devLog("refreshBusinessUnreadOnly: fetch failed", err);
           } finally {
             if (isStaleAuthEpoch(requestEpoch)) return;
             set((s) => ({
