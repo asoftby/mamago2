@@ -109,3 +109,44 @@ export function openCookiePreferences(): void {
     showPreferences();
   });
 }
+
+let ensureShownPromise: Promise<void> | null = null;
+
+/**
+ * Single-flight: init the library, then explicitly show its consent modal
+ * iff there is no valid consent yet. `autoShow` is `false` in
+ * `createCookieConsentRunConfig` precisely so *this* function owns that
+ * decision — not the library's own init — so `CookieConsentShell` can hand
+ * off deterministically (hide itself in the same promise-resolution turn
+ * this decides whether the real modal appears, with no tick where neither
+ * or both are the visible consent UI).
+ *
+ * Safe to call from multiple mount points (CookieConsentProvider,
+ * CookieConsentShell); the underlying init + show only ever run once.
+ */
+export function ensureConsentModalShown(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (ensureShownPromise) return ensureShownPromise;
+
+  ensureShownPromise = initCookieConsent().then(async () => {
+    const { validConsent, show } = await import("vanilla-cookieconsent");
+    if (!validConsent()) show(true);
+  });
+
+  return ensureShownPromise;
+}
+
+/**
+ * Used only by `CookieConsentShell`'s buttons. Waits for the real library
+ * (fail-closed: nothing is recorded as consent until this resolves), then
+ * drives its canonical `acceptCategory`/`hide` API directly — the same
+ * sequence the library's own trigger elements run internally. Never records
+ * or infers consent itself; vanilla-cookieconsent remains the only state
+ * machine.
+ */
+export async function acceptFromShell(categories: "all" | []): Promise<void> {
+  await ensureConsentModalShown();
+  const { acceptCategory, hide } = await import("vanilla-cookieconsent");
+  acceptCategory(categories);
+  hide();
+}

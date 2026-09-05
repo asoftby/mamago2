@@ -8,9 +8,16 @@
  * - Категория `marketing` = только сторонние рекламные/маркетинговые пиксели.
  * - Продуктовые события на наших серверах — отдельный слой, не «analytics cookies» в смысле этого UI.
  */
+import { CONSENT_COOKIE_NAME } from "./consent-cookie-format";
+
 type RunConfig = Parameters<typeof import("vanilla-cookieconsent").run>[0];
 
-const BANNER = {
+/**
+ * Exported so `CookieConsentShell` (the fast, SSR-rendered first-paint
+ * banner — see components/providers/CookieConsentShell.tsx) can reuse the
+ * exact same copy instead of duplicating it.
+ */
+export const BANNER = {
   title: "Cookies и данные",
   description:
     "Для работы сайта нужны необходимые cookies и базовые данные сервиса. Сторонние инструменты веб-аналитики и рекламы мы подключаем только с вашего согласия.",
@@ -55,8 +62,15 @@ export function createCookieConsentRunConfig(
     mode: "opt-in",
     // Bumped 0 -> 1: the external analytics provider set changed (Yandex Metrica
     // added). Existing consent must be re-collected rather than silently reused.
+    // Keep in sync with CONSENT_REVISION in consent-cookie-format.ts (see that
+    // file's comment for why it's a duplicated literal, not a shared import) —
+    // externalAnalyticsContract.test.ts and consent-cookie-format.test.ts both
+    // pin this exact `revision: <number>` shape.
     revision: 1,
-    autoShow: true,
+    // false: showing the modal is driven explicitly by ensureConsentModalShown()
+    // (consent-manager.ts) once init resolves, so it can hand off cleanly from
+    // the fast SSR CookieConsentShell without a moment where both are visible.
+    autoShow: false,
     autoClearCookies: true,
     manageScriptTags: true,
     hideFromBots: true,
@@ -64,7 +78,7 @@ export function createCookieConsentRunConfig(
     lazyHtmlGeneration: true,
 
     cookie: {
-      name: "cc_cookie_mamago",
+      name: CONSENT_COOKIE_NAME,
       expiresAfterDays: 365,
       path: "/",
       sameSite: "Lax",
