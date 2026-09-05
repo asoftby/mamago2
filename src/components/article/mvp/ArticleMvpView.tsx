@@ -30,6 +30,7 @@ import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
+import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
@@ -280,6 +281,9 @@ export function ArticleMvpView({
             if (block.type === "embed") {
               return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
             }
+            if (block.type === "contacts") return <ArticleContactsBlock data={block.data} />;
+            if (block.type === "price") return <ArticlePriceBlock data={block.data} />;
+            if (block.type === "openingHours") return <ArticleOpeningHoursBlock data={block.data} />;
             if (block.type === "activityCard") {
               const c = block.card;
               if (block.entityType === "PLACE") {

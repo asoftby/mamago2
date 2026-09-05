@@ -26,6 +26,7 @@ import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
   deriveArticleExcerptFromContent,
+  prepareArticleContentForSave,
   type ArticleContentPayload,
 } from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
@@ -405,7 +406,7 @@ export function ArticleEditorClient({
       slug: slug.trim() || null,
       subtitle: null as string | null,
       excerpt: deriveArticleExcerptFromContent(content),
-      content,
+      content: prepareArticleContentForSave(content),
       coverImageId: coverImageId.trim() || null,
       authorLabel: authorLabel.trim() || null,
       authorUserId: authorUserId || null,

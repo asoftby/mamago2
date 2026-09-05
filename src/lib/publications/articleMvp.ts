@@ -5,6 +5,9 @@ import {
 } from "@/lib/richtext/utils";
 import { articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { randomId } from "@/lib/utils/randomId";
+import { SharedContactsDataSchema } from "@/domain/contacts/structuredContacts";
+import { SharedPriceDataSchema } from "@/domain/pricing/structuredPrice";
+import { SharedOpeningHoursDataSchema, OPENING_HOURS_DAYS } from "@/domain/opening-hours/structuredOpeningHours";
 
 /** Версия формата `Article.contentJson` */
 export const ARTICLE_CONTENT_VERSION = 1 as const;
@@ -17,6 +20,13 @@ export type ArticleGalleryPresentation = z.infer<typeof ArticleGalleryPresentati
 export const LEGACY_ARTICLE_GALLERY_PRESENTATION: ArticleGalleryPresentation = "mosaic";
 
 const base = z.object({ id: z.string().min(1) });
+const ArticlePriceDataSchema = SharedPriceDataSchema.superRefine((value, ctx) => {
+  value.items.forEach((item, index) => {
+    if (!item.label.trim() || !item.price.trim() || !item.unit.trim()) {
+      ctx.addIssue({ code: "custom", path: ["items", index], message: "Price items require a label, price and unit" });
+    }
+  });
+});
 
 export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({
@@ -60,6 +70,9 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     embedHtml: z.string(),
     caption: z.string().optional(),
   }),
+  base.extend({ type: z.literal("contacts"), data: SharedContactsDataSchema }),
+  base.extend({ type: z.literal("price"), data: ArticlePriceDataSchema }),
+  base.extend({ type: z.literal("openingHours"), data: SharedOpeningHoursDataSchema }),
 ]);
 
 export type ArticleBlockMvp = z.infer<typeof ArticleBlockMvpSchema>;
@@ -80,6 +93,32 @@ export function parseArticleContentJson(raw: unknown): ArticleContentPayload {
 
 export function serializeArticleContent(payload: ArticleContentPayload): object {
   return JSON.parse(JSON.stringify(payload)) as object;
+}
+
+/** Removes only completely blank Article price draft rows before API serialization. */
+export function prepareArticleContentForSave(payload: ArticleContentPayload): ArticleContentPayload {
+  return {
+    ...payload,
+    blocks: payload.blocks.map((block) => {
+      if (block.type !== "price") return block;
+      return {
+        ...block,
+        data: {
+          ...block.data,
+          currency: block.data.currency.trim(),
+          note: block.data.note.trim(),
+          items: block.data.items.flatMap((item) => {
+            const label = item.label.trim();
+            const price = item.price.trim();
+            const description = item.description?.trim();
+            const oldPrice = item.oldPrice?.trim();
+            if (!label && !price && !description && !oldPrice) return [];
+            return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
+          }),
+        },
+      };
+    }),
+  };
 }
 
 export function emptyArticleContent(): ArticleContentPayload {
@@ -211,6 +250,21 @@ export function newBlock(
       return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "" };
     case "embed":
       return { id: bid, type: "embed", embedHtml: "", caption: "" };
+    case "contacts":
+      return { id: bid, type: "contacts", data: { phones: [], socials: [] } };
+    case "price":
+      return { id: bid, type: "price", data: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" } };
+    case "openingHours":
+      return {
+        id: bid,
+        type: "openingHours",
+        data: {
+          mode: "WEEKLY",
+          timezone: "Europe/Minsk",
+          rules: OPENING_HOURS_DAYS.map((dayOfWeek) => ({ dayOfWeek, isOpen: false, allDay: false, intervals: [] })),
+          exceptions: [],
+        },
+      };
     default: {
       const _x: never = type;
       return _x;

@@ -7,8 +7,9 @@
  * Run: npx tsx src/components/admin/articles/ArticleBlocksMvpEditor.test.ts
  */
 import assert from "node:assert/strict";
-import type { ArticleBlockMvp } from "@/lib/publications/articleMvp";
+import { newBlock, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditor";
+import { addExceptionInterval, priceForMode, removeExceptionInterval, updateExceptionInterval } from "./ArticleStructuredInfoBlockEditors";
 
 function image(overrides: Partial<Extract<ArticleBlockMvp, { type: "image" }>> = {}): Extract<
   ArticleBlockMvp,
@@ -67,3 +68,19 @@ function image(overrides: Partial<Extract<ArticleBlockMvp, { type: "image" }>> =
 }
 
 console.log("ArticleBlocksMvpEditor.test.ts (image/gallery conversion helpers): OK");
+
+for (const type of ["contacts", "price", "openingHours"] as const) {
+  const block = newBlock(type, () => `new-${type}`);
+  assert.equal(block.id, `new-${type}`);
+  assert.equal(block.type, type);
+}
+
+const unknownPrice = { mode: "UNKNOWN" as const, currency: "BYN", min: null, max: null, items: [], note: "" };
+assert.deepEqual(priceForMode(unknownPrice, "FREE"), { ...unknownPrice, mode: "FREE", min: 0, max: 0 });
+assert.deepEqual(priceForMode(unknownPrice, "FROM"), { ...unknownPrice, mode: "FROM", min: 0, max: null });
+
+const hours = { mode: "WEEKLY" as const, timezone: "Europe/Minsk", rules: [], exceptions: [{ date: "2026-09-03", isClosed: false, allDay: false, intervals: [{ startTime: "09:00", endTime: "12:00" }, { startTime: "13:00", endTime: "18:00" }] }] };
+assert.deepEqual(updateExceptionInterval(hours, 0, 0, { startTime: "10:00" }).exceptions[0].intervals, [{ startTime: "10:00", endTime: "12:00" }, { startTime: "13:00", endTime: "18:00" }]);
+assert.deepEqual(updateExceptionInterval(hours, 0, 1, { endTime: "19:00" }).exceptions[0].intervals, [{ startTime: "09:00", endTime: "12:00" }, { startTime: "13:00", endTime: "19:00" }]);
+assert.equal(addExceptionInterval(hours, 0).exceptions[0].intervals.length, 3);
+assert.deepEqual(removeExceptionInterval(hours, 0, 0).exceptions[0].intervals, [{ startTime: "13:00", endTime: "18:00" }]);
