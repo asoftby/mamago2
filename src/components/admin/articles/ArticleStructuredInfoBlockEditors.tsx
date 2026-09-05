@@ -40,7 +40,7 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
 export function contactsDraftFieldErrors(value: SharedContactsData) {
   return {
     phones: value.phones.map((phone) => !phone.value.trim() && Boolean(phone.label?.trim()) ? "Укажите номер телефона" : null),
-    socials: value.socials.map((social) => social.url.trim() && !z.url().safeParse(social.url.trim()).success ? "Введите корректную ссылку" : null),
+    socials: value.socials.map((social) => social.url.trim() && !z.url().safeParse(social.url.trim()).success ? "Введите полную ссылку, например https://instagram.com/..." : null),
     email: value.email?.trim() && !z.email().safeParse(value.email.trim()).success ? "Введите корректный email" : null,
     website: value.website?.trim() && !z.url().safeParse(value.website.trim()).success ? "Введите корректный адрес сайта" : null,
   };

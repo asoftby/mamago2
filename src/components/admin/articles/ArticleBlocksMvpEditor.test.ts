@@ -92,7 +92,7 @@ assert.deepEqual(contactsDraftFieldErrors({
   website: "bad",
 }), {
   phones: ["Укажите номер телефона", null],
-  socials: ["Введите корректную ссылку", null],
+  socials: ["Введите полную ссылку, например https://instagram.com/...", null],
   email: "Введите корректный email",
   website: "Введите корректный адрес сайта",
 });

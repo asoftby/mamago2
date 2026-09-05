@@ -41,7 +41,7 @@ for (const type of allBlockTypes) {
 
   const malformedSocial = ArticleContentPayloadSchema.safeParse(prepareArticleContentForSave(contacts([], [{ kind: "instagram", url: "not-a-url" }])));
   assert.equal(malformedSocial.success, false);
-  if (!malformedSocial.success) assert.equal(articleContentValidationMessage(malformedSocial.error.issues), "Введите корректную ссылку");
+  if (!malformedSocial.success) assert.equal(articleContentValidationMessage(malformedSocial.error.issues), "Введите полную ссылку, например https://instagram.com/...");
 
   const valid = prepareArticleContentForSave(contacts(
     [{ value: " +375291112233 ", label: " " }, { value: " +375172223344 ", label: " Офис " }],
@@ -52,6 +52,43 @@ for (const type of allBlockTypes) {
     phones: [{ value: "+375291112233" }, { value: "+375172223344", label: "Офис" }],
     socials: [{ kind: "instagram", url: "https://instagram.com/mamago" }, { kind: "telegram", url: "https://t.me/mamago" }],
   });
+
+  const screenshotCase = prepareArticleContentForSave({
+    version: 1,
+    blocks: [{ id: "screenshot", type: "contacts", data: {
+      address: " минскмястровска5 ",
+      phones: [{ value: " 1234567 " }],
+      email: " info@mooon.by ",
+      website: " https://mamago.by ",
+      socials: [{ kind: "instagram", url: " mamago.by " }],
+      mapUrl: " ",
+    } }],
+  });
+  const screenshotResult = ArticleContentPayloadSchema.safeParse(screenshotCase);
+  assert.equal(screenshotResult.success, false);
+  if (!screenshotResult.success) {
+    assert.deepEqual(screenshotResult.error.issues.map((issue) => issue.path), [["blocks", 0, "data", "socials", 0, "url"]]);
+  }
+  const screenshotContacts = screenshotCase.blocks[0] as Extract<ArticleBlockMvp, { type: "contacts" }>;
+  assert.equal(screenshotContacts.data.address, "минскмястровска5");
+  assert.equal(screenshotContacts.data.email, "info@mooon.by");
+  assert.equal(screenshotContacts.data.website, "https://mamago.by");
+  assert.equal(screenshotContacts.data.mapUrl, undefined);
+  assert.equal(screenshotContacts.data.socials[0]?.url, "mamago.by", "malformed URL is preserved, not repaired");
+}
+
+// A brand-new empty exception is draft UI state. A partially configured
+// exception remains invalid instead of being silently discarded.
+{
+  const hours = newBlock("openingHours", () => "hours");
+  assert.ok(hours.type === "openingHours");
+  if (hours.type === "openingHours") {
+    const blank = prepareArticleContentForSave({ version: 1, blocks: [{ ...hours, data: { ...hours.data, exceptions: [{ date: "", isClosed: true, allDay: false, intervals: [] }] } }] });
+    assert.equal(ArticleContentPayloadSchema.safeParse(blank).success, true);
+    assert.deepEqual((blank.blocks[0] as Extract<ArticleBlockMvp, { type: "openingHours" }>).data.exceptions, []);
+    const partial = prepareArticleContentForSave({ version: 1, blocks: [{ ...hours, data: { ...hours.data, exceptions: [{ date: "", isClosed: true, allDay: false, intervals: [], note: "holiday" }] } }] });
+    assert.equal(ArticleContentPayloadSchema.safeParse(partial).success, false);
+  }
 }
 
 // Phase 5 stays additive in content version 1. Legacy PLACE references remain
