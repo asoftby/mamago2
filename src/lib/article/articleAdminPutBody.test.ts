@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { ArticleAdminPutBodySchema, articleSaveInputFromPutBody } from "./articleAdminPutBody";
+import { newBlock, prepareArticleContentForSave } from "../publications/articleMvp";
 
 const base = {
   title: "Test",
@@ -38,3 +39,10 @@ const structured = ArticleAdminPutBodySchema.parse({
   },
 });
 assert.deepEqual(articleSaveInputFromPutBody(structured).content, structured.content, "structured snapshots remain part of the single Article critical write");
+
+const allBlockTypes = ["intro", "text", "quote", "heading", "image", "gallery", "activityCard", "embed", "contacts", "price", "openingHours"] as const;
+const allDefaultsBody = {
+  ...base,
+  content: prepareArticleContentForSave({ version: 1, blocks: allBlockTypes.map((type) => newBlock(type, () => `admin-${type}`)) }),
+};
+assert.equal(ArticleAdminPutBodySchema.safeParse(allDefaultsBody).success, true, "full admin request accepts all block defaults");
