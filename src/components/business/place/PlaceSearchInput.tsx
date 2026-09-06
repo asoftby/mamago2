@@ -103,6 +103,8 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
 
       const widget = new PlaceAutocompleteElement();
       widgetRef.current = widget;
+      let suppressInputChange = false;
+      let releaseSuppressionTimer: ReturnType<typeof setTimeout> | null = null;
 
       widget.setAttribute("placeholder", "Адрес или название места");
       widget.setAttribute("aria-label", "Адрес или название места");
@@ -122,6 +124,7 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
       widget.classList.add(PLACE_SEARCH_WIDGET_CLASS);
 
       const handleInput = () => {
+        if (suppressInputChange) return;
         onInputChangeRef.current?.(widget.value ?? widget.getAttribute("value") ?? "");
       };
 
@@ -132,27 +135,34 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
         const place = prediction?.toPlace?.();
         if (!place) return;
 
+        suppressInputChange = true;
+        if (releaseSuppressionTimer) clearTimeout(releaseSuppressionTimer);
+
         try {
           await place.fetchFields?.({
             fields: ["id", "displayName", "formattedAddress", "location", "addressComponents"],
           });
+
+          const lat = readCoordinate(place.location?.lat);
+          const lng = readCoordinate(place.location?.lng);
+          if (!place.id || lat === null || lng === null) return;
+
+          onPlaceSelectRef.current({
+            googlePlaceId: place.id,
+            placeName: place.displayName || place.formattedAddress || "",
+            lat,
+            lng,
+            formattedAddr: place.formattedAddress || "",
+            addressJson: toLegacyAddressComponents(place.addressComponents),
+          });
         } catch (error) {
           console.error("[PlaceSearchInput] Place fetch error:", error);
-          return;
+        } finally {
+          releaseSuppressionTimer = setTimeout(() => {
+            suppressInputChange = false;
+            releaseSuppressionTimer = null;
+          }, 0);
         }
-
-        const lat = readCoordinate(place.location?.lat);
-        const lng = readCoordinate(place.location?.lng);
-        if (!place.id || lat === null || lng === null) return;
-
-        onPlaceSelectRef.current({
-          googlePlaceId: place.id,
-          placeName: place.displayName || place.formattedAddress || "",
-          lat,
-          lng,
-          formattedAddr: place.formattedAddress || "",
-          addressJson: toLegacyAddressComponents(place.addressComponents),
-        });
       };
 
       widget.addEventListener("input", handleInput);
@@ -165,6 +175,7 @@ export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initi
       setIsWidgetReady(true);
 
       cleanupRef.current = () => {
+        if (releaseSuppressionTimer) clearTimeout(releaseSuppressionTimer);
         widget.removeEventListener("input", handleInput);
         widget.removeEventListener("change", handleInput);
         widget.removeEventListener("gmp-select", handlePlaceSelect);
