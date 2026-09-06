@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OpeningHoursEditor } from "@/components/openingHours/OpeningHoursEditor";
-import { InternationalPhoneInput } from "@/components/phone/InternationalPhoneInput";
 import { PlaceMapModal } from "@/components/business/place/PlaceMapModal";
 import { PlaceSearchInput } from "@/components/business/place/PlaceSearchInput";
 import { CONTACT_SOCIAL_KINDS, SharedContactsDataSchema, type SharedContactsData } from "@/domain/contacts/structuredContacts";
@@ -24,6 +24,11 @@ import {
   removeExceptionInterval,
   updateExceptionInterval,
 } from "./ArticleStructuredInfoBlockEditorHelpers";
+
+const InternationalPhoneInput = dynamic(
+  () => import("@/components/phone/InternationalPhoneInput").then((module) => module.InternationalPhoneInput),
+  { ssr: false },
+);
 
 const clean = (value: string) => value.trim() || undefined;
 const validationMessage = (value: unknown, schema: { safeParse: (value: unknown) => { success: boolean } }) =>
