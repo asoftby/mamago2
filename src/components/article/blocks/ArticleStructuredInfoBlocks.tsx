@@ -15,8 +15,13 @@ import { cn } from "@/lib/utils";
 import type { SharedContactsData } from "@/domain/contacts/structuredContacts";
 import { formatSharedPrice, type SharedPriceData } from "@/domain/pricing/structuredPrice";
 import { OPENING_HOURS_DAYS, type SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
-import { getOpeningStatus } from "@/server/services/openingHours/openingHours.service";
-import { getDayOfWeekInTimezone } from "@/server/services/openingHours/openingHours.utils";
+import { getOpeningStatus, getTodayIntervals } from "@/server/services/openingHours/openingHours.service";
+import {
+  compareTime,
+  formatDateInTimezone,
+  getDayOfWeekInTimezone,
+  getTimeStringInTimezone,
+} from "@/server/services/openingHours/openingHours.utils";
 import { JS_DAY_TO_DAY_OF_WEEK } from "@/server/services/openingHours/openingHours.types";
 import { CopyCoordinatesButton } from "./CopyCoordinatesButton";
 
@@ -219,8 +224,8 @@ function intervals(items: Array<{ startTime: string; endTime: string }>) {
   return items.map((item) => `${item.startTime}–${item.endTime}`).join(", ");
 }
 
-function todaysDayKey(timezone: string): (typeof OPENING_HOURS_DAYS)[number] {
-  const jsDay = getDayOfWeekInTimezone(new Date(), timezone) as keyof typeof JS_DAY_TO_DAY_OF_WEEK;
+function todaysDayKey(timezone: string, now: Date): (typeof OPENING_HOURS_DAYS)[number] {
+  const jsDay = getDayOfWeekInTimezone(now, timezone) as keyof typeof JS_DAY_TO_DAY_OF_WEEK;
   return JS_DAY_TO_DAY_OF_WEEK[jsDay];
 }
 
@@ -245,14 +250,27 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
     );
   }
 
-  const todayKey = todaysDayKey(data.timezone);
+  const now = new Date();
+  const todayKey = todaysDayKey(data.timezone, now);
   const todayLabel = WEEKDAY_FULL[todayKey];
-  const status = getOpeningStatus(data, new Date());
-  const openingMatch = /до (\d{2}:\d{2})/.exec(status.message);
-  const reopenMatch = /Откроется в (\d{2}:\d{2})/.exec(status.message);
+  const todayDate = formatDateInTimezone(now, data.timezone);
+  const todayException = data.exceptions.find((item) => item.date === todayDate);
+  const todayIntervals = getTodayIntervals(data, now);
+  const currentTime = getTimeStringInTimezone(now, data.timezone);
+  const status = getOpeningStatus(data, now);
+  const currentInterval = status.isOpen
+    ? todayIntervals.find((interval) => {
+        const afterStart = compareTime(currentTime, interval.startTime);
+        const beforeEnd = compareTime(currentTime, interval.endTime);
+        return afterStart !== null && beforeEnd !== null && afterStart >= 0 && beforeEnd < 0;
+      })
+    : undefined;
+  const nextIntervalToday = status.isOpen
+    ? undefined
+    : todayIntervals.find((interval) => compareTime(currentTime, interval.startTime) === -1);
   const bannerCaption = status.isOpen
-    ? [openingMatch ? `до ${openingMatch[1]}` : null, todayLabel].filter(Boolean).join(", ")
-    : [reopenMatch ? `откроется в ${reopenMatch[1]}` : null, todayLabel].filter(Boolean).join(", ");
+    ? [currentInterval ? `до ${currentInterval.endTime}` : null, todayLabel].filter(Boolean).join(", ")
+    : [nextIntervalToday ? `откроется в ${nextIntervalToday.startTime}` : null, todayLabel].filter(Boolean).join(", ");
 
   return (
     <Shell icon={<Clock className="h-[18px] w-[18px]" />} title="Режим работы">
@@ -267,8 +285,13 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
 
         {OPENING_HOURS_DAYS.map((day) => {
           const rule = data.rules.find((item) => item.dayOfWeek === day);
-          if (!rule) return null;
           const isToday = day === todayKey;
+          if (!rule && !(isToday && todayException)) return null;
+
+          const effectiveIsOpen = isToday && todayException ? !todayException.isClosed : Boolean(rule?.isOpen);
+          const effectiveAllDay = isToday && todayException ? todayException.allDay : Boolean(rule?.allDay);
+          const effectiveIntervals = isToday && todayException ? todayException.intervals : (rule?.intervals ?? []);
+
           return (
             <div key={day} className="flex items-baseline gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
               <span className={cn("shrink-0 text-[14.5px] sm:w-[7rem]", isToday ? "font-bold" : "font-medium")}>
@@ -282,11 +305,11 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
               <span className="mb-1 h-0 flex-1 border-b border-dotted border-border" />
               <span
                 className={cn(
-                  "whitespace-nowrap font-mono text-sm",
-                  !rule.isOpen ? "font-normal text-muted-foreground" : isToday ? "font-semibold text-brand" : "font-medium",
+                  "min-w-0 max-w-[55%] text-right font-mono text-sm sm:max-w-none sm:whitespace-nowrap",
+                  !effectiveIsOpen ? "font-normal text-muted-foreground" : isToday ? "font-semibold text-brand" : "font-medium",
                 )}
               >
-                {!rule.isOpen ? "выходной" : rule.allDay ? "Круглосуточно" : intervals(rule.intervals)}
+                {!effectiveIsOpen ? "выходной" : effectiveAllDay ? "Круглосуточно" : intervals(effectiveIntervals)}
               </span>
             </div>
           );
