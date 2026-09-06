@@ -9,7 +9,13 @@
 import assert from "node:assert/strict";
 import { newBlock, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditor";
-import { addExceptionInterval, contactsDraftFieldErrors, priceForMode, removeExceptionInterval, updateExceptionInterval } from "./ArticleStructuredInfoBlockEditors";
+import {
+  addExceptionInterval,
+  contactsDraftFieldErrors,
+  priceForMode,
+  removeExceptionInterval,
+  updateExceptionInterval,
+} from "./ArticleStructuredInfoBlockEditorHelpers";
 
 function image(overrides: Partial<Extract<ArticleBlockMvp, { type: "image" }>> = {}): Extract<
   ArticleBlockMvp,
@@ -95,4 +101,14 @@ assert.deepEqual(contactsDraftFieldErrors({
   socials: ["Введите полную ссылку, например https://instagram.com/...", null],
   email: "Введите корректный email",
   website: "Введите корректный адрес сайта",
+});
+
+assert.deepEqual(contactsDraftFieldErrors({
+  phones: [{ value: "+375291234567", label: "Бронирование" }],
+  socials: [],
+}), {
+  phones: [null],
+  socials: [],
+  email: undefined,
+  website: undefined,
 });

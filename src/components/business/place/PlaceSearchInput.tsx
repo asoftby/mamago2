@@ -16,6 +16,7 @@ interface PlaceSearchInputProps {
     formattedAddr: string;
     addressJson: google.maps.GeocoderAddressComponent[];
   }) => void;
+  onInputChange?: (value: string) => void;
   disabled?: boolean;
   initialValue?: string; // Initial address to display
 }
@@ -69,17 +70,22 @@ function readCoordinate(value: number | (() => number) | undefined): number | nu
   return null;
 }
 
-export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: PlaceSearchInputProps) {
+export function PlaceSearchInput({ onPlaceSelect, onInputChange, disabled, initialValue }: PlaceSearchInputProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const fallbackInputRef = useRef<HTMLInputElement>(null);
   const widgetRef = useRef<(HTMLElement & { value?: string; focus?: () => void }) | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const onPlaceSelectRef = useRef(onPlaceSelect);
+  const onInputChangeRef = useRef(onInputChange);
   const [isWidgetReady, setIsWidgetReady] = useState(false);
 
   useEffect(() => {
     onPlaceSelectRef.current = onPlaceSelect;
   }, [onPlaceSelect]);
+
+  useEffect(() => {
+    onInputChangeRef.current = onInputChange;
+  }, [onInputChange]);
 
   const initAutocomplete = useCallback(async () => {
     if (widgetRef.current) return;
@@ -97,6 +103,8 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
 
       const widget = new PlaceAutocompleteElement();
       widgetRef.current = widget;
+      let suppressInputChange = false;
+      let releaseSuppressionTimer: ReturnType<typeof setTimeout> | null = null;
 
       widget.setAttribute("placeholder", "Адрес или название места");
       widget.setAttribute("aria-label", "Адрес или название места");
@@ -115,6 +123,11 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
 
       widget.classList.add(PLACE_SEARCH_WIDGET_CLASS);
 
+      const handleInput = () => {
+        if (suppressInputChange) return;
+        onInputChangeRef.current?.(widget.value ?? widget.getAttribute("value") ?? "");
+      };
+
       const handlePlaceSelect = async (event: Event) => {
         const selectEvent = event as PlaceAutocompleteSelectionEvent;
         const prediction = selectEvent.placePrediction ?? selectEvent.detail?.placePrediction;
@@ -122,29 +135,38 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
         const place = prediction?.toPlace?.();
         if (!place) return;
 
+        suppressInputChange = true;
+        if (releaseSuppressionTimer) clearTimeout(releaseSuppressionTimer);
+
         try {
           await place.fetchFields?.({
             fields: ["id", "displayName", "formattedAddress", "location", "addressComponents"],
           });
+
+          const lat = readCoordinate(place.location?.lat);
+          const lng = readCoordinate(place.location?.lng);
+          if (!place.id || lat === null || lng === null) return;
+
+          onPlaceSelectRef.current({
+            googlePlaceId: place.id,
+            placeName: place.displayName || place.formattedAddress || "",
+            lat,
+            lng,
+            formattedAddr: place.formattedAddress || "",
+            addressJson: toLegacyAddressComponents(place.addressComponents),
+          });
         } catch (error) {
           console.error("[PlaceSearchInput] Place fetch error:", error);
-          return;
+        } finally {
+          releaseSuppressionTimer = setTimeout(() => {
+            suppressInputChange = false;
+            releaseSuppressionTimer = null;
+          }, 0);
         }
-
-        const lat = readCoordinate(place.location?.lat);
-        const lng = readCoordinate(place.location?.lng);
-        if (!place.id || lat === null || lng === null) return;
-
-        onPlaceSelectRef.current({
-          googlePlaceId: place.id,
-          placeName: place.displayName || place.formattedAddress || "",
-          lat,
-          lng,
-          formattedAddr: place.formattedAddress || "",
-          addressJson: toLegacyAddressComponents(place.addressComponents),
-        });
       };
 
+      widget.addEventListener("input", handleInput);
+      widget.addEventListener("change", handleInput);
       widget.addEventListener("gmp-select", handlePlaceSelect);
       widget.addEventListener("gmp-placeselect", handlePlaceSelect);
 
@@ -153,6 +175,9 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
       setIsWidgetReady(true);
 
       cleanupRef.current = () => {
+        if (releaseSuppressionTimer) clearTimeout(releaseSuppressionTimer);
+        widget.removeEventListener("input", handleInput);
+        widget.removeEventListener("change", handleInput);
         widget.removeEventListener("gmp-select", handlePlaceSelect);
         widget.removeEventListener("gmp-placeselect", handlePlaceSelect);
         if (host.contains(widget)) {
@@ -211,7 +236,9 @@ export function PlaceSearchInput({ onPlaceSelect, disabled, initialValue }: Plac
           type="text"
           placeholder="Адрес или название места"
           disabled={disabled}
-          defaultValue={initialValue}
+          value={onInputChange ? initialValue ?? "" : undefined}
+          defaultValue={onInputChange ? undefined : initialValue}
+          onChange={(event) => onInputChange?.(event.target.value)}
           autoComplete="off"
           className={cn(
             "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-10 w-full min-w-0 rounded-md border bg-white px-3 py-2 text-base leading-none shadow-xs outline-none md:text-sm dark:bg-input/30",

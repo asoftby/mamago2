@@ -68,8 +68,16 @@ function Row({ label, action, children }: { label: string; action?: ReactNode; c
   );
 }
 
+function contactMapHref(data: SharedContactsData): string | null {
+  if (data.mapUrl) return data.mapUrl;
+  if (!data.coordinates) return null;
+  const query = encodeURIComponent(`${data.coordinates.latitude},${data.coordinates.longitude}`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
 export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
-  if (!data.address && !data.email && !data.website && !data.mapUrl && data.phones.length === 0 && data.socials.length === 0) return null;
+  const mapHref = contactMapHref(data);
+  if (!data.address && !data.email && !data.website && !mapHref && data.phones.length === 0 && data.socials.length === 0) return null;
   return (
     <Shell icon={<Phone className="h-[18px] w-[18px]" />} title="Контакты">
       <div>
@@ -79,8 +87,8 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
             action={
               <>
                 {data.coordinates && <CopyCoordinatesButton value={`${data.coordinates.latitude}, ${data.coordinates.longitude}`} />}
-                {data.mapUrl && (
-                  <a href={data.mapUrl} target="_blank" rel="noreferrer" className={pill}>
+                {mapHref && (
+                  <a href={mapHref} target="_blank" rel="noreferrer" className={pill}>
                     <MapIcon className="h-3.5 w-3.5" />Маршрут
                   </a>
                 )}
@@ -93,9 +101,9 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
             )}
           </Row>
         )}
-        {!data.address && data.mapUrl && (
+        {!data.address && mapHref && (
           <Row label="Адрес">
-            <a className="underline underline-offset-2" href={data.mapUrl} target="_blank" rel="noreferrer">Открыть на карте</a>
+            <a className="underline underline-offset-2" href={mapHref} target="_blank" rel="noreferrer">Открыть на карте</a>
           </Row>
         )}
         {data.phones.map((phone, index) => (
