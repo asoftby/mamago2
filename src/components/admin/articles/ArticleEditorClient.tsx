@@ -26,6 +26,8 @@ import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
   deriveArticleExcerptFromContent,
+  ArticleContentPayloadSchema,
+  articleContentValidationMessage,
   prepareArticleContentForSave,
   type ArticleContentPayload,
 } from "@/lib/publications/articleMvp";
@@ -132,6 +134,7 @@ export function ArticleEditorClient({
   const [submitting, setSubmitting] = useState(false);
   const [moderating, setModerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasContentValidationError, setHasContentValidationError] = useState(false);
   const [views, setViews] = useState(initial.views);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(() => {
     const t = Date.parse(initial.updatedAt);
@@ -496,6 +499,16 @@ export function ArticleEditorClient({
   const save = useCallback(
     async (opts?: { silent?: boolean; skipLoading?: boolean }): Promise<boolean> => {
       if (!validateGeoScopeForWrite(isPublishLikeStatus(status))) return false;
+      const contentResult = ArticleContentPayloadSchema.safeParse(payload.content);
+      if (!contentResult.success) {
+        const msg = articleContentValidationMessage(contentResult.error.issues);
+        setHasContentValidationError(true);
+        setError(msg);
+        toast.error(msg);
+        return false;
+      }
+      setHasContentValidationError(false);
+      const requestPayload = { ...payload, content: contentResult.data };
       if (!opts?.skipLoading) setSaving(true);
       setError(null);
       try {
@@ -503,7 +516,7 @@ export function ArticleEditorClient({
           const res = await fetch("/api/admin/articles", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(requestPayload),
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
@@ -532,7 +545,7 @@ export function ArticleEditorClient({
         const res = await fetch(`/api/admin/articles/${initial.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(requestPayload),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -601,10 +614,19 @@ export function ArticleEditorClient({
 
       if (!articleId) {
         setError(null);
+        const contentResult = ArticleContentPayloadSchema.safeParse(payload.content);
+        if (!contentResult.success) {
+          const msg = articleContentValidationMessage(contentResult.error.issues);
+          setHasContentValidationError(true);
+          setError(msg);
+          toast.error(msg);
+          return;
+        }
+        setHasContentValidationError(false);
         const res = await fetch("/api/admin/articles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, content: contentResult.data }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -772,7 +794,7 @@ export function ArticleEditorClient({
         ? "dirty"
         : "saved";
   const stickyStatusLabel = error
-    ? "Не удалось сохранить"
+    ? hasContentValidationError ? "Проверьте поля в статье" : "Не удалось сохранить"
     : saving
       ? "Сохранение…"
       : dirty

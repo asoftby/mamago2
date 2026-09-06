@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { newBlock, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditor";
-import { addExceptionInterval, priceForMode, removeExceptionInterval, updateExceptionInterval } from "./ArticleStructuredInfoBlockEditors";
+import { addExceptionInterval, contactsDraftFieldErrors, priceForMode, removeExceptionInterval, updateExceptionInterval } from "./ArticleStructuredInfoBlockEditors";
 
 function image(overrides: Partial<Extract<ArticleBlockMvp, { type: "image" }>> = {}): Extract<
   ArticleBlockMvp,
@@ -84,3 +84,15 @@ assert.deepEqual(updateExceptionInterval(hours, 0, 0, { startTime: "10:00" }).ex
 assert.deepEqual(updateExceptionInterval(hours, 0, 1, { endTime: "19:00" }).exceptions[0].intervals, [{ startTime: "09:00", endTime: "12:00" }, { startTime: "13:00", endTime: "19:00" }]);
 assert.equal(addExceptionInterval(hours, 0).exceptions[0].intervals.length, 3);
 assert.deepEqual(removeExceptionInterval(hours, 0, 0).exceptions[0].intervals, [{ startTime: "13:00", endTime: "18:00" }]);
+
+assert.deepEqual(contactsDraftFieldErrors({
+  phones: [{ value: "", label: "Справочная" }, { value: "" }],
+  socials: [{ kind: "instagram", url: "bad" }, { kind: "telegram", url: "" }],
+  email: "bad",
+  website: "bad",
+}), {
+  phones: ["Укажите номер телефона", null],
+  socials: ["Введите полную ссылку, например https://instagram.com/...", null],
+  email: "Введите корректный email",
+  website: "Введите корректный адрес сайта",
+});
