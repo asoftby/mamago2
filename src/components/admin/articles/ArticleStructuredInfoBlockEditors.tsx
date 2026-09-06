@@ -17,7 +17,13 @@ import { SharedOpeningHoursDataSchema, type SharedOpeningHoursData } from "@/dom
 import { randomId } from "@/lib/utils/randomId";
 import { prepareArticleContactsForSave } from "@/lib/publications/articleMvp";
 import { PHONE_LABEL_MAX_LENGTH } from "@/lib/phones/normalizePhones";
-import { z } from "zod";
+import {
+  addExceptionInterval,
+  contactsDraftFieldErrors,
+  priceForMode,
+  removeExceptionInterval,
+  updateExceptionInterval,
+} from "./ArticleStructuredInfoBlockEditorHelpers";
 
 const clean = (value: string) => value.trim() || undefined;
 const validationMessage = (value: unknown, schema: { safeParse: (value: unknown) => { success: boolean } }) =>
@@ -33,6 +39,12 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
     <Field label="Адрес">
       <PlaceSearchInput
         initialValue={value.address ?? ""}
+        onInputChange={(address) => onChange({
+          ...value,
+          address: clean(address),
+          coordinates: undefined,
+          mapUrl: undefined,
+        })}
         onPlaceSelect={({ placeName, lat, lng, formattedAddr }) => onChange({
           ...value,
           address: clean(formattedAddr || placeName),
@@ -47,11 +59,11 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
         </Button>
         {coordinates ? <span className="text-xs text-muted-foreground">Точка на карте выбрана</span> : null}
       </div>
-      <p className="text-xs text-muted-foreground">Выберите адрес из подсказок Google. Если нужного адреса нет, укажите точку на карте.</p>
+      <p className="text-xs text-muted-foreground">Выберите адрес из подсказок Google. Адрес можно отредактировать или удалить вручную; если нужного адреса нет, укажите точку на карте.</p>
     </Field>
 
-    <PlaceMapModal
-      isOpen={isMapOpen}
+    {isMapOpen ? <PlaceMapModal
+      isOpen
       onClose={() => setIsMapOpen(false)}
       initialLat={coordinates?.latitude}
       initialLng={coordinates?.longitude}
@@ -60,7 +72,7 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
         coordinates: { latitude: lat, longitude: lng },
         mapUrl: undefined,
       })}
-    />
+    /> : null}
 
     <Field label="Телефоны">
       <div className="space-y-3">
@@ -106,36 +118,7 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
   </div>;
 }
 
-export function contactsDraftFieldErrors(value: SharedContactsData) {
-  return {
-    phones: value.phones.map((phone) => !phone.value.trim() && Boolean(phone.label?.trim()) ? "Укажите номер телефона" : null),
-    socials: value.socials.map((social) => social.url.trim() && !z.url().safeParse(social.url.trim()).success ? "Введите полную ссылку, например https://instagram.com/..." : null),
-    email: value.email?.trim() && !z.email().safeParse(value.email.trim()).success ? "Введите корректный email" : null,
-    website: value.website?.trim() && !z.url().safeParse(value.website.trim()).success ? "Введите корректный адрес сайта" : null,
-  };
-}
-
 const PRICE_LABELS: Record<SharedPriceData["mode"], string> = { FREE: "Бесплатно", EXACT: "Точная", FROM: "От", RANGE: "Диапазон", NONE: "Не применяется", UNKNOWN: "Не указана" };
-export function priceForMode(value: SharedPriceData, mode: SharedPriceData["mode"]): SharedPriceData {
-  const base = { ...value, mode };
-  if (mode === "FREE") return { ...base, min: 0, max: 0 };
-  if (mode === "EXACT") return { ...base, min: value.min ?? 0, max: value.min ?? 0 };
-  if (mode === "FROM") return { ...base, min: value.min ?? 0, max: null };
-  if (mode === "RANGE") return { ...base, min: value.min ?? 0, max: value.max ?? value.min ?? 0 };
-  return { ...base, min: null, max: null };
-}
-
-export function updateExceptionInterval(data: SharedOpeningHoursData, exceptionIndex: number, intervalIndex: number, patch: Partial<{ startTime: string; endTime: string }>): SharedOpeningHoursData {
-  return { ...data, exceptions: data.exceptions.map((item, i) => i === exceptionIndex ? { ...item, intervals: item.intervals.map((interval, j) => j === intervalIndex ? { ...interval, ...patch } : interval) } : item) };
-}
-
-export function addExceptionInterval(data: SharedOpeningHoursData, exceptionIndex: number): SharedOpeningHoursData {
-  return { ...data, exceptions: data.exceptions.map((item, i) => i === exceptionIndex ? { ...item, intervals: [...item.intervals, { startTime: "09:00", endTime: "18:00" }] } : item) };
-}
-
-export function removeExceptionInterval(data: SharedOpeningHoursData, exceptionIndex: number, intervalIndex: number): SharedOpeningHoursData {
-  return { ...data, exceptions: data.exceptions.map((item, i) => i === exceptionIndex ? { ...item, intervals: item.intervals.filter((_, j) => j !== intervalIndex) } : item) };
-}
 
 export function ArticlePriceBlockEditor({ value, onChange }: { value: SharedPriceData; onChange: (value: SharedPriceData) => void }) {
   const updateAmount = (key: "min" | "max", raw: string) => { const amount = raw === "" ? null : Number(raw); const next = { ...value, [key]: Number.isFinite(amount) ? amount : null }; onChange(next.mode === "EXACT" ? { ...next, min: next.min, max: next.min } : next); };
