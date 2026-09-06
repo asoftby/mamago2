@@ -88,6 +88,9 @@ for (const type of allBlockTypes) {
     assert.deepEqual((blank.blocks[0] as Extract<ArticleBlockMvp, { type: "openingHours" }>).data.exceptions, []);
     const partial = prepareArticleContentForSave({ version: 1, blocks: [{ ...hours, data: { ...hours.data, exceptions: [{ date: "", isClosed: true, allDay: false, intervals: [], note: "holiday" }] } }] });
     assert.equal(ArticleContentPayloadSchema.safeParse(partial).success, false);
+    const allDayWithoutDate = prepareArticleContentForSave({ version: 1, blocks: [{ ...hours, data: { ...hours.data, exceptions: [{ date: "", isClosed: false, allDay: true, intervals: [] }] } }] });
+    assert.equal((allDayWithoutDate.blocks[0] as Extract<ArticleBlockMvp, { type: "openingHours" }>).data.exceptions.length, 1);
+    assert.equal(ArticleContentPayloadSchema.safeParse(allDayWithoutDate).success, false);
   }
 }
 

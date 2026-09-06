@@ -183,7 +183,7 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
           data: {
             ...block.data,
             exceptions: block.data.exceptions.filter((exception) =>
-              Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length),
+              Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
             ),
           },
         };
