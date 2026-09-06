@@ -11,11 +11,19 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
 }
 const Row = ({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) => <div className="flex min-w-0 items-start gap-3 text-[15px] leading-6"><span className="mt-1 shrink-0 text-muted-foreground">{icon}</span><span className="min-w-0 break-words">{children}</span></div>;
 
+function contactMapHref(data: SharedContactsData): string | null {
+  if (data.mapUrl) return data.mapUrl;
+  if (!data.coordinates) return null;
+  const query = encodeURIComponent(`${data.coordinates.latitude},${data.coordinates.longitude}`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
 export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
-  if (!data.address && !data.email && !data.website && !data.mapUrl && data.phones.length === 0 && data.socials.length === 0) return null;
+  const mapHref = contactMapHref(data);
+  if (!data.address && !data.email && !data.website && !mapHref && data.phones.length === 0 && data.socials.length === 0) return null;
   return <Shell title="Контакты"><div className="space-y-3">
-    {data.address && <Row icon={<MapPin className="h-4 w-4" />}>{data.mapUrl ? <a className="underline underline-offset-2" href={data.mapUrl} target="_blank" rel="noreferrer">{data.address}</a> : data.address}</Row>}
-    {!data.address && data.mapUrl && <Row icon={<MapPin className="h-4 w-4" />}><a className="underline underline-offset-2" href={data.mapUrl} target="_blank" rel="noreferrer">Открыть на карте</a></Row>}
+    {data.address && <Row icon={<MapPin className="h-4 w-4" />}>{mapHref ? <a className="underline underline-offset-2" href={mapHref} target="_blank" rel="noreferrer">{data.address}</a> : data.address}</Row>}
+    {!data.address && mapHref && <Row icon={<MapPin className="h-4 w-4" />}><a className="underline underline-offset-2" href={mapHref} target="_blank" rel="noreferrer">Открыть на карте</a></Row>}
     {data.phones.map((phone, index) => <Row key={`${phone.value}-${index}`} icon={<Phone className="h-4 w-4" />}><a className="underline underline-offset-2" href={`tel:${phone.value}`}>{phone.label ? `${phone.label}: ` : ""}{phone.value}</a></Row>)}
     {data.email && <Row icon={<Mail className="h-4 w-4" />}><a className="underline underline-offset-2" href={`mailto:${data.email}`}>{data.email}</a></Row>}
     {data.website && <Row icon={<ExternalLink className="h-4 w-4" />}><a className="break-all underline underline-offset-2" href={data.website} target="_blank" rel="noreferrer">{data.website}</a></Row>}
