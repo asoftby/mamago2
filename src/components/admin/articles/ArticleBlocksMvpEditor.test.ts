@@ -9,7 +9,13 @@
 import assert from "node:assert/strict";
 import { newBlock, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
 import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditor";
-import { addExceptionInterval, contactsDraftFieldErrors, priceForMode, removeExceptionInterval, updateExceptionInterval } from "./ArticleStructuredInfoBlockEditors";
+import {
+  addExceptionInterval,
+  contactsDraftFieldErrors,
+  priceForMode,
+  removeExceptionInterval,
+  updateExceptionInterval,
+} from "./ArticleStructuredInfoBlockEditorHelpers";
 
 function image(overrides: Partial<Extract<ArticleBlockMvp, { type: "image" }>> = {}): Extract<
   ArticleBlockMvp,
