@@ -96,3 +96,13 @@ assert.deepEqual(contactsDraftFieldErrors({
   email: "Введите корректный email",
   website: "Введите корректный адрес сайта",
 });
+
+assert.deepEqual(contactsDraftFieldErrors({
+  phones: [{ value: "+375291234567", label: "Бронирование" }],
+  socials: [],
+}), {
+  phones: [null],
+  socials: [],
+  email: undefined,
+  website: undefined,
+});
