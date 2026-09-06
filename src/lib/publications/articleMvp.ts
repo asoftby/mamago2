@@ -125,11 +125,69 @@ export function serializeArticleContent(payload: ArticleContentPayload): object 
   return JSON.parse(JSON.stringify(payload)) as object;
 }
 
-/** Removes only completely blank Article price draft rows before API serialization. */
+export function prepareArticleContactsForSave(data: z.infer<typeof SharedContactsDataSchema>) {
+  const optionalTrimmed = (value: string | undefined) => value?.trim() || undefined;
+  const address = optionalTrimmed(data.address);
+  const email = optionalTrimmed(data.email);
+  const website = optionalTrimmed(data.website);
+  const mapUrl = optionalTrimmed(data.mapUrl);
+  const phones = data.phones.flatMap((phone) => {
+    const value = phone.value.trim();
+    const label = phone.label?.trim();
+    if (!value && !label) return [];
+    return [{ value, ...(label ? { label } : {}) }];
+  });
+  const socials = data.socials.flatMap((social) => {
+    const url = social.url.trim();
+    if (!url) return [];
+    return [{ ...social, url }];
+  });
+  return {
+    ...(address ? { address } : {}),
+    phones,
+    ...(email ? { email } : {}),
+    ...(website ? { website } : {}),
+    socials,
+    ...(data.coordinates ? { coordinates: data.coordinates } : {}),
+    ...(mapUrl ? { mapUrl } : {}),
+  };
+}
+
+export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): string {
+  const paths = issues.map((issue) => issue.path.map(String).join("."));
+  if (paths.some((path) => /\.phones\.\d+\.value$/.test(path))) return "Укажите номер телефона";
+  if (paths.some((path) => /\.socials\.\d+\.url$/.test(path))) return "Введите полную ссылку, например https://instagram.com/...";
+  if (paths.some((path) => /\.data\.email$/.test(path))) return "Введите корректный email";
+  if (paths.some((path) => /\.data\.website$/.test(path))) return "Введите корректный адрес сайта";
+  return "Проверьте заполнение блоков статьи";
+}
+
+/**
+ * Removes completely blank editor-only rows before API serialization.
+ * Partially filled invalid rows are deliberately preserved so the strict
+ * persisted schema can report them to the editor.
+ */
 export function prepareArticleContentForSave(payload: ArticleContentPayload): ArticleContentPayload {
   return {
     ...payload,
     blocks: payload.blocks.map((block) => {
+      if (block.type === "contacts") {
+        return {
+          ...block,
+          data: prepareArticleContactsForSave(block.data),
+        };
+      }
+      if (block.type === "openingHours") {
+        return {
+          ...block,
+          data: {
+            ...block.data,
+            exceptions: block.data.exceptions.filter((exception) =>
+              Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
+            ),
+          },
+        };
+      }
       if (block.type !== "price") return block;
       return {
         ...block,
