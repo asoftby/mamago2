@@ -1,72 +1,129 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import { MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OpeningHoursEditor } from "@/components/openingHours/OpeningHoursEditor";
+import { PlaceMapModal } from "@/components/business/place/PlaceMapModal";
+import { PlaceSearchInput } from "@/components/business/place/PlaceSearchInput";
 import { CONTACT_SOCIAL_KINDS, SharedContactsDataSchema, type SharedContactsData } from "@/domain/contacts/structuredContacts";
 import { SharedPriceDataSchema, type SharedPriceData } from "@/domain/pricing/structuredPrice";
 import { SharedOpeningHoursDataSchema, type SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
 import { randomId } from "@/lib/utils/randomId";
 import { prepareArticleContactsForSave } from "@/lib/publications/articleMvp";
-import { z } from "zod";
+import { PHONE_LABEL_MAX_LENGTH } from "@/lib/phones/normalizePhones";
+import {
+  addExceptionInterval,
+  contactsDraftFieldErrors,
+  priceForMode,
+  removeExceptionInterval,
+  updateExceptionInterval,
+} from "./ArticleStructuredInfoBlockEditorHelpers";
+
+const InternationalPhoneInput = dynamic(
+  () => import("@/components/phone/InternationalPhoneInput").then((module) => module.InternationalPhoneInput),
+  { ssr: false },
+);
 
 const clean = (value: string) => value.trim() || undefined;
 const validationMessage = (value: unknown, schema: { safeParse: (value: unknown) => { success: boolean } }) =>
   schema.safeParse(value).success ? null : "Проверьте заполненные поля: email, ссылки, суммы и время должны быть корректными.";
 
 export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedContactsData; onChange: (value: SharedContactsData) => void }) {
+  const [isMapOpen, setIsMapOpen] = useState(false);
   const errors = contactsDraftFieldErrors(value);
   const error = validationMessage(prepareArticleContactsForSave(value), SharedContactsDataSchema);
+  const coordinates = value.coordinates;
+
   return <div className="space-y-4">
-    <Field label="Адрес"><Input aria-label="Адрес" value={value.address ?? ""} onChange={(e) => onChange({ ...value, address: clean(e.target.value) })} /></Field>
-    <Field label="Телефоны">
-      {value.phones.map((phone, index) => <div className="space-y-1" key={index}><Row><Input aria-label={`Телефон ${index + 1}`} aria-invalid={Boolean(errors.phones[index])} value={phone.value} onChange={(e) => onChange({ ...value, phones: value.phones.map((item, i) => i === index ? { ...item, value: e.target.value } : item) })} /><Delete onClick={() => onChange({ ...value, phones: value.phones.filter((_, i) => i !== index) })} label="Удалить телефон" /></Row>{errors.phones[index] && <p role="alert" className="text-xs text-destructive">{errors.phones[index]}</p>}</div>)}
-      <Add onClick={() => onChange({ ...value, phones: [...value.phones, { value: "" }] })}>Добавить телефон</Add>
+    <Field label="Адрес">
+      <PlaceSearchInput
+        initialValue={value.address ?? ""}
+        onInputChange={(address) => onChange({
+          ...value,
+          address: clean(address),
+          coordinates: undefined,
+          mapUrl: undefined,
+        })}
+        onPlaceSelect={({ placeName, lat, lng, formattedAddr }) => onChange({
+          ...value,
+          address: clean(formattedAddr || placeName),
+          coordinates: { latitude: lat, longitude: lng },
+          mapUrl: undefined,
+        })}
+      />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button type="button" variant="link" className="h-auto gap-1.5 px-0 py-0 text-sm" onClick={() => setIsMapOpen(true)}>
+          <MapPin className="h-4 w-4" />
+          Указать точку на карте
+        </Button>
+        {coordinates ? <span className="text-xs text-muted-foreground">Точка на карте выбрана</span> : null}
+      </div>
+      <p className="text-xs text-muted-foreground">Выберите адрес из подсказок Google. Адрес можно отредактировать или удалить вручную; если нужного адреса нет, укажите точку на карте.</p>
     </Field>
+
+    {isMapOpen ? <PlaceMapModal
+      isOpen
+      onClose={() => setIsMapOpen(false)}
+      initialLat={coordinates?.latitude}
+      initialLng={coordinates?.longitude}
+      onConfirm={({ lat, lng }) => onChange({
+        ...value,
+        coordinates: { latitude: lat, longitude: lng },
+        mapUrl: undefined,
+      })}
+    /> : null}
+
+    <Field label="Телефоны">
+      <div className="space-y-3">
+        {value.phones.map((phone, index) => <div className="space-y-1" key={index}>
+          <Row>
+            <div className="min-w-0 flex-1">
+              <InternationalPhoneInput
+                id={`article-contact-phone-${index}`}
+                value={phone.value}
+                aria-invalid={Boolean(errors.phones[index])}
+                onChange={(phoneValue) => onChange({
+                  ...value,
+                  phones: value.phones.map((item, i) => i === index ? { ...item, value: phoneValue } : item),
+                })}
+              />
+            </div>
+            <Input
+              className="sm:max-w-sm"
+              aria-label={`Что это за номер ${index + 1}`}
+              placeholder="Например: ресепшен, бронирование"
+              maxLength={PHONE_LABEL_MAX_LENGTH}
+              value={phone.label ?? ""}
+              onChange={(e) => onChange({
+                ...value,
+                phones: value.phones.map((item, i) => i === index ? { ...item, label: clean(e.target.value) } : item),
+              })}
+            />
+            <Delete onClick={() => onChange({ ...value, phones: value.phones.filter((_, i) => i !== index) })} label="Удалить телефон" />
+          </Row>
+          {errors.phones[index] && <p role="alert" className="text-xs text-destructive">{errors.phones[index]}</p>}
+        </div>)}
+      </div>
+      <Add onClick={() => onChange({ ...value, phones: [...value.phones, { value: "" }] })}>Добавить телефон</Add>
+      <p className="text-xs text-muted-foreground">Подпись поможет понять, куда звонить: ресепшен, бронирование, администратор.</p>
+    </Field>
+
     <div className="grid gap-3 sm:grid-cols-2"><Field label="Email"><Input aria-label="Email" aria-invalid={Boolean(errors.email)} type="email" value={value.email ?? ""} onChange={(e) => onChange({ ...value, email: clean(e.target.value) })} />{errors.email && <p role="alert" className="text-xs text-destructive">{errors.email}</p>}</Field><Field label="Сайт"><Input aria-label="Сайт" aria-invalid={Boolean(errors.website)} type="url" value={value.website ?? ""} onChange={(e) => onChange({ ...value, website: clean(e.target.value) })} />{errors.website && <p role="alert" className="text-xs text-destructive">{errors.website}</p>}</Field></div>
     <Field label="Соцсети">
       {value.socials.map((social, index) => <div className="space-y-1" key={index}><Row><Select value={social.kind} onValueChange={(kind) => onChange({ ...value, socials: value.socials.map((item, i) => i === index ? { ...item, kind: kind as typeof social.kind } : item) })}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent>{CONTACT_SOCIAL_KINDS.map((kind) => <SelectItem key={kind} value={kind}>{kind}</SelectItem>)}</SelectContent></Select><Input type="url" aria-label={`Ссылка соцсети ${index + 1}`} aria-invalid={Boolean(errors.socials[index])} value={social.url} onChange={(e) => onChange({ ...value, socials: value.socials.map((item, i) => i === index ? { ...item, url: e.target.value } : item) })} /><Delete onClick={() => onChange({ ...value, socials: value.socials.filter((_, i) => i !== index) })} label="Удалить ссылку" /></Row>{errors.socials[index] && <p role="alert" className="text-xs text-destructive">{errors.socials[index]}</p>}</div>)}
       <Add onClick={() => onChange({ ...value, socials: [...value.socials, { kind: "instagram", url: "" }] })}>Добавить ссылку</Add>
     </Field>
-    <Field label="Ссылка на карту"><Input aria-label="Ссылка на карту" type="url" value={value.mapUrl ?? ""} onChange={(e) => onChange({ ...value, mapUrl: clean(e.target.value) })} /></Field>
     {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
   </div>;
 }
 
-export function contactsDraftFieldErrors(value: SharedContactsData) {
-  return {
-    phones: value.phones.map((phone) => !phone.value.trim() && Boolean(phone.label?.trim()) ? "Укажите номер телефона" : null),
-    socials: value.socials.map((social) => social.url.trim() && !z.url().safeParse(social.url.trim()).success ? "Введите полную ссылку, например https://instagram.com/..." : null),
-    email: value.email?.trim() && !z.email().safeParse(value.email.trim()).success ? "Введите корректный email" : null,
-    website: value.website?.trim() && !z.url().safeParse(value.website.trim()).success ? "Введите корректный адрес сайта" : null,
-  };
-}
-
 const PRICE_LABELS: Record<SharedPriceData["mode"], string> = { FREE: "Бесплатно", EXACT: "Точная", FROM: "От", RANGE: "Диапазон", NONE: "Не применяется", UNKNOWN: "Не указана" };
-export function priceForMode(value: SharedPriceData, mode: SharedPriceData["mode"]): SharedPriceData {
-  const base = { ...value, mode };
-  if (mode === "FREE") return { ...base, min: 0, max: 0 };
-  if (mode === "EXACT") return { ...base, min: value.min ?? 0, max: value.min ?? 0 };
-  if (mode === "FROM") return { ...base, min: value.min ?? 0, max: null };
-  if (mode === "RANGE") return { ...base, min: value.min ?? 0, max: value.max ?? value.min ?? 0 };
-  return { ...base, min: null, max: null };
-}
-
-export function updateExceptionInterval(data: SharedOpeningHoursData, exceptionIndex: number, intervalIndex: number, patch: Partial<{ startTime: string; endTime: string }>): SharedOpeningHoursData {
-  return { ...data, exceptions: data.exceptions.map((item, i) => i === exceptionIndex ? { ...item, intervals: item.intervals.map((interval, j) => j === intervalIndex ? { ...interval, ...patch } : interval) } : item) };
-}
-
-export function addExceptionInterval(data: SharedOpeningHoursData, exceptionIndex: number): SharedOpeningHoursData {
-  return { ...data, exceptions: data.exceptions.map((item, i) => i === exceptionIndex ? { ...item, intervals: [...item.intervals, { startTime: "09:00", endTime: "18:00" }] } : item) };
-}
-
-export function removeExceptionInterval(data: SharedOpeningHoursData, exceptionIndex: number, intervalIndex: number): SharedOpeningHoursData {
-  return { ...data, exceptions: data.exceptions.map((item, i) => i === exceptionIndex ? { ...item, intervals: item.intervals.filter((_, j) => j !== intervalIndex) } : item) };
-}
 
 export function ArticlePriceBlockEditor({ value, onChange }: { value: SharedPriceData; onChange: (value: SharedPriceData) => void }) {
   const updateAmount = (key: "min" | "max", raw: string) => { const amount = raw === "" ? null : Number(raw); const next = { ...value, [key]: Number.isFinite(amount) ? amount : null }; onChange(next.mode === "EXACT" ? { ...next, min: next.min, max: next.min } : next); };
