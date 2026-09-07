@@ -14,6 +14,7 @@ import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import { toast } from "@/lib/toast";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import type { SharedContactsData } from "@/domain/contacts/structuredContacts";
 import type {
   ArticlePlaceAfishaItem,
   ArticlePlaceListItem,
@@ -50,6 +51,21 @@ const capsStyle: React.CSSProperties = {
 
 type TabId = "afisha" | "visit" | "party" | "promo";
 
+type ContactLink = {
+  key: string;
+  label: string;
+  href: string;
+  external?: boolean;
+};
+
+export type ArticlePlaceEmbedProps = {
+  card: ResolvedPlaceEmbedCard;
+  description?: string | null;
+  contacts?: SharedContactsData | null;
+  priceLabel?: string | null;
+  showCta?: boolean;
+};
+
 const TAB_LABELS: Record<TabId, string> = {
   afisha: "Афиша",
   visit: "Посещение",
@@ -64,11 +80,45 @@ const QUICK_LABELS: Record<TabId, string> = {
   promo: "✦ Спецпредложения",
 };
 
+const SOCIAL_LABELS: Record<SharedContactsData["socials"][number]["kind"], string> = {
+  instagram: "Instagram",
+  telegram: "Telegram",
+  vk: "VK",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  other: "Соцсеть",
+};
+
 function minPriceLabel(items: ArticlePlaceListItem[]): string | null {
   const numeric = items
     .map((item) => item.priceLabel)
     .filter((label): label is string => Boolean(label));
   return numeric[0] ?? null;
+}
+
+function buildContactLinks(contacts?: SharedContactsData | null): ContactLink[] {
+  if (!contacts) return [];
+  const links: ContactLink[] = contacts.phones.map((phone, index) => ({
+    key: `phone-${index}-${phone.value}`,
+    label: phone.label ? `${phone.label}: ${phone.value}` : phone.value,
+    href: `tel:${phone.value.replace(/[^\d+]/g, "")}`,
+  }));
+
+  if (contacts.email) {
+    links.push({ key: "email", label: contacts.email, href: `mailto:${contacts.email}` });
+  }
+  if (contacts.website) {
+    links.push({ key: "website", label: "Сайт", href: contacts.website, external: true });
+  }
+  contacts.socials.forEach((social, index) => {
+    links.push({
+      key: `social-${index}-${social.url}`,
+      label: SOCIAL_LABELS[social.kind],
+      href: social.url,
+      external: true,
+    });
+  });
+  return links;
 }
 
 async function copyToClipboard(text: string, message: string) {
@@ -180,7 +230,13 @@ function ListPane({ items, promo }: { items: ArticlePlaceListItem[]; promo?: boo
   );
 }
 
-export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
+export function ArticlePlaceEmbed({
+  card,
+  description,
+  contacts,
+  priceLabel,
+  showCta = true,
+}: ArticlePlaceEmbedProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     const first = (Object.keys(card.tabs) as TabId[]).find((id) => card.tabs[id].length > 0);
@@ -189,7 +245,7 @@ export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
 
   const availableTabs = (Object.keys(card.tabs) as TabId[]).filter((id) => card.tabs[id].length > 0);
   const activeItems = card.tabs[activeTab];
-
+  const contactLinks = buildContactLinks(contacts);
   const hoursColor = card.isOpenNow == null ? T.ink3 : card.isOpenNow ? T.ok : T.accentDeep;
 
   return (
@@ -267,6 +323,12 @@ export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
               </div>
             </div>
 
+            {description && (
+              <p style={{ margin: 0, color: T.ink3, fontSize: 13.5, lineHeight: 1.48 }}>
+                {description}
+              </p>
+            )}
+
             {card.address && (
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13.5, color: T.ink2 }}>
                 <MapPin size={14} style={{ color: T.accentDeep, flexShrink: 0 }} />
@@ -308,6 +370,25 @@ export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
               </div>
             )}
 
+            {contactLinks.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {contactLinks.map((item) => (
+                  <a
+                    key={item.key}
+                    href={item.href}
+                    target={item.external ? "_blank" : undefined}
+                    rel={item.external ? "noopener noreferrer" : undefined}
+                    style={{
+                      display: "inline-flex", alignItems: "center", minHeight: 29, padding: "4px 11px", borderRadius: 999,
+                      border: `1px solid ${T.line2}`, fontSize: 12, color: T.ink2, textDecoration: "none", lineHeight: 1.2,
+                    }}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {card.hoursMessage && (
                 <span style={{
@@ -329,6 +410,11 @@ export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
                   {tag}
                 </span>
               ))}
+              {priceLabel && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 29, padding: "0 11px", borderRadius: 999, border: `1px solid ${T.line2}`, fontSize: 12.5, color: T.ink2, whiteSpace: "nowrap" }}>
+                  Стоимость <b style={{ color: T.ink, fontWeight: 600 }}>{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}</b>
+                </span>
+              )}
             </div>
 
             {availableTabs.length > 0 && (
@@ -405,16 +491,32 @@ export function ArticlePlaceEmbed({ card }: { card: ResolvedPlaceEmbedCard }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", padding: "15px 20px", borderTop: `1px solid ${T.line}` }}>
               <span style={{ fontSize: 12.5, color: T.ink3 }}>Бронирование и полная афиша — на странице места</span>
-              <Link
-                href={card.href}
-                style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 46, padding: "0 20px",
-                  borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
-                }}
-              >
-                Открыть место <span aria-hidden="true">→</span>
-              </Link>
+              {showCta && (
+                <Link
+                  href={card.href}
+                  style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 46, padding: "0 20px",
+                    borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
+                  }}
+                >
+                  Открыть место <span aria-hidden="true">→</span>
+                </Link>
+              )}
             </div>
+          </div>
+        )}
+
+        {availableTabs.length === 0 && showCta && (
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "15px 20px", borderTop: `1px solid ${T.line}` }}>
+            <Link
+              href={card.href}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 44, padding: "0 18px",
+                borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
+              }}
+            >
+              Открыть место <span aria-hidden="true">→</span>
+            </Link>
           </div>
         )}
 
