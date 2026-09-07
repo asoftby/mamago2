@@ -64,7 +64,7 @@ function Shell({ icon, title, meta, children }: { icon: ReactNode; title: string
 }
 
 const pill = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-foreground/40";
-const pillPrimary = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary-hover hover:text-white focus-visible:text-white [&_svg]:text-white";
+const pillPrimary = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 text-xs font-medium !text-white transition-colors hover:bg-primary-hover hover:!text-white focus-visible:!text-white [&_svg]:!text-white";
 
 function Row({ label, action, children }: { label: string; action?: ReactNode; children: ReactNode }) {
   return (

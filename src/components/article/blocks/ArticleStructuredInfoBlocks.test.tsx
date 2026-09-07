@@ -18,8 +18,8 @@ import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } fro
   const callHtml = renderToStaticMarkup(<ArticleContactsBlock data={{ phones: [{ value: "+375291112233" }], socials: [] }} />);
   const callButtonMatch = callHtml.match(/<a href="tel:\+375291112233"[^>]*>[\s\S]*?<\/a>/);
   assert.ok(callButtonMatch, "call CTA must render");
-  assert.match(callButtonMatch![0], /text-white/);
-  assert.match(callButtonMatch![0], /hover:text-white/);
+  assert.match(callButtonMatch![0], /!text-white/);
+  assert.match(callButtonMatch![0], /hover:!text-white/);
   assert.doesNotMatch(callButtonMatch![0], /text-primary-foreground/);
 }
 
