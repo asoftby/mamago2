@@ -20,6 +20,7 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import { withCanonicalUserEventScope } from "@/server/services/analytics/articleSubjectTelemetryScope";
 
 function buildBaseWhere(
   start: Date,
@@ -58,7 +59,7 @@ function buildBaseWhere(
 
   if (cityId) where.cityId = cityId;
 
-  return where;
+  return withCanonicalUserEventScope(where);
 }
 
 const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
