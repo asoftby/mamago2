@@ -24,6 +24,7 @@ export function ArticlePlaceCardBlock({
       href={href}
       image={image}
       imageAlt={title}
+      imagePadded
       placeholderGradient="from-emerald-50 to-teal-100"
       placeholderIcon={<MapPin className="w-9 h-9 text-emerald-300" />}
       typeLabel="Место"
@@ -38,6 +39,7 @@ export function ArticlePlaceCardBlock({
         ),
       ]}
       description={description}
+      descriptionExpandable
       primaryCta={ARTICLE_CARD_PRIMARY_CTA.place}
     />
   );
