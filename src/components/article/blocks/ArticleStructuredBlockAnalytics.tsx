@@ -13,6 +13,7 @@ export type ArticleStructuredBlockType = "contacts" | "price" | "openingHours";
 
 export type ArticleStructuredAnalyticsContext = {
   articleId: string;
+  citySlug?: string | null;
   blockId: string;
   blockType: ArticleStructuredBlockType;
   subject: ArticleSubject;
@@ -27,6 +28,7 @@ function analyticsMeta(
     source: "detail" as const,
     section: "journal" as const,
     articleEvent,
+    articleId: context.articleId,
     subjectId: context.subject.id,
     subjectTitle: context.subject.title,
     subjectSource: context.subject.source,
@@ -38,6 +40,13 @@ function analyticsMeta(
   };
 }
 
+function telemetryBase(context: ArticleStructuredAnalyticsContext) {
+  return {
+    vertical: "CITY" as const,
+    citySlug: context.citySlug ?? undefined,
+  };
+}
+
 export function trackArticleStructuredAction(
   context: ArticleStructuredAnalyticsContext | undefined,
   action: string,
@@ -46,8 +55,10 @@ export function trackArticleStructuredAction(
   if (!context) return;
   void postProductTelemetryEvent({
     eventType: "CTA_CLICK",
-    entityType: "ARTICLE",
-    entityId: context.articleId,
+    ...telemetryBase(context),
+    // Article-subject telemetry intentionally has no entityType/entityId.
+    // The described object may not exist in the mamaGo catalog and these
+    // inner-block actions must not be counted as publication CTA metrics.
     meta: analyticsMeta(context, "article_subject_action", {
       action,
       ...(actionItemId ? { actionItemId } : {}),
@@ -83,8 +94,9 @@ export function ArticleStructuredBlockImpression({
           fired.current = true;
           void postProductTelemetryEvent({
             eventType: "CARD_VIEW",
-            entityType: "ARTICLE",
-            entityId: context.articleId,
+            ...telemetryBase(context),
+            // Same isolation rule as actions: the raw UserEvent is retained,
+            // while canonical publication-view metrics exclude this scope.
             meta: analyticsMeta(context, "article_subject_block_view"),
           });
           observer.disconnect();
