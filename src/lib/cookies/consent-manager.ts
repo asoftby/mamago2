@@ -68,11 +68,7 @@ export function subscribeConsent(listener: Listener): () => void {
   };
 }
 
-/**
- * Однократная инициализация CookieConsent (dynamic import, без SSR).
- * CSS подключается в CookieConsentProvider.
- *
- */
+/** Однократная инициализация CookieConsent (dynamic import, без SSR). */
 export function initCookieConsent(): Promise<void> {
   if (typeof window === "undefined") {
     return Promise.resolve();
@@ -98,14 +94,34 @@ export function initCookieConsent(): Promise<void> {
   return initPromise;
 }
 
-/**
- * Повторное открытие модалки настроек (футер «Настройки cookies»).
- * Дожидается init, затем CookieConsent.showPreferences().
- */
+/** Повторное открытие модалки настроек (футер «Настройки cookies»). */
 export function openCookiePreferences(): void {
   if (typeof window === "undefined") return;
   void initCookieConsent().then(async () => {
     const { showPreferences } = await import("vanilla-cookieconsent");
     showPreferences();
   });
+}
+
+let ensureShownPromise: Promise<void> | null = null;
+
+/** Single-flight handoff from the first-paint shell to the real consent UI. */
+export function ensureConsentModalShown(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (ensureShownPromise) return ensureShownPromise;
+
+  ensureShownPromise = initCookieConsent().then(async () => {
+    const { validConsent, show } = await import("vanilla-cookieconsent");
+    if (!validConsent()) show(true);
+  });
+
+  return ensureShownPromise;
+}
+
+/** Consent is still recorded only by vanilla-cookieconsent itself. */
+export async function acceptFromShell(categories: "all" | []): Promise<void> {
+  await ensureConsentModalShown();
+  const { acceptCategory, hide } = await import("vanilla-cookieconsent");
+  acceptCategory(categories);
+  hide();
 }
