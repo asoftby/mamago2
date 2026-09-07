@@ -3,11 +3,7 @@ import type { SharedContactsData } from "@/domain/contacts/structuredContacts";
 import { formatSharedPrice } from "@/domain/pricing/structuredPrice";
 import type { ResolvedArticlePlaceCard } from "@/lib/place/articlePlaceLiveData";
 import { ArticlePlaceEmbed } from "./ArticlePlaceEmbed";
-import {
-  ArticleContactsBlock,
-  ArticleOpeningHoursBlock,
-  ArticlePriceBlock,
-} from "./ArticleStructuredInfoBlocks";
+import { ArticleInfoCard } from "./ArticleStructuredInfoBlocks";
 
 export function contactsForPlaceSections(
   contacts: SharedContactsData,
@@ -77,9 +73,11 @@ export function ArticleLivePlaceBlock({ card }: { card: ResolvedArticlePlaceCard
             {place.description}
           </p>
         ) : null}
-        {(sections.address || sections.contacts) ? <ArticleContactsBlock data={visibleContacts} /> : null}
-        {sections.openingHours && place.openingHours ? <ArticleOpeningHoursBlock data={place.openingHours} /> : null}
-        {sections.price ? <ArticlePriceBlock data={place.price} /> : null}
+        <ArticleInfoCard
+          contacts={sections.address || sections.contacts ? visibleContacts : undefined}
+          price={sections.price ? place.price : undefined}
+          openingHours={sections.openingHours ? (place.openingHours ?? undefined) : undefined}
+        />
         {sections.cta ? (
           <Link
             href={place.href}

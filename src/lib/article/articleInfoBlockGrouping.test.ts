@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import { groupArticleInfoBlocks } from "./articleInfoBlockGrouping";
+
+type Block = { id: string; type: string };
+
+{
+  // Adjacent contacts/price/openingHours merge into one info group.
+  const blocks: Block[] = [
+    { id: "a", type: "text" },
+    { id: "b", type: "contacts" },
+    { id: "c", type: "price" },
+    { id: "d", type: "openingHours" },
+    { id: "e", type: "text" },
+  ];
+  const groups = groupArticleInfoBlocks(blocks);
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].kind, "single");
+  assert.equal(groups[1].kind, "info");
+  assert.equal(groups[1].kind === "info" && groups[1].blocks.map((b) => b.id).join(","), "b,c,d");
+  assert.equal(groups[1].index, 1);
+  assert.equal(groups[2].kind, "single");
+  assert.equal(groups[2].kind === "single" && groups[2].block.id, "e");
+}
+
+{
+  // A lone info-type block (nothing adjacent of the same family) stays "single".
+  const blocks: Block[] = [{ id: "a", type: "contacts" }];
+  const groups = groupArticleInfoBlocks(blocks);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].kind, "single");
+}
+
+{
+  // Two separate runs, split by an unrelated block, stay two distinct groups.
+  const blocks: Block[] = [
+    { id: "a", type: "contacts" },
+    { id: "b", type: "price" },
+    { id: "c", type: "heading" },
+    { id: "d", type: "openingHours" },
+    { id: "e", type: "contacts" },
+  ];
+  const groups = groupArticleInfoBlocks(blocks);
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].kind, "info");
+  assert.equal(groups[1].kind, "single");
+  assert.equal(groups[2].kind, "info");
+  assert.equal(groups[2].index, 3);
+}
+
+{
+  // No info blocks at all: everything passes through untouched.
+  const blocks: Block[] = [{ id: "a", type: "text" }, { id: "b", type: "heading" }];
+  const groups = groupArticleInfoBlocks(blocks);
+  assert.equal(groups.length, 2);
+  assert.ok(groups.every((g) => g.kind === "single"));
+}
+
+console.log("articleInfoBlockGrouping.test.ts: OK");
