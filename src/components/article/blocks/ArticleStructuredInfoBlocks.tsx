@@ -27,6 +27,11 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { CopyCoordinatesButton } from "./CopyCoordinatesButton";
 import { OpeningHoursSchedule } from "./OpeningHoursSchedule";
+import {
+  ArticleStructuredBlockImpression,
+  ArticleStructuredTrackedAnchor,
+  type ArticleStructuredAnalyticsContext,
+} from "./ArticleStructuredBlockAnalytics";
 
 const DAY: Record<(typeof OPENING_HOURS_DAYS)[number], string> = { MON: "Понедельник", TUE: "Вторник", WED: "Среда", THU: "Четверг", FRI: "Пятница", SAT: "Суббота", SUN: "Воскресенье" };
 const WEEKDAY_FULL: Record<(typeof OPENING_HOURS_DAYS)[number], string> = { MON: "понедельник", TUE: "вторник", WED: "среда", THU: "четверг", FRI: "пятница", SAT: "суббота", SUN: "воскресенье" };
@@ -63,6 +68,26 @@ function Shell({ icon, title, meta, children }: { icon: ReactNode; title: string
   );
 }
 
+function TrackedShell({
+  analytics,
+  icon,
+  title,
+  meta,
+  children,
+}: {
+  analytics?: ArticleStructuredAnalyticsContext;
+  icon: ReactNode;
+  title: string;
+  meta?: string;
+  children: ReactNode;
+}) {
+  return (
+    <ArticleStructuredBlockImpression context={analytics}>
+      <Shell icon={icon} title={title} meta={meta}>{children}</Shell>
+    </ArticleStructuredBlockImpression>
+  );
+}
+
 const pill = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-foreground/40";
 const pillPrimary = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 text-xs font-medium !text-white transition-colors hover:bg-primary-hover hover:!text-white focus-visible:!text-white [&_svg]:!text-white";
 
@@ -83,22 +108,28 @@ function contactMapHref(data: SharedContactsData): string | null {
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 
-export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
+export function ArticleContactsBlock({
+  data,
+  analytics,
+}: {
+  data: SharedContactsData;
+  analytics?: ArticleStructuredAnalyticsContext;
+}) {
   const mapHref = contactMapHref(data);
   if (!data.address && !data.email && !data.website && !mapHref && data.phones.length === 0 && data.socials.length === 0) return null;
   return (
-    <Shell icon={<Phone className="h-[18px] w-[18px]" />} title="Контакты">
+    <TrackedShell analytics={analytics} icon={<Phone className="h-[18px] w-[18px]" />} title="Контакты">
       <div>
         {data.address && (
           <Row
             label="Адрес"
             action={
               <>
-                {data.coordinates && <CopyCoordinatesButton value={`${data.coordinates.latitude}, ${data.coordinates.longitude}`} />}
+                {data.coordinates && <CopyCoordinatesButton analytics={analytics} value={`${data.coordinates.latitude}, ${data.coordinates.longitude}`} />}
                 {mapHref && (
-                  <a href={mapHref} target="_blank" rel="noreferrer" className={pill}>
+                  <ArticleStructuredTrackedAnchor context={analytics} action="route" href={mapHref} target="_blank" rel="noreferrer" className={pill}>
                     <MapIcon className="h-3.5 w-3.5" />Маршрут
-                  </a>
+                  </ArticleStructuredTrackedAnchor>
                 )}
               </>
             }
@@ -111,7 +142,7 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
         )}
         {!data.address && mapHref && (
           <Row label="Адрес">
-            <a className="underline underline-offset-2" href={mapHref} target="_blank" rel="noreferrer">Открыть на карте</a>
+            <ArticleStructuredTrackedAnchor context={analytics} action="route" className="underline underline-offset-2" href={mapHref} target="_blank" rel="noreferrer">Открыть на карте</ArticleStructuredTrackedAnchor>
           </Row>
         )}
         {data.phones.map((phone, index) => (
@@ -119,9 +150,9 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
             key={`${phone.value}-${index}`}
             label={phone.label || "Телефон"}
             action={
-              <a href={`tel:${phone.value}`} className={pillPrimary}>
+              <ArticleStructuredTrackedAnchor context={analytics} action="phone" actionItemId={`phone_${index + 1}`} href={`tel:${phone.value}`} className={pillPrimary}>
                 <Phone className="h-3.5 w-3.5" />Позвонить
-              </a>
+              </ArticleStructuredTrackedAnchor>
             }
           >
             <span className="font-mono text-[14.5px]">{phone.value}</span>
@@ -131,9 +162,9 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
           <Row
             label="Почта"
             action={
-              <a href={`mailto:${data.email}`} className={pill}>
+              <ArticleStructuredTrackedAnchor context={analytics} action="email" href={`mailto:${data.email}`} className={pill}>
                 <Mail className="h-3.5 w-3.5" />Написать
-              </a>
+              </ArticleStructuredTrackedAnchor>
             }
           >
             <span className="font-mono text-[14.5px]">{data.email}</span>
@@ -141,9 +172,9 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
         )}
         {data.website && (
           <Row label="Сайт">
-            <a href={data.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all font-semibold text-brand">
+            <ArticleStructuredTrackedAnchor context={analytics} action="website" href={data.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all font-semibold text-brand">
               {data.website}<ExternalLink className="h-3.5 w-3.5 shrink-0" />
-            </a>
+            </ArticleStructuredTrackedAnchor>
           </Row>
         )}
         {data.socials.length > 0 && (
@@ -152,8 +183,11 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
               {data.socials.map((social, index) => {
                 const Icon = SOCIAL_ICON[social.kind];
                 return (
-                  <a
+                  <ArticleStructuredTrackedAnchor
                     key={`${social.url}-${index}`}
+                    context={analytics}
+                    action="social"
+                    actionItemId={`${social.kind}_${index + 1}`}
                     href={social.url}
                     target="_blank"
                     rel="noreferrer"
@@ -162,14 +196,14 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
                     className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-foreground/80 transition-colors hover:border-foreground hover:text-foreground"
                   >
                     <Icon className="h-4 w-4" />
-                  </a>
+                  </ArticleStructuredTrackedAnchor>
                 );
               })}
             </span>
           </Row>
         )}
       </div>
-    </Shell>
+    </TrackedShell>
   );
 }
 
@@ -181,11 +215,18 @@ function pluralizeItems(count: number): string {
   return "позиций";
 }
 
-export function ArticlePriceBlock({ data }: { data: SharedPriceData }) {
+export function ArticlePriceBlock({
+  data,
+  analytics,
+}: {
+  data: SharedPriceData;
+  analytics?: ArticleStructuredAnalyticsContext;
+}) {
   const summary = formatSharedPrice(data);
   if (!summary && data.items.length === 0 && !data.note.trim()) return null;
   return (
-    <Shell
+    <TrackedShell
+      analytics={analytics}
       icon={<Banknote className="h-[18px] w-[18px]" />}
       title="Стоимость"
       meta={data.items.length > 0 ? `${data.items.length} ${pluralizeItems(data.items.length)}` : undefined}
@@ -225,7 +266,7 @@ export function ArticlePriceBlock({ data }: { data: SharedPriceData }) {
           </p>
         )}
       </div>
-    </Shell>
+    </TrackedShell>
   );
 }
 
@@ -238,14 +279,20 @@ function todaysDayKey(timezone: string, now: Date): (typeof OPENING_HOURS_DAYS)[
   return JS_DAY_TO_DAY_OF_WEEK[jsDay];
 }
 
-export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursData }) {
+export function ArticleOpeningHoursBlock({
+  data,
+  analytics,
+}: {
+  data: SharedOpeningHoursData;
+  analytics?: ArticleStructuredAnalyticsContext;
+}) {
   const hasWeekly = data.rules.some((rule) => rule.isOpen);
   if (data.mode === "WEEKLY" && !hasWeekly && data.exceptions.length === 0 && !data.note) return null;
 
   if (data.mode !== "WEEKLY") {
     const modeLabel = data.mode === "ALWAYS_OPEN" ? "Круглосуточно" : data.mode === "BY_APPOINTMENT" ? "По предварительной записи" : "Временно закрыто";
     return (
-      <Shell icon={<Clock className="h-[18px] w-[18px]" />} title="Режим работы">
+      <TrackedShell analytics={analytics} icon={<Clock className="h-[18px] w-[18px]" />} title="Режим работы">
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-background p-4">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
             <Clock className="h-[22px] w-[22px]" />
@@ -255,7 +302,7 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
             {data.note && <span className="mt-1 block text-sm text-muted-foreground">{data.note}</span>}
           </span>
         </div>
-      </Shell>
+      </TrackedShell>
     );
   }
 
@@ -290,7 +337,7 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
     : [nextIntervalToday ? `откроется в ${nextIntervalToday.startTime}` : null, todayLabel, todayClosedDetail].filter(Boolean).join(", ");
 
   return (
-    <Shell icon={<Clock className="h-[18px] w-[18px]" />} title="Режим работы">
+    <TrackedShell analytics={analytics} icon={<Clock className="h-[18px] w-[18px]" />} title="Режим работы">
       <div>
         <div className={cn("mb-4 flex items-center gap-2.5 rounded-[13px] px-3.5 py-3", status.isOpen ? "bg-success/10" : "bg-surface-hover")}>
           <span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", status.isOpen ? "bg-success shadow-[0_0_0_3px_rgba(22,163,74,0.18)]" : "bg-muted-foreground/40")} />
@@ -300,7 +347,7 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
           {bannerCaption && <span className="text-[13px] text-muted-foreground">· {bannerCaption}</span>}
         </div>
 
-        <OpeningHoursSchedule>
+        <OpeningHoursSchedule analytics={analytics}>
           {OPENING_HOURS_DAYS.map((day) => {
             const rule = data.rules.find((item) => item.dayOfWeek === day);
             const isToday = day === todayKey;
@@ -347,6 +394,6 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
           {data.note && <p className="mt-3 text-sm text-muted-foreground">{data.note}</p>}
         </OpeningHoursSchedule>
       </div>
-    </Shell>
+    </TrackedShell>
   );
 }
