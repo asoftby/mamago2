@@ -201,6 +201,18 @@ export function ArticleMvpView({
             return null;
           }
 
+          const structuredAnalytics =
+            articleId &&
+            (block.type === "contacts" || block.type === "price" || block.type === "openingHours") &&
+            block.subject
+              ? {
+                  articleId,
+                  blockId: block.id,
+                  blockType: block.type,
+                  subject: block.subject,
+                }
+              : undefined;
+
           const body = (() => {
             if (block.type === "text") {
               const legacyEmbed = parseArticleEmbed(block.text);
@@ -281,9 +293,9 @@ export function ArticleMvpView({
             if (block.type === "embed") {
               return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
             }
-            if (block.type === "contacts") return <ArticleContactsBlock data={block.data} />;
-            if (block.type === "price") return <ArticlePriceBlock data={block.data} />;
-            if (block.type === "openingHours") return <ArticleOpeningHoursBlock data={block.data} />;
+            if (block.type === "contacts") return <ArticleContactsBlock data={block.data} analytics={structuredAnalytics} />;
+            if (block.type === "price") return <ArticlePriceBlock data={block.data} analytics={structuredAnalytics} />;
+            if (block.type === "openingHours") return <ArticleOpeningHoursBlock data={block.data} analytics={structuredAnalytics} />;
             if (block.type === "activityCard") {
               const c = block.card;
               if (block.entityType === "PLACE") {
