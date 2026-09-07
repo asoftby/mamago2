@@ -277,9 +277,17 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
   const nextIntervalToday = status.isOpen
     ? undefined
     : todayIntervals.find((interval) => compareTime(currentTime, interval.startTime) === -1);
+  // When closed with nothing left to open today, the weekday alone doesn't
+  // say whether today is a day off or already closed for the day — keep
+  // that distinction visible even while the weekly list stays collapsed.
+  const todayClosedDetail = nextIntervalToday
+    ? null
+    : todayIntervals.length === 0
+      ? "выходной"
+      : `закрылось в ${todayIntervals[todayIntervals.length - 1].endTime}`;
   const bannerCaption = status.isOpen
     ? [currentInterval ? `до ${currentInterval.endTime}` : null, todayLabel].filter(Boolean).join(", ")
-    : [nextIntervalToday ? `откроется в ${nextIntervalToday.startTime}` : null, todayLabel].filter(Boolean).join(", ");
+    : [nextIntervalToday ? `откроется в ${nextIntervalToday.startTime}` : null, todayLabel, todayClosedDetail].filter(Boolean).join(", ");
 
   return (
     <Shell icon={<Clock className="h-[18px] w-[18px]" />} title="Режим работы">
