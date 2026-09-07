@@ -207,6 +207,7 @@ export function ArticleMvpView({
             block.subject
               ? {
                   articleId,
+                  citySlug,
                   blockId: block.id,
                   blockType: block.type,
                   subject: block.subject,
