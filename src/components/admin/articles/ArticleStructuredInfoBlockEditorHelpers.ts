@@ -16,11 +16,11 @@ export function contactsDraftFieldErrors(value: SharedContactsData) {
     email:
       value.email?.trim() && !z.email().safeParse(value.email.trim()).success
         ? "Введите корректный email"
-        : null,
+        : undefined,
     website:
       value.website?.trim() && !z.url().safeParse(value.website.trim()).success
         ? "Введите корректный адрес сайта"
-        : null,
+        : undefined,
   };
 }
 
