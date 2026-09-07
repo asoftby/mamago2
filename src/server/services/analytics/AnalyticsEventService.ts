@@ -9,6 +9,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
+import { isArticleSubjectTelemetryMeta } from "@/lib/analytics/articleSubjectTelemetry";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
 import { enrichSemanticEventMeta } from "@/server/services/analytics/SemanticEventContextService";
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
@@ -90,6 +91,8 @@ export async function trackUserEvent(
       }
     }
 
+    const isArticleSubjectTelemetry = isArticleSubjectTelemetryMeta(metaObject);
+
     const userEvent = await prisma.userEvent.create({
       data: {
         userId: input.userId ?? undefined,
@@ -103,7 +106,11 @@ export async function trackUserEvent(
       },
     });
 
-    if (input.userId) {
+    // Article-subject block telemetry is a reporting signal, not a preference
+    // or discovery signal. Keep the raw UserEvent, but do not let a block view
+    // inflate totalViews/preferredVerticals or an inner action inflate CTA
+    // learning counters for authenticated users.
+    if (input.userId && !isArticleSubjectTelemetry) {
       void applyUserBehaviorEvent({
         userId: input.userId,
         eventType: input.eventType,
@@ -114,13 +121,18 @@ export async function trackUserEvent(
       });
     }
 
-    void registerPromotionActionFromUserEvent({
-      userEventId: userEvent.id,
-      eventType: input.eventType,
-      entityType: input.entityType ?? null,
-      entityId: input.entityId ?? null,
-      meta: metaObject,
-    });
+    // Structured article subjects may not be catalog entities and must not
+    // accidentally produce promotion actions just because their transport uses
+    // CARD_VIEW/CTA_CLICK.
+    if (!isArticleSubjectTelemetry) {
+      void registerPromotionActionFromUserEvent({
+        userEventId: userEvent.id,
+        eventType: input.eventType,
+        entityType: input.entityType ?? null,
+        entityId: input.entityId ?? null,
+        meta: metaObject,
+      });
+    }
 
     const recommendationExposureId =
       typeof metaObject?.recommendationExposureId === "string"
