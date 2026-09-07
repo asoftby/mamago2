@@ -211,6 +211,23 @@ function prepareArticleSubjectForSave(subject: ArticleSubject | undefined): Arti
   };
 }
 
+/**
+ * New structured blocks start with an editor-only blank subject so the author
+ * can immediately name/reuse the described object. An entirely blank block must
+ * still be saveable; once the block contains real data, a blank subject is kept
+ * deliberately so the persisted schema reports the missing object name.
+ * Legacy populated blocks that never had a subject remain valid.
+ */
+function prepareStructuredSubjectForSave(
+  subject: ArticleSubject | undefined,
+  hasMeaningfulData: boolean,
+): ArticleSubject | undefined {
+  const prepared = prepareArticleSubjectForSave(subject);
+  if (!prepared) return undefined;
+  if (!prepared.title && !hasMeaningfulData) return undefined;
+  return prepared;
+}
+
 export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): string {
   const paths = issues.map((issue) => issue.path.map(String).join("."));
   if (paths.some((path) => /\.subject\.title$/.test(path))) return "Укажите, к какому объекту относится блок";
@@ -231,41 +248,66 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
     ...payload,
     blocks: payload.blocks.map((block) => {
       if (block.type === "contacts") {
+        const data = prepareArticleContactsForSave(block.data);
+        const hasMeaningfulData = Boolean(
+          data.address ||
+            data.email ||
+            data.website ||
+            data.mapUrl ||
+            data.coordinates ||
+            data.phones.length ||
+            data.socials.length,
+        );
         return {
           ...block,
-          ...(block.subject ? { subject: prepareArticleSubjectForSave(block.subject) } : {}),
-          data: prepareArticleContactsForSave(block.data),
+          subject: prepareStructuredSubjectForSave(block.subject, hasMeaningfulData),
+          data,
         };
       }
       if (block.type === "openingHours") {
+        const data = {
+          ...block.data,
+          exceptions: block.data.exceptions.filter((exception) =>
+            Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
+          ),
+        };
+        const hasMeaningfulData = Boolean(
+          data.mode !== "WEEKLY" ||
+            data.note?.trim() ||
+            data.exceptions.length ||
+            data.rules.some((rule) => rule.isOpen || rule.allDay || rule.intervals.length > 0),
+        );
         return {
           ...block,
-          ...(block.subject ? { subject: prepareArticleSubjectForSave(block.subject) } : {}),
-          data: {
-            ...block.data,
-            exceptions: block.data.exceptions.filter((exception) =>
-              Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
-            ),
-          },
+          subject: prepareStructuredSubjectForSave(block.subject, hasMeaningfulData),
+          data,
         };
       }
       if (block.type !== "price") return block;
+      const data = {
+        ...block.data,
+        currency: block.data.currency.trim(),
+        note: block.data.note.trim(),
+        items: block.data.items.flatMap((item) => {
+          const label = item.label.trim();
+          const price = item.price.trim();
+          const description = item.description?.trim();
+          const oldPrice = item.oldPrice?.trim();
+          if (!label && !price && !description && !oldPrice) return [];
+          return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
+        }),
+      };
+      const hasMeaningfulData = Boolean(
+        data.mode !== "UNKNOWN" ||
+          data.min != null ||
+          data.max != null ||
+          data.items.length ||
+          data.note,
+      );
       return {
         ...block,
-        ...(block.subject ? { subject: prepareArticleSubjectForSave(block.subject) } : {}),
-        data: {
-          ...block.data,
-          currency: block.data.currency.trim(),
-          note: block.data.note.trim(),
-          items: block.data.items.flatMap((item) => {
-            const label = item.label.trim();
-            const price = item.price.trim();
-            const description = item.description?.trim();
-            const oldPrice = item.oldPrice?.trim();
-            if (!label && !price && !description && !oldPrice) return [];
-            return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
-          }),
-        },
+        subject: prepareStructuredSubjectForSave(block.subject, hasMeaningfulData),
+        data,
       };
     }),
   };
