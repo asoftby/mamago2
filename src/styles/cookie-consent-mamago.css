@@ -9,6 +9,10 @@
  * Поэтому включаем pointer-events только для реально показанного consent/preferences UI.
  */
 
+html[data-cc-consent-known="1"] #mamago-cookie-shell {
+  display: none !important;
+}
+
 #cc-main {
   /* Бренд primary #EF8759 */
   --cc-bg: #ffffff;

@@ -18,6 +18,7 @@ import {
   getBrandingFaviconRouteHref,
 } from "@/lib/brandingFavicon";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
+import { buildNoFlashCookieShellScript } from "@/lib/cookies/no-flash-cookie-shell-script";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "mamaGo — помощник для семейного отдыха и развития",
@@ -42,8 +43,15 @@ export default async function RootLayout({
   const faviconHref = getBrandingFaviconRouteHref(branding);
 
   return (
-    <html lang="ru" className={`${ntSomic.variable} ${ptSerif.variable}`}>
+    <html
+      lang="ru"
+      className={`${ntSomic.variable} ${ptSerif.variable}`}
+      suppressHydrationWarning
+    >
       <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: buildNoFlashCookieShellScript() }}
+        />
         <style>{`
           :root {
             --color-primary: ${branding.colorPrimary};
