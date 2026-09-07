@@ -40,10 +40,18 @@ function analyticsMeta(
   };
 }
 
+function currentArticleCitySlug(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  if (parts.length >= 2 && parts[1] === "blog" && parts[0] !== "blog") return parts[0];
+  return undefined;
+}
+
 function telemetryBase(context: ArticleStructuredAnalyticsContext) {
+  const citySlug = context.citySlug?.trim() || currentArticleCitySlug();
   return {
     vertical: "CITY" as const,
-    citySlug: context.citySlug ?? undefined,
+    citySlug,
   };
 }
 
