@@ -3,8 +3,18 @@
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  trackArticleStructuredAction,
+  type ArticleStructuredAnalyticsContext,
+} from "./ArticleStructuredBlockAnalytics";
 
-export function OpeningHoursSchedule({ children }: { children: ReactNode }) {
+export function OpeningHoursSchedule({
+  children,
+  analytics,
+}: {
+  children: ReactNode;
+  analytics?: ArticleStructuredAnalyticsContext;
+}) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
@@ -14,7 +24,10 @@ export function OpeningHoursSchedule({ children }: { children: ReactNode }) {
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          trackArticleStructuredAction(analytics, open ? "hours_collapse" : "hours_expand");
+          setOpen((value) => !value);
+        }}
         className="flex w-full items-center justify-between gap-2 rounded-md py-2 text-left text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
       >
         <span>{open ? "Скрыть расписание на неделю" : "Показать расписание на неделю"}</span>
