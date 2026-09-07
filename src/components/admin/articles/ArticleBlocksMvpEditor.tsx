@@ -20,6 +20,8 @@ import {
   DEFAULT_ARTICLE_PLACE_SECTIONS,
   type ArticleBlockMvp,
   type ArticlePlaceSections,
+  type ArticleSubject,
+  newArticleSubject,
   newBlock,
 } from "@/lib/publications/articleMvp";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
@@ -31,6 +33,7 @@ import type { useArticleMediaSource } from "@/components/admin/articles/useArtic
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 import { ArticleContactsBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
+import { ArticleStructuredBlockSubjectEditor } from "./ArticleStructuredBlockSubjectEditor";
 
 /** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
 export function convertImageBlockToGallery(block: Extract<ArticleBlockMvp, { type: "image" }>): ArticleBlockMvp {
@@ -98,6 +101,12 @@ const PLACE_SECTION_LABELS: Array<[keyof ArticlePlaceSections, string]> = [
   ["offers", "Предложения"],
   ["cta", "Кнопка перехода"],
 ];
+
+function isStructuredInfoBlock(
+  block: ArticleBlockMvp,
+): block is Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }> {
+  return block.type === "contacts" || block.type === "price" || block.type === "openingHours";
+}
 
 function SelectSkeleton({ className }: { className?: string }) {
   return (
@@ -252,6 +261,14 @@ export function ArticleBlocksMvpEditor({
   const hydrated = useHydrated();
 
   const hasIntro = useMemo(() => blocks.some((b) => b.type === "intro"), [blocks]);
+  const availableSubjects = useMemo(() => {
+    const byId = new Map<string, ArticleSubject>();
+    for (const block of blocks) {
+      if (!isStructuredInfoBlock(block) || !block.subject?.title.trim()) continue;
+      if (!byId.has(block.subject.id)) byId.set(block.subject.id, block.subject);
+    }
+    return [...byId.values()];
+  }, [blocks]);
 
   const insertAt = useCallback(
     (index: number, type: ArticleBlockMvp["type"]) => {
@@ -277,6 +294,22 @@ export function ArticleBlocksMvpEditor({
     onChange(next);
   };
 
+  const updateSubjectAt = (i: number, subject: ArticleSubject) => {
+    const current = blocks[i];
+    if (!current || !isStructuredInfoBlock(current)) return;
+    const previousSubjectId = current.subject?.id;
+    const shouldUpdateGroup = Boolean(previousSubjectId && previousSubjectId === subject.id);
+    onChange(
+      blocks.map((block, index) => {
+        if (!isStructuredInfoBlock(block)) return block;
+        if (index === i || (shouldUpdateGroup && block.subject?.id === previousSubjectId)) {
+          return { ...block, subject };
+        }
+        return block;
+      }),
+    );
+  };
+
   const removeAt = (i: number) => {
     onChange(blocks.filter((_, k) => k !== i));
   };
@@ -296,6 +329,17 @@ export function ArticleBlocksMvpEditor({
     next.splice(i, 2, mergeImageBlocksIntoGallery(a, b));
     onChange(next);
   };
+
+  const subjectEditor = (
+    block: Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }>,
+    i: number,
+  ) => (
+    <ArticleStructuredBlockSubjectEditor
+      value={block.subject ?? newArticleSubject("", () => `subject_${block.id}`)}
+      availableSubjects={availableSubjects}
+      onChange={(subject) => updateSubjectAt(i, subject)}
+    />
+  );
 
   const renderBlockBody = (block: ArticleBlockMvp, i: number) => (
     <>
@@ -484,9 +528,24 @@ export function ArticleBlocksMvpEditor({
           }
         />
       )}
-      {block.type === "contacts" && <ArticleContactsBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
-      {block.type === "price" && <ArticlePriceBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
-      {block.type === "openingHours" && <ArticleOpeningHoursBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
+      {block.type === "contacts" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticleContactsBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
+      {block.type === "price" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticlePriceBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
+      {block.type === "openingHours" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticleOpeningHoursBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
     </>
   );
 
