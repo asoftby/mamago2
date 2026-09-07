@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { SharedContactsData } from "@/domain/contacts/structuredContacts";
+import { formatSharedPrice } from "@/domain/pricing/structuredPrice";
 import type { ResolvedArticlePlaceCard } from "@/lib/place/articlePlaceLiveData";
+import { ArticlePlaceEmbed } from "./ArticlePlaceEmbed";
 import {
   ArticleContactsBlock,
   ArticleOpeningHoursBlock,
@@ -22,8 +24,42 @@ export function contactsForPlaceSections(
   };
 }
 
+export function richPlaceEmbedProps(card: ResolvedArticlePlaceCard) {
+  const { place, sections } = card;
+  if (!place.embedCard) return null;
+
+  return {
+    card: {
+      ...place.embedCard,
+      coverImageUrl: sections.image ? place.embedCard.coverImageUrl : null,
+      coverImageCount: sections.image ? place.embedCard.coverImageCount : 0,
+      address: sections.address ? place.embedCard.address : null,
+      lat: sections.address ? place.embedCard.lat : null,
+      lng: sections.address ? place.embedCard.lng : null,
+      mapsUrl: sections.address ? place.embedCard.mapsUrl : null,
+      isOpenNow: sections.openingHours ? place.embedCard.isOpenNow : null,
+      hoursMessage: sections.openingHours ? place.embedCard.hoursMessage : null,
+    },
+    description: sections.description ? place.description : null,
+    contacts: sections.contacts ? place.contacts : null,
+    priceLabel: sections.price ? formatSharedPrice(place.price) : null,
+    showCta: sections.cta,
+  };
+}
+
 export function ArticleLivePlaceBlock({ card }: { card: ResolvedArticlePlaceCard }) {
   const { place, sections } = card;
+  const richProps = richPlaceEmbedProps(card);
+
+  if (richProps) {
+    // The approved compact/expandable Place design owns the visual shell.
+    // All editor section switches are passed through as compact rich-card
+    // content rather than silently disappearing in this early-return path.
+    return <ArticlePlaceEmbed {...richProps} />;
+  }
+
+  // Defensive fallback for a rich resolver that returned null/failed. This
+  // keeps the existing structured data visible instead of dropping the block.
   const visibleContacts = contactsForPlaceSections(place.contacts, sections);
 
   return (
