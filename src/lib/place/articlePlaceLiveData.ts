@@ -9,6 +9,10 @@ import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
 import { getPlacePublicPath } from "@/lib/placePublicUrl";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import type { ArticlePlaceSections } from "@/lib/publications/articleMvp";
+import {
+  getArticlePlaceEmbedData,
+  type ResolvedPlaceEmbedCard,
+} from "@/lib/place/articlePlaceEmbedData";
 
 export type ResolvedArticlePlace = {
   id: string;
@@ -20,6 +24,13 @@ export type ResolvedArticlePlace = {
   contacts: SharedContactsData;
   price: SharedPriceData;
   openingHours: SharedOpeningHoursData | null;
+  /**
+   * Rich editorial Place card used by the public article renderer.
+   * The legacy/live fields above stay available for section helpers and
+   * compatibility, while the visual card reuses the approved expandable
+   * ArticlePlaceEmbed design.
+   */
+  embedCard?: ResolvedPlaceEmbedCard | null;
 };
 
 export type ResolvedArticlePlaceCard = {
@@ -81,6 +92,14 @@ export async function loadArticlePlacesByIds(ids: string[]): Promise<Map<string,
     },
   });
 
+  // The rich Place embed is the approved article design (PR #142). Resolve
+  // each visible Place once, concurrently, instead of rendering the later
+  // generic structured-info card that replaced it by mistake.
+  const embedEntries = await Promise.all(
+    places.map(async (place) => [place.id, await getArticlePlaceEmbedData(place.id)] as const),
+  );
+  const embedById = new Map(embedEntries);
+
   return new Map(places.flatMap((place) => {
     const href = getPlacePublicPath({ id: place.id, slug: place.slug, citySlug: place.city?.slug });
     if (!href) return [];
@@ -96,6 +115,7 @@ export async function loadArticlePlacesByIds(ids: string[]): Promise<Map<string,
       contacts,
       price: sharedPriceFromPublication(place),
       openingHours: place.openingHours ? openingHoursFromRelational(place.openingHours) : null,
+      embedCard: embedById.get(place.id) ?? null,
     } satisfies ResolvedArticlePlace] as const];
   }));
 }
