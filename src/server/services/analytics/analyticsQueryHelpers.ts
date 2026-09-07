@@ -5,6 +5,10 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
+import {
+  ARTICLE_SUBJECT_TELEMETRY_EXCLUSION_SQL,
+  withCanonicalUserEventScope,
+} from "@/server/services/analytics/articleSubjectTelemetryScope";
 
 export function analyticsEntityMap(): Record<string, AnalyticsEntityType> {
   return {
@@ -118,7 +122,7 @@ export function buildAnalyticsBaseEventWhere(
     const vm = analyticsVerticalMap()[filters.vertical];
     if (vm) w.vertical = vm;
   }
-  return w;
+  return withCanonicalUserEventScope(w);
 }
 
 export function applyAnalyticsUserFilter(
@@ -145,6 +149,7 @@ export function analyticsEventWhereSql(
   const parts: Prisma.Sql[] = [
     Prisma.sql`e."createdAt" >= ${start}`,
     Prisma.sql`e."createdAt" <= ${end}`,
+    ARTICLE_SUBJECT_TELEMETRY_EXCLUSION_SQL,
   ];
   if (cityId) parts.push(Prisma.sql`e."cityId" = ${cityId}`);
   if (filters.entity && filters.entity !== "all") {
