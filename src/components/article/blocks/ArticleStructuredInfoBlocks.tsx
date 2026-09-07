@@ -23,7 +23,10 @@ import {
   getTimeStringInTimezone,
 } from "@/server/services/openingHours/openingHours.utils";
 import { JS_DAY_TO_DAY_OF_WEEK } from "@/server/services/openingHours/openingHours.types";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { CopyCoordinatesButton } from "./CopyCoordinatesButton";
+import { OpeningHoursSchedule } from "./OpeningHoursSchedule";
 
 const DAY: Record<(typeof OPENING_HOURS_DAYS)[number], string> = { MON: "Понедельник", TUE: "Вторник", WED: "Среда", THU: "Четверг", FRI: "Пятница", SAT: "Суббота", SUN: "Воскресенье" };
 const WEEKDAY_FULL: Record<(typeof OPENING_HOURS_DAYS)[number], string> = { MON: "понедельник", TUE: "вторник", WED: "среда", THU: "четверг", FRI: "пятница", SAT: "суббота", SUN: "воскресенье" };
@@ -61,14 +64,14 @@ function Shell({ icon, title, meta, children }: { icon: ReactNode; title: string
 }
 
 const pill = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:border-foreground/40";
-const pillPrimary = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover";
+const pillPrimary = "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary-hover hover:text-white focus-visible:text-white [&_svg]:text-white";
 
 function Row({ label, action, children }: { label: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border py-3 first:border-t-0 first:pt-0">
-      <span className="order-first w-full shrink-0 font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground sm:order-none sm:w-[74px]">{label}</span>
-      <span className="min-w-0 flex-1 text-[15px]">{children}</span>
-      {action && <span className="flex shrink-0 flex-wrap items-center gap-2">{action}</span>}
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-2 border-t border-border py-3 first:border-t-0 first:pt-0">
+      <span className="order-first w-full shrink-0 pt-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground sm:order-none sm:w-[74px]">{label}</span>
+      <span className="min-w-0 flex-1 break-words text-[15px]">{children}</span>
+      {action && <span className="flex w-full shrink-0 flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">{action}</span>}
     </div>
   );
 }
@@ -203,12 +206,18 @@ export function ArticlePriceBlock({ data }: { data: SharedPriceData }) {
                 )}
               >
                 {item.price}
-                {item.unit && <em className="text-[11px] font-normal not-italic text-muted-foreground"> {item.unit}</em>}
+                {item.unit && (
+                  <em className="ml-1 text-[11px] font-normal not-italic text-muted-foreground">
+                    {renderCurrencyText(normalizeUiCurrencyText(item.unit), { iconSize: "sm" })}
+                  </em>
+                )}
               </span>
             </div>
           ))
         ) : summary ? (
-          <p className={cn("text-lg font-semibold", data.mode === "FREE" && "text-success")}>{summary}</p>
+          <p className={cn("text-lg font-semibold", data.mode === "FREE" && "text-success")}>
+            {renderCurrencyText(summary, { iconSize: "text" })}
+          </p>
         ) : null}
         {data.note.trim() && (
           <p className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
@@ -283,50 +292,52 @@ export function ArticleOpeningHoursBlock({ data }: { data: SharedOpeningHoursDat
           {bannerCaption && <span className="text-[13px] text-muted-foreground">· {bannerCaption}</span>}
         </div>
 
-        {OPENING_HOURS_DAYS.map((day) => {
-          const rule = data.rules.find((item) => item.dayOfWeek === day);
-          const isToday = day === todayKey;
-          if (!rule && !(isToday && todayException)) return null;
+        <OpeningHoursSchedule>
+          {OPENING_HOURS_DAYS.map((day) => {
+            const rule = data.rules.find((item) => item.dayOfWeek === day);
+            const isToday = day === todayKey;
+            if (!rule && !(isToday && todayException)) return null;
 
-          const effectiveIsOpen = isToday && todayException ? !todayException.isClosed : Boolean(rule?.isOpen);
-          const effectiveAllDay = isToday && todayException ? todayException.allDay : Boolean(rule?.allDay);
-          const effectiveIntervals = isToday && todayException ? todayException.intervals : (rule?.intervals ?? []);
+            const effectiveIsOpen = isToday && todayException ? !todayException.isClosed : Boolean(rule?.isOpen);
+            const effectiveAllDay = isToday && todayException ? todayException.allDay : Boolean(rule?.allDay);
+            const effectiveIntervals = isToday && todayException ? todayException.intervals : (rule?.intervals ?? []);
 
-          return (
-            <div key={day} className="flex items-baseline gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
-              <span className={cn("shrink-0 text-[14.5px] sm:w-[7rem]", isToday ? "font-bold" : "font-medium")}>
-                {DAY[day]}
-                {isToday && (
-                  <span className="ml-2 rounded-full bg-brand-soft px-1.5 py-0.5 align-middle font-mono text-[8.5px] font-semibold uppercase tracking-wide text-brand">
-                    сегодня
-                  </span>
-                )}
-              </span>
-              <span className="mb-1 h-0 flex-1 border-b border-dotted border-border" />
-              <span
-                className={cn(
-                  "min-w-0 max-w-[55%] text-right font-mono text-sm sm:max-w-none sm:whitespace-nowrap",
-                  !effectiveIsOpen ? "font-normal text-muted-foreground" : isToday ? "font-semibold text-brand" : "font-medium",
-                )}
-              >
-                {!effectiveIsOpen ? "выходной" : effectiveAllDay ? "Круглосуточно" : intervals(effectiveIntervals)}
-              </span>
-            </div>
-          );
-        })}
-
-        {data.exceptions.length > 0 && (
-          <div className="mt-3 border-t border-border pt-3">
-            <p className="mb-2 text-sm font-medium">Особые даты</p>
-            {data.exceptions.map((item) => (
-              <div key={item.date} className="flex justify-between gap-3 text-sm">
-                <span>{item.date}</span>
-                <span>{item.isClosed ? "Закрыто" : item.allDay ? "Круглосуточно" : intervals(item.intervals)}</span>
+            return (
+              <div key={day} className="flex items-baseline gap-3 border-t border-border py-3 first:border-t-0 first:pt-0">
+                <span className={cn("shrink-0 text-[14.5px] sm:w-[7rem]", isToday ? "font-bold" : "font-medium")}>
+                  {DAY[day]}
+                  {isToday && (
+                    <span className="ml-2 rounded-full bg-brand-soft px-1.5 py-0.5 align-middle font-mono text-[8.5px] font-semibold uppercase tracking-wide text-brand">
+                      сегодня
+                    </span>
+                  )}
+                </span>
+                <span className="mb-1 h-0 flex-1 border-b border-dotted border-border" />
+                <span
+                  className={cn(
+                    "min-w-0 max-w-[55%] text-right font-mono text-sm sm:max-w-none sm:whitespace-nowrap",
+                    !effectiveIsOpen ? "font-normal text-muted-foreground" : isToday ? "font-semibold text-brand" : "font-medium",
+                  )}
+                >
+                  {!effectiveIsOpen ? "выходной" : effectiveAllDay ? "Круглосуточно" : intervals(effectiveIntervals)}
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-        {data.note && <p className="mt-3 text-sm text-muted-foreground">{data.note}</p>}
+            );
+          })}
+
+          {data.exceptions.length > 0 && (
+            <div className="mt-3 border-t border-border pt-3">
+              <p className="mb-2 text-sm font-medium">Особые даты</p>
+              {data.exceptions.map((item) => (
+                <div key={item.date} className="flex justify-between gap-3 text-sm">
+                  <span>{item.date}</span>
+                  <span>{item.isClosed ? "Закрыто" : item.allDay ? "Круглосуточно" : intervals(item.intervals)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.note && <p className="mt-3 text-sm text-muted-foreground">{data.note}</p>}
+        </OpeningHoursSchedule>
       </div>
     </Shell>
   );
