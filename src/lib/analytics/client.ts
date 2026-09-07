@@ -43,6 +43,7 @@ export async function postAnalyticsEvent(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
+      keepalive: true,
       body: JSON.stringify({
         ...input,
         sessionId: input.sessionId ?? (clientSid || undefined),
