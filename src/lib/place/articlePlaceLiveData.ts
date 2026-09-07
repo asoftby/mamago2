@@ -39,6 +39,18 @@ export type ResolvedArticlePlaceCard = {
   sections: ArticlePlaceSections;
 };
 
+async function resolveRichPlaceCard(placeId: string): Promise<ResolvedPlaceEmbedCard | null> {
+  try {
+    return await getArticlePlaceEmbedData(placeId);
+  } catch (error) {
+    // Rich data (rating/events/offers/logo) are an enhancement. A transient
+    // failure for one Place must not reject the whole Article; the caller
+    // keeps the already-resolved structured Place and renders its fallback.
+    console.error("[article-place] rich embed resolution failed", { placeId, error });
+    return null;
+  }
+}
+
 /** One public Place query for every PLACE reference in an Article. */
 export async function loadArticlePlacesByIds(ids: string[]): Promise<Map<string, ResolvedArticlePlace>> {
   const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
@@ -92,11 +104,10 @@ export async function loadArticlePlacesByIds(ids: string[]): Promise<Map<string,
     },
   });
 
-  // The rich Place embed is the approved article design (PR #142). Resolve
-  // each visible Place once, concurrently, instead of rendering the later
-  // generic structured-info card that replaced it by mistake.
+  // Resolve each visible Place independently. One failed rich resolver becomes
+  // null for that Place only; other cards still resolve concurrently.
   const embedEntries = await Promise.all(
-    places.map(async (place) => [place.id, await getArticlePlaceEmbedData(place.id)] as const),
+    places.map(async (place) => [place.id, await resolveRichPlaceCard(place.id)] as const),
   );
   const embedById = new Map(embedEntries);
 
