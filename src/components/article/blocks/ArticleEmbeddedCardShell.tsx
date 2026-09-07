@@ -15,8 +15,19 @@ function ExpandableDescription({ text }: { text: string }) {
   useEffect(() => {
     const el = textRef.current;
     if (!el) return;
-    setNeedsToggle(el.scrollHeight > el.clientHeight + 1);
-  }, [text]);
+
+    const measure = () => {
+      if (expanded) return;
+      setNeedsToggle(el.scrollHeight > el.clientHeight + 1);
+    };
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [text, expanded]);
 
   return (
     <div>
