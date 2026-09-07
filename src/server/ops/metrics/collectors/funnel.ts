@@ -12,12 +12,13 @@
  *   cta_clicks    -> CTA_CLICK
  *
  * Counts are for this collector's own rolling window (trailing 15
- * minutes), not an all-time cumulative counter, per Phase E. No
- * business/admin/internal exclusion — none exists in the canonical
- * UserEvent writers either (see audit), so none is invented here.
+ * minutes), not an all-time cumulative counter, per Phase E. Article-subject
+ * structured telemetry is intentionally excluded because it has its own
+ * reporting scope and must not inflate the canonical funnel.
  */
 import type { UserEventType } from "@prisma/client";
 
+import { withCanonicalUserEventScope } from "@/server/services/analytics/articleSubjectTelemetryScope";
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
 
 const FUNNEL_WINDOW_SEC = 900;
@@ -35,7 +36,10 @@ export async function collectFunnelMetrics(ctx: MetricCollectorContext): Promise
   const counts = await Promise.all(
     FUNNEL_EVENT_METRIC.map(({ eventType }) =>
       ctx.prisma.userEvent.count({
-        where: { eventType, createdAt: { gte: windowStart, lt: ctx.now } },
+        where: withCanonicalUserEventScope({
+          eventType,
+          createdAt: { gte: windowStart, lt: ctx.now },
+        }),
       }),
     ),
   );
