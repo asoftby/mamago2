@@ -2,14 +2,25 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import {
+  trackArticleStructuredAction,
+  type ArticleStructuredAnalyticsContext,
+} from "./ArticleStructuredBlockAnalytics";
 
-export function CopyCoordinatesButton({ value }: { value: string }) {
+export function CopyCoordinatesButton({
+  value,
+  analytics,
+}: {
+  value: string;
+  analytics?: ArticleStructuredAnalyticsContext;
+}) {
   const [copied, setCopied] = useState(false);
 
   return (
     <button
       type="button"
       onClick={() => {
+        trackArticleStructuredAction(analytics, "coordinates_copy");
         navigator.clipboard?.writeText(value).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 1700);
