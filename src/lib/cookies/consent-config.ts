@@ -8,9 +8,11 @@
  * - Категория `marketing` = только сторонние рекламные/маркетинговые пиксели.
  * - Продуктовые события на наших серверах — отдельный слой, не «analytics cookies» в смысле этого UI.
  */
+import { CONSENT_COOKIE_NAME } from "./consent-cookie-format";
+
 type RunConfig = Parameters<typeof import("vanilla-cookieconsent").run>[0];
 
-const BANNER = {
+export const BANNER = {
   title: "Cookies и данные",
   description:
     "Для работы сайта нужны необходимые cookies и базовые данные сервиса. Сторонние инструменты веб-аналитики и рекламы мы подключаем только с вашего согласия.",
@@ -44,19 +46,15 @@ const PREFERENCES = {
   },
 } as const;
 
-/**
- * Собирает конфиг для CookieConsent.run.
- * Колбэки вызываются при любом обновлении согласия (в т.ч. после загрузки cookie).
- */
 export function createCookieConsentRunConfig(
   onConsentUpdated: () => void,
 ): RunConfig {
   return {
     mode: "opt-in",
-    // Bumped 0 -> 1: the external analytics provider set changed (Yandex Metrica
-    // added). Existing consent must be re-collected rather than silently reused.
+    // Keep this literal in sync with CONSENT_REVISION.
     revision: 1,
-    autoShow: true,
+    // The first-paint shell owns initial visibility; this config owns consent state.
+    autoShow: false,
     autoClearCookies: true,
     manageScriptTags: true,
     hideFromBots: true,
@@ -64,7 +62,7 @@ export function createCookieConsentRunConfig(
     lazyHtmlGeneration: true,
 
     cookie: {
-      name: "cc_cookie_mamago",
+      name: CONSENT_COOKIE_NAME,
       expiresAfterDays: 365,
       path: "/",
       sameSite: "Lax",
@@ -94,13 +92,10 @@ export function createCookieConsentRunConfig(
         enabled: false,
         autoClear: {
           cookies: [
-            // Google Analytics 4 (first-party, our domain).
             { name: /^_ga/ },
             { name: /^_gid$/ },
             { name: "_gat" },
             { name: /^gcl_/ },
-            // Yandex Metrica (first-party, our domain only — the plugin can't
-            // reach cookies scoped to yandex.ru itself).
             { name: /^_ym_/ },
           ],
         },
