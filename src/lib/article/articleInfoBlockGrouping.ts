@@ -11,6 +11,11 @@ export type ArticleRenderGroup<T extends { type: string }> =
  * `index` is the position of the group's first block in the original array —
  * callers use it to line up per-position logic (e.g. table-of-contents
  * placement) without re-searching the source array.
+ *
+ * A run stops as soon as a type would repeat (e.g. contacts, price,
+ * contacts) — ArticleInfoCard only has room for one of each section, so a
+ * repeated type starts a fresh group instead of silently overwriting the
+ * first one's data.
  */
 export function groupArticleInfoBlocks<T extends { type: string }>(blocks: T[]): ArticleRenderGroup<T>[] {
   const groups: ArticleRenderGroup<T>[] = [];
@@ -20,7 +25,9 @@ export function groupArticleInfoBlocks<T extends { type: string }>(blocks: T[]):
     const block = blocks[i];
     if (INFO_BLOCK_TYPES.has(block.type)) {
       const run: T[] = [];
-      while (i < blocks.length && INFO_BLOCK_TYPES.has(blocks[i].type)) {
+      const seenTypes = new Set<string>();
+      while (i < blocks.length && INFO_BLOCK_TYPES.has(blocks[i].type) && !seenTypes.has(blocks[i].type)) {
+        seenTypes.add(blocks[i].type);
         run.push(blocks[i]);
         i += 1;
       }

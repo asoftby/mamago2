@@ -55,4 +55,21 @@ type Block = { id: string; type: string };
   assert.ok(groups.every((g) => g.kind === "single"));
 }
 
+{
+  // A repeated type within a run must not be swallowed: the run stops
+  // before it repeats, and the second occurrence starts its own group so
+  // nothing silently disappears (each block still ends up in some group).
+  const blocks: Block[] = [
+    { id: "a", type: "contacts" },
+    { id: "b", type: "price" },
+    { id: "c", type: "contacts" },
+  ];
+  const groups = groupArticleInfoBlocks(blocks);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].kind, "info");
+  assert.equal(groups[0].kind === "info" && groups[0].blocks.map((b) => b.id).join(","), "a,b");
+  assert.equal(groups[1].kind, "single");
+  assert.equal(groups[1].kind === "single" && groups[1].block.id, "c");
+}
+
 console.log("articleInfoBlockGrouping.test.ts: OK");
