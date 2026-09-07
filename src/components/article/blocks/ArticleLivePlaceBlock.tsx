@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { SharedContactsData } from "@/domain/contacts/structuredContacts";
 import type { ResolvedArticlePlaceCard } from "@/lib/place/articlePlaceLiveData";
+import { ArticlePlaceEmbed } from "./ArticlePlaceEmbed";
 import {
   ArticleContactsBlock,
   ArticleOpeningHoursBlock,
@@ -24,6 +25,29 @@ export function contactsForPlaceSections(
 
 export function ArticleLivePlaceBlock({ card }: { card: ResolvedArticlePlaceCard }) {
   const { place, sections } = card;
+
+  if (place.embedCard) {
+    // PR #142 already shipped the approved compact/expandable Place design
+    // (the third-screen reference). Keep the live section controls that map
+    // directly to that layout, while the rich card itself owns its dynamic
+    // Афиша / Посещение / Праздник / Спецпредложения content.
+    const embedCard = {
+      ...place.embedCard,
+      coverImageUrl: sections.image ? place.embedCard.coverImageUrl : null,
+      coverImageCount: sections.image ? place.embedCard.coverImageCount : 0,
+      address: sections.address ? place.embedCard.address : null,
+      lat: sections.address ? place.embedCard.lat : null,
+      lng: sections.address ? place.embedCard.lng : null,
+      mapsUrl: sections.address ? place.embedCard.mapsUrl : null,
+      isOpenNow: sections.openingHours ? place.embedCard.isOpenNow : null,
+      hoursMessage: sections.openingHours ? place.embedCard.hoursMessage : null,
+    };
+
+    return <ArticlePlaceEmbed card={embedCard} />;
+  }
+
+  // Defensive fallback for a transient resolver failure. This keeps the
+  // existing structured data visible instead of dropping the Place block.
   const visibleContacts = contactsForPlaceSections(place.contacts, sections);
 
   return (
