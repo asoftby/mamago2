@@ -17,6 +17,7 @@ function ExpandableDescription({ text }: { text: string }) {
     if (!el) return;
 
     const measure = () => {
+      if (expanded) return;
       setNeedsToggle(el.scrollHeight > el.clientHeight + 1);
     };
 
@@ -26,7 +27,7 @@ function ExpandableDescription({ text }: { text: string }) {
     observer.observe(el);
 
     return () => observer.disconnect();
-  }, [text]);
+  }, [text, expanded]);
 
   return (
     <div>
