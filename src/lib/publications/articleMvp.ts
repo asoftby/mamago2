@@ -15,6 +15,51 @@ export const ARTICLE_CONTENT_VERSION = 1 as const;
 export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
 export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema>;
 
+/**
+ * Стабильная идентичность объекта, который автор описывает ручными
+ * structured-блоками статьи. Это не запись каталога: объект может находиться
+ * вне географии/охвата mamaGo и вообще никогда не появиться в основной БД.
+ *
+ * catalogEntity* — только опциональная связь для атрибуции/аналитики. Она не
+ * меняет источник отображаемых данных блока.
+ */
+export const ArticleSubjectSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(["MANUAL", "CATALOG"]),
+  title: z.string().trim().min(1).max(200),
+  catalogEntityType: ArticleBlockEntityTypeSchema.optional(),
+  catalogEntityId: z.string().trim().min(1).optional(),
+}).superRefine((subject, ctx) => {
+  const hasType = Boolean(subject.catalogEntityType);
+  const hasId = Boolean(subject.catalogEntityId);
+  if (hasType !== hasId) {
+    ctx.addIssue({
+      code: "custom",
+      path: [hasType ? "catalogEntityId" : "catalogEntityType"],
+      message: "Catalog entity type and id must be provided together",
+    });
+  }
+  if (subject.source === "CATALOG" && (!hasType || !hasId)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["catalogEntityId"],
+      message: "Catalog subjects require an entity type and id",
+    });
+  }
+});
+export type ArticleSubject = z.infer<typeof ArticleSubjectSchema>;
+
+export function newArticleSubject(
+  title = "",
+  id: () => string = () => randomId(),
+): ArticleSubject {
+  return {
+    id: id(),
+    source: "MANUAL",
+    title,
+  };
+}
+
 export const DEFAULT_ARTICLE_PLACE_SECTIONS = {
   image: true,
   description: true,
@@ -96,9 +141,9 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     embedHtml: z.string(),
     caption: z.string().optional(),
   }),
-  base.extend({ type: z.literal("contacts"), data: SharedContactsDataSchema }),
-  base.extend({ type: z.literal("price"), data: ArticlePriceDataSchema }),
-  base.extend({ type: z.literal("openingHours"), data: SharedOpeningHoursDataSchema }),
+  base.extend({ type: z.literal("contacts"), subject: ArticleSubjectSchema.optional(), data: SharedContactsDataSchema }),
+  base.extend({ type: z.literal("price"), subject: ArticleSubjectSchema.optional(), data: ArticlePriceDataSchema }),
+  base.extend({ type: z.literal("openingHours"), subject: ArticleSubjectSchema.optional(), data: SharedOpeningHoursDataSchema }),
 ]).superRefine((block, ctx) => {
   if (block.type === "activityCard" && block.entityType !== "PLACE" && block.placeSections) {
     ctx.addIssue({ code: "custom", path: ["placeSections"], message: "Place sections are only valid for PLACE cards" });
@@ -153,8 +198,22 @@ export function prepareArticleContactsForSave(data: z.infer<typeof SharedContact
   };
 }
 
+function prepareArticleSubjectForSave(subject: ArticleSubject | undefined): ArticleSubject | undefined {
+  if (!subject) return undefined;
+  const title = subject.title.trim();
+  const catalogEntityId = subject.catalogEntityId?.trim();
+  return {
+    id: subject.id,
+    source: subject.source,
+    title,
+    ...(subject.catalogEntityType ? { catalogEntityType: subject.catalogEntityType } : {}),
+    ...(catalogEntityId ? { catalogEntityId } : {}),
+  };
+}
+
 export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): string {
   const paths = issues.map((issue) => issue.path.map(String).join("."));
+  if (paths.some((path) => /\.subject\.title$/.test(path))) return "Укажите, к какому объекту относится блок";
   if (paths.some((path) => /\.phones\.\d+\.value$/.test(path))) return "Укажите номер телефона";
   if (paths.some((path) => /\.socials\.\d+\.url$/.test(path))) return "Введите полную ссылку, например https://instagram.com/...";
   if (paths.some((path) => /\.data\.email$/.test(path))) return "Введите корректный email";
@@ -174,12 +233,14 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
       if (block.type === "contacts") {
         return {
           ...block,
+          ...(block.subject ? { subject: prepareArticleSubjectForSave(block.subject) } : {}),
           data: prepareArticleContactsForSave(block.data),
         };
       }
       if (block.type === "openingHours") {
         return {
           ...block,
+          ...(block.subject ? { subject: prepareArticleSubjectForSave(block.subject) } : {}),
           data: {
             ...block.data,
             exceptions: block.data.exceptions.filter((exception) =>
@@ -191,6 +252,7 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
       if (block.type !== "price") return block;
       return {
         ...block,
+        ...(block.subject ? { subject: prepareArticleSubjectForSave(block.subject) } : {}),
         data: {
           ...block.data,
           currency: block.data.currency.trim(),
@@ -345,13 +407,24 @@ export function newBlock(
     case "embed":
       return { id: bid, type: "embed", embedHtml: "", caption: "" };
     case "contacts":
-      return { id: bid, type: "contacts", data: { phones: [], socials: [] } };
+      return {
+        id: bid,
+        type: "contacts",
+        subject: newArticleSubject("", () => `subject_${bid}`),
+        data: { phones: [], socials: [] },
+      };
     case "price":
-      return { id: bid, type: "price", data: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" } };
+      return {
+        id: bid,
+        type: "price",
+        subject: newArticleSubject("", () => `subject_${bid}`),
+        data: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" },
+      };
     case "openingHours":
       return {
         id: bid,
         type: "openingHours",
+        subject: newArticleSubject("", () => `subject_${bid}`),
         data: {
           mode: "WEEKLY",
           timezone: "Europe/Minsk",
