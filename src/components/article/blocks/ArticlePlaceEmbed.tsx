@@ -140,6 +140,11 @@ function sharePlace(title: string, href: string) {
   copyToClipboard(url, `Ссылка на «${title}» скопирована`);
 }
 
+function afishaMetaLabel(item: ArticlePlaceAfishaItem): string | undefined {
+  const date = item.day && item.month ? `${item.day} ${item.month}` : null;
+  return [date, item.meta].filter(Boolean).join(" · ") || undefined;
+}
+
 function AfishaRail({ items }: { items: ArticlePlaceAfishaItem[] }) {
   return (
     <div style={{ display: "flex", gap: 16, overflowX: "auto", padding: "2px 20px 4px" }}>
@@ -151,7 +156,7 @@ function AfishaRail({ items }: { items: ArticlePlaceAfishaItem[] }) {
             href={item.href}
             imageUrl={item.imageUrl}
             categoryLabel={item.categoryLabel ?? undefined}
-            metaLabel={item.meta ?? undefined}
+            metaLabel={afishaMetaLabel(item)}
             priceLabel={item.priceLabel ?? undefined}
           />
         </div>
