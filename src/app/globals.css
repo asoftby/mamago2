@@ -92,8 +92,13 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
   --color-success: var(--success);
   --color-success-hover: var(--success-hover);
+  --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
   --color-warning-hover: var(--warning-hover);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-hover: var(--info-hover);
+  --color-info-soft: var(--info-soft);
   --color-danger: var(--danger);
   --color-danger-hover: var(--danger-hover);
   --color-danger-soft: var(--danger-soft);
@@ -221,8 +226,13 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   /* States */
   --success: #16A34A;
   --success-hover: #15803D;
+  --success-soft: #F0FDF4;
   --warning: #F59E0B;
   --warning-hover: #D97706;
+  --warning-soft: #FFFBEB;
+  --info: #2563EB;
+  --info-hover: #1D4ED8;
+  --info-soft: #EFF6FF;
   --danger: #DC2626;
   --danger-hover: #B91C1C;
   --danger-soft: #FEF2F2;

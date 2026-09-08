@@ -80,11 +80,12 @@ export async function listBreakingNewsArticles(
     .map((r) => {
       const content = parseArticleContentJson(r.contentJson);
       const firstTextBlock = content.blocks.find(
-        (block): block is Extract<(typeof content.blocks)[number], { type: "intro" | "text" | "quote" | "heading" }> =>
+        (block): block is Extract<(typeof content.blocks)[number], { type: "intro" | "text" | "quote" | "heading" | "callout" }> =>
           block.type === "intro" ||
           block.type === "text" ||
           block.type === "quote" ||
-          block.type === "heading",
+          block.type === "heading" ||
+          block.type === "callout",
       );
       const descriptionSource =
         firstTextBlock?.text ??

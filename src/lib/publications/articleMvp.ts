@@ -44,6 +44,9 @@ export const ArticleGalleryPresentationSchema = z.enum(["carousel", "mosaic", "s
 export type ArticleGalleryPresentation = z.infer<typeof ArticleGalleryPresentationSchema>;
 export const LEGACY_ARTICLE_GALLERY_PRESENTATION: ArticleGalleryPresentation = "mosaic";
 
+export const ArticleCalloutVariantSchema = z.enum(["tip", "warning", "info"]);
+export type ArticleCalloutVariant = z.infer<typeof ArticleCalloutVariantSchema>;
+
 const base = z.object({ id: z.string().min(1) });
 const ArticlePriceDataSchema = SharedPriceDataSchema.superRefine((value, ctx) => {
   value.items.forEach((item, index) => {
@@ -71,6 +74,12 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({
     type: z.literal("heading"),
     level: z.union([z.literal(2), z.literal(3)]),
+    text: z.string(),
+  }),
+  base.extend({
+    type: z.literal("callout"),
+    variant: ArticleCalloutVariantSchema,
+    title: z.string().optional(),
     text: z.string(),
   }),
   base.extend({
@@ -330,6 +339,8 @@ export function newBlock(
       return { id: bid, type: "quote", text: "" };
     case "heading":
       return { id: bid, type: "heading", level: 2, text: "" };
+    case "callout":
+      return { id: bid, type: "callout", variant: "tip", text: "" };
     case "image":
       return { id: bid, type: "image", mediaId: "", alt: "", caption: "" };
     case "gallery":

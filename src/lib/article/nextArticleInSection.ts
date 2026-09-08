@@ -119,7 +119,7 @@ async function fetchCoverPublicUrl(articleId: string): Promise<{
 function estimateReadTimeMinutes(blocks: ArticleMvpResolvedBlock[]): number {
   let chars = 0;
   for (const b of blocks) {
-    if (b.type === "text" || b.type === "intro" || b.type === "quote") {
+    if (b.type === "text" || b.type === "intro" || b.type === "quote" || b.type === "callout") {
       chars += b.text.replace(/<[^>]+>/g, " ").length;
     } else if (b.type === "heading") {
       chars += b.text.length;
