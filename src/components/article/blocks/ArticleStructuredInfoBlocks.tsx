@@ -165,7 +165,7 @@ export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
                     rel="noreferrer"
                     title={SOCIAL_LABEL[social.kind]}
                     aria-label={SOCIAL_LABEL[social.kind]}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-foreground/80 transition-colors hover:border-foreground hover:text-foreground"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border !text-foreground/80 !no-underline transition-colors hover:border-foreground hover:!text-foreground"
                   >
                     <Icon className="h-4 w-4" />
                   </a>
@@ -566,7 +566,7 @@ export function ArticleInfoCard({
                 href={mapHref}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:border-foreground/40"
+                className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium !text-foreground !no-underline transition-colors hover:border-foreground/40"
               >
                 <ExternalLink className="h-[13px] w-[13px]" />Как добраться
               </a>
@@ -582,7 +582,7 @@ export function ArticleInfoCard({
             <a
               key={`${phone.value}-${index}`}
               href={`tel:${phone.value}`}
-              className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3 font-mono text-[13px] font-medium text-foreground transition-colors hover:border-foreground/40"
+              className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3 font-mono text-[13px] font-medium !text-foreground !no-underline transition-colors hover:border-foreground/40"
             >
               <Phone className="h-3.5 w-3.5 text-muted-foreground" />
               {phone.value}
@@ -595,12 +595,12 @@ export function ArticleInfoCard({
       {hasLinksBand && contacts && (
         <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-3 md:px-6">
           {contacts.website && (
-            <a href={contacts.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all font-mono text-[13px] font-semibold text-brand">
+            <a href={contacts.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all font-mono text-[13px] font-semibold !text-brand !no-underline">
               {contacts.website}<ExternalLink className="h-3.5 w-3.5 shrink-0" />
             </a>
           )}
           {contacts.email && (
-            <a href={`mailto:${contacts.email}`} className="font-mono text-[13px] text-muted-foreground transition-colors hover:text-foreground">
+            <a href={`mailto:${contacts.email}`} className="font-mono text-[13px] !text-muted-foreground !no-underline transition-colors hover:!text-foreground">
               {contacts.email}
             </a>
           )}
@@ -616,7 +616,7 @@ export function ArticleInfoCard({
                     rel="noreferrer"
                     title={SOCIAL_LABEL[social.kind]}
                     aria-label={SOCIAL_LABEL[social.kind]}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-foreground/80 transition-colors hover:border-foreground hover:text-foreground"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border !text-foreground/80 !no-underline transition-colors hover:border-foreground hover:!text-foreground"
                   >
                     <Icon className="h-4 w-4" />
                   </a>
