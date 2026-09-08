@@ -498,10 +498,7 @@ export function ArticleInfoCard({
           )}
           {hasPrice && price && (
             <div className="p-5 md:p-6">
-              <div className="mb-3 flex items-center justify-between gap-2 font-mono text-[9.5px] uppercase tracking-[0.13em] text-muted-foreground">
-                <span>Стоимость</span>
-                {price.items.length > 0 && <span className="whitespace-nowrap">{price.items.length} {pluralizeItems(price.items.length)}</span>}
-              </div>
+              <div className="mb-3 font-mono text-[9.5px] uppercase tracking-[0.13em] text-muted-foreground">Стоимость</div>
               {price.items.length > 0 ? (
                 price.items.map((item) => (
                   <div key={item.id} className="flex items-baseline gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0">
@@ -541,37 +538,40 @@ export function ArticleInfoCard({
       )}
 
       {hasAddressBand && contacts && (
-        <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-3.5 md:px-6">
-          <span className="flex min-w-0 flex-1 items-center gap-2 text-[14.5px]">
-            <MapPin className="h-4 w-4 shrink-0 text-brand" />
-            {contacts.address ? (
-              <span className="min-w-0">
-                <span className="font-normal">{contacts.address}</span>
-                {contacts.coordinates && (
-                  <small className="ml-2 font-mono text-xs text-muted-foreground">
-                    {contacts.coordinates.latitude}, {contacts.coordinates.longitude}
-                  </small>
-                )}
-              </span>
-            ) : (
-              <a className="underline underline-offset-2" href={mapHref ?? undefined} target="_blank" rel="noreferrer">
-                Открыть на карте
-              </a>
-            )}
-          </span>
-          <span className="flex shrink-0 flex-wrap items-center gap-2">
-            {contacts.coordinates && <CopyCoordinatesButton value={`${contacts.coordinates.latitude}, ${contacts.coordinates.longitude}`} />}
-            {mapHref && (
-              <a
-                href={mapHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium !text-foreground !no-underline transition-colors hover:border-foreground/40"
-              >
-                <ExternalLink className="h-[13px] w-[13px]" />Как добраться
-              </a>
-            )}
-          </span>
+        <div className="border-t border-border px-5 py-3.5 md:px-6">
+          <div className="mb-2 font-mono text-[9.5px] uppercase tracking-[0.13em] text-muted-foreground">Адрес</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex min-w-0 flex-1 items-center gap-2 text-[14.5px]">
+              <MapPin className="h-4 w-4 shrink-0 text-brand" />
+              {contacts.address ? (
+                <span className="min-w-0">
+                  <span className="font-normal">{contacts.address}</span>
+                  {contacts.coordinates && (
+                    <small className="ml-2 font-mono text-xs text-muted-foreground">
+                      {contacts.coordinates.latitude}, {contacts.coordinates.longitude}
+                    </small>
+                  )}
+                </span>
+              ) : (
+                <a className="underline underline-offset-2" href={mapHref ?? undefined} target="_blank" rel="noreferrer">
+                  Открыть на карте
+                </a>
+              )}
+            </span>
+            <span className="flex shrink-0 flex-wrap items-center gap-2">
+              {contacts.coordinates && <CopyCoordinatesButton value={`${contacts.coordinates.latitude}, ${contacts.coordinates.longitude}`} />}
+              {mapHref && (
+                <a
+                  href={mapHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium !text-foreground !no-underline transition-colors hover:border-foreground/40"
+                >
+                  <ExternalLink className="h-[13px] w-[13px]" />Как добраться
+                </a>
+              )}
+            </span>
+          </div>
         </div>
       )}
 
