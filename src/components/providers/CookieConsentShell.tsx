@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BANNER } from "@/lib/cookies/consent-config";
 import {
   acceptFromShell,
-  ensureConsentModalShown,
-  openCookiePreferences,
+  openCookiePreferencesFromShell,
 } from "@/lib/cookies/consent-manager";
 import {
   CONSENT_COOKIE_NAME,
@@ -36,24 +35,18 @@ export function CookieConsentShell() {
       return;
     }
 
-    let active = true;
-    const hideShell = () => {
-      if (!active) return;
-      if (rootRef.current) rootRef.current.style.display = "none";
-      setMounted(false);
-    };
-
-    ensureConsentModalShown().then(hideShell, hideShell);
-
-    return () => {
-      active = false;
-    };
+    // The shell owns first-visit visibility. CookieConsent initializes silently
+    // in the provider and must never replace this UI after hydration.
   }, []);
 
   async function handleAccept(categories: "all" | []) {
     setPending(true);
     try {
       await acceptFromShell(categories);
+      if (rootRef.current) rootRef.current.style.display = "none";
+      setMounted(false);
+    } catch (err) {
+      console.error("[CookieConsent] accept failed", err);
     } finally {
       setPending(false);
     }
@@ -62,7 +55,11 @@ export function CookieConsentShell() {
   async function handleCustomize() {
     setPending(true);
     try {
-      openCookiePreferences();
+      await openCookiePreferencesFromShell();
+      if (rootRef.current) rootRef.current.style.display = "none";
+      setMounted(false);
+    } catch (err) {
+      console.error("[CookieConsent] preferences failed", err);
     } finally {
       setPending(false);
     }
