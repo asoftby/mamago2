@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import Link from "next/link";
 import {
   MapPin,
@@ -9,6 +9,13 @@ import {
   ChevronDown,
   Share2,
   Star,
+  Phone,
+  Mail,
+  Globe,
+  Instagram,
+  Youtube,
+  Send,
+  Link2,
 } from "lucide-react";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import { EventCard } from "@/components/events";
@@ -57,6 +64,8 @@ type ContactLink = {
   label: string;
   href: string;
   external?: boolean;
+  kind: "phone" | "email" | "website" | "social";
+  icon: ComponentType<{ size?: number }>;
 };
 
 export type ArticlePlaceEmbedProps = {
@@ -90,6 +99,23 @@ const SOCIAL_LABELS: Record<SharedContactsData["socials"][number]["kind"], strin
   other: "Соцсеть",
 };
 
+function VkIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3.5 7.5h3c.3 3.3 1.8 5.6 3 6.2V7.5h2.9v4.4c1.2-.2 2.5-1.9 2.9-4.4h2.9c-.3 2.6-1.7 4.4-2.7 5.2 1 .6 2.6 2.2 3.2 4.8h-3.2c-.5-1.7-1.7-3-3.1-3.2v3.2h-.5c-4.1 0-7.1-2.9-8.4-10z" />
+    </svg>
+  );
+}
+
+const SOCIAL_ICON: Record<SharedContactsData["socials"][number]["kind"], ComponentType<{ size?: number }>> = {
+  instagram: Instagram,
+  telegram: Send,
+  vk: VkIcon,
+  tiktok: Link2,
+  youtube: Youtube,
+  other: Link2,
+};
+
 function minPriceLabel(items: ArticlePlaceListItem[]): string | null {
   const numeric = items
     .map((item) => item.priceLabel)
@@ -103,13 +129,15 @@ function buildContactLinks(contacts?: SharedContactsData | null): ContactLink[] 
     key: `phone-${index}-${phone.value}`,
     label: phone.label ? `${phone.label}: ${phone.value}` : phone.value,
     href: `tel:${phone.value.replace(/[^\d+]/g, "")}`,
+    kind: "phone",
+    icon: Phone,
   }));
 
   if (contacts.email) {
-    links.push({ key: "email", label: contacts.email, href: `mailto:${contacts.email}` });
+    links.push({ key: "email", label: contacts.email, href: `mailto:${contacts.email}`, kind: "email", icon: Mail });
   }
   if (contacts.website) {
-    links.push({ key: "website", label: "Сайт", href: contacts.website, external: true });
+    links.push({ key: "website", label: "Сайт", href: contacts.website, external: true, kind: "website", icon: Globe });
   }
   contacts.socials.forEach((social, index) => {
     links.push({
@@ -117,9 +145,54 @@ function buildContactLinks(contacts?: SharedContactsData | null): ContactLink[] 
       label: SOCIAL_LABELS[social.kind],
       href: social.url,
       external: true,
+      kind: "social",
+      icon: SOCIAL_ICON[social.kind],
     });
   });
   return links;
+}
+
+/** Phone becomes a labeled "Позвонить" pill; everything else is an icon-only circle. */
+function ContactActionsRow({ links }: { links: ContactLink[] }) {
+  if (links.length === 0) return null;
+  const phone = links.find((item) => item.kind === "phone");
+  const iconLinks = links.filter((item) => item.kind !== "phone");
+
+  return (
+    <>
+      {phone && (
+        <a
+          href={phone.href}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 7, height: 38, padding: "0 14px", borderRadius: 999,
+            border: `1px solid ${T.line2}`, background: T.paper2, color: T.ink, fontSize: 13, fontWeight: 600,
+            textDecoration: "none", whiteSpace: "nowrap",
+          }}
+        >
+          <Phone size={14} /> Позвонить
+        </a>
+      )}
+      {iconLinks.map((item) => {
+        const Icon = item.icon;
+        return (
+          <a
+            key={item.key}
+            href={item.href}
+            target={item.external ? "_blank" : undefined}
+            rel={item.external ? "noopener noreferrer" : undefined}
+            aria-label={item.label}
+            title={item.label}
+            style={{
+              width: 38, height: 38, borderRadius: 999, border: `1px solid ${T.line2}`, color: T.ink2,
+              display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "none",
+            }}
+          >
+            <Icon size={15} />
+          </a>
+        );
+      })}
+    </>
+  );
 }
 
 async function copyToClipboard(text: string, message: string) {
@@ -227,6 +300,12 @@ export function ArticlePlaceEmbed({
   const activeItems = card.tabs[activeTab];
   const contactLinks = buildContactLinks(contacts);
   const hoursColor = card.isOpenNow == null ? T.ink3 : card.isOpenNow ? T.ok : T.accentDeep;
+  const metroDistrictSuffix = [
+    card.metroName ? `м. ${card.metroName}` : null,
+    card.districtName ? `${card.districtName} р-н` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className="not-prose my-8 md:my-10">
@@ -239,10 +318,10 @@ export function ArticlePlaceEmbed({
         fontFamily: T.sans,
         color: T.ink,
       }}>
-        <div style={{ display: "grid", gridTemplateColumns: card.coverImageUrl ? "186px 1fr" : "1fr", gap: 0 }}>
+        <div className={card.coverImageUrl ? "grid grid-cols-1 sm:grid-cols-[186px_1fr]" : "grid grid-cols-1"}>
           {card.coverImageUrl && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: T.paper2 }}>
-              <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: 16, overflow: "hidden" }}>
+            <div className="flex items-center justify-center sm:p-5" style={{ background: T.paper2 }}>
+              <div className="relative w-full aspect-[16/9] sm:aspect-square sm:rounded-2xl overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={card.coverImageUrl} alt={card.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 {card.coverImageCount > 1 && (
@@ -258,18 +337,22 @@ export function ArticlePlaceEmbed({
             </div>
           )}
 
-          <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 13, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 11, minWidth: 0 }}>
+          <div className="flex flex-col gap-[13px] px-4 py-4 sm:px-5 sm:py-[18px]" style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
+              <div style={{ display: "flex", gap: 11, minWidth: 0, overflow: "hidden" }}>
                 {card.logoUrl && (
                   <span style={{ width: 40, height: 40, borderRadius: 11, overflow: "hidden", flexShrink: 0, border: `1px solid ${T.line}`, position: "relative" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={card.logoUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                   </span>
                 )}
-                <div style={{ minWidth: 0 }}>
+                <div style={{ minWidth: 0, overflow: "hidden" }}>
                   {card.categoryLabel && <span style={{ ...capsStyle, display: "block", marginBottom: 4 }}>{card.categoryLabel}</span>}
-                  <Link href={card.href} style={{ fontFamily: T.serif, fontWeight: 400, fontSize: 29, lineHeight: 1, letterSpacing: "-.02em", display: "block", color: "inherit", textDecoration: "none" }}>
+                  <Link
+                    href={card.href}
+                    className="block truncate text-[22px] sm:text-[29px]"
+                    style={{ fontFamily: T.serif, fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em", color: "inherit", textDecoration: "none" }}
+                  >
                     {card.title}
                   </Link>
                 </div>
@@ -312,62 +395,46 @@ export function ArticlePlaceEmbed({
             )}
 
             {card.address && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13.5, color: T.ink2 }}>
-                <MapPin size={14} style={{ color: T.accentDeep, flexShrink: 0 }} />
-                <span>{card.address}</span>
-                <span style={{ display: "flex", gap: 5, marginLeft: "auto" }}>
-                  {card.mapsUrl != null && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyToClipboard(
-                            card.lat != null && card.lng != null
-                              ? `${card.lat}, ${card.lng}`
-                              : card.address ?? "",
-                            card.lat != null && card.lng != null ? "Координаты скопированы" : "Адрес скопирован",
-                          )
-                        }
-                        style={{
-                          height: 30, padding: "0 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: T.paper2,
-                          color: T.ink2, fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", cursor: "pointer",
-                        }}
-                      >
-                        <Copy size={13} /> Копировать
-                      </button>
-                      <a
-                        href={card.mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          height: 30, padding: "0 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: T.paper2,
-                          color: T.ink2, fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", textDecoration: "none",
-                        }}
-                      >
-                        <ExternalLink size={13} /> Google Maps
-                      </a>
-                    </>
-                  )}
-                </span>
-              </div>
-            )}
-
-            {contactLinks.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {contactLinks.map((item) => (
-                  <a
-                    key={item.key}
-                    href={item.href}
-                    target={item.external ? "_blank" : undefined}
-                    rel={item.external ? "noopener noreferrer" : undefined}
-                    style={{
-                      display: "inline-flex", alignItems: "center", minHeight: 29, padding: "4px 11px", borderRadius: 999,
-                      border: `1px solid ${T.line2}`, fontSize: 12, color: T.ink2, textDecoration: "none", lineHeight: 1.2,
-                    }}
-                  >
-                    {item.label}
-                  </a>
-                ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13.5, color: T.ink2 }}>
+                  <MapPin size={14} style={{ color: T.accentDeep, flexShrink: 0, marginTop: 2 }} />
+                  <span>
+                    {card.address}
+                    {metroDistrictSuffix && <span style={{ color: T.ink3 }}> ({metroDistrictSuffix})</span>}
+                  </span>
+                </div>
+                {card.mapsUrl != null && (
+                  <div style={{ display: "flex", gap: 6, paddingLeft: 22, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(
+                          card.lat != null && card.lng != null
+                            ? `${card.lat}, ${card.lng}`
+                            : card.address ?? "",
+                          card.lat != null && card.lng != null ? "Координаты скопированы" : "Адрес скопирован",
+                        )
+                      }
+                      style={{
+                        height: 30, padding: "0 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: T.paper2,
+                        color: T.ink2, fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", cursor: "pointer",
+                      }}
+                    >
+                      <Copy size={13} /> Копировать
+                    </button>
+                    <a
+                      href={card.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        height: 30, padding: "0 10px", borderRadius: 999, border: `1px solid ${T.line}`, background: T.paper2,
+                        color: T.ink2, fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", textDecoration: "none",
+                      }}
+                    >
+                      <ExternalLink size={13} /> Google Maps
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
@@ -382,16 +449,6 @@ export function ArticlePlaceEmbed({
                   {card.hoursMessage}
                 </span>
               )}
-              {card.metroName && (
-                <span style={{ display: "inline-flex", alignItems: "center", height: 29, padding: "0 11px", borderRadius: 999, border: `1px solid ${T.line2}`, fontSize: 12.5, color: T.ink2, whiteSpace: "nowrap" }}>
-                  м. {card.metroName}
-                </span>
-              )}
-              {card.ageTags.slice(0, 2).map((tag) => (
-                <span key={tag} style={{ display: "inline-flex", alignItems: "center", height: 29, padding: "0 11px", borderRadius: 999, border: `1px solid ${T.line2}`, fontSize: 12.5, color: T.ink2, whiteSpace: "nowrap" }}>
-                  {tag}
-                </span>
-              ))}
               {priceLabel && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 29, padding: "0 11px", borderRadius: 999, border: `1px solid ${T.line2}`, fontSize: 12.5, color: T.ink2, whiteSpace: "nowrap" }}>
                   Стоимость <b style={{ color: T.ink, fontWeight: 600 }}>{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}</b>
@@ -471,7 +528,9 @@ export function ArticlePlaceEmbed({
             )}
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", padding: "15px 20px", borderTop: `1px solid ${T.line}` }}>
-              <span style={{ fontSize: 12.5, color: T.ink3 }}>Бронирование и полная афиша — на странице места</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <ContactActionsRow links={contactLinks} />
+              </div>
               {showCta && (
                 <Link
                   href={card.href}
@@ -487,17 +546,22 @@ export function ArticlePlaceEmbed({
           </div>
         )}
 
-        {availableTabs.length === 0 && showCta && (
-          <div style={{ display: "flex", justifyContent: "flex-end", padding: "15px 20px", borderTop: `1px solid ${T.line}` }}>
-            <Link
-              href={card.href}
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 44, padding: "0 18px",
-                borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
-              }}
-            >
-              Открыть место <span aria-hidden="true">→</span>
-            </Link>
+        {availableTabs.length === 0 && (showCta || contactLinks.length > 0) && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", padding: "15px 20px", borderTop: `1px solid ${T.line}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <ContactActionsRow links={contactLinks} />
+            </div>
+            {showCta && (
+              <Link
+                href={card.href}
+                style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 44, padding: "0 18px",
+                  borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
+                }}
+              >
+                Открыть место <span aria-hidden="true">→</span>
+              </Link>
+            )}
           </div>
         )}
 
