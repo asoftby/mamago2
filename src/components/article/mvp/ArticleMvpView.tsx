@@ -8,6 +8,7 @@ import { ArticleOfferCardBlock } from "@/components/article/blocks/ArticleOfferC
 import { ArticleOfferEmbed } from "@/components/article/blocks/ArticleOfferEmbed";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
+import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
 import {
   deriveArticleLeadHtml,
   deriveArticleLeadPlainText,
@@ -257,6 +258,11 @@ export function ArticleMvpView({
                     ) : null}
                   </div>
                 </blockquote>
+              );
+            }
+            if (block.type === "callout") {
+              return (
+                <ArticleCalloutBlock variant={block.variant} title={block.title} text={block.text} />
               );
             }
             if (block.type === "heading") {

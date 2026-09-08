@@ -70,6 +70,7 @@ function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
         case "quote":
         case "heading":
         case "text":
+        case "callout":
           return block.text;
         default:
           return "";

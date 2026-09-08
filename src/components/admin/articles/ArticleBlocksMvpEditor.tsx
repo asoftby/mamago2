@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronUp, Images, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Images, Info, Lightbulb, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,11 +19,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   DEFAULT_ARTICLE_PLACE_SECTIONS,
   type ArticleBlockMvp,
+  type ArticleCalloutVariant,
   type ArticlePlaceSections,
   newBlock,
 } from "@/lib/publications/articleMvp";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleEmbedBlock } from "@/components/article/blocks/ArticleEmbedBlock";
+import { ArticleCalloutBlock } from "@/components/article/blocks/ArticleCalloutBlock";
 import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
 import { ActivityCardEntityPicker } from "@/components/admin/articles/ActivityCardEntityPicker";
 import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEditorGalleryField";
@@ -62,6 +64,7 @@ const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   intro: "Лид",
   text: "Текст",
   quote: "Цитата",
+  callout: "Акцент",
   heading: "Заголовок",
   image: "Изображение",
   gallery: "Галерея",
@@ -78,6 +81,7 @@ const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: 
   { type: "text", label: "Текст" },
   { type: "heading", label: "Заголовок" },
   { type: "quote", label: "Цитата" },
+  { type: "callout", label: "Акцент" },
   { type: "image", label: "Изображение" },
   { type: "gallery", label: "Галерея" },
   { type: "activityCard", label: "Карточка активности" },
@@ -235,6 +239,72 @@ function EmbedBlockEditor({
   );
 }
 
+const CALLOUT_VARIANTS: { value: ArticleCalloutVariant; label: string; Icon: typeof Lightbulb }[] = [
+  { value: "tip", label: "Совет", Icon: Lightbulb },
+  { value: "warning", label: "Внимание", Icon: AlertTriangle },
+  { value: "info", label: "Информация", Icon: Info },
+];
+
+function CalloutBlockEditor({
+  variant,
+  title,
+  text,
+  onChangeVariant,
+  onChangeTitle,
+  onChangeText,
+}: {
+  variant: ArticleCalloutVariant;
+  title?: string;
+  text: string;
+  onChangeVariant: (v: ArticleCalloutVariant) => void;
+  onChangeTitle: (v: string) => void;
+  onChangeText: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="inline-flex rounded-md border border-input p-0.5 gap-0.5">
+        {CALLOUT_VARIANTS.map(({ value, label, Icon }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChangeVariant(value)}
+            aria-pressed={variant === value}
+            className={cn(
+              "flex items-center gap-1.5 rounded-[calc(var(--radius-md)-2px)] px-3 py-1.5 text-sm transition-colors",
+              variant === value
+                ? "bg-muted font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="callout-title">Заголовок</Label>
+        <Input
+          id="callout-title"
+          placeholder="Опционально"
+          value={title ?? ""}
+          onChange={(e) => onChangeTitle(e.target.value)}
+        />
+      </div>
+      <ArticleBlockRichEditor
+        variant="text"
+        value={text}
+        onChange={onChangeText}
+        placeholder="Текст акцента"
+        minHeightClass="min-h-[100px]"
+      />
+      <div className="rounded-lg border border-border/70 bg-muted/25 p-3">
+        <p className="text-xs text-muted-foreground mb-2">Предпросмотр</p>
+        <ArticleCalloutBlock variant={variant} title={title} text={text} />
+      </div>
+    </div>
+  );
+}
+
 export function ArticleBlocksMvpEditor({
   blocks,
   onChange,
@@ -349,6 +419,16 @@ export function ArticleBlocksMvpEditor({
             />
           </div>
         </>
+      )}
+      {block.type === "callout" && (
+        <CalloutBlockEditor
+          variant={block.variant}
+          title={block.title}
+          text={block.text}
+          onChangeVariant={(v) => updateAt(i, { ...block, variant: v })}
+          onChangeTitle={(v) => updateAt(i, { ...block, title: v || undefined })}
+          onChangeText={(v) => updateAt(i, { ...block, text: v })}
+        />
       )}
       {block.type === "heading" && (
         <div className="space-y-2">

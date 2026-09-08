@@ -138,6 +138,7 @@ export type ArticleMvpResolvedBlock =
   | (ArticleBlockMvp & { type: "text" })
   | (ArticleBlockMvp & { type: "quote" })
   | (ArticleBlockMvp & { type: "heading" })
+  | (ArticleBlockMvp & { type: "callout" })
   | (Extract<ArticleBlockMvp, { type: "image" }> & { imageUrl: string | null })
   | (Extract<ArticleBlockMvp, { type: "gallery" }> & {
       images: Array<{
@@ -443,7 +444,7 @@ export async function buildArticleMvpResolvedBlocks(
   );
 
   for (const b of blocks) {
-    if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading") {
+    if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading" || b.type === "callout") {
       out.push(b);
       continue;
     }
