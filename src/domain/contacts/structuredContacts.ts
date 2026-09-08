@@ -129,11 +129,13 @@ function stripLeadingOrTrailingUlitsaWord(name: string): string {
 }
 
 /**
- * Builds "г.Город, ул.Улица, Дом" from Google Places `address_components`
+ * Builds "г. Город, ул. Улица Дом" from Google Places `address_components`
  * (matched by `types`, not by splitting Google's own `formatted_address`
  * string — that string's punctuation/order varies by place type and
- * locale, while `locality`/`route`/`street_number` are stable). Falls back
- * to `fallback` (normally Google's formatted_address) whenever there isn't
+ * locale, while `locality`/`route`/`street_number` are stable). Matches the
+ * house style already used for Place addresses elsewhere in the article
+ * (e.g. ArticlePlaceEmbed's "г. Минск, ул. Восточная 137"). Falls back to
+ * `fallback` (normally Google's formatted_address) whenever there isn't
  * even a locality to anchor on, so this never produces a worse result than
  * just using the raw address.
  */
@@ -142,10 +144,10 @@ export function formatAddressFromGoogleComponents(components: GoogleAddressCompo
   if (!city) return fallback;
   const street = findAddressComponent(components, ["route"]);
   const houseNumber = findAddressComponent(components, ["street_number"]);
-  const parts = [`г.${city}`];
+  const parts = [`г. ${city}`];
   if (street) {
     const cleanStreet = stripLeadingOrTrailingUlitsaWord(street);
-    parts.push(houseNumber ? `ул.${cleanStreet}, ${houseNumber}` : `ул.${cleanStreet}`);
+    parts.push(houseNumber ? `ул. ${cleanStreet} ${houseNumber}` : `ул. ${cleanStreet}`);
   }
   return parts.join(", ");
 }

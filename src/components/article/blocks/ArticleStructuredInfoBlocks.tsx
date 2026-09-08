@@ -562,8 +562,13 @@ export function ArticleInfoCard({
           <span className="flex shrink-0 flex-wrap items-center gap-2">
             {contacts.coordinates && <CopyCoordinatesButton value={`${contacts.coordinates.latitude}, ${contacts.coordinates.longitude}`} />}
             {mapHref && (
-              <a href={mapHref} target="_blank" rel="noreferrer" className={pill}>
-                <MapIcon className="h-3.5 w-3.5" />Как добраться
+              <a
+                href={mapHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:border-foreground/40"
+              >
+                <ExternalLink className="h-[13px] w-[13px]" />Как добраться
               </a>
             )}
           </span>
