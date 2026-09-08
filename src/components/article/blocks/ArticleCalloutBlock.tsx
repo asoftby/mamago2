@@ -10,19 +10,19 @@ const VARIANT_CONFIG: Record<
   tip: {
     Icon: Lightbulb,
     label: "Совет",
-    classes: "bg-[var(--success-soft)] border-[var(--success)]",
+    classes: "bg-[var(--success-soft)]",
     iconClasses: "text-[var(--success-hover)]",
   },
   warning: {
     Icon: AlertTriangle,
     label: "Внимание",
-    classes: "bg-[var(--warning-soft)] border-[var(--warning)]",
+    classes: "bg-[var(--warning-soft)]",
     iconClasses: "text-[var(--warning-hover)]",
   },
   info: {
     Icon: Info,
     label: "Информация",
-    classes: "bg-[var(--info-soft)] border-[var(--info)]",
+    classes: "bg-[var(--info-soft)]",
     iconClasses: "text-[var(--info-hover)]",
   },
 };
@@ -44,7 +44,7 @@ export function ArticleCalloutBlock({
       role="note"
       aria-label={titleTrim || label}
       className={cn(
-        "not-prose my-6 md:my-8 flex gap-3 rounded-xl border-l-4 px-4 py-4 md:px-5 md:py-5",
+        "not-prose my-6 md:my-8 flex gap-3 rounded-xl px-4 py-4 md:px-5 md:py-5",
         classes,
       )}
     >
