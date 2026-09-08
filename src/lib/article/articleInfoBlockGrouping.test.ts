@@ -23,11 +23,14 @@ type Block = { id: string; type: string };
 }
 
 {
-  // A lone info-type block (nothing adjacent of the same family) stays "single".
+  // A lone info-type block (nothing adjacent of the same family) still forms
+  // its own one-item info group — it always renders as ArticleInfoCard, never
+  // the old standalone Shell layout.
   const blocks: Block[] = [{ id: "a", type: "contacts" }];
   const groups = groupArticleInfoBlocks(blocks);
   assert.equal(groups.length, 1);
-  assert.equal(groups[0].kind, "single");
+  assert.equal(groups[0].kind, "info");
+  assert.equal(groups[0].kind === "info" && groups[0].blocks.length, 1);
 }
 
 {
@@ -68,8 +71,8 @@ type Block = { id: string; type: string };
   assert.equal(groups.length, 2);
   assert.equal(groups[0].kind, "info");
   assert.equal(groups[0].kind === "info" && groups[0].blocks.map((b) => b.id).join(","), "a,b");
-  assert.equal(groups[1].kind, "single");
-  assert.equal(groups[1].kind === "single" && groups[1].block.id, "c");
+  assert.equal(groups[1].kind, "info");
+  assert.equal(groups[1].kind === "info" && groups[1].blocks.map((b) => b.id).join(","), "c");
 }
 
 console.log("articleInfoBlockGrouping.test.ts: OK");
