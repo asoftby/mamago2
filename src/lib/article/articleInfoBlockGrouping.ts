@@ -6,11 +6,13 @@ export type ArticleRenderGroup<T extends { type: string }> =
 
 /**
  * Contacts/price/openingHours are authored as three independent blocks, but
- * render as one merged info card whenever they sit back-to-back with nothing
- * else between them (see ArticleInfoCard). Anything else stays untouched.
- * `index` is the position of the group's first block in the original array —
- * callers use it to line up per-position logic (e.g. table-of-contents
- * placement) without re-searching the source array.
+ * always render as one info card (see ArticleInfoCard) — never as the old
+ * three-separate-Shells layout, even when only one of the three is present.
+ * Adjacent blocks of these types (with nothing else between them) join the
+ * same card; anything else stays untouched. `index` is the position of the
+ * group's first block in the original array — callers use it to line up
+ * per-position logic (e.g. table-of-contents placement) without
+ * re-searching the source array.
  *
  * A run stops as soon as a type would repeat (e.g. contacts, price,
  * contacts) — ArticleInfoCard only has room for one of each section, so a
@@ -31,7 +33,7 @@ export function groupArticleInfoBlocks<T extends { type: string }>(blocks: T[]):
         run.push(blocks[i]);
         i += 1;
       }
-      groups.push(run.length > 1 ? { kind: "info", blocks: run, index: startIndex } : { kind: "single", block: run[0], index: startIndex });
+      groups.push({ kind: "info", blocks: run, index: startIndex });
       continue;
     }
     groups.push({ kind: "single", block, index: startIndex });
