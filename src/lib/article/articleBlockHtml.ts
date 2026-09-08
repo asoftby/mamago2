@@ -9,7 +9,7 @@
 
 export type ArticleBlockHtmlVariant = "intro" | "text" | "quote";
 
-const RICH_TEXT_TAGS = ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a", "div"];
+const RICH_TEXT_TAGS = ["p", "br", "strong", "b", "em", "i", "code", "ul", "ol", "li", "a", "div"];
 const RICH_TEXT_ATTRS = ["href", "target", "rel", "class", "data-sponsored"];
 
 const TAGS: Record<ArticleBlockHtmlVariant, string[]> = {

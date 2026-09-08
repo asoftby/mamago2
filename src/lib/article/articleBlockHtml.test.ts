@@ -107,5 +107,13 @@ assert.ok(introPublicHtml.includes("<blockquote"), "intro quote rendered as bloc
 assert.ok(!introPublicHtml.includes('data-type="quote-block"'), "editor quote node removed from public HTML");
 console.log("OK 16: intro quote renders for public article");
 
+// 17. <code> (footnote/small monospace mark) survives sanitization for a
+// text block, both at save time and when re-rendered for the public page.
+const codeSaved = sanitizeArticleBlockHtml("<p>Обычный текст <code>сноска</code> дальше</p>", "text");
+assert.ok(codeSaved.includes("<code>сноска</code>"), "code mark preserved on save");
+const codePublic = articleBlockHtmlForPublic(codeSaved, "text");
+assert.ok(codePublic.includes("<code>сноска</code>"), "code mark preserved for public render");
+console.log("OK 17: code (footnote) mark survives text-block sanitization");
+
 console.log("");
 console.log("All articleBlockHtml sanitizer tests passed!");
