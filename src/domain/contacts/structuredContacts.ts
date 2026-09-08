@@ -116,6 +116,18 @@ function findAddressComponent(components: GoogleAddressComponent[], types: strin
   return undefined;
 }
 
+// Google's `route.long_name` sometimes already spells out "улица"/"ул." as
+// part of the name itself (e.g. "Мястровская улица") instead of a clean
+// bare name — prepending our own "ул." on top would duplicate it.
+function stripLeadingOrTrailingUlitsaWord(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length <= 1) return name.trim();
+  const isUlitsaWord = (word: string) => /^ул\.?$|^улица$/i.test(word);
+  if (isUlitsaWord(words[0])) return words.slice(1).join(" ").trim();
+  if (isUlitsaWord(words[words.length - 1])) return words.slice(0, -1).join(" ").trim();
+  return name.trim();
+}
+
 /**
  * Builds "г.Город, ул.Улица, Дом" from Google Places `address_components`
  * (matched by `types`, not by splitting Google's own `formatted_address`
@@ -131,6 +143,9 @@ export function formatAddressFromGoogleComponents(components: GoogleAddressCompo
   const street = findAddressComponent(components, ["route"]);
   const houseNumber = findAddressComponent(components, ["street_number"]);
   const parts = [`г.${city}`];
-  if (street) parts.push(houseNumber ? `ул.${street}, ${houseNumber}` : `ул.${street}`);
+  if (street) {
+    const cleanStreet = stripLeadingOrTrailingUlitsaWord(street);
+    parts.push(houseNumber ? `ул.${cleanStreet}, ${houseNumber}` : `ул.${cleanStreet}`);
+  }
   return parts.join(", ");
 }

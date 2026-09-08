@@ -63,7 +63,29 @@ test("formats city/street/house from Google address_components, not from formatt
     ],
     "some fallback",
   );
-  assert.equal(full, "г.Минск, ул.Мястровская улица, 5");
+  assert.equal(full, "г.Минск, ул.Мястровская, 5");
+});
+
+test("does not duplicate the street designator when Google's route name already spells it out", () => {
+  const trailing = formatAddressFromGoogleComponents(
+    [
+      { long_name: "5", short_name: "5", types: ["street_number"] },
+      { long_name: "Мястровская улица", short_name: "Мястровская", types: ["route"] },
+      { long_name: "Минск", short_name: "Минск", types: ["locality", "political"] },
+    ],
+    "fallback",
+  );
+  assert.equal(trailing, "г.Минск, ул.Мястровская, 5");
+
+  const leading = formatAddressFromGoogleComponents(
+    [
+      { long_name: "5", short_name: "5", types: ["street_number"] },
+      { long_name: "улица Ленина", short_name: "ул. Ленина", types: ["route"] },
+      { long_name: "Минск", short_name: "Минск", types: ["locality", "political"] },
+    ],
+    "fallback",
+  );
+  assert.equal(leading, "г.Минск, ул.Ленина, 5");
 });
 
 test("degrades gracefully when a component is missing, still anchored on locality", () => {
@@ -74,7 +96,7 @@ test("degrades gracefully when a component is missing, still anchored on localit
     ],
     "fallback",
   );
-  assert.equal(noHouse, "г.Минск, ул.Мястровская улица");
+  assert.equal(noHouse, "г.Минск, ул.Мястровская");
 
   const cityOnly = formatAddressFromGoogleComponents(
     [{ long_name: "Минск", short_name: "Минск", types: ["locality", "political"] }],
