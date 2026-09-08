@@ -337,19 +337,21 @@ export function ArticlePlaceEmbed({
           )}
 
           <div className="flex flex-col gap-[13px] px-4 py-4 sm:px-5 sm:py-[18px]" style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {card.categoryLabel && (
-                <span style={{ ...capsStyle, display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "1 1 auto" }}>
-                  {card.categoryLabel}
-                </span>
-              )}
-              {card.rating && (
-                <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
-                  <Star size={10} style={{ color: T.accent, fill: T.accent }} />
-                  {card.rating.value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
-                </span>
-              )}
-            </div>
+            {(card.categoryLabel || card.rating) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {card.categoryLabel && (
+                  <span style={{ ...capsStyle, display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "1 1 auto" }}>
+                    {card.categoryLabel}
+                  </span>
+                )}
+                {card.rating && (
+                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
+                    <Star size={10} style={{ color: T.accent, fill: T.accent }} />
+                    {card.rating.value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {card.hoursMessage && (
