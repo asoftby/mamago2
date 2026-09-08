@@ -368,15 +368,15 @@ export function ArticlePlaceEmbed({
             </div>
 
             {(card.hoursMessage || card.rating) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 {card.hoursMessage && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0, flex: "1 1 auto", fontSize: 12.5, color: hoursColor }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0, fontSize: 12.5, color: hoursColor }}>
                     {card.isOpenNow != null && <span style={{ width: 6, height: 6, borderRadius: 999, background: hoursColor, flexShrink: 0 }} />}
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.hoursMessage}</span>
                   </span>
                 )}
                 {card.rating && (
-                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
+                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
                     <Star size={10} style={{ color: T.accent, fill: T.accent }} />
                     {card.rating.value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
                   </span>
