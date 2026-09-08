@@ -69,6 +69,7 @@ const embedCard = {
   isOpenNow: true,
   hoursMessage: "Открыто до 20:00",
   metroName: "Площадь Победы",
+  districtName: null,
   ageTags: ["3+"],
   address: "Минск, ул. Мира, 1",
   lat: 53.9,

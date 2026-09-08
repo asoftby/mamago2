@@ -34,6 +34,19 @@ function truncate(text: string, max: number): string {
   return `${trimmed.slice(0, max - 1).trimEnd()}…`;
 }
 
+/**
+ * `formatMarketplaceHeroAddress` already strips a trailing ", CityName" when
+ * it can, but a raw `formattedAddr`/`customAddress` fallback (e.g. Google's
+ * "ул. Восточная, 137, Минск, Беларусь") can still leave it in — the country
+ * suffix keeps the city from sitting at the very end. Guard the display
+ * value directly rather than reworking the shared formatter's regexes.
+ */
+function stripTrailingCityDuplicate(address: string, cityName: string | null): string {
+  if (!cityName) return address;
+  const escaped = cityName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return address.replace(new RegExp(`,\\s*${escaped}\\s*$`, "i"), "").trim();
+}
+
 function buildGoogleMapsUrl(lat: number | null, lng: number | null, address: string | null): string | null {
   if (lat != null && lng != null) return `https://maps.google.com/?q=${lat},${lng}`;
   if (address?.trim()) return `https://maps.google.com/?q=${encodeURIComponent(address.trim())}`;
@@ -124,6 +137,7 @@ export type ResolvedPlaceEmbedCard = {
   isOpenNow: boolean | null;
   hoursMessage: string | null;
   metroName: string | null;
+  districtName: string | null;
   ageTags: string[];
   address: string | null;
   lat: number | null;
@@ -182,6 +196,8 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
       city: { select: { slug: true, name: true } },
       metroAuto: { select: { name: true } },
       metroManual: { select: { name: true } },
+      districtAuto: { select: { name: true } },
+      districtManual: { select: { name: true } },
       primaryCategory: { select: { nameRu: true } },
       images: {
         orderBy: { sortOrder: "asc" },
@@ -239,7 +255,7 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
         ?.trim() || null
     : null;
 
-  const address =
+  const rawAddress =
     formatMarketplaceHeroAddress({
       city: place.city,
       shortAddress: place.shortAddress,
@@ -252,6 +268,7 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
     place.formattedAddr?.trim() ||
     place.customAddress?.trim() ||
     null;
+  const address = rawAddress ? stripTrailingCityDuplicate(rawAddress, place.city?.name ?? null) : null;
 
   const afisha: ArticlePlaceAfishaItem[] = upcomingEvents.map((event) => {
     const when = event.sessions[0]?.startsAt ?? event.nextOccurrenceAt ?? null;
@@ -322,6 +339,7 @@ export async function getArticlePlaceEmbedData(placeId: string): Promise<Resolve
     isOpenNow: isOpenNow?.isOpen ?? null,
     hoursMessage: isOpenNow?.message ?? null,
     metroName: place.metroManual?.name || place.metroAuto?.name || null,
+    districtName: place.districtManual?.name || place.districtAuto?.name || null,
     ageTags: place.ageTags,
     address,
     lat: place.lat ?? null,
