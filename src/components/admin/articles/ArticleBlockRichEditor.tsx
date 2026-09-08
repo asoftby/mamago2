@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { QuoteBlock } from "@/lib/article/quoteBlockExtension";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bold, Italic, Link2, List, ListOrdered, Quote, Redo, Undo } from "lucide-react";
+import { Bold, Code, Italic, Link2, List, ListOrdered, Quote, Redo, Undo } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { ARTICLE_DEK_CLASSNAME } from "@/components/article/ArticleHeader";
@@ -63,13 +63,15 @@ function buildExtensions(variant: ArticleBlockRichEditorVariant, placeholder: st
     StarterKit.configure({
       heading: false,
       blockquote: false,
-      code: false,
       codeBlock: false,
       horizontalRule: false,
       strike: false,
       underline: false,
       link: false,
       paragraph: {},
+      // "text" gets the footnote/code mark; "intro" (the dek) stays plain —
+      // its own render path (ArticleHeader) doesn't carry the code styling.
+      ...(variant === "text" ? {} : { code: false }),
     }),
     QuoteBlock,
     ArticleBodyLink.configure({
@@ -231,7 +233,7 @@ export function ArticleBlockRichEditor({
         disabled && "opacity-50 cursor-not-allowed",
       )}
     >
-      <div className="border-b bg-muted/30 px-2 py-1.5 flex flex-wrap items-center gap-0.5">
+      <div className="sticky top-16 z-10 border-b bg-background px-2 py-1.5 flex flex-wrap items-center gap-0.5">
         {variant !== "quote" ? (
           <ToolbarIcon
             title="Жирный"
@@ -250,6 +252,16 @@ export function ArticleBlockRichEditor({
         >
           <Italic className="w-4 h-4" />
         </ToolbarIcon>
+        {variant === "text" ? (
+          <ToolbarIcon
+            title="Сноска (мелкий моноширинный текст)"
+            disabled={disabled}
+            active={editor.isActive("code")}
+            onClick={() => editor.chain().focus().toggleCode().run()}
+          >
+            <Code className="w-4 h-4" />
+          </ToolbarIcon>
+        ) : null}
 
         {showLists ? (
           <>
@@ -412,6 +424,7 @@ export function ArticleBlockRichEditor({
           minHeightClass,
           proseMirrorMin,
           "[&_.ProseMirror]:outline-none",
+          "[&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-muted-foreground",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left",

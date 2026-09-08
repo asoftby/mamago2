@@ -10,11 +10,16 @@
 export type ArticleBlockHtmlVariant = "intro" | "text" | "quote";
 
 const RICH_TEXT_TAGS = ["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a", "div"];
+// "text" alone gets the footnote mark (<code>) — the editor only exposes the
+// toggle for this variant, and "intro" (the dek) has no matching public
+// styling for it (ArticleHeader), so keep it out of intro's own allowlist
+// in case older/imported intro HTML happens to contain a stray <code>.
+const TEXT_TAGS = [...RICH_TEXT_TAGS, "code"];
 const RICH_TEXT_ATTRS = ["href", "target", "rel", "class", "data-sponsored"];
 
 const TAGS: Record<ArticleBlockHtmlVariant, string[]> = {
   intro: RICH_TEXT_TAGS,
-  text: RICH_TEXT_TAGS,
+  text: TEXT_TAGS,
   quote: ["p", "br", "em", "i"],
 };
 

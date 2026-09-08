@@ -107,5 +107,21 @@ assert.ok(introPublicHtml.includes("<blockquote"), "intro quote rendered as bloc
 assert.ok(!introPublicHtml.includes('data-type="quote-block"'), "editor quote node removed from public HTML");
 console.log("OK 16: intro quote renders for public article");
 
+// 17. <code> (footnote/small monospace mark) survives sanitization for a
+// text block, both at save time and when re-rendered for the public page.
+const codeSaved = sanitizeArticleBlockHtml("<p>Обычный текст <code>сноска</code> дальше</p>", "text");
+assert.ok(codeSaved.includes("<code>сноска</code>"), "code mark preserved on save");
+const codePublic = articleBlockHtmlForPublic(codeSaved, "text");
+assert.ok(codePublic.includes("<code>сноска</code>"), "code mark preserved for public render");
+console.log("OK 17: code (footnote) mark survives text-block sanitization");
+
+// 18. <code> is stripped from intro (dek) HTML — the editor never offers the
+// toggle there, and older/imported intro content shouldn't leak it through
+// to the public header, which has no matching styling for it.
+const introCodeStripped = sanitizeArticleBlockHtml("<p>Лид <code>сноска</code> текст</p>", "intro");
+assert.ok(!introCodeStripped.includes("<code>"), "code tag stripped from intro");
+assert.ok(introCodeStripped.includes("сноска"), "inner text kept even though the tag is stripped");
+console.log("OK 18: code mark stripped from intro (dek) HTML");
+
 console.log("");
 console.log("All articleBlockHtml sanitizer tests passed!");
