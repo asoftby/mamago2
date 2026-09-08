@@ -337,27 +337,10 @@ export function ArticlePlaceEmbed({
           )}
 
           <div className="flex flex-col gap-[13px] px-4 py-4 sm:px-5 sm:py-[18px]" style={{ minWidth: 0 }}>
-            {(card.categoryLabel || card.rating) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {card.categoryLabel && (
-                  <span style={{ ...capsStyle, display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "1 1 auto" }}>
-                    {card.categoryLabel}
-                  </span>
-                )}
-                {card.rating && (
-                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
-                    <Star size={10} style={{ color: T.accent, fill: T.accent }} />
-                    {card.rating.value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
-                  </span>
-                )}
-              </div>
-            )}
-
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {card.hoursMessage && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0, flex: "1 1 auto", fontSize: 12.5, color: hoursColor }}>
-                  {card.isOpenNow != null && <span style={{ width: 6, height: 6, borderRadius: 999, background: hoursColor, flexShrink: 0 }} />}
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.hoursMessage}</span>
+              {card.categoryLabel && (
+                <span style={{ ...capsStyle, display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: "1 1 auto" }}>
+                  {card.categoryLabel}
                 </span>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
@@ -383,6 +366,23 @@ export function ArticlePlaceEmbed({
                 </button>
               </div>
             </div>
+
+            {(card.hoursMessage || card.rating) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {card.hoursMessage && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0, flex: "1 1 auto", fontSize: 12.5, color: hoursColor }}>
+                    {card.isOpenNow != null && <span style={{ width: 6, height: 6, borderRadius: 999, background: hoursColor, flexShrink: 0 }} />}
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.hoursMessage}</span>
+                  </span>
+                )}
+                {card.rating && (
+                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
+                    <Star size={10} style={{ color: T.accent, fill: T.accent }} />
+                    {card.rating.value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               {card.logoUrl && (
