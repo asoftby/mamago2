@@ -78,6 +78,7 @@ import { ArticleContactsBlock, ArticleInfoCard, ArticleOpeningHoursBlock, Articl
   assert.match(html, /ул\. Примерная, 1/);
   assert.match(html, /tel:\+375291112233/);
   assert.match(html, /Понедельник/);
+  assert.match(html, /Открыто сейчас|Закрыто сейчас/);
 }
 
 {

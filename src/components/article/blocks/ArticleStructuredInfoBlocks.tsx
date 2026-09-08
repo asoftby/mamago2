@@ -435,9 +435,16 @@ export function ArticleInfoCard({
               <div className="mb-3 font-mono text-[9.5px] uppercase tracking-[0.13em] text-muted-foreground">Режим работы</div>
               {openingHours.mode === "WEEKLY" ? (
                 (() => {
-                  const { todayKey, todayException } = weeklyStatusSummary(openingHours, new Date());
+                  const { isOpen, caption, todayKey, todayException } = weeklyStatusSummary(openingHours, new Date());
                   return (
                     <div>
+                      <div className={cn("mb-3 flex items-center gap-2 rounded-lg px-2.5 py-2", isOpen ? "bg-success/10" : "bg-surface-hover")}>
+                        <span className={cn("h-[6px] w-[6px] shrink-0 rounded-full", isOpen ? "bg-success shadow-[0_0_0_3px_rgba(22,163,74,0.18)]" : "bg-muted-foreground/40")} />
+                        <b className={cn("text-[12.5px] font-semibold", isOpen ? "text-success" : "text-foreground")}>
+                          {isOpen ? "Открыто сейчас" : "Закрыто сейчас"}
+                        </b>
+                        {caption && <span className="text-[12px] text-muted-foreground">· {caption}</span>}
+                      </div>
                       {weeklyDayRows(openingHours, todayKey, todayException).map((row) => (
                         <div key={row.day} className="flex items-baseline gap-3 border-t border-border py-2 first:border-t-0 first:pt-0">
                           <span className={cn("shrink-0 text-[13.5px]", row.isToday ? "font-bold text-foreground" : "font-medium text-foreground/80")}>
