@@ -427,7 +427,7 @@ export function ArticleInfoCard({
   const hasLinksBand = hasContacts && contacts && Boolean(contacts.website || contacts.email || contacts.socials.length > 0);
 
   return (
-    <section className="not-prose my-8 overflow-hidden rounded-2xl border border-border bg-surface-subtle shadow-sm md:my-10">
+    <section className="not-prose my-8 overflow-hidden rounded-2xl border border-border bg-surface-subtle font-sans shadow-sm md:my-10">
       {(hasHours || hasPrice) && (
         <div className={cn("grid grid-cols-1", hasHours && hasPrice && "sm:grid-cols-2")}>
           {hasHours && openingHours && (
@@ -482,7 +482,7 @@ export function ArticleInfoCard({
                     <Clock className="h-5 w-5" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block font-serif text-xl tracking-tight">
+                    <span className="block text-xl font-semibold tracking-tight">
                       {openingHours.mode === "ALWAYS_OPEN" ? "Круглосуточно" : openingHours.mode === "BY_APPOINTMENT" ? "По записи" : "Временно закрыто"}
                     </span>
                     {openingHours.note && <span className="mt-0.5 block text-xs text-muted-foreground">{openingHours.note}</span>}
@@ -585,7 +585,7 @@ export function ArticleInfoCard({
       {hasLinksBand && contacts && (
         <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-3 md:px-6">
           {contacts.website && (
-            <a href={contacts.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all text-[14px] font-semibold text-brand">
+            <a href={contacts.website} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1.5 break-all font-mono text-[13px] font-semibold text-brand">
               {contacts.website}<ExternalLink className="h-3.5 w-3.5 shrink-0" />
             </a>
           )}
