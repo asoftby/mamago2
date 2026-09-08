@@ -11,6 +11,7 @@ import {
   Star,
 } from "lucide-react";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
+import { EventCard } from "@/components/events";
 import { toast } from "@/lib/toast";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
@@ -139,47 +140,26 @@ function sharePlace(title: string, href: string) {
   copyToClipboard(url, `Ссылка на «${title}» скопирована`);
 }
 
+function afishaMetaLabel(item: ArticlePlaceAfishaItem): string | undefined {
+  const date = item.day && item.month ? `${item.day} ${item.month}` : null;
+  return [date, item.meta].filter(Boolean).join(" · ") || undefined;
+}
+
 function AfishaRail({ items }: { items: ArticlePlaceAfishaItem[] }) {
   return (
-    <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "2px 20px 4px" }}>
+    <div style={{ display: "flex", gap: 16, overflowX: "auto", padding: "2px 20px 4px" }}>
       {items.map((item) => (
-        <Link
-          key={item.id}
-          href={item.href}
-          style={{ flex: "0 0 172px", display: "flex", flexDirection: "column", gap: 8, textDecoration: "none", color: "inherit" }}
-        >
-          <div style={{ position: "relative", aspectRatio: "4 / 3", borderRadius: 13, overflow: "hidden", background: T.paper2 }}>
-            {item.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.imageUrl} alt={item.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-            )}
-            {item.day && item.month && (
-              <div style={{
-                position: "absolute", top: 8, left: 8, width: 40, borderRadius: 10,
-                background: "rgba(250,247,241,.95)", textAlign: "center", padding: "4px 0 3px", lineHeight: 1,
-              }}>
-                <b style={{ display: "block", fontFamily: T.serif, fontSize: 18, color: T.ink, fontWeight: 400 }}>{item.day}</b>
-                <i style={{ display: "block", fontStyle: "normal", fontFamily: T.mono, fontSize: 7.5, letterSpacing: ".06em", textTransform: "uppercase", color: T.ink3, marginTop: 2 }}>{item.month}</i>
-              </div>
-            )}
-            {item.categoryLabel && (
-              <span style={{
-                position: "absolute", bottom: 8, left: 8, height: 19, padding: "0 7px", borderRadius: 999,
-                background: "rgba(20,18,16,.82)", color: T.paper, fontFamily: T.mono, fontSize: 8.5,
-                fontWeight: 500, letterSpacing: ".07em", textTransform: "uppercase", display: "inline-flex", alignItems: "center",
-              }}>
-                {item.categoryLabel}
-              </span>
-            )}
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.28 }}>{item.title}</span>
-          {item.meta && <span style={{ fontSize: 12, color: T.ink3 }}>{item.meta}</span>}
-          {item.priceLabel && (
-            <span style={{ fontFamily: T.mono, fontSize: 12.5, fontWeight: 600 }}>
-              {renderCurrencyText(normalizeUiCurrencyText(item.priceLabel), { iconSize: "sm" })}
-            </span>
-          )}
-        </Link>
+        <div key={item.id} style={{ flex: "0 0 160px" }}>
+          <EventCard
+            id={item.id}
+            title={item.title}
+            href={item.href}
+            imageUrl={item.imageUrl}
+            categoryLabel={item.categoryLabel ?? undefined}
+            metaLabel={afishaMetaLabel(item)}
+            priceLabel={item.priceLabel ?? undefined}
+          />
+        </div>
       ))}
     </div>
   );
@@ -261,18 +241,20 @@ export function ArticlePlaceEmbed({
       }}>
         <div style={{ display: "grid", gridTemplateColumns: card.coverImageUrl ? "186px 1fr" : "1fr", gap: 0 }}>
           {card.coverImageUrl && (
-            <div style={{ position: "relative", minHeight: 230 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={card.coverImageUrl} alt={card.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-              {card.coverImageCount > 1 && (
-                <span style={{
-                  position: "absolute", bottom: 10, left: 10, height: 23, padding: "0 9px", borderRadius: 999,
-                  background: "rgba(20,18,16,.78)", color: T.paper, fontFamily: T.mono, fontSize: 9.5,
-                  letterSpacing: ".07em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 5,
-                }}>
-                  ◲ {card.coverImageCount} фото
-                </span>
-              )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: T.paper2 }}>
+              <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: 16, overflow: "hidden" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={card.coverImageUrl} alt={card.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                {card.coverImageCount > 1 && (
+                  <span style={{
+                    position: "absolute", bottom: 8, left: 8, height: 23, padding: "0 9px", borderRadius: 999,
+                    background: "rgba(20,18,16,.78)", color: T.paper, fontFamily: T.mono, fontSize: 9.5,
+                    letterSpacing: ".07em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 5,
+                  }}>
+                    ◲ {card.coverImageCount} фото
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -419,7 +401,6 @@ export function ArticlePlaceEmbed({
 
             {availableTabs.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 7, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
-                <span style={{ ...capsStyle, marginRight: 2 }}>сейчас</span>
                 {availableTabs.map((id) => {
                   const count = card.tabs[id].length;
                   const priceHint = id === "visit" || id === "party" ? minPriceLabel(card.tabs[id]) : null;
