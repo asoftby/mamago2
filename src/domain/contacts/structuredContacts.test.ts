@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SharedContactsDataSchema, contactsFromPlace, normalizeSharedContactsData } from "./structuredContacts";
+import { SharedContactsDataSchema, contactsFromPlace, formatAddressFromGoogleComponents, normalizeSharedContactsData } from "./structuredContacts";
 
 test("accepts empty contacts and survives a JSON roundtrip", () => {
   const contacts = normalizeSharedContactsData({});
@@ -51,4 +51,45 @@ test("adapts current Place scalar contacts without Prisma coupling", () => {
 test("does not synthesize coordinates from null or partial Place pairs", () => {
   assert.equal(contactsFromPlace({ lat: null, lng: null }).coordinates, undefined);
   assert.equal(contactsFromPlace({ lat: 53.9, lng: null }).coordinates, undefined);
+});
+
+test("formats city/street/house from Google address_components, not from formatted_address", () => {
+  const full = formatAddressFromGoogleComponents(
+    [
+      { long_name: "5", short_name: "5", types: ["street_number"] },
+      { long_name: "Мястровская улица", short_name: "Мястровская", types: ["route"] },
+      { long_name: "Минск", short_name: "Минск", types: ["locality", "political"] },
+      { long_name: "Беларусь", short_name: "BY", types: ["country", "political"] },
+    ],
+    "some fallback",
+  );
+  assert.equal(full, "г.Минск, ул.Мястровская улица, 5");
+});
+
+test("degrades gracefully when a component is missing, still anchored on locality", () => {
+  const noHouse = formatAddressFromGoogleComponents(
+    [
+      { long_name: "Мястровская улица", short_name: "Мястровская", types: ["route"] },
+      { long_name: "Минск", short_name: "Минск", types: ["locality", "political"] },
+    ],
+    "fallback",
+  );
+  assert.equal(noHouse, "г.Минск, ул.Мястровская улица");
+
+  const cityOnly = formatAddressFromGoogleComponents(
+    [{ long_name: "Минск", short_name: "Минск", types: ["locality", "political"] }],
+    "fallback",
+  );
+  assert.equal(cityOnly, "г.Минск");
+});
+
+test("falls back to the raw address when there is no locality to anchor on", () => {
+  assert.equal(
+    formatAddressFromGoogleComponents(
+      [{ long_name: "Мястровская улица", short_name: "Мястровская", types: ["route"] }],
+      "Мястровская улица, 5",
+    ),
+    "Мястровская улица, 5",
+  );
+  assert.equal(formatAddressFromGoogleComponents([], "raw text"), "raw text");
 });

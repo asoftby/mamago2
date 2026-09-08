@@ -105,3 +105,32 @@ export function contactsFromPlace(source: PlaceContactsSource): SharedContactsDa
     mapUrl: clean(source.mapUrl),
   });
 }
+
+type GoogleAddressComponent = { long_name: string; short_name: string; types: string[] };
+
+function findAddressComponent(components: GoogleAddressComponent[], types: string[]): string | undefined {
+  for (const type of types) {
+    const match = components.find((component) => component.types.includes(type));
+    if (match?.long_name) return match.long_name;
+  }
+  return undefined;
+}
+
+/**
+ * Builds "г.Город, ул.Улица, Дом" from Google Places `address_components`
+ * (matched by `types`, not by splitting Google's own `formatted_address`
+ * string — that string's punctuation/order varies by place type and
+ * locale, while `locality`/`route`/`street_number` are stable). Falls back
+ * to `fallback` (normally Google's formatted_address) whenever there isn't
+ * even a locality to anchor on, so this never produces a worse result than
+ * just using the raw address.
+ */
+export function formatAddressFromGoogleComponents(components: GoogleAddressComponent[], fallback: string): string {
+  const city = findAddressComponent(components, ["locality", "sublocality", "sublocality_level_1"]);
+  if (!city) return fallback;
+  const street = findAddressComponent(components, ["route"]);
+  const houseNumber = findAddressComponent(components, ["street_number"]);
+  const parts = [`г.${city}`];
+  if (street) parts.push(houseNumber ? `ул.${street}, ${houseNumber}` : `ул.${street}`);
+  return parts.join(", ");
+}
