@@ -79,9 +79,14 @@ function Row({ label, action, children }: { label: string; action?: ReactNode; c
 
 function contactMapHref(data: SharedContactsData): string | null {
   if (data.mapUrl) return data.mapUrl;
-  if (!data.coordinates) return null;
-  const query = encodeURIComponent(`${data.coordinates.latitude},${data.coordinates.longitude}`);
-  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+  if (data.coordinates) {
+    const query = encodeURIComponent(`${data.coordinates.latitude},${data.coordinates.longitude}`);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+  }
+  // No coordinates on record — still give a working "how to get there" link
+  // by letting Google Maps resolve the free-text address itself.
+  if (data.address) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.address)}`;
+  return null;
 }
 
 export function ArticleContactsBlock({ data }: { data: SharedContactsData }) {
@@ -541,7 +546,7 @@ export function ArticleInfoCard({
             <MapPin className="h-4 w-4 shrink-0 text-brand" />
             {contacts.address ? (
               <span className="min-w-0">
-                <span className="font-semibold">{contacts.address}</span>
+                <span className="font-normal">{contacts.address}</span>
                 {contacts.coordinates && (
                   <small className="ml-2 font-mono text-xs text-muted-foreground">
                     {contacts.coordinates.latitude}, {contacts.coordinates.longitude}
@@ -558,7 +563,7 @@ export function ArticleInfoCard({
             {contacts.coordinates && <CopyCoordinatesButton value={`${contacts.coordinates.latitude}, ${contacts.coordinates.longitude}`} />}
             {mapHref && (
               <a href={mapHref} target="_blank" rel="noreferrer" className={pill}>
-                <MapIcon className="h-3.5 w-3.5" />Маршрут
+                <MapIcon className="h-3.5 w-3.5" />Как добраться
               </a>
             )}
           </span>

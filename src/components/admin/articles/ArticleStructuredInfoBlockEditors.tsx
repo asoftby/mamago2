@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { OpeningHoursEditor } from "@/components/openingHours/OpeningHoursEditor";
 import { PlaceMapModal } from "@/components/business/place/PlaceMapModal";
 import { PlaceSearchInput } from "@/components/business/place/PlaceSearchInput";
-import { CONTACT_SOCIAL_KINDS, SharedContactsDataSchema, type SharedContactsData } from "@/domain/contacts/structuredContacts";
+import { CONTACT_SOCIAL_KINDS, SharedContactsDataSchema, formatAddressFromGoogleComponents, type SharedContactsData } from "@/domain/contacts/structuredContacts";
 import { SharedPriceDataSchema, type SharedPriceData } from "@/domain/pricing/structuredPrice";
 import { SharedOpeningHoursDataSchema, type SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
 import { randomId } from "@/lib/utils/randomId";
@@ -50,9 +50,9 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
           coordinates: undefined,
           mapUrl: undefined,
         })}
-        onPlaceSelect={({ placeName, lat, lng, formattedAddr }) => onChange({
+        onPlaceSelect={({ placeName, lat, lng, formattedAddr, addressJson }) => onChange({
           ...value,
-          address: clean(formattedAddr || placeName),
+          address: clean(formatAddressFromGoogleComponents(addressJson, formattedAddr || placeName)),
           coordinates: { latitude: lat, longitude: lng },
           mapUrl: undefined,
         })}

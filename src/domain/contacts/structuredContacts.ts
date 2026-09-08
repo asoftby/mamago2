@@ -105,3 +105,47 @@ export function contactsFromPlace(source: PlaceContactsSource): SharedContactsDa
     mapUrl: clean(source.mapUrl),
   });
 }
+
+type GoogleAddressComponent = { long_name: string; short_name: string; types: string[] };
+
+function findAddressComponent(components: GoogleAddressComponent[], types: string[]): string | undefined {
+  for (const type of types) {
+    const match = components.find((component) => component.types.includes(type));
+    if (match?.long_name) return match.long_name;
+  }
+  return undefined;
+}
+
+// Google's `route.long_name` sometimes already spells out "улица"/"ул." as
+// part of the name itself (e.g. "Мястровская улица") instead of a clean
+// bare name — prepending our own "ул." on top would duplicate it.
+function stripLeadingOrTrailingUlitsaWord(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length <= 1) return name.trim();
+  const isUlitsaWord = (word: string) => /^ул\.?$|^улица$/i.test(word);
+  if (isUlitsaWord(words[0])) return words.slice(1).join(" ").trim();
+  if (isUlitsaWord(words[words.length - 1])) return words.slice(0, -1).join(" ").trim();
+  return name.trim();
+}
+
+/**
+ * Builds "г.Город, ул.Улица, Дом" from Google Places `address_components`
+ * (matched by `types`, not by splitting Google's own `formatted_address`
+ * string — that string's punctuation/order varies by place type and
+ * locale, while `locality`/`route`/`street_number` are stable). Falls back
+ * to `fallback` (normally Google's formatted_address) whenever there isn't
+ * even a locality to anchor on, so this never produces a worse result than
+ * just using the raw address.
+ */
+export function formatAddressFromGoogleComponents(components: GoogleAddressComponent[], fallback: string): string {
+  const city = findAddressComponent(components, ["locality", "sublocality", "sublocality_level_1"]);
+  if (!city) return fallback;
+  const street = findAddressComponent(components, ["route"]);
+  const houseNumber = findAddressComponent(components, ["street_number"]);
+  const parts = [`г.${city}`];
+  if (street) {
+    const cleanStreet = stripLeadingOrTrailingUlitsaWord(street);
+    parts.push(houseNumber ? `ул.${cleanStreet}, ${houseNumber}` : `ул.${cleanStreet}`);
+  }
+  return parts.join(", ");
+}
