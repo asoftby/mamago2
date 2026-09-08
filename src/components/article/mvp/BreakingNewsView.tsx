@@ -950,7 +950,7 @@ function GlobalStyles() {
       .bn-body strong, .bn-body b { font-weight: 600; }
       .bn-body em, .bn-body i { font-style: italic; }
       .bn-body a { color: ${C.accent}; text-decoration: underline; text-underline-offset: 3px; }
-      .bn-body code { font-family: ${FONT_MONO}; font-size: 0.85em; color: ${C.ink3}; }
+      .bn-body code { font-family: Menlo, ui-monospace, 'JetBrains Mono', monospace; font-size: calc(1em - 2px); color: ${C.ink3}; }
       @keyframes bn-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       @keyframes bn-blink { 0%, 60% { opacity: 1; } 80% { opacity: .25; } 100% { opacity: 1; } }
       @keyframes bn-pulse { 0% { box-shadow: 0 0 0 0 rgba(214,52,43,.55); } 70% { box-shadow: 0 0 0 12px rgba(214,52,43,0); } 100% { box-shadow: 0 0 0 0 rgba(214,52,43,0); } }
