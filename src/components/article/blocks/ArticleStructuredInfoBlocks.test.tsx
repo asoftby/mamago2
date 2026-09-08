@@ -91,6 +91,10 @@ import { ArticleContactsBlock, ArticleInfoCard, ArticleOpeningHoursBlock, Articl
   );
   assert.doesNotMatch(html, /Режим работы/);
   assert.match(html, /Стоимость/);
+  // No coordinates on record — "Как добраться" still shows, resolving the
+  // free-text address via a Google Maps search query instead of coordinates.
+  assert.match(html, /Как добраться/);
+  assert.match(html, /maps\/search\/\?api=1&amp;query=%D0%9C%D0%B8%D0%BD%D1%81%D0%BA/);
 }
 
 {
