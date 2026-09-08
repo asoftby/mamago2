@@ -30,7 +30,8 @@ import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
-import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
+import { ArticleContactsBlock, ArticleInfoCard, ArticleOpeningHoursBlock, ArticlePriceBlock } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
+import { groupArticleInfoBlocks } from "@/lib/article/articleInfoBlockGrouping";
 
 /** Лёгкое оглавление: только текст и вложенный список для H3, без карточек и рамок. */
 function ArticleInlineToc({ branches }: { branches: ArticleTocBranch[] }) {
@@ -190,11 +191,31 @@ export function ArticleMvpView({
       <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
 
       <ArticleContent>
-        {blocks.map((block, i) => {
+        {groupArticleInfoBlocks(blocks).map((group) => {
           const tocBeforeBody =
-            showToc && i === firstBodyBlockIndex ? (
+            showToc && group.index === firstBodyBlockIndex ? (
               <ArticleInlineToc branches={tocBranches} />
             ) : null;
+
+          if (group.kind === "info") {
+            const contacts = group.blocks.find(
+              (b): b is Extract<ArticleMvpResolvedBlock, { type: "contacts" }> => b.type === "contacts",
+            )?.data;
+            const price = group.blocks.find(
+              (b): b is Extract<ArticleMvpResolvedBlock, { type: "price" }> => b.type === "price",
+            )?.data;
+            const openingHours = group.blocks.find(
+              (b): b is Extract<ArticleMvpResolvedBlock, { type: "openingHours" }> => b.type === "openingHours",
+            )?.data;
+            return (
+              <Fragment key={group.blocks[0].id}>
+                {tocBeforeBody}
+                <ArticleInfoCard contacts={contacts} price={price} openingHours={openingHours} />
+              </Fragment>
+            );
+          }
+
+          const block = group.block;
 
           // Лид показываем только в шапке (excerpt), в теле статьи не дублируем.
           if (block.type === "intro") {

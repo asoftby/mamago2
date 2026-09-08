@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } from "./ArticleStructuredInfoBlocks";
+import { ArticleContactsBlock, ArticleInfoCard, ArticleOpeningHoursBlock, ArticlePriceBlock } from "./ArticleStructuredInfoBlocks";
 
 {
   const html = renderToStaticMarkup(<ArticleContactsBlock data={{ address: "ул. Примерная, 1", phones: [{ value: "+375291112233" }], email: "hi@example.by", website: "https://example.by", socials: [{ kind: "telegram", url: "https://t.me/example" }] }} />);
@@ -62,6 +62,61 @@ import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } fro
   const controlsId = html.match(/aria-controls="([^"]+)"/)![1];
   assert.equal(controlsId, panelMatch![1], "toggle button must reference the panel it controls");
   assert.match(html, /Показать расписание на неделю/);
+}
+
+{
+  // Merged card: all three sections render inside one card.
+  const html = renderToStaticMarkup(
+    <ArticleInfoCard
+      contacts={{ address: "ул. Примерная, 1", phones: [{ value: "+375291112233" }], socials: [], coordinates: { latitude: 53.9, longitude: 27.5 } }}
+      price={{ mode: "FROM", currency: "BYN", min: 10, max: null, items: [], note: "" }}
+      openingHours={{ mode: "WEEKLY", timezone: "Europe/Minsk", rules: [{ dayOfWeek: "MON", isOpen: true, allDay: true, intervals: [] }], exceptions: [] }}
+    />,
+  );
+  assert.match(html, /Режим работы/);
+  assert.match(html, /Стоимость/);
+  assert.match(html, /ул\. Примерная, 1/);
+  assert.match(html, /tel:\+375291112233/);
+  assert.match(html, /Открыто сейчас|Закрыто сейчас/);
+}
+
+{
+  // Missing openingHours: the price column takes the full card, no hours column.
+  const html = renderToStaticMarkup(
+    <ArticleInfoCard
+      contacts={{ address: "Минск", phones: [], socials: [] }}
+      price={{ mode: "EXACT", currency: "BYN", min: 45, max: 45, items: [], note: "" }}
+    />,
+  );
+  assert.doesNotMatch(html, /Режим работы/);
+  assert.match(html, /Стоимость/);
+}
+
+{
+  // Missing price: the hours column takes the full card, no price column.
+  const html = renderToStaticMarkup(
+    <ArticleInfoCard
+      contacts={{ phones: [], socials: [] }}
+      openingHours={{ mode: "ALWAYS_OPEN", timezone: "Europe/Minsk", rules: [], exceptions: [] }}
+    />,
+  );
+  assert.match(html, /Режим работы/);
+  assert.doesNotMatch(html, /Стоимость/);
+  assert.match(html, /Круглосуточно/);
+}
+
+{
+  // Nothing to show at all: renders nothing, same contract as the individual blocks.
+  assert.equal(
+    renderToStaticMarkup(
+      <ArticleInfoCard
+        contacts={{ phones: [], socials: [] }}
+        price={{ mode: "NONE", currency: "BYN", min: null, max: null, items: [], note: "" }}
+        openingHours={{ mode: "WEEKLY", timezone: "Europe/Minsk", rules: [], exceptions: [] }}
+      />,
+    ),
+    "",
+  );
 }
 
 console.log("ArticleStructuredInfoBlocks.test.tsx: OK");
