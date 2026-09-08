@@ -129,23 +129,27 @@ function stripLeadingOrTrailingUlitsaWord(name: string): string {
 }
 
 /**
- * Builds "г.Город, ул.Улица, Дом" from Google Places `address_components`
+ * Builds "г. Город, ул. Улица, Дом" from Google Places `address_components`
  * (matched by `types`, not by splitting Google's own `formatted_address`
  * string — that string's punctuation/order varies by place type and
- * locale, while `locality`/`route`/`street_number` are stable). Falls back
- * to `fallback` (normally Google's formatted_address) whenever there isn't
- * even a locality to anchor on, so this never produces a worse result than
- * just using the raw address.
+ * locale, while `locality`/`route`/`street_number` are stable). Matches
+ * `formatMarketplaceHeroAddress` (src/lib/placeLocationString.ts), the
+ * canonical Place address formatter used across the app (marketplace hero,
+ * search cards): comma-separated segments, house number as its own segment.
+ * Falls back to `fallback` (normally Google's formatted_address) whenever
+ * there isn't even a locality to anchor on, so this never produces a worse
+ * result than just using the raw address.
  */
 export function formatAddressFromGoogleComponents(components: GoogleAddressComponent[], fallback: string): string {
   const city = findAddressComponent(components, ["locality", "sublocality", "sublocality_level_1"]);
   if (!city) return fallback;
   const street = findAddressComponent(components, ["route"]);
   const houseNumber = findAddressComponent(components, ["street_number"]);
-  const parts = [`г.${city}`];
+  const parts = [`г. ${city}`];
   if (street) {
     const cleanStreet = stripLeadingOrTrailingUlitsaWord(street);
-    parts.push(houseNumber ? `ул.${cleanStreet}, ${houseNumber}` : `ул.${cleanStreet}`);
+    parts.push(`ул. ${cleanStreet}`);
+    if (houseNumber) parts.push(houseNumber);
   }
   return parts.join(", ");
 }
