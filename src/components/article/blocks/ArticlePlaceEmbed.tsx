@@ -338,48 +338,54 @@ export function ArticlePlaceEmbed({
 
           <div className="flex flex-col gap-[13px] px-4 py-4 sm:px-5 sm:py-[18px]" style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
                 {card.logoUrl && (
                   <span style={{ width: 24, height: 24, borderRadius: 7, overflow: "hidden", flexShrink: 0, border: `1px solid ${T.line}`, position: "relative" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={card.logoUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                   </span>
                 )}
-                {card.categoryLabel && <span style={{ ...capsStyle, whiteSpace: "nowrap" }}>{card.categoryLabel}</span>}
+                {card.categoryLabel && (
+                  <span style={{ ...capsStyle, display: "inline-block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                    {card.categoryLabel}
+                  </span>
+                )}
                 {card.rating && (
-                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                  <span style={{ ...capsStyle, display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
                     · <Star size={10} style={{ color: T.accent, fill: T.accent }} />
                     {card.rating.value.toLocaleString("ru-RU", { maximumFractionDigits: 1 })} · {card.rating.count}
                   </span>
                 )}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 {card.hoursMessage && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: hoursColor, whiteSpace: "nowrap" }}>
-                    {card.isOpenNow != null && <span style={{ width: 6, height: 6, borderRadius: 999, background: hoursColor }} />}
-                    {card.hoursMessage}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, overflow: "hidden", minWidth: 0, fontSize: 12.5, color: hoursColor }}>
+                    {card.isOpenNow != null && <span style={{ width: 6, height: 6, borderRadius: 999, background: hoursColor, flexShrink: 0 }} />}
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.hoursMessage}</span>
                   </span>
                 )}
-                <PlaceSaveHeart
-                  placeId={card.placeId}
-                  placeSlug={card.slug}
-                  placeTitle={card.title}
-                  coverImageUrl={card.coverImageUrl}
-                  source="article-place-embed"
-                  className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border transition-colors"
-                  iconClassName="h-4 w-4"
-                />
-                <button
-                  type="button"
-                  onClick={() => sharePlace(card.title, card.href)}
-                  aria-label="Поделиться"
-                  style={{
-                    width: 34, height: 34, borderRadius: 999, border: `1px solid ${T.line2}`, color: T.ink3,
-                    display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", background: "none",
-                  }}
-                >
-                  <Share2 size={16} />
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <PlaceSaveHeart
+                    placeId={card.placeId}
+                    placeSlug={card.slug}
+                    placeTitle={card.title}
+                    coverImageUrl={card.coverImageUrl}
+                    source="article-place-embed"
+                    className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full border transition-colors"
+                    iconClassName="h-4 w-4"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => sharePlace(card.title, card.href)}
+                    aria-label="Поделиться"
+                    style={{
+                      width: 34, height: 34, borderRadius: 999, border: `1px solid ${T.line2}`, color: T.ink3,
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", background: "none",
+                    }}
+                  >
+                    <Share2 size={16} />
+                  </button>
+                </div>
               </div>
             </div>
 
