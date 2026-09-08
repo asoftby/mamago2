@@ -519,12 +519,14 @@ export function ArticlePlaceEmbed({
               {showCta && (
                 <Link
                   href={card.href}
+                  aria-label="Открыть место"
+                  className="w-[46px] shrink-0 justify-center px-0 sm:w-auto sm:justify-start sm:px-5"
                   style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 46, padding: "0 20px",
+                    display: "inline-flex", alignItems: "center", gap: 9, height: 46,
                     borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
                   }}
                 >
-                  Открыть место <span aria-hidden="true">→</span>
+                  <span className="hidden sm:inline">Открыть место</span> <span aria-hidden="true">→</span>
                 </Link>
               )}
             </div>
@@ -539,12 +541,14 @@ export function ArticlePlaceEmbed({
             {showCta && (
               <Link
                 href={card.href}
+                aria-label="Открыть место"
+                className="w-11 shrink-0 justify-center px-0 sm:w-auto sm:justify-start sm:px-[18px]"
                 style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 9, height: 44, padding: "0 18px",
+                  display: "inline-flex", alignItems: "center", gap: 9, height: 44,
                   borderRadius: 999, fontWeight: 600, fontSize: 14, background: T.accent, color: "#fff", textDecoration: "none",
                 }}
               >
-                Открыть место <span aria-hidden="true">→</span>
+                <span className="hidden sm:inline">Открыть место</span> <span aria-hidden="true">→</span>
               </Link>
             )}
           </div>
