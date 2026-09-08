@@ -421,35 +421,6 @@ export function ArticleInfoCard({
 
   const priceSummary = hasPrice && price ? formatSharedPrice(price) : null;
 
-  let statusNode: ReactNode = null;
-  if (hasHours && openingHours) {
-    if (openingHours.mode !== "WEEKLY") {
-      const modeLabel =
-        openingHours.mode === "ALWAYS_OPEN"
-          ? "Круглосуточно"
-          : openingHours.mode === "BY_APPOINTMENT"
-            ? "По предварительной записи"
-            : "Временно закрыто";
-      statusNode = <b className="text-[13.5px] font-semibold text-foreground">{modeLabel}</b>;
-    } else {
-      const { isOpen, caption } = weeklyStatusSummary(openingHours, new Date());
-      statusNode = (
-        <>
-          <span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", isOpen ? "bg-success shadow-[0_0_0_3px_rgba(22,163,74,0.18)]" : "bg-muted-foreground/40")} />
-          <b className={cn("text-[13.5px] font-semibold", isOpen ? "text-success" : "text-foreground")}>
-            {isOpen ? "Открыто сейчас" : "Закрыто сейчас"}
-          </b>
-          {caption && (
-            <>
-              <span className="text-muted-foreground/60">·</span>
-              <span className="text-[13px] text-muted-foreground">{caption}</span>
-            </>
-          )}
-        </>
-      );
-    }
-  }
-
   const mapHref = hasContacts && contacts ? contactMapHref(contacts) : null;
   const hasAddressBand = hasContacts && contacts && Boolean(contacts.address || mapHref);
   const hasPhonesBand = hasContacts && contacts && contacts.phones.length > 0;
@@ -457,17 +428,6 @@ export function ArticleInfoCard({
 
   return (
     <section className="not-prose my-8 overflow-hidden rounded-2xl border border-border bg-surface-subtle shadow-sm md:my-10">
-      {(statusNode || priceSummary) && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3 md:px-6">
-          {statusNode}
-          {priceSummary && (
-            <span className={cn("ml-auto whitespace-nowrap font-mono text-[13px] font-semibold", price?.mode === "FREE" && "text-success")}>
-              {renderCurrencyText(normalizeUiCurrencyText(priceSummary), { iconSize: "sm" })}
-            </span>
-          )}
-        </div>
-      )}
-
       {(hasHours || hasPrice) && (
         <div className={cn("grid grid-cols-1", hasHours && hasPrice && "sm:grid-cols-2")}>
           {hasHours && openingHours && (
