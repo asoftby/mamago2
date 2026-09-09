@@ -50,6 +50,12 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Article performance analytics regressions
+        run: |
+          pnpm exec tsx src/lib/publications/articleMvp.test.ts
+          pnpm exec tsx src/lib/article/articleInfoBlockGrouping.test.ts
+          pnpm exec tsx src/lib/article/articlePerformanceAnalytics.test.ts
+
       - name: Cache and discovery performance regressions
         run: |
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
