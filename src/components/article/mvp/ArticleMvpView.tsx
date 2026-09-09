@@ -194,7 +194,13 @@ export function ArticleMvpView({
       >
         <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
         {showChromeBack ? (
-          <div className="mb-4 md:mb-0"><MobileSmartBackButton fallbackHref={cityHomeHref} /></div>
+          // -mt-3/mb-7 center the button within the gap between the sticky
+          // city-selector header and the article's category/date row on
+          // mobile (28px above and below, measured against a 94px gap);
+          // md:mt-0/md:mb-0 keeps the existing tablet layout untouched.
+          <div className="-mt-3 mb-7 md:mt-0 md:mb-0">
+            <MobileSmartBackButton fallbackHref={cityHomeHref} />
+          </div>
         ) : null}
         {draftWatermark ? (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
