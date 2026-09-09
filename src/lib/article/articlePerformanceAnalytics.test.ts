@@ -5,6 +5,12 @@ import {
   ARTICLE_PERFORMANCE_BATCH_MAX_EVENTS,
   ArticlePerformanceBatchSchema,
 } from "./articlePerformanceAnalytics";
+import {
+  ArticleContentPayloadSchema,
+  articleContentValidationMessage,
+  newBlock,
+  prepareArticleContentForSave,
+} from "@/lib/publications/articleMvp";
 
 const sessionId = "article-session-1";
 
@@ -63,6 +69,47 @@ assert.equal(ARTICLE_PERFORMANCE_BATCH_MAX_BYTES, 32 * 1024);
   );
 }
 
+// Empty new structured blocks are saveable, but their stable subject identity
+// must survive save/reopen. Once data is added, that same new-format block must
+// require a subject title. Genuine legacy blocks without subject remain valid.
+{
+  const fresh = newBlock("contacts", () => "subject-persistence");
+  assert.equal(fresh.type, "contacts");
+  if (fresh.type === "contacts") {
+    const savedEmpty = ArticleContentPayloadSchema.parse(
+      prepareArticleContentForSave({ version: 1, blocks: [fresh] }),
+    );
+    const reopened = savedEmpty.blocks[0];
+    assert.equal(
+      reopened?.type === "contacts" ? reopened.subject?.id : null,
+      "subject_subject-persistence",
+    );
+
+    if (reopened?.type === "contacts") {
+      const populated = prepareArticleContentForSave({
+        version: 1,
+        blocks: [{ ...reopened, data: { ...reopened.data, address: "Минск" } }],
+      });
+      const result = ArticleContentPayloadSchema.safeParse(populated);
+      assert.equal(result.success, false);
+      if (!result.success) {
+        assert.equal(
+          articleContentValidationMessage(result.error.issues),
+          "Укажите, к какому объекту относится блок",
+        );
+      }
+    }
+  }
+
+  assert.equal(
+    ArticleContentPayloadSchema.safeParse({
+      version: 1,
+      blocks: [{ id: "legacy-contacts", type: "contacts", data: { address: "Минск", phones: [], socials: [] } }],
+    }).success,
+    true,
+  );
+}
+
 // Wiring guard: one accepted batch is one reporting-only UserEvent INSERT. It
 // must bypass the generic analytics service, otherwise every article batch
 // would also update behavior/recommendation/promotion projections.
@@ -76,12 +123,32 @@ assert.equal(ARTICLE_PERFORMANCE_BATCH_MAX_BYTES, 32 * 1024);
 }
 
 // Qualified article views come from browser-visible batched signals. Never
-// regress the business report back to raw DETAIL_OPEN, which is also emitted by
-// SSR detail beacons and continuous-reading navigation signals.
+// regress the business report back to raw DETAIL_OPEN. Product periods must use
+// the canonical Belarus timezone and half-open boundaries rather than server TZ.
 {
   const report = readFileSync("src/server/services/analytics/articlePerformanceStats.service.ts", "utf8");
   assert.equal(report.includes("item->>'kind' = 'article_view'"), true);
   assert.equal(report.includes('eventType: "DETAIL_OPEN"'), false);
+  assert.equal(report.includes("DEFAULT_TZ"), true);
+  assert.equal(report.includes("startOfZonedDay"), true);
+  assert.equal(report.includes("createdAt: { gte: start, lt: endExclusive }"), true);
+  assert.equal(report.includes('e."createdAt" < ${endExclusive}'), true);
+}
+
+// Empty structured sections omitted by ArticleInfoCard must also be omitted
+// from impression descriptors, otherwise per-block impressions become false.
+{
+  const view = readFileSync("src/components/article/mvp/ArticleMvpView.tsx", "utf8");
+  assert.equal(view.includes("function structuredBlockRenders("), true);
+  assert.equal(view.includes(".filter(structuredBlockRenders)"), true);
+}
+
+// Route clicks are classified from the rendered control semantics, so Yandex,
+// 2GIS and other legitimate map providers cannot fall through as website clicks.
+{
+  const client = readFileSync("src/components/article/analytics/ArticlePerformanceAnalytics.tsx", "utf8");
+  assert.equal(client.includes('controlLabel.includes("маршрут")'), true);
+  assert.equal(client.includes('controlLabel.includes("открыть на карте")'), true);
 }
 
 console.log("articlePerformanceAnalytics.test.ts: OK");
