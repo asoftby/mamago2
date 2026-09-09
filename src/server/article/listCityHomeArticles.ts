@@ -88,6 +88,7 @@ function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
  */
 export async function queryCityHomeArticles(
   city: CityHomeArticleCity,
+  take = 6,
 ): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
@@ -101,7 +102,7 @@ export async function queryCityHomeArticles(
       ],
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-    take: 6,
+    take,
     select: {
       id: true,
       slug: true,
@@ -160,6 +161,23 @@ export async function listCityHomeArticles(
   return unstable_cache(
     () => queryCityHomeArticles(city),
     ["public-article-list:city", city.id, city.slug, city.regionId ?? ""],
+    {
+      tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
+      revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+/**
+ * Full city-scoped journal feed. Unlike the six-card home preview this feed is
+ * intentionally large enough for client-side filtering and pagination.
+ */
+export async function listCityBlogArticles(
+  city: CityHomeArticleCity,
+): Promise<CityHomeJournalArticle[]> {
+  return unstable_cache(
+    () => queryCityHomeArticles(city, 100),
+    ["public-article-list:city-blog", city.id, city.slug, city.regionId ?? ""],
     {
       tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
       revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
