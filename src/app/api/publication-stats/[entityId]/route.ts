@@ -7,11 +7,14 @@ import {
   parsePublicationStatsPeriod,
 } from "@/lib/publication-stats/period";
 import { canViewPublicationStats } from "@/lib/publication-stats/visibility";
+import { getArticlePerformanceStats } from "@/server/services/analytics/articlePerformanceStats.service";
 
 /**
  * GET /api/publication-stats/[entityId]?path=&period=
- * Статистика публикации — admin и business owner (этап 1).
- * Данные: реальный агрегатор ещё не подключён, поэтому возвращаем честное пустое состояние.
+ *
+ * Article reports are real for ADMIN. BUSINESS_OWNER keeps the existing safe
+ * empty contract until a sponsored-project/ownership relation explicitly grants
+ * that business access to a particular editorial article.
  */
 export async function GET(
   request: Request,
@@ -30,14 +33,13 @@ export async function GET(
 
   const url = new URL(request.url);
   const path = url.searchParams.get("path") ?? `/minsk/events/${entityId}`;
-  const periodRaw = url.searchParams.get("period");
-  const period =
-    parsePublicationStatsPeriod(periodRaw) ?? DEFAULT_PUBLICATION_STATS_PERIOD;
+  const period = parsePublicationStatsPeriod(url.searchParams.get("period"))
+    ?? DEFAULT_PUBLICATION_STATS_PERIOD;
 
-  const payload = buildEmptyPublicationStats(entityId, path, user, period);
-  console.log("[API] real data used", {
-    endpoint: "/api/publication-stats/[entityId]",
-    empty: true,
-  });
-  return NextResponse.json(payload);
+  if (user.role === "ADMIN") {
+    const articleStats = await getArticlePerformanceStats(entityId, period);
+    if (articleStats) return NextResponse.json(articleStats);
+  }
+
+  return NextResponse.json(buildEmptyPublicationStats(entityId, path, user, period));
 }
