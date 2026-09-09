@@ -288,6 +288,23 @@ function actionFromAnchor(
     return { action: "phone", item: index >= 0 ? `phone_${index + 1}` : undefined };
   }
   if (href.startsWith("mailto:")) return { action: "email" };
+
+  // Route classification follows the semantic UI control, not a map-provider
+  // allowlist. Imported/legacy mapUrl values may legitimately point to Yandex,
+  // 2GIS or any other provider while still rendering the same route control.
+  const controlLabel = [
+    anchor.getAttribute("aria-label"),
+    anchor.getAttribute("title"),
+    anchor.textContent,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLocaleLowerCase("ru");
+  if (controlLabel.includes("маршрут") || controlLabel.includes("открыть на карте")) {
+    return { action: "route" };
+  }
+
+  // Provider patterns remain a fallback for unlabeled legacy anchors.
   if (/google\.[^/]+\/maps|maps\.google|maps\.apple/i.test(href)) return { action: "route" };
   const social = socialItemId(href);
   if (social) return { action: "social", item: social };
