@@ -424,7 +424,7 @@ export function ArticleBlockRichEditor({
           minHeightClass,
           proseMirrorMin,
           "[&_.ProseMirror]:outline-none",
-          "[&_code]:font-mono [&_code]:text-[calc(1em-2px)] [&_code]:text-muted-foreground",
+          "[&_code]:font-mono [&_code]:text-[13px] [&_code]:text-muted-foreground",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground",
           "[&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left",
