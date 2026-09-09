@@ -7,7 +7,7 @@
  * Скрипты аналитики/маркетинга: см. AnalyticsLoader / MarketingLoader.
  */
 import { useEffect } from "react";
-import { ensureConsentModalShown } from "@/lib/cookies/consent-manager";
+import { initCookieConsent } from "@/lib/cookies/consent-manager";
 import { AnalyticsLoader } from "@/components/analytics/analytics-loader";
 import { MarketingLoader } from "@/components/analytics/marketing-loader";
 import { CookieConsentShell } from "./CookieConsentShell";
@@ -28,7 +28,7 @@ export function CookieConsentProvider({
   useEffect(() => {
     if (TEMP_DISABLE_COOKIE_CONSENT) return;
 
-    void ensureConsentModalShown().catch((err) => {
+    void initCookieConsent().catch((err) => {
       console.error("[CookieConsent] init failed", err);
     });
   }, []);

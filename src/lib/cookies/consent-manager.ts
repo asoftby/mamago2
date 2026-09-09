@@ -14,7 +14,11 @@ import { createCookieConsentRunConfig } from "./consent-config";
 /** ESM пакет экспортирует именованные функции (run, …), без default — см. dist/cookieconsent.esm.js */
 type CookieConsentApi = Pick<
   typeof import("vanilla-cookieconsent"),
-  "run" | "validConsent" | "acceptedCategory" | "showPreferences"
+  | "run"
+  | "validConsent"
+  | "acceptedCategory"
+  | "acceptCategory"
+  | "showPreferences"
 >;
 
 type Listener = (state: ConsentSnapshot) => void;
@@ -97,31 +101,41 @@ export function initCookieConsent(): Promise<void> {
 /** Повторное открытие модалки настроек (футер «Настройки cookies»). */
 export function openCookiePreferences(): void {
   if (typeof window === "undefined") return;
-  void initCookieConsent().then(async () => {
-    const { showPreferences } = await import("vanilla-cookieconsent");
-    showPreferences();
+  void openCookiePreferencesFromShell().catch((err) => {
+    console.error("[CookieConsent] preferences failed", err);
   });
-}
-
-let ensureShownPromise: Promise<void> | null = null;
-
-/** Single-flight handoff from the first-paint shell to the real consent UI. */
-export function ensureConsentModalShown(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (ensureShownPromise) return ensureShownPromise;
-
-  ensureShownPromise = initCookieConsent().then(async () => {
-    const { validConsent, show } = await import("vanilla-cookieconsent");
-    if (!validConsent()) show(true);
-  });
-
-  return ensureShownPromise;
 }
 
 /** Consent is still recorded only by vanilla-cookieconsent itself. */
 export async function acceptFromShell(categories: "all" | []): Promise<void> {
-  await ensureConsentModalShown();
-  const { acceptCategory, hide } = await import("vanilla-cookieconsent");
-  acceptCategory(categories);
-  hide();
+  await initCookieConsent();
+  const CC = await import("vanilla-cookieconsent");
+  CC.acceptCategory(categories);
+  notify(CC);
+}
+
+/**
+ * Opens preferences only after an explicit user action. The shell caller may
+ * unmount only after the library has rendered and exposed the preferences UI.
+ */
+export async function openCookiePreferencesFromShell(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  await initCookieConsent();
+  const { showPreferences } = await import("vanilla-cookieconsent");
+  showPreferences();
+
+  await new Promise<void>((resolve) =>
+    window.requestAnimationFrame(() => resolve()),
+  );
+
+  const preferences = document.querySelector<HTMLElement>("#cc-main .pm");
+  const isVisible =
+    document.documentElement.classList.contains("show--preferences") &&
+    preferences !== null &&
+    window.getComputedStyle(preferences).visibility !== "hidden";
+
+  if (!isVisible) {
+    throw new Error("Cookie preferences modal did not become visible");
+  }
 }
