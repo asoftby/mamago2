@@ -1,5 +1,4 @@
 import { unstable_cache } from "next/cache";
-import { endOfDay, startOfDay, subDays } from "date-fns";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
@@ -14,13 +13,18 @@ import type {
 } from "@/lib/article/articlePerformanceStats";
 import type { PublicationStatsPeriod } from "@/lib/publication-stats/period";
 import { emptyEmojiRatingCounts, isEmojiRatingType } from "@/lib/content-rating/emojiRating";
+import { addDateKeyDays, startOfZonedDay, zonedDateKey } from "@/lib/stories/ranges";
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 
-function rangeForPeriod(period: PublicationStatsPeriod): { start: Date; end: Date } {
-  const now = new Date();
+function rangeForPeriod(period: PublicationStatsPeriod): { start: Date; endExclusive: Date } {
+  const todayKey = zonedDateKey(new Date(), DEFAULT_TZ);
   if (period === "yesterday") {
-    const day = subDays(now, 1);
-    return { start: startOfDay(day), end: endOfDay(day) };
+    return {
+      start: startOfZonedDay(addDateKeyDays(todayKey, -1), DEFAULT_TZ),
+      endExclusive: startOfZonedDay(todayKey, DEFAULT_TZ),
+    };
   }
+
   const days = period === "today"
     ? 1
     : period === "week"
@@ -32,7 +36,10 @@ function rangeForPeriod(period: PublicationStatsPeriod): { start: Date; end: Dat
           : period === "sixMonths"
             ? 180
             : 365;
-  return { start: startOfDay(subDays(now, days - 1)), end: endOfDay(now) };
+  return {
+    start: startOfZonedDay(addDateKeyDays(todayKey, -(days - 1)), DEFAULT_TZ),
+    endExclusive: startOfZonedDay(addDateKeyDays(todayKey, 1), DEFAULT_TZ),
+  };
 }
 
 type ShareRow = { action: string | null; count: bigint };
@@ -144,10 +151,12 @@ function buildSubjects(rows: BlockAggregateRow[]): ArticlePerformanceSubjectStat
 /**
  * Report queries are bounded by the existing UserEvent composite index
  * (entityType, entityId, createdAt). JSON expansion is only performed after
- * narrowing to the requested article/date and reporting-only scope. The result
- * is cached for 60 seconds, so opening the drawer repeatedly does not rescan the
- * slice. Qualified views come from the same low-cost batch as block impressions;
- * SSR renders/prefetches and legacy DETAIL_OPEN events cannot inflate them.
+ * narrowing to the requested article/date and reporting-only scope. Periods
+ * use the canonical product timezone and half-open UTC ranges, so "today" and
+ * "yesterday" match the Belarus calendar regardless of server timezone. The
+ * result is cached for 60 seconds. Qualified views come from the same low-cost
+ * batch as block impressions; SSR renders/prefetches and legacy DETAIL_OPEN
+ * events cannot inflate them.
  */
 async function computeArticlePerformanceStats(
   articleId: string,
@@ -166,11 +175,11 @@ async function computeArticlePerformanceStats(
   });
   if (!article) return null;
 
-  const { start, end } = rangeForPeriod(period);
+  const { start, endExclusive } = rangeForPeriod(period);
   const baseWhere: Prisma.UserEventWhereInput = {
     entityType: "ARTICLE",
     entityId: articleId,
-    createdAt: { gte: start, lte: end },
+    createdAt: { gte: start, lt: endExclusive },
   };
 
   const [signalRows, saves, shareRows, ratingRows, blockRows] = await Promise.all([
@@ -182,7 +191,7 @@ async function computeArticlePerformanceStats(
           AND e."entityId" = ${articleId}
           AND e."eventType" = 'FILTER_APPLY'::"UserEventType"
           AND e."createdAt" >= ${start}
-          AND e."createdAt" <= ${end}
+          AND e."createdAt" < ${endExclusive}
           AND e.meta->>'analyticsScope' = ${ARTICLE_PERFORMANCE_ANALYTICS_SCOPE}
       ), expanded AS (
         SELECT n."sessionId", jsonb_array_elements(
@@ -208,7 +217,7 @@ async function computeArticlePerformanceStats(
         AND e."entityId" = ${articleId}
         AND e."eventType" = 'CTA_CLICK'::"UserEventType"
         AND e."createdAt" >= ${start}
-        AND e."createdAt" <= ${end}
+        AND e."createdAt" < ${endExclusive}
         AND e.meta->>'targetAction' IN (
           'article_share_telegram',
           'article_share_whatsapp',
@@ -219,7 +228,7 @@ async function computeArticlePerformanceStats(
     `),
     prisma.articleRating.groupBy({
       by: ["ratingType"],
-      where: { articleId, createdAt: { gte: start, lte: end } },
+      where: { articleId, createdAt: { gte: start, lt: endExclusive } },
       _count: true,
     }),
     prisma.$queryRaw<BlockAggregateRow[]>(Prisma.sql`
@@ -230,7 +239,7 @@ async function computeArticlePerformanceStats(
           AND e."entityId" = ${articleId}
           AND e."eventType" = 'FILTER_APPLY'::"UserEventType"
           AND e."createdAt" >= ${start}
-          AND e."createdAt" <= ${end}
+          AND e."createdAt" < ${endExclusive}
           AND e.meta->>'analyticsScope' = ${ARTICLE_PERFORMANCE_ANALYTICS_SCOPE}
       ), expanded AS (
         SELECT jsonb_array_elements(
@@ -316,7 +325,7 @@ async function computeArticlePerformanceStats(
 
 const cachedArticlePerformanceStats = unstable_cache(
   computeArticlePerformanceStats,
-  ["article-performance-report-v2"],
+  ["article-performance-report-v3"],
   { revalidate: 60 },
 );
 
