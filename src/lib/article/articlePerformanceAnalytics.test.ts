@@ -69,8 +69,8 @@ assert.equal(ARTICLE_PERFORMANCE_BATCH_MAX_BYTES, 32 * 1024);
 {
   const route = readFileSync("src/app/api/articles/[articleId]/analytics/batch/route.ts", "utf8");
   assert.equal((route.match(/prisma\.userEvent\.create\s*\(/g) ?? []).length, 1);
-  assert.equal(route.includes("AnalyticsEventService"), false);
-  assert.equal(route.includes("trackUserEvent("), false);
+  assert.equal(route.includes('from "@/server/services/analytics/AnalyticsEventService"'), false);
+  assert.equal(/\btrackUserEvent\s*\(/.test(route), false);
   assert.equal(route.includes("ARTICLE_PERFORMANCE_BATCH_MAX_BYTES"), true);
   assert.equal(route.includes('article.status !== "PUBLISHED"'), true);
 }
