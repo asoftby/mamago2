@@ -47,12 +47,18 @@ export function getAvailableTags(articles: CityHomeJournalArticle[]) {
   return [...tags.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
+function publicationTimestamp(value: CityHomeJournalArticle["publishedAt"]): number {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export function sortBlogArticlesNewestFirst(
   articles: CityHomeJournalArticle[],
 ): CityHomeJournalArticle[] {
   return [...articles].sort((left, right) => {
-    const leftPublishedAt = left.publishedAt?.getTime() ?? 0;
-    const rightPublishedAt = right.publishedAt?.getTime() ?? 0;
+    const leftPublishedAt = publicationTimestamp(left.publishedAt);
+    const rightPublishedAt = publicationTimestamp(right.publishedAt);
     if (leftPublishedAt !== rightPublishedAt) return rightPublishedAt - leftPublishedAt;
     return right.id.localeCompare(left.id);
   });
