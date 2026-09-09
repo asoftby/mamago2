@@ -4,11 +4,9 @@ import { lazy, Suspense } from "react";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { PUBLICATION_STATUS_LABEL } from "@/lib/publications/labels";
+import { PUBLICATION_STATUS_LABEL, PUBLICATION_TYPE_LABEL } from "@/lib/publications/labels";
 import type { PublicationStatus, PublicationType } from "@/lib/publications/domain";
-import { PUBLICATION_TYPE_LABEL } from "@/lib/publications/labels";
 
-// Lazy-load детальной статистики — грузится только после открытия drawer
 const PublicationStatsDetails = lazy(() =>
   import("./PublicationStatsDetails").then((m) => ({ default: m.PublicationStatsDetails }))
 );
@@ -47,38 +45,35 @@ export interface PublicationStatsDrawerProps {
     type: PublicationType;
     status: PublicationStatus;
     slug: string | null;
-    path: string; // публичный URL для запроса статистики
+    path: string;
     updatedAt: string;
   };
 }
 
-/**
- * Drawer/Modal со статистикой конкретной публикации.
- * Desktop → Dialog, Mobile → bottom Sheet (через ResponsiveOverlay).
- * Детальная статистика загружается lazy только после открытия.
- */
 export function PublicationStatsDrawer({
   open,
   onOpenChange,
   publication,
 }: PublicationStatsDrawerProps) {
+  const isArticle = publication.type === "ARTICLE";
+  const overlayTitle = isArticle ? "Статистика статьи" : "Статистика публикации";
   const subtitle = (
-    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-      <span className="text-[12px] text-gray-500">{PUBLICATION_TYPE_LABEL[publication.type]}</span>
-      <Badge
-        variant="outline"
-        className={cn(
-          "text-[10px] px-1.5 py-0 h-auto font-normal border",
-          statusBadgeClass(publication.status),
-        )}
-      >
-        {PUBLICATION_STATUS_LABEL[publication.status]}
-      </Badge>
-      {publication.slug && (
-        <span className="font-mono text-[11px] text-gray-400 truncate max-w-[200px]">
-          /{publication.slug}
-        </span>
-      )}
+    <div className="mt-1 min-w-0">
+      <p className="max-w-[560px] text-[16px] font-semibold leading-snug text-gray-900 line-clamp-2">
+        {publication.title}
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <span className="text-[12px] text-gray-500">{PUBLICATION_TYPE_LABEL[publication.type]}</span>
+        <Badge
+          variant="outline"
+          className={cn("text-[10px] px-1.5 py-0 h-auto font-normal border", statusBadgeClass(publication.status))}
+        >
+          {PUBLICATION_STATUS_LABEL[publication.status]}
+        </Badge>
+        {publication.slug ? (
+          <span className="max-w-[260px] truncate font-mono text-[10px] text-gray-400">/{publication.slug}</span>
+        ) : null}
+      </div>
     </div>
   );
 
@@ -86,22 +81,18 @@ export function PublicationStatsDrawer({
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      a11yTitle="Статистика публикации"
+      a11yTitle={overlayTitle}
       variant="framed"
-      title="Статистика публикации"
+      title={overlayTitle}
       subtitle={subtitle}
       heightMode="full"
       dialogContentClassName="max-w-2xl"
     >
-      {/* Lazy-loaded details — монтируются только когда drawer открыт */}
-      {open && (
+      {open ? (
         <Suspense fallback={<DetailsSkeleton />}>
-          <PublicationStatsDetails
-            entityId={publication.id}
-            path={publication.path}
-          />
+          <PublicationStatsDetails entityId={publication.id} path={publication.path} />
         </Suspense>
-      )}
+      ) : null}
     </ResponsiveOverlay>
   );
 }
