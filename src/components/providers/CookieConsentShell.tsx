@@ -19,6 +19,15 @@ function readOwnCookieValue(): string | undefined {
   return match?.[1];
 }
 
+/** Keep the first-paint shell aligned with vanilla-cookieconsent's hideFromBots detector. */
+function isConsentBot(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return Boolean(
+    navigator.webdriver ||
+      (navigator.userAgent && /bot|crawl|spider|slurp|teoma/i.test(navigator.userAgent)),
+  );
+}
+
 /**
  * First-paint consent shell. It is present in the initial HTML so a first
  * visit does not wait for the vanilla-cookieconsent dynamic import before
@@ -27,10 +36,14 @@ function readOwnCookieValue(): string | undefined {
 export function CookieConsentShell() {
   const [mounted, setMounted] = useState(true);
   const [pending, setPending] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (hasValidConsentCookieValue(readOwnCookieValue())) {
+    if (
+      hasValidConsentCookieValue(readOwnCookieValue()) ||
+      isConsentBot()
+    ) {
       setMounted(false);
       return;
     }
@@ -38,6 +51,37 @@ export function CookieConsentShell() {
     // The shell owns first-visit visibility. CookieConsent initializes silently
     // in the provider and must never replace this UI after hydration.
   }, []);
+
+  useEffect(() => {
+    if (!preferencesOpen || typeof document === "undefined") return;
+
+    const html = document.documentElement;
+    const handlePreferencesState = () => {
+      if (html.classList.contains("show--preferences")) return;
+
+      if (
+        hasValidConsentCookieValue(readOwnCookieValue()) ||
+        isConsentBot()
+      ) {
+        setMounted(false);
+      } else if (rootRef.current) {
+        // Preferences were dismissed with X/Escape and no consent was saved:
+        // restore the first-visit shell instead of letting the prompt disappear.
+        rootRef.current.style.display = "";
+      }
+
+      setPreferencesOpen(false);
+    };
+
+    const observer = new MutationObserver(handlePreferencesState);
+    observer.observe(html, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    handlePreferencesState();
+
+    return () => observer.disconnect();
+  }, [preferencesOpen]);
 
   async function handleAccept(categories: "all" | []) {
     setPending(true);
@@ -57,7 +101,9 @@ export function CookieConsentShell() {
     try {
       await openCookiePreferencesFromShell();
       if (rootRef.current) rootRef.current.style.display = "none";
-      setMounted(false);
+      // Keep this component mounted while Preferences owns the UI. The observer
+      // restores the shell if the modal closes without a valid consent cookie.
+      setPreferencesOpen(true);
     } catch (err) {
       console.error("[CookieConsent] preferences failed", err);
     } finally {
