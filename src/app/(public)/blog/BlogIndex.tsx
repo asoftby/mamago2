@@ -8,12 +8,15 @@ import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardVi
 import { ArticleSaveHeart, type ArticleSaveStatus } from "@/features/save/ArticleSaveHeart";
 import { useArticleSaveStatusBatch } from "@/features/save/useArticleSaveStatusBatch";
 import { useOptionalCity } from "@/contexts/CityContext";
+import { PublicContentPagination } from "@/components/public/PublicContentPagination";
 import {
   filterBlogArticles,
   getArticlesForType,
+  getAvailableCategories,
   getAvailableContentTypes,
   getAvailableTags,
   parseBlogContentType,
+  parseBlogPage,
   type BlogContentType,
 } from "./blogFilters";
 
@@ -23,6 +26,8 @@ const TONES = [
   "from-[#F6D567] to-[#E8B935]",
   "from-[#E6DBC8] to-[#C9BCA0]",
 ];
+
+const BLOG_PAGE_SIZE = 10;
 
 function fmtDate(d: Date | null): string {
   if (!d) return "";
@@ -42,27 +47,71 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   const searchParams = useSearchParams();
   const cityCtx = useOptionalCity();
   const citySlug = cityCtx?.citySlug;
+
   const availableTypes = getAvailableContentTypes(articles);
   const requestedTypeParam = searchParams.get("type");
   const requestedType = parseBlogContentType(requestedTypeParam);
   const activeContentType =
     requestedType === "ALL" || availableTypes.has(requestedType) ? requestedType : "ALL";
+
   const articlesForType = getArticlesForType(articles, activeContentType);
-  const availableTags = getAvailableTags(articlesForType);
+  const availableCategories = getAvailableCategories(articlesForType);
+  const requestedCategorySlug = searchParams.get("category");
+  const activeCategorySlug = availableCategories.some(
+    (category) => category.slug === requestedCategorySlug,
+  )
+    ? requestedCategorySlug
+    : null;
+
+  const articlesForCategory = activeCategorySlug
+    ? articlesForType.filter((article) => article.category?.slug === activeCategorySlug)
+    : articlesForType;
+  const availableTags = getAvailableTags(articlesForCategory);
   const requestedTagSlug = searchParams.get("tag");
   const activeTagSlug = availableTags.some((tag) => tag.slug === requestedTagSlug)
     ? requestedTagSlug
     : null;
-  const filtered = filterBlogArticles(articles, activeContentType, activeTagSlug);
+
+  const filtered = filterBlogArticles(
+    articles,
+    activeContentType,
+    activeCategorySlug,
+    activeTagSlug,
+  );
+  const requestedPage = parseBlogPage(searchParams.get("page"));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / BLOG_PAGE_SIZE));
+  const activePage = Math.min(requestedPage, totalPages);
+  const pageStart = (activePage - 1) * BLOG_PAGE_SIZE;
+  const pageArticles = filtered.slice(pageStart, pageStart + BLOG_PAGE_SIZE);
+  const featured = activePage === 1 ? pageArticles[0] : undefined;
+  const rest = activePage === 1 ? pageArticles.slice(1) : pageArticles;
+  const saveStatuses = useArticleSaveStatusBatch(pageArticles.map((article) => article.id));
+
   const showTypeFilter = availableTypes.size > 1;
+  const showCategoryFilter = availableCategories.length > 0;
   const showTagFilter = availableTags.length >= 2;
 
-  const updateFilters = (type: BlogContentType, tagSlug: string | null) => {
+  const updateFilters = (
+    type: BlogContentType,
+    categorySlug: string | null,
+    tagSlug: string | null,
+  ) => {
     const params = new URLSearchParams(searchParams.toString());
     if (type === "ALL") params.delete("type");
     else params.set("type", type.toLowerCase());
+    if (categorySlug) params.set("category", categorySlug);
+    else params.delete("category");
     if (tagSlug) params.set("tag", tagSlug);
     else params.delete("tag");
+    params.delete("page");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  const updatePage = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page <= 1) params.delete("page");
+    else params.set("page", String(page));
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
   };
@@ -70,22 +119,45 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   useEffect(() => {
     const normalizedTypeParam =
       activeContentType === "ALL" ? null : activeContentType.toLowerCase();
-    if (requestedTypeParam === normalizedTypeParam && requestedTagSlug === activeTagSlug) return;
+    const normalizedPageParam = activePage <= 1 ? null : String(activePage);
+    const requestedPageParam = searchParams.get("page");
+
+    if (
+      requestedTypeParam === normalizedTypeParam &&
+      requestedCategorySlug === activeCategorySlug &&
+      requestedTagSlug === activeTagSlug &&
+      requestedPageParam === normalizedPageParam
+    ) {
+      return;
+    }
+
     const params = new URLSearchParams(searchParams.toString());
     if (activeContentType === "ALL") params.delete("type");
     else params.set("type", activeContentType.toLowerCase());
+    if (activeCategorySlug) params.set("category", activeCategorySlug);
+    else params.delete("category");
     if (activeTagSlug) params.set("tag", activeTagSlug);
     else params.delete("tag");
+    if (activePage <= 1) params.delete("page");
+    else params.set("page", String(activePage));
+
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [activeContentType, activeTagSlug, pathname, requestedTagSlug, requestedTypeParam, router, searchParams]);
-
-  const [featured, ...rest] = filtered;
-  const saveStatuses = useArticleSaveStatusBatch(filtered.map((a) => a.id));
+  }, [
+    activeCategorySlug,
+    activeContentType,
+    activePage,
+    activeTagSlug,
+    pathname,
+    requestedCategorySlug,
+    requestedTagSlug,
+    requestedTypeParam,
+    router,
+    searchParams,
+  ]);
 
   return (
     <>
-      {/* ── Hero ── */}
       <section className="border-b border-border">
         <div className="site-wrap px-6 sm:px-7 py-10 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-8 items-end">
           <div>
@@ -108,12 +180,16 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
               Вдохновение для семейных прогулок, событий и открытий — в одной редакторской подборке.
             </p>
           </div>
-
         </div>
       </section>
 
-      {/* ── Filters ── */}
-      <section className={showTypeFilter || showTagFilter ? "border-b border-border" : ""}>
+      <section
+        className={
+          showTypeFilter || showCategoryFilter || showTagFilter
+            ? "border-b border-border"
+            : ""
+        }
+      >
         <div className="site-wrap px-6 sm:px-7 py-3.5 space-y-4">
           {showTypeFilter && (
             <div
@@ -126,12 +202,52 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                   type="button"
                   key={filter.key}
                   aria-pressed={activeContentType === filter.key}
-                  onClick={() => updateFilters(filter.key, activeTagSlug)}
+                  onClick={() =>
+                    updateFilters(filter.key, activeCategorySlug, activeTagSlug)
+                  }
                   className="min-w-0 rounded-lg px-1.5 py-2 text-[11px] font-medium whitespace-nowrap transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4 sm:text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:shadow-sm aria-pressed:hover:bg-primary"
                 >
                   {filter.label}
                 </button>
               ))}
+            </div>
+          )}
+
+          {showCategoryFilter && (
+            <div>
+              <h2 className="mb-1 text-[11px] font-mono uppercase tracking-[.14em] text-muted-foreground">
+                Разделы
+              </h2>
+              <div
+                className="no-scrollbar flex gap-2 overflow-x-auto py-1"
+                aria-label="Разделы журнала"
+              >
+                <button
+                  type="button"
+                  aria-pressed={activeCategorySlug === null}
+                  onClick={() => updateFilters(activeContentType, null, activeTagSlug)}
+                  className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-primary"
+                >
+                  Все разделы
+                </button>
+                {availableCategories.map((category) => (
+                  <button
+                    type="button"
+                    key={category.id}
+                    aria-pressed={activeCategorySlug === category.slug}
+                    onClick={() =>
+                      updateFilters(
+                        activeContentType,
+                        activeCategorySlug === category.slug ? null : category.slug,
+                        activeTagSlug,
+                      )
+                    }
+                    className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-primary"
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -144,7 +260,9 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                 <button
                   type="button"
                   aria-pressed={activeTagSlug === null}
-                  onClick={() => updateFilters(activeContentType, null)}
+                  onClick={() =>
+                    updateFilters(activeContentType, activeCategorySlug, null)
+                  }
                   className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-primary"
                 >
                   Все темы
@@ -155,7 +273,11 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                     key={tag.id}
                     aria-pressed={activeTagSlug === tag.slug}
                     onClick={() =>
-                      updateFilters(activeContentType, activeTagSlug === tag.slug ? null : tag.slug)
+                      updateFilters(
+                        activeContentType,
+                        activeCategorySlug,
+                        activeTagSlug === tag.slug ? null : tag.slug,
+                      )
                     }
                     className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:font-semibold aria-pressed:text-primary"
                   >
@@ -168,14 +290,13 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
         </div>
       </section>
 
-      {/* ── Content ── */}
       <div className="site-wrap px-6 sm:px-7 pb-16">
         {filtered.length === 0 ? (
           <div className="py-12">
             <p className="text-sm text-muted-foreground">По выбранным фильтрам материалов пока нет.</p>
             <button
               type="button"
-              onClick={() => updateFilters("ALL", null)}
+              onClick={() => updateFilters("ALL", null, null)}
               className="mt-4 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Сбросить фильтры
@@ -203,23 +324,39 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                   </span>
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-[11px] font-mono text-muted-foreground shrink-0">
-                    {rest.length} из {articles.length}
+                    {pageStart + 1}–{pageStart + pageArticles.length} из {filtered.length}
                   </span>
                 </div>
-                {rest.map((a, i) => (
-                  <AnalyticsCardViewTracker
-                    key={a.slug}
-                    entityType="ARTICLE"
-                    entityId={a.id}
-                    vertical="CITY"
-                    citySlug={citySlug}
-                    meta={{ section: "journal", position: i + 1 }}
-                  >
-                    <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
-                  </AnalyticsCardViewTracker>
-                ))}
+                {rest.map((article, index) => {
+                  const absoluteIndex =
+                    pageStart + (activePage === 1 ? index + 1 : index);
+                  return (
+                    <AnalyticsCardViewTracker
+                      key={article.slug}
+                      entityType="ARTICLE"
+                      entityId={article.id}
+                      vertical="CITY"
+                      citySlug={citySlug}
+                      meta={{ section: "journal", position: absoluteIndex + 1 }}
+                    >
+                      <ArticleRow
+                        article={article}
+                        idx={absoluteIndex}
+                        saveStatus={saveStatuses[article.id]}
+                      />
+                    </AnalyticsCardViewTracker>
+                  );
+                })}
               </div>
             )}
+
+            <PublicContentPagination
+              page={activePage}
+              totalPages={totalPages}
+              total={filtered.length}
+              pageSize={BLOG_PAGE_SIZE}
+              onPageChange={updatePage}
+            />
           </>
         )}
       </div>
@@ -242,7 +379,6 @@ function FeaturedArticle({
       href={article.href}
       className="group grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12 py-12 border-b border-border"
     >
-      {/* Image */}
       <div
         className={`relative overflow-hidden rounded-[18px] bg-gradient-to-br ${TONES[0]} aspect-[5/4]`}
       >
@@ -262,7 +398,6 @@ function FeaturedArticle({
         </span>
       </div>
 
-      {/* Text */}
       <div className="flex flex-col gap-4 justify-center">
         <div className="flex items-center gap-3 flex-wrap">
           {article.isBreakingNews ? (
@@ -303,7 +438,6 @@ function FeaturedArticle({
       </div>
     </Link>
 
-    {/* Heart overlay — mirrors the Link's own grid so it lands on the image corner without nesting inside <a> */}
     <div
       aria-hidden={false}
       className="pointer-events-none absolute inset-0 grid grid-cols-1 py-12 sm:grid-cols-2 sm:gap-12"
@@ -343,7 +477,6 @@ function ArticleRow({
       href={article.href}
       className="group grid grid-cols-1 sm:grid-cols-[200px_1fr_180px] gap-4 sm:gap-9 py-8 border-t border-border last:border-b items-center transition-[padding] duration-200 hover:sm:pl-2"
     >
-      {/* Meta */}
       <div className="flex sm:flex-col gap-3 sm:gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {article.isBreakingNews && <BreakingPill />}
@@ -364,7 +497,6 @@ function ArticleRow({
         </span>
       </div>
 
-      {/* Body */}
       <div className="flex flex-col gap-3">
         <h3
           className="font-serif m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
@@ -377,7 +509,6 @@ function ArticleRow({
         </h3>
       </div>
 
-      {/* Image */}
       <div
         className={`hidden sm:block relative overflow-hidden rounded-2xl bg-gradient-to-br ${tone} aspect-[4/3]`}
       >
@@ -397,7 +528,6 @@ function ArticleRow({
       </div>
     </Link>
 
-    {/* Heart overlay — mirrors the Link's own grid so it lands in the image's action slot (former arrow position) without nesting inside <a> */}
     <div className="pointer-events-none absolute inset-0 hidden grid-cols-1 gap-4 py-8 sm:grid sm:grid-cols-[200px_1fr_180px] sm:gap-9">
       <div />
       <div />
