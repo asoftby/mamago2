@@ -171,7 +171,7 @@ export function ArticlePerformanceProvider({
         });
       },
       enqueueArticleSignal(signal) {
-        queueOnce(`article:${signal}`, { kind: signal });
+        queue({ kind: signal });
       },
     };
   }, [articleId, endpoint, flush, scheduleFlush]);
@@ -182,11 +182,14 @@ export function ArticlePerformanceProvider({
 /**
  * Counts a real browser-visible article, not a server render/prefetch. The same
  * observer also records 75% and full-read milestones into the existing batch,
- * so reading depth adds no request/INSERT of its own.
+ * so reading depth adds no request/INSERT of its own. Signals are once per
+ * mounted article view; the stable batch session id lets the report distinguish
+ * total views from unique readers.
  */
 export function ArticlePerformanceArticleTracker() {
   const analytics = useContext(AnalyticsContext);
   const markerRef = useRef<HTMLSpanElement>(null);
+  const firedRef = useRef<Set<ArticlePerformanceArticleSignal>>(new Set());
 
   useEffect(() => {
     if (!analytics || !markerRef.current || typeof window === "undefined") return;
@@ -196,7 +199,12 @@ export function ArticlePerformanceArticleTracker() {
     let viewTimer: ReturnType<typeof setTimeout> | null = null;
     let raf = 0;
 
-    const queueView = () => analytics.enqueueArticleSignal("article_view");
+    const queueSignal = (signal: ArticlePerformanceArticleSignal) => {
+      if (firedRef.current.has(signal)) return;
+      firedRef.current.add(signal);
+      analytics.enqueueArticleSignal(signal);
+    };
+    const queueView = () => queueSignal("article_view");
     const measureDepth = () => {
       raf = 0;
       const rect = article.getBoundingClientRect();
@@ -204,12 +212,12 @@ export function ArticlePerformanceArticleTracker() {
       const depth = Math.max(0, Math.min(1, (window.innerHeight - rect.top) / rect.height));
       if (depth >= 0.75) {
         queueView();
-        analytics.enqueueArticleSignal("article_read_75");
+        queueSignal("article_read_75");
       }
       if (depth >= 0.98 || rect.bottom <= window.innerHeight + 24) {
         queueView();
-        analytics.enqueueArticleSignal("article_read_75");
-        analytics.enqueueArticleSignal("article_complete");
+        queueSignal("article_read_75");
+        queueSignal("article_complete");
       }
     };
 
@@ -226,7 +234,7 @@ export function ArticlePerformanceArticleTracker() {
             viewTimer = null;
             return;
           }
-          if (!viewTimer) {
+          if (!viewTimer && !firedRef.current.has("article_view")) {
             viewTimer = setTimeout(() => {
               queueView();
               viewTimer = null;
