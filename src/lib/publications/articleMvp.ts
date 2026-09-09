@@ -19,11 +19,16 @@ export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema
  * Стабильная идентичность объекта, который автор описывает ручными
  * structured-блоками статьи. Это не запись каталога: объект может находиться
  * вне географии/охвата mamaGo и вообще никогда не появиться в основной БД.
+ *
+ * Пустой title допустим только как сохранённое состояние ещё пустого MANUAL
+ * блока: это сохраняет subject.id между сохранением и повторным открытием
+ * редактора. Как только в structured-блоке появляются данные, block-level
+ * validation ниже требует непустое название объекта.
  */
 export const ArticleSubjectSchema = z.object({
   id: z.string().min(1),
   source: z.enum(["MANUAL", "CATALOG"]),
-  title: z.string().trim().min(1).max(200),
+  title: z.string().trim().max(200),
   catalogEntityType: ArticleBlockEntityTypeSchema.optional(),
   catalogEntityId: z.string().trim().min(1).optional(),
 }).superRefine((subject, ctx) => {
@@ -41,6 +46,13 @@ export const ArticleSubjectSchema = z.object({
       code: "custom",
       path: ["catalogEntityId"],
       message: "Catalog subjects require an entity type and id",
+    });
+  }
+  if (subject.source === "CATALOG" && !subject.title) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["title"],
+      message: "Catalog subjects require a title",
     });
   }
 });
@@ -144,6 +156,46 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   if (block.type === "activityCard" && block.entityType !== "PLACE" && block.placeSections) {
     ctx.addIssue({ code: "custom", path: ["placeSections"], message: "Place sections are only valid for PLACE cards" });
   }
+
+  if (block.type === "contacts" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.address ||
+        block.data.email ||
+        block.data.website ||
+        block.data.mapUrl ||
+        block.data.coordinates ||
+        block.data.phones.length ||
+        block.data.socials.length,
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
+  }
+
+  if (block.type === "price" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.mode !== "UNKNOWN" ||
+        block.data.min != null ||
+        block.data.max != null ||
+        block.data.items.length ||
+        block.data.note.trim(),
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
+  }
+
+  if (block.type === "openingHours" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.mode !== "WEEKLY" ||
+        block.data.note?.trim() ||
+        block.data.exceptions.length ||
+        block.data.rules.some((rule) => rule.isOpen || rule.allDay || rule.intervals.length > 0),
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
+  }
 });
 
 export type ArticleBlockMvp = z.infer<typeof ArticleBlockMvpSchema>;
@@ -208,18 +260,15 @@ function prepareArticleSubjectForSave(subject: ArticleSubject | undefined): Arti
 }
 
 /**
- * A brand-new structured block carries an editor-only blank subject. Keep the
- * empty block saveable, but once it contains actual data require the author to
- * name the described object. Legacy populated blocks without a subject remain valid.
+ * Preserve a structured block's subject even while both the block and title
+ * are empty. That stable id marks the block as new-format editorial content and
+ * survives save/reopen; legacy populated blocks that never had subject remain
+ * valid for backward compatibility.
  */
 function prepareStructuredSubjectForSave(
   subject: ArticleSubject | undefined,
-  hasMeaningfulData: boolean,
 ): ArticleSubject | undefined {
-  const prepared = prepareArticleSubjectForSave(subject);
-  if (!prepared) return undefined;
-  if (!prepared.title && !hasMeaningfulData) return undefined;
-  return prepared;
+  return prepareArticleSubjectForSave(subject);
 }
 
 export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): string {
@@ -239,12 +288,9 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
     blocks: payload.blocks.map((block) => {
       if (block.type === "contacts") {
         const data = prepareArticleContactsForSave(block.data);
-        const hasMeaningfulData = Boolean(
-          data.address || data.email || data.website || data.mapUrl || data.coordinates || data.phones.length || data.socials.length,
-        );
         return {
           ...block,
-          subject: prepareStructuredSubjectForSave(block.subject, hasMeaningfulData),
+          subject: prepareStructuredSubjectForSave(block.subject),
           data,
         };
       }
@@ -255,15 +301,9 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
             Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
           ),
         };
-        const hasMeaningfulData = Boolean(
-          data.mode !== "WEEKLY" ||
-            data.note?.trim() ||
-            data.exceptions.length ||
-            data.rules.some((rule) => rule.isOpen || rule.allDay || rule.intervals.length > 0),
-        );
         return {
           ...block,
-          subject: prepareStructuredSubjectForSave(block.subject, hasMeaningfulData),
+          subject: prepareStructuredSubjectForSave(block.subject),
           data,
         };
       }
@@ -281,12 +321,9 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
           return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
         }),
       };
-      const hasMeaningfulData = Boolean(
-        data.mode !== "UNKNOWN" || data.min != null || data.max != null || data.items.length || data.note,
-      );
       return {
         ...block,
-        subject: prepareStructuredSubjectForSave(block.subject, hasMeaningfulData),
+        subject: prepareStructuredSubjectForSave(block.subject),
         data,
       };
     }),
