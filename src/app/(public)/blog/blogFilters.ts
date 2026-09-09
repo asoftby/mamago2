@@ -47,9 +47,9 @@ export function getAvailableTags(articles: CityHomeJournalArticle[]) {
   return [...tags.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
-function publicationTimestamp(value: CityHomeJournalArticle["publishedAt"]): number {
+function publicationTimestamp(value: Date | string | null): number {
   if (!value) return 0;
-  const timestamp = new Date(value).getTime();
+  const timestamp = value instanceof Date ? value.getTime() : new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
