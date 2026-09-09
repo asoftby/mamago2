@@ -24,6 +24,18 @@ export const ArticlePerformanceActionSchema = z.enum([
 ]);
 export type ArticlePerformanceAction = z.infer<typeof ArticlePerformanceActionSchema>;
 
+/**
+ * Article-level signals share the same cheap batch as block telemetry. They are
+ * deliberately not emitted through the generic UserEvent endpoint, so one read
+ * does not create another synchronous analytics write/projection.
+ */
+export const ArticlePerformanceArticleSignalSchema = z.enum([
+  "article_view",
+  "article_read_75",
+  "article_complete",
+]);
+export type ArticlePerformanceArticleSignal = z.infer<typeof ArticlePerformanceArticleSignalSchema>;
+
 const identity = z.object({
   blockId: z.string().trim().min(1).max(160),
   blockType: ArticlePerformanceTrackedBlockTypeSchema,
@@ -35,6 +47,9 @@ const identity = z.object({
 });
 
 export const ArticlePerformanceBatchEventSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("article_view") }),
+  z.object({ kind: z.literal("article_read_75") }),
+  z.object({ kind: z.literal("article_complete") }),
   identity.extend({ kind: z.literal("impression") }),
   identity.extend({
     kind: z.literal("action"),
