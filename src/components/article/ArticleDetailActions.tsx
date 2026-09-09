@@ -52,7 +52,7 @@ export function ArticleDetailActions({
         articleTitle={title}
         coverImageUrl={coverImageUrl}
         variant="labeled"
-        source={source}
+        source="detail"
       />
       <button
         type="button"
