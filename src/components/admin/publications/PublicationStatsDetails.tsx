@@ -8,14 +8,19 @@ import {
   type PublicationStatsPeriod,
 } from "@/lib/publication-stats/period";
 import type { PublicationStatsPayload } from "@/lib/publication-stats/types";
+import type { ArticlePerformanceStatsPayload } from "@/lib/article/articlePerformanceStats";
+import { isArticlePerformanceStatsPayload } from "@/lib/article/articlePerformanceStats";
 import { PublicationStatsPeriodSwitch } from "@/components/publication-stats/PublicationStatsPeriodSwitch";
 import { PublicationStatsSections } from "@/components/publication-stats/PublicationStatsSections";
 import { PublicationStatsHeader } from "@/components/publication-stats/PublicationStatsHeader";
+import { ArticlePerformanceStatsView } from "./ArticlePerformanceStatsView";
 
 interface PublicationStatsDetailsProps {
   entityId: string;
   path: string;
 }
+
+type StatsResponse = PublicationStatsPayload | ArticlePerformanceStatsPayload;
 
 function Skeleton() {
   return (
@@ -50,9 +55,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-2 p-8 text-center">
       <p className="text-[14px] font-medium text-gray-600">Данных пока нет</p>
-      <p className="text-[12px] text-gray-400">
-        Статистика появится после того, как публикация наберёт просмотры
-      </p>
+      <p className="text-[12px] text-gray-400">Статистика появится после того, как публикация наберёт просмотры</p>
     </div>
   );
 }
@@ -71,13 +74,9 @@ function formatUpdatedAt(iso: string): string {
   }
 }
 
-/**
- * Детальная статистика публикации — загружается lazy только после открытия drawer.
- * Переиспользует все существующие секции из PublicationStatsSections.
- */
 export function PublicationStatsDetails({ entityId, path }: PublicationStatsDetailsProps) {
   const [period, setPeriod] = useState<PublicationStatsPeriod>(DEFAULT_PUBLICATION_STATS_PERIOD);
-  const [data, setData] = useState<PublicationStatsPayload | null>(null);
+  const [data, setData] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -90,12 +89,8 @@ export function PublicationStatsDetails({ entityId, path }: PublicationStatsDeta
     (async () => {
       try {
         const qs = new URLSearchParams({ path, period });
-        const res = await fetch(
-          `/api/publication-stats/${encodeURIComponent(entityId)}?${qs}`,
-          { credentials: "include" },
-        );
+        const res = await fetch(`/api/publication-stats/${encodeURIComponent(entityId)}?${qs}`, { credentials: "include" });
         if (cancelled) return;
-
         if (res.status === 401 || res.status === 403) {
           setError("Недостаточно прав для просмотра статистики");
           return;
@@ -105,8 +100,7 @@ export function PublicationStatsDetails({ entityId, path }: PublicationStatsDeta
           setError(typeof err.error === "string" ? err.error : `HTTP ${res.status}`);
           return;
         }
-
-        const json = (await res.json()) as PublicationStatsPayload;
+        const json = (await res.json()) as StatsResponse;
         if (!cancelled) setData(json);
       } catch {
         if (!cancelled) setError("Сеть недоступна");
@@ -118,45 +112,38 @@ export function PublicationStatsDetails({ entityId, path }: PublicationStatsDeta
     return () => { cancelled = true; };
   }, [entityId, path, period, retryKey]);
 
-  const isEmpty = data && (data as PublicationStatsPayload & { empty?: boolean }).empty === true;
+  const genericData = data && !isArticlePerformanceStatsPayload(data) ? data : null;
+  const isEmpty = genericData && (genericData as PublicationStatsPayload & { empty?: boolean }).empty === true;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Period switch */}
       <div className="shrink-0 border-b border-gray-100 px-4 py-3">
-        <PublicationStatsPeriodSwitch
-          value={period}
-          onChange={setPeriod}
-          disabled={loading}
-          className="w-full"
-        />
+        <PublicationStatsPeriodSwitch value={period} onChange={setPeriod} disabled={loading} className="w-full" />
       </div>
 
-      {/* Scrollable content */}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {loading && !data ? (
           <Skeleton />
         ) : error && !data ? (
           <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} />
+        ) : data && isArticlePerformanceStatsPayload(data) ? (
+          <div className={cn(loading && "opacity-60 pointer-events-none")}>
+            <ArticlePerformanceStatsView data={data} />
+            {error ? <p className="px-4 pb-4 font-mono text-[10px] text-gray-400">предупреждение: {error}</p> : null}
+          </div>
         ) : isEmpty ? (
           <EmptyState />
-        ) : data ? (
+        ) : genericData ? (
           <div className={cn("p-4 space-y-4", loading && "opacity-60 pointer-events-none")}>
-            {/* Header meta */}
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
               <PublicationStatsHeader
-                header={data.header}
+                header={genericData.header}
                 periodLabelRu={PUBLICATION_STATS_PERIOD_LABEL_RU[period]}
-                statsUpdatedAtDisplay={loading ? "…" : formatUpdatedAt(data.header.statsUpdatedAt)}
+                statsUpdatedAtDisplay={loading ? "…" : formatUpdatedAt(genericData.header.statsUpdatedAt)}
               />
             </div>
-
-            {/* All sections */}
-            <PublicationStatsSections payload={data} />
-
-            {error && (
-              <p className="font-mono text-[10px] text-gray-400">предупреждение: {error}</p>
-            )}
+            <PublicationStatsSections payload={genericData} />
+            {error ? <p className="font-mono text-[10px] text-gray-400">предупреждение: {error}</p> : null}
           </div>
         ) : null}
       </div>
