@@ -15,6 +15,56 @@ export const ARTICLE_CONTENT_VERSION = 1 as const;
 export const ArticleBlockEntityTypeSchema = z.enum(["EVENT", "PLACE", "OFFER", "ROUTE", "ARTICLE"]);
 export type ArticleBlockEntityType = z.infer<typeof ArticleBlockEntityTypeSchema>;
 
+/**
+ * Стабильная идентичность объекта, который автор описывает ручными
+ * structured-блоками статьи. Это не запись каталога: объект может находиться
+ * вне географии/охвата mamaGo и вообще никогда не появиться в основной БД.
+ *
+ * Пустой title допустим только как сохранённое состояние ещё пустого MANUAL
+ * блока: это сохраняет subject.id между сохранением и повторным открытием
+ * редактора. Как только в structured-блоке появляются данные, block-level
+ * validation ниже требует непустое название объекта.
+ */
+export const ArticleSubjectSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(["MANUAL", "CATALOG"]),
+  title: z.string().trim().max(200),
+  catalogEntityType: ArticleBlockEntityTypeSchema.optional(),
+  catalogEntityId: z.string().trim().min(1).optional(),
+}).superRefine((subject, ctx) => {
+  const hasType = Boolean(subject.catalogEntityType);
+  const hasId = Boolean(subject.catalogEntityId);
+  if (hasType !== hasId) {
+    ctx.addIssue({
+      code: "custom",
+      path: [hasType ? "catalogEntityId" : "catalogEntityType"],
+      message: "Catalog entity type and id must be provided together",
+    });
+  }
+  if (subject.source === "CATALOG" && (!hasType || !hasId)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["catalogEntityId"],
+      message: "Catalog subjects require an entity type and id",
+    });
+  }
+  if (subject.source === "CATALOG" && !subject.title) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["title"],
+      message: "Catalog subjects require a title",
+    });
+  }
+});
+export type ArticleSubject = z.infer<typeof ArticleSubjectSchema>;
+
+export function newArticleSubject(
+  title = "",
+  id: () => string = () => randomId(),
+): ArticleSubject {
+  return { id: id(), source: "MANUAL", title };
+}
+
 export const DEFAULT_ARTICLE_PLACE_SECTIONS = {
   image: true,
   description: true,
@@ -57,14 +107,8 @@ const ArticlePriceDataSchema = SharedPriceDataSchema.superRefine((value, ctx) =>
 });
 
 export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
-  base.extend({
-    type: z.literal("intro"),
-    text: z.string(),
-  }),
-  base.extend({
-    type: z.literal("text"),
-    text: z.string(),
-  }),
+  base.extend({ type: z.literal("intro"), text: z.string() }),
+  base.extend({ type: z.literal("text"), text: z.string() }),
   base.extend({
     type: z.literal("quote"),
     text: z.string(),
@@ -105,12 +149,52 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
     embedHtml: z.string(),
     caption: z.string().optional(),
   }),
-  base.extend({ type: z.literal("contacts"), data: SharedContactsDataSchema }),
-  base.extend({ type: z.literal("price"), data: ArticlePriceDataSchema }),
-  base.extend({ type: z.literal("openingHours"), data: SharedOpeningHoursDataSchema }),
+  base.extend({ type: z.literal("contacts"), subject: ArticleSubjectSchema.optional(), data: SharedContactsDataSchema }),
+  base.extend({ type: z.literal("price"), subject: ArticleSubjectSchema.optional(), data: ArticlePriceDataSchema }),
+  base.extend({ type: z.literal("openingHours"), subject: ArticleSubjectSchema.optional(), data: SharedOpeningHoursDataSchema }),
 ]).superRefine((block, ctx) => {
   if (block.type === "activityCard" && block.entityType !== "PLACE" && block.placeSections) {
     ctx.addIssue({ code: "custom", path: ["placeSections"], message: "Place sections are only valid for PLACE cards" });
+  }
+
+  if (block.type === "contacts" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.address ||
+        block.data.email ||
+        block.data.website ||
+        block.data.mapUrl ||
+        block.data.coordinates ||
+        block.data.phones.length ||
+        block.data.socials.length,
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
+  }
+
+  if (block.type === "price" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.mode !== "UNKNOWN" ||
+        block.data.min != null ||
+        block.data.max != null ||
+        block.data.items.length ||
+        block.data.note.trim(),
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
+  }
+
+  if (block.type === "openingHours" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.mode !== "WEEKLY" ||
+        block.data.note?.trim() ||
+        block.data.exceptions.length ||
+        block.data.rules.some((rule) => rule.isOpen || rule.allDay || rule.intervals.length > 0),
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
   }
 });
 
@@ -162,8 +246,34 @@ export function prepareArticleContactsForSave(data: z.infer<typeof SharedContact
   };
 }
 
+function prepareArticleSubjectForSave(subject: ArticleSubject | undefined): ArticleSubject | undefined {
+  if (!subject) return undefined;
+  const title = subject.title.trim();
+  const catalogEntityId = subject.catalogEntityId?.trim();
+  return {
+    id: subject.id,
+    source: subject.source,
+    title,
+    ...(subject.catalogEntityType ? { catalogEntityType: subject.catalogEntityType } : {}),
+    ...(catalogEntityId ? { catalogEntityId } : {}),
+  };
+}
+
+/**
+ * Preserve a structured block's subject even while both the block and title
+ * are empty. That stable id marks the block as new-format editorial content and
+ * survives save/reopen; legacy populated blocks that never had subject remain
+ * valid for backward compatibility.
+ */
+function prepareStructuredSubjectForSave(
+  subject: ArticleSubject | undefined,
+): ArticleSubject | undefined {
+  return prepareArticleSubjectForSave(subject);
+}
+
 export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): string {
   const paths = issues.map((issue) => issue.path.map(String).join("."));
+  if (paths.some((path) => /\.subject\.title$/.test(path))) return "Укажите, к какому объекту относится блок";
   if (paths.some((path) => /\.phones\.\d+\.value$/.test(path))) return "Укажите номер телефона";
   if (paths.some((path) => /\.socials\.\d+\.url$/.test(path))) return "Введите полную ссылку, например https://instagram.com/...";
   if (paths.some((path) => /\.data\.email$/.test(path))) return "Введите корректный email";
@@ -171,48 +281,50 @@ export function articleContentValidationMessage(issues: readonly z.ZodIssue[]): 
   return "Проверьте заполнение блоков статьи";
 }
 
-/**
- * Removes completely blank editor-only rows before API serialization.
- * Partially filled invalid rows are deliberately preserved so the strict
- * persisted schema can report them to the editor.
- */
+/** Removes blank editor-only rows before API serialization. */
 export function prepareArticleContentForSave(payload: ArticleContentPayload): ArticleContentPayload {
   return {
     ...payload,
     blocks: payload.blocks.map((block) => {
       if (block.type === "contacts") {
+        const data = prepareArticleContactsForSave(block.data);
         return {
           ...block,
-          data: prepareArticleContactsForSave(block.data),
+          subject: prepareStructuredSubjectForSave(block.subject),
+          data,
         };
       }
       if (block.type === "openingHours") {
+        const data = {
+          ...block.data,
+          exceptions: block.data.exceptions.filter((exception) =>
+            Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
+          ),
+        };
         return {
           ...block,
-          data: {
-            ...block.data,
-            exceptions: block.data.exceptions.filter((exception) =>
-              Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
-            ),
-          },
+          subject: prepareStructuredSubjectForSave(block.subject),
+          data,
         };
       }
       if (block.type !== "price") return block;
+      const data = {
+        ...block.data,
+        currency: block.data.currency.trim(),
+        note: block.data.note.trim(),
+        items: block.data.items.flatMap((item) => {
+          const label = item.label.trim();
+          const price = item.price.trim();
+          const description = item.description?.trim();
+          const oldPrice = item.oldPrice?.trim();
+          if (!label && !price && !description && !oldPrice) return [];
+          return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
+        }),
+      };
       return {
         ...block,
-        data: {
-          ...block.data,
-          currency: block.data.currency.trim(),
-          note: block.data.note.trim(),
-          items: block.data.items.flatMap((item) => {
-            const label = item.label.trim();
-            const price = item.price.trim();
-            const description = item.description?.trim();
-            const oldPrice = item.oldPrice?.trim();
-            if (!label && !price && !description && !oldPrice) return [];
-            return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
-          }),
-        },
+        subject: prepareStructuredSubjectForSave(block.subject),
+        data,
       };
     }),
   };
@@ -232,7 +344,6 @@ export function articleStarterContent(): ArticleContentPayload {
 
 const ARTICLE_LEAD_EXCERPT_MAX = 220;
 
-/** Полный лид статьи (блок intro) — для шапки на странице. */
 export function deriveArticleLeadPlainText(
   content: ArticleContentPayload | { blocks: ArticleBlockMvp[] },
 ): string | null {
@@ -242,7 +353,6 @@ export function deriveArticleLeadPlainText(
   return text || null;
 }
 
-/** HTML лида (intro) с разметкой редактора — для шапки без потери bold/italic/br. */
 export function deriveArticleLeadHtml(
   content: ArticleContentPayload | { blocks: ArticleBlockMvp[] },
 ): string | null {
@@ -253,16 +363,13 @@ export function deriveArticleLeadHtml(
   return html;
 }
 
-/** Превью статьи: первые строки блока intro (лид). */
 export function deriveArticleExcerptFromContent(
   content: ArticleContentPayload,
 ): string | null {
   const intro = content.blocks.find((b) => b.type === "intro");
   if (!intro || intro.type !== "intro") return null;
-
   const lines = extractPlainTextLinesFromHtml(intro.text);
   if (lines.length === 0) return null;
-
   let text = lines.slice(0, 2).join(" ").replace(/\s+/g, " ").trim();
   if (!text) return null;
   if (text.length > ARTICLE_LEAD_EXCERPT_MAX) {
@@ -271,21 +378,10 @@ export function deriveArticleExcerptFromContent(
   return text;
 }
 
-/** Где именно внутри статьи используется конкретный MediaAsset — для «Фото этой статьи» в picker'е. */
 export const ArticleMediaUsageKindSchema = z.enum(["cover", "seo", "image-block", "gallery-block"]);
 export type ArticleMediaUsageKind = z.infer<typeof ArticleMediaUsageKindSchema>;
-
 export type ArticleMediaUsageEntry = { mediaId: string; usage: ArticleMediaUsageKind[] };
 
-/**
- * Все MediaAsset.id, на которые ссылается статья (обложка, legacy SEO-картинка,
- * image/gallery блоки), с дедупликацией и списком мест использования на каждый id.
- * Owner-agnostic: намеренно не трогает `uploadedById` — задача picker'а показать
- * «Фото этой статьи» независимо от того, кому исторически принадлежит файл
- * (важно для migrated/legacy статей, где uploadedById=ADMIN).
- * Порядок: id встречи первого usage (cover → seo → блоки по порядку).
- * Единый source of truth и для сервера (API), и для клиента (draft-статья без id) — см. п.16 тикета.
- */
 export function extractArticleMediaUsage(input: {
   coverImageId?: string | null;
   seoImageId?: string | null;
@@ -293,7 +389,6 @@ export function extractArticleMediaUsage(input: {
 }): ArticleMediaUsageEntry[] {
   const order: string[] = [];
   const usageByMedia = new Map<string, Set<ArticleMediaUsageKind>>();
-
   const add = (mediaId: string | null | undefined, kind: ArticleMediaUsageKind) => {
     const id = mediaId?.trim();
     if (!id) return;
@@ -303,7 +398,6 @@ export function extractArticleMediaUsage(input: {
     }
     usageByMedia.get(id)!.add(kind);
   };
-
   add(input.coverImageId, "cover");
   add(input.seoImageId, "seo");
   for (const block of input.blocks ?? []) {
@@ -312,11 +406,9 @@ export function extractArticleMediaUsage(input: {
       for (const mediaId of block.mediaIds) add(mediaId, "gallery-block");
     }
   }
-
   return order.map((mediaId) => ({ mediaId, usage: [...usageByMedia.get(mediaId)!] }));
 }
 
-/** Уникальный список media id, используемых статьёй — без usage-детализации. */
 export function extractArticleMediaIds(input: {
   coverImageId?: string | null;
   seoImageId?: string | null;
@@ -331,38 +423,25 @@ export function newBlock(
 ): ArticleBlockMvp {
   const bid = id();
   switch (type) {
-    case "intro":
-      return { id: bid, type: "intro", text: "" };
-    case "text":
-      return { id: bid, type: "text", text: "" };
-    case "quote":
-      return { id: bid, type: "quote", text: "" };
-    case "heading":
-      return { id: bid, type: "heading", level: 2, text: "" };
-    case "callout":
-      return { id: bid, type: "callout", variant: "tip", text: "" };
-    case "image":
-      return { id: bid, type: "image", mediaId: "", alt: "", caption: "" };
-    case "gallery":
-      return { id: bid, type: "gallery", mediaIds: [], presentation: "carousel", caption: "" };
+    case "intro": return { id: bid, type: "intro", text: "" };
+    case "text": return { id: bid, type: "text", text: "" };
+    case "quote": return { id: bid, type: "quote", text: "" };
+    case "heading": return { id: bid, type: "heading", level: 2, text: "" };
+    case "callout": return { id: bid, type: "callout", variant: "tip", text: "" };
+    case "image": return { id: bid, type: "image", mediaId: "", alt: "", caption: "" };
+    case "gallery": return { id: bid, type: "gallery", mediaIds: [], presentation: "carousel", caption: "" };
     case "activityCard":
-      return {
-        id: bid,
-        type: "activityCard",
-        entityType: "PLACE",
-        entityId: "",
-        placeSections: { ...DEFAULT_ARTICLE_PLACE_SECTIONS },
-      };
-    case "embed":
-      return { id: bid, type: "embed", embedHtml: "", caption: "" };
+      return { id: bid, type: "activityCard", entityType: "PLACE", entityId: "", placeSections: { ...DEFAULT_ARTICLE_PLACE_SECTIONS } };
+    case "embed": return { id: bid, type: "embed", embedHtml: "", caption: "" };
     case "contacts":
-      return { id: bid, type: "contacts", data: { phones: [], socials: [] } };
+      return { id: bid, type: "contacts", subject: newArticleSubject("", () => `subject_${bid}`), data: { phones: [], socials: [] } };
     case "price":
-      return { id: bid, type: "price", data: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" } };
+      return { id: bid, type: "price", subject: newArticleSubject("", () => `subject_${bid}`), data: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" } };
     case "openingHours":
       return {
         id: bid,
         type: "openingHours",
+        subject: newArticleSubject("", () => `subject_${bid}`),
         data: {
           mode: "WEEKLY",
           timezone: "Europe/Minsk",

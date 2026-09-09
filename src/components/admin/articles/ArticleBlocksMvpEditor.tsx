@@ -21,6 +21,8 @@ import {
   type ArticleBlockMvp,
   type ArticleCalloutVariant,
   type ArticlePlaceSections,
+  type ArticleSubject,
+  newArticleSubject,
   newBlock,
 } from "@/lib/publications/articleMvp";
 import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
@@ -33,6 +35,7 @@ import type { useArticleMediaSource } from "@/components/admin/articles/useArtic
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 import { ArticleContactsBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
+import { ArticleStructuredBlockSubjectEditor } from "./ArticleStructuredBlockSubjectEditor";
 
 /** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
 export function convertImageBlockToGallery(block: Extract<ArticleBlockMvp, { type: "image" }>): ArticleBlockMvp {
@@ -59,7 +62,6 @@ export function mergeImageBlocksIntoGallery(
   };
 }
 
-/** Короткие подписи в шапке блока */
 const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   intro: "Лид",
   text: "Текст",
@@ -75,7 +77,6 @@ const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   openingHours: "Режим работы",
 };
 
-/** Пункты picker: один intro на статью — в список попадает только если лида ещё нет. */
 const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: boolean }[] = [
   { type: "intro", label: "Вступление", introOnly: true },
   { type: "text", label: "Текст" },
@@ -102,6 +103,12 @@ const PLACE_SECTION_LABELS: Array<[keyof ArticlePlaceSections, string]> = [
   ["offers", "Предложения"],
   ["cta", "Кнопка перехода"],
 ];
+
+function isStructuredInfoBlock(
+  block: ArticleBlockMvp,
+): block is Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }> {
+  return block.type === "contacts" || block.type === "price" || block.type === "openingHours";
+}
 
 function SelectSkeleton({ className }: { className?: string }) {
   return (
@@ -130,17 +137,11 @@ function BlockTypePicker({
   triggerClassName?: string;
   size?: "sm" | "default";
   variant?: "outline" | "ghost" | "secondary";
-  /** Кастомный триггер (например широкая плашка внизу). Иначе — стандартная кнопка. */
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-
   const items = useMemo(
-    () =>
-      PICKER_ITEMS.filter((item) => {
-        if (item.introOnly && hasIntro) return false;
-        return true;
-      }),
+    () => PICKER_ITEMS.filter((item) => !(item.introOnly && hasIntro)),
     [hasIntro],
   );
 
@@ -148,12 +149,7 @@ function BlockTypePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {children ?? (
-          <Button
-            type="button"
-            variant={variant}
-            size={size}
-            className={cn("gap-1.5 font-normal", triggerClassName)}
-          >
+          <Button type="button" variant={variant} size={size} className={cn("gap-1.5 font-normal", triggerClassName)}>
             <Plus className="h-4 w-4 shrink-0" />
             Добавить блок
           </Button>
@@ -192,7 +188,6 @@ function EmbedBlockEditor({
   onChangeCaption: (v: string) => void;
 }) {
   const resolved = useMemo(() => parseArticleEmbed(embedHtml), [embedHtml]);
-
   return (
     <div className="space-y-3">
       <div className="space-y-1">
@@ -205,18 +200,11 @@ function EmbedBlockEditor({
           onChange={(e) => onChangeEmbedHtml(e.target.value)}
           className="font-mono text-xs"
         />
-        <p className="text-xs text-muted-foreground">
-          Вставьте ссылку YouTube / Instagram либо старый код встраивания
-        </p>
+        <p className="text-xs text-muted-foreground">Вставьте ссылку YouTube / Instagram либо старый код встраивания</p>
       </div>
       <div className="space-y-1">
         <Label htmlFor="embed-caption">Подпись</Label>
-        <Input
-          id="embed-caption"
-          placeholder="Опционально"
-          value={caption}
-          onChange={(e) => onChangeCaption(e.target.value)}
-        />
+        <Input id="embed-caption" placeholder="Опционально" value={caption} onChange={(e) => onChangeCaption(e.target.value)} />
       </div>
       <div className="rounded-lg border border-border/70 bg-muted/25 p-3 text-xs">
         {resolved ? (
@@ -225,14 +213,9 @@ function EmbedBlockEditor({
             <ArticleEmbedBlock value={embedHtml} caption={caption} compact />
           </>
         ) : embedHtml.trim() ? (
-          <p className="text-amber-800">
-            Не удалось распознать значение. Используйте безопасную http/https-ссылку или поддерживаемую вставку.
-          </p>
+          <p className="text-amber-800">Не удалось распознать значение. Используйте безопасную http/https-ссылку или поддерживаемую вставку.</p>
         ) : (
-          <p className="text-muted-foreground">
-            Предпросмотр появится после вставки кода — на сайте и в черновике используется тот же безопасный
-            рендер.
-          </p>
+          <p className="text-muted-foreground">Предпросмотр появится после вставки кода — на сайте и в черновике используется тот же безопасный рендер.</p>
         )}
       </div>
     </div>
@@ -271,9 +254,7 @@ function CalloutBlockEditor({
             aria-pressed={variant === value}
             className={cn(
               "flex items-center gap-1.5 rounded-[calc(var(--radius-md)-2px)] px-3 py-1.5 text-sm transition-colors",
-              variant === value
-                ? "bg-muted font-medium text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+              variant === value ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -283,20 +264,9 @@ function CalloutBlockEditor({
       </div>
       <div className="space-y-1">
         <Label htmlFor="callout-title">Заголовок</Label>
-        <Input
-          id="callout-title"
-          placeholder="Опционально"
-          value={title ?? ""}
-          onChange={(e) => onChangeTitle(e.target.value)}
-        />
+        <Input id="callout-title" placeholder="Опционально" value={title ?? ""} onChange={(e) => onChangeTitle(e.target.value)} />
       </div>
-      <ArticleBlockRichEditor
-        variant="text"
-        value={text}
-        onChange={onChangeText}
-        placeholder="Текст акцента"
-        minHeightClass="min-h-[100px]"
-      />
+      <ArticleBlockRichEditor variant="text" value={text} onChange={onChangeText} placeholder="Текст акцента" minHeightClass="min-h-[100px]" />
       <div className="rounded-lg border border-border/70 bg-muted/25 p-3">
         <p className="text-xs text-muted-foreground mb-2">Предпросмотр</p>
         <ArticleCalloutBlock variant={variant} title={title} text={text} />
@@ -316,12 +286,18 @@ export function ArticleBlocksMvpEditor({
   onChange: (next: ArticleBlockMvp[]) => void;
   authorUserId?: string | null;
   articleId?: string | null;
-  /** «Фото этой статьи» — общий источник для image/gallery picker'ов всех блоков. */
   articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
   const hydrated = useHydrated();
-
   const hasIntro = useMemo(() => blocks.some((b) => b.type === "intro"), [blocks]);
+  const availableSubjects = useMemo(() => {
+    const byId = new Map<string, ArticleSubject>();
+    for (const block of blocks) {
+      if (!isStructuredInfoBlock(block) || !block.subject?.title.trim()) continue;
+      if (!byId.has(block.subject.id)) byId.set(block.subject.id, block.subject);
+    }
+    return [...byId.values()];
+  }, [blocks]);
 
   const insertAt = useCallback(
     (index: number, type: ArticleBlockMvp["type"]) => {
@@ -347,11 +323,24 @@ export function ArticleBlocksMvpEditor({
     onChange(next);
   };
 
-  const removeAt = (i: number) => {
-    onChange(blocks.filter((_, k) => k !== i));
+  const updateSubjectAt = (i: number, subject: ArticleSubject) => {
+    const current = blocks[i];
+    if (!current || !isStructuredInfoBlock(current)) return;
+    const previousSubjectId = current.subject?.id;
+    const shouldUpdateGroup = Boolean(previousSubjectId && previousSubjectId === subject.id);
+    onChange(
+      blocks.map((block, index) => {
+        if (!isStructuredInfoBlock(block)) return block;
+        if (index === i || (shouldUpdateGroup && block.subject?.id === previousSubjectId)) {
+          return { ...block, subject };
+        }
+        return block;
+      }),
+    );
   };
 
-  /** Только references внутри contentJson меняются — ни новый MediaAsset, ни смена uploadedById. */
+  const removeAt = (i: number) => onChange(blocks.filter((_, k) => k !== i));
+
   const makeGalleryAt = (i: number) => {
     const block = blocks[i];
     if (block.type !== "image") return;
@@ -367,27 +356,24 @@ export function ArticleBlocksMvpEditor({
     onChange(next);
   };
 
+  const subjectEditor = (
+    block: Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }>,
+    i: number,
+  ) => (
+    <ArticleStructuredBlockSubjectEditor
+      value={block.subject ?? newArticleSubject("", () => `subject_${block.id}`)}
+      availableSubjects={availableSubjects}
+      onChange={(subject) => updateSubjectAt(i, subject)}
+    />
+  );
+
   const renderBlockBody = (block: ArticleBlockMvp, i: number) => (
     <>
       {block.type === "intro" && (
-        <ArticleBlockRichEditor
-          key={`${block.id}-intro`}
-          variant="intro"
-          value={block.text}
-          onChange={(html) => updateAt(i, { ...block, text: html })}
-          placeholder="Краткий лид для превью и начала статьи"
-          minHeightClass="min-h-[120px]"
-        />
+        <ArticleBlockRichEditor key={`${block.id}-intro`} variant="intro" value={block.text} onChange={(html) => updateAt(i, { ...block, text: html })} placeholder="Краткий лид для превью и начала статьи" minHeightClass="min-h-[120px]" />
       )}
       {block.type === "text" && (
-        <ArticleBlockRichEditor
-          key={`${block.id}-text`}
-          variant="text"
-          value={block.text}
-          onChange={(html) => updateAt(i, { ...block, text: html })}
-          placeholder="Текст абзаца"
-          minHeightClass="min-h-[200px]"
-        />
+        <ArticleBlockRichEditor key={`${block.id}-text`} variant="text" value={block.text} onChange={(html) => updateAt(i, { ...block, text: html })} placeholder="Текст абзаца" minHeightClass="min-h-[200px]" />
       )}
       {block.type === "quote" && (
         <>
@@ -398,25 +384,11 @@ export function ArticleBlocksMvpEditor({
             onChange={(html) => updateAt(i, { ...block, text: html })}
             placeholder="Текст цитаты"
             minHeightClass="min-h-[120px]"
-            onToggleQuote={() =>
-              updateAt(i, { id: block.id, type: "text", text: block.text })
-            }
+            onToggleQuote={() => updateAt(i, { id: block.id, type: "text", text: block.text })}
           />
           <div className="flex gap-2">
-            <Input
-              placeholder="Автор (опционально)"
-              value={block.attribution ?? ""}
-              onChange={(e) =>
-                updateAt(i, { ...block, attribution: e.target.value || undefined })
-              }
-            />
-            <Input
-              placeholder="Роль / должность"
-              value={block.authorRole ?? ""}
-              onChange={(e) =>
-                updateAt(i, { ...block, authorRole: e.target.value || undefined })
-              }
-            />
+            <Input placeholder="Автор (опционально)" value={block.attribution ?? ""} onChange={(e) => updateAt(i, { ...block, attribution: e.target.value || undefined })} />
+            <Input placeholder="Роль / должность" value={block.authorRole ?? ""} onChange={(e) => updateAt(i, { ...block, authorRole: e.target.value || undefined })} />
           </div>
         </>
       )}
@@ -435,29 +407,13 @@ export function ArticleBlocksMvpEditor({
           <div className="space-y-1 max-w-[200px]">
             <Label className="text-xs text-muted-foreground">Уровень</Label>
             {hydrated ? (
-              <Select
-                value={String(block.level)}
-                onValueChange={(v) =>
-                  updateAt(i, { ...block, level: Number(v) === 3 ? 3 : 2 })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2">H2</SelectItem>
-                  <SelectItem value="3">H3</SelectItem>
-                </SelectContent>
+              <Select value={String(block.level)} onValueChange={(v) => updateAt(i, { ...block, level: Number(v) === 3 ? 3 : 2 })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="2">H2</SelectItem><SelectItem value="3">H3</SelectItem></SelectContent>
               </Select>
-            ) : (
-              <SelectSkeleton className="w-full" />
-            )}
+            ) : <SelectSkeleton className="w-full" />}
           </div>
-          <Input
-            placeholder="Текст заголовка"
-            value={block.text}
-            onChange={(e) => updateAt(i, { ...block, text: e.target.value })}
-          />
+          <Input placeholder="Текст заголовка" value={block.text} onChange={(e) => updateAt(i, { ...block, text: e.target.value })} />
         </div>
       )}
       {block.type === "image" && (
@@ -473,45 +429,19 @@ export function ArticleBlocksMvpEditor({
             onChange={(mediaId) => updateAt(i, { ...block, mediaId })}
             articleMediaSource={articleMediaSource}
           />
-          <Input
-            placeholder="Alt"
-            value={block.alt ?? ""}
-            onChange={(e) => updateAt(i, { ...block, alt: e.target.value })}
-          />
-          <Input
-            placeholder="Подпись"
-            value={block.caption ?? ""}
-            onChange={(e) => updateAt(i, { ...block, caption: e.target.value })}
-          />
+          <Input placeholder="Alt" value={block.alt ?? ""} onChange={(e) => updateAt(i, { ...block, alt: e.target.value })} />
+          <Input placeholder="Подпись" value={block.caption ?? ""} onChange={(e) => updateAt(i, { ...block, caption: e.target.value })} />
           {block.mediaId ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5 font-normal"
-              onClick={() => makeGalleryAt(i)}
-            >
-              <Images className="h-4 w-4 shrink-0" />
-              Сделать галереей
+            <Button type="button" variant="outline" size="sm" className="gap-1.5 font-normal" onClick={() => makeGalleryAt(i)}>
+              <Images className="h-4 w-4 shrink-0" />Сделать галереей
             </Button>
           ) : null}
         </>
       )}
       {block.type === "gallery" && (
         <>
-          <ArticleEditorGalleryField
-            showHeading={false}
-            value={block.mediaIds}
-            authorUserId={authorUserId}
-            articleId={articleId}
-            onChange={(ids) => updateAt(i, { ...block, mediaIds: ids })}
-            articleMediaSource={articleMediaSource}
-          />
-          <Input
-            placeholder="Подпись к галерее (опционально)"
-            value={block.caption ?? ""}
-            onChange={(e) => updateAt(i, { ...block, caption: e.target.value })}
-          />
+          <ArticleEditorGalleryField showHeading={false} value={block.mediaIds} authorUserId={authorUserId} articleId={articleId} onChange={(ids) => updateAt(i, { ...block, mediaIds: ids })} articleMediaSource={articleMediaSource} />
+          <Input placeholder="Подпись к галерее (опционально)" value={block.caption ?? ""} onChange={(e) => updateAt(i, { ...block, caption: e.target.value })} />
         </>
       )}
       {block.type === "activityCard" && (
@@ -519,12 +449,7 @@ export function ArticleBlocksMvpEditor({
           <ActivityCardEntityPicker
             entityType={block.entityType}
             entityId={block.entityId}
-            onChangeType={(t) => updateAt(i, {
-              ...block,
-              entityType: t,
-              entityId: "",
-              placeSections: t === "PLACE" ? { ...DEFAULT_ARTICLE_PLACE_SECTIONS } : undefined,
-            })}
+            onChangeType={(t) => updateAt(i, { ...block, entityType: t, entityId: "", placeSections: t === "PLACE" ? { ...DEFAULT_ARTICLE_PLACE_SECTIONS } : undefined })}
             onChangeId={(id) => updateAt(i, { ...block, entityId: id })}
           />
           {block.entityType === "PLACE" ? (
@@ -540,10 +465,7 @@ export function ArticleBlocksMvpEditor({
                         type="checkbox"
                         checked={sections[key]}
                         disabled={unavailable}
-                        onChange={(event) => updateAt(i, {
-                          ...block,
-                          placeSections: { ...sections, [key]: event.target.checked },
-                        })}
+                        onChange={(event) => updateAt(i, { ...block, placeSections: { ...sections, [key]: event.target.checked } })}
                       />
                       <span>{label}{unavailable ? " (скоро)" : ""}</span>
                     </label>
@@ -559,14 +481,27 @@ export function ArticleBlocksMvpEditor({
           embedHtml={block.embedHtml}
           caption={block.caption ?? ""}
           onChangeEmbedHtml={(embedHtml) => updateAt(i, { ...block, embedHtml })}
-          onChangeCaption={(caption) =>
-            updateAt(i, { ...block, caption: caption || undefined })
-          }
+          onChangeCaption={(caption) => updateAt(i, { ...block, caption: caption || undefined })}
         />
       )}
-      {block.type === "contacts" && <ArticleContactsBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
-      {block.type === "price" && <ArticlePriceBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
-      {block.type === "openingHours" && <ArticleOpeningHoursBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />}
+      {block.type === "contacts" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticleContactsBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
+      {block.type === "price" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticlePriceBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
+      {block.type === "openingHours" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticleOpeningHoursBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
     </>
   );
 
@@ -575,69 +510,26 @@ export function ArticleBlocksMvpEditor({
       {blocks.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-10 text-center">
           <p className="text-sm text-muted-foreground mb-4">Пока нет блоков — добавьте первый.</p>
-          <BlockTypePicker
-            hasIntro={hasIntro}
-            onPick={(type) => insertAt(0, type)}
-            size="default"
-            variant="secondary"
-            triggerClassName="mx-auto"
-          />
+          <BlockTypePicker hasIntro={hasIntro} onPick={(type) => insertAt(0, type)} size="default" variant="secondary" triggerClassName="mx-auto" />
         </div>
       ) : (
         <>
           {blocks.map((block, i) => (
             <div key={block.id}>
-              <Card
-                className={cn(
-                  "border-border/60 shadow-none transition-colors",
-                  block.type === "intro" && "border-primary/25 bg-primary/[0.03]",
-                )}
-              >
+              <Card className={cn("border-border/60 shadow-none transition-colors", block.type === "intro" && "border-primary/25 bg-primary/[0.03]")}>
                 <div className="flex flex-row items-center gap-2 border-b border-border/50 px-3 py-2 sm:px-4">
-                  <span
-                    className={cn(
-                      "text-xs font-medium tracking-tight",
-                      block.type === "intro"
-                        ? "text-primary"
-                        : "text-muted-foreground",
-                    )}
-                  >
+                  <span className={cn("text-xs font-medium tracking-tight", block.type === "intro" ? "text-primary" : "text-muted-foreground")}>
                     {BLOCK_LABEL[block.type]}
-                    {block.type === "intro" ? (
-                      <span className="ml-1.5 font-normal text-muted-foreground">· начало статьи</span>
-                    ) : null}
+                    {block.type === "intro" ? <span className="ml-1.5 font-normal text-muted-foreground">· начало статьи</span> : null}
                   </span>
                   <div className="ml-auto flex items-center gap-0.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground"
-                      aria-label="Выше"
-                      onClick={() => move(i, -1)}
-                      disabled={i === 0}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Выше" onClick={() => move(i, -1)} disabled={i === 0}>
                       <ChevronUp className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground"
-                      aria-label="Ниже"
-                      onClick={() => move(i, 1)}
-                      disabled={i === blocks.length - 1}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Ниже" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}>
                       <ChevronDown className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      aria-label="Удалить"
-                      onClick={() => removeAt(i)}
-                    >
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" aria-label="Удалить" onClick={() => removeAt(i)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -647,30 +539,14 @@ export function ArticleBlocksMvpEditor({
 
               {i < blocks.length - 1 ? (
                 <div className="relative flex justify-center py-2">
-                  <div
-                    className="pointer-events-none absolute inset-x-8 top-1/2 border-t border-dashed border-border/80"
-                    aria-hidden
-                  />
+                  <div className="pointer-events-none absolute inset-x-8 top-1/2 border-t border-dashed border-border/80" aria-hidden />
                   <div className="relative flex items-center gap-1 bg-background px-2">
                     {block.type === "image" && blocks[i + 1]?.type === "image" ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground h-8"
-                        onClick={() => mergeAdjacentImagesAt(i)}
-                      >
-                        <Images className="h-3.5 w-3.5 shrink-0" />
-                        Объединить в галерею
+                      <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground h-8" onClick={() => mergeAdjacentImagesAt(i)}>
+                        <Images className="h-3.5 w-3.5 shrink-0" />Объединить в галерею
                       </Button>
                     ) : null}
-                    <BlockTypePicker
-                      hasIntro={hasIntro}
-                      onPick={(type) => insertAt(i + 1, type)}
-                      variant="ghost"
-                      size="sm"
-                      triggerClassName="text-muted-foreground hover:text-foreground h-8 text-xs"
-                    />
+                    <BlockTypePicker hasIntro={hasIntro} onPick={(type) => insertAt(i + 1, type)} variant="ghost" size="sm" triggerClassName="text-muted-foreground hover:text-foreground h-8 text-xs" />
                   </div>
                 </div>
               ) : null}
@@ -680,21 +556,14 @@ export function ArticleBlocksMvpEditor({
       )}
 
       {blocks.length > 0 ? (
-        <BlockTypePicker
-          hasIntro={hasIntro}
-          onPick={(type) => insertAt(blocks.length, type)}
-        >
+        <BlockTypePicker hasIntro={hasIntro} onPick={(type) => insertAt(blocks.length, type)}>
           <button
             type="button"
             className="group w-full rounded-xl border-2 border-dashed border-border/80 bg-muted/10 px-4 py-8 text-center transition-colors hover:border-primary/35 hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <span className="flex flex-col items-center gap-1">
-              <span className="text-sm font-medium text-foreground group-hover:text-primary">
-                + Добавить блок
-              </span>
-              <span className="text-xs text-muted-foreground max-w-sm">
-                Текст, заголовок, цитата, медиа, галерея, вставка или карточка
-              </span>
+              <span className="text-sm font-medium text-foreground group-hover:text-primary">+ Добавить блок</span>
+              <span className="text-xs text-muted-foreground max-w-sm">Текст, заголовок, цитата, медиа, галерея, вставка или карточка</span>
             </span>
           </button>
         </BlockTypePicker>

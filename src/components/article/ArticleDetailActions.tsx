@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ShareModal } from "@/components/shared/ShareModal";
+import { ShareModal, type ShareAnalyticsChannel } from "@/components/shared/ShareModal";
 import { ArticleSaveHeart } from "@/features/save/ArticleSaveHeart";
+import { postProductTelemetryEvent } from "@/lib/analytics/client";
 
 type ArticleDetailActionsProps = {
   articleId: string;
@@ -13,24 +14,37 @@ type ArticleDetailActionsProps = {
   href: string;
   coverImageUrl?: string | null;
   source?: string;
+  citySlug?: string | null;
   className?: string;
 };
 
-/**
- * Save (Heart + «Сохранить») + Share (Share2 + «Поделиться») action row for
- * Article detail / continuous-reading surfaces. Cards never render this —
- * only the opened entity.
- */
 export function ArticleDetailActions({
   articleId,
   title,
   href,
   coverImageUrl,
   source = "article-detail",
+  citySlug,
   className,
 }: ArticleDetailActionsProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}${href}` : href;
+
+  const trackShare = (channel: ShareAnalyticsChannel) => {
+    void postProductTelemetryEvent({
+      eventType: "CTA_CLICK",
+      entityType: "ARTICLE",
+      entityId: articleId,
+      vertical: "CITY",
+      citySlug: citySlug ?? undefined,
+      meta: {
+        source: "detail",
+        articleSource: source,
+        section: "journal",
+        targetAction: `article_share_${channel}`,
+      },
+    });
+  };
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -39,7 +53,7 @@ export function ArticleDetailActions({
         articleTitle={title}
         coverImageUrl={coverImageUrl}
         variant="labeled"
-        source={source}
+        source="detail"
       />
       <button
         type="button"
@@ -56,6 +70,7 @@ export function ArticleDetailActions({
         url={shareUrl}
         title={title}
         entityNoun="статьёй"
+        onShare={trackShare}
       />
     </div>
   );

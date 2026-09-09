@@ -9,6 +9,7 @@ export function CopyCoordinatesButton({ value }: { value: string }) {
   return (
     <button
       type="button"
+      data-article-analytics-action="coordinates"
       onClick={() => {
         navigator.clipboard?.writeText(value).then(() => {
           setCopied(true);
