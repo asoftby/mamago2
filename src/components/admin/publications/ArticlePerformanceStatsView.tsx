@@ -101,9 +101,14 @@ export function ArticlePerformanceStatsView({ data }: { data: ArticlePerformance
 
       <section>
         <h3 className="mb-2 text-sm font-semibold text-gray-900">Результат публикации</h3>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Metric label="Просмотры" value={n(data.metrics.views)} />
-          <Metric label="Уникальные читатели" value={n(data.metrics.uniqueReaders)} />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          <Metric label="Просмотры" value={n(data.metrics.views)} note="статья видима ≥ 1 сек." />
+          <Metric label="Уникальные читатели" value={n(data.metrics.uniqueReaders)} note="уникальные сессии" />
+          <Metric
+            label="Дочитали 75%"
+            value={pct(data.metrics.read75Rate)}
+            note={`${n(data.metrics.read75)} · полностью ${pct(data.metrics.completionRate)}`}
+          />
           <Metric label="Сохранили" value={n(data.metrics.saves)} />
           <Metric label="Поделились" value={n(data.metrics.shares)} />
           <Metric label="Оценили" value={n(data.metrics.ratings)} note={`Положительно: ${pct(data.metrics.positiveRatingRate)}`} />
