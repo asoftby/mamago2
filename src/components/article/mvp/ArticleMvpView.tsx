@@ -34,6 +34,7 @@ import { parseArticleEmbed } from "@/lib/article/articleEmbedSanitize";
 import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
 import { groupArticleInfoBlocks } from "@/lib/article/articleInfoBlockGrouping";
 import {
+  ArticlePerformanceArticleTracker,
   ArticlePerformanceProvider,
   ArticlePerformanceScope,
 } from "@/components/article/analytics/ArticlePerformanceAnalytics";
@@ -199,6 +200,7 @@ export function ArticleMvpView({
         <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
 
         <ArticlePerformanceProvider articleId={articleId}>
+          <ArticlePerformanceArticleTracker />
           <ArticleContent>
             {groupArticleInfoBlocks(blocks).map((group) => {
               const tocBeforeBody = showToc && group.index === firstBodyBlockIndex
