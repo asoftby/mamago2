@@ -205,17 +205,21 @@ export function ArticlePerformanceArticleTracker() {
       analytics.enqueueArticleSignal(signal);
     };
     const queueView = () => queueSignal("article_view");
+    const hasQualifiedView = () => firedRef.current.has("article_view");
     const measureDepth = () => {
       raf = 0;
+      // Reading-depth signals are meaningful only after the same article has
+      // satisfied the qualified-view dwell. This prevents a short article that
+      // fits in the first viewport from instantly manufacturing a view/complete
+      // pair during the initial layout measurement.
+      if (!hasQualifiedView()) return;
       const rect = article.getBoundingClientRect();
       if (rect.height <= 0) return;
       const depth = Math.max(0, Math.min(1, (window.innerHeight - rect.top) / rect.height));
       if (depth >= 0.75) {
-        queueView();
         queueSignal("article_read_75");
       }
       if (depth >= 0.98 || rect.bottom <= window.innerHeight + 24) {
-        queueView();
         queueSignal("article_read_75");
         queueSignal("article_complete");
       }
@@ -238,6 +242,9 @@ export function ArticlePerformanceArticleTracker() {
             viewTimer = setTimeout(() => {
               queueView();
               viewTimer = null;
+              // Re-measure after qualification so a genuinely short article
+              // can still receive 75%/complete, just never before the dwell.
+              scheduleMeasure();
             }, ARTICLE_VIEW_DWELL_MS);
           }
           scheduleMeasure();

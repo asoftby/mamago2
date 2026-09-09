@@ -151,4 +151,20 @@ assert.equal(ARTICLE_PERFORMANCE_BATCH_MAX_BYTES, 32 * 1024);
   assert.equal(client.includes('controlLabel.includes("открыть на карте")'), true);
 }
 
+// Reading depth must never manufacture the qualified article view. A short
+// article can be 75%/100% visible on first layout, but those milestones are only
+// eligible after the independent 1s dwell has fired article_view. The dwell
+// callback re-measures depth afterwards so legitimately short articles still
+// receive their read milestones without extra requests.
+{
+  const client = readFileSync("src/components/article/analytics/ArticlePerformanceAnalytics.tsx", "utf8");
+  const guard = client.indexOf('if (!hasQualifiedView()) return;');
+  const firstReadSignal = client.indexOf('queueSignal("article_read_75")', guard);
+  assert.ok(guard >= 0);
+  assert.ok(firstReadSignal > guard);
+  assert.equal(client.includes('const hasQualifiedView = () => firedRef.current.has("article_view")'), true);
+  assert.equal(client.includes('queueView();\n              viewTimer = null;\n              // Re-measure after qualification'), true);
+  assert.equal(client.includes('queueView();\n        queueSignal("article_read_75")'), false);
+}
+
 console.log("articlePerformanceAnalytics.test.ts: OK");
