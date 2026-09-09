@@ -24,7 +24,12 @@ assert.match(shell, /await acceptFromShell\(categories\);[\s\S]*setMounted\(fals
 assert.match(shell, /catch \(err\) \{[\s\S]*accept failed[\s\S]*\} finally \{[\s\S]*setPending\(false\)/);
 assert.match(shell, /handleAccept\(\s*"all"\s*\)/);
 assert.match(shell, /handleAccept\(\s*\[\]\s*\)/);
-assert.match(shell, /await openCookiePreferencesFromShell\(\);[\s\S]*setMounted\(false\)/);
+assert.match(shell, /await openCookiePreferencesFromShell\(\);[\s\S]*setPreferencesOpen\(true\)/);
+assert.match(shell, /new MutationObserver\(handlePreferencesState\)/);
+assert.match(shell, /classList\.contains\("show--preferences"\)/);
+assert.match(shell, /rootRef\.current\.style\.display\s*=\s*""/);
+assert.match(shell, /navigator\.webdriver/);
+assert.match(shell, /bot\|crawl\|spider\|slurp\|teoma/);
 assert.match(shell, /catch \(err\)[\s\S]*setPending\(false\)/);
 assert.match(shell, /import \{ BANNER \} from "@\/lib\/cookies\/consent-config"/);
 
