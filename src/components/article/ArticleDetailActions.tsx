@@ -38,7 +38,8 @@ export function ArticleDetailActions({
       vertical: "CITY",
       citySlug: citySlug ?? undefined,
       meta: {
-        source,
+        source: "detail",
+        articleSource: source,
         section: "journal",
         targetAction: `article_share_${channel}`,
       },
