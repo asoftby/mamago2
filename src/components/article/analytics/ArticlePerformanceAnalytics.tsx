@@ -13,6 +13,7 @@ import {
 import {
   ARTICLE_PERFORMANCE_BATCH_MAX_EVENTS,
   type ArticlePerformanceAction,
+  type ArticlePerformanceArticleSignal,
   type ArticlePerformanceBatchEvent,
   type ArticlePerformanceBlockDescriptor,
 } from "@/lib/article/articlePerformanceAnalytics";
@@ -24,11 +25,13 @@ type ArticlePerformanceQueue = {
     action: ArticlePerformanceAction,
     actionItemId?: string,
   ) => void;
+  enqueueArticleSignal: (signal: ArticlePerformanceArticleSignal) => void;
 };
 
 const AnalyticsContext = createContext<ArticlePerformanceQueue | null>(null);
 const FLUSH_DELAY_MS = 30_000;
 const SOFT_FLUSH_EVENTS = 60;
+const ARTICLE_VIEW_DWELL_MS = 1_000;
 
 function storageKey(articleId: string, suffix: string) {
   return `mamago:article-performance:${articleId}:${suffix}`;
@@ -64,7 +67,7 @@ function readSeenImpressions(articleId: string): Set<string> {
 
 function persistSeenImpressions(articleId: string, seen: Set<string>) {
   try {
-    window.sessionStorage.setItem(storageKey(articleId, "seen"), JSON.stringify([...seen].slice(-200)));
+    window.sessionStorage.setItem(storageKey(articleId, "seen"), JSON.stringify([...seen].slice(-240)));
   } catch {
     // Analytics storage is best-effort and must never affect article UX.
   }
@@ -146,17 +149,18 @@ export function ArticlePerformanceProvider({
       else scheduleFlush();
     };
 
+    const queueOnce = (key: string, event: ArticlePerformanceBatchEvent) => {
+      if (seenRef.current.has(key)) return;
+      seenRef.current.add(key);
+      persistSeenImpressions(articleId, seenRef.current);
+      queue(event);
+    };
+
     return {
       enqueueImpressions(blocks) {
-        let changed = false;
         for (const block of blocks) {
-          const key = `${block.blockType}:${block.blockId}`;
-          if (seenRef.current.has(key)) continue;
-          seenRef.current.add(key);
-          changed = true;
-          queue({ ...block, kind: "impression" });
+          queueOnce(`${block.blockType}:${block.blockId}`, { ...block, kind: "impression" });
         }
-        if (changed) persistSeenImpressions(articleId, seenRef.current);
       },
       enqueueAction(block, action, actionItemId) {
         queue({
@@ -166,10 +170,87 @@ export function ArticlePerformanceProvider({
           ...(actionItemId ? { actionItemId } : {}),
         });
       },
+      enqueueArticleSignal(signal) {
+        queueOnce(`article:${signal}`, { kind: signal });
+      },
     };
   }, [articleId, endpoint, flush, scheduleFlush]);
 
   return <AnalyticsContext.Provider value={value}>{children}</AnalyticsContext.Provider>;
+}
+
+/**
+ * Counts a real browser-visible article, not a server render/prefetch. The same
+ * observer also records 75% and full-read milestones into the existing batch,
+ * so reading depth adds no request/INSERT of its own.
+ */
+export function ArticlePerformanceArticleTracker() {
+  const analytics = useContext(AnalyticsContext);
+  const markerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!analytics || !markerRef.current || typeof window === "undefined") return;
+    const article = markerRef.current.closest<HTMLElement>("article");
+    if (!article) return;
+
+    let viewTimer: ReturnType<typeof setTimeout> | null = null;
+    let raf = 0;
+
+    const queueView = () => analytics.enqueueArticleSignal("article_view");
+    const measureDepth = () => {
+      raf = 0;
+      const rect = article.getBoundingClientRect();
+      if (rect.height <= 0) return;
+      const depth = Math.max(0, Math.min(1, (window.innerHeight - rect.top) / rect.height));
+      if (depth >= 0.75) {
+        queueView();
+        analytics.enqueueArticleSignal("article_read_75");
+      }
+      if (depth >= 0.98 || rect.bottom <= window.innerHeight + 24) {
+        queueView();
+        analytics.enqueueArticleSignal("article_read_75");
+        analytics.enqueueArticleSignal("article_complete");
+      }
+    };
+
+    const scheduleMeasure = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(measureDepth);
+    };
+
+    const observer = typeof IntersectionObserver !== "undefined"
+      ? new IntersectionObserver((entries) => {
+          const visible = entries.some((entry) => entry.isIntersecting);
+          if (!visible) {
+            if (viewTimer) clearTimeout(viewTimer);
+            viewTimer = null;
+            return;
+          }
+          if (!viewTimer) {
+            viewTimer = setTimeout(() => {
+              queueView();
+              viewTimer = null;
+            }, ARTICLE_VIEW_DWELL_MS);
+          }
+          scheduleMeasure();
+        }, { threshold: [0] })
+      : null;
+
+    observer?.observe(article);
+    window.addEventListener("scroll", scheduleMeasure, { passive: true });
+    window.addEventListener("resize", scheduleMeasure, { passive: true });
+    scheduleMeasure();
+
+    return () => {
+      observer?.disconnect();
+      if (viewTimer) clearTimeout(viewTimer);
+      if (raf) window.cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", scheduleMeasure);
+      window.removeEventListener("resize", scheduleMeasure);
+    };
+  }, [analytics]);
+
+  return <span ref={markerRef} aria-hidden className="sr-only" />;
 }
 
 function socialItemId(href: string): string | undefined {
