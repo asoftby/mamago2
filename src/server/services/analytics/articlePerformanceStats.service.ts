@@ -36,7 +36,12 @@ function rangeForPeriod(period: PublicationStatsPeriod): { start: Date; end: Dat
 }
 
 type ShareRow = { action: string | null; count: bigint };
-type UniqueRow = { count: bigint };
+type ArticleSignalRow = {
+  views: bigint;
+  uniqueReaders: bigint;
+  read75: bigint;
+  completed: bigint;
+};
 type BlockAggregateRow = {
   subjectId: string | null;
   subjectTitle: string | null;
@@ -137,10 +142,12 @@ function buildSubjects(rows: BlockAggregateRow[]): ArticlePerformanceSubjectStat
 }
 
 /**
- * All expensive work is bounded by the existing UserEvent composite index
- * (entityType, entityId, createdAt). JSON expansion happens only after that
- * article+date slice is selected. Result is cached for 60 seconds so repeatedly
- * opening the admin report never scans the same slice on every click.
+ * Report queries are bounded by the existing UserEvent composite index
+ * (entityType, entityId, createdAt). JSON expansion is only performed after
+ * narrowing to the requested article/date and reporting-only scope. The result
+ * is cached for 60 seconds, so opening the drawer repeatedly does not rescan the
+ * slice. Qualified views come from the same low-cost batch as block impressions;
+ * SSR renders/prefetches and legacy DETAIL_OPEN events cannot inflate them.
  */
 async function computeArticlePerformanceStats(
   articleId: string,
@@ -166,22 +173,34 @@ async function computeArticlePerformanceStats(
     createdAt: { gte: start, lte: end },
   };
 
-  const [views, saves, uniqueRows, shareRows, ratingRows, blockRows] = await Promise.all([
-    prisma.userEvent.count({ where: { ...baseWhere, eventType: "DETAIL_OPEN" } }),
-    prisma.userEvent.count({ where: { ...baseWhere, eventType: "SAVE" } }),
-    prisma.$queryRaw<UniqueRow[]>(Prisma.sql`
-      SELECT COUNT(DISTINCT COALESCE(
-        CASE WHEN e."userId" IS NOT NULL THEN 'u:' || e."userId" END,
-        CASE WHEN e."sessionId" IS NOT NULL THEN 's:' || e."sessionId" END,
-        'e:' || e.id
-      ))::bigint AS count
-      FROM "UserEvent" e
-      WHERE e."entityType" = 'ARTICLE'::"AnalyticsEntityType"
-        AND e."entityId" = ${articleId}
-        AND e."eventType" = 'DETAIL_OPEN'::"UserEventType"
-        AND e."createdAt" >= ${start}
-        AND e."createdAt" <= ${end}
+  const [signalRows, saves, shareRows, ratingRows, blockRows] = await Promise.all([
+    prisma.$queryRaw<ArticleSignalRow[]>(Prisma.sql`
+      WITH narrowed AS (
+        SELECT e."sessionId", e.meta
+        FROM "UserEvent" e
+        WHERE e."entityType" = 'ARTICLE'::"AnalyticsEntityType"
+          AND e."entityId" = ${articleId}
+          AND e."eventType" = 'FILTER_APPLY'::"UserEventType"
+          AND e."createdAt" >= ${start}
+          AND e."createdAt" <= ${end}
+          AND e.meta->>'analyticsScope' = ${ARTICLE_PERFORMANCE_ANALYTICS_SCOPE}
+      ), expanded AS (
+        SELECT n."sessionId", jsonb_array_elements(
+          CASE
+            WHEN jsonb_typeof(n.meta->'events') = 'array' THEN n.meta->'events'
+            ELSE '[]'::jsonb
+          END
+        ) AS item
+        FROM narrowed n
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE item->>'kind' = 'article_view')::bigint AS views,
+        COUNT(DISTINCT "sessionId") FILTER (WHERE item->>'kind' = 'article_view')::bigint AS "uniqueReaders",
+        COUNT(*) FILTER (WHERE item->>'kind' = 'article_read_75')::bigint AS "read75",
+        COUNT(*) FILTER (WHERE item->>'kind' = 'article_complete')::bigint AS completed
+      FROM expanded
     `),
+    prisma.userEvent.count({ where: { ...baseWhere, eventType: "SAVE" } }),
     prisma.$queryRaw<ShareRow[]>(Prisma.sql`
       SELECT e.meta->>'targetAction' AS action, COUNT(*)::bigint AS count
       FROM "UserEvent" e
@@ -254,6 +273,11 @@ async function computeArticlePerformanceStats(
   const ratingTotal = ratings.like + ratings.neutral + ratings.dislike;
   const subjects = buildSubjects(blockRows);
   const targetActions = subjects.reduce((sum, subject) => sum + subject.targetActions, 0);
+  const signals = signalRows[0];
+  const views = Number(signals?.views ?? 0);
+  const uniqueReaders = Number(signals?.uniqueReaders ?? 0);
+  const read75 = Number(signals?.read75 ?? 0);
+  const completed = Number(signals?.completed ?? 0);
 
   return {
     kind: "article-performance",
@@ -269,7 +293,11 @@ async function computeArticlePerformanceStats(
     statsUpdatedAt: new Date().toISOString(),
     metrics: {
       views,
-      uniqueReaders: Number(uniqueRows[0]?.count ?? 0),
+      uniqueReaders,
+      read75,
+      read75Rate: views > 0 ? read75 / views : null,
+      completed,
+      completionRate: views > 0 ? completed / views : null,
       saves,
       shares,
       ratings: ratingTotal,
@@ -288,7 +316,7 @@ async function computeArticlePerformanceStats(
 
 const cachedArticlePerformanceStats = unstable_cache(
   computeArticlePerformanceStats,
-  ["article-performance-report-v1"],
+  ["article-performance-report-v2"],
   { revalidate: 60 },
 );
 
