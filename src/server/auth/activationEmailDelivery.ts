@@ -1,4 +1,8 @@
-import { resolveActivationEmailDelivery, type ActivationEmailEnvironment } from "./activationEmailGate";
+import {
+  resolveActivationEmailDelivery,
+  type ActivationEmailApprovalMode,
+  type ActivationEmailEnvironment,
+} from "./activationEmailGate";
 import { getConfiguredPublicAppUrl } from "@/lib/config/publicAppUrl";
 // Type-only: erased at compile time, so this never triggers email-service.tsx's
 // `import "server-only"` side effect for callers of this module (this file's
@@ -74,16 +78,18 @@ export type DeliverMigratedAccountActivationEmailResult =
  * purely so a rehearsal/test can supply a fake/sandbox transport without
  * this module knowing it's being rehearsed — production code path is
  * identical either way. `gateEnvironment` is the same idea applied to the
- * env-based gate: a rehearsal can prove the "all flags approved" branch
- * without mutating real `process.env` (which would leak into every other
- * module in the same test process).
+ * env-based gate: a rehearsal can prove the delivery decision without
+ * mutating real `process.env` (which would leak into every other module in
+ * the same test process). `approvalMode` defaults to the legacy-safe batch
+ * policy; self-service callers opt in explicitly.
  */
 export async function deliverMigratedAccountActivationEmail(
   params: { to: string; rawToken: string },
   sender?: RawEmailSender,
   gateEnvironment?: ActivationEmailEnvironment,
+  approvalMode: ActivationEmailApprovalMode = "PRODUCTION_BATCH",
 ): Promise<DeliverMigratedAccountActivationEmailResult> {
-  const gate = resolveActivationEmailDelivery(gateEnvironment);
+  const gate = resolveActivationEmailDelivery(gateEnvironment, approvalMode);
   if (gate.status === "DELIVERY_DISABLED") {
     return { status: "SKIPPED", reason: "DELIVERY_DISABLED" };
   }

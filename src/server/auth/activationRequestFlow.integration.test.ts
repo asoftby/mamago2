@@ -12,6 +12,13 @@ const APPROVED_PRODUCTION_ENV = {
   productionApproved: "true",
 } as const;
 
+const KILL_SWITCHED_PRODUCTION_ENV = {
+  nodeEnv: "production",
+  appEnvironment: "production",
+  productionEnabled: "false",
+  productionApproved: "false",
+} as const;
+
 function fakeSender(status: "SENT" | "FAILED") {
   return async (params: { to: string; subject: string; text: string }) => {
     if (status === "SENT") return { status: "SENT" as const, messageId: "fake-message-id" };
@@ -49,6 +56,50 @@ async function main(): Promise<void> {
     assert.equal(sentAudit.activationTokenId!.includes("."), false);
     const sentToken = await prisma.userActionToken.findUniqueOrThrow({ where: { id: sentAudit.activationTokenId! } });
     assert.equal(sentToken.userId, sentUser.id);
+
+    // --- Regression: first-login self-service must send in PROD even while
+    // the bulk migration kill switch remains OFF.
+    const firstLoginUser = await prisma.user.create({
+      data: { email: `flow-first-login-${marker}@example.invalid`, passwordHash: null, status: "PENDING_ACTIVATION" },
+    });
+    userIds.push(firstLoginUser.id);
+    const firstLoginOutcome = await requestMigratedAccountActivationByEmail(
+      { email: firstLoginUser.email, ip: null, source: "LOGIN_FLOW" },
+      { sender: fakeSender("SENT"), gateEnvironment: KILL_SWITCHED_PRODUCTION_ENV },
+    );
+    assert.deepEqual(firstLoginOutcome, { delivered: true });
+    const firstLoginAudit = await prisma.activationDeliveryAudit.findFirstOrThrow({ where: { userId: firstLoginUser.id } });
+    assert.equal(firstLoginAudit.status, "SENT");
+    assert.equal(firstLoginAudit.source, "LOGIN_FLOW");
+
+    // --- Manual self-service resend has the same policy as LOGIN_FLOW.
+    const manualUser = await prisma.user.create({
+      data: { email: `flow-manual-${marker}@example.invalid`, passwordHash: null, status: "PENDING_ACTIVATION" },
+    });
+    userIds.push(manualUser.id);
+    const manualOutcome = await requestMigratedAccountActivationByEmail(
+      { email: manualUser.email, ip: null, source: "MANUAL_REQUEST" },
+      { sender: fakeSender("SENT"), gateEnvironment: KILL_SWITCHED_PRODUCTION_ENV },
+    );
+    assert.deepEqual(manualOutcome, { delivered: true });
+    const manualAudit = await prisma.activationDeliveryAudit.findFirstOrThrow({ where: { userId: manualUser.id } });
+    assert.equal(manualAudit.status, "SENT");
+    assert.equal(manualAudit.source, "MANUAL_REQUEST");
+
+    // --- Bulk production delivery must remain blocked while approval flags
+    // are off; this is the safety boundary the kill switch was built for.
+    const batchUser = await prisma.user.create({
+      data: { email: `flow-batch-${marker}@example.invalid`, passwordHash: null, status: "PENDING_ACTIVATION" },
+    });
+    userIds.push(batchUser.id);
+    const batchOutcome = await requestMigratedAccountActivationByEmail(
+      { email: batchUser.email, ip: null, source: "PRODUCTION_BATCH" },
+      { sender: fakeSender("SENT"), gateEnvironment: KILL_SWITCHED_PRODUCTION_ENV },
+    );
+    assert.deepEqual(batchOutcome, { delivered: false });
+    const batchAudit = await prisma.activationDeliveryAudit.findFirstOrThrow({ where: { userId: batchUser.id } });
+    assert.equal(batchAudit.status, "BLOCKED_KILL_SWITCH");
+    assert.equal(batchAudit.source, "PRODUCTION_BATCH");
 
     // --- delivered:false — provider itself fails even though production is approved.
     const failedUser = await prisma.user.create({
@@ -104,6 +155,9 @@ async function main(): Promise<void> {
         key: {
           in: [
             activationRateLimitKey("request-email", `flow-sent-${marker}@example.invalid`),
+            activationRateLimitKey("request-email", `flow-first-login-${marker}@example.invalid`),
+            activationRateLimitKey("request-email", `flow-manual-${marker}@example.invalid`),
+            activationRateLimitKey("request-email", `flow-batch-${marker}@example.invalid`),
             activationRateLimitKey("request-email", `flow-failed-${marker}@example.invalid`),
             activationRateLimitKey("request-email", `flow-blocked-${marker}@example.invalid`),
             activationRateLimitKey("request-email", `flow-unknown-${marker}@example.invalid`),

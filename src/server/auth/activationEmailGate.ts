@@ -9,6 +9,8 @@ export type ActivationEmailEnvironment = {
   productionApproved: string | undefined;
 };
 
+export type ActivationEmailApprovalMode = "SELF_SERVICE" | "PRODUCTION_BATCH";
+
 export type ActivationEmailBlockReason = "ENVIRONMENT" | "KILL_SWITCH";
 
 function currentEnvironment(): ActivationEmailEnvironment {
@@ -21,19 +23,22 @@ function currentEnvironment(): ActivationEmailEnvironment {
 }
 
 /**
- * Same decision as `resolveActivationEmailDelivery`, split into its two
- * distinct "why not" reasons — for delivery-audit persistence, which needs
- * to tell "wrong environment entirely" (`ENVIRONMENT`, e.g. LOCAL/DEV) apart
- * from "in production but the explicit approval flags are off"
- * (`KILL_SWITCH`). `null` means delivery is allowed.
+ * LOCAL/DEV are always blocked. The two explicit migrated-user approval flags
+ * protect only bulk production delivery; user-initiated activation requests
+ * (login/manual self-service) must not be disabled by the bulk-send kill
+ * switch.
  */
 export function classifyActivationEmailBlock(
   environment = currentEnvironment(),
+  approvalMode: ActivationEmailApprovalMode = "PRODUCTION_BATCH",
 ): ActivationEmailBlockReason | null {
   if (environment.nodeEnv !== "production" || environment.appEnvironment !== "production") {
     return "ENVIRONMENT";
   }
-  if (environment.productionEnabled !== "true" || environment.productionApproved !== "true") {
+  if (
+    approvalMode === "PRODUCTION_BATCH" &&
+    (environment.productionEnabled !== "true" || environment.productionApproved !== "true")
+  ) {
     return "KILL_SWITCH";
   }
   return null;
@@ -41,8 +46,9 @@ export function classifyActivationEmailBlock(
 
 export function resolveActivationEmailDelivery(
   environment = currentEnvironment(),
+  approvalMode: ActivationEmailApprovalMode = "PRODUCTION_BATCH",
 ): ActivationEmailDeliveryResult {
-  if (classifyActivationEmailBlock(environment) !== null) {
+  if (classifyActivationEmailBlock(environment, approvalMode) !== null) {
     return { status: "DELIVERY_DISABLED" };
   }
   // Provider itself lives in activationEmailDelivery.ts (deliverMigratedAccountActivationEmail);

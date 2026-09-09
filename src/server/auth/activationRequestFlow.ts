@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { deliverMigratedAccountActivationEmail } from "./activationEmailDelivery";
-import { classifyActivationEmailBlock, type ActivationEmailEnvironment } from "./activationEmailGate";
+import {
+  classifyActivationEmailBlock,
+  type ActivationEmailApprovalMode,
+  type ActivationEmailEnvironment,
+} from "./activationEmailGate";
 import {
   activationRateLimitKey,
   checkActivationRateLimit,
@@ -35,6 +39,10 @@ export function maskEmail(email: string): string {
   const at = email.indexOf("@");
   if (at <= 0) return "***";
   return `${email.slice(0, 1)}***@${email.slice(at + 1)}`;
+}
+
+function getApprovalMode(source: ActivationRequestSource): ActivationEmailApprovalMode {
+  return source === "PRODUCTION_BATCH" ? "PRODUCTION_BATCH" : "SELF_SERVICE";
 }
 
 async function lookupSourceRecordKey(userId: string): Promise<string | null> {
@@ -85,17 +93,21 @@ export async function requestMigratedAccountActivationByEmail(
     const sourceRecordKey = await lookupSourceRecordKey(user.id);
 
     // Token issuance always happens, independent of whether delivery is
-    // currently allowed — exactly the original endpoint's behavior. LOCAL/DEV
-    // and a not-yet-approved production still need a real, usable token for
-    // manual/admin-assisted activation and for tests/rehearsal; only the
-    // EMAIL SEND is gated, never the token itself. Eligibility
-    // (PENDING_ACTIVATION, not deleted) is enforced inside issueUserActionToken.
+    // currently allowed. LOCAL/DEV remain blocked from sending; in production
+    // login/manual self-service requests may send immediately, while
+    // PRODUCTION_BATCH remains behind the explicit bulk-send kill switch.
+    // Eligibility (PENDING_ACTIVATION, not deleted) is enforced inside
+    // issueUserActionToken.
     const issued = await issueUserActionToken({
       userId: user.id,
       purpose: "MIGRATED_ACCOUNT_ACTIVATION",
     });
 
-    const blockReason = classifyActivationEmailBlock(overrides.gateEnvironment);
+    const approvalMode = getApprovalMode(params.source);
+    const blockReason = classifyActivationEmailBlock(
+      overrides.gateEnvironment,
+      approvalMode,
+    );
     if (blockReason) {
       await prisma.activationDeliveryAudit.create({
         data: {
@@ -129,6 +141,7 @@ export async function requestMigratedAccountActivationByEmail(
       { to: user.email, rawToken: issued.token },
       overrides.sender,
       overrides.gateEnvironment,
+      approvalMode,
     );
 
     await prisma.activationDeliveryAudit.update({
