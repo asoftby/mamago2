@@ -7,7 +7,7 @@ import {
   buildCityPublicPath,
 } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
-import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
+import { listCityBlogArticles } from "@/server/article/listCityHomeArticles";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,7 @@ export default async function CityBlogPage({ params }: PageProps) {
 
   if (!city) notFound();
 
-  const articles = await listCityHomeArticles(city);
+  const articles = await listCityBlogArticles(city);
 
   return (
     <main>
