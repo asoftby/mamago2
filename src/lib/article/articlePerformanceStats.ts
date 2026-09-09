@@ -37,8 +37,13 @@ export type ArticlePerformanceStatsPayload = {
   period: PublicationStatsPeriod;
   statsUpdatedAt: string;
   metrics: {
+    /** Qualified browser-visible article views (not SSR/prefetch renders). */
     views: number;
     uniqueReaders: number;
+    read75: number;
+    read75Rate: number | null;
+    completed: number;
+    completionRate: number | null;
     saves: number;
     shares: number;
     ratings: number;
