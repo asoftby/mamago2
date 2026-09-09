@@ -84,7 +84,11 @@ export function PublicContentPagination({
               aria-current={item === page ? "page" : undefined}
               aria-label={`Страница ${item}`}
               onClick={() => goTo(item)}
-              className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground"
+              className={cn(
+                "inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted",
+                item === page &&
+                  "border-primary bg-primary text-primary-foreground hover:bg-primary",
+              )}
             >
               {item}
             </button>
