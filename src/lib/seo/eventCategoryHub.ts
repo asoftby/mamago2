@@ -2,6 +2,10 @@ export function eventCategoryHubPath(citySlug: string, categorySlug: string): st
   return `/${citySlug}/events/category/${categorySlug}`;
 }
 
+export function eventCategoryHubTitle(categoryName: string, cityName: string): string {
+  return `${categoryName} для детей в ${cityName}`;
+}
+
 /**
  * Traffic-prioritized WordPress category hubs that previously collapsed into
  * the generic /minsk/events listing. Keep this small and evidence-based: each
