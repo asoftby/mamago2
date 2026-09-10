@@ -24,6 +24,8 @@ interface CityShellProps {
   citySlug: string;
   intent: Intent;
   searchParams: Record<string, string | string[] | undefined>;
+  pageTitleOverride?: string;
+  pageDescription?: string;
 }
 
 function isSectionSystemFilterTableMissing(error: unknown): boolean {
@@ -34,7 +36,13 @@ function isSectionSystemFilterTableMissing(error: unknown): boolean {
   );
 }
 
-export async function CityShell({ citySlug, intent, searchParams }: CityShellProps) {
+export async function CityShell({
+  citySlug,
+  intent,
+  searchParams,
+  pageTitleOverride,
+  pageDescription,
+}: CityShellProps) {
   const [city, user, systemFilters] = await Promise.all([
     findCityBySlug(citySlug),
     getCurrentUser(),
@@ -97,7 +105,12 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
             to: scalar("to") ?? scalar("dateTo") ?? null,
           }),
           free: scalar("free") === "true",
-          priceMax: scalar("free") === "true" || scalar("priceMax") == null ? null : (() => { const value = Number(scalar("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),
+          priceMax: scalar("free") === "true" || scalar("priceMax") == null
+            ? null
+            : (() => {
+                const value = Number(scalar("priceMax"));
+                return Number.isFinite(value) && value >= 0 ? value : null;
+              })(),
           districtId: scalar("district") ?? null,
           metroId: scalar("metro") ?? null,
           adultOnly: scalar("adultOnly") === "true",
@@ -167,7 +180,6 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
     }
   }
 
-  // For routes intent, load routes data server-side
   let routesData = undefined;
   if (intent === "routes") {
     const dbRoutes = await listPublicRoutesByCity(city.id).catch(() => []);
@@ -219,6 +231,8 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       classChips={classChips}
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
+      pageTitleOverride={pageTitleOverride}
+      pageDescription={pageDescription}
     />
   );
 }
