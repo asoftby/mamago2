@@ -40,6 +40,18 @@ function isRouteContentRoute(pathname: string): boolean {
 }
 
 /**
+ * Notification click-through resolver lives in the shared route group at
+ * `/n/[id]`. Notification cards use a relative `/n/<id>` href on every
+ * surface, so admin/business middleware must not rewrite it to nonexistent
+ * `/admin/n/*` or `/business/n/*` routes.
+ */
+const NOTIFICATION_CLICKTHROUGH_ROUTE_PATTERN = /^\/n\/[^/]+$/;
+
+function isNotificationClickthroughRoute(pathname: string): boolean {
+  return NOTIFICATION_CLICKTHROUGH_ROUTE_PATTERN.test(pathname);
+}
+
+/**
  * `/me/{places|offers|events}/{id}/preview` — opened from the admin content
  * list (relative link) as well as from the business cabinet. Like
  * `isEditorRoute`/`isRouteContentRoute`, these must stay on the current
@@ -217,6 +229,10 @@ export function resolveSubdomainMiddlewareDecision(params: {
       // as isEditorRoute: serve the public route-group page on this surface
       // instead of rewriting into a nonexistent /admin/routes/* or
       // /business/routes/* page.
+      return { kind: "next" };
+    }
+
+    if (isNotificationClickthroughRoute(pathname)) {
       return { kind: "next" };
     }
 
