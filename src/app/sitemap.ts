@@ -62,6 +62,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         where: {
           ...getPublicPublishedArticleWhere(),
           noindex: false,
+          slug: { not: null },
+          publishedAt: { not: null },
         },
         select: {
           geoScope: true,
@@ -69,6 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           regionId: true,
           categoryId: true,
           seoRobots: true,
+          additionalCategoryLinks: { select: { categoryId: true } },
           tags: {
             where: { isActive: true },
             select: { id: true },
@@ -110,6 +113,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         if (!matchesCity) continue;
         for (const tag of article.tags) populatedTagHubs.add(`${city.id}:${tag.id}`);
         if (article.categoryId) populatedArticleCategoryHubs.add(`${city.id}:${article.categoryId}`);
+        for (const link of article.additionalCategoryLinks) {
+          populatedArticleCategoryHubs.add(`${city.id}:${link.categoryId}`);
+        }
       }
     }
 
