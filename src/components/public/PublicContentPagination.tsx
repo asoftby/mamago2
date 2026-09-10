@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +25,7 @@ export interface PublicContentPaginationProps {
   totalPages: number;
   total: number;
   pageSize: number;
-  onPageChange: (page: number) => void;
+  onPageChange?: (page: number) => void;
   className?: string;
 }
 
@@ -35,16 +37,34 @@ export function PublicContentPagination({
   onPageChange,
   className,
 }: PublicContentPaginationProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   if (totalPages <= 1) return null;
 
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   const items = getPageRange(page, totalPages);
 
-  const goTo = (nextPage: number) => {
-    if (nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+  const hrefForPage = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) params.delete("page");
+    else params.set("page", String(nextPage));
+    const query = params.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  };
+
+  const handlePageClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    nextPage: number,
+  ) => {
+    if (!onPageChange || nextPage === page) return;
+    event.preventDefault();
     onPageChange(nextPage);
   };
+
+  const navLinkClass =
+    "inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background transition-colors hover:bg-muted";
 
   return (
     <div
@@ -58,15 +78,24 @@ export function PublicContentPagination({
       </p>
 
       <nav className="flex flex-wrap items-center gap-1.5" aria-label="Страницы материалов">
-        <button
-          type="button"
-          aria-label="Предыдущая страница"
-          disabled={page <= 1}
-          onClick={() => goTo(page - 1)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
+        {page > 1 ? (
+          <Link
+            href={hrefForPage(page - 1)}
+            aria-label="Предыдущая страница"
+            rel="prev"
+            onClick={(event) => handlePageClick(event, page - 1)}
+            className={navLinkClass}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+        ) : (
+          <span
+            aria-hidden="true"
+            className={cn(navLinkClass, "cursor-not-allowed opacity-35")}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </span>
+        )}
 
         {items.map((item, index) =>
           item === "…" ? (
@@ -77,33 +106,46 @@ export function PublicContentPagination({
             >
               …
             </span>
-          ) : (
-            <button
+          ) : item === page ? (
+            <span
               key={item}
-              type="button"
-              aria-current={item === page ? "page" : undefined}
+              aria-current="page"
               aria-label={`Страница ${item}`}
-              onClick={() => goTo(item)}
-              className={cn(
-                "inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted",
-                item === page &&
-                  "border-primary bg-primary text-primary-foreground hover:bg-primary",
-              )}
+              className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-primary bg-primary px-3 text-sm font-medium text-primary-foreground"
             >
               {item}
-            </button>
+            </span>
+          ) : (
+            <Link
+              key={item}
+              href={hrefForPage(item)}
+              aria-label={`Страница ${item}`}
+              onClick={(event) => handlePageClick(event, item)}
+              className="inline-flex h-10 min-w-10 items-center justify-center rounded-full border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              {item}
+            </Link>
           ),
         )}
 
-        <button
-          type="button"
-          aria-label="Следующая страница"
-          disabled={page >= totalPages}
-          onClick={() => goTo(page + 1)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        {page < totalPages ? (
+          <Link
+            href={hrefForPage(page + 1)}
+            aria-label="Следующая страница"
+            rel="next"
+            onClick={(event) => handlePageClick(event, page + 1)}
+            className={navLinkClass}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        ) : (
+          <span
+            aria-hidden="true"
+            className={cn(navLinkClass, "cursor-not-allowed opacity-35")}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </span>
+        )}
       </nav>
     </div>
   );
