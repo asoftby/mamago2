@@ -1,0 +1,168 @@
+import {
+  addWeeks,
+  differenceInCalendarISOWeeks,
+  format,
+  isAfter,
+  isValid,
+  parse,
+  parseISO,
+  startOfISOWeek,
+  subWeeks,
+} from "date-fns";
+
+import { SEO_BASELINE } from "../../config/seo-baseline";
+
+const ISO_WEEK_FORMAT = "RRRR-'W'II";
+const ISO_WEEK_REFERENCE = new Date(2000, 0, 3, 12, 0, 0);
+
+export interface PairedRecoveryWeek {
+  isoWeek: string;
+  actualClicks: number;
+  baselineClicks: number;
+}
+
+export interface OperationalRecoveryWindow {
+  weeks: PairedRecoveryWeek[];
+  mode: "rolling" | "single_week_high_noise" | "unavailable";
+}
+
+function parseIsoWeekStart(isoWeek: string): Date | null {
+  const parsed = parse(isoWeek, ISO_WEEK_FORMAT, ISO_WEEK_REFERENCE);
+  if (!isValid(parsed)) return null;
+  const weekStart = startOfISOWeek(parsed);
+  return format(weekStart, ISO_WEEK_FORMAT) === isoWeek ? weekStart : null;
+}
+
+function formatIsoWeek(date: Date): string {
+  return format(startOfISOWeek(date), ISO_WEEK_FORMAT);
+}
+
+function isFiniteNonNegative(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+export function getBaselineForWeek(isoWeek: string): number | null {
+  if (SEO_BASELINE.unavailableWeeks.includes(isoWeek as (typeof SEO_BASELINE.unavailableWeeks)[number])) {
+    return null;
+  }
+  const value = SEO_BASELINE.baselineByIsoWeek[
+    isoWeek as keyof typeof SEO_BASELINE.baselineByIsoWeek
+  ];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export function getRecoveryShare(actualClicks: number, isoWeek: string): number | null {
+  if (!isFiniteNonNegative(actualClicks)) return null;
+  const baseline = getBaselineForWeek(isoWeek);
+  if (baseline === null || baseline <= 0) return null;
+  return actualClicks / baseline;
+}
+
+function getTargetClicks(): number | null {
+  const targetBaseline = getBaselineForWeek(SEO_BASELINE.targetIsoWeek);
+  if (targetBaseline === null || targetBaseline <= 0) return null;
+  return targetBaseline * SEO_BASELINE.targetShare;
+}
+
+function getTransitionCount(fromWeek: string): number | null {
+  const from = parseIsoWeekStart(fromWeek);
+  const target = parseIsoWeekStart(SEO_BASELINE.targetIsoWeek);
+  if (!from || !target) return null;
+  const transitions = differenceInCalendarISOWeeks(target, from);
+  return transitions > 0 ? transitions : null;
+}
+
+export function getRequiredWeeklyGrowth(actualClicks: number, fromWeek: string): number | null {
+  if (!Number.isFinite(actualClicks) || actualClicks <= 0) return null;
+  const targetClicks = getTargetClicks();
+  const transitions = getTransitionCount(fromWeek);
+  if (targetClicks === null || targetClicks <= 0 || transitions === null) return null;
+  return Math.pow(targetClicks / actualClicks, 1 / transitions) - 1;
+}
+
+/**
+ * Single-paired-week share-growth helper retained for the original v3 API.
+ * For a rolling operational window use getRequiredShareGainForWindow so the
+ * actual and baseline denominators are averaged over the exact same weeks.
+ */
+export function getRequiredShareGain(actualClicks: number, fromWeek: string): number | null {
+  if (!Number.isFinite(actualClicks) || actualClicks <= 0) return null;
+  const currentShare = getRecoveryShare(actualClicks, fromWeek);
+  const transitions = getTransitionCount(fromWeek);
+  if (currentShare === null || currentShare <= 0 || transitions === null) return null;
+  return Math.pow(SEO_BASELINE.targetShare / currentShare, 1 / transitions) - 1;
+}
+
+/**
+ * Returns up to maxWeeks fully completed paired weeks, walking backwards from
+ * throughWeek. The ISO week containing migrationDate is excluded, as are all
+ * earlier weeks. A week whose baseline is unavailable is removed from both
+ * sides of the pair rather than turning into a zero or a substituted week.
+ */
+export function getPairedRecoveryWindow(
+  actualClicksByIsoWeek: Readonly<Record<string, number>>,
+  throughWeek: string,
+  maxWeeks = 4,
+): PairedRecoveryWeek[] {
+  if (!Number.isInteger(maxWeeks) || maxWeeks <= 0) return [];
+  const through = parseIsoWeekStart(throughWeek);
+  if (!through) return [];
+
+  const migrationDate = parseISO(`${SEO_BASELINE.migrationDate}T12:00:00`);
+  if (!isValid(migrationDate)) return [];
+
+  const pairs: PairedRecoveryWeek[] = [];
+  let cursor = through;
+  for (let checked = 0; checked < maxWeeks; checked += 1) {
+    // Strictly after the cutover date means the week containing cutover is
+    // never included, even when cutover happened on that week's Monday.
+    if (!isAfter(cursor, migrationDate)) break;
+
+    const isoWeek = formatIsoWeek(cursor);
+    const actualClicks = actualClicksByIsoWeek[isoWeek];
+    const baselineClicks = getBaselineForWeek(isoWeek);
+    if (isFiniteNonNegative(actualClicks) && baselineClicks !== null && baselineClicks > 0) {
+      pairs.push({ isoWeek, actualClicks, baselineClicks });
+    }
+    cursor = subWeeks(cursor, 1);
+  }
+
+  return pairs.reverse();
+}
+
+/**
+ * v3.1 operational rule: when fewer than three post-migration paired weeks
+ * exist, use only the latest one and mark the result as high-noise.
+ */
+export function getOperationalRecoveryWindow(
+  actualClicksByIsoWeek: Readonly<Record<string, number>>,
+  throughWeek: string,
+  maxWeeks = 4,
+): OperationalRecoveryWindow {
+  const pairs = getPairedRecoveryWindow(actualClicksByIsoWeek, throughWeek, maxWeeks);
+  if (pairs.length === 0) return { weeks: [], mode: "unavailable" };
+  if (pairs.length < 3) {
+    return { weeks: [pairs[pairs.length - 1]], mode: "single_week_high_noise" };
+  }
+  return { weeks: pairs, mode: "rolling" };
+}
+
+export function getRequiredShareGainForWindow(
+  window: readonly PairedRecoveryWeek[],
+  fromWeek: string,
+): number | null {
+  if (window.length === 0) return null;
+  const actualAverage = window.reduce((sum, week) => sum + week.actualClicks, 0) / window.length;
+  const baselineAverage = window.reduce((sum, week) => sum + week.baselineClicks, 0) / window.length;
+  const transitions = getTransitionCount(fromWeek);
+  if (actualAverage <= 0 || baselineAverage <= 0 || transitions === null) return null;
+  const currentShare = actualAverage / baselineAverage;
+  if (!Number.isFinite(currentShare) || currentShare <= 0) return null;
+  return Math.pow(SEO_BASELINE.targetShare / currentShare, 1 / transitions) - 1;
+}
+
+/** Exposed for deterministic ISO-boundary tests without week-number arithmetic. */
+export function nextIsoWeek(isoWeek: string): string | null {
+  const weekStart = parseIsoWeekStart(isoWeek);
+  return weekStart ? formatIsoWeek(addWeeks(weekStart, 1)) : null;
+}
