@@ -24,6 +24,8 @@ interface CityShellProps {
   citySlug: string;
   intent: Intent;
   searchParams: Record<string, string | string[] | undefined>;
+  pageTitleOverride?: string;
+  pageDescription?: string;
 }
 
 function isSectionSystemFilterTableMissing(error: unknown): boolean {
@@ -34,7 +36,13 @@ function isSectionSystemFilterTableMissing(error: unknown): boolean {
   );
 }
 
-export async function CityShell({ citySlug, intent, searchParams }: CityShellProps) {
+export async function CityShell({
+  citySlug,
+  intent,
+  searchParams,
+  pageTitleOverride,
+  pageDescription,
+}: CityShellProps) {
   const [city, user, systemFilters] = await Promise.all([
     findCityBySlug(citySlug),
     getCurrentUser(),
@@ -219,6 +227,8 @@ export async function CityShell({ citySlug, intent, searchParams }: CityShellPro
       classChips={classChips}
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
+      pageTitleOverride={pageTitleOverride}
+      pageDescription={pageDescription}
     />
   );
 }
