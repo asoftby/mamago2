@@ -1,9 +1,10 @@
-import { EventCategoryPublicationType } from "@prisma/client";
+import { EventCategoryPublicationType, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import type { CityHomeJournalArticle, JournalPage } from "@/server/article/listCityHomeArticles";
 
 export type CityBlogCategory = {
@@ -25,19 +26,48 @@ function estimateReadTimeMinutes(text: string): number {
   return Math.max(3, Math.ceil(words / 180));
 }
 
+function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
+  const content = parseArticleContentJson(raw);
+  const blockText = content.blocks
+    .map((block) => {
+      switch (block.type) {
+        case "intro":
+        case "quote":
+        case "heading":
+        case "text":
+        case "callout":
+          return block.text;
+        default:
+          return "";
+      }
+    })
+    .filter(Boolean)
+    .join(" ");
+  return [excerpt ?? "", blockText].filter(Boolean).join(" ");
+}
+
+function indexableArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
+  return {
+    ...getPublicPublishedArticleWhere(),
+    noindex: false,
+    slug: { not: null },
+    publishedAt: { not: null },
+    NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } },
+    ...buildArticleCityDiscoveryWhere(city, true),
+  };
+}
+
 export async function listPopulatedCityBlogCategories(city: CityRef): Promise<CityBlogCategory[]> {
+  const articleWhere = indexableArticleWhere(city);
   const categories = await prisma.eventCategory.findMany({
     where: {
       publicationType: EventCategoryPublicationType.ARTICLE,
       isActive: true,
       archivedAt: null,
-      articles: {
-        some: {
-          ...getPublicPublishedArticleWhere(),
-          noindex: false,
-          ...buildArticleCityDiscoveryWhere(city, true),
-        },
-      },
+      OR: [
+        { articles: { some: articleWhere } },
+        { articleAdditionalLinks: { some: { article: articleWhere } } },
+      ],
     },
     select: { id: true, slug: true, nameRu: true },
     orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }],
@@ -51,19 +81,17 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
 }
 
 export async function resolveCityBlogCategory(city: CityRef, slug: string) {
+  const articleWhere = indexableArticleWhere(city);
   return prisma.eventCategory.findFirst({
     where: {
       slug,
       publicationType: EventCategoryPublicationType.ARTICLE,
       isActive: true,
       archivedAt: null,
-      articles: {
-        some: {
-          ...getPublicPublishedArticleWhere(),
-          noindex: false,
-          ...buildArticleCityDiscoveryWhere(city, true),
-        },
-      },
+      OR: [
+        { articles: { some: articleWhere } },
+        { articleAdditionalLinks: { some: { article: articleWhere } } },
+      ],
     },
     select: { id: true, slug: true, nameRu: true },
   });
@@ -77,13 +105,16 @@ export async function listCityBlogCategoryArticles(
 ): Promise<JournalPage> {
   const safePage = Math.max(1, Math.trunc(page));
   const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
-  const where = {
-    ...getPublicPublishedArticleWhere(),
-    noindex: false,
-    slug: { not: null },
-    publishedAt: { not: null },
-    categoryId,
-    ...buildArticleCityDiscoveryWhere(city, true),
+  const where: Prisma.ArticleWhereInput = {
+    AND: [
+      indexableArticleWhere(city),
+      {
+        OR: [
+          { categoryId },
+          { additionalCategoryLinks: { some: { categoryId } } },
+        ],
+      },
+    ],
   };
 
   const total = await prisma.article.count({ where });
@@ -103,6 +134,7 @@ export async function listCityBlogCategoryArticles(
           title: true,
           subtitle: true,
           excerpt: true,
+          contentJson: true,
           publishedAt: true,
           heroImage: true,
           coverImage: { select: { publicUrl: true } },
@@ -117,29 +149,26 @@ export async function listCityBlogCategoryArticles(
 
   const articles: CityHomeJournalArticle[] = rows
     .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
-    .map((row) => {
-      const plainText = [row.excerpt ?? "", row.title, row.subtitle ?? ""].join(" ");
-      return {
-        id: row.id,
+    .map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      href: buildArticlePublicPath({
         slug: row.slug,
-        href: buildArticlePublicPath({
-          slug: row.slug,
-          geoScope: row.geoScope,
-          citySlug: row.city?.slug ?? city.slug,
-        }),
-        title: row.title,
-        subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-        contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
-        category: row.category
-          ? { id: row.category.id, slug: row.category.slug, name: row.category.nameRu }
-          : null,
-        tags: row.tags.map((tag) => ({ id: tag.id, slug: tag.slug, name: tag.title })),
-        readTime: estimateReadTimeMinutes(plainText),
-        isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
-        publishedAt: row.publishedAt,
-        coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
-      };
-    });
+        geoScope: row.geoScope,
+        citySlug: row.city?.slug ?? city.slug,
+      }),
+      title: row.title,
+      subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
+      contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
+      category: row.category
+        ? { id: row.category.id, slug: row.category.slug, name: row.category.nameRu }
+        : null,
+      tags: row.tags.map((tag) => ({ id: tag.id, slug: tag.slug, name: tag.title })),
+      readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
+      isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
+      publishedAt: row.publishedAt,
+      coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
+    }));
 
   return { articles, page: safePage, pageSize: safePageSize, total, totalPages };
 }
