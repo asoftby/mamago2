@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import { eventCategoryHubTitle } from "./eventCategoryHub";
 import { resolveLegacySeoDestination } from "./legacySeoRedirectOverrides";
 import { PHASE_2A_PRIORITY_RECOVERIES, validatePhase2AIntegrity } from "./phase2aPriorityRecovery";
+
+assert.equal(
+  eventCategoryHubTitle("Спектакли", "Минске"),
+  "Спектакли для детей в Минске",
+);
 
 assert.equal(
   resolveLegacySeoDestination("/master-klassy-dlya-detej", "/minsk/events"),
