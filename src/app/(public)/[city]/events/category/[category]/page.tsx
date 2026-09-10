@@ -82,11 +82,17 @@ export default async function EventCategoryHubPage({ params, searchParams }: Pag
 
   if (!hub) notFound();
 
+  const cityName = getCityDisplayName(citySlug);
+  const title = `${hub.category.nameRu} для детей в ${cityName}`;
+  const description = `${hub.category.nameRu} в ${cityName}: актуальные события для детей и всей семьи, даты, возраст, стоимость и места проведения.`;
+
   return (
     <CityShell
       citySlug={citySlug}
       intent="kuda"
       searchParams={{ ...query, category: hub.category.slug }}
+      pageTitleOverride={title}
+      pageDescription={description}
     />
   );
 }
