@@ -41,6 +41,26 @@ function isFiniteNonNegative(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+export function recoveryShareFromValues(
+  actualClicks: number,
+  baselineClicks: number | null,
+): number | null {
+  if (!isFiniteNonNegative(actualClicks)) return null;
+  if (baselineClicks === null || !Number.isFinite(baselineClicks) || baselineClicks <= 0) return null;
+  return actualClicks / baselineClicks;
+}
+
+export function compoundWeeklyRate(
+  currentValue: number,
+  targetValue: number,
+  transitions: number,
+): number | null {
+  if (!Number.isFinite(currentValue) || currentValue <= 0) return null;
+  if (!Number.isFinite(targetValue) || targetValue <= 0) return null;
+  if (!Number.isInteger(transitions) || transitions <= 0) return null;
+  return Math.pow(targetValue / currentValue, 1 / transitions) - 1;
+}
+
 export function getBaselineForWeek(isoWeek: string): number | null {
   if (SEO_BASELINE.unavailableWeeks.includes(isoWeek as (typeof SEO_BASELINE.unavailableWeeks)[number])) {
     return null;
@@ -52,10 +72,7 @@ export function getBaselineForWeek(isoWeek: string): number | null {
 }
 
 export function getRecoveryShare(actualClicks: number, isoWeek: string): number | null {
-  if (!isFiniteNonNegative(actualClicks)) return null;
-  const baseline = getBaselineForWeek(isoWeek);
-  if (baseline === null || baseline <= 0) return null;
-  return actualClicks / baseline;
+  return recoveryShareFromValues(actualClicks, getBaselineForWeek(isoWeek));
 }
 
 function getTargetClicks(): number | null {
@@ -73,11 +90,10 @@ function getTransitionCount(fromWeek: string): number | null {
 }
 
 export function getRequiredWeeklyGrowth(actualClicks: number, fromWeek: string): number | null {
-  if (!Number.isFinite(actualClicks) || actualClicks <= 0) return null;
   const targetClicks = getTargetClicks();
   const transitions = getTransitionCount(fromWeek);
-  if (targetClicks === null || targetClicks <= 0 || transitions === null) return null;
-  return Math.pow(targetClicks / actualClicks, 1 / transitions) - 1;
+  if (targetClicks === null || transitions === null) return null;
+  return compoundWeeklyRate(actualClicks, targetClicks, transitions);
 }
 
 /**
@@ -86,11 +102,10 @@ export function getRequiredWeeklyGrowth(actualClicks: number, fromWeek: string):
  * actual and baseline denominators are averaged over the exact same weeks.
  */
 export function getRequiredShareGain(actualClicks: number, fromWeek: string): number | null {
-  if (!Number.isFinite(actualClicks) || actualClicks <= 0) return null;
   const currentShare = getRecoveryShare(actualClicks, fromWeek);
   const transitions = getTransitionCount(fromWeek);
-  if (currentShare === null || currentShare <= 0 || transitions === null) return null;
-  return Math.pow(SEO_BASELINE.targetShare / currentShare, 1 / transitions) - 1;
+  if (currentShare === null || transitions === null) return null;
+  return compoundWeeklyRate(currentShare, SEO_BASELINE.targetShare, transitions);
 }
 
 /**
@@ -155,10 +170,10 @@ export function getRequiredShareGainForWindow(
   const actualAverage = window.reduce((sum, week) => sum + week.actualClicks, 0) / window.length;
   const baselineAverage = window.reduce((sum, week) => sum + week.baselineClicks, 0) / window.length;
   const transitions = getTransitionCount(fromWeek);
-  if (actualAverage <= 0 || baselineAverage <= 0 || transitions === null) return null;
-  const currentShare = actualAverage / baselineAverage;
-  if (!Number.isFinite(currentShare) || currentShare <= 0) return null;
-  return Math.pow(SEO_BASELINE.targetShare / currentShare, 1 / transitions) - 1;
+  if (transitions === null) return null;
+  const currentShare = recoveryShareFromValues(actualAverage, baselineAverage);
+  if (currentShare === null) return null;
+  return compoundWeeklyRate(currentShare, SEO_BASELINE.targetShare, transitions);
 }
 
 /** Exposed for deterministic ISO-boundary tests without week-number arithmetic. */
