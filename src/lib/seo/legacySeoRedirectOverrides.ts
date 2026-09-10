@@ -1,6 +1,8 @@
 import { resolveLegacySeoDestination as resolveEventCategoryLegacyDestination } from "./eventCategoryHub";
 
 const LEGACY_ARTICLE_REDIRECT_OVERRIDES: Readonly<Record<string, string>> = {
+  "/top-18-kafe-i-restoranov-s-detskoj-ploshhadkoj-ili-komnatoj":
+    "/minsk/blog/top-18-kafe-i-restoranov-s-detskoy-ploshchadkoy-ili-komnatoy",
   "/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome":
     "/blog/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome",
 };
