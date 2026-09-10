@@ -23,7 +23,6 @@ function BirthdayQuickStartBanner({ city }: { city: string }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[#F2D5C4] bg-[#FFF5F0] px-6 py-5 shadow-sm">
       <div className="flex items-center justify-between gap-6">
-        {/* Icon */}
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="4" y="12" width="16" height="9" rx="1.5" fill="#EF8759"/>
@@ -38,7 +37,6 @@ function BirthdayQuickStartBanner({ city }: { city: string }) {
           </svg>
         </div>
 
-        {/* Content */}
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold leading-tight text-neutral-900">
             Организовать День Рождения за <span className="text-[#EF8759]">10 минут</span>
@@ -48,26 +46,13 @@ function BirthdayQuickStartBanner({ city }: { city: string }) {
           </p>
         </div>
 
-        {/* CTA Button */}
         <Link
           href={`/${city}/birthday/make`}
           className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-[#EF8759] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover hover:shadow-md"
         >
           Собрать праздник
-          <svg 
-            width="16" 
-            height="16" 
-            viewBox="0 0 16 16" 
-            fill="none" 
-            className="transition-transform group-hover:translate-x-0.5"
-          >
-            <path 
-              d="M6 3L11 8L6 13" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="transition-transform group-hover:translate-x-0.5">
+            <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </Link>
       </div>
@@ -79,12 +64,12 @@ interface CityDiscoveryShellProps {
   city: string;
   intent: Intent;
   routesData?: PublicRouteCardModel[];
-  /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
   classChips?: Array<{ id: string; title: string; slug: string }>;
   activeClassChipSlug?: string;
-  /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
   budgetConfig?: BudgetConfig;
+  pageTitleOverride?: string;
+  pageDescription?: string;
 }
 
 export function CityDiscoveryShell({
@@ -95,13 +80,16 @@ export function CityDiscoveryShell({
   classChips,
   activeClassChipSlug,
   budgetConfig,
+  pageTitleOverride,
+  pageDescription,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
-  const pageTitle =
+  const defaultPageTitle =
     formatCityTitle(intentConfig.titleTemplate, city) +
     whenPresetPageTitleSuffix(applied);
+  const pageTitle = pageTitleOverride?.trim() || defaultPageTitle;
 
   useEffect(() => {
     budgetCtx?.setBudgetConfig(budgetConfig ?? null);
@@ -110,15 +98,19 @@ export function CityDiscoveryShell({
     };
   }, [budgetConfig, budgetCtx]);
 
-  // ── Routes intent ──────────────────────────────────────────────────────────
   if (intent === "routes") {
     const routes = routesData ?? [];
 
     return (
       <main className="min-h-screen bg-white pb-20">
         <Container className="pt-6 space-y-6">
-          <div className="flex items-start justify-between">
-            <H1 className="px-1">{pageTitle}</H1>
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-0">
+              <H1 className="px-1">{pageTitle}</H1>
+              {pageDescription ? (
+                <p className="mt-3 max-w-3xl px-1 text-base leading-7 text-muted-foreground">{pageDescription}</p>
+              ) : null}
+            </div>
             <Link
               href="/routes/new"
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors shrink-0"
@@ -146,13 +138,15 @@ export function CityDiscoveryShell({
     );
   }
 
-  // ── Birthday: CTA block + activities ───────────────────────────────────────
   if (intent === "birthday") {
     return (
       <main className="min-h-screen bg-white pb-20">
         <Container className="pt-10 space-y-6">
           <div className="space-y-4">
             <H1 className="px-1">{pageTitle}</H1>
+            {pageDescription ? (
+              <p className="max-w-3xl px-1 text-base leading-7 text-muted-foreground">{pageDescription}</p>
+            ) : null}
           </div>
 
           <BirthdayQuickStartBanner city={city} />
@@ -162,12 +156,14 @@ export function CityDiscoveryShell({
     );
   }
 
-  // ── Default: activities ────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-white pb-20">
       <Container className="pt-10 space-y-6">
         <div className="space-y-4">
           <H1 className="px-1">{pageTitle}</H1>
+          {pageDescription ? (
+            <p className="max-w-3xl px-1 text-base leading-7 text-muted-foreground">{pageDescription}</p>
+          ) : null}
         </div>
         {intent === "kuda" ? <EventQuickFilters /> : null}
         {intent === "classes" && classChips && activeClassChipSlug ? (
