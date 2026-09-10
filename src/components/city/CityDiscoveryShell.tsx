@@ -145,7 +145,7 @@ export function CityDiscoveryShell({
           </div>
 
           {routes.length === 0 && (
-            <p className="text-sm neutral-400 px-1">
+            <p className="text-sm text-neutral-400 px-1">
               Маршрутов пока нет — будьте первым!
             </p>
           )}
