@@ -47,6 +47,13 @@ async function resolveHub(citySlug: string, categorySlug: string) {
   return { city, category };
 }
 
+function hubCopy(categoryName: string, cityName: string) {
+  return {
+    title: `${categoryName} для детей в ${cityName}`,
+    description: `${categoryName} для детей в ${cityName}: актуальная афиша, даты, возраст, стоимость и места проведения на mamaGo.`,
+  };
+}
+
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { city: citySlug, category: categorySlug } = await params;
   const [hub, query] = await Promise.all([
@@ -59,15 +66,14 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const cityName = getCityDisplayName(citySlug);
   const canonical = `${getBaseUrl("BY")}${eventCategoryHubPath(citySlug, hub.category.slug)}`;
   const hasExtraDiscoveryFilter = Object.keys(query).some((key) => DISCOVERY_FILTER_KEYS.has(key));
+  const copy = hubCopy(hub.category.nameRu, cityName);
 
   const metadata: Metadata = {
-    title: `${hub.category.nameRu} для детей в ${cityName} — mamaGo`,
-    description: `${hub.category.nameRu} для детей в ${cityName}: актуальная афиша, даты, возраст, стоимость и места проведения на mamaGo.`,
+    title: `${copy.title} — mamaGo`,
+    description: copy.description,
     alternates: { canonical },
   };
 
-  // The clean category path is indexable. Additional discovery combinations
-  // remain useful for users but must not create an indexable faceted-URL fanout.
   if (hasExtraDiscoveryFilter) metadata.robots = { index: false, follow: true };
 
   return applyGlobalRobotsOverride(metadata);
@@ -82,11 +88,16 @@ export default async function EventCategoryHubPage({ params, searchParams }: Pag
 
   if (!hub) notFound();
 
+  const cityName = getCityDisplayName(citySlug);
+  const copy = hubCopy(hub.category.nameRu, cityName);
+
   return (
     <CityShell
       citySlug={citySlug}
       intent="kuda"
       searchParams={{ ...query, category: hub.category.slug }}
+      pageTitleOverride={copy.title}
+      pageDescription={copy.description}
     />
   );
 }
