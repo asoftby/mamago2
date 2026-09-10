@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogIndex } from "../../blog/BlogIndex";
 import { BlogPagination } from "../../blog/BlogPagination";
+import { BlogCategoryNav } from "../../blog/BlogCategoryNav";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import {
   buildAbsoluteCanonicalUrl,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { listCityBlogArticles } from "@/server/article/listCityHomeArticles";
+import { listPopulatedCityBlogCategories } from "@/server/article/cityBlogCategories";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 export const dynamic = "force-dynamic";
@@ -65,13 +67,17 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
   if (!city) notFound();
 
   const requestedPage = parsePage(query.page);
-  const journal = await listCityBlogArticles(city, requestedPage);
+  const [journal, categories] = await Promise.all([
+    listCityBlogArticles(city, requestedPage),
+    listPopulatedCityBlogCategories(city),
+  ]);
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const basePath = buildCityPublicPath({ citySlug: city.slug, type: "journal" });
 
   return (
     <main>
+      <BlogCategoryNav citySlug={city.slug} categories={categories} />
       <BlogIndex articles={journal.articles} />
       <BlogPagination
         basePath={basePath}
