@@ -10,7 +10,7 @@ import {
   getPublicPublishedArticleWhere,
   getPublicRouteIndexWhere,
 } from "@/server/public/publicContentVisibility";
-import { ActivityType } from "@prisma/client";
+import { ActivityType, EventCategoryPublicationType } from "@prisma/client";
 import { resolvePlaceCanonicalUrl } from "@/lib/seo/resolvePlaceCanonicalUrl";
 import { resolveOfferCanonicalUrl } from "@/lib/seo/resolveOfferCanonicalUrl";
 import { resolveRouteCanonicalUrl } from "@/lib/seo/resolveRouteCanonicalUrl";
@@ -22,14 +22,6 @@ import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Matches the `parts.includes("noindex")` semantics already used by the
- * per-entity `parseRobots()` helpers in the Event/Offer detail pages'
- * `generateMetadata()` — an entity explicitly marked noindex via its
- * `seoRobots` field must never get a sitemap entry, even though its own
- * detail page correctly renders `robots: noindex` regardless of sitemap
- * presence.
- */
 export function hasNoindexRobots(seoRobots: string | null | undefined): boolean {
   if (!seoRobots) return false;
   return seoRobots
@@ -40,37 +32,16 @@ export function hasNoindexRobots(seoRobots: string | null | undefined): boolean 
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  if (isGlobalNoindexEnabled()) {
-    return [];
-  }
+  if (isGlobalNoindexEnabled()) return [];
 
   const baseUrl = getBaseUrl("BY");
-
-  // The public surface's own middleware unconditionally 307-redirects "/"
-  // to the flagship city hub outside dev/localhost
-  // (resolveSubdomainMiddlewareDecision in subdomainMiddleware.ts) — a real
-  // production request for baseUrl never itself returns 200, so this
-  // entry is intentionally omitted here; the flagship city's hub entry
-  // below (from the city loop) gets priority 1 instead of 0.9, since it's
-  // effectively the sitemap's "homepage" entry (sitemap entries should
-  // resolve directly to 200, not redirect).
-  const entries: MetadataRoute.Sitemap = [];
-
-  // Global (non-city-scoped) listing pages — real, indexable, each with its
-  // own metadata (see BACKLOG-064).
-  entries.push({
-    url: `${baseUrl}/routes`,
-    changeFrequency: "weekly",
-    priority: 0.5,
-  });
-  entries.push({
-    url: `${baseUrl}/blog`,
-    changeFrequency: "daily",
-    priority: 0.6,
-  });
+  const entries: MetadataRoute.Sitemap = [
+    { url: `${baseUrl}/routes`, changeFrequency: "weekly", priority: 0.5 },
+    { url: `${baseUrl}/blog`, changeFrequency: "daily", priority: 0.6 },
+  ];
 
   try {
-    const [cities, tags, categories, taggedArticles, categoryEvents] = await Promise.all([
+    const [cities, tags, categories, articlesForHubs, categoryEvents] = await Promise.all([
       prisma.city.findMany({
         where: { isActive: true, isLegacyNonCity: false },
         select: { id: true, slug: true, regionId: true, updatedAt: true },
@@ -83,20 +54,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         orderBy: { sortOrder: "asc" },
       }),
       prisma.eventCategory.findMany({
-        where: { isActive: true },
-        select: { id: true, slug: true, updatedAt: true },
+        where: { isActive: true, archivedAt: null },
+        select: { id: true, slug: true, updatedAt: true, publicationType: true },
         orderBy: { nameRu: "asc" },
       }),
       prisma.article.findMany({
         where: {
           ...getPublicPublishedArticleWhere(),
           noindex: false,
-          tags: { some: { isActive: true } },
         },
         select: {
           geoScope: true,
           cityId: true,
           regionId: true,
+          categoryId: true,
           seoRobots: true,
           tags: {
             where: { isActive: true },
@@ -123,7 +94,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ]);
 
     const populatedTagHubs = new Set<string>();
-    for (const article of taggedArticles) {
+    const populatedArticleCategoryHubs = new Set<string>();
+    for (const article of articlesForHubs) {
       if (hasNoindexRobots(article.seoRobots)) continue;
       for (const city of cities) {
         const matchesCity =
@@ -136,13 +108,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
               (target.type === "REGION" && Boolean(city.regionId) && target.regionId === city.regionId),
           );
         if (!matchesCity) continue;
-        for (const tag of article.tags) {
-          populatedTagHubs.add(`${city.id}:${tag.id}`);
-        }
+        for (const tag of article.tags) populatedTagHubs.add(`${city.id}:${tag.id}`);
+        if (article.categoryId) populatedArticleCategoryHubs.add(`${city.id}:${article.categoryId}`);
       }
     }
 
-    const populatedCategoryHubs = new Set<string>();
+    const populatedEventCategoryHubs = new Set<string>();
     for (const event of categoryEvents) {
       if (!event.eventCategoryId) continue;
       const eventCityIds = new Set(
@@ -151,12 +122,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ),
       );
       for (const cityId of eventCityIds) {
-        populatedCategoryHubs.add(`${cityId}:${event.eventCategoryId}`);
+        populatedEventCategoryHubs.add(`${cityId}:${event.eventCategoryId}`);
       }
     }
 
     for (const city of cities) {
-      // City hub and events pages
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "hub" })}`,
         lastModified: city.updatedAt,
@@ -169,12 +139,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "daily",
         priority: 0.8,
       });
-
-      // City-scoped listing pages confirmed real/indexable by the Task 8
-      // audit but previously missing from the sitemap (BACKLOG-064).
-      // Birthday is intentionally excluded — not part of the approved gap
-      // list (its discovery feed currently reuses kuda/event content, a
-      // separate pre-existing product issue, not a sitemap decision here).
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
         lastModified: city.updatedAt,
@@ -200,22 +164,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       });
 
-      // Clean event-category SEO hubs are indexable only when they actually
-      // contain a current public event for the city. This prevents thin/empty
-      // hubs while making real search-intent landing pages discoverable.
       for (const category of categories) {
-        if (!populatedCategoryHubs.has(`${city.id}:${category.id}`)) continue;
-        entries.push({
-          url: `${baseUrl}${eventCategoryHubPath(city.slug, category.slug)}`,
-          lastModified: category.updatedAt,
-          changeFrequency: "daily",
-          priority: 0.75,
-        });
+        if (
+          category.publicationType === EventCategoryPublicationType.EVENT &&
+          populatedEventCategoryHubs.has(`${city.id}:${category.id}`)
+        ) {
+          entries.push({
+            url: `${baseUrl}${eventCategoryHubPath(city.slug, category.slug)}`,
+            lastModified: category.updatedAt,
+            changeFrequency: "daily",
+            priority: 0.75,
+          });
+        }
+        if (
+          category.publicationType === EventCategoryPublicationType.ARTICLE &&
+          populatedArticleCategoryHubs.has(`${city.id}:${category.id}`)
+        ) {
+          entries.push({
+            url: `${baseUrl}/${city.slug}/blog/category/${category.slug}`,
+            lastModified: category.updatedAt,
+            changeFrequency: "weekly",
+            priority: 0.7,
+          });
+        }
       }
 
-      // Discovery tag pages per city: only expose populated combinations.
-      // Country-scope and matching region/additional-target articles count as
-      // content because the public tag page intentionally includes them.
       for (const tag of tags) {
         if (!populatedTagHubs.has(`${city.id}:${tag.id}`)) continue;
         entries.push({
@@ -227,7 +200,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
   } catch (error) {
-    console.warn("[sitemap] city/tag/category query failed, returning base URL only:", error);
+    console.warn("[sitemap] city/tag/category query failed, skipping city discovery hubs:", error);
   }
 
   try {
@@ -238,11 +211,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       select: { id: true, slug: true, seoCanonicalUrl: true, updatedAt: true, seoRobots: true, city: { select: { slug: true } } },
     });
     for (const place of places) {
-      if (hasNoindexRobots(place.seoRobots)) continue;
-      // A Place with no city can't get a valid city-scoped canonical —
-      // see docs/migration/seo/final-url-architecture-2026-08-15.md §2/
-      // BACKLOG-115. Skipped rather than guessed into the sitemap.
-      if (!place.city?.slug) continue;
+      if (hasNoindexRobots(place.seoRobots) || !place.city?.slug) continue;
       entries.push({
         url: resolvePlaceCanonicalUrl({
           seoCanonicalUrl: place.seoCanonicalUrl,
@@ -278,11 +247,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       },
     });
     for (const offer of offers) {
-      if (hasNoindexRobots(offer.seoRobots)) continue;
-      // A placeless/cityless Offer can't get a valid city-scoped
-      // canonical — see docs/migration/seo/final-url-architecture-2026-08-15.md
-      // §2-3. Skipped rather than guessed into the sitemap.
-      if (!offer.place?.city?.slug) continue;
+      if (hasNoindexRobots(offer.seoRobots) || !offer.place?.city?.slug) continue;
       entries.push({
         url: resolveOfferCanonicalUrl({
           seoCanonicalUrl: offer.seoCanonicalUrl,
@@ -376,18 +341,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const cityIds = Array.from(
       new Set(
         events
-          .flatMap((e) => [e.cityId, e.venue?.cityId])
-          .filter((v): v is string => typeof v === "string" && v.length > 0),
+          .flatMap((event) => [event.cityId, event.venue?.cityId])
+          .filter((value): value is string => typeof value === "string" && value.length > 0),
       ),
     );
-    const cityRows =
-      cityIds.length > 0
-        ? await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true, isActive: true } })
-        : [];
+    const cityRows = cityIds.length > 0
+      ? await prisma.city.findMany({
+          where: { id: { in: cityIds } },
+          select: { id: true, slug: true, isActive: true },
+        })
+      : [];
     const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
-    // Only resolved cities can be inactive — resolveCanonicalCitySlugForEvent's
-    // DEFAULT_CITY_SLUG fallback (used when no source resolves) is never a
-    // member of cityRows, so it's never in this set either.
     const inactiveCitySlugs = new Set(cityRows.filter((row) => !row.isActive).map((row) => row.slug));
 
     for (const event of events) {
