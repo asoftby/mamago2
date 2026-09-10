@@ -14,6 +14,14 @@ assert.equal(
 
 assert.equal(
   resolveLegacySeoDestination(
+    "/top-18-kafe-i-restoranov-s-detskoj-ploshhadkoj-ili-komnatoj",
+    "/minsk/blog/top-18-kafe-i-restoranov-s-detskoj-ploshhadkoj-ili-komnatoj",
+  ),
+  "/minsk/blog/top-18-kafe-i-restoranov-s-detskoy-ploshchadkoy-ili-komnatoy",
+);
+
+assert.equal(
+  resolveLegacySeoDestination(
     "/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome",
     "/minsk/blog/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome",
   ),
