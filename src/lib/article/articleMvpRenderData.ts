@@ -139,7 +139,13 @@ export type ArticleMvpResolvedBlock =
   | (ArticleBlockMvp & { type: "quote" })
   | (ArticleBlockMvp & { type: "heading" })
   | (ArticleBlockMvp & { type: "callout" })
-  | (Extract<ArticleBlockMvp, { type: "image" }> & { imageUrl: string | null })
+  | (Extract<ArticleBlockMvp, { type: "image" }> & {
+      imageUrl: string | null;
+      imageAlt: string;
+      imageCaption: string | null;
+      imageWidth: number | null;
+      imageHeight: number | null;
+    })
   | (Extract<ArticleBlockMvp, { type: "gallery" }> & {
       images: Array<{
         id: string;
@@ -427,7 +433,6 @@ export async function buildArticleMvpResolvedBlocks(
           select: { id: true, publicUrl: true, alt: true, title: true, caption: true, width: true, height: true },
         })
       : [];
-  const urlById = new Map(assets.map((a) => [a.id, a.publicUrl]));
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const [placesById, basicCards] = await Promise.all([
     (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(blocks)),
@@ -449,9 +454,14 @@ export async function buildArticleMvpResolvedBlocks(
       continue;
     }
     if (b.type === "image") {
+      const asset = b.mediaId ? assetById.get(b.mediaId) : undefined;
       out.push({
         ...b,
-        imageUrl: b.mediaId ? urlById.get(b.mediaId) ?? null : null,
+        imageUrl: asset?.publicUrl ?? null,
+        imageAlt: b.alt?.trim() || asset?.alt?.trim() || asset?.title?.trim() || "",
+        imageCaption: b.caption?.trim() || asset?.caption?.trim() || null,
+        imageWidth: asset?.width ?? null,
+        imageHeight: asset?.height ?? null,
       });
       continue;
     }
