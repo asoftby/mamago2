@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -55,7 +56,7 @@ export function PublicContentPagination({
   };
 
   const handlePageClick = (
-    event: React.MouseEvent<HTMLAnchorElement>,
+    event: MouseEvent<HTMLAnchorElement>,
     nextPage: number,
   ) => {
     if (!onPageChange || nextPage === page) return;
