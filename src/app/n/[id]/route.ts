@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
-import { buildAuthUrl, getSafeRedirectPath } from "@/lib/auth/redirectTo";
+import { buildAuthUrl } from "@/lib/auth/redirectTo";
+import { resolveNotificationClickthroughDestination } from "@/lib/notifications/notificationClickthroughDestination";
 import prisma from "@/lib/prisma";
 import { resolveNotificationPageUrl } from "@/server/notifications/notification-action-resolver";
 
@@ -22,7 +23,7 @@ function redirectToRelativePath(path: string, status = 307): NextResponse {
  * and navigation happen server-side in one request.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -71,13 +72,14 @@ export async function GET(
     actionUrl: notification.actionUrl,
   });
 
-  const safeInternalDestination = getSafeRedirectPath(destination, "");
-  if (safeInternalDestination) {
-    return redirectToRelativePath(safeInternalDestination);
-  }
+  const resolvedDestination = resolveNotificationClickthroughDestination({
+    destination,
+    currentHost: request.headers.get("host") ?? request.nextUrl.host,
+    currentProtocol: request.nextUrl.protocol,
+  });
 
-  if (destination && /^https?:\/\//i.test(destination)) {
-    return NextResponse.redirect(destination);
+  if (resolvedDestination) {
+    return redirectToRelativePath(resolvedDestination);
   }
 
   return redirectToRelativePath("/notifications");
