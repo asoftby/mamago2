@@ -17,6 +17,8 @@ import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
+import { getAvailableEventTaxonomy } from "@/server/discovery/eventTaxonomyAvailability";
 
 export const dynamic = "force-dynamic";
 
@@ -43,19 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   const baseUrl = getBaseUrl("BY");
-
-  // The public surface's own middleware unconditionally 307-redirects "/"
-  // to the flagship city hub outside dev/localhost
-  // (resolveSubdomainMiddlewareDecision in subdomainMiddleware.ts) — a real
-  // production request for baseUrl never itself returns 200, so this
-  // entry is intentionally omitted here; the flagship city's hub entry
-  // below (from the city loop) gets priority 1 instead of 0.9, since it's
-  // effectively the sitemap's "homepage" entry (sitemap entries should
-  // resolve directly to 200, not redirect).
   const entries: MetadataRoute.Sitemap = [];
 
-  // Global (non-city-scoped) listing pages — real, indexable, each with its
-  // own metadata (see BACKLOG-064).
   entries.push({
     url: `${baseUrl}/routes`,
     changeFrequency: "weekly",
@@ -70,12 +61,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const cities = await prisma.city.findMany({
       where: { isActive: true, isLegacyNonCity: false },
-      select: { slug: true, updatedAt: true },
+      select: { id: true, slug: true, updatedAt: true },
       orderBy: { name: "asc" },
       take: 50,
     });
 
-    // Fetch active discovery tags once (reuse for all cities)
     const tags = await prisma.discoveryTag.findMany({
       where: { isActive: true },
       select: { slug: true, updatedAt: true },
@@ -83,7 +73,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
 
     for (const city of cities) {
-      // City hub and events pages
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "hub" })}`,
         lastModified: city.updatedAt,
@@ -97,11 +86,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       });
 
-      // City-scoped listing pages confirmed real/indexable by the Task 8
-      // audit but previously missing from the sitemap (BACKLOG-064).
-      // Birthday is intentionally excluded — not part of the approved gap
-      // list (its discovery feed currently reuses kuda/event content, a
-      // separate pre-existing product issue, not a sitemap decision here).
+      // Only category hubs backed by currently discoverable events are emitted.
+      // This avoids manufacturing empty city × category URLs while giving clean
+      // category landings a direct sitemap discovery path.
+      const eventCategories = await getAvailableEventTaxonomy(city.id, city.slug).catch((error) => {
+        console.warn(`[sitemap] event category query failed for ${city.slug}, skipping hubs:`, error);
+        return [];
+      });
+      for (const category of eventCategories) {
+        entries.push({
+          url: `${baseUrl}${eventCategoryHubPath(city.slug, category.slug)}`,
+          lastModified: city.updatedAt,
+          changeFrequency: "daily",
+          priority: 0.7,
+        });
+      }
+
       entries.push({
         url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "programs" })}`,
         lastModified: city.updatedAt,
@@ -127,7 +127,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       });
 
-      // Discovery tag pages per city
       for (const tag of tags) {
         entries.push({
           url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "tag", slug: tag.slug })}`,
@@ -150,9 +149,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     for (const place of places) {
       if (hasNoindexRobots(place.seoRobots)) continue;
-      // A Place with no city can't get a valid city-scoped canonical —
-      // see docs/migration/seo/final-url-architecture-2026-08-15.md §2/
-      // BACKLOG-115. Skipped rather than guessed into the sitemap.
       if (!place.city?.slug) continue;
       entries.push({
         url: resolvePlaceCanonicalUrl({
@@ -190,9 +186,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
     for (const offer of offers) {
       if (hasNoindexRobots(offer.seoRobots)) continue;
-      // A placeless/cityless Offer can't get a valid city-scoped
-      // canonical — see docs/migration/seo/final-url-architecture-2026-08-15.md
-      // §2-3. Skipped rather than guessed into the sitemap.
       if (!offer.place?.city?.slug) continue;
       entries.push({
         url: resolveOfferCanonicalUrl({
@@ -296,9 +289,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ? await prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, slug: true, isActive: true } })
         : [];
     const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
-    // Only resolved cities can be inactive — resolveCanonicalCitySlugForEvent's
-    // DEFAULT_CITY_SLUG fallback (used when no source resolves) is never a
-    // member of cityRows, so it's never in this set either.
     const inactiveCitySlugs = new Set(cityRows.filter((row) => !row.isActive).map((row) => row.slug));
 
     for (const event of events) {
