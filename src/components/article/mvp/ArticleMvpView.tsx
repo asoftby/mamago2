@@ -194,10 +194,6 @@ export function ArticleMvpView({
       >
         <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
         {showChromeBack ? (
-          // -mt-3/mb-7 center the button within the gap between the sticky
-          // city-selector header and the article's category/date row on
-          // mobile (28px above and below, measured against a 94px gap);
-          // md:mt-0/md:mb-0 keeps the existing tablet layout untouched.
           <div className="-mt-3 mb-7 md:mt-0 md:mb-0">
             <MobileSmartBackButton fallbackHref={cityHomeHref} />
           </div>
@@ -315,11 +311,19 @@ export function ArticleMvpView({
                     <figure className="not-prose my-8 md:my-10">
                       {block.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={block.imageUrl} alt={block.alt || title} className="w-full rounded-xl border border-border/60 shadow-sm" />
+                        <img
+                          src={block.imageUrl}
+                          alt={block.imageAlt}
+                          width={block.imageWidth ?? undefined}
+                          height={block.imageHeight ?? undefined}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-auto rounded-xl border border-border/60 shadow-sm"
+                        />
                       ) : (
                         <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center text-sm text-muted-foreground">Изображение не найдено (mediaId)</div>
                       )}
-                      {block.caption ? <figcaption className="mt-3 text-sm text-muted-foreground text-center px-1">{block.caption}</figcaption> : null}
+                      {block.imageCaption ? <figcaption className="mt-3 text-sm text-muted-foreground text-center px-1">{block.imageCaption}</figcaption> : null}
                     </figure>
                   );
                 }
