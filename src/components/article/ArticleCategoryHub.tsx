@@ -49,6 +49,7 @@ function formatDate(value: Date | null): string | null {
 }
 
 export function ArticleCategoryHubView({
+  categorySlug,
   categoryName,
   description,
   articles,
@@ -56,6 +57,7 @@ export function ArticleCategoryHubView({
   totalPages,
   citySlug,
 }: {
+  categorySlug: string;
   categoryName: string;
   description: string;
   articles: ArticleCategoryHubItem[];
@@ -64,11 +66,6 @@ export function ArticleCategoryHubView({
   citySlug?: string | null;
 }) {
   const journalHref = citySlug ? `/${citySlug}/blog` : "/blog";
-  const basePath = articleCategoryHubPath({
-    categorySlug: articles.length >= 0 ? "placeholder" : "placeholder",
-    citySlug,
-  });
-  void basePath;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 md:py-14">
@@ -95,47 +92,45 @@ export function ArticleCategoryHubView({
         </p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
-          {articles.map((article) => (
-            <article key={article.id} className="overflow-hidden rounded-2xl border border-border bg-background">
-              <Link href={article.href} className="group block h-full">
-                {article.coverImageUrl ? (
-                  <img
-                    src={article.coverImageUrl}
-                    alt={article.title}
-                    width={800}
-                    height={500}
-                    loading="lazy"
-                    className="aspect-[8/5] w-full object-cover"
-                  />
-                ) : (
-                  <div className="aspect-[8/5] w-full bg-muted" aria-hidden="true" />
-                )}
-                <div className="p-5">
-                  {formatDate(article.publishedAt) ? (
-                    <time className="text-xs text-muted-foreground">
-                      {formatDate(article.publishedAt)}
-                    </time>
-                  ) : null}
-                  <h2 className="mt-2 text-xl font-semibold leading-tight tracking-tight transition-colors group-hover:text-primary">
-                    {article.title}
-                  </h2>
-                  {(article.subtitle || article.excerpt) ? (
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
-                      {article.subtitle || article.excerpt}
-                    </p>
-                  ) : null}
-                </div>
-              </Link>
-            </article>
-          ))}
+          {articles.map((article) => {
+            const publishedLabel = formatDate(article.publishedAt);
+            return (
+              <article key={article.id} className="overflow-hidden rounded-2xl border border-border bg-background">
+                <Link href={article.href} className="group block h-full">
+                  {article.coverImageUrl ? (
+                    <img
+                      src={article.coverImageUrl}
+                      alt={article.title}
+                      width={800}
+                      height={500}
+                      loading="lazy"
+                      className="aspect-[8/5] w-full object-cover"
+                    />
+                  ) : (
+                    <div className="aspect-[8/5] w-full bg-muted" aria-hidden="true" />
+                  )}
+                  <div className="p-5">
+                    {publishedLabel ? (
+                      <time className="text-xs text-muted-foreground">{publishedLabel}</time>
+                    ) : null}
+                    <h2 className="mt-2 text-xl font-semibold leading-tight tracking-tight transition-colors group-hover:text-primary">
+                      {article.title}
+                    </h2>
+                    {article.subtitle || article.excerpt ? (
+                      <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
+                        {article.subtitle || article.excerpt}
+                      </p>
+                    ) : null}
+                  </div>
+                </Link>
+              </article>
+            );
+          })}
         </div>
       )}
 
       <BlogPagination
-        basePath={articleCategoryHubPath({
-          categorySlug: categoryName,
-          citySlug,
-        })}
+        basePath={articleCategoryHubPath({ categorySlug, citySlug })}
         page={page}
         totalPages={totalPages}
       />
