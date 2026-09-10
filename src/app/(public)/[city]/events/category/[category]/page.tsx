@@ -4,7 +4,7 @@ import { CityShell } from "@/components/city/CityShell";
 import prisma from "@/lib/prisma";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { getBaseUrl } from "@/lib/routing/cityPaths";
-import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
+import { eventCategoryHubPath, eventCategoryHubTitle } from "@/lib/seo/eventCategoryHub";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface PageProps {
@@ -57,12 +57,13 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   if (!hub) return applyGlobalRobotsOverride({ robots: { index: false, follow: true } });
 
   const cityName = getCityDisplayName(citySlug);
+  const hubTitle = eventCategoryHubTitle(hub.category.nameRu, cityName);
   const canonical = `${getBaseUrl("BY")}${eventCategoryHubPath(citySlug, hub.category.slug)}`;
   const hasExtraDiscoveryFilter = Object.keys(query).some((key) => DISCOVERY_FILTER_KEYS.has(key));
 
   const metadata: Metadata = {
-    title: `${hub.category.nameRu} для детей в ${cityName} — mamaGo`,
-    description: `${hub.category.nameRu} для детей в ${cityName}: актуальная афиша, даты, возраст, стоимость и места проведения на mamaGo.`,
+    title: `${hubTitle} — mamaGo`,
+    description: `${hubTitle}: актуальная афиша, даты, возраст, стоимость и места проведения на mamaGo.`,
     alternates: { canonical },
   };
 
@@ -82,11 +83,17 @@ export default async function EventCategoryHubPage({ params, searchParams }: Pag
 
   if (!hub) notFound();
 
+  const hubTitle = eventCategoryHubTitle(
+    hub.category.nameRu,
+    getCityDisplayName(citySlug),
+  );
+
   return (
     <CityShell
       citySlug={citySlug}
       intent="kuda"
       searchParams={{ ...query, category: hub.category.slug }}
+      pageTitleOverride={hubTitle}
     />
   );
 }
