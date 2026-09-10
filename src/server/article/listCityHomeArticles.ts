@@ -38,6 +38,14 @@ export type CityHomeJournalArticle = {
   coverImageUrl: string | null;
 };
 
+export type JournalPage = {
+  articles: CityHomeJournalArticle[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 type CityHomeArticleCity = {
   id: string;
   slug: string;
@@ -83,11 +91,13 @@ function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
 }
 
 /**
- * Uncached DB projection used by the runtime cache wrapper and by the existing
- * DB integration test. Public page callers should use listCityHomeArticles().
+ * Uncached DB projection used by the runtime cache wrapper, paginated journal,
+ * and existing DB integration tests. The default remains the six-item homepage
+ * feed; callers that need a real archive must pass skip/take explicitly.
  */
 export async function queryCityHomeArticles(
   city: CityHomeArticleCity,
+  options: { skip?: number; take?: number } = {},
 ): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
@@ -101,7 +111,8 @@ export async function queryCityHomeArticles(
       ],
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-    take: 6,
+    skip: options.skip ?? 0,
+    take: options.take ?? 6,
     select: {
       id: true,
       slug: true,
@@ -167,7 +178,39 @@ export async function listCityHomeArticles(
   )();
 }
 
-async function queryNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
+export async function listCityBlogArticles(
+  city: CityHomeArticleCity,
+  page: number,
+  pageSize = 24,
+): Promise<JournalPage> {
+  const safePage = Math.max(1, Math.trunc(page));
+  const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
+  const where = {
+    ...getPublicPublishedArticleWhere(),
+    slug: { not: null },
+    publishedAt: { not: null },
+    OR: [
+      ...(buildArticleCityDiscoveryWhere(city).OR ?? []),
+      { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" as const },
+    ],
+  };
+
+  const total = await prisma.article.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const articles =
+    safePage > totalPages
+      ? []
+      : await queryCityHomeArticles(city, {
+          skip: (safePage - 1) * safePageSize,
+          take: safePageSize,
+        });
+
+  return { articles, page: safePage, pageSize: safePageSize, total, totalPages };
+}
+
+async function queryNationalBlogArticles(
+  options: { skip?: number; take?: number } = {},
+): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
@@ -176,7 +219,8 @@ async function queryNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
       publishedAt: { not: null },
     },
     orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-    take: 100,
+    skip: options.skip ?? 0,
+    take: options.take ?? 100,
     select: {
       id: true,
       slug: true,
@@ -233,4 +277,30 @@ export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle
     tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
     revalidate: PUBLIC_ARTICLE_LIST_REVALIDATE_SECONDS,
   })();
+}
+
+export async function listNationalBlogArticlesPage(
+  page: number,
+  pageSize = 24,
+): Promise<JournalPage> {
+  const safePage = Math.max(1, Math.trunc(page));
+  const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
+  const total = await prisma.article.count({
+    where: {
+      ...getPublicPublishedArticleWhere(),
+      geoScope: "COUNTRY",
+      slug: { not: null },
+      publishedAt: { not: null },
+    },
+  });
+  const totalPages = Math.max(1, Math.ceil(total / safePageSize));
+  const articles =
+    safePage > totalPages
+      ? []
+      : await queryNationalBlogArticles({
+          skip: (safePage - 1) * safePageSize,
+          take: safePageSize,
+        });
+
+  return { articles, page: safePage, pageSize: safePageSize, total, totalPages };
 }
