@@ -29,6 +29,11 @@ function normalizeKeywords(value: string[] | null | undefined): string[] | undef
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
+function normalizeBaseUrl(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.replace(/\/$/, "") : undefined;
+}
+
 export function buildArticleJsonLd(input: BuildArticleJsonLdInput): Record<string, unknown> {
   const image = absolutePublicImageUrl(input.image, input.publicBaseUrl);
   const datePublished = normalizeDate(input.datePublished);
@@ -38,6 +43,7 @@ export function buildArticleJsonLd(input: BuildArticleJsonLdInput): Record<strin
   const publisherLogo = absolutePublicImageUrl(input.publisherLogoUrl, input.publicBaseUrl);
   const articleSection = input.articleSection?.trim() || undefined;
   const keywords = normalizeKeywords(input.keywords);
+  const publicBaseUrl = normalizeBaseUrl(input.publicBaseUrl);
 
   return {
     "@context": "https://schema.org",
@@ -62,7 +68,9 @@ export function buildArticleJsonLd(input: BuildArticleJsonLdInput): Record<strin
     publisher: publisherName
       ? {
           "@type": "Organization",
+          "@id": publicBaseUrl ? `${publicBaseUrl}#organization` : undefined,
           name: publisherName,
+          url: publicBaseUrl,
           logo: publisherLogo
             ? {
                 "@type": "ImageObject",
