@@ -85,6 +85,8 @@ interface CityDiscoveryShellProps {
   activeClassChipSlug?: string;
   /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
   budgetConfig?: BudgetConfig;
+  /** SEO-specific visible heading for dedicated discovery hubs. */
+  pageTitleOverride?: string;
 }
 
 export function CityDiscoveryShell({
@@ -95,12 +97,13 @@ export function CityDiscoveryShell({
   classChips,
   activeClassChipSlug,
   budgetConfig,
+  pageTitleOverride,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle =
-    formatCityTitle(intentConfig.titleTemplate, city) +
+    (pageTitleOverride ?? formatCityTitle(intentConfig.titleTemplate, city)) +
     whenPresetPageTitleSuffix(applied);
 
   useEffect(() => {
