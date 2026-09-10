@@ -6,6 +6,7 @@ import {
   getPublicPublishedPlaceWhere,
   getPublicPublishedOfferWhere,
   getPublicActivityDetailWhere,
+  getPublicListingActivityWhere,
   getPublicPublishedArticleWhere,
   getPublicRouteIndexWhere,
 } from "@/server/public/publicContentVisibility";
@@ -17,6 +18,7 @@ import { resolveArticleCanonicalUrl } from "@/lib/seo/resolveArticleCanonicalUrl
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
 
 export const dynamic = "force-dynamic";
 
@@ -68,19 +70,90 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 
   try {
-    const cities = await prisma.city.findMany({
-      where: { isActive: true, isLegacyNonCity: false },
-      select: { slug: true, updatedAt: true },
-      orderBy: { name: "asc" },
-      take: 50,
-    });
+    const [cities, tags, categories, taggedArticles, categoryEvents] = await Promise.all([
+      prisma.city.findMany({
+        where: { isActive: true, isLegacyNonCity: false },
+        select: { id: true, slug: true, regionId: true, updatedAt: true },
+        orderBy: { name: "asc" },
+        take: 50,
+      }),
+      prisma.discoveryTag.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true, updatedAt: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+      prisma.eventCategory.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true, updatedAt: true },
+        orderBy: { nameRu: "asc" },
+      }),
+      prisma.article.findMany({
+        where: {
+          ...getPublicPublishedArticleWhere(),
+          noindex: false,
+          tags: { some: { isActive: true } },
+        },
+        select: {
+          geoScope: true,
+          cityId: true,
+          regionId: true,
+          seoRobots: true,
+          tags: {
+            where: { isActive: true },
+            select: { id: true },
+          },
+          additionalGeographyTargets: {
+            select: { type: true, cityId: true, regionId: true },
+          },
+        },
+      }),
+      prisma.activity.findMany({
+        where: {
+          type: ActivityType.EVENT,
+          eventCategoryId: { not: null },
+          ...getPublicListingActivityWhere(),
+        },
+        select: {
+          eventCategoryId: true,
+          cityId: true,
+          place: { select: { cityId: true } },
+          venue: { select: { cityId: true } },
+        },
+      }),
+    ]);
 
-    // Fetch active discovery tags once (reuse for all cities)
-    const tags = await prisma.discoveryTag.findMany({
-      where: { isActive: true },
-      select: { slug: true, updatedAt: true },
-      orderBy: { sortOrder: "asc" },
-    });
+    const populatedTagHubs = new Set<string>();
+    for (const article of taggedArticles) {
+      if (hasNoindexRobots(article.seoRobots)) continue;
+      for (const city of cities) {
+        const matchesCity =
+          article.geoScope === "COUNTRY" ||
+          (article.geoScope === "CITY" && article.cityId === city.id) ||
+          (article.geoScope === "REGION" && Boolean(city.regionId) && article.regionId === city.regionId) ||
+          article.additionalGeographyTargets.some(
+            (target) =>
+              (target.type === "CITY" && target.cityId === city.id) ||
+              (target.type === "REGION" && Boolean(city.regionId) && target.regionId === city.regionId),
+          );
+        if (!matchesCity) continue;
+        for (const tag of article.tags) {
+          populatedTagHubs.add(`${city.id}:${tag.id}`);
+        }
+      }
+    }
+
+    const populatedCategoryHubs = new Set<string>();
+    for (const event of categoryEvents) {
+      if (!event.eventCategoryId) continue;
+      const eventCityIds = new Set(
+        [event.cityId, event.place?.cityId, event.venue?.cityId].filter(
+          (value): value is string => Boolean(value),
+        ),
+      );
+      for (const cityId of eventCityIds) {
+        populatedCategoryHubs.add(`${cityId}:${event.eventCategoryId}`);
+      }
+    }
 
     for (const city of cities) {
       // City hub and events pages
@@ -127,8 +200,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       });
 
-      // Discovery tag pages per city
+      // Clean event-category SEO hubs are indexable only when they actually
+      // contain a current public event for the city. This prevents thin/empty
+      // hubs while making real search-intent landing pages discoverable.
+      for (const category of categories) {
+        if (!populatedCategoryHubs.has(`${city.id}:${category.id}`)) continue;
+        entries.push({
+          url: `${baseUrl}${eventCategoryHubPath(city.slug, category.slug)}`,
+          lastModified: category.updatedAt,
+          changeFrequency: "daily",
+          priority: 0.75,
+        });
+      }
+
+      // Discovery tag pages per city: only expose populated combinations.
+      // Country-scope and matching region/additional-target articles count as
+      // content because the public tag page intentionally includes them.
       for (const tag of tags) {
+        if (!populatedTagHubs.has(`${city.id}:${tag.id}`)) continue;
         entries.push({
           url: `${baseUrl}${buildCityPublicPath({ citySlug: city.slug, type: "tag", slug: tag.slug })}`,
           lastModified: tag.updatedAt,
@@ -138,7 +227,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }
     }
   } catch (error) {
-    console.warn("[sitemap] city/tag query failed, returning base URL only:", error);
+    console.warn("[sitemap] city/tag/category query failed, returning base URL only:", error);
   }
 
   try {
