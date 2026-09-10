@@ -153,6 +153,7 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
     description: input.description?.trim() || undefined,
     image: image ? [image] : undefined,
     startDate,
+    eventStatus: "https://schema.org/EventScheduled",
     location:
       locationName || locationAddress
         ? {
@@ -161,7 +162,7 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
             address: locationAddress
               ? {
                   "@type": "PostalAddress",
-                  name: locationAddress,
+                  streetAddress: locationAddress,
                 }
               : undefined,
           }
