@@ -996,9 +996,17 @@ model ActivitySession {
   activityId      String
   startsAt        DateTime
   createdAt       DateTime         @default(now())
+  source          String?
+  externalId      String?
+  buyUrl          String?
+  priceMinCents   Int?
+  priceMaxCents   Int?
+  isSaleOpen      Boolean?
+  withdrawnAt     DateTime?
   activity        Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
   bookingRequests BookingRequest[]
 
+  @@unique([source, externalId])
   @@index([activityId])
   @@index([startsAt])
 }
@@ -1208,6 +1216,8 @@ model Place {
   directionsNote               String?
   formattedAddr                String?
   googlePlaceId                String?
+  source                       String?
+  externalId                   String?
   instagramHandle              String?
   instagramUrl                 String?
   reelsUrl                     String?
@@ -1312,6 +1322,7 @@ model Place {
 
   @@unique([cityId, slug])
   @@unique([createdByUserId, createRequestId])
+  @@unique([source, externalId])
   @@index([createdByUserId])
   @@index([ownerBusinessId])
   @@index([status])
