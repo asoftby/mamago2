@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Bell, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,13 @@ import { toast } from "@/lib/toast";
 import type { NotificationApiRow } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
 import { trackNotificationEvent } from "@/lib/notifications/notificationAnalytics";
-import { handleNotificationClick } from "@/features/notifications/notification-click";
+import {
+  handleNotificationClick,
+  type ResolvedNotificationAction,
+} from "@/features/notifications/notification-click";
 import { useNotificationStore } from "@/features/notifications/store";
 import { NotificationListItem } from "./NotificationListItem";
+import { NotificationDetailDialog } from "./NotificationDetailDialog";
 import { useOnboardingNotificationCta } from "@/features/notifications/hooks/useOnboardingNotificationCta";
 import { canArchiveNotificationRow } from "@/lib/notifications/notificationLifecycle";
 
@@ -39,6 +43,7 @@ export function NotificationFeed({
   const showTelegramPrompt = useNotificationStore((s) => s.showTelegramPrompt);
   const fetchMoreNotifications = useNotificationStore((s) => s.fetchMoreNotifications);
   const clearError = useNotificationStore((s) => s.clearError);
+  const [detailAction, setDetailAction] = useState<ResolvedNotificationAction | null>(null);
 
   const telegramBannerViewedRef = useRef(false);
 
@@ -102,6 +107,7 @@ export function NotificationFeed({
           onAfterRead: (notificationId) => {
             void markAsReadLocally(notificationId);
           },
+          onModal: setDetailAction,
           onClose,
         });
       } catch (clickError) {
@@ -232,29 +238,29 @@ export function NotificationFeed({
                 ctaLoading={ctaProps.loading}
                 ctaDisabled={ctaProps.disabled}
                 trailingAction={
-                activeTab === "archived" ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => void handleRestore(notification.id)}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                ) : notification.readAt && canArchiveNotificationRow(notification) ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => void handleArchive(notification.id)}
-                  >
-                    <Archive className="h-4 w-4" />
-                  </Button>
-                ) : null
-              }
-            />
+                  activeTab === "archived" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => void handleRestore(notification.id)}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  ) : notification.readAt && canArchiveNotificationRow(notification) ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => void handleArchive(notification.id)}
+                    >
+                      <Archive className="h-4 w-4" />
+                    </Button>
+                  ) : null
+                }
+              />
             );
           })}
         </div>
@@ -273,6 +279,14 @@ export function NotificationFeed({
         ) : null}
       </div>
 
+      <NotificationDetailDialog
+        open={detailAction != null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setDetailAction(null);
+        }}
+        title={detailAction?.modalTitle ?? null}
+        body={detailAction?.modalBody ?? null}
+      />
     </>
   );
 }
