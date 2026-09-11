@@ -1,0 +1,63 @@
+url,class,basis
+https://mamago.by/,evergreen,homepage
+https://mamago.by/ivan-kupala-2025-ili-gde-otmetit-kupale-v-minske/,event,holiday article: year + Kupala in slug
+https://mamago.by/lyubimye-plyazhi-i-otkrytye-basseyny-v-minske-i-nepodalyoku/,evergreen,article without date/year/holiday binding
+https://mamago.by/routes/5-mini-puteshestvij-na-1-den-nedaleko-ot-minska/,evergreen,Route entity namespace
+https://mamago.by/top-18-kafe-i-restoranov-s-detskoj-ploshhadkoj-ili-komnatoj/,evergreen,article without date/year/holiday binding
+https://mamago.by/places/muzej-aviacionnoj-tehniki/,evergreen,Place entity namespace
+https://mamago.by/ivan-kupala-2026-ili-gde-otmetit-kupale-v-minske-i-za-gorodom/,event,holiday article: year + Kupala in slug
+https://mamago.by/events/,event,Event namespace/listing
+https://mamago.by/events/festival-lidbeer-2025-lidbir/,event,Event namespace
+https://mamago.by/maslenicza-2026-v-minske-kuda-pojti-s-detmi-i-gde-otmetit-prazdnik/,event,holiday article: year + Maslenitsa in slug
+https://mamago.by/events/bolshaya-kosmicheskaya-vystavka-kosmopark/,event,Event namespace
+https://mamago.by/novogodnie-fotozony-minska-40-fotozon-i-40-idey-pochemu-stoit-tuda-shodit/,event,holiday article: New Year in slug
+https://mamago.by/gde-otmetit-den-rozhdeniya-rebenka-10-krutyh-mest-v-gorode/,evergreen,evergreen birthday guide
+https://mamago.by/events/serija-koncertov-klassika-u-ratushi/,event,Event namespace
+https://mamago.by/kuda-shodit-s-rebenkom-v-minske-v-den-zashhity-detej-1-iyunya/,event,holiday article: Children's Day + exact date
+https://mamago.by/events/den-goroda-minska-2025/,event,Event namespace
+https://mamago.by/novyj-god-2026-ili-kuda-shodit-na-novogodnih-kanikulah-v-minske/,event,holiday article: year + New Year in slug
+https://mamago.by/events/teatralnaya-gostinaya-v-rakovskom-dvorike-sezon-2025/,event,Event namespace
+https://mamago.by/park-ugo-chavesa-samyy-bolshoy-skeyt-park-zamok-i-attrakciony/,evergreen,article without date/year/holiday binding
+https://mamago.by/lyubimye-mesta-v-grodno-i-v-okrestnostyah-na-mashine-ili-avtodome/,evergreen,article without date/year/holiday binding
+https://mamago.by/events/obshhegorodskie-meropriyatiya-k-novomu-2025-godu-v-minske/,event,Event namespace
+https://mamago.by/events/3-iyulya-den-nezavisimosti/,event,Event namespace
+https://mamago.by/kuda-shodit-14-go-fevralya-raznym-tipam-parochek/,event,holiday article: Valentine's Day exact date
+https://mamago.by/master-klassy-dlya-detej/,evergreen,evergreen hub
+https://mamago.by/events/9-maya-v-minske/,event,Event namespace
+https://mamago.by/mashiny-pomoshhniki-v-minske-otkrylsya-detskij-gorod-professij/,evergreen,article without date/year/holiday binding
+https://mamago.by/detskie-spektakli/,evergreen,evergreen hub
+https://mamago.by/leto-2026-zagorodnyy-i-gorodskoy-otdyh-dlya-detey/,event,article contains year in slug per v3.3 rule
+https://mamago.by/events/holydays/maslenicza-v-lejksajd-parke/,event,Event namespace
+https://mamago.by/events/festival-viva-braslav-2025/,event,Event namespace
+https://mamago.by/events/teatralnyj-dvorik-afisha-na-ijun/,event,Event namespace
+https://mamago.by/bassejny-minsk-i-ne-tolko-ili-akvazony-na-vse-sluchai-zhizni/,evergreen,article without date/year/holiday binding
+https://mamago.by/events/9-maya-na-memorialnom-komplekse-kurgan-slavy/,event,Event namespace
+https://mamago.by/kuda-shodit-s-rebenkom-v-vyhodnye/,evergreen,recurring evergreen hub
+https://mamago.by/events/vishnevyj-festival-v-glubokom/,event,Event namespace
+https://mamago.by/events/dzhazovyj-festival-let-s-jaz/,event,Event namespace
+https://mamago.by/10-parkov-dlya-aktivnogo-otdyha-i-razvlecheniy-v-minske/,evergreen,article without date/year/holiday binding
+https://mamago.by/events/prazdnik-den-stroitelja-v-mikashevichah/,event,Event namespace
+https://mamago.by/gde-otmetit-den-rozhdeniya-rebenka-7/,evergreen,evergreen birthday guide
+https://mamago.by/events/joga-v-stile-fysm-na-stadione-dinamo/,event,Event namespace
+https://mamago.by/events/vystavka-paukov-i-reptilij-instinkt-hishhnika/,event,Event namespace
+https://mamago.by/events/teatralnaja-gostinaja-v-rakovskom-dvorike/,event,Event namespace
+https://mamago.by/events/den-rozhdeniya-gippo-v-loshiczkom-parke-20-let/,event,Event namespace
+https://mamago.by/events/noch-pozhiratelej-reklamy-2025/,event,Event namespace
+https://mamago.by/events/bolshaya-bard-rybalka-2025/,event,Event namespace
+https://mamago.by/events/holydays/maslenicza-v-logojske/,event,Event namespace
+https://mamago.by/events/holydays/maslenicza-v-zaslavle/,event,Event namespace
+https://mamago.by/events/holydays/maslenicza-v-smolevichah/,event,Event namespace
+https://mamago.by/events/maslenicza-v-komarovo/,event,Event namespace
+https://mamago.by/events/den-otkrytyh-dverej-na-belaze/,event,Event namespace
+https://mamago.by/events/czikl-konczertov-v-aleksandrovskom-skvere/,event,Event namespace
+https://mamago.by/top-idey-chto-podarit-mame-na-den-materi-interesnye-i-originalnye-podarki-pro-emocii/,event,holiday article: Mother's Day in slug
+https://mamago.by/events/kreva-fest-festival/,event,Event namespace
+https://mamago.by/events/holydays/kupalskaya-noch-na-belom-ozere/,event,Event namespace
+https://mamago.by/events/holydays/kupale-v-stankovo/,event,Event namespace
+https://mamago.by/events/festival-vodnyh-fonarikov-v-vitebske/,event,Event namespace
+https://mamago.by/events/festival-uha-fest/,event,Event namespace
+https://mamago.by/events/festival-pets-fest/,event,Event namespace
+https://mamago.by/kak-otprazdnovat-hellouin-2025/,event,holiday article: year + Halloween in slug
+https://mamago.by/vesennie-kanikuly-2025-chem-zanyatsya-i-kuda-otpravit-detej/,event,article contains year in slug per v3.3 rule
+https://mamago.by/zimnie-kanikuly-kuda-pristroit-detey/,event,calendar-bound school holidays article
+https://mamago.by/breakingnews/,unclear,legacy breaking-news namespace is not enough to prove evergreen or calendar-event semantics
