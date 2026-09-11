@@ -68,7 +68,7 @@ export function buildArticleJsonLd(input: BuildArticleJsonLdInput): Record<strin
     publisher: publisherName
       ? {
           "@type": "Organization",
-          "@id": publicBaseUrl ? `${publicBaseUrl}#organization` : undefined,
+          "@id": publicBaseUrl ? `${publicBaseUrl}/#organization` : undefined,
           name: publisherName,
           url: publicBaseUrl,
           logo: publisherLogo
