@@ -22,6 +22,14 @@ interface Props {
   broadcast?: AdminBroadcast;
 }
 
+type BroadcastEmailDeliverySummary = {
+  requested: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+  error?: string;
+};
+
 const TYPE_OPTIONS = [
   { value: "NEWS", label: "Новость" },
   { value: "ANNOUNCEMENT", label: "Объявление" },
@@ -72,6 +80,7 @@ export function BroadcastForm({ mode, broadcast }: Props) {
 
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [retryingEmail, setRetryingEmail] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [unscheduling, setUnscheduling] = useState(false);
@@ -138,7 +147,7 @@ export function BroadcastForm({ mode, broadcast }: Props) {
     return true;
   };
 
-  const persistDraft = async (): Promise<string | null> => {
+  const persistDraft = async (notifySuccess = true): Promise<string | null> => {
     if (!validateCoreFields()) return null;
 
     const payload = buildPayload();
@@ -186,12 +195,14 @@ export function BroadcastForm({ mode, broadcast }: Props) {
       return null;
     }
 
-    if (isPublished) {
-      toast.success(
-        `Исправление сохранено${typeof data.notificationsUpdated === "number" ? `. Обновлено уведомлений: ${data.notificationsUpdated}` : ""}`,
-      );
-    } else {
-      toast.success(isScheduled ? "Изменения сохранены" : "Черновик сохранён");
+    if (notifySuccess) {
+      if (isPublished) {
+        toast.success(
+          `Исправление сохранено${typeof data.notificationsUpdated === "number" ? `. Обновлено уведомлений: ${data.notificationsUpdated}` : ""}`,
+        );
+      } else {
+        toast.success(isScheduled ? "Изменения сохранены" : "Черновик сохранён");
+      }
     }
 
     return broadcast!.id;
@@ -218,16 +229,33 @@ export function BroadcastForm({ mode, broadcast }: Props) {
     if (!validateCoreFields()) return;
     setPublishing(true);
     try {
-      const id = mode === "create" ? await persistDraft() : broadcast?.id ?? null;
+      const id = await persistDraft(false);
       if (!id) return;
 
       const res = await fetch(`/api/admin/broadcasts/${id}/publish`, { method: "POST" });
-      const data = await res.json() as { error?: string; notificationsCreated?: number };
+      const data = await res.json() as {
+        error?: string;
+        notificationsCreated?: number;
+        emailDelivery?: BroadcastEmailDeliverySummary;
+      };
       if (!res.ok) {
         toast.error(data.error ?? "Ошибка публикации");
         return;
       }
-      toast.success(`Опубликовано. Уведомлений создано: ${data.notificationsCreated ?? 0}`);
+
+      const emailDelivery = data.emailDelivery;
+      const emailResult =
+        form.sendEmail && emailDelivery
+          ? ` · Email: ${emailDelivery.sent} отправлено, ${emailDelivery.skipped} пропущено, ${emailDelivery.failed} ошибок`
+          : "";
+      toast.success(
+        `Опубликовано. In-app уведомлений: ${data.notificationsCreated ?? 0}${emailResult}`,
+      );
+
+      if (form.sendEmail && emailDelivery?.error) {
+        toast.error(`Email-рассылка завершилась с ошибкой: ${emailDelivery.error}`);
+      }
+
       if (mode === "create") {
         router.push(`/admin/broadcasts/${id}/edit`);
       } else {
@@ -235,6 +263,40 @@ export function BroadcastForm({ mode, broadcast }: Props) {
       }
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const handleRetryEmail = async () => {
+    if (!broadcast?.id || !broadcast.sendEmail) return;
+    setRetryingEmail(true);
+    try {
+      const res = await fetch(`/api/admin/broadcasts/${broadcast.id}/publish`, {
+        method: "POST",
+      });
+      const data = await res.json() as {
+        error?: string;
+        emailDelivery?: BroadcastEmailDeliverySummary;
+      };
+      if (!res.ok) {
+        toast.error(data.error ?? "Не удалось повторить email-доставку");
+        return;
+      }
+
+      const result = data.emailDelivery;
+      if (!result) {
+        toast.error("Сервис не вернул статистику email-доставки");
+        return;
+      }
+
+      toast.success(
+        `Email: ${result.sent} отправлено, ${result.skipped} пропущено, ${result.failed} ошибок`,
+      );
+      if (result.error) {
+        toast.error(`Email-рассылка завершилась с ошибкой: ${result.error}`);
+      }
+      router.refresh();
+    } finally {
+      setRetryingEmail(false);
     }
   };
 
@@ -247,7 +309,7 @@ export function BroadcastForm({ mode, broadcast }: Props) {
 
     setScheduling(true);
     try {
-      const id = mode === "create" ? await persistDraft() : broadcast?.id ?? null;
+      const id = await persistDraft(false);
       if (!id) return;
 
       const res = await fetch(`/api/admin/broadcasts/${id}/schedule`, {
@@ -493,14 +555,18 @@ export function BroadcastForm({ mode, broadcast }: Props) {
               type="checkbox"
               checked={form.sendEmail}
               onChange={(e) => set("sendEmail", e.target.checked)}
-              disabled
-              className="h-4 w-4 rounded border-gray-300 opacity-50"
+              disabled={isFieldDisabled("sendEmail")}
+              className="h-4 w-4 rounded border-gray-300"
             />
-            <span className="text-sm text-gray-500">
-              Отправить email{" "}
-              <span className="text-xs text-gray-400">(будет подключено позже)</span>
-            </span>
+            <span className="text-sm text-gray-700">Отправить email</span>
           </label>
+          {form.sendEmail && !isPublished ? (
+            <p className="pl-7 text-xs text-gray-500">
+              Новости и объявления отправляются только получателям, которые не
+              отключили маркетинговые письма. Системные сообщения отправляются
+              независимо от этой настройки.
+            </p>
+          ) : null}
           <label className="flex cursor-pointer items-center gap-3">
             <input
               type="checkbox"
@@ -574,6 +640,16 @@ export function BroadcastForm({ mode, broadcast }: Props) {
                   {saving ? "Сохранение…" : "Сохранить исправление"}
                 </button>
               )}
+              {broadcast?.sendEmail ? (
+                <button
+                  type="button"
+                  onClick={() => void handleRetryEmail()}
+                  disabled={retryingEmail}
+                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {retryingEmail ? "Повтор доставки…" : "Повторить email-доставку"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleCreateCorrection()}
@@ -658,7 +734,7 @@ export function BroadcastForm({ mode, broadcast }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Исправить опубликованное сообщение?</AlertDialogTitle>
             <AlertDialogDescription>
-              Сообщение уже опубликовано и могло быть прочитано пользователями.
+              Сообщение уже опубликовано и могло быть прочитано получателями.
               Исправление обновит текст в ленте уведомлений и в блоке
               «Что нового». Для существенных изменений лучше создать новое
               сообщение-исправление.

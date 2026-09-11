@@ -64,12 +64,12 @@ type PublishAdminBroadcastOptions = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Маппинг BroadcastType → unified NotificationType */
+/** Маппинг BroadcastType → unified NotificationType для конкретного surface получателя. */
 function broadcastTypeToNotificationType(
   type: BroadcastType,
-  audienceType: AudienceType,
+  audience: NotificationAudience,
 ): NotificationType {
-  if (audienceType === "BUSINESS") {
+  if (audience === NotificationAudience.BUSINESS) {
     return "BUSINESS_NEWS";
   }
 
@@ -252,7 +252,7 @@ async function fanOutBroadcastNotifications(
     data: missingRecipients.map((recipient) => ({
       userId: recipient.userId,
       audience: recipient.audience,
-      type: broadcastTypeToNotificationType(broadcast.type, broadcast.audienceType),
+      type: broadcastTypeToNotificationType(broadcast.type, recipient.audience),
       title: broadcast.title,
       body: buildBroadcastNotificationBody(broadcast),
       ctaLabel: broadcast.ctaLabel ?? null,

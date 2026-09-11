@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { publishDueAdminBroadcasts } from "@/server/services/admin/broadcast.service";
+import { publishDueAdminBroadcastsWithDelivery } from "@/server/services/admin/broadcastDelivery.service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await publishDueAdminBroadcasts();
+    const result = await publishDueAdminBroadcastsWithDelivery();
 
     return NextResponse.json(result);
   } catch (error) {

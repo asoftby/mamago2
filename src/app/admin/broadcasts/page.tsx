@@ -14,7 +14,7 @@ export default async function AdminBroadcastsPage() {
     <div className="p-6 md:p-4 space-y-6">
       <AdminPageHeader
         title="Сообщения"
-        subtitle="Новости, объявления и системные уведомления для пользователей"
+        subtitle="Новости, объявления и системные уведомления для пользователей и бизнес-партнёров"
         showBackButton={false}
         actions={
           <Link
