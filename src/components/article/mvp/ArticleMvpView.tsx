@@ -138,6 +138,7 @@ export function ArticleMvpView({
   editHref,
   draftWatermark,
   categoryLabel,
+  categoryHref,
   citySlug,
   readingScrollPaddingExtraRem,
   continuousVariant = "standalone",
@@ -156,6 +157,7 @@ export function ArticleMvpView({
   editHref?: string;
   draftWatermark?: boolean;
   categoryLabel?: string | null;
+  categoryHref?: string | null;
   citySlug?: string | null;
   readingScrollPaddingExtraRem?: number;
   continuousVariant?: "standalone" | "first" | "continuation";
@@ -210,7 +212,7 @@ export function ArticleMvpView({
           journalLabel="Обзоры и статьи"
           journalHref={journalHref}
           category={categoryLabel?.trim() || undefined}
-          categoryHref={categoryLabel?.trim() ? journalHref : undefined}
+          categoryHref={categoryLabel?.trim() ? categoryHref?.trim() || journalHref : undefined}
           readTime={5}
           publishedAt={publishedAt ?? undefined}
           editHref={editHref}
