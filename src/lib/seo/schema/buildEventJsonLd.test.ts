@@ -44,6 +44,11 @@ assert.equal(
   "2026-08-31T09:00:00.000Z",
   "authoritative schema start date must win over UI session filtering",
 );
+assert.equal(
+  explicitStartDate.eventStatus,
+  "https://schema.org/EventScheduled",
+  "published events must explicitly describe their scheduled status",
+);
 
 const structuredLocation = buildEventJsonLd({
   canonicalUrl,
@@ -63,7 +68,7 @@ assert.deepEqual(
     name: "Парк истории Сула",
     address: {
       "@type": "PostalAddress",
-      name: "Сула, 14, Сула, Минская область 222664",
+      streetAddress: "Сула, 14, Сула, Минская область 222664",
     },
   },
   "physical Event addresses must be emitted as PostalAddress without guessing address components",
