@@ -11,9 +11,16 @@ import {
 } from "date-fns";
 
 import { SEO_BASELINE } from "../../config/seo-baseline";
+import { classifyUrl } from "./urlClass";
 
 const ISO_WEEK_FORMAT = "RRRR-'W'II";
 const ISO_WEEK_REFERENCE = new Date(2000, 0, 3, 12, 0, 0);
+
+export interface WeeklySeoPageRow {
+  isoWeek: string;
+  url: string;
+  clicks: number | null | undefined;
+}
 
 export interface PairedRecoveryWeek {
   isoWeek: string;
@@ -24,6 +31,15 @@ export interface PairedRecoveryWeek {
 export interface OperationalRecoveryWindow {
   weeks: PairedRecoveryWeek[];
   mode: "rolling" | "single_week_high_noise" | "unavailable";
+}
+
+export interface GateStatus {
+  actual: number;
+  baseline: number;
+  share: number;
+  /** Required recovery share for this ISO week on the linear W36 -> W44 path. */
+  target: number;
+  onTrack: boolean;
 }
 
 function parseIsoWeekStart(isoWeek: string): Date | null {
@@ -37,7 +53,7 @@ function formatIsoWeek(date: Date): string {
   return format(startOfISOWeek(date), ISO_WEEK_FORMAT);
 }
 
-function isFiniteNonNegative(value: number | undefined): value is number {
+function isFiniteNonNegative(value: number | undefined | null): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
@@ -73,6 +89,30 @@ export function getBaselineForWeek(isoWeek: string): number | null {
 
 export function getRecoveryShare(actualClicks: number, isoWeek: string): number | null {
   return recoveryShareFromValues(actualClicks, getBaselineForWeek(isoWeek));
+}
+
+/**
+ * Sum evergreen clicks for one ISO week from page-level weekly rows.
+ * Event and unclear rows are excluded. No rows for the requested week means
+ * unavailable (null), not a synthetic zero. A real week containing rows but
+ * no evergreen clicks may legitimately return 0.
+ */
+export function getEvergreenClicks(
+  weeklyRows: readonly WeeklySeoPageRow[],
+  isoWeek: string,
+): number | null {
+  let sawWeek = false;
+  let total = 0;
+
+  for (const row of weeklyRows) {
+    if (row.isoWeek !== isoWeek) continue;
+    sawWeek = true;
+    if (classifyUrl(row.url).class !== "evergreen") continue;
+    if (!isFiniteNonNegative(row.clicks)) return null;
+    total += row.clicks;
+  }
+
+  return sawWeek ? total : null;
 }
 
 function getTargetClicks(): number | null {
@@ -146,8 +186,8 @@ export function getPairedRecoveryWindow(
 }
 
 /**
- * v3.1 operational rule: when fewer than three post-migration paired weeks
- * exist, use only the latest one and mark the result as high-noise.
+ * Operational rule: when fewer than three post-migration paired weeks exist,
+ * use only the latest one and mark the result as high-noise.
  */
 export function getOperationalRecoveryWindow(
   actualClicksByIsoWeek: Readonly<Record<string, number>>,
@@ -174,6 +214,50 @@ export function getRequiredShareGainForWindow(
   const currentShare = recoveryShareFromValues(actualAverage, baselineAverage);
   if (currentShare === null) return null;
   return compoundWeeklyRate(currentShare, SEO_BASELINE.targetShare, transitions);
+}
+
+function getConfiguredActualEvergreen(isoWeek: string): number | null {
+  const value = SEO_BASELINE.actualEvergreenByIsoWeek[
+    isoWeek as keyof typeof SEO_BASELINE.actualEvergreenByIsoWeek
+  ];
+  return isFiniteNonNegative(value) ? value : null;
+}
+
+function getLinearGateTargetShare(isoWeek: string): number | null {
+  const startWeek = parseIsoWeekStart(SEO_BASELINE.measurementStartIsoWeek);
+  const targetWeek = parseIsoWeekStart(SEO_BASELINE.targetIsoWeek);
+  const currentWeek = parseIsoWeekStart(isoWeek);
+  if (!startWeek || !targetWeek || !currentWeek) return null;
+
+  const totalTransitions = differenceInCalendarISOWeeks(targetWeek, startWeek);
+  const elapsedTransitions = differenceInCalendarISOWeeks(currentWeek, startWeek);
+  if (totalTransitions <= 0 || elapsedTransitions < 0) return null;
+
+  const startActual = getConfiguredActualEvergreen(SEO_BASELINE.measurementStartIsoWeek);
+  const startBaseline = getBaselineForWeek(SEO_BASELINE.measurementStartIsoWeek);
+  if (startActual === null || startBaseline === null) return null;
+  const startShare = recoveryShareFromValues(startActual, startBaseline);
+  if (startShare === null) return null;
+
+  const progress = Math.min(1, elapsedTransitions / totalTransitions);
+  return startShare + (SEO_BASELINE.targetShare - startShare) * progress;
+}
+
+/**
+ * Return a configured completed-week gate fact. `target` is the required
+ * recovery share on the straight-line trajectory from the first measurement
+ * week to 80% in 2026-W44. Weeks without either a configured actual or a
+ * baseline are unavailable rather than treated as zero.
+ */
+export function getGateStatus(isoWeek: string): GateStatus | null {
+  const actual = getConfiguredActualEvergreen(isoWeek);
+  const baseline = getBaselineForWeek(isoWeek);
+  const target = getLinearGateTargetShare(isoWeek);
+  if (actual === null || baseline === null || target === null) return null;
+
+  const share = recoveryShareFromValues(actual, baseline);
+  if (share === null) return null;
+  return { actual, baseline, share, target, onTrack: share >= target };
 }
 
 /** Exposed for deterministic ISO-boundary tests without week-number arithmetic. */
