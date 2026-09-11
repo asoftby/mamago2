@@ -162,7 +162,7 @@ export default async function BusinessDashboardPage({
       leads: href("/promotion"),
       publications: href("/events"),
       promotion: href("/promotion"),
-      bookings: href("/bookings"),
+      bookings: href("/notifications"),
       newPublication: href("/events"),
       settings: href("/settings"),
     },
