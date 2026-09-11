@@ -144,35 +144,71 @@ const sessionPriceRub = session.minPrice / 100;          // гипотеза: к
 
 ## 3. Контракт адаптера
 
-Реализует существующий интерфейс `ImportParser` (по аудиту — тот же, что и
-family.by). Новый файл, ничего в family.by не трогаем.
+Реализует существующий интерфейс `EventImportParser` (наследует `ImportParser`
+из `src/server/modules/import/parsers/base.parser.ts`). Контракт минимален —
+**только** `parserKey` и `parse(source)`:
 
 ```ts
-class AbwsAdapter implements ImportParser {
-  source = "abws";
-
-  async fetchRaw(): Promise<AbwsRawItem[]> {
-    // один HTTP-вызов, без lastSync, с логированием кода/тела/времени
-  }
-
-  dedupeKey(item: AbwsRawItem): string {
-    return item.performance.id.toString(); // externalId мероприятия
-  }
-
-  isSingleVenue(item: AbwsRawItem): boolean {
-    const venueIds = new Set(item.sessions.map(s => s.object?.id).filter(Boolean));
-    return venueIds.size <= 1;
-  }
-
-  async normalize(item: AbwsRawItem): Promise<NormalizedEvent> {
-    // маппинг полей (раздел 5) + вызов LLM-классификатора (раздел 6)
-  }
-
-  reconcile(item: AbwsRawItem): ReconcileAction {
-    // раздел 4
-  }
+export interface ImportParser {
+  readonly parserKey: string;
+  parse(source: ImportSource): Promise<ParserResult>;
 }
 ```
+
+`ParserResult` — плоский список `ParsedRawRecord` (`externalId`, `sourceUrl`,
+`rawPayload`, `sourceUpdatedAt`, …). Конвейер (`import-pipeline.service.ts`)
+вызывает у парсера только `parse()` — нормализация (`normalizeRunRecords`) и
+матчинг (`matchRunRecords`) идут отдельными проходами по уже сохранённым
+`ImportedRecord`, а не через методы адаптера. Класс с публичными методами
+`fetchRaw/normalize/reconcile` (как в предыдущей редакции этого раздела) не
+типизируется как `ImportParser` и, даже если бы типизировался, эти методы
+пайплайн никогда не вызвал бы — по аналогии с `family-by-afisha-event.parser.ts`,
+где вся полевая маппинг-логика идёт через `rawPayload`, а не через методы
+класса-парсера.
+
+Правильная форма — один файл `abws-performances-event.parser.ts`:
+
+```ts
+export const abwsPerformancesEventParser: EventImportParser = {
+  parserKey: "abws-performances-event",
+  entityType: "EVENT",
+
+  async parse(source) {
+    // один HTTP-вызов (раздел 1), без lastSync, с логированием кода/тела
+    const items = await fetchAbwsPerformances(source);
+
+    return {
+      parserKey: "abws-performances-event",
+      totalFound: items.length,
+      records: items.map((item) => ({
+        externalId: item.performance.id.toString(),
+        sourceUrl: item.performance.urlSaleframe,
+        rawPayload: {
+          performance: item.performance,
+          sessions: item.sessions,
+          isSingleVenue: isSingleVenue(item.sessions), // раздел 0
+        },
+      })),
+    };
+  },
+};
+
+function isSingleVenue(sessions: AbwsSession[]): boolean {
+  const venueIds = new Set(sessions.map(s => s.object?.id).filter(Boolean));
+  return venueIds.size <= 1;
+}
+```
+
+**Открытый вопрос реализации (уточнить перед кодированием, не перед стартом
+Фазы 1):** маппинг полей (раздел 5), LLM-нормализация (раздел 6), матчинг
+`Place` (раздел 2.3) и реконсиляция по `deletedAt`/`isSaleOpen` (раздел 4)
+у family.by устроены как «сырой `rawPayload` → отдельный apply-слой», но этот
+apply-слой сегодня рассчитан на модель мест/событий без вложенных сеансов
+(`ActivitySession` с ценой/`buyUrl`/`withdrawnAt` на уровне сеанса — новое
+для ABWS, раздел 2.2). Нужно на старте реализации проверить, достаточно ли
+существующих `normalizeRunRecords`/`matchRunRecords` для записи сеансов, или
+для EVENT-парсеров с сеансами нужен отдельный шаг конвейера — это инженерное
+решение при реализации, не блокирует написание миграций/адаптера.
 
 ## 4. Реконсиляция — состояния
 
@@ -191,9 +227,15 @@ class AbwsAdapter implements ImportParser {
 подтверждённый рабочий случай, а не гипотетический — обработка обязательна
 с первого дня, а не «добавим потом».
 
-Правило: мероприятие целиком снимается с публикации, если у него
-`deletedAt != null` ИЛИ ни один сеанс не в будущем И `isSaleOpen == false`
-у всех. Отдельно снятые сеансы просто перестают отображаться в списке дат.
+Правило: мероприятие целиком снимается с публикации **только** если у него
+`deletedAt != null`. «Ни одного сеанса в будущем» само по себе не повод для
+снятия — это обычное прошедшее мероприятие, для него действует правило
+раздела 9 (остаётся доступно с пометкой «прошло»). Более ранняя редакция
+этого правила добавляла второе условие («ни один сеанс не в будущем И
+`isSaleOpen == false` у всех»), которое на практике покрывает тот же самый
+случай прошедшего мероприятия и противоречило бы разделу 9 — убрано.
+Отдельно снятые сеансы (`session.deletedAt != null`) просто перестают
+отображаться в списке дат, статус мероприятия не трогают.
 
 ## 5. Маппинг полей (актуализирован по реальной фикстуре)
 
@@ -281,9 +323,14 @@ const CATEGORY_TYPE_IDS = new Set([1, 2, 3, 15, 16, 17, 22, 29, 41]);
 - Ссылка — `session.urlSaleframe` (`?sid=`), не `performance.urlSaleframe`.
   Для одноплощадочных мероприятий с несколькими сеансами показывать список
   дат, каждая — своя ссылка на свой `sid`.
-- Клик идёт не напрямую на `saleframe.24afisha.by`, а на внутренний роут
-  (паттерн `/n/[id]` уже есть в проекте по аудиту). Роут пишет `UserEvent`
-  с типом `CTA_CLICK` (поле уже существует), затем редиректит или открывает
+- Клик идёт не напрямую на `saleframe.24afisha.by`, а на внутренний роут.
+  **Не** `/n/[id]` — этот путь занят: `src/app/n/[id]/route.ts` уже
+  реализует резолвер клика по уведомлению (`id` — это `Notification.id`,
+  анонимных редиректит на логин, неизвестный `id` — на `/`), переиспользовать
+  его для ABWS-ссылок нельзя, ни `CTA_CLICK` не запишется, ни на sale frame
+  не попадёт. Нужен отдельный namespace, например `/go/abws/[sessionId]`
+  (`sessionId` = `ActivitySession.externalId`). Роут пишет `UserEvent` с
+  типом `CTA_CLICK` (поле уже существует), затем редиректит или открывает
   модалку с фреймом.
 - Модалка с fallback на «открыть в новом окне» — обязательно проверить на
   iOS Safari до релиза, платёжные формы в iframe там часто ломаются.
