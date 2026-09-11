@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { Role } from "@prisma/client";
-import { publishAdminBroadcast } from "@/server/services/admin/broadcast.service";
+import { publishAdminBroadcastWithDelivery } from "@/server/services/admin/broadcastDelivery.service";
 
 function isAdmin(role: string) {
   return role === Role.ADMIN || role === Role.MODERATOR;
@@ -19,10 +19,11 @@ export async function POST(
   const { id } = await params;
 
   try {
-    const result = await publishAdminBroadcast(id);
+    const result = await publishAdminBroadcastWithDelivery(id);
     return NextResponse.json({
       broadcast: result.broadcast,
       notificationsCreated: result.notificationsCreated,
+      emailDelivery: result.emailDelivery,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
