@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/formatters/format-price";
 import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpTrigger";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import type { DashboardData } from "./DashboardClient";
+import { BusinessInboxPreview } from "./BusinessInboxPreview";
 import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 
 // ── Value cards ───────────────────────────────────────────────────────────────
@@ -31,12 +32,19 @@ const VALUE_CARDS = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface NewBusinessDashboardProps {
-  data: Pick<DashboardData, "depositBalance" | "lowBalanceThreshold" | "hrefs">;
+  data: Pick<
+    DashboardData,
+    "depositBalance" | "lowBalanceThreshold" | "hrefs" | "inboxPreview"
+  >;
 }
 
 export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
   return (
     <div className="w-full space-y-5">
+      <BusinessInboxPreview
+        items={data.inboxPreview}
+        notificationsHref={data.hrefs.bookings}
+      />
 
       {/* Hero */}
       <BusinessSurfaceCard className="px-8 py-10 text-center">
@@ -79,27 +87,26 @@ export function NewBusinessDashboard({ data }: NewBusinessDashboardProps) {
 
       {/* Balance — secondary, neutral tone */}
       {BUSINESS_DASHBOARD_MVP.businessBalanceUiEnabled && (
-      <BusinessSurfaceCard className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Баланс</p>
-          <p className="mt-1.5 text-3xl font-semibold tracking-tight text-stone-950">
-            {formatPrice(data.depositBalance)}
-          </p>
-          <p className="mt-1 text-sm text-stone-400">
-            Пополните баланс, когда будете готовы запускать продвижение
-          </p>
-        </div>
-        <DepositTopUpTrigger
-          balance={data.depositBalance}
-          lowBalanceThreshold={data.lowBalanceThreshold}
-          promotionHref={data.hrefs.promotion}
-          variant="primary"
-          label="Пополнить баланс"
-          className="w-full sm:w-auto sm:shrink-0"
-        />
-      </BusinessSurfaceCard>
+        <BusinessSurfaceCard className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Баланс</p>
+            <p className="mt-1.5 text-3xl font-semibold tracking-tight text-stone-950">
+              {formatPrice(data.depositBalance)}
+            </p>
+            <p className="mt-1 text-sm text-stone-400">
+              Пополните баланс, когда будете готовы запускать продвижение
+            </p>
+          </div>
+          <DepositTopUpTrigger
+            balance={data.depositBalance}
+            lowBalanceThreshold={data.lowBalanceThreshold}
+            promotionHref={data.hrefs.promotion}
+            variant="primary"
+            label="Пополнить баланс"
+            className="w-full sm:w-auto sm:shrink-0"
+          />
+        </BusinessSurfaceCard>
       )}
-
     </div>
   );
 }
