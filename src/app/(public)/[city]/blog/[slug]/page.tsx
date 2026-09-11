@@ -16,6 +16,7 @@ import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/article/articleMvpRenderData";
 import { resolveCityArticlePublicRoute } from "@/lib/article/resolveCityArticlePublicRoute";
+import { resolveCityBlogCategory } from "@/server/article/cityBlogCategories";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
@@ -46,7 +47,7 @@ export const dynamic = "force-dynamic";
 async function resolveCity(citySlug: string) {
   return findCityBySlug(citySlug.toLowerCase(), {
     isActive: true,
-    select: { id: true, slug: true, name: true },
+    select: { id: true, slug: true, name: true, regionId: true },
   });
 }
 
@@ -225,8 +226,11 @@ export default async function CityArticlePage({ params }: PageProps) {
 
   const continuous = await loadArticleContinuousContext(mvp.id);
   const journalHref = `/${city.slug}/blog`;
-  const categoryHref = articleRow.category?.slug
-    ? `/${city.slug}/blog/category/${articleRow.category.slug}`
+  const resolvedCategory = articleRow.category?.slug
+    ? await resolveCityBlogCategory(city, articleRow.category.slug)
+    : null;
+  const categoryHref = resolvedCategory
+    ? `/${city.slug}/blog/category/${resolvedCategory.slug}`
     : undefined;
   const articleView = (
     <ArticleMvpView
