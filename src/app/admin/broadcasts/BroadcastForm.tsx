@@ -22,6 +22,14 @@ interface Props {
   broadcast?: AdminBroadcast;
 }
 
+type BroadcastEmailDeliverySummary = {
+  requested: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+  error?: string;
+};
+
 const TYPE_OPTIONS = [
   { value: "NEWS", label: "Новость" },
   { value: "ANNOUNCEMENT", label: "Объявление" },
@@ -222,12 +230,29 @@ export function BroadcastForm({ mode, broadcast }: Props) {
       if (!id) return;
 
       const res = await fetch(`/api/admin/broadcasts/${id}/publish`, { method: "POST" });
-      const data = await res.json() as { error?: string; notificationsCreated?: number };
+      const data = await res.json() as {
+        error?: string;
+        notificationsCreated?: number;
+        emailDelivery?: BroadcastEmailDeliverySummary;
+      };
       if (!res.ok) {
         toast.error(data.error ?? "Ошибка публикации");
         return;
       }
-      toast.success(`Опубликовано. Уведомлений создано: ${data.notificationsCreated ?? 0}`);
+
+      const emailDelivery = data.emailDelivery;
+      const emailResult =
+        form.sendEmail && emailDelivery
+          ? ` · Email: ${emailDelivery.sent} отправлено, ${emailDelivery.skipped} пропущено, ${emailDelivery.failed} ошибок`
+          : "";
+      toast.success(
+        `Опубликовано. In-app уведомлений: ${data.notificationsCreated ?? 0}${emailResult}`,
+      );
+
+      if (form.sendEmail && emailDelivery?.error) {
+        toast.error(`Email-рассылка завершилась с ошибкой: ${emailDelivery.error}`);
+      }
+
       if (mode === "create") {
         router.push(`/admin/broadcasts/${id}/edit`);
       } else {
@@ -493,14 +518,18 @@ export function BroadcastForm({ mode, broadcast }: Props) {
               type="checkbox"
               checked={form.sendEmail}
               onChange={(e) => set("sendEmail", e.target.checked)}
-              disabled
-              className="h-4 w-4 rounded border-gray-300 opacity-50"
+              disabled={isFieldDisabled("sendEmail")}
+              className="h-4 w-4 rounded border-gray-300"
             />
-            <span className="text-sm text-gray-500">
-              Отправить email{" "}
-              <span className="text-xs text-gray-400">(будет подключено позже)</span>
-            </span>
+            <span className="text-sm text-gray-700">Отправить email</span>
           </label>
+          {form.sendEmail && !isPublished ? (
+            <p className="pl-7 text-xs text-gray-500">
+              Новости и объявления отправляются только получателям, которые не
+              отключили маркетинговые письма. Системные сообщения отправляются
+              независимо от этой настройки.
+            </p>
+          ) : null}
           <label className="flex cursor-pointer items-center gap-3">
             <input
               type="checkbox"
@@ -658,7 +687,7 @@ export function BroadcastForm({ mode, broadcast }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Исправить опубликованное сообщение?</AlertDialogTitle>
             <AlertDialogDescription>
-              Сообщение уже опубликовано и могло быть прочитано пользователями.
+              Сообщение уже опубликовано и могло быть прочитано получателями.
               Исправление обновит текст в ленте уведомлений и в блоке
               «Что нового». Для существенных изменений лучше создать новое
               сообщение-исправление.
