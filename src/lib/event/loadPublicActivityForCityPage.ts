@@ -34,6 +34,8 @@ export async function loadPublicActivityForCityPage(
       seoJsonLdOverride: unknown | null;
       faqItems: unknown | null;
       priceItems: unknown | null;
+      priceMode: import("@prisma/client").PublicationPriceMode;
+      priceTo: number | null;
       ownerUserId: string;
       schemaStartDate: Date | null;
       _redirectToSlug?: string;
@@ -176,6 +178,8 @@ export async function loadPublicActivityForCityPage(
     agePolicy: activity.agePolicy,
     priceText: activity.priceText,
     priceFrom: activity.priceFrom,
+    priceTo: activity.priceTo,
+    priceMode: activity.priceMode,
     currency: activity.currency,
     priceDetails: activity.priceDetails,
     priceItems: (activity.priceItems as unknown) ?? null,
