@@ -4166,3 +4166,44 @@ P3 — cleanup / polish / optional
 - Source: `fix/perf-pagespeed-p0-20260830` PERFORMANCE VALIDATION step —
   5x mobile Lighthouse against a local production build, both
   `--throttling-method=simulate` and `--throttling-method=devtools`.
+
+## [BACKLOG-147] ABWS/24afisha — open questions to the source developer
+
+- Status: OPEN
+- Priority: P1
+- Area: Import / Integrations
+- Added: 2026-09-11
+- Reason deferred: none of these block starting ABWS Phase 1 implementation
+  (`docs/imports/abws-phase1-spec.md`), but they must be resolved — the
+  first item especially — before session-level pricing goes live in front
+  of users, since it directly determines whether the displayed price is
+  correct.
+- Context: during Phase 1 spec drafting, four facts about the ABWS
+  (`webgate.24guru.by` / `24afisha.by`) API could not be confirmed from the
+  fixture alone (818 events / 8167 sessions, captured 2026-09-11) and need
+  a direct answer from the ABWS developer:
+  1. Units of `session.minPrice`/`maxPrice` — kopecks or rubles? Inferred
+     as kopecks from the value range only, not confirmed in writing.
+     Critical: a wrong guess shows an incorrect price on the site. If no
+     answer arrives before session pricing ships, verify manually on
+     10–15 live cards instead of shipping the guess unchecked.
+  2. Does `lastSync` work on `v3`/`webgate.24guru.by` for the
+     `performances` endpoint, and if so, how is it passed to get an
+     incremental response instead of the full catalog on every sync?
+  3. Purpose of `session.type: "related"` vs `"default"` — not mapped in
+     Phase 1, meaning unknown.
+  4. Full `types[]` reference with ids — the fixture only surfaced 23 of an
+     unknown total; Phase 1 uses a hardcoded category whitelist
+     (`docs/imports/abws-phase1-spec.md` §5.1) and logs unrecognized ids
+     rather than guessing at the full set.
+- Current state: not yet sent to the developer; can go out in a single
+  email whenever convenient, not urgent.
+- Dependencies: none block Phase 1 start. Item 1 blocks *trusting* live
+  session pricing — verify manually before or in parallel with a real
+  answer.
+- Acceptance criteria: all four answered by the ABWS developer (or manual
+  verification substituted for item 1), spec updated with confirmed
+  values, this entry marked DONE with the reference (email/ticket) that
+  resolved it.
+- Source: `docs/imports/abws-phase1-spec.md` §10 (open questions), carried
+  over from spec review.
