@@ -146,6 +146,11 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
               address: locationAddress,
             }
           : undefined,
+      pricing: {
+        mode: fromDb.priceMode,
+        priceFrom: fromDb.priceFrom,
+        currency: fromDb.currency,
+      },
       publicBaseUrl: publicBase,
     });
     const overrideJsonLd =
