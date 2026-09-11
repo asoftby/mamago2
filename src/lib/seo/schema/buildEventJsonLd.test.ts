@@ -74,6 +74,71 @@ assert.deepEqual(
   "physical Event addresses must be emitted as PostalAddress without guessing address components",
 );
 
+const freeEvent = buildEventJsonLd({
+  canonicalUrl,
+  title: "Free event",
+  startDate: "2026-09-01T12:00:00+03:00",
+  pricing: { mode: "FREE", priceFrom: null, currency: "BYN" },
+});
+assert.ok(freeEvent);
+assert.deepEqual(
+  freeEvent.offers,
+  { "@type": "Offer", price: 0, priceCurrency: "BYN" },
+  "FREE events must expose zero-price admission",
+);
+
+for (const [mode, price] of [
+  ["EXACT", 25],
+  ["FROM", 12.5],
+  ["RANGE", 10],
+] as const) {
+  const pricedEvent = buildEventJsonLd({
+    canonicalUrl,
+    title: `${mode} event`,
+    startDate: "2026-09-01T12:00:00+03:00",
+    pricing: { mode, priceFrom: price, currency: "byn" },
+  });
+  assert.ok(pricedEvent);
+  assert.deepEqual(
+    pricedEvent.offers,
+    { "@type": "Offer", price, priceCurrency: "BYN" },
+    `${mode} events must expose their lowest authoritative price`,
+  );
+}
+
+for (const mode of ["NONE", "UNKNOWN"] as const) {
+  const unknownEvent = buildEventJsonLd({
+    canonicalUrl,
+    title: `${mode} event`,
+    startDate: "2026-09-01T12:00:00+03:00",
+    pricing: { mode, priceFrom: 20, currency: "BYN" },
+  });
+  assert.ok(unknownEvent);
+  assert.equal(
+    unknownEvent.offers,
+    undefined,
+    `${mode} pricing must not create Event offers`,
+  );
+}
+
+const invalidPrice = buildEventJsonLd({
+  canonicalUrl,
+  title: "Invalid price event",
+  startDate: "2026-09-01T12:00:00+03:00",
+  pricing: { mode: "EXACT", priceFrom: -5, currency: "BYN" },
+});
+assert.ok(invalidPrice);
+assert.equal(invalidPrice.offers, undefined, "invalid numeric prices must not enter JSON-LD");
+
+const invalidCurrency = buildEventJsonLd({
+  canonicalUrl,
+  title: "Invalid currency event",
+  startDate: "2026-09-01T12:00:00+03:00",
+  pricing: { mode: "EXACT", priceFrom: 10, currency: "Br" },
+});
+assert.ok(invalidCurrency);
+assert.equal(invalidCurrency.offers, undefined, "non-ISO currency labels must not enter JSON-LD");
+
 assert.equal(
   buildEventJsonLd({
     canonicalUrl,

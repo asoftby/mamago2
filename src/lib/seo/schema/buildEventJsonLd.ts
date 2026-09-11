@@ -1,6 +1,7 @@
 import { absolutePublicImageUrl } from "@/lib/seo/schema/url";
 
 export type EventAttendanceFormat = "ONLINE" | "OFFLINE" | "HYBRID" | string | null | undefined;
+export type EventPriceMode = "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" | string | null | undefined;
 
 export type BuildEventJsonLdInput = {
   canonicalUrl: string;
@@ -15,6 +16,11 @@ export type BuildEventJsonLdInput = {
   location?: {
     name?: string | null;
     address?: string | null;
+  } | null;
+  pricing?: {
+    mode?: EventPriceMode;
+    priceFrom?: number | null;
+    currency?: string | null;
   } | null;
   publicBaseUrl?: string;
 };
@@ -136,6 +142,33 @@ function mapAttendanceMode(format: EventAttendanceFormat): string | undefined {
   }
 }
 
+function buildEventOffer(pricing: BuildEventJsonLdInput["pricing"]): Record<string, unknown> | undefined {
+  if (!pricing) return undefined;
+  const mode = typeof pricing.mode === "string" ? pricing.mode.toUpperCase() : "";
+  if (mode === "NONE" || mode === "UNKNOWN" || !mode) return undefined;
+
+  const currency = pricing.currency?.trim().toUpperCase();
+  if (!currency || !/^[A-Z]{3}$/.test(currency)) return undefined;
+
+  let price: number | null = null;
+  if (mode === "FREE") {
+    price = 0;
+  } else if (mode === "EXACT" || mode === "FROM" || mode === "RANGE") {
+    const candidate = pricing.priceFrom;
+    if (typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 0) {
+      price = candidate;
+    }
+  }
+
+  if (price == null) return undefined;
+
+  return {
+    "@type": "Offer",
+    price,
+    priceCurrency: currency,
+  };
+}
+
 export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, unknown> | null {
   const startDate = resolveEventStartDate(input);
   if (!startDate) return null;
@@ -143,6 +176,7 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
   const image = absolutePublicImageUrl(input.image, input.publicBaseUrl);
   const locationName = input.location?.name?.trim() || undefined;
   const locationAddress = input.location?.address?.trim() || undefined;
+  const offers = buildEventOffer(input.pricing);
 
   return {
     "@context": "https://schema.org",
@@ -168,5 +202,6 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
           }
         : undefined,
     eventAttendanceMode: mapAttendanceMode(input.format),
+    offers,
   };
 }
