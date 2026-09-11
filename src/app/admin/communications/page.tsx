@@ -1,5 +1,12 @@
 import Link from "next/link";
-import { Mail, Send, Sparkles, Bell, ArrowRight } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  Mail,
+  MessageSquareText,
+  Send,
+  Sparkles,
+} from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +24,7 @@ export default async function AdminCommunicationsOverviewPage() {
     <div className="space-y-6 p-6 md:p-4">
       <AdminPageHeader
         title="Коммуникации"
-        subtitle="Единый домен для email-канала, будущих уведомлений и delivery-инструментов."
+        subtitle="Сообщения, уведомления и каналы доставки для пользователей и бизнес-партнёров."
         showBackButton={false}
       />
 
@@ -79,11 +86,31 @@ export default async function AdminCommunicationsOverviewPage() {
           <Card className="rounded-3xl border-stone-200/90">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquareText className="h-4 w-4 text-stone-500" />
+                Сообщения
+              </CardTitle>
+              <CardDescription>
+                Новости, объявления и системные сообщения для пользователей и бизнес-партнёров.
+              </CardDescription>
+              <div className="pt-2">
+                <Button asChild variant="outline" className="rounded-2xl">
+                  <Link href={adminPath("/broadcasts")}>
+                    Открыть сообщения
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+
+          <Card className="rounded-3xl border-stone-200/90">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Bell className="h-4 w-4 text-stone-500" />
                 Notifications
               </CardTitle>
               <CardDescription>
-                Следующий этап: сценарии уведомлений и правила доставки поверх email-канала.
+                Сценарии уведомлений и правила доставки поверх доступных каналов.
               </CardDescription>
               <div className="pt-2">
                 <Button asChild variant="outline" className="rounded-2xl">
@@ -103,7 +130,7 @@ export default async function AdminCommunicationsOverviewPage() {
                 Telegram
               </CardTitle>
               <CardDescription>
-                Будущий канал для важных событий и быстрых напоминаний.
+                Канал для важных событий и быстрых напоминаний.
               </CardDescription>
               <div className="pt-2">
                 <Button asChild variant="outline" className="rounded-2xl">
@@ -123,7 +150,7 @@ export default async function AdminCommunicationsOverviewPage() {
                 Deliveries
               </CardTitle>
               <CardDescription>
-                Логи отправок, статусы и диагностика delivery-пайплайна уже доступны для MVP уведомлений.
+                Логи отправок, статусы и диагностика delivery-пайплайна.
               </CardDescription>
               <div className="pt-2">
                 <Button asChild variant="outline" className="rounded-2xl">
