@@ -145,6 +145,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       seoCanonicalUrl: true,
       seoJsonLdOverride: true,
       seoTitle: true,
+      category: { select: { slug: true } },
     },
   });
   if (!articleRow?.slug) notFound();
@@ -224,6 +225,9 @@ export default async function CityArticlePage({ params }: PageProps) {
 
   const continuous = await loadArticleContinuousContext(mvp.id);
   const journalHref = `/${city.slug}/blog`;
+  const categoryHref = articleRow.category?.slug
+    ? `/${city.slug}/blog/category/${articleRow.category.slug}`
+    : undefined;
   const articleView = (
     <ArticleMvpView
       title={mvp.title}
@@ -233,6 +237,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       blocks={mvp.blocks}
       tags={mvp.tags}
       categoryLabel={mvp.categoryLabel}
+      categoryHref={categoryHref}
       editHref={editHref}
       citySlug={city.slug}
       continuousVariant={continuous?.enabled ? "first" : "standalone"}
