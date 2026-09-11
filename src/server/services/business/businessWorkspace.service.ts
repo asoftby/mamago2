@@ -284,14 +284,12 @@ export async function getBusinessWorkspaceData(params: {
     (tx) => tx.type === BillingTransactionType.LEAD_CHARGE,
   ).length;
 
-  // Inbox preview: latest 3 broadcast-style notifications for this user.
-  // Avoid filtering by entityType here because some local databases still
-  // store Notification.entityType without the generated Postgres enum type.
+  // Inbox preview: latest 3 admin broadcasts for this business user.
   const inboxPreview = await prisma.notification.findMany({
     where: {
       userId: params.userId,
       audience: NotificationAudience.BUSINESS,
-      type: { in: ["NEWS", "ANNOUNCEMENT"] },
+      type: "BUSINESS_NEWS",
     },
     orderBy: { createdAt: "desc" },
     take: 3,
