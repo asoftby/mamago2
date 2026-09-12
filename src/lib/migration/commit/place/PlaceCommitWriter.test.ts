@@ -64,8 +64,6 @@ function placeFixture(overrides: Partial<Place> = {}): Place {
     directionsNote: null,
     formattedAddr: null,
     googlePlaceId: null,
-    source: null,
-    externalId: null,
     instagramHandle: null,
     instagramUrl: null,
     reelsUrl: null,
