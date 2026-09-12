@@ -77,6 +77,7 @@ const yearBoundaryWindow = getPairedRecoveryWindow(
     "2027-W01": 130,
   },
   "2027-W01",
+  "2027-01-10",
   4,
 );
 assert.deepEqual(
@@ -92,6 +93,7 @@ const migrationBoundaryWindow = getPairedRecoveryWindow(
     "2026-W36": 529,
   },
   "2026-W36",
+  "2026-09-06",
   4,
 );
 assert.deepEqual(
@@ -99,9 +101,22 @@ assert.deepEqual(
   ["2026-W36"],
 );
 
+// A source snapshot ending on Monday W37 cannot make that partial week a fact.
+const partialThroughWeek = getPairedRecoveryWindow(
+  {
+    "2026-W36": 529,
+    "2026-W37": 79,
+  },
+  "2026-W37",
+  "2026-09-07",
+  4,
+);
+assert.deepEqual(partialThroughWeek.map((week) => week.isoWeek), ["2026-W36"]);
+
 const operationalWindow = getOperationalRecoveryWindow(
   { "2026-W35": 1107, "2026-W36": 529 },
   "2026-W36",
+  "2026-09-06",
   4,
 );
 assert.equal(operationalWindow.mode, "single_week_high_noise");
