@@ -1457,42 +1457,73 @@ P3 — cleanup / polish / optional
   refactor.
 - Source: Task 6 (Article Actions) product decision, 2026-08-11.
 
-## [BACKLOG-054] Local dev DB has `SearchDocument.cityId`/`SearchQueryLog` migrations applied that aren't in `dev` branch's `prisma/schema.prisma`
+## [BACKLOG-054] `SearchDocument.cityId`/`SearchQueryLog` click fields: migrations exist but `schema.prisma` still doesn't declare them
 
 - Status: OPEN
 - Priority: P2
 - Area: Infra / Prisma migrations
 - Added: 2026-08-11
+- Updated: 2026-09-12 — migration-file half of the original finding is
+  resolved; the `schema.prisma` half is not. See "2026-09-12 update" below.
 - Reason deferred: discovered incidentally while applying Task 6's own
   migration (`prisma migrate status` before `migrate deploy`); confirmed no
   file/table overlap with Task 6's change (`ArticleIdea`/`PlanItem.articleId`
   vs. `SearchDocument`/`SearchQueryLog`), so not a blocker for Task 6. Fixing
   a foreign branch-merge gap is out of Task 6's scope per repo rules
-  (foreign work-in-progress must not be silently fixed or absorbed).
-- Context: `npx prisma migrate status` showed the local dev Postgres
-  (`mamago2` @ `localhost:5433`) has two migrations applied —
-  `20260806120000_add_search_document_city_id` and
-  `20260806123000_add_search_query_log_click_fields` — that do **not** exist
-  under `prisma/migrations/` on the `dev` branch. `git log --all` traced
-  them to commit `98390674` ("chore(recovery): snapshot main working tree"),
-  which only exists on branch `recovery/main-wip-snapshot-2026-08-07` — i.e.
-  another session applied these migrations directly to the shared local dev
-  DB from a WIP/recovery branch that was never merged into `dev`. Current
-  `dev` `schema.prisma` is missing `SearchDocument.cityId` and
-  `SearchQueryLog.searchId`/`clickedPosition`/`clickedAt` even though the DB
-  already has the columns.
-- Current state: not started. Not yet confirmed whether this recovery
-  branch's search work is still wanted, superseded, or abandoned.
-- Dependencies: needs an explicit decision from the repo owner on the
-  `recovery/main-wip-snapshot-2026-08-07` branch's search-related changes
-  (merge the missing migration files + schema changes into `dev`, or discard
-  and let a future task redo the DB columns cleanly).
-- Acceptance criteria: `prisma migrate status` on `dev` shows a clean match
-  between local `prisma/migrations/` and the DB's `_prisma_migrations` table
-  (no DB-side migrations missing from disk), `schema.prisma` reflects the
-  real DB schema for `SearchDocument`/`SearchQueryLog`.
+  (foreign work-in-progress must not be silently fixed or absorbed). Same
+  reasoning applied on 2026-09-12 re-discovery (PR #269, ABWS migration —
+  no file/table overlap with `ActivitySession`/`Place`).
+- Context (original, 2026-08-11): `npx prisma migrate status` showed the
+  local dev Postgres (`mamago2` @ `localhost:5433`) has two migrations
+  applied — `20260806120000_add_search_document_city_id` and
+  `20260806123000_add_search_query_log_click_fields` — that did **not**
+  exist under `prisma/migrations/` on the `dev` branch at that time. `git
+  log --all` traced them to commit `98390674` ("chore(recovery): snapshot
+  main working tree"), which only existed on branch
+  `recovery/main-wip-snapshot-2026-08-07` — i.e. another session had
+  applied these migrations directly to the shared local dev DB from a
+  WIP/recovery branch never merged into `dev`.
+- **2026-09-12 update:** the migration files are now present on `dev`
+  (commit `96514f2c`, "chore(prisma): restore applied search migrations",
+  2026-08-24, confirmed an ancestor of current `dev` HEAD) — so the
+  "missing from disk" half of this finding is resolved. **`schema.prisma`
+  was never updated to match, though.** Re-confirmed today by replaying
+  every migration under `prisma/migrations/` into a throwaway shadow DB
+  (`prisma migrate diff --from-migrations --to-schema-datamodel` while
+  preparing PR #269): the replayed DB has `SearchDocument.cityId` (+ index
+  + FK to `City`) and `SearchQueryLog.searchId` (unique), `clickedPosition`,
+  `clickedAt` — current `schema.prisma`'s `SearchDocument` model (line
+  ~2881) and `SearchQueryLog` model (line ~5267) declare none of these
+  four fields. No later migration removes them either. Net effect
+  unchanged from the original finding: a fresh DB built from migration
+  history has columns `schema.prisma` doesn't know about — only *why*
+  they're still missing from `schema.prisma` has changed (restored
+  migration files were never followed up with a schema edit, rather than
+  the files themselves being unmerged).
+  Not the already-known partial-unique-index drift from
+  `20260608114243_city_scoped_slugs` (documented in this repo's
+  CLAUDE.md) — a separate, narrower mismatch confirmed by diffing two
+  concrete migrations against two concrete model definitions, not a
+  `prisma migrate dev` false-positive.
+- Current state: not started. Migration files are on disk and (per the
+  original finding) already applied to at least the local dev DB; whether
+  DEV/PROD have them applied is unconfirmed. Still not decided whether
+  the underlying search work (`recovery/main-wip-snapshot-2026-08-07`) is
+  wanted, superseded, or abandoned.
+- Dependencies: needs an explicit decision from the repo owner on that
+  recovery branch's search-related work: restore the four fields to
+  `schema.prisma` to match already-applied migrations, or write a new
+  migration to drop the columns/index/FK from every environment that has
+  them and treat the columns as abandoned.
+- Acceptance criteria: `schema.prisma` and `prisma/migrations/` agree on
+  `SearchDocument`/`SearchQueryLog`'s shape (either fields restored to
+  `schema.prisma`, or a drop migration written and applied everywhere);
+  `prisma migrate status` clean on local/DEV/PROD for these two tables.
 - Source: Task 6 (Article Actions) implementation, 2026-08-11 (`npx prisma
-  migrate status` output during migration apply).
+  migrate status` output during migration apply); re-confirmed and
+  migration-location context corrected during PR #269
+  (`feat/abws-session-place-source-fields-20260912`) migration-diff
+  sanity check, 2026-09-12.
 
 ## [BACKLOG-055] Day Scenario: guest (unauthenticated) persistence not implemented
 
@@ -4207,62 +4238,3 @@ P3 — cleanup / polish / optional
   resolved it.
 - Source: `docs/imports/abws-phase1-spec.md` §10 (open questions), carried
   over from spec review.
-
-## [BACKLOG-148] SearchDocument/SearchQueryLog: schema.prisma diverged from migration history
-
-- Status: OPEN
-- Priority: P2
-- Area: Database / Search
-- Added: 2026-09-12
-- Reason deferred: found incidentally while generating an unrelated
-  migration (PR #269, ABWS `ActivitySession`/`Place` fields) and running
-  `prisma migrate diff --from-migrations --to-schema-datamodel` against a
-  throwaway shadow DB to sanity-check the diff. Fixing it is a schema
-  refactor unrelated to that task's scope, so per the "no unrelated
-  changes in a task branch" rule it's recorded here instead of folded into
-  PR #269.
-- Context: replaying every migration under `prisma/migrations/` into a
-  clean shadow DB produces a `SearchDocument`/`SearchQueryLog` shape that
-  no longer matches current `schema.prisma`:
-  - `prisma/migrations/20260806120000_add_search_document_city_id/migration.sql`
-    adds `SearchDocument.cityId` (+ index + FK to `City`). Current
-    `schema.prisma`'s `SearchDocument` model (line ~2881) has no `cityId`
-    field at all.
-  - `prisma/migrations/20260806123000_add_search_query_log_click_fields/migration.sql`
-    adds `SearchQueryLog.searchId` (unique), `clickedPosition`, `clickedAt`.
-    Current `schema.prisma`'s `SearchQueryLog` model (line ~5267) has none
-    of these three fields.
-  - No later migration removes any of these columns. So a fresh DB built
-    from migration history alone would have four columns (+ 2 indexes +
-    1 FK) that `schema.prisma` doesn't declare — i.e. the migration
-    history is ahead of the schema in a way nothing ever reconciled.
-  - Not the already-known partial-unique-index drift from
-    `20260608114243_city_scoped_slugs` (documented in this repo's
-    CLAUDE.md) — this is a separate, narrower mismatch confirmed by
-    diffing two concrete migrations against two concrete model
-    definitions, not a `prisma migrate dev` false-positive.
-  - A first look at the same shadow-DB diff also appeared to show
-    `RecommendationExposure`/`RecommendationOutcome`/`RecommendationRun`/
-    `RecommendationSurfacePolicy` tables and two enums being dropped —
-    that was a false positive caused by passing only `schema.prisma` (not
-    the full multi-file `prisma/` directory `prisma.config.ts` actually
-    uses) as `--to-schema-datamodel`; those models live in
-    `prisma/recommendations.prisma` and are not actually missing.
-    Re-diffing with the whole `prisma/` directory as the target should
-    make that go away — not re-reported here as an issue.
-- Current state: not investigated further — unknown whether the real
-  local/DEV/PROD databases still physically have these four columns
-  (nobody ever wrote a migration to drop them) or whether they were
-  dropped by hand outside the migration flow (which `docs/database-migrations.md`
-  explicitly forbids and has its own repair path for).
-- Dependencies: none blocking; needs someone to decide product intent
-  first (were `SearchDocument.cityId` / the three `SearchQueryLog` click
-  fields deliberately abandoned, or should they still exist and
-  `schema.prisma` is what's wrong).
-- Acceptance criteria: root cause established (deliberate removal vs.
-  accidental schema edit); if abandoned, a proper migration added to drop
-  the columns/index/constraint from real databases and this entry closed
-  DONE; if not abandoned, the fields restored to `schema.prisma` (and to
-  any environment where they were manually dropped) instead.
-- Source: PR #269 (`feat/abws-session-place-source-fields-20260912`)
-  migration-diff sanity check, 2026-09-12.
