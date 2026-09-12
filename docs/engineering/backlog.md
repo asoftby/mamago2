@@ -4207,3 +4207,62 @@ P3 — cleanup / polish / optional
   resolved it.
 - Source: `docs/imports/abws-phase1-spec.md` §10 (open questions), carried
   over from spec review.
+
+## [BACKLOG-148] SearchDocument/SearchQueryLog: schema.prisma diverged from migration history
+
+- Status: OPEN
+- Priority: P2
+- Area: Database / Search
+- Added: 2026-09-12
+- Reason deferred: found incidentally while generating an unrelated
+  migration (PR #269, ABWS `ActivitySession`/`Place` fields) and running
+  `prisma migrate diff --from-migrations --to-schema-datamodel` against a
+  throwaway shadow DB to sanity-check the diff. Fixing it is a schema
+  refactor unrelated to that task's scope, so per the "no unrelated
+  changes in a task branch" rule it's recorded here instead of folded into
+  PR #269.
+- Context: replaying every migration under `prisma/migrations/` into a
+  clean shadow DB produces a `SearchDocument`/`SearchQueryLog` shape that
+  no longer matches current `schema.prisma`:
+  - `prisma/migrations/20260806120000_add_search_document_city_id/migration.sql`
+    adds `SearchDocument.cityId` (+ index + FK to `City`). Current
+    `schema.prisma`'s `SearchDocument` model (line ~2881) has no `cityId`
+    field at all.
+  - `prisma/migrations/20260806123000_add_search_query_log_click_fields/migration.sql`
+    adds `SearchQueryLog.searchId` (unique), `clickedPosition`, `clickedAt`.
+    Current `schema.prisma`'s `SearchQueryLog` model (line ~5267) has none
+    of these three fields.
+  - No later migration removes any of these columns. So a fresh DB built
+    from migration history alone would have four columns (+ 2 indexes +
+    1 FK) that `schema.prisma` doesn't declare — i.e. the migration
+    history is ahead of the schema in a way nothing ever reconciled.
+  - Not the already-known partial-unique-index drift from
+    `20260608114243_city_scoped_slugs` (documented in this repo's
+    CLAUDE.md) — this is a separate, narrower mismatch confirmed by
+    diffing two concrete migrations against two concrete model
+    definitions, not a `prisma migrate dev` false-positive.
+  - A first look at the same shadow-DB diff also appeared to show
+    `RecommendationExposure`/`RecommendationOutcome`/`RecommendationRun`/
+    `RecommendationSurfacePolicy` tables and two enums being dropped —
+    that was a false positive caused by passing only `schema.prisma` (not
+    the full multi-file `prisma/` directory `prisma.config.ts` actually
+    uses) as `--to-schema-datamodel`; those models live in
+    `prisma/recommendations.prisma` and are not actually missing.
+    Re-diffing with the whole `prisma/` directory as the target should
+    make that go away — not re-reported here as an issue.
+- Current state: not investigated further — unknown whether the real
+  local/DEV/PROD databases still physically have these four columns
+  (nobody ever wrote a migration to drop them) or whether they were
+  dropped by hand outside the migration flow (which `docs/database-migrations.md`
+  explicitly forbids and has its own repair path for).
+- Dependencies: none blocking; needs someone to decide product intent
+  first (were `SearchDocument.cityId` / the three `SearchQueryLog` click
+  fields deliberately abandoned, or should they still exist and
+  `schema.prisma` is what's wrong).
+- Acceptance criteria: root cause established (deliberate removal vs.
+  accidental schema edit); if abandoned, a proper migration added to drop
+  the columns/index/constraint from real databases and this entry closed
+  DONE; if not abandoned, the fields restored to `schema.prisma` (and to
+  any environment where they were manually dropped) instead.
+- Source: PR #269 (`feat/abws-session-place-source-fields-20260912`)
+  migration-diff sanity check, 2026-09-12.
