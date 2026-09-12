@@ -57,6 +57,13 @@ function isFiniteNonNegative(value: number | undefined | null): value is number 
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+function getLastCompletedIsoWeekStart(dataThroughDate: string): Date | null {
+  const dataThrough = parseISO(`${dataThroughDate}T12:00:00`);
+  if (!isValid(dataThrough)) return null;
+  const containingWeekStart = startOfISOWeek(dataThrough);
+  return format(dataThrough, "i") === "7" ? containingWeekStart : subWeeks(containingWeekStart, 1);
+}
+
 export function recoveryShareFromValues(
   actualClicks: number,
   baselineClicks: number | null,
@@ -150,24 +157,29 @@ export function getRequiredShareGain(actualClicks: number, fromWeek: string): nu
 
 /**
  * Returns up to maxWeeks fully completed paired weeks, walking backwards from
- * throughWeek. The ISO week containing migrationDate is excluded, as are all
- * earlier weeks. A week whose baseline is unavailable is removed from both
- * sides of the pair rather than turning into a zero or a substituted week.
+ * throughWeek. dataThroughDate is the final calendar date actually present in
+ * the source snapshot; if it falls inside throughWeek, that partial week is
+ * excluded automatically. The ISO week containing migrationDate is excluded,
+ * as are all earlier weeks. A week whose baseline is unavailable is removed
+ * from both sides of the pair rather than turning into a zero or a substituted
+ * week.
  */
 export function getPairedRecoveryWindow(
   actualClicksByIsoWeek: Readonly<Record<string, number>>,
   throughWeek: string,
+  dataThroughDate: string,
   maxWeeks = 4,
 ): PairedRecoveryWeek[] {
   if (!Number.isInteger(maxWeeks) || maxWeeks <= 0) return [];
   const through = parseIsoWeekStart(throughWeek);
-  if (!through) return [];
+  const lastCompletedWeek = getLastCompletedIsoWeekStart(dataThroughDate);
+  if (!through || !lastCompletedWeek) return [];
 
   const migrationDate = parseISO(`${SEO_BASELINE.migrationDate}T12:00:00`);
   if (!isValid(migrationDate)) return [];
 
   const pairs: PairedRecoveryWeek[] = [];
-  let cursor = through;
+  let cursor = isAfter(through, lastCompletedWeek) ? lastCompletedWeek : through;
   for (let checked = 0; checked < maxWeeks; checked += 1) {
     // Strictly after the cutover date means the week containing cutover is
     // never included, even when cutover happened on that week's Monday.
@@ -192,9 +204,15 @@ export function getPairedRecoveryWindow(
 export function getOperationalRecoveryWindow(
   actualClicksByIsoWeek: Readonly<Record<string, number>>,
   throughWeek: string,
+  dataThroughDate: string,
   maxWeeks = 4,
 ): OperationalRecoveryWindow {
-  const pairs = getPairedRecoveryWindow(actualClicksByIsoWeek, throughWeek, maxWeeks);
+  const pairs = getPairedRecoveryWindow(
+    actualClicksByIsoWeek,
+    throughWeek,
+    dataThroughDate,
+    maxWeeks,
+  );
   if (pairs.length === 0) return { weeks: [], mode: "unavailable" };
   if (pairs.length < 3) {
     return { weeks: [pairs[pairs.length - 1]], mode: "single_week_high_noise" };
