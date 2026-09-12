@@ -48,7 +48,10 @@ function indexableTaggedArticleWhere(city: CityRef, tagId: string): Prisma.Artic
     noindex: false,
     slug: { not: null },
     publishedAt: { not: null },
-    NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } },
+    OR: [
+      { seoRobots: null },
+      { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
+    ],
     tags: { some: { id: tagId } },
     ...buildArticleCityDiscoveryWhere(city, true),
   };
@@ -81,7 +84,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
     ? []
     : await prisma.article.findMany({
         where,
-        orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+        orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
         skip: (safePage - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
         select: {
@@ -141,7 +144,15 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   });
   const canonical = `${getCanonicalPublicAppUrl()}${requestedPage > 1 ? `${basePath}?page=${requestedPage}` : basePath}`;
   const cityName = getCityDisplayName(data.city.slug);
-  const titleBase = data.tag.seoTitle?.trim() || `${data.tag.title} в ${cityName}`;
+  const customSeoTitle = data.tag.seoTitle?.trim() || null;
+  const fallbackTitleBase = `${data.tag.title} в ${cityName}`;
+  const title = customSeoTitle
+    ? requestedPage > 1
+      ? `${customSeoTitle} — страница ${requestedPage}`
+      : customSeoTitle
+    : requestedPage > 1
+      ? `${fallbackTitleBase} — страница ${requestedPage} — mamaGo`
+      : `${fallbackTitleBase} — mamaGo`;
   const description =
     data.tag.seoDescription?.trim() ||
     data.tag.description?.trim() ||
@@ -149,12 +160,12 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
   return applyGlobalRobotsOverride({
     ...buildOgMeta({
-      title: requestedPage > 1 ? `${titleBase} — страница ${requestedPage} — mamaGo` : `${titleBase} — mamaGo`,
+      title,
       description,
       url: canonical,
       robots: { index: true, follow: true },
     }),
-    title: requestedPage > 1 ? `${titleBase} — страница ${requestedPage} — mamaGo` : `${titleBase} — mamaGo`,
+    title,
     description,
     alternates: { canonical },
   });
