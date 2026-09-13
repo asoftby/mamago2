@@ -115,9 +115,8 @@ export function StoryModal({
           "relative overflow-hidden bg-white shadow-2xl",
           // Desktop: 2-column, fixed size
           "md:flex md:rounded-3xl md:max-w-[780px] md:w-full md:h-[560px] md:mx-8",
-          // Mobile: full screen sheet
-          "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:rounded-t-3xl max-md:flex max-md:flex-col",
-          "max-md:max-h-[92dvh]",
+          // Mobile: true fullscreen — no bottom-sheet gap, no auto-sized height
+          "max-md:fixed max-md:inset-0 max-md:flex max-md:flex-col max-md:h-[100dvh]",
         )}
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
