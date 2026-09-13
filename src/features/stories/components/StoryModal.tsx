@@ -52,10 +52,19 @@ export function StoryModal({
     onItemShown(currentItem?.offerId ?? "");
   }, [currentItem?.offerId, onItemShown]);
 
-  // ── scroll lock ───────────────────────────────────────────────────────────
+  // ── scroll lock (iOS-safe: fixed + saved scrollY, restored on close) ─────
   useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    const scrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      window.scrollTo(0, scrollY);
+    };
   }, []);
 
   // ── close on backdrop click ───────────────────────────────────────────────
@@ -143,6 +152,8 @@ export function StoryModal({
             paused={paused}
             onNext={onNext}
             onPrev={onPrev}
+            onPause={onPause}
+            onResume={onResume}
             onTogglePause={handleTogglePause}
             onProgressComplete={onNext}
           />
@@ -165,6 +176,7 @@ export function StoryModal({
             item={currentItem}
             storyTitle={activeStory.title}
             onClose={onClose}
+            onPause={onPause}
           />
         </div>
       </div>

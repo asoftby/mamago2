@@ -12,12 +12,14 @@ interface StoryModalActionCardProps {
   item: StoryItem;
   storyTitle: string;
   onClose: () => void;
+  onPause: () => void;
 }
 
 export function StoryModalActionCard({
   item,
   storyTitle,
   onClose,
+  onPause,
 }: StoryModalActionCardProps) {
   const eyebrow = item.eyebrow ?? storyTitle;
   const actions = resolveStoryActions(item);
@@ -27,7 +29,10 @@ export function StoryModalActionCard({
     <div className={cn("flex flex-col px-6 py-6 gap-0", "md:h-full", "max-md:flex-1 max-md:min-h-0")}>
 
       {/* ── Scrollable text content — mobile: fills the row above the actions slot ── */}
-      <div className={cn("max-md:flex-1 max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain")}>
+      <div
+        className={cn("max-md:flex-1 max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain")}
+        onScroll={onPause}
+      >
         {/* ── Story context label ── */}
         <p className="mb-4 text-[11px] font-medium tracking-[0.18em] text-neutral-400">
           {eyebrow}
@@ -135,7 +140,10 @@ export function StoryModalActionCard({
                 <Link
                   key={action.label}
                   href={action.href}
-                  onClick={onClose}
+                  onClick={() => {
+                    onPause();
+                    onClose();
+                  }}
                   className={cn(
                     "flex h-11 w-full items-center justify-center text-[14px] font-semibold transition-all",
                     action.variant === "primary"
