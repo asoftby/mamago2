@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MapPin, Clock, Tag, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { resolveStoryActions } from "../lib/story-actions";
 import type { StoryItem } from "../types/story";
 
 interface StoryModalActionCardProps {
@@ -19,7 +20,8 @@ export function StoryModalActionCard({
   onClose,
 }: StoryModalActionCardProps) {
   const eyebrow = item.eyebrow ?? storyTitle;
-  const hasActionSlot = Boolean(item.price || item.href);
+  const actions = resolveStoryActions(item);
+  const hasActionSlot = Boolean(item.price || actions.length > 0);
 
   return (
     <div className={cn("flex flex-col px-6 py-6 gap-0", "md:h-full", "max-md:flex-1 max-md:min-h-0")}>
@@ -109,7 +111,10 @@ export function StoryModalActionCard({
         <div
           className={cn(
             "max-md:shrink-0 max-md:pt-3",
-            "max-md:max-h-[30%] max-md:overflow-hidden",
+            // 18dvh = 30% of the 60dvh content row. A %-based max-height would need
+            // this element's own box to be a definite height, but it's flex-1 —
+            // some engines then treat the % as indefinite and let it overflow.
+            "max-md:max-h-[18dvh] max-md:overflow-hidden",
             "max-md:pb-[calc(env(safe-area-inset-bottom)+16px)]",
           )}
         >
@@ -124,19 +129,25 @@ export function StoryModalActionCard({
             </div>
           )}
 
-          {item.href ? (
-            <Link
-              href={item.href}
-              onClick={onClose}
-              className={cn(
-                "flex h-11 w-full items-center justify-center rounded-2xl text-[14px] font-semibold",
-                "bg-neutral-100 text-neutral-700",
-                "hover:bg-neutral-200 active:scale-[0.98] transition-all",
-              )}
-            >
-              Подробнее
-            </Link>
-          ) : null}
+          {actions.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {actions.map((action) => (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  onClick={onClose}
+                  className={cn(
+                    "flex h-11 w-full items-center justify-center text-[14px] font-semibold transition-all",
+                    action.variant === "primary"
+                      ? "rounded-2xl bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:scale-[0.98]"
+                      : "text-neutral-500 hover:text-neutral-700",
+                  )}
+                >
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
