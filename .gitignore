@@ -87,3 +87,6 @@ ts-errors.txt
 graphify-out/
 .graphify/
 graphify-out/
+
+# Raw ABWS API snapshots (research/debug only, not fixtures — large, not for git)
+/datasets/abws/
