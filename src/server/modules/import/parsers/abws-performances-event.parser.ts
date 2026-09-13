@@ -38,6 +38,17 @@ export interface AbwsPerformanceType {
   name?: string | null;
 }
 
+/**
+ * Confirmed via live call (performance.id=5852465, 2026-09-13): both
+ * `performance.image` and each entry of `performance.images[]` are objects
+ * keyed by thumbnail size (e.g. "240x340", "880x550") plus an "original"
+ * key — never a flat URL string. Keys observed vary per image.
+ */
+export interface AbwsImageSizes {
+  original?: string | null;
+  [size: string]: string | null | undefined;
+}
+
 export interface AbwsPerformance {
   id: number;
   name: string;
@@ -47,8 +58,8 @@ export interface AbwsPerformance {
   duration?: number | null; // minutes, confirmed (range 2-480 observed)
   showFrom?: number | null; // unix seconds
   showTo?: number | null; // unix seconds
-  image?: string | null;
-  images?: string[] | null;
+  image?: AbwsImageSizes | null;
+  images?: AbwsImageSizes[] | null;
   minPrice?: string | null; // rubles, string e.g. "34.00"
   maxPrice?: string | null;
   types?: AbwsPerformanceType[] | null;
@@ -180,12 +191,19 @@ export interface AbwsSessionRawPayload {
   citySlugMismatch: boolean;
 }
 
+/**
+ * `session.url` observed shape (confirmed live, performance.id=5852465):
+ * `https://24afisha.by/ru/{citySlug}/events/{category}/{performanceId}?sid=...`
+ * — city is the SECOND path segment, after a locale prefix (`ru`). Using
+ * the first segment (an earlier version of this function did) always
+ * extracted the locale and made every session look mismatched.
+ */
 function citySlugFromSessionUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
     const parsed = new URL(url);
-    const firstSegment = parsed.pathname.split("/").filter(Boolean)[0];
-    return firstSegment ?? null;
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    return segments[1] ?? null;
   } catch {
     return null;
   }
@@ -250,12 +268,24 @@ function unixSecondsToIso(value: number | null | undefined): string | null {
   return value == null ? null : new Date(value * 1000).toISOString();
 }
 
+/**
+ * `image`/`images[]` entries are keyed by thumbnail size, not flat URLs
+ * (confirmed live). Prefer "original"; fall back to any string value
+ * present rather than dropping the image if "original" is absent.
+ */
+function extractImageUrl(image: AbwsImageSizes | null | undefined): string | null {
+  if (!image) return null;
+  if (image.original) return image.original;
+  const firstStringValue = Object.values(image).find((v): v is string => typeof v === "string");
+  return firstStringValue ?? null;
+}
+
 export function mapAbwsPerformanceToRawPayload(item: AbwsPerformanceItem): AbwsPerformanceRawPayload {
   const { performance, sessions } = item;
   const { categoryTypeIds, unrecognizedTypes } = filterCategoryTypeIds(performance.types);
-  const images = [performance.image, ...(performance.images ?? [])].filter(
-    (url): url is string => Boolean(url),
-  );
+  const images = [performance.image, ...(performance.images ?? [])]
+    .map(extractImageUrl)
+    .filter((url): url is string => Boolean(url));
 
   return {
     title: performance.name,

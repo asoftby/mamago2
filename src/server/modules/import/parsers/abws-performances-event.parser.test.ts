@@ -29,8 +29,9 @@ const singleVenueFixture: AbwsPerformanceItem = {
     duration: 60,
     showFrom: 1_760_000_000,
     showTo: 1_765_000_000,
-    image: "https://24afisha.by/images/5852465/main.jpg",
-    images: ["https://24afisha.by/images/5852465/1.jpg"],
+    // Real shape (confirmed live): keyed by thumbnail size, not a flat URL.
+    image: { "240x340": "https://24afisha.by/images/5852465/main-240.jpg", original: "https://24afisha.by/images/5852465/main.jpg" },
+    images: [{ "880x550": "https://24afisha.by/images/5852465/1-880.jpg", original: "https://24afisha.by/images/5852465/1.jpg" }],
     minPrice: "25.00",
     maxPrice: "45.00",
     types: [
@@ -52,7 +53,8 @@ const singleVenueFixture: AbwsPerformanceItem = {
       object: { id: 501, name: "Дворец Республики", address: "пр. Независимости, 2", city: { slug: "minsk" } },
       tags: [{ name: "2D" }, { name: "2 D" }],
       type: "default",
-      url: "https://24afisha.by/minsk/performance/5852465",
+      // Real shape (confirmed live): /ru/{citySlug}/events/{category}/{id}?sid=...
+      url: "https://24afisha.by/ru/minsk/events/kino/5852465?sid=1743171&distributor_company_id=550",
     },
     {
       id: 1743172,
@@ -65,7 +67,7 @@ const singleVenueFixture: AbwsPerformanceItem = {
       object: { id: 501, name: "Дворец Республики", address: "пр. Независимости, 2", city: { slug: "minsk" } },
       tags: [{ name: "3D" }],
       type: "default",
-      url: "https://24afisha.by/minsk/performance/5852465",
+      url: "https://24afisha.by/ru/minsk/events/kino/5852465?sid=1743172&distributor_company_id=550",
     },
   ],
 };
@@ -112,15 +114,20 @@ assert.deepEqual(normalizeSessionTags([{ name: "2 D" }, { name: "2D" }]), ["2d"]
   assert.deepEqual(mapped.tags, ["2d"]);
 }
 
-// citySlugMismatch: object says minsk, url says brest
+// citySlugMismatch: object says minsk, url says brest (city is path segment
+// index 1, after the "ru" locale prefix — confirmed live)
 {
   const mismatched = mapAbwsSession({
     ...singleVenueFixture.sessions[0],
     object: { id: 501, city: { slug: "minsk" } },
-    url: "https://24afisha.by/brest/performance/5852465",
+    url: "https://24afisha.by/ru/brest/events/kino/5852465?sid=1743171&distributor_company_id=550",
   });
   assert.equal(mismatched.citySlugMismatch, true);
 }
+
+// A URL sharing the fixture's own city must NOT be flagged (regression check
+// for the earlier bug that read the locale segment instead of the city one).
+assert.equal(mapAbwsSession(singleVenueFixture.sessions[0]).citySlugMismatch, false);
 
 // ── full performance mapping — price units kept separate (§2.4) ──────────
 {
