@@ -4651,7 +4651,7 @@ model ImportedRecord {
   source            ImportSource      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   @@index([sourceId, reviewStatus])
-  @@index([sourceId, externalId])
+  @@unique([sourceId, externalId])
   @@index([contentHash])
   @@index([runId])
   @@index([runId, reviewStatus])
