@@ -36,9 +36,16 @@ export function importSourceLockName(sourceId: string): string {
   return `${IMPORT_SOURCE_LOCK_PREFIX}${sourceId}`;
 }
 
+/**
+ * Distinct from any future "user cancelled a run" feature, which would also
+ * naturally use ImportRunStatus.CANCELLED (nothing sets that status today —
+ * checked before reusing it here) — keep this prefix so the two are never
+ * ambiguous from errorMessage alone.
+ */
+const SKIPPED_LOCKED_MESSAGE_PREFIX = "Skipped (concurrent run):";
+
 export interface RunImportResult {
-  /** null when skipped before an ImportRun row was ever created (SKIPPED_LOCKED) */
-  runId: string | null;
+  runId: string;
   sourceId: string;
   /** SKIPPED_LOCKED: another run for this source was already in progress; this call did not start one. */
   status: "COMPLETED" | "FAILED" | "SKIPPED_LOCKED";
@@ -79,8 +86,37 @@ export async function runImportForSource(
 
   if (!acquired) {
     await lock.close();
+
+    const message = `${SKIPPED_LOCKED_MESSAGE_PREFIX} another import run for source "${source.slug}" was already in progress.`;
+    const now = new Date();
+
+    // Terminal row from the start (never RUNNING) — no orphan to clean up —
+    // but still gives this a visible trace in /admin/import/runs instead of
+    // silently doing nothing.
+    const skippedRun = await prisma.importRun.create({
+      data: {
+        source: { connect: { id: sourceId } },
+        status: "CANCELLED",
+        startedAt: now,
+        finishedAt: now,
+        triggerType: triggeredByUserId ? "MANUAL" : "MANUAL",
+        triggerUserId: triggeredByUserId ?? null,
+        errorMessage: message,
+      },
+    });
+
+    // Deliberately NOT writing lastErrorAt/lastErrorMessage on ImportSource
+    // here: verified by test that the concurrently-succeeding run's own
+    // completion handler unconditionally clears those same two fields to
+    // null on success (see the "8. Обновить source stats" block below),
+    // which races this write and silently erases it whenever the winning
+    // run finishes after this one returns — i.e. in exactly the scenario
+    // this field would exist to document. The CANCELLED ImportRun row
+    // above is the reliable trace; ImportSource is not, without also
+    // changing that unconditional clear-on-success behavior (a separate,
+    // wider decision — it's shared by every source, not ABWS-specific).
     return {
-      runId: null,
+      runId: skippedRun.id,
       sourceId,
       status: "SKIPPED_LOCKED",
       totalFetched: 0,
@@ -90,7 +126,7 @@ export async function runImportForSource(
       totalErrors: 0,
       normalizeResults: { success: 0, failed: 0 },
       matchResults: { matched: 0, noMatch: 0, ambiguous: 0, failed: 0, reviewTasksCreated: 0 },
-      error: `Another import run is already in progress for source "${source.slug}".`,
+      error: message,
     };
   }
 

@@ -72,7 +72,7 @@ export async function triggerImportRun(sourceId: string): Promise<{
 
     return {
       success: result.status === "COMPLETED",
-      runId: result.runId ?? undefined,
+      runId: result.runId,
       error: result.error,
       stats: {
         totalFetched: result.totalFetched,
