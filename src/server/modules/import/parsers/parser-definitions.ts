@@ -43,6 +43,15 @@ export const PARSER_DEFINITIONS: ParserDefinition[] = [
       maxDatePages: 5,
     },
   },
+  {
+    key: "abws-performances-event",
+    label: "24afisha.by (ABWS) — Мероприятия и сеансы",
+    entityType: "EVENT",
+    description:
+      "JSON API webgate.24guru.by/api/v3/sync/data/performances. Требует ABWS_KEY в окружении. " +
+      "Фаза 1: только одноплощадочные мероприятия публикуются; многоплощадочные сохраняются как " +
+      "pendingMultiVenue (см. docs/imports/abws-phase1-spec.md).",
+  },
   // ── Real parsers (добавлять сюда) ────────────────────────────────────────
   // {
   //   key: "afisha-by-place",
