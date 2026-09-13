@@ -138,3 +138,6 @@ jobs:
 
       - name: Imported media source privacy regression
         run: pnpm exec tsx src/lib/media/importedMediaPrivacy.test.ts
+
+      - name: family.by event normalization regression
+        run: pnpm test:family-by-event-normalization
