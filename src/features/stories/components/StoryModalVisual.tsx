@@ -51,7 +51,7 @@ export function StoryModalVisual({
     <div className="relative w-full h-full overflow-hidden bg-neutral-950 select-none">
 
       {/* ── Skeleton / placeholder while loading ── */}
-      {!imgLoaded && !imgError && (
+      {currentItem.image && !imgLoaded && !imgError && (
         <div className="absolute inset-0 z-[1] bg-neutral-900 animate-pulse" />
       )}
 
@@ -61,6 +61,11 @@ export function StoryModalVisual({
           <ImageOff className="h-8 w-8 text-neutral-600" />
           <p className="text-xs text-neutral-500">Изображение не загрузилось</p>
         </div>
+      )}
+
+      {/* ── No cover at all → gradient fallback, zone never collapses ── */}
+      {!currentItem.image && !imgError && (
+        <div className="absolute inset-0 z-[1] bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
       )}
 
       {/* ── Main image ── */}
@@ -86,7 +91,14 @@ export function StoryModalVisual({
       <div className="absolute inset-x-0 bottom-0 h-20 z-[2] bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
 
       {/* ── Progress bar ── */}
-      <div className="absolute inset-x-0 top-0 z-[5] pt-3 px-3">
+      <div
+        className={cn(
+          "absolute inset-x-0 z-[5]",
+          "md:top-0 md:pt-3",
+          // Mobile: clear the notch/dynamic island; close button uses the same offset
+          "max-md:top-[calc(env(safe-area-inset-top)+8px)]",
+        )}
+      >
         <StoryProgress
           total={story.items.length}
           current={activeItemIndex}
@@ -134,13 +146,6 @@ export function StoryModalVisual({
       >
         <ChevronRight className="h-4 w-4" />
       </button>
-
-      {/* ── Mobile: item title at bottom ── */}
-      <div className="absolute inset-x-0 bottom-0 z-[5] px-5 pb-4 md:hidden pointer-events-none">
-        <p className="text-sm font-semibold text-white leading-snug drop-shadow line-clamp-2">
-          {currentItem.title}
-        </p>
-      </div>
     </div>
   );
 }

@@ -105,7 +105,8 @@ export function StoryModal({
         className={cn(
           "absolute z-[60]",
           "md:top-6 md:right-6",
-          "top-4 right-4",
+          // Mobile: same top offset as the progress bar inside the media zone
+          "max-md:top-[calc(env(safe-area-inset-top)+8px)] max-md:right-3",
         )}
       />
 
@@ -115,21 +116,21 @@ export function StoryModal({
           "relative overflow-hidden bg-white shadow-2xl",
           // Desktop: 2-column, fixed size
           "md:flex md:rounded-3xl md:max-w-[780px] md:w-full md:h-[560px] md:mx-8",
-          // Mobile: true fullscreen — no bottom-sheet gap, no auto-sized height
-          "max-md:fixed max-md:inset-0 max-md:flex max-md:flex-col max-md:h-[100dvh]",
+          // Mobile: true fullscreen, fixed 40/60 split — proportions never shift with content
+          "max-md:fixed max-md:inset-0 max-md:grid max-md:grid-rows-[40fr_60fr] max-md:h-[100dvh]",
         )}
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* ══ LEFT / TOP: Visual panel ══════════════════════════════════════ */}
+        {/* ══ LEFT / TOP: Visual panel (mobile: fixed 40% row) ═══════════════ */}
         <div
           className={cn(
-            "relative shrink-0 overflow-hidden bg-neutral-950",
+            "relative overflow-hidden bg-neutral-950",
             // Desktop: left column
-            "md:w-[52%] md:h-full",
-            // Mobile: top area
-            "max-md:h-[52vw] max-md:min-h-[220px] max-md:max-h-[300px]",
+            "md:w-[52%] md:h-full md:shrink-0",
+            // Mobile: top grid row, fills it exactly
+            "max-md:h-full max-md:min-h-0",
           )}
         >
           <StoryModalVisual
@@ -147,16 +148,18 @@ export function StoryModal({
           />
         </div>
 
-        {/* ══ RIGHT / BOTTOM: Action card ═══════════════════════════════════ */}
+        {/* ══ RIGHT / BOTTOM: Content zone (mobile: fixed 60% row) ══════════ */}
         <div
           className={cn(
             "bg-white",
             "md:flex-1 md:overflow-y-auto",
-            "max-md:flex-1 max-md:overflow-y-auto",
+            // Mobile: own flex layout — StoryModalActionCard owns the internal
+            // scroll area + shrink-0 actions slot, this row just bounds them
+            "max-md:flex max-md:flex-col max-md:h-full max-md:min-h-0 max-md:overflow-hidden",
           )}
         >
           {seenGroupStart === activeItemIndex && (
-            <div data-testid="stories-seen-divider" className="mx-5 border-t border-neutral-200" />
+            <div data-testid="stories-seen-divider" className="mx-5 border-t border-neutral-200 shrink-0" />
           )}
           <StoryModalActionCard
             item={currentItem}
