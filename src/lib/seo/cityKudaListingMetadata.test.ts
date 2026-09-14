@@ -1,8 +1,6 @@
 /**
- * Task 8 (BACKLOG-063) regression tests: the new city-scoped listing
- * metadata builders (`buildCityClassesListingMetadata`,
- * `buildCityBirthdayListingMetadata`, `buildCityRoutesListingMetadata`)
- * and their wiring into the 3 previously-metadata-less pages.
+ * Regression tests for city-scoped listing metadata builders and their
+ * canonical/indexing contracts.
  *
  * Run: set -a; source .env; set +a; npx tsx src/lib/seo/cityKudaListingMetadata.test.ts
  */
@@ -12,12 +10,13 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import {
+  buildCityEventsListingMetadata,
   buildCityClassesListingMetadata,
   buildCityBirthdayListingMetadata,
   buildCityRoutesListingMetadata,
 } from "@/lib/seo/cityKudaListingMetadata";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
-import { formatCityTitle } from "@/lib/city/cityDisplayNames";
+import { formatCityTitle, getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,7 +30,26 @@ async function main() {
   });
   assert.ok(city, "expected at least one active city in the local dev DB for this test");
   const citySlug = city!.slug;
+  const cityName = getCityDisplayName(citySlug);
   const base = getCanonicalPublicAppUrl();
+
+  // --- events ---
+  const eventsMeta = await buildCityEventsListingMetadata(citySlug);
+  assert.equal(
+    eventsMeta.title,
+    `Куда сходить с детьми в ${cityName} сегодня — афиша mamaGo`,
+    "events title must match the approved high-intent search wording",
+  );
+  assert.equal(
+    eventsMeta.description,
+    `Куда сходить с ребёнком в ${cityName} сегодня и на выходных: семейные события, спектакли, мастер-классы, выставки и развлечения. Фильтры по возрасту и дате.`,
+    "events description must cover today/weekend intent without changing the page contract",
+  );
+  assert.equal(
+    eventsMeta.alternates?.canonical,
+    `${base}/${citySlug}/events`,
+    "events canonical must remain the absolute /{city}/events URL",
+  );
 
   // --- classes ---
   const classesMeta = await buildCityClassesListingMetadata(citySlug);
@@ -92,14 +110,16 @@ async function main() {
 
   // --- unknown city slug: no fabricated metadata ---
   const unknownSlug = `no-such-city-${Date.now()}`;
+  assert.deepEqual(await buildCityEventsListingMetadata(unknownSlug), {});
   assert.deepEqual(await buildCityClassesListingMetadata(unknownSlug), {});
   assert.deepEqual(await buildCityBirthdayListingMetadata(unknownSlug), {});
   assert.deepEqual(await buildCityRoutesListingMetadata(unknownSlug), {});
 
-  // --- global noindex override still wins for all 3 new pages ---
+  // --- global noindex override still wins for listing pages ---
   // Mirrors globalNoindex.test.ts's subprocess-isolation approach so env
   // vars from this process can't leak into the probe.
   const pages: Array<{ label: string; file: string }> = [
+    { label: "events", file: "src/app/(public)/[city]/events/page.tsx" },
     { label: "classes", file: "src/app/(public)/[city]/classes/page.tsx" },
     { label: "birthday", file: "src/app/(public)/[city]/birthday/page.tsx" },
     { label: "routes", file: "src/app/(public)/[city]/routes/page.tsx" },
@@ -109,7 +129,7 @@ async function main() {
     const script = `
       import { generateMetadata } from ${JSON.stringify(modulePath)};
       (async () => {
-        const result = await generateMetadata({ params: Promise.resolve({ city: ${JSON.stringify(citySlug)} }) });
+        const result = await generateMetadata({ params: Promise.resolve({ city: ${JSON.stringify(citySlug)} }), searchParams: Promise.resolve({}) });
         console.log(JSON.stringify({ robots: result.robots }));
       })();
     `;
@@ -130,7 +150,7 @@ async function main() {
     );
   }
 
-  console.log("cityKudaListingMetadata (Task 8 / BACKLOG-063) tests: OK");
+  console.log("cityKudaListingMetadata regression tests: OK");
 }
 
 main()
