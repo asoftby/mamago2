@@ -4635,6 +4635,13 @@ model ImportedRecord {
   qualityScore        Float?
   normalizedData      Json?
   matchCandidates     Json?
+  /// Source-computed quality/review gate marks (ABWS: multiVenue,
+  /// belowPriceFloor, nonMinskCity). Informational only — publication stays
+  /// manual, these never block. Populated for every ABWS record at
+  /// normalize time with all keys present and explicit false, never a
+  /// partial object or null for ABWS, so aggregate stats have a correct
+  /// denominator. Null for non-ABWS sources (not computed).
+  qualityFlags        Json?
   reviewDecision      Json?
   publishedPlaceId    String?
   publishedActivityId String?

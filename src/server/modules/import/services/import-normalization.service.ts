@@ -9,7 +9,12 @@
 import prisma from "@/lib/prisma";
 import { normalizePlacePayload } from "../normalizers/place.normalizer";
 import { normalizeEventPayload } from "../normalizers/event.normalizer";
-import { ABWS_PARSER_KEY, normalizeAbwsEventPayload } from "../normalizers/abws-event.normalizer";
+import {
+  ABWS_PARSER_KEY,
+  computeAbwsQualityFlags,
+  normalizeAbwsEventPayload,
+} from "../normalizers/abws-event.normalizer";
+import type { AbwsPerformanceRawPayload } from "../parsers/abws-performances-event.parser";
 import { scorePlaceImport, scoreEventImport } from "./import-quality.service";
 
 export interface NormalizeRecordResult {
@@ -118,6 +123,15 @@ async function normalizeEventRecord(
 
     const { score } = scoreEventImport(normalized);
 
+    // Gate marks are ABWS-specific and computed straight from the raw
+    // payload shape (not from `normalized`) — same dispatch-by-parserKey
+    // as the normalizer above. Non-ABWS records keep qualityFlags: null,
+    // untouched, exactly as before this field existed.
+    const qualityFlags =
+      source.parserKey === ABWS_PARSER_KEY
+        ? computeAbwsQualityFlags(record.rawPayload as unknown as AbwsPerformanceRawPayload)
+        : undefined;
+
     await prisma.importedRecord.update({
       where: { id: record.id },
       data: {
@@ -125,6 +139,7 @@ async function normalizeEventRecord(
         normalizeStatus: "SUCCESS",
         qualityScore: score,
         errorMessage: warnings.length > 0 ? `warnings: ${warnings.join("; ")}` : null,
+        ...(qualityFlags !== undefined ? { qualityFlags: qualityFlags as object } : {}),
       },
     });
 

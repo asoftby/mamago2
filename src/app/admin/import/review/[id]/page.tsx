@@ -13,6 +13,8 @@ import type {
 import { ImportEventMediaIngest } from "./_components/ImportEventMediaIngest";
 import { ReviewDetailWorkflow } from "./_components/ReviewDetailWorkflow";
 import { reconcileImportedRecordLinks } from "@/server/modules/import/services/import-link-reconciliation.service";
+import { activeQualityFlagBadges } from "../../_lib/import-admin-ui";
+import type { AbwsQualityFlags } from "@/server/modules/import/normalizers/abws-event.normalizer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -40,6 +42,7 @@ const importedRecordForReviewDetailSelect = {
   qualityScore: true,
   confidenceScore: true,
   matchStatus: true,
+  qualityFlags: true,
   source: { select: { id: true, name: true, slug: true, type: true } },
 } as const;
 
@@ -846,6 +849,9 @@ export default async function ReviewDetailPage({
 
       <NeedsAttentionBlock
         items={[
+          ...activeQualityFlagBadges(rec.qualityFlags as AbwsQualityFlags | null).map(
+            (badge) => `⚑ ${badge.label} — пометка не блокирует публикацию, решение за ревьюером`,
+          ),
           ...(nd && nd.entityType === "EVENT" && !nd.typeCandidate
             ? ["Тип активности не определён"]
             : []),

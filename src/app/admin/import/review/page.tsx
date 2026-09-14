@@ -26,6 +26,7 @@ import {
   type ImportedRecordLinkSnapshot,
 } from "@/server/modules/import/services/import-link-reconciliation.service";
 import type { ReviewDecisionPayload } from "@/server/modules/import/types";
+import type { AbwsQualityFlags } from "@/server/modules/import/normalizers/abws-event.normalizer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -42,6 +43,7 @@ const importReviewImportedRecordSelect = {
   confidenceScore: true,
   matchStatus: true,
   normalizedData: true,
+  qualityFlags: true,
   publishedPlaceId: true,
   publishedActivityId: true,
   reviewDecision: true,
@@ -285,6 +287,7 @@ export default async function ImportReviewPage({
         qualityScore: record.qualityScore,
         confidenceScore: record.confidenceScore,
         matchStatus: record.matchStatus,
+        qualityFlags: record.qualityFlags as AbwsQualityFlags | null,
         normalizedTitle,
         publishedPlaceId: record.publishedPlaceId,
         publishedActivityId: record.publishedActivityId,

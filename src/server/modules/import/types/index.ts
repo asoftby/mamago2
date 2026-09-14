@@ -166,6 +166,14 @@ export interface EventImportOccurrence {
   addressText?: string;
   cityName?: string;
   priceText?: string;
+  /**
+   * Цена сеанса в копейках, как отдаёт источник (ABWS). Хранится отдельно
+   * от `priceText`, а не парсится из него обратно — `priceText` уже
+   * округлён/отформатирован для отображения и не гарантирует точность
+   * копеек при обратном парсинге.
+   */
+  priceMinCents?: number | null;
+  priceMaxCents?: number | null;
   buyUrl?: string;
   isSaleOpen?: boolean;
 }

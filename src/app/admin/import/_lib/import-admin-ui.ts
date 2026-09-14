@@ -9,6 +9,7 @@ import type {
   ImportSourceStatus,
   ImportSuggestedAction,
 } from "@prisma/client";
+import type { AbwsQualityFlags } from "@/server/modules/import/normalizers/abws-event.normalizer";
 
 export const importEntityLabels: Record<ImportEntityType, string> = {
   PLACE: "Место",
@@ -210,4 +211,24 @@ export function getImportedObjectStage(params: {
     tone: "bg-amber-100 text-amber-800",
     helper: "Это сырой импортированный объект. Он ещё не стал сущностью платформы.",
   };
+}
+
+// ─── ABWS quality-gate marks ────────────────────────────────────────────────
+// Информационные пометки для ревьюера — публикация остаётся ручной, эти
+// флаги ничего не блокируют. См. computeAbwsQualityFlags.
+
+type QualityFlagBadge = { key: keyof AbwsQualityFlags; label: string; className: string };
+
+const qualityFlagBadgeConfig: QualityFlagBadge[] = [
+  { key: "multiVenue", label: "Несколько площадок", className: "bg-amber-100 text-amber-800" },
+  { key: "belowPriceFloor", label: "Цена < 1 BYN", className: "bg-amber-100 text-amber-800" },
+  { key: "nonMinskCity", label: "Не Минск", className: "bg-amber-100 text-amber-800" },
+];
+
+/** Возвращает только сработавшие гейты — для рендера бейджей. */
+export function activeQualityFlagBadges(
+  flags: AbwsQualityFlags | null | undefined,
+): QualityFlagBadge[] {
+  if (!flags) return [];
+  return qualityFlagBadgeConfig.filter((badge) => flags[badge.key] === true);
 }

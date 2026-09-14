@@ -28,6 +28,47 @@ export const ABWS_PARSER_KEY = "abws-performances-event";
 
 const SHORT_DESC_MAX = 200;
 
+/** 1.00 BYN in kopecks — the price-floor gate threshold (§ decisions doc). */
+const PRICE_FLOOR_CENTS = 100;
+const MINSK_CITY_SLUG = "minsk";
+
+/**
+ * Review-queue gate marks for one ABWS record — informational only, never
+ * blocking (publication is already manual). All three keys are always
+ * present with an explicit boolean: a record with none of the gates
+ * triggered still gets `{ multiVenue: false, belowPriceFloor: false,
+ * nonMinskCity: false }`, never a partial object, so a later
+ * `GROUP BY qualityFlags->>'x'` has a correct denominator.
+ */
+export interface AbwsQualityFlags {
+  multiVenue: boolean;
+  belowPriceFloor: boolean;
+  nonMinskCity: boolean;
+}
+
+export function computeAbwsQualityFlags(payload: AbwsPerformanceRawPayload): AbwsQualityFlags {
+  const multiVenue = !payload.isSingleVenue;
+
+  // Per-session price when there are sessions to read (the normal case);
+  // fall back to the performance-level price only for the rare record with
+  // no sessions at all. Never mix the two into one comparison — sessions
+  // carry kopecks, the performance-level fallback carries rubles (§2.4).
+  const belowPriceFloor =
+    payload.sessions.length > 0
+      ? payload.sessions.some(
+          (session) => session.priceMinCents != null && session.priceMinCents < PRICE_FLOOR_CENTS,
+        )
+      : payload.perfPriceMinRub != null && payload.perfPriceMinRub < PRICE_FLOOR_CENTS / 100;
+
+  // Single-venue-only scope (§0): one city is representative for the whole
+  // record. Unknown city is treated as "not confirmed Minsk" — flagged
+  // rather than silently assumed to be in scope.
+  const cityName = payload.sessions[0]?.venue?.city?.slug ?? null;
+  const nonMinskCity = cityName !== MINSK_CITY_SLUG;
+
+  return { multiVenue, belowPriceFloor, nonMinskCity };
+}
+
 function deriveShortDesc(description: string): string {
   if (description.length <= SHORT_DESC_MAX) return description;
   const truncated = description.slice(0, SHORT_DESC_MAX);
@@ -63,6 +104,8 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
     addressText: session.venue?.address ?? undefined,
     cityName: session.venue?.city?.slug ?? undefined,
     priceText: formatCentsAsRub(session.priceMinCents),
+    priceMinCents: session.priceMinCents,
+    priceMaxCents: session.priceMaxCents,
     buyUrl: session.buyUrl ?? undefined,
     isSaleOpen: session.isSaleOpen ?? undefined,
   }));
