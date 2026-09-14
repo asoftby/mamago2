@@ -12,6 +12,7 @@ import {
   dedupeKey,
   filterCategoryTypeIds,
   isSingleVenue,
+  limitAbwsItems,
   mapAbwsPerformanceToRawPayload,
   mapAbwsSession,
   normalizeSessionTagName,
@@ -162,3 +163,37 @@ assert.deepEqual(
 );
 assert.throws(() => parseAbwsResponseBody(JSON.stringify({ unexpected: true })), /Unrecognized ABWS response/);
 assert.throws(() => parseAbwsResponseBody("not json"), /not valid JSON/);
+
+// ── limitAbwsItems (ImportSource.crawlMaxRecords) ───────────────────────────
+// API response order is not reliably stable (confirmed live, two fetches
+// ~19h apart) — sort by performance.id first so the same crawlMaxRecords
+// value always selects the same subset, independent of API response order.
+{
+  const outOfOrder: AbwsPerformanceItem[] = [
+    { ...singleVenueFixture, performance: { ...singleVenueFixture.performance, id: 300 } },
+    { ...singleVenueFixture, performance: { ...singleVenueFixture.performance, id: 100 } },
+    { ...singleVenueFixture, performance: { ...singleVenueFixture.performance, id: 200 } },
+  ];
+
+  // null -> no limit, order untouched (caller doesn't need determinism when
+  // taking everything).
+  assert.deepEqual(limitAbwsItems(outOfOrder, null), outOfOrder);
+
+  // limit sorts by performance.id ascending first, then slices.
+  const limited2 = limitAbwsItems(outOfOrder, 2);
+  assert.deepEqual(limited2.map((i) => i.performance.id), [100, 200]);
+
+  // limit >= length -> full set, sorted.
+  const limitedAll = limitAbwsItems(outOfOrder, 10);
+  assert.deepEqual(limitedAll.map((i) => i.performance.id), [100, 200, 300]);
+
+  // limit 0 -> empty, not an error.
+  assert.deepEqual(limitAbwsItems(outOfOrder, 0), []);
+
+  // original array untouched (no in-place sort).
+  assert.deepEqual(
+    outOfOrder.map((i) => i.performance.id),
+    [300, 100, 200],
+    "limitAbwsItems must not mutate its input",
+  );
+}

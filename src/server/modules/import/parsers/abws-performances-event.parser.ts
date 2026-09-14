@@ -400,6 +400,32 @@ export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsP
   }
 }
 
+/**
+ * `ImportSource.crawlMaxRecords`-driven cap on how many performances this
+ * parser actually processes into ParsedRawRecord — applied before mapping,
+ * not after, so a limited run doesn't spend time parsing records it's going
+ * to discard.
+ *
+ * The API's own response order is NOT reliably stable: confirmed empirically
+ * by comparing two independent live fetches ~19h apart (2026-09-13 vs
+ * 2026-09-14 snapshots) — item order shifts between calls (insertions,
+ * removals, occasional reordering of surviving items) and is not sorted by
+ * `performance.id` in either response. Taking a raw prefix of `items` would
+ * make "the first N" depend on incidental API response order, not on
+ * anything meaningful, and wouldn't reproduce the same set from one run to
+ * the next. Sorting by `performance.id` ascending first makes the selected
+ * subset deterministic across runs (modulo the catalog itself changing
+ * between runs, which no sort order can avoid).
+ */
+export function limitAbwsItems(
+  items: AbwsPerformanceItem[],
+  crawlMaxRecords: number | null,
+): AbwsPerformanceItem[] {
+  if (crawlMaxRecords == null) return items;
+  const sorted = [...items].sort((a, b) => a.performance.id - b.performance.id);
+  return sorted.slice(0, crawlMaxRecords);
+}
+
 // ── Parser export ────────────────────────────────────────────────────────────
 
 export const abwsPerformancesEventParser: EventImportParser = {
@@ -415,7 +441,10 @@ export const abwsPerformancesEventParser: EventImportParser = {
       return errorParserResult(PARSER_KEY, `Failed to fetch ABWS performances: ${msg}`);
     }
 
-    const records: ParsedRawRecord[] = items.map((item) => {
+    const totalFound = items.length;
+    const limitedItems = limitAbwsItems(items, source.crawlMaxRecords);
+
+    const records: ParsedRawRecord[] = limitedItems.map((item) => {
       const rawPayload = mapAbwsPerformanceToRawPayload(item);
       // `urlSaleframe` is the only known per-performance URL; when it's
       // absent, fall back to a synthetic (not a real public page) reference
@@ -433,7 +462,7 @@ export const abwsPerformancesEventParser: EventImportParser = {
 
     return {
       records,
-      totalFound: records.length,
+      totalFound,
       parserKey: PARSER_KEY,
     };
   },
