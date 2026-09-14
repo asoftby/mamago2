@@ -4303,6 +4303,45 @@ distributor_company_id=550) и хотели бы уточнить несколь
 Буду благодарен за ответы.
 ```
 
+## [BACKLOG-150] `/api/ai/rewrite` — platform-staff bypass skips Business scoping
+
+- Status: OPEN
+- Priority: P3
+- Area: Auth / Permissions
+- Added: 2026-09-14
+- Reason deferred: found while auditing the existing AI description-rewrite
+  feature (`src/app/api/ai/rewrite/route.ts`) for ABWS import review reuse;
+  not related to ABWS and not a blocker for it — filed separately per
+  "no unrelated while-here changes".
+- Context: `checkBusinessToolPermission()`
+  (`src/server/permissions/business-permissions.ts:211-221`) is meant to
+  gate a `BusinessPermission` (`content.create` etc.) against the caller's
+  membership in a specific `Business`. For `ADMIN`/`MODERATOR` users,
+  `isPlatformContentStaff(user.role)` short-circuits and returns `true`
+  immediately, before any `Business`/`BusinessMember` lookup happens. This
+  means any endpoint that calls `checkBusinessToolPermission` — currently
+  including `/api/ai/rewrite` — is reachable by platform staff with zero
+  binding to a specific business, business membership role, or resource
+  ownership. For `/api/ai/rewrite` specifically this looks intentional and
+  low-risk (it takes free-form `sourceText`/`title`/`context` from the
+  caller, not a business-scoped entity id, and only proxies to an LLM), but
+  the same bypass would apply to any *other* route that reuses
+  `checkBusinessToolPermission` expecting business-scoped authorization —
+  worth a deliberate look at all current callers to confirm none of them
+  assume the Business-membership check actually ran for staff roles.
+- Current state: not changed; documented only.
+- Dependencies: none.
+- Acceptance criteria: audit every caller of `checkBusinessToolPermission`
+  (`grep -rn checkBusinessToolPermission src`), confirm for each whether the
+  platform-staff bypass is safe (route doesn't rely on business-scoped
+  authorization beyond "is this a trusted platform operator") or needs an
+  explicit resource-ownership check added alongside the staff bypass; either
+  document the bypass as intentional per-route or fix the routes that need
+  scoping, then mark DONE with the PR/commit reference.
+- Source: found during `docs/imports/abws-phase1-spec.md` §6 investigation,
+  2026-09-14 session (AI rewrite reuse assessment for the ABWS manual
+  review/publish path).
+
 ## [BACKLOG-148] Run the full test suite (505 files) in `check:push`, not a named list
 
 - Status: OPEN
