@@ -129,7 +129,7 @@ export function StoryModalActionCard({
                 Стоимость
               </p>
               <p className="text-[17px] font-semibold text-neutral-900">
-                {renderCurrencyText(item.price)}
+                {renderCurrencyText(item.price, { iconSize: "sm" })}
               </p>
             </div>
           )}
