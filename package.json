@@ -161,8 +161,9 @@
     "test:google-maps-config": "tsx src/services/googleMaps/googleMapsConfigContract.test.ts && tsx src/services/googleMaps/toLegacyAddressComponents.test.ts",
     "test:family-by-event-normalization": "tsx src/server/modules/import/normalizers/event.normalizer.test.ts && tsx src/server/modules/import/parsers/family-by-afisha-event.parser.test.ts",
     "test:abws-quality-flags": "tsx src/server/modules/import/normalizers/abws-event.normalizer.test.ts",
+    "test:abws-activity-session-publish": "tsx src/server/modules/import/publish/activity-session-from-occurrences.test.ts",
     "prepare": "husky",
-    "check:push": "tsc --noEmit && pnpm test:family-by-event-normalization && pnpm test:abws-quality-flags && pnpm build",
+    "check:push": "tsc --noEmit && pnpm test:family-by-event-normalization && pnpm test:abws-quality-flags && pnpm test:abws-activity-session-publish && pnpm build",
     "check:no-old-social-links": "sh -c 'OLD_URL=$(printf \"%s%s\" \"https://www.tiktok.com/\" \"@mamago.by\"); if git grep -n \"$OLD_URL\" -- src prisma public .env.example; then echo \"Old TikTok URL found in tracked source/example files\"; exit 1; fi'"
   },
   "dependencies": {
