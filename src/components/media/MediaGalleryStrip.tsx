@@ -18,6 +18,8 @@ function Tile({
   onClick: () => void;
 }) {
   const isReels = item.type === "reels";
+  const instagramMediaLabel =
+    isReels && /instagram\.com\/p\//i.test(item.url) ? "Post" : "Reels";
   const bgSrc = isReels
     ? (item as Extract<MediaGalleryItem, { type: "reels" }>).thumbnailSrc
     : (item as Extract<MediaGalleryItem, { type: "image" }>).src;
@@ -26,7 +28,7 @@ function Tile({
     <button
       type="button"
       onClick={onClick}
-      aria-label={isReels ? "Смотреть Reels" : "Открыть фото"}
+      aria-label={isReels ? `Смотреть ${instagramMediaLabel}` : "Открыть фото"}
       className={cn(
         "group relative overflow-hidden rounded-[16px] bg-[#E8E0D4]",
         "aspect-square w-full shrink-0",
@@ -66,7 +68,7 @@ function Tile({
           </span>
         </div>
       ) : isReels ? (
-        /* Reels: play icon + label */
+        /* Instagram media: play icon + label */
         <>
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-transform group-hover:scale-110">
@@ -74,7 +76,7 @@ function Tile({
             </span>
           </div>
           <span className="absolute bottom-2 left-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-white/80 select-none">
-            Reels
+            {instagramMediaLabel}
           </span>
         </>
       ) : null}

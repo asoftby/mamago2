@@ -44,6 +44,7 @@ export type PublicContinuousArticleDto = {
   heroAlt: string | null;
   readTimeMinutes: number;
   categoryLabel: string | null;
+  author: { displayName: string | null; avatarUrl: string | null } | null;
   section: NextArticleSectionRef | null;
   tags: Array<{ slug: string; title: string }>;
   blocks: ArticleMvpResolvedBlock[];
@@ -80,6 +81,13 @@ const nextArticleSelect = {
   geoScope: true,
   cityId: true,
   categoryId: true,
+  authorLabel: true,
+  authorUser: {
+    select: {
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
   category: {
     select: {
       id: true,
@@ -144,6 +152,8 @@ export async function mapRowToPublicContinuousArticleDto(
     geoScope: GeoScope | null;
     cityId: string | null;
     categoryId: string | null;
+    authorLabel: string | null;
+    authorUser: { displayName: string | null; avatarUrl: string | null } | null;
     category: { id: string; slug: string; nameRu: string } | null;
     city: { slug: string } | null;
     tags: Array<{ slug: string; title: string }>;
@@ -182,6 +192,11 @@ export async function mapRowToPublicContinuousArticleDto(
     heroAlt: cover?.alt ?? row.title,
     readTimeMinutes: estimateReadTimeMinutes(blocks),
     categoryLabel: row.category?.nameRu ?? null,
+    author: row.authorUser
+      ? { displayName: row.authorUser.displayName, avatarUrl: row.authorUser.avatarUrl }
+      : row.authorLabel?.trim()
+        ? { displayName: row.authorLabel, avatarUrl: null }
+        : null,
     section,
     tags: row.tags,
     blocks,

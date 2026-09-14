@@ -143,6 +143,47 @@ export interface NormalizedEventImport extends NormalizedImportPayload {
   socialUrls?: string[];
   /** URL трейлера (YouTube, VK Video и т.п.) */
   trailerUrl?: string;
+  /**
+   * Структурированные данные по каждому сеансу/показу (площадка, дата,
+   * цена) — для источников, у которых одна запись описывает несколько
+   * сеансов вместо одной пары дата+площадка (ABWS). Аддитивное поле:
+   * `normalizeEventPayload` (family.by) никогда его не заполняет — не
+   * ломается. `venueName`/`addressText`/`cityName`/`startAt` выше остаются
+   * best-effort представлением "первого" сеанса для потребителей, ещё не
+   * умеющих читать `occurrences[]`; `occurrences[]` — источник истины для
+   * множественных сеансов.
+   */
+  occurrences?: EventImportOccurrence[];
+  /**
+   * Whole-event purchase link — one per event, distinct from each
+   * occurrence's own per-session link (`EventImportOccurrence.buyUrl`).
+   * For ABWS this is `performance.urlSaleframe` (`?pid=`, opens the sale
+   * frame's own date-picker widget), never set by `normalizeEventPayload`
+   * (family.by).
+   */
+  performanceBuyUrl?: string;
+}
+
+/** Один сеанс/показ мероприятия — площадка, дата, цена по отдельности от остальных. */
+export interface EventImportOccurrence {
+  /** id сеанса у источника, если есть */
+  externalId?: string;
+  /** ISO 8601 строка */
+  startAt?: string;
+  venueName?: string;
+  addressText?: string;
+  cityName?: string;
+  priceText?: string;
+  /**
+   * Цена сеанса в копейках, как отдаёт источник (ABWS). Хранится отдельно
+   * от `priceText`, а не парсится из него обратно — `priceText` уже
+   * округлён/отформатирован для отображения и не гарантирует точность
+   * копеек при обратном парсинге.
+   */
+  priceMinCents?: number | null;
+  priceMaxCents?: number | null;
+  buyUrl?: string;
+  isSaleOpen?: boolean;
 }
 
 // ─── Parser ───────────────────────────────────────────────────────────────────

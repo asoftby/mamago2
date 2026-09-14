@@ -63,6 +63,7 @@ export default async function ArticlePreviewPage({
         blocks={data.blocks}
         tags={data.tags}
         categoryLabel={data.categoryLabel}
+        author={data.author}
         readingScrollPaddingExtraRem={2.75}
       />
     </>

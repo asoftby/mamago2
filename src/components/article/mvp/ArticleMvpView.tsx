@@ -23,7 +23,6 @@ import {
   type ArticleTocBranch,
 } from "@/lib/article/articleHeadingAnchors";
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
-import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
@@ -39,50 +38,13 @@ import {
   ArticlePerformanceScope,
 } from "@/components/article/analytics/ArticlePerformanceAnalytics";
 import type { ArticlePerformanceBlockDescriptor } from "@/lib/article/articlePerformanceAnalytics";
-import { formatSharedPrice } from "@/domain/pricing/structuredPrice";
-
-type StructuredResolvedBlock = Extract<
-  ArticleMvpResolvedBlock,
-  { type: "contacts" | "price" | "openingHours" }
->;
-
-function structuredDescriptor(block: StructuredResolvedBlock): ArticlePerformanceBlockDescriptor {
-  const subject = block.subject;
-  return {
-    blockId: block.id,
-    blockType: block.type,
-    ...(subject?.id ? { subjectId: subject.id } : {}),
-    ...(subject?.title ? { subjectTitle: subject.title } : {}),
-    ...(subject?.source ? { subjectSource: subject.source } : {}),
-    ...(subject?.catalogEntityType ? { catalogEntityType: subject.catalogEntityType } : {}),
-    ...(subject?.catalogEntityId ? { catalogEntityId: subject.catalogEntityId } : {}),
-  };
-}
-
-/** Keep analytics impressions aligned with the exact omission rules used by ArticleInfoCard. */
-function structuredBlockRenders(block: StructuredResolvedBlock): boolean {
-  if (block.type === "contacts") {
-    const data = block.data;
-    return Boolean(
-      data.address ||
-        data.email ||
-        data.website ||
-        data.mapUrl ||
-        data.coordinates ||
-        data.phones.length ||
-        data.socials.length,
-    );
-  }
-  if (block.type === "price") {
-    return Boolean(formatSharedPrice(block.data) || block.data.items.length || block.data.note.trim());
-  }
-  return !(
-    block.data.mode === "WEEKLY" &&
-    !block.data.rules.some((rule) => rule.isOpen) &&
-    block.data.exceptions.length === 0 &&
-    !block.data.note
-  );
-}
+import { ArticleBreadcrumbs } from "@/components/article/ArticleBreadcrumbs";
+import { ArticleAuthorActionsBar, type ArticleAuthor } from "@/components/article/ArticleAuthorActionsBar";
+import {
+  structuredBlockRenders,
+  structuredDescriptor,
+  type StructuredResolvedBlock,
+} from "@/lib/article/articleStructuredBlockAnalytics";
 
 function activityDescriptor(
   block: Extract<ArticleMvpResolvedBlock, { type: "activityCard" }>,
@@ -147,6 +109,7 @@ export function ArticleMvpView({
   articleId,
   articleHref,
   coverImageUrl,
+  author,
 }: {
   title: string;
   subtitle: string | null;
@@ -166,6 +129,7 @@ export function ArticleMvpView({
   articleId?: string;
   articleHref?: string;
   coverImageUrl?: string | null;
+  author?: ArticleAuthor;
 }) {
   const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
   const headingEntries = extractHeadingEntriesFromArticleBlocks(blocks as ArticleBlockMvp[]);
@@ -205,6 +169,12 @@ export function ArticleMvpView({
             Черновик / предпросмотр — так видят только редакторы
           </div>
         ) : null}
+        <ArticleBreadcrumbs
+          title={title}
+          homeHref={cityHomeHref}
+          journalHref={journalHref}
+          className="mb-6"
+        />
         <ArticleHeader
           title={title}
           subtitle={headerDekPlain || undefined}
@@ -218,17 +188,16 @@ export function ArticleMvpView({
           editHref={editHref}
         />
 
-        {articleId && articleHref ? (
-          <ArticleDetailActions
-            articleId={articleId}
-            title={title}
-            href={articleHref}
-            coverImageUrl={coverImageUrl}
-            source={`article-detail-${continuousVariant}`}
-            citySlug={citySlug}
-            className="mb-6 md:mb-8"
-          />
-        ) : null}
+        <ArticleAuthorActionsBar
+          author={author ?? null}
+          articleId={articleId}
+          title={title}
+          href={articleHref}
+          coverImageUrl={coverImageUrl}
+          source={`article-detail-${continuousVariant}`}
+          citySlug={citySlug}
+          className="mb-6 md:mb-8"
+        />
 
         <PublicationTagChips tags={tags} citySlug={citySlug} className="mb-6 md:mb-8" />
 

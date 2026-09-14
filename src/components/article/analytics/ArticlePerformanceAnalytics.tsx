@@ -193,7 +193,9 @@ export function ArticlePerformanceArticleTracker() {
 
   useEffect(() => {
     if (!analytics || !markerRef.current || typeof window === "undefined") return;
-    const article = markerRef.current.closest<HTMLElement>("article");
+    const article =
+      markerRef.current.closest<HTMLElement>("article") ??
+      markerRef.current.parentElement;
     if (!article) return;
 
     let viewTimer: ReturnType<typeof setTimeout> | null = null;

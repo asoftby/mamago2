@@ -8,19 +8,31 @@
  * Fonts: NTSomic for UI and display · project body font · system mono
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
-import { ArticleContactsBlock, ArticleOpeningHoursBlock, ArticlePriceBlock } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
+import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { SaveHeart } from "@/features/save/SaveHeart";
-import { ArticleDetailActions } from "@/components/article/ArticleDetailActions";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
+import { ArticleBreadcrumbs } from "@/components/article/ArticleBreadcrumbs";
+import { ArticleAuthorActionsBar } from "@/components/article/ArticleAuthorActionsBar";
+import { groupArticleInfoBlocks } from "@/lib/article/articleInfoBlockGrouping";
+import {
+  ArticlePerformanceArticleTracker,
+  ArticlePerformanceProvider,
+  ArticlePerformanceScope,
+} from "@/components/article/analytics/ArticlePerformanceAnalytics";
+import {
+  structuredBlockRenders,
+  structuredDescriptor,
+  type StructuredResolvedBlock,
+} from "@/lib/article/articleStructuredBlockAnalytics";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -185,39 +197,6 @@ function PublishedAtChip({ publishedAt }: { publishedAt: Date | null }) {
 
 // ─── Breadcrumbs ──────────────────────────────────────────────────────────────
 
-const BREADCRUMB_HREFS: Record<string, string> = {
-  "Главная": "/",
-  "Журнал": "/blog",
-};
-
-function Breadcrumbs({ items }: { items: string[] }) {
-  return (
-    <div style={{
-      maxWidth: 1200, margin: "0 auto", padding: "28px 28px 16px",
-      display: "flex", gap: 8, alignItems: "center",
-      color: C.ink3, fontSize: 13, overflowX: "auto", whiteSpace: "nowrap",
-    }}>
-      {items.map((t, i) => {
-        const isLast = i === items.length - 1;
-        const href = BREADCRUMB_HREFS[t];
-        return (
-          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            {i > 0 && <span style={{ opacity: .45, fontSize: 11 }}>→</span>}
-            {!isLast && href ? (
-              <Link href={href} style={{ color: "inherit", textDecoration: "none" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = C.ink; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = ""; }}
-              >{t}</Link>
-            ) : (
-              <span style={{ color: isLast ? C.ink : "inherit" }}>{t}</span>
-            )}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 // ─── Hero section ─────────────────────────────────────────────────────────────
 
 function NewsHero({
@@ -227,6 +206,9 @@ function NewsHero({
   publishedAt,
   author,
   editHref,
+  articleHref,
+  citySlug,
+  coverImageUrl,
 }: {
   articleId: string;
   title: string;
@@ -234,18 +216,13 @@ function NewsHero({
   publishedAt: Date | null;
   author: { displayName: string | null; avatarUrl: string | null } | null;
   editHref?: string;
+  articleHref: string;
+  citySlug?: string | null;
+  coverImageUrl?: string | null;
 }) {
-  const formattedDate = publishedAt
-    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(publishedAt).replace(/ г\.$/, "")
-    : null;
-
-  const authorName = author?.displayName ?? "Редакция mamaGo";
-  const authorInitial = authorName.charAt(0).toUpperCase();
-
   return (
     <section style={{ padding: "4px 0 24px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           {/* Meta row */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
             <span style={{
@@ -290,11 +267,7 @@ function NewsHero({
           </div>
 
           {/* H1 */}
-          <h1 style={{
-            fontFamily: FONT_DISPLAY, fontWeight: 400,
-            fontSize: "clamp(40px, 5.4vw, 78px)", lineHeight: .98,
-            letterSpacing: "-.025em", margin: "0 0 22px", color: C.ink,
-          }}>
+          <h1 className="mb-4 font-sans text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
             {title}
           </h1>
 
@@ -308,42 +281,15 @@ function NewsHero({
             </p>
           )}
 
-          {/* Author bar */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap",
-            paddingTop: 18, borderTop: `1px solid ${C.line}`,
-            color: C.ink3, fontSize: 13,
-          }}>
-            {/* Author */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {author?.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={author.avatarUrl} alt={authorName}
-                  style={{ width: 35, height: 35, borderRadius: 99, objectFit: "cover", flexShrink: 0 }} />
-              ) : (
-                <span style={{
-                  width: 35, height: 35, borderRadius: 99,
-                  background: C.accentSoft, color: C.accentDeep,
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, fontWeight: 600, flexShrink: 0,
-                }}>{authorInitial}</span>
-              )}
-              <div>
-                <div style={{ color: C.ink, fontSize: 14, fontWeight: 600, letterSpacing: "-.01em" }}>{authorName}</div>
-              </div>
-            </div>
-
-            <span style={{ flex: 1 }} />
-
-            {/* Save + Share */}
-            <ArticleDetailActions
-              articleId={articleId}
-              title={title}
-              href={typeof window !== "undefined" ? window.location.pathname : ""}
-              source="breaking-news-detail"
-            />
-          </div>
-        </div>
+          <ArticleAuthorActionsBar
+            author={author}
+            articleId={articleId}
+            title={title}
+            href={articleHref}
+            coverImageUrl={coverImageUrl}
+            source="breaking-news-detail"
+            citySlug={citySlug}
+          />
       </div>
     </section>
   );
@@ -480,17 +426,35 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
   const contentBlocks = blocks.filter((b): b is ContentBlock =>
     b.type === "text" || b.type === "quote" || b.type === "contacts" || b.type === "price" || b.type === "openingHours",
   );
+  const groups = groupArticleInfoBlocks(contentBlocks);
 
   if (contentBlocks.length === 0) return null;
 
   return (
     <section style={{ padding: "28px 0 12px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {contentBlocks.map((block, i) => {
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+          {groups.map((group, i) => {
+            if (group.kind === "info") {
+              const contactsBlock = group.blocks.find((b): b is Extract<ContentBlock, { type: "contacts" }> => b.type === "contacts");
+              const priceBlock = group.blocks.find((b): b is Extract<ContentBlock, { type: "price" }> => b.type === "price");
+              const hoursBlock = group.blocks.find((b): b is Extract<ContentBlock, { type: "openingHours" }> => b.type === "openingHours");
+              const analyticsBlocks = group.blocks
+                .filter((b): b is StructuredResolvedBlock => b.type === "contacts" || b.type === "price" || b.type === "openingHours")
+                .filter(structuredBlockRenders)
+                .map(structuredDescriptor);
+              return (
+                <div key={group.blocks[0].id} style={{ marginBottom: i < groups.length - 1 ? 48 : 0 }}>
+                  <ArticlePerformanceScope blocks={analyticsBlocks} mode="info">
+                    <ArticleInfoCard contacts={contactsBlock?.data} price={priceBlock?.data} openingHours={hoursBlock?.data} />
+                  </ArticlePerformanceScope>
+                </div>
+              );
+            }
+
+            const block = group.block;
             const textBlockIndex =
               block.type === "text"
-                ? contentBlocks.slice(0, i + 1).filter((item) => item.type === "text").length - 1
+                ? contentBlocks.slice(0, group.index + 1).filter((item) => item.type === "text").length - 1
                 : -1;
             const isPricingTextBlock = block.type === "text" && textBlockIndex === 1;
             if (block.type === "text" && isPricingTextBlock && !block.text.trim()) {
@@ -498,7 +462,7 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
             }
 
             return (
-            <div key={block.id} style={{ marginBottom: i < contentBlocks.length - 1 ? 48 : 0 }}>
+            <div key={block.id} style={{ marginBottom: i < groups.length - 1 ? 48 : 0 }}>
               {block.type === "text" && (
                 <>
                   {isPricingTextBlock ? <SectionKicker label="Сколько стоит" /> : null}
@@ -528,13 +492,9 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
                   </div>
                 </blockquote>
               )}
-              {block.type === "contacts" && <ArticleContactsBlock data={block.data} />}
-              {block.type === "price" && <ArticlePriceBlock data={block.data} />}
-              {block.type === "openingHours" && <ArticleOpeningHoursBlock data={block.data} />}
             </div>
             );
           })}
-        </div>
       </div>
     </section>
   );
@@ -553,8 +513,7 @@ function PriceSection({ placeExtra }: { placeExtra: PlaceCardExtra }) {
 
   return (
     <section style={{ padding: "40px 0 0" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <SectionKicker label="Сколько стоит" />
 
           {/* Rows */}
@@ -598,7 +557,6 @@ function PriceSection({ placeExtra }: { placeExtra: PlaceCardExtra }) {
               <span style={{ ...capsStyle, color: C.ink3 }}>{priceData.note.trim()}</span>
             )}
           </div>
-        </div>
       </div>
     </section>
   );
@@ -699,8 +657,7 @@ function LinkedEntityCard({
 
   return (
     <section style={{ padding: "40px 0 12px" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <SectionKicker label="О чём речь" />
 
           <div
@@ -831,7 +788,6 @@ function LinkedEntityCard({
               </div>
             </div>
           </div>
-        </div>
       </div>
     </section>
   );
@@ -985,6 +941,8 @@ export interface BreakingNewsViewProps {
   editHref?: string;
   draftWatermark?: boolean;
   citySlug?: string | null;
+  articleHref: string;
+  coverImageUrl?: string | null;
 }
 
 export function BreakingNewsView({
@@ -999,8 +957,11 @@ export function BreakingNewsView({
   editHref,
   draftWatermark,
   citySlug,
+  articleHref,
+  coverImageUrl,
 }: BreakingNewsViewProps) {
   const cityHomeHref = getCityHomeHref(citySlug);
+  const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
 
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
 
@@ -1009,8 +970,6 @@ export function BreakingNewsView({
 
   // Build marquee items from article context.
   const marqueeItems = ["BREAKING NEWS"];
-
-  const breadcrumbs = ["Главная", "Журнал", title];
 
   return (
     <div style={{ background: "#fff", color: C.ink, minHeight: "100vh", position: "relative" }}>
@@ -1030,18 +989,20 @@ export function BreakingNewsView({
       <Marquee items={marqueeItems} />
 
       {draftWatermark && (
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "12px 28px 0" }}>
+        <div className="mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6">
           <div style={{ borderRadius: 10, border: "1px solid #fde68a", background: "#fffbeb", padding: "10px 16px", fontSize: 13, color: "#92400e" }}>
             Черновик / предпросмотр — так видят только редакторы
           </div>
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6">
         <MobileSmartBackButton fallbackHref={cityHomeHref} />
       </div>
 
-      <Breadcrumbs items={breadcrumbs} />
+      <div className="mx-auto w-full max-w-3xl px-4 pb-4 pt-7 sm:px-6">
+        <ArticleBreadcrumbs title={title} homeHref={cityHomeHref} journalHref={journalHref} />
+      </div>
       <NewsHero
         articleId={articleId}
         title={title}
@@ -1049,21 +1010,27 @@ export function BreakingNewsView({
         publishedAt={publishedAt}
         author={author}
         editHref={editHref}
+        articleHref={articleHref}
+        citySlug={citySlug}
+        coverImageUrl={coverImageUrl}
       />
-      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-        <div className="max-w-[760px] pb-6">
+      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+        <div className="pb-6">
           <PublicationTagChips tags={tags} citySlug={citySlug} />
         </div>
       </div>
       {galleryBlock ? (
-        <div className="mx-auto w-full max-w-[760px] px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <ArticleGallery images={galleryBlock.images} presentation={galleryBlock.presentation} caption={galleryBlock.caption} />
         </div>
       ) : null}
-      <ArticleBody blocks={blocks} />
+      <ArticlePerformanceProvider articleId={articleId}>
+        <ArticlePerformanceArticleTracker />
+        <ArticleBody blocks={blocks} />
+      </ArticlePerformanceProvider>
 
       {activityBlock?.card?.kind === "place-live" ? (
-        <div className="mx-auto w-full max-w-[760px] px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <ArticleLivePlaceBlock card={activityBlock.card} />
         </div>
       ) : null}

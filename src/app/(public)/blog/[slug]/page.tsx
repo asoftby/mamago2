@@ -402,6 +402,8 @@ export default async function ArticlePage({
             tags={mvp.tags}
             related={related}
             editHref={editHref}
+            articleHref={canonicalPath}
+            coverImageUrl={mvp.heroUrl}
           />
         </>
       );
@@ -424,6 +426,7 @@ export default async function ArticlePage({
         articleId={mvp.id}
         articleHref={canonicalPath}
         coverImageUrl={mvp.heroUrl}
+        author={mvp.author}
       />
     );
 
@@ -450,6 +453,7 @@ export default async function ArticlePage({
         heroAlt: mvp.heroAlt,
         blocks: [],
         categoryLabel: mvp.categoryLabel,
+        author: mvp.author,
         tags: mvp.tags,
         section: continuous.section,
         geoScope: "COUNTRY",
