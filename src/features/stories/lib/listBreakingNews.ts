@@ -5,6 +5,10 @@ import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
+export const BREAKING_NEWS_STORIES_TTL_DAYS = 14;
+const BREAKING_NEWS_STORIES_TTL_MS =
+  BREAKING_NEWS_STORIES_TTL_DAYS * 24 * 60 * 60 * 1000;
+
 export type BreakingNewsItem = {
   id: string;
   title: string;
@@ -18,6 +22,8 @@ export type BreakingNewsItem = {
 /**
  * Fetches up to 6 published breaking news articles for a given city.
  * Breaking news is identified by subtitle === "__breaking_news__".
+ * Stories only keep breaking news for 14 days from publishedAt; the article
+ * itself remains published and available in the journal after that window.
  * Sorted by publishedAt descending (newest first).
  */
 export async function listBreakingNewsArticles(
@@ -25,6 +31,7 @@ export async function listBreakingNewsArticles(
   limit = 6,
 ): Promise<BreakingNewsItem[]> {
   const now = new Date();
+  const storiesCutoff = new Date(now.getTime() - BREAKING_NEWS_STORIES_TTL_MS);
 
   const rows = await prisma.article.findMany({
     where: {
@@ -38,7 +45,7 @@ export async function listBreakingNewsArticles(
         },
       ],
       subtitle: BREAKING_NEWS_SUBTITLE,
-      publishedAt: { not: null, lte: now },
+      publishedAt: { not: null, gte: storiesCutoff, lte: now },
     },
     orderBy: { publishedAt: "desc" },
     take: limit,
