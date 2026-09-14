@@ -4408,3 +4408,60 @@ distributor_company_id=550) и хотели бы уточнить несколь
   `pull_request.branches`.
 - Source: PR #278 review, 2026-09-14; git-history trace of commit
   `789c5921`.
+
+## [BACKLOG-151] ABWS price/ticketLink backfill script needed once cards are published
+
+- Status: OPEN
+- Priority: P3
+- Area: Import / Integrations
+- Added: 2026-09-14
+- Reason deferred: on DEV, at the time PR #296 shipped (adds
+  `priceFrom`/`priceMode`/`scheduleJson.ticketLink`/`pricingMode` mapping
+  for ABWS), the review queue held at most ~100 `ImportedRecord` rows and
+  **none had been Applied** — decided to delete and re-import that batch
+  instead of writing a backfill script, since a fresh import re-normalizes
+  with the new mapper for free. That option stops being available the
+  first time any ABWS-sourced `Activity` actually exists (Applied, whether
+  published or still `PENDING`).
+- Context: `filterActivityNonDestructiveUpdates()`
+  (`event-field-mapper.ts`) treats `scheduleJson` as one atomic
+  `onlyIfEmpty` blob — any already-created Activity already has *some*
+  non-empty `scheduleJson` (set at CREATE time), so a later UPDATE
+  decision skips the whole object wholesale, including the new
+  `ticketLink`/`pricingMode` keys, even after the `ImportedRecord` itself
+  gets re-normalized with the current mapper code. `priceFrom`/`priceTo`/
+  `priceText` *are* individually in that same `onlyIfEmpty` list and *do*
+  backfill correctly on UPDATE if still `null` on the existing row.
+  `priceMode` does not have this problem solved either way: it was never
+  added to `onlyIfEmpty` at all, and adding it naively would not work —
+  `Activity.priceMode` defaults to `"UNKNOWN"` in the schema, never truly
+  empty/null, so the generic `existingVal !== null/undefined/""` check
+  used by every other field in that list would treat every existing row
+  as "already has a value" and skip it forever. Needs a field-specific
+  exception (treat `"UNKNOWN"` as empty for this one field only), not the
+  generic mechanism.
+- Current state: not started — no ABWS `Activity` has been created yet
+  (confirmed at PR #296 time), so nothing to backfill exists yet.
+- Dependencies: none block starting the manual-review-path work. This only
+  needs solving once the first ABWS card is Applied *and* someone wants
+  its `ticketLink`/`priceMode` corrected without re-creating the Activity
+  from scratch.
+- Acceptance criteria: a one-off script that, for existing ABWS-sourced
+  Activities, merges `ticketLink`/`participationMode`/`pricingMode` into
+  the *existing* `scheduleJson` object (preserving every other key already
+  there — never replace the object wholesale) — **and fills each of these
+  three target keys only when absent on the existing object, same
+  non-destructive posture as `filterActivityNonDestructiveUpdates()`
+  elsewhere in this module. If a reviewer already hand-corrected
+  `ticketLink` after import, the script must not overwrite that
+  correction back to the auto-derived value.** Sets `priceMode` to
+  `"FROM"` only when `priceFrom` is set and `priceMode` is still
+  `"UNKNOWN"` (an explicit UNKNOWN-is-empty exception, not a reusable
+  generic pattern for every enum field) — same only-if-still-default
+  rule. Idempotent — safe to re-run.
+- Source: found while answering the "does re-import backfill existing
+  cards" question during PR #296 review, 2026-09-14 — see PR #296
+  description for the full trace (`onlyIfEmpty` gate, `contentHash`-gated
+  re-normalization). Acceptance criteria's non-destructive-per-key wording
+  fixed after automated review on this entry's own PR (#297) caught the
+  first draft allowing a manual post-import correction to be overwritten.
