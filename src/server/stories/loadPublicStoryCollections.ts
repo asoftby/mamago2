@@ -112,7 +112,7 @@ export async function loadPublicStoryCollections(input: {
   const [rail, configs, breakingNews, city] = await Promise.all([
     buildStoryRailData({ cityId: input.cityId, now, bypassCache: input.bypassCache }),
     getPublicStoryIntentConfigs(),
-    listBreakingNewsArticles(input.citySlug).catch(() => []),
+    listBreakingNewsArticles(input.citySlug, 6, now).catch(() => []),
     prisma.city.findUnique({ where: { id: input.cityId }, select: { name: true } }),
   ]);
   const cityName = city?.name ?? null;

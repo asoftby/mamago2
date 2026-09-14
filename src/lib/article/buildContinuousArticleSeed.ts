@@ -18,6 +18,7 @@ export function buildContinuousArticleSeed(args: {
   heroAlt?: string | null;
   blocks: ArticleMvpResolvedBlock[];
   categoryLabel: string | null;
+  author: { displayName: string | null; avatarUrl: string | null } | null;
   tags: Array<{ slug: string; title: string }>;
   section: NextArticleSectionRef | null;
   geoScope: GeoScope;
@@ -44,6 +45,7 @@ export function buildContinuousArticleSeed(args: {
     heroAlt: args.heroAlt ?? args.title,
     readTimeMinutes: args.readTimeMinutes ?? 5,
     categoryLabel: args.categoryLabel,
+    author: args.author,
     section: args.section,
     tags: args.tags,
     blocks: args.blocks,

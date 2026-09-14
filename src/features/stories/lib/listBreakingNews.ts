@@ -5,6 +5,17 @@ import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { stripHtml } from "@/lib/search/sanitizeSearchText";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
+export const BREAKING_NEWS_STORIES_TTL_DAYS = 14;
+const BREAKING_NEWS_STORIES_TTL_MS =
+  BREAKING_NEWS_STORIES_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+export function getBreakingNewsStoriesPublishedWindow(now: Date): { gte: Date; lte: Date } {
+  return {
+    gte: new Date(now.getTime() - BREAKING_NEWS_STORIES_TTL_MS),
+    lte: now,
+  };
+}
+
 export type BreakingNewsItem = {
   id: string;
   title: string;
@@ -18,14 +29,17 @@ export type BreakingNewsItem = {
 /**
  * Fetches up to 6 published breaking news articles for a given city.
  * Breaking news is identified by subtitle === "__breaking_news__".
+ * Stories only keep breaking news for 14 days from publishedAt; the article
+ * itself remains published and available in the journal after that window.
+ * The caller may inject the collection clock so historical/future previews
+ * evaluate the same TTL window as the rest of the Stories read model.
  * Sorted by publishedAt descending (newest first).
  */
 export async function listBreakingNewsArticles(
   citySlug: string,
   limit = 6,
+  now = new Date(),
 ): Promise<BreakingNewsItem[]> {
-  const now = new Date();
-
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
@@ -38,7 +52,7 @@ export async function listBreakingNewsArticles(
         },
       ],
       subtitle: BREAKING_NEWS_SUBTITLE,
-      publishedAt: { not: null, lte: now },
+      publishedAt: { not: null, ...getBreakingNewsStoriesPublishedWindow(now) },
     },
     orderBy: { publishedAt: "desc" },
     take: limit,

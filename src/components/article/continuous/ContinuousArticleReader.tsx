@@ -490,6 +490,7 @@ export function ContinuousArticleReader({
                 articleId={article.id}
                 articleHref={article.href}
                 coverImageUrl={article.heroUrl}
+                author={article.author}
               />
             </div>
             <ArticleIntermission

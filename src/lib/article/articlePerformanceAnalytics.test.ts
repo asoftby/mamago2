@@ -139,8 +139,11 @@ assert.equal(ARTICLE_PERFORMANCE_BATCH_MAX_BYTES, 32 * 1024);
 // from impression descriptors, otherwise per-block impressions become false.
 {
   const view = readFileSync("src/components/article/mvp/ArticleMvpView.tsx", "utf8");
-  assert.equal(view.includes("function structuredBlockRenders("), true);
+  const breakingView = readFileSync("src/components/article/mvp/BreakingNewsView.tsx", "utf8");
+  const helper = readFileSync("src/lib/article/articleStructuredBlockAnalytics.ts", "utf8");
+  assert.equal(helper.includes("function structuredBlockRenders("), true);
   assert.equal(view.includes(".filter(structuredBlockRenders)"), true);
+  assert.equal(breakingView.includes(".filter(structuredBlockRenders)"), true);
 }
 
 // Route clicks are classified from the rendered control semantics, so Yandex,
