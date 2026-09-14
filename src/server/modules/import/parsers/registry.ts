@@ -8,6 +8,7 @@ import { familyByPlaceParser } from "./family-by-place.parser";
 import { familyByDirectoryPlaceParser } from "./family-by-directory-place.parser";
 import { familyByPlaycenterPlaceParser } from "./family-by-playcenter-place.parser";
 import { familyByAfishaEventParser } from "./family-by-afisha-event.parser";
+import { abwsPerformancesEventParser } from "./abws-performances-event.parser";
 
 const registry = new Map<string, ImportParser>([
   // Production parsers — PLACE
@@ -16,6 +17,7 @@ const registry = new Map<string, ImportParser>([
   [familyByPlaycenterPlaceParser.parserKey, familyByPlaycenterPlaceParser],
   // Production parsers — EVENT
   [familyByAfishaEventParser.parserKey, familyByAfishaEventParser],
+  [abwsPerformancesEventParser.parserKey, abwsPerformancesEventParser],
 ]);
 
 export function getParser(parserKey: string): ImportParser | null {
