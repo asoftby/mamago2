@@ -304,7 +304,7 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
   if (activity.sessions.length > 0) {
     const uniqueTimes = [
       ...new Set(activity.sessions.map((s) => formatHHMM(s.startsAt))),
-    ];
+    ].sort((a, b) => a.localeCompare(b));
     rows.push({
       id: "time",
       label: "Время начала",
@@ -576,12 +576,13 @@ function buildGalleryItems(
     const thumbnailSrc =
       reelsThumbnailUrl ??
       (resolvedPosterUrl !== "/og-default.jpg" ? resolvedPosterUrl : undefined);
+    const isInstagramPost = /instagram\.com\/p\//i.test(reelsUrl);
     items.push({
       type: "reels",
       id: "reels",
       url: reelsUrl,
       thumbnailSrc,
-      title: "Reels о событии",
+      title: isInstagramPost ? "Post о событии" : "Reels о событии",
     });
   }
 
