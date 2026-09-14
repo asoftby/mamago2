@@ -4449,11 +4449,19 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Acceptance criteria: a one-off script that, for existing ABWS-sourced
   Activities, merges `ticketLink`/`participationMode`/`pricingMode` into
   the *existing* `scheduleJson` object (preserving every other key already
-  there — never replace the object wholesale) and sets `priceMode` to
-  `"FROM"` when `priceFrom` is set and `priceMode` is still `"UNKNOWN"`
-  (an explicit UNKNOWN-is-empty exception, not a reusable generic pattern
-  for every enum field). Idempotent — safe to re-run.
+  there — never replace the object wholesale) — **and fills each of these
+  three target keys only when absent on the existing object, same
+  non-destructive posture as `filterActivityNonDestructiveUpdates()`
+  elsewhere in this module. If a reviewer already hand-corrected
+  `ticketLink` after import, the script must not overwrite that
+  correction back to the auto-derived value.** Sets `priceMode` to
+  `"FROM"` only when `priceFrom` is set and `priceMode` is still
+  `"UNKNOWN"` (an explicit UNKNOWN-is-empty exception, not a reusable
+  generic pattern for every enum field) — same only-if-still-default
+  rule. Idempotent — safe to re-run.
 - Source: found while answering the "does re-import backfill existing
   cards" question during PR #296 review, 2026-09-14 — see PR #296
   description for the full trace (`onlyIfEmpty` gate, `contentHash`-gated
-  re-normalization).
+  re-normalization). Acceptance criteria's non-destructive-per-key wording
+  fixed after automated review on this entry's own PR (#297) caught the
+  first draft allowing a manual post-import correction to be overwritten.
