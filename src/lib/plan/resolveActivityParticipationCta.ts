@@ -1,5 +1,6 @@
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { PlanItemWithActivity } from "@/server/services/plan.service";
+import { decorateStoredTicketLink } from "@/lib/abws/saleframeUrl";
 
 type ActivityForCta = NonNullable<PlanItemWithActivity["activity"]>;
 
@@ -48,7 +49,7 @@ export function resolveActivityParticipationCta(
   const prebookPhone = (sj.prebookPhone ?? "").trim();
 
   if (mode === "external-link" && ticketLink && isHttpUrl(ticketLink)) {
-    return { label: "Купить билет", href: ticketLink, external: true };
+    return { label: "Купить билет", href: decorateStoredTicketLink(ticketLink), external: true };
   }
 
   if (mode === "prebook") {
