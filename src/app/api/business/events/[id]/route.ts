@@ -245,7 +245,7 @@ export async function PATCH(
         },
         sessions: {
           orderBy: { startsAt: "asc" },
-          select: { startsAt: true },
+          select: { startsAt: true, source: true },
         },
       },
     });
@@ -368,15 +368,27 @@ export async function PATCH(
       return NextResponse.json({ error: schedulingError, code: "INCOMPLETE_SLOT_SCHEDULE" }, { status: 400 });
     }
     const nextScheduleFingerprint = eventSessionScheduleFingerprint(nextScheduleJson);
+    // Sessions with a non-null `source` come from an import pipeline (ABWS
+    // today), not from this wizard's own scheduleItems/dates model — the
+    // wizard's scheduleJson has no way to represent them (no scheduleItems/
+    // dates array), so the fingerprint comparison below would ALWAYS see a
+    // mismatch and wipe them on every single save, including one that only
+    // touches the description. Once any imported session exists, the
+    // resync is skipped entirely — the schedule step is read-only for this
+    // activity (see Step4DateTime), so there is nothing for the wizard to
+    // reconcile against scheduleJson in the first place.
+    const hasImportedSessions = existing.sessions.some((s) => s.source != null);
     const activitySessionsNeedResync =
-      eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
-      eventSessionFingerprintFromStoredSessions(existing.sessions) !== nextScheduleFingerprint;
+      !hasImportedSessions &&
+      (eventSessionScheduleFingerprint(existing.scheduleJson) !== nextScheduleFingerprint ||
+        eventSessionFingerprintFromStoredSessions(existing.sessions) !== nextScheduleFingerprint);
     if (isServerSavePerfEnabled()) {
       console.info("[event-patch-timing] schedule-compare", {
         activityId: existing.id,
         durationMs: Math.round(performance.now() - patchStarted),
         scheduleJsonDirty,
         activitySessionsNeedResync,
+        hasImportedSessions,
       });
     }
 

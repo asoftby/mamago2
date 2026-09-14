@@ -120,6 +120,31 @@ export async function GET(
   });
   if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Sessions with a non-null `source` come from an import pipeline (ABWS
+  // today), not from this wizard's own scheduleItems/dates model. The PATCH
+  // route already refuses to touch them (see events/[id]/route.ts,
+  // activitySessionsNeedResync) — this flag tells the wizard to render the
+  // schedule step read-only instead of showing an editable form that would
+  // silently no-op on save.
+  const importedSessions = await prisma.activitySession.findMany({
+    where: { activityId, source: { not: null } },
+    orderBy: { startsAt: "asc" },
+    select: { startsAt: true },
+  });
+
+  if (importedSessions.length > 0) {
+    const dateFormatter = new Intl.DateTimeFormat("ru-BY", {
+      day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Minsk",
+    });
+    const timeFormatter = new Intl.DateTimeFormat("ru-BY", {
+      hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Minsk",
+    });
+    const items = importedSessions.map(
+      (s) => `${dateFormatter.format(s.startsAt)}, ${timeFormatter.format(s.startsAt)}`,
+    );
+    return NextResponse.json({ items, readOnly: true });
+  }
+
   const linkedImport = await prisma.importedRecord.findFirst({
     where: { publishedActivityId: activityId },
     orderBy: { updatedAt: "desc" },
@@ -129,5 +154,8 @@ export async function GET(
   const normalizedSource = extractScheduleSourcePayload(linkedImport?.normalizedData);
   const rawSource = extractScheduleSourcePayload(linkedImport?.rawPayload);
   const items = buildScheduleItems(normalizedSource);
-  return NextResponse.json({ items: items.length > 0 ? items : buildScheduleItems(rawSource) });
+  return NextResponse.json({
+    items: items.length > 0 ? items : buildScheduleItems(rawSource),
+    readOnly: false,
+  });
 }

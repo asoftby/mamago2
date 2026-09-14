@@ -26,6 +26,7 @@ interface Step4DateTimeProps {
 
 export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4DateTimeProps) {
   const [importedScheduleItems, setImportedScheduleItems] = useState<string[]>([]);
+  const [scheduleReadOnly, setScheduleReadOnly] = useState(false);
   const scheduleItems =
     Array.isArray(data.scheduleItems) && data.scheduleItems.length > 0
       ? data.scheduleItems
@@ -55,6 +56,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
     if (!eventId) {
       queueMicrotask(() => {
         setImportedScheduleItems([]);
+        setScheduleReadOnly(false);
       });
       return;
     }
@@ -65,9 +67,10 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
         credentials: "include",
       });
       if (!response.ok) return;
-      const payload = (await response.json()) as { items?: string[] };
+      const payload = (await response.json()) as { items?: string[]; readOnly?: boolean };
       if (!cancelled) {
         setImportedScheduleItems(Array.isArray(payload.items) ? payload.items : []);
+        setScheduleReadOnly(payload.readOnly === true);
       }
     })();
 
@@ -121,22 +124,20 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
         </p>
       </div>
 
-      {normalizedImportedItems.length > 0 ? (
-        <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-sky-950">Даты и время из источника</h3>
-              <p className="mt-1 text-[12px] text-sky-900/70">
-                Это данные, которые парсер уже нашёл в источнике. Их можно использовать как ориентир при ручной проверке.
-              </p>
-            </div>
-          </div>
+      {scheduleReadOnly ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <h3 className="text-sm font-semibold text-amber-950">Расписание из источника — не редактируется</h3>
+          <p className="mt-1 text-[12px] text-amber-900/80">
+            Сеансы для этого события ведёт источник импорта. Здесь их нельзя изменить —
+            правки в этой форме не сохранятся. Чтобы убрать или изменить конкретный сеанс,
+            обратитесь к администратору импорта.
+          </p>
 
           <div className="mt-4 space-y-2">
             {visibleImportedItems.map((item) => (
               <div
                 key={item}
-                className="rounded-lg border border-sky-100 bg-white px-3 py-2 text-sm text-slate-800"
+                className="rounded-lg border border-amber-100 bg-white px-3 py-2 text-sm text-slate-800"
               >
                 {item}
               </div>
@@ -145,7 +146,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
               <button
                 type="button"
                 onClick={() => setShowAllImported(true)}
-                className="mt-1 text-[12px] font-medium text-sky-700 hover:text-sky-900 hover:underline"
+                className="mt-1 text-[12px] font-medium text-amber-700 hover:text-amber-900 hover:underline"
               >
                 Показать ещё {hiddenCount}
               </button>
@@ -154,21 +155,64 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
               <button
                 type="button"
                 onClick={() => setShowAllImported(false)}
-                className="mt-1 text-[12px] font-medium text-sky-700 hover:text-sky-900 hover:underline"
+                className="mt-1 text-[12px] font-medium text-amber-700 hover:text-amber-900 hover:underline"
               >
                 Свернуть
               </button>
             ) : null}
           </div>
-
         </div>
-      ) : null}
+      ) : (
+        <>
+          {normalizedImportedItems.length > 0 ? (
+            <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-sky-950">Даты и время из источника</h3>
+                  <p className="mt-1 text-[12px] text-sky-900/70">
+                    Это данные, которые парсер уже нашёл в источнике. Их можно использовать как ориентир при ручной проверке.
+                  </p>
+                </div>
+              </div>
 
-      <EventScheduleList
-        items={scheduleItems}
-        onChange={handleScheduleItemsChange}
-        disabled={!isEditable}
-      />
+              <div className="mt-4 space-y-2">
+                {visibleImportedItems.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-lg border border-sky-100 bg-white px-3 py-2 text-sm text-slate-800"
+                  >
+                    {item}
+                  </div>
+                ))}
+                {hiddenCount > 0 && !showAllImported ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllImported(true)}
+                    className="mt-1 text-[12px] font-medium text-sky-700 hover:text-sky-900 hover:underline"
+                  >
+                    Показать ещё {hiddenCount}
+                  </button>
+                ) : null}
+                {showAllImported && normalizedImportedItems.length > VISIBLE_LIMIT ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllImported(false)}
+                    className="mt-1 text-[12px] font-medium text-sky-700 hover:text-sky-900 hover:underline"
+                  >
+                    Свернуть
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <EventScheduleList
+            items={scheduleItems}
+            onChange={handleScheduleItemsChange}
+            disabled={!isEditable}
+          />
+        </>
+      )}
     </div>
   );
 }
