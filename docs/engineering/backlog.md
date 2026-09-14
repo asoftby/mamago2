@@ -4294,9 +4294,22 @@ P3 — cleanup / polish / optional
   `tsc`+`build` cost — worth a deliberate decision, not a silent
   default); integration/live tests run somewhere real (CI against a
   disposable DB), not skipped entirely.
+- Confirmed cost, not theoretical: PRs #286, #288, #289 (the three
+  manual-review-path pieces — matching by `occurrences[]`, `qualityFlags`,
+  `ActivitySession` publish) each added their own named script
+  (`test:abws-event-matching`, `test:abws-quality-flags`,
+  `test:abws-activity-session-publish`) to the same `check:push` line in
+  `package.json`. Reconciling each PR against the previous one's merge
+  produced a real `package.json` merge conflict on that exact line, twice
+  in a row (#288 reconciling past #286; #289 reconciling past #288) —
+  hand-resolved both times, not hypothetical. A glob-based discovery
+  (this entry's own proposal) would have added zero lines to
+  `package.json` per PR and produced zero conflicts across this same
+  three-PR sequence.
 - Source: PR #278 review, 2026-09-14; full-suite timing measured directly
   in this session (not extrapolated from a sample — an earlier 30-file
-  sample undershot the real per-file cost by roughly 2x).
+  sample undershot the real per-file cost by roughly 2x); conflict
+  evidence from PRs #286/#288/#289, 2026-09-14.
 
 ## [BACKLOG-149] `.github/workflows/ci.yml` never triggers on long-lived `feature/*` branches
 
