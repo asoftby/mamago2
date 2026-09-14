@@ -114,8 +114,8 @@ export function StoryModal({
         className={cn(
           "absolute z-[60]",
           "md:top-6 md:right-6",
-          // Mobile: same top offset as the progress bar inside the media zone
-          "max-md:top-[calc(env(safe-area-inset-top)+8px)] max-md:right-3",
+          // Mobile: below the progress bar strip, not flush with/overlapping it
+          "max-md:top-[calc(env(safe-area-inset-top)+20px)] max-md:right-3",
         )}
       />
 

@@ -182,7 +182,7 @@ export function StoryModalVisual({
         className={cn(
           "absolute inset-x-0 z-[5]",
           "md:top-0 md:pt-3",
-          // Mobile: clear the notch/dynamic island; close button uses the same offset
+          // Mobile: clear the notch/dynamic island
           "max-md:top-[calc(env(safe-area-inset-top)+8px)]",
         )}
       >
