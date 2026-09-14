@@ -4238,3 +4238,96 @@ P3 — cleanup / polish / optional
   resolved it.
 - Source: `docs/imports/abws-phase1-spec.md` §10 (open questions), carried
   over from spec review.
+
+## [BACKLOG-148] Run the full test suite (505 files) in `check:push`, not a named list
+
+- Status: OPEN
+- Priority: P2
+- Area: Tooling / CI
+- Added: 2026-09-14
+- Reason deferred: found while wiring the two family.by regression tests
+  into `check:push` for PR #278 (ABWS Blocker 2 prerequisite) — that PR
+  intentionally stayed scoped to exactly the two files touched by that
+  change, not a general fix. Priority right now is getting the ABWS
+  import working; this is real but doesn't block that.
+- Context: `check:push` was `tsc --noEmit && pnpm build` with **zero**
+  test execution, for any file, until PR #278 added one named script
+  covering two specific files. Confirmed by direct count: **505** real
+  `*.test.ts`/`*.test.tsx` files exist under `src/`, `lib/`, `scripts/`
+  (excluding `node_modules`, `.next` build output, and a stray untracked
+  `_worktree-backup/` directory) — of which `.github/workflows/ci.yml`'s
+  hand-curated step list covers only 52. No `jest`/`vitest`/other runner
+  is configured anywhere in the repo — every test file is a standalone
+  script executed via `tsx <file>`, no shared runner semantics.
+  **Measured, not estimated:** ran all 505 non-integration/non-live test
+  files sequentially via `tsx`, each under a 25s watchdog (macOS has no
+  `timeout`/`gtimeout` built in — hand-rolled via background PID +
+  `kill`). Result: **505 files in 526s (~8.8 min), 18 failures, 0
+  timeouts.** The 18 failures were not inspected individually — at least
+  two spot-checked earlier in a smaller sample were pre-existing and
+  unrelated to any current work (`googleMapsConfigContract.test.ts` — an
+  env-var-dependent assertion, fails without a local Google Maps API key;
+  `phoenixUsersBusinessesAdapters.test.ts` — a committed-artifact hash
+  mismatch against `scripts/data/wp-redirect-map.json`, unrelated data
+  drift). The full list of 18 was not preserved — rerun to get it before
+  acting on this.
+  Separately, **22 `*.integration.test.ts` files + 1 `*.live.test.ts`**
+  file exist and were deliberately **not** run as part of this
+  measurement — they need a real Postgres (some may write real rows) or
+  hit a real external network endpoint (family.by), and running them
+  against a developer's actual local dev database blindly risks
+  polluting real data. Their timing/pass-rate is unmeasured.
+- Current state: not started. `check:push` still only runs the two files
+  PR #278 added.
+- Dependencies: needs the 18 known failures identified and triaged
+  (pre-existing broken/flaky vs. real regressions) before any "run
+  everything" gate can be turned on — otherwise every push starts failing
+  for unrelated reasons and the gate gets bypassed with `--no-verify`,
+  which is worse than today's narrow gate. Needs a decision on where the
+  22 integration + 1 live file run (proposal, not decided: keep them
+  CI-only against a dedicated/ephemeral database, never in the local
+  pre-push hook against a developer's real local DB).
+- Acceptance criteria: `check:push` (or a script it calls) discovers test
+  files by glob instead of a maintained name list; the known-failing set
+  is either fixed or explicitly, visibly excluded with a reason; total
+  local pre-push time budget agreed (526s already roughly doubles today's
+  `tsc`+`build` cost — worth a deliberate decision, not a silent
+  default); integration/live tests run somewhere real (CI against a
+  disposable DB), not skipped entirely.
+- Source: PR #278 review, 2026-09-14; full-suite timing measured directly
+  in this session (not extrapolated from a sample — an earlier 30-file
+  sample undershot the real per-file cost by roughly 2x).
+
+## [BACKLOG-149] `.github/workflows/ci.yml` never triggers on long-lived `feature/*` branches
+
+- Status: OPEN
+- Priority: P2
+- Area: CI
+- Added: 2026-09-14
+- Reason deferred: found during the same PR #278 review. Confirmed not a
+  deliberate exclusion (see Context) — real gap, but doesn't block
+  getting the ABWS import working; `pnpm check:push` (the local pre-push
+  hook) has been covering this branch's PRs in the meantime.
+- Context: `on.push.branches` / `on.pull_request.branches` in
+  `.github/workflows/ci.yml` lists only `main` and `dev`. Traced via git
+  history: this scope was set in commit `789c5921` ("ci: add blocking
+  TypeScript typecheck workflow", 2026-06-10), whose own commit message
+  states the intent plainly — "Запускает pnpm tsc --noEmit на push/PR в
+  main и dev" — scoped to the two long-lived branches that existed at the
+  time. Long-lived `feature/*` integration branches (this repo's
+  `feature/abws-integration`, first created ~2026-09-11) are a pattern
+  introduced later that nobody has revisited the trigger scope for. Net
+  effect confirmed directly: **every PR opened against
+  `feature/abws-integration` in this ABWS effort (#269, #273, #275, #276,
+  #277, #278, #279) ran zero GitHub Actions CI** — `pnpm check:push` via
+  the local pre-push git hook was the only gate any of them had, and (per
+  BACKLOG-148) that gate itself didn't run any tests until #278.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: `ci.yml`'s trigger includes long-lived feature
+  branches without also firing on every short-lived task branch (those
+  already merge straight into `dev`, already covered). Proposed pattern,
+  not implemented: add `'feature/**'` to both `push.branches` and
+  `pull_request.branches`.
+- Source: PR #278 review, 2026-09-14; git-history trace of commit
+  `789c5921`.
