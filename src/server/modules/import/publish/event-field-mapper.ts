@@ -320,8 +320,17 @@ export async function mapNormalizedToActivity(
     const minCentsValues = nd.occurrences
       .map((o) => o.priceMinCents)
       .filter((c): c is number => c != null);
-    if (minCentsValues.length > 0) {
-      fields.priceFrom = Math.min(...minCentsValues) / 100;
+    // Zero-priced occurrences are excluded from the minimum: ABWS has a
+    // known false-zero rate (source didn't fill in a price for that
+    // session), not a genuine "free" signal — including them made events
+    // that really start from e.g. 40 BYN show "от 0 BYN". If every
+    // occurrence with a price is zero, we deliberately do NOT fall back to
+    // priceMode "FREE" either: a real free event is a distinct, confirmed
+    // signal, not the absence of one, so priceFrom/priceMode are left
+    // untouched here.
+    const nonZeroMinCentsValues = minCentsValues.filter((c) => c > 0);
+    if (nonZeroMinCentsValues.length > 0) {
+      fields.priceFrom = Math.min(...nonZeroMinCentsValues) / 100;
       // Set directly, not left for normalizePublicationPrice() — import
       // writes Activity via Prisma, bypassing the API route that normally
       // derives this.
@@ -330,6 +339,8 @@ export async function mapNormalizedToActivity(
         ...(typeof fields.scheduleJson === "object" ? (fields.scheduleJson as Record<string, unknown>) : {}),
         pricingMode: "from",
       };
+    } else if (minCentsValues.length > 0) {
+      warnings.push("occurrences have priceMinCents but all are zero — treated as unpriced (not free); priceFrom left empty");
     } else {
       warnings.push("occurrences present but none has priceMinCents — priceFrom left empty");
     }
