@@ -12,12 +12,14 @@ import type {
   ImportSuggestedAction,
 } from "@prisma/client";
 import type { ImportLinkRecoveryPayload } from "@/server/modules/import/types";
+import type { AbwsQualityFlags } from "@/server/modules/import/normalizers/abws-event.normalizer";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { TableContainer } from "@/components/ui/table";
 import { Trash2, X } from "lucide-react";
 import { ReviewQueueActions } from "./ReviewQueueActions";
 import {
+  activeQualityFlagBadges,
   formatImportEntity,
   getImportedObjectStage,
   importEntityBadgeClasses,
@@ -37,6 +39,7 @@ type ReviewQueueRow = {
     qualityScore: number | null;
     confidenceScore: number | null;
     matchStatus: ImportMatchStatus | null;
+    qualityFlags: AbwsQualityFlags | null;
     normalizedTitle: string | null;
     publishedPlaceId: string | null;
     publishedActivityId: string | null;
@@ -158,6 +161,7 @@ export function ReviewQueueTableClient({ records }: Props) {
                 hasReviewTask: Boolean(task),
               });
               const canDelete = !linkedEntityId;
+              const qualityFlagBadges = activeQualityFlagBadges(rec.qualityFlags);
 
               return (
                 <tr key={rec.id} className={task?.status === "IN_PROGRESS" ? "bg-blue-50/40" : "hover:bg-gray-50"}>
@@ -197,6 +201,15 @@ export function ReviewQueueTableClient({ records }: Props) {
                             Нет задачи ревью (ошибка)
                           </span>
                         )}
+                        {qualityFlagBadges.map((badge) => (
+                          <span
+                            key={badge.key}
+                            title="Пометка не блокирует публикацию — только для ревьюера"
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                          >
+                            ⚑ {badge.label}
+                          </span>
+                        ))}
                       </div>
                       <div className="mt-2 text-xs text-gray-500">Добавлен {row.createdAtLabel}</div>
                     </div>

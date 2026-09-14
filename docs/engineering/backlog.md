@@ -4201,14 +4201,20 @@ P3 — cleanup / polish / optional
 ## [BACKLOG-147] ABWS/24afisha — open questions to the source developer
 
 - Status: OPEN
-- Priority: P1
+- Priority: P0 (commission attribution — added 2026-09-14; blocks the "Купить"
+  button work specifically, see below); P1 for the rest
 - Area: Import / Integrations
-- Added: 2026-09-11
+- Added: 2026-09-11; commission-attribution question added 2026-09-14
 - Reason deferred: none of these block starting ABWS Phase 1 implementation
-  (`docs/imports/abws-phase1-spec.md`), but they must be resolved — the
-  first item especially — before session-level pricing goes live in front
-  of users, since it directly determines whether the displayed price is
-  correct.
+  (`docs/imports/abws-phase1-spec.md`), but they must be resolved before
+  the affected feature ships. Item 1 (price units) before session-level
+  pricing goes live. The new commission-attribution question (item 5)
+  before the "Купить" button work starts at all — spec §8 describes a
+  sale-frame modal at `saleframe.24afisha.by`, but nothing in the spec or
+  the API fixture documents how a completed sale gets attributed back to
+  mamaGo for the partner commission. Building the frame/route without
+  knowing this risks shipping a purchase flow that technically works but
+  never pays out.
 - Context: during Phase 1 spec drafting, four facts about the ABWS
   (`webgate.24guru.by` / `24afisha.by`) API could not be confirmed from the
   fixture alone (818 events / 8167 sessions, captured 2026-09-11) and need
@@ -4227,14 +4233,178 @@ P3 — cleanup / polish / optional
      unknown total; Phase 1 uses a hardcoded category whitelist
      (`docs/imports/abws-phase1-spec.md` §5.1) and logs unrecognized ids
      rather than guessing at the full set.
-- Current state: not yet sent to the developer; can go out in a single
-  email whenever convenient, not urgent.
+  5. **(new, 2026-09-14) Commission/sale attribution.** Found while
+     investigating the "Купить" button: `session.urlSaleframe` name and
+     spec §8's own design (iframe modal, CSP `frame-src` for
+     `saleframe.24afisha.by`) imply an embedded sale frame, not a plain
+     redirect — but neither the spec nor the fixture documents how ABWS
+     attributes a completed sale on that frame back to mamaGo for the
+     partner commission. `distributor_company_id=550` is the id mamaGo
+     already sends on every catalog-sync request
+     (`abws-performances-event.parser.ts:32`) — unconfirmed whether that
+     same id (or something else entirely) drives sale attribution.
+     Building the purchase frame/route before this is answered risks a
+     flow that technically works but never attributes/pays out.
+- Current state: not yet sent to the developer. A ready-to-send message
+  covering items 1, 2, and 5 is below — send as-is, or edit first.
 - Dependencies: none block Phase 1 start. Item 1 blocks *trusting* live
   session pricing — verify manually before or in parallel with a real
-  answer.
-- Acceptance criteria: all four answered by the ABWS developer (or manual
-  verification substituted for item 1), spec updated with confirmed
-  values, this entry marked DONE with the reference (email/ticket) that
-  resolved it.
+  answer. Item 5 blocks starting the "Купить" button work entirely — not
+  started, per explicit decision, until this is answered.
+- Acceptance criteria: items 1, 2, and 5 answered by the ABWS developer (or
+  manual verification substituted for item 1), spec updated with confirmed
+  values (§8 in particular, once item 5 is answered — the frame/route
+  design may need to change), this entry marked DONE (or split, with 5
+  DONE separately) with the reference (email/ticket) that resolved it.
+  Items 3–4 remain open, lower priority, not part of the message below.
 - Source: `docs/imports/abws-phase1-spec.md` §10 (open questions), carried
-  over from spec review.
+  over from spec review; item 5 found during "Купить"-button code
+  investigation, 2026-09-14.
+
+### Готовое письмо разработчику ABWS (отправить как есть)
+
+```
+Тема: Вопросы по интеграции API (distributor_company_id=550)
+
+Здравствуйте!
+
+Дорабатываем интеграцию с вашим API
+(webgate.24guru.by/api/v3/sync/data/performances,
+distributor_company_id=550) и хотели бы уточнить несколько вопросов.
+
+1. Единицы цены. В каких единицах приходят session.minPrice/maxPrice —
+   в копейках или в рублях? По диапазону значений предполагаем копейки,
+   но хотим подтвердить перед тем, как показывать цену пользователям.
+
+2. Инкрементальная синхронизация. Работает ли параметр lastSync для
+   эндпоинта performances на этом хосте (v3)? Если да — в каком формате
+   его передавать, чтобы получать только изменения, а не полный каталог
+   при каждом запросе?
+
+3. Атрибуция продаж и партнёрская комиссия. Планируем показывать кнопку
+   покупки билета на своей стороне через session.urlSaleframe (по всей
+   видимости, встраиваемый фрейм на saleframe.24afisha.by) и хотели бы
+   понять механику начисления партнёрской комиссии:
+
+   - Как именно на вашей стороне определяется, что продажа пришла через
+     партнёра (в данном случае — через нас)? Какой параметр, заголовок
+     или иной механизм это обеспечивает?
+   - Нужно ли добавлять что-то дополнительное в саму ссылку
+     urlSaleframe (свой параметр), использовать отдельный поддомен,
+     специальный заголовок при встраивании фрейма — или что-то ещё,
+     чтобы атрибуция сохранялась?
+   - Привязана ли атрибуция продажи к distributor_company_id=550,
+     который мы передаём при запросе каталога, или для продаж
+     используется отдельный, не связанный с ним идентификатор?
+   - Ведёте ли вы отчётность по продажам, пришедшим через партнёра, и
+     в каком виде она нам доступна — личный кабинет, API, регулярная
+     выгрузка?
+
+Буду благодарен за ответы.
+```
+
+## [BACKLOG-148] Run the full test suite (505 files) in `check:push`, not a named list
+
+- Status: OPEN
+- Priority: P2
+- Area: Tooling / CI
+- Added: 2026-09-14
+- Reason deferred: found while wiring the two family.by regression tests
+  into `check:push` for PR #278 (ABWS Blocker 2 prerequisite) — that PR
+  intentionally stayed scoped to exactly the two files touched by that
+  change, not a general fix. Priority right now is getting the ABWS
+  import working; this is real but doesn't block that.
+- Context: `check:push` was `tsc --noEmit && pnpm build` with **zero**
+  test execution, for any file, until PR #278 added one named script
+  covering two specific files. Confirmed by direct count: **505** real
+  `*.test.ts`/`*.test.tsx` files exist under `src/`, `lib/`, `scripts/`
+  (excluding `node_modules`, `.next` build output, and a stray untracked
+  `_worktree-backup/` directory) — of which `.github/workflows/ci.yml`'s
+  hand-curated step list covers only 52. No `jest`/`vitest`/other runner
+  is configured anywhere in the repo — every test file is a standalone
+  script executed via `tsx <file>`, no shared runner semantics.
+  **Measured, not estimated:** ran all 505 non-integration/non-live test
+  files sequentially via `tsx`, each under a 25s watchdog (macOS has no
+  `timeout`/`gtimeout` built in — hand-rolled via background PID +
+  `kill`). Result: **505 files in 526s (~8.8 min), 18 failures, 0
+  timeouts.** The 18 failures were not inspected individually — at least
+  two spot-checked earlier in a smaller sample were pre-existing and
+  unrelated to any current work (`googleMapsConfigContract.test.ts` — an
+  env-var-dependent assertion, fails without a local Google Maps API key;
+  `phoenixUsersBusinessesAdapters.test.ts` — a committed-artifact hash
+  mismatch against `scripts/data/wp-redirect-map.json`, unrelated data
+  drift). The full list of 18 was not preserved — rerun to get it before
+  acting on this.
+  Separately, **22 `*.integration.test.ts` files + 1 `*.live.test.ts`**
+  file exist and were deliberately **not** run as part of this
+  measurement — they need a real Postgres (some may write real rows) or
+  hit a real external network endpoint (family.by), and running them
+  against a developer's actual local dev database blindly risks
+  polluting real data. Their timing/pass-rate is unmeasured.
+- Current state: not started. `check:push` still only runs the two files
+  PR #278 added.
+- Dependencies: needs the 18 known failures identified and triaged
+  (pre-existing broken/flaky vs. real regressions) before any "run
+  everything" gate can be turned on — otherwise every push starts failing
+  for unrelated reasons and the gate gets bypassed with `--no-verify`,
+  which is worse than today's narrow gate. Needs a decision on where the
+  22 integration + 1 live file run (proposal, not decided: keep them
+  CI-only against a dedicated/ephemeral database, never in the local
+  pre-push hook against a developer's real local DB).
+- Acceptance criteria: `check:push` (or a script it calls) discovers test
+  files by glob instead of a maintained name list; the known-failing set
+  is either fixed or explicitly, visibly excluded with a reason; total
+  local pre-push time budget agreed (526s already roughly doubles today's
+  `tsc`+`build` cost — worth a deliberate decision, not a silent
+  default); integration/live tests run somewhere real (CI against a
+  disposable DB), not skipped entirely.
+- Confirmed cost, not theoretical: PRs #286, #288, #289 (the three
+  manual-review-path pieces — matching by `occurrences[]`, `qualityFlags`,
+  `ActivitySession` publish) each added their own named script
+  (`test:abws-event-matching`, `test:abws-quality-flags`,
+  `test:abws-activity-session-publish`) to the same `check:push` line in
+  `package.json`. Reconciling each PR against the previous one's merge
+  produced a real `package.json` merge conflict on that exact line, twice
+  in a row (#288 reconciling past #286; #289 reconciling past #288) —
+  hand-resolved both times, not hypothetical. A glob-based discovery
+  (this entry's own proposal) would have added zero lines to
+  `package.json` per PR and produced zero conflicts across this same
+  three-PR sequence.
+- Source: PR #278 review, 2026-09-14; full-suite timing measured directly
+  in this session (not extrapolated from a sample — an earlier 30-file
+  sample undershot the real per-file cost by roughly 2x); conflict
+  evidence from PRs #286/#288/#289, 2026-09-14.
+
+## [BACKLOG-149] `.github/workflows/ci.yml` never triggers on long-lived `feature/*` branches
+
+- Status: OPEN
+- Priority: P2
+- Area: CI
+- Added: 2026-09-14
+- Reason deferred: found during the same PR #278 review. Confirmed not a
+  deliberate exclusion (see Context) — real gap, but doesn't block
+  getting the ABWS import working; `pnpm check:push` (the local pre-push
+  hook) has been covering this branch's PRs in the meantime.
+- Context: `on.push.branches` / `on.pull_request.branches` in
+  `.github/workflows/ci.yml` lists only `main` and `dev`. Traced via git
+  history: this scope was set in commit `789c5921` ("ci: add blocking
+  TypeScript typecheck workflow", 2026-06-10), whose own commit message
+  states the intent plainly — "Запускает pnpm tsc --noEmit на push/PR в
+  main и dev" — scoped to the two long-lived branches that existed at the
+  time. Long-lived `feature/*` integration branches (this repo's
+  `feature/abws-integration`, first created ~2026-09-11) are a pattern
+  introduced later that nobody has revisited the trigger scope for. Net
+  effect confirmed directly: **every PR opened against
+  `feature/abws-integration` in this ABWS effort (#269, #273, #275, #276,
+  #277, #278, #279) ran zero GitHub Actions CI** — `pnpm check:push` via
+  the local pre-push git hook was the only gate any of them had, and (per
+  BACKLOG-148) that gate itself didn't run any tests until #278.
+- Current state: not started.
+- Dependencies: none blocking.
+- Acceptance criteria: `ci.yml`'s trigger includes long-lived feature
+  branches without also firing on every short-lived task branch (those
+  already merge straight into `dev`, already covered). Proposed pattern,
+  not implemented: add `'feature/**'` to both `push.branches` and
+  `pull_request.branches`.
+- Source: PR #278 review, 2026-09-14; git-history trace of commit
+  `789c5921`.

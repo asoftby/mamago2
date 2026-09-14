@@ -24,6 +24,7 @@ import { mapNormalizedToActivity, filterActivityNonDestructiveUpdates } from "..
 import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, isFieldAllowed } from "../publish/field-override-checker";
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
+import { upsertActivitySessionsFromOccurrences } from "../publish/activity-session-from-occurrences";
 import { assignActivitySlugIfMissing } from "@/lib/slug/activitySlugService";
 import { optimizeImportedImage } from "@/server/media/imported-image-optimizer";
 import {
@@ -462,6 +463,20 @@ async function createActivityFromImport(
 
   if (nd.venueName || nd.addressText) appliedFields.push("venue");
 
+  // Sources with several sessions per record (ABWS) carry them in
+  // occurrences[] — create one ActivitySession per session so the ABWS
+  // schedule and "Купить" button have something to render. No-op for
+  // every other source: occurrences[] stays undefined for them.
+  if (nd.occurrences && nd.occurrences.length > 0) {
+    const { upserted, skipped } = await upsertActivitySessionsFromOccurrences(
+      activity.id,
+      nd.occurrences,
+    );
+    if (upserted > 0) appliedFields.push("sessions");
+    if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
+  }
+  t.mark("activity-sessions");
+
   // Получаем актуальный slug — либо из create (если был), либо из assignActivitySlugIfMissing
   const activitySlug = activity.slug ?? (
     await prisma.activity.findUnique({ where: { id: activity.id }, select: { slug: true } })
@@ -561,6 +576,17 @@ async function updateExistingActivityFromImport(
 
   if (Object.keys(allowed).length > 0) {
     await prisma.activity.update({ where: { id: targetActivityId }, data: allowed as never });
+  }
+
+  // APPROVED_UPDATE means the reviewer confirmed this ImportedRecord IS this
+  // Activity — safe to sync ABWS sessions here too, same as CREATE.
+  // Deliberately NOT done in mergeImportedRecordIntoActivity below: MERGE is
+  // additive-only and never touches schedule-related fields, precisely to
+  // stay safe when possibleOccurrenceRisk flagged this as maybe-a-different-
+  // occurrence rather than confirmed-same-event.
+  if (nd.occurrences && nd.occurrences.length > 0) {
+    const { skipped } = await upsertActivitySessionsFromOccurrences(targetActivityId, nd.occurrences);
+    if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
   }
 
   const updatedActivity = await prisma.activity.findUnique({

@@ -9,6 +9,12 @@
 import prisma from "@/lib/prisma";
 import { normalizePlacePayload } from "../normalizers/place.normalizer";
 import { normalizeEventPayload } from "../normalizers/event.normalizer";
+import {
+  ABWS_PARSER_KEY,
+  computeAbwsQualityFlags,
+  normalizeAbwsEventPayload,
+} from "../normalizers/abws-event.normalizer";
+import type { AbwsPerformanceRawPayload } from "../parsers/abws-performances-event.parser";
 import { scorePlaceImport, scoreEventImport } from "./import-quality.service";
 
 export interface NormalizeRecordResult {
@@ -98,7 +104,16 @@ async function normalizeEventRecord(
     const source = await prisma.importSource.findUnique({ where: { id: record.sourceId } });
     if (!source) throw new Error("ImportSource not found");
 
-    const { normalized, warnings } = normalizeEventPayload({
+    // ABWS records carry sessions[] that normalizeEventPayload has no
+    // concept of (confirmed: it returns venueName/startAt/priceText all
+    // undefined for them) — dispatch by parserKey to a normalizer that
+    // reads that shape directly. Every other source, including family.by,
+    // is untouched: normalizeEventPayload is still called exactly as
+    // before for anything that isn't this one parserKey.
+    const normalizeFn =
+      source.parserKey === ABWS_PARSER_KEY ? normalizeAbwsEventPayload : normalizeEventPayload;
+
+    const { normalized, warnings } = normalizeFn({
       rawPayload: record.rawPayload as Record<string, unknown>,
       sourceSlug: source.slug,
       sourceUrl: record.sourceUrl ?? "",
@@ -108,6 +123,15 @@ async function normalizeEventRecord(
 
     const { score } = scoreEventImport(normalized);
 
+    // Gate marks are ABWS-specific and computed straight from the raw
+    // payload shape (not from `normalized`) — same dispatch-by-parserKey
+    // as the normalizer above. Non-ABWS records keep qualityFlags: null,
+    // untouched, exactly as before this field existed.
+    const qualityFlags =
+      source.parserKey === ABWS_PARSER_KEY
+        ? computeAbwsQualityFlags(record.rawPayload as unknown as AbwsPerformanceRawPayload)
+        : undefined;
+
     await prisma.importedRecord.update({
       where: { id: record.id },
       data: {
@@ -115,6 +139,7 @@ async function normalizeEventRecord(
         normalizeStatus: "SUCCESS",
         qualityScore: score,
         errorMessage: warnings.length > 0 ? `warnings: ${warnings.join("; ")}` : null,
+        ...(qualityFlags !== undefined ? { qualityFlags: qualityFlags as object } : {}),
       },
     });
 
