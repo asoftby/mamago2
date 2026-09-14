@@ -4201,14 +4201,20 @@ P3 — cleanup / polish / optional
 ## [BACKLOG-147] ABWS/24afisha — open questions to the source developer
 
 - Status: OPEN
-- Priority: P1
+- Priority: P0 (commission attribution — added 2026-09-14; blocks the "Купить"
+  button work specifically, see below); P1 for the rest
 - Area: Import / Integrations
-- Added: 2026-09-11
+- Added: 2026-09-11; commission-attribution question added 2026-09-14
 - Reason deferred: none of these block starting ABWS Phase 1 implementation
-  (`docs/imports/abws-phase1-spec.md`), but they must be resolved — the
-  first item especially — before session-level pricing goes live in front
-  of users, since it directly determines whether the displayed price is
-  correct.
+  (`docs/imports/abws-phase1-spec.md`), but they must be resolved before
+  the affected feature ships. Item 1 (price units) before session-level
+  pricing goes live. The new commission-attribution question (item 5)
+  before the "Купить" button work starts at all — spec §8 describes a
+  sale-frame modal at `saleframe.24afisha.by`, but nothing in the spec or
+  the API fixture documents how a completed sale gets attributed back to
+  mamaGo for the partner commission. Building the frame/route without
+  knowing this risks shipping a purchase flow that technically works but
+  never pays out.
 - Context: during Phase 1 spec drafting, four facts about the ABWS
   (`webgate.24guru.by` / `24afisha.by`) API could not be confirmed from the
   fixture alone (818 events / 8167 sessions, captured 2026-09-11) and need
@@ -4227,17 +4233,75 @@ P3 — cleanup / polish / optional
      unknown total; Phase 1 uses a hardcoded category whitelist
      (`docs/imports/abws-phase1-spec.md` §5.1) and logs unrecognized ids
      rather than guessing at the full set.
-- Current state: not yet sent to the developer; can go out in a single
-  email whenever convenient, not urgent.
+  5. **(new, 2026-09-14) Commission/sale attribution.** Found while
+     investigating the "Купить" button: `session.urlSaleframe` name and
+     spec §8's own design (iframe modal, CSP `frame-src` for
+     `saleframe.24afisha.by`) imply an embedded sale frame, not a plain
+     redirect — but neither the spec nor the fixture documents how ABWS
+     attributes a completed sale on that frame back to mamaGo for the
+     partner commission. `distributor_company_id=550` is the id mamaGo
+     already sends on every catalog-sync request
+     (`abws-performances-event.parser.ts:32`) — unconfirmed whether that
+     same id (or something else entirely) drives sale attribution.
+     Building the purchase frame/route before this is answered risks a
+     flow that technically works but never attributes/pays out.
+- Current state: not yet sent to the developer. A ready-to-send message
+  covering items 1, 2, and 5 is below — send as-is, or edit first.
 - Dependencies: none block Phase 1 start. Item 1 blocks *trusting* live
   session pricing — verify manually before or in parallel with a real
-  answer.
-- Acceptance criteria: all four answered by the ABWS developer (or manual
-  verification substituted for item 1), spec updated with confirmed
-  values, this entry marked DONE with the reference (email/ticket) that
-  resolved it.
+  answer. Item 5 blocks starting the "Купить" button work entirely — not
+  started, per explicit decision, until this is answered.
+- Acceptance criteria: items 1, 2, and 5 answered by the ABWS developer (or
+  manual verification substituted for item 1), spec updated with confirmed
+  values (§8 in particular, once item 5 is answered — the frame/route
+  design may need to change), this entry marked DONE (or split, with 5
+  DONE separately) with the reference (email/ticket) that resolved it.
+  Items 3–4 remain open, lower priority, not part of the message below.
 - Source: `docs/imports/abws-phase1-spec.md` §10 (open questions), carried
-  over from spec review.
+  over from spec review; item 5 found during "Купить"-button code
+  investigation, 2026-09-14.
+
+### Готовое письмо разработчику ABWS (отправить как есть)
+
+```
+Тема: Вопросы по интеграции API (distributor_company_id=550)
+
+Здравствуйте!
+
+Дорабатываем интеграцию с вашим API
+(webgate.24guru.by/api/v3/sync/data/performances,
+distributor_company_id=550) и хотели бы уточнить несколько вопросов.
+
+1. Единицы цены. В каких единицах приходят session.minPrice/maxPrice —
+   в копейках или в рублях? По диапазону значений предполагаем копейки,
+   но хотим подтвердить перед тем, как показывать цену пользователям.
+
+2. Инкрементальная синхронизация. Работает ли параметр lastSync для
+   эндпоинта performances на этом хосте (v3)? Если да — в каком формате
+   его передавать, чтобы получать только изменения, а не полный каталог
+   при каждом запросе?
+
+3. Атрибуция продаж и партнёрская комиссия. Планируем показывать кнопку
+   покупки билета на своей стороне через session.urlSaleframe (по всей
+   видимости, встраиваемый фрейм на saleframe.24afisha.by) и хотели бы
+   понять механику начисления партнёрской комиссии:
+
+   - Как именно на вашей стороне определяется, что продажа пришла через
+     партнёра (в данном случае — через нас)? Какой параметр, заголовок
+     или иной механизм это обеспечивает?
+   - Нужно ли добавлять что-то дополнительное в саму ссылку
+     urlSaleframe (свой параметр), использовать отдельный поддомен,
+     специальный заголовок при встраивании фрейма — или что-то ещё,
+     чтобы атрибуция сохранялась?
+   - Привязана ли атрибуция продажи к distributor_company_id=550,
+     который мы передаём при запросе каталога, или для продаж
+     используется отдельный, не связанный с ним идентификатор?
+   - Ведёте ли вы отчётность по продажам, пришедшим через партнёра, и
+     в каком виде она нам доступна — личный кабинет, API, регулярная
+     выгрузка?
+
+Буду благодарен за ответы.
+```
 
 ## [BACKLOG-148] Run the full test suite (505 files) in `check:push`, not a named list
 
