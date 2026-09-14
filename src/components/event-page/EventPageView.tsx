@@ -109,11 +109,8 @@ function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
               key={f.id}
               className={cn(
                 "flex flex-col gap-1.5 py-5",
-                // мобиле: левая граница у правых ячеек (i нечётное)
                 i % 2 !== 0 ? "border-l border-[rgba(20,18,16,0.10)] px-4" : "pr-4",
-                // мобиле: нижняя граница у первого ряда
                 i < 2 && "border-b border-[rgba(20,18,16,0.10)] md:border-b-0",
-                // десктоп: левая граница у всех кроме первого, убираем мобильный паттерн
                 i > 0 && "md:border-l md:border-[rgba(20,18,16,0.10)] md:px-5",
                 i === 0 && "md:pr-5",
               )}
@@ -149,7 +146,6 @@ function EventAboutEditorial({
     <section className="border-b border-[rgba(20,18,16,0.10)] py-16 md:py-20">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
-          {/* Left: heading */}
           <div>
             <div className="mb-4 flex items-center gap-3.5">
               <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
@@ -164,11 +160,11 @@ function EventAboutEditorial({
             </h2>
           </div>
 
-          {/* Right: description + chips */}
           <div>
             {descriptionHtml ? (
               <EventRichDescription
                 htmlContent={descriptionHtml}
+                collapsedHeight={960}
                 className="border-t-0 pt-0"
               />
             ) : about.summary ? (
@@ -177,7 +173,6 @@ function EventAboutEditorial({
               </p>
             ) : null}
 
-            {/* Chip tags from highlights */}
             {about.highlights && about.highlights.length > 0 && (
               <div className="mt-8 flex flex-wrap gap-2.5">
                 {about.highlights.map((h, i) => (
@@ -302,9 +297,6 @@ function EventFinalCta({
   );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   Main EventPageView
-══════════════════════════════════════════════════════════════ */
 export interface EventDirectCtaInfo {
   activityId: string;
   publicationTitle: string;
@@ -316,7 +308,6 @@ export function EventPageView({
   direct,
 }: {
   data: EventPageData;
-  /** Direct "Отправить заявку" CTA — omitted when the event has no resolvable owning Business (rule 5). */
   direct?: EventDirectCtaInfo;
 }) {
   const { isAuthenticated } = useAuthMe();
@@ -385,8 +376,6 @@ export function EventPageView({
     return Array.from(set).sort();
   }, [sessions]);
 
-  // Group sessions by date: { "YYYY-MM-DD": [{ id, time: "HH:mm" }, ...] }
-  // This is the single source of truth for both time chips and session count dots.
   const planSessionsByDate = useMemo(() => {
     const map: Record<string, Array<{ id: string; time: string }>> = {};
     for (const session of sessions) {
@@ -444,14 +433,10 @@ export function EventPageView({
         planItemId: json.planItemId ?? null,
       });
     } catch {
-      // ignore
     }
   }, [data.id, isAuthenticated]);
 
   useEffect(() => { void loadSaveStatus(); }, [loadSaveStatus]);
-  // Статус обновляется только после закрытия модалки, и только если пользователь
-  // реально открывал её — эффект выше уже загрузил статус на монтировании,
-  // без этой проверки здесь случился бы дублирующийся GET сразу на первом рендере.
   useEffect(() => {
     if (saveModalOpen) {
       hasOpenedSaveModalOnceRef.current = true;
@@ -511,8 +496,6 @@ export function EventPageView({
           if (!res.ok) throw new Error("plan_remove_failed");
           toast.success("Убрано из плана");
         }
-        // loadSaveStatus вызывается через useEffect когда saveModalOpen=false —
-        // после закрытия модалки, без перерисовки пока она ещё открыта.
       } catch {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
       } finally {
@@ -586,7 +569,6 @@ export function EventPageView({
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
 
-  /* Marquee items built from available data */
   const marqueeItems = useMemo(() => {
     const items: string[] = [];
     if (sessionLineHero) items.push(sessionLineHero);
@@ -601,7 +583,6 @@ export function EventPageView({
     <div
       className="ep-surface min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
     >
-      {/* Preview banner */}
       {data.previewBannerLabel && (
         <div
           role="status"
@@ -611,15 +592,12 @@ export function EventPageView({
         </div>
       )}
 
-
-      {/* ── Hero section ─── */}
       <section className="pt-12 pb-14">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
           <div className="mb-4 md:mb-0">
             <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
           </div>
 
-          {/* Mobile: media above decision panel */}
           <div className="lg:hidden mb-8">
             <PublicationMediaColumn
               media={data.media}
@@ -627,9 +605,7 @@ export function EventPageView({
             />
           </div>
 
-          {/* Desktop: two-column side-by-side (media left, decision panel right) */}
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
-            {/* Left: media stack + gallery strip (desktop only — mobile rendered above) */}
             <div className="hidden lg:block">
               <PublicationMediaColumn
                 media={data.media}
@@ -637,7 +613,6 @@ export function EventPageView({
               />
             </div>
 
-            {/* Right: decision panel */}
             <div ref={ctaRef}>
               <EventDecisionPanel
                 data={data}
@@ -667,18 +642,15 @@ export function EventPageView({
         </div>
       </section>
 
-      {/* ── Meta strip ─── */}
       {data.importantFacts.length > 0 && (
         <EventMetaStrip facts={data.importantFacts} />
       )}
 
-      {/* ── About ─── */}
       <EventAboutEditorial
         about={data.about}
         descriptionHtml={data.about.descriptionHtml}
       />
 
-      {/* ── Structured pricing from Event wizard ─── */}
       {(Boolean(data.priceDetails?.trim()) || (data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
@@ -693,7 +665,7 @@ export function EventPageView({
                 <h2
                   style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
                 >
-                  <span style={{ fontFamily: "var(--font-sans)" }}>Сколько это </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>стоит.</span>
+                  <span style={{ fontFamily: "var(--font-sans)" }}>Сколько это </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>стоит</span>
                 </h2>
               </div>
               {(data.priceItems?.length ?? 0) > 0 && (
@@ -714,8 +686,6 @@ export function EventPageView({
 
       <FaqSection items={data.faqItems} />
 
-
-      {/* ── Sessions ─── */}
       {sessions.length > 0 && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
@@ -730,7 +700,7 @@ export function EventPageView({
                 <h2
                   style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
                 >
-                  <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>удобное время.</span>
+                  <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>удобное время</span>
                 </h2>
               </div>
               <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
@@ -752,10 +722,8 @@ export function EventPageView({
         </section>
       )}
 
-      {/* ── Location ─── */}
       {data.venue && <EventLocationEditorial venue={data.venue} />}
 
-      {/* ── Similar events ─── */}
       {hasSimilar && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
@@ -764,7 +732,6 @@ export function EventPageView({
         </section>
       )}
 
-      {/* Publication stats */}
       {!data.hidePublicationStats && (
         <PublicationStatsPanel
           entityId={data.id}
@@ -772,7 +739,6 @@ export function EventPageView({
         />
       )}
 
-      {/* ── Top sticky bar (desktop scroll) ─── */}
       <EventStickyActionBar
         ctaRef={ctaRef}
         sessionLine={sessionLineSticky}
@@ -798,7 +764,6 @@ export function EventPageView({
           booking={data.cta.simpleBooking}
         />
       )}
-      {/* Save flow modal */}
       <SaveActivityFlowAdaptive
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
@@ -812,7 +777,6 @@ export function EventPageView({
         planItemId={saveStatus.planItemId}
       />
 
-      {/* Date chooser (multiple sessions) */}
       <Dialog open={planDateChooserOpen} onOpenChange={setPlanDateChooserOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
