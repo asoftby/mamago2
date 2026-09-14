@@ -118,10 +118,31 @@ export function scoreEventCandidate(
   }
 
   // ── Start date proximity ─────────────────────────────────────────────────
+  // Источники с несколькими сеансами на одну запись (ABWS) кладут каждую дату
+  // в occurrences[]; normalized.startAt — best-effort "первый" сеанс. Партнёрская
+  // карточка может соответствовать ЛЮБОМУ из сеансов, не обязательно первому —
+  // берём минимальную дельту по всем occurrences[], а не только по startAt.
+  // Для источников без occurrences[] (family.by) поведение не меняется:
+  // единственный кандидат даты — normalized.startAt, как и раньше.
+  const occurrenceStartDates = (normalized.occurrences ?? [])
+    .map((o) => o.startAt)
+    .filter((d): d is string => Boolean(d));
+  const candidateStartDates =
+    occurrenceStartDates.length > 0
+      ? occurrenceStartDates
+      : normalized.startAt
+        ? [normalized.startAt]
+        : [];
+
   let startDateDeltaDays: number | null = null;
   let dateScore = 0;
-  if (normalized.startAt && candidate.nextOccurrenceAt) {
-    startDateDeltaDays = dateDeltaDays(normalized.startAt, candidate.nextOccurrenceAt);
+  if (candidateStartDates.length > 0 && candidate.nextOccurrenceAt) {
+    for (const startAt of candidateStartDates) {
+      const delta = dateDeltaDays(startAt, candidate.nextOccurrenceAt);
+      if (delta != null && (startDateDeltaDays == null || delta < startDateDeltaDays)) {
+        startDateDeltaDays = delta;
+      }
+    }
     if (startDateDeltaDays != null) {
       dateScore = dateProximityScore(startDateDeltaDays);
     }
