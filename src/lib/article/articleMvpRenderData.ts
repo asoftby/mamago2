@@ -594,6 +594,11 @@ export async function loadArticleMvpById(articleId: string) {
     heroAlt: cover?.alt ?? article.title,
     blocks,
     authorUserId: article.authorUser?.id ?? null,
+    author: article.authorUser
+      ? { displayName: article.authorUser.displayName, avatarUrl: article.authorUser.avatarUrl }
+      : article.authorLabel?.trim()
+        ? { displayName: article.authorLabel, avatarUrl: null }
+        : null,
     categoryLabel: article.category?.nameRu ?? null,
     tags: article.tags,
   };

@@ -219,6 +219,8 @@ export default async function CityArticlePage({ params }: PageProps) {
           related={related}
           editHref={editHref}
           citySlug={city.slug}
+          articleHref={canonicalPath}
+          coverImageUrl={mvp.heroUrl}
         />
       </>
     );
@@ -250,6 +252,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       articleId={mvp.id}
       articleHref={canonicalPath}
       coverImageUrl={mvp.heroUrl}
+      author={mvp.author}
     />
   );
 
@@ -276,6 +279,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       heroAlt: mvp.heroAlt,
       blocks: [],
       categoryLabel: mvp.categoryLabel,
+      author: mvp.author,
       tags: mvp.tags,
       section: continuous.section,
       geoScope: "CITY",

@@ -9,6 +9,13 @@ export const BREAKING_NEWS_STORIES_TTL_DAYS = 14;
 const BREAKING_NEWS_STORIES_TTL_MS =
   BREAKING_NEWS_STORIES_TTL_DAYS * 24 * 60 * 60 * 1000;
 
+export function getBreakingNewsStoriesPublishedWindow(now: Date): { gte: Date; lte: Date } {
+  return {
+    gte: new Date(now.getTime() - BREAKING_NEWS_STORIES_TTL_MS),
+    lte: now,
+  };
+}
+
 export type BreakingNewsItem = {
   id: string;
   title: string;
@@ -31,7 +38,6 @@ export async function listBreakingNewsArticles(
   limit = 6,
 ): Promise<BreakingNewsItem[]> {
   const now = new Date();
-  const storiesCutoff = new Date(now.getTime() - BREAKING_NEWS_STORIES_TTL_MS);
 
   const rows = await prisma.article.findMany({
     where: {
@@ -45,7 +51,7 @@ export async function listBreakingNewsArticles(
         },
       ],
       subtitle: BREAKING_NEWS_SUBTITLE,
-      publishedAt: { not: null, gte: storiesCutoff, lte: now },
+      publishedAt: { not: null, ...getBreakingNewsStoriesPublishedWindow(now) },
     },
     orderBy: { publishedAt: "desc" },
     take: limit,
