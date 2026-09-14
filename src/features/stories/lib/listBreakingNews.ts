@@ -31,14 +31,15 @@ export type BreakingNewsItem = {
  * Breaking news is identified by subtitle === "__breaking_news__".
  * Stories only keep breaking news for 14 days from publishedAt; the article
  * itself remains published and available in the journal after that window.
+ * The caller may inject the collection clock so historical/future previews
+ * evaluate the same TTL window as the rest of the Stories read model.
  * Sorted by publishedAt descending (newest first).
  */
 export async function listBreakingNewsArticles(
   citySlug: string,
   limit = 6,
+  now = new Date(),
 ): Promise<BreakingNewsItem[]> {
-  const now = new Date();
-
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
