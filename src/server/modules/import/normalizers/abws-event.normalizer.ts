@@ -155,6 +155,7 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
     categoryCandidates,
     imageUrls: payload.images,
     ...(occurrences.length > 0 ? { occurrences } : {}),
+    ...(payload.perfBuyUrl ? { performanceBuyUrl: payload.perfBuyUrl } : {}),
   };
 
   return { normalized, warnings, aiDetectedCategory: null };

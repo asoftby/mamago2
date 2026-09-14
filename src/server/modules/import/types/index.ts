@@ -154,6 +154,14 @@ export interface NormalizedEventImport extends NormalizedImportPayload {
    * множественных сеансов.
    */
   occurrences?: EventImportOccurrence[];
+  /**
+   * Whole-event purchase link — one per event, distinct from each
+   * occurrence's own per-session link (`EventImportOccurrence.buyUrl`).
+   * For ABWS this is `performance.urlSaleframe` (`?pid=`, opens the sale
+   * frame's own date-picker widget), never set by `normalizeEventPayload`
+   * (family.by).
+   */
+  performanceBuyUrl?: string;
 }
 
 /** Один сеанс/показ мероприятия — площадка, дата, цена по отдельности от остальных. */

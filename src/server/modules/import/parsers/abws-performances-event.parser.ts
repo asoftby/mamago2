@@ -26,10 +26,10 @@ import type { EventImportParser } from "./base.parser";
 import type { ParsedRawRecord, ParserResult } from "../types";
 import { errorParserResult } from "./base.parser";
 import { fetchHtml } from "./fetchHtml";
+import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
 
 const PARSER_KEY = "abws-performances-event";
 const DEFAULT_API_URL = "https://webgate.24guru.by/api/v3/sync/data/performances";
-const DISTRIBUTOR_COMPANY_ID = 550;
 
 // ── Raw ABWS API shapes (best-effort — unconfirmed fields marked below) ────
 
@@ -364,11 +364,11 @@ export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsP
   const baseUrl = source.baseUrl?.trim() || DEFAULT_API_URL;
   const url = new URL(baseUrl);
   url.searchParams.set("key", apiKey);
-  url.searchParams.set("distributor_company_id", String(DISTRIBUTOR_COMPANY_ID));
+  url.searchParams.set("distributor_company_id", String(ABWS_DISTRIBUTOR_COMPANY_ID));
   // No `lastSync` param — unconfirmed for this host (spec §1). Always fetch
   // the full catalog; incrementality is built on our own contentHash side.
 
-  const loggableUrl = `${url.origin}${url.pathname}?distributor_company_id=${DISTRIBUTOR_COMPANY_ID}&key=***`;
+  const loggableUrl = `${url.origin}${url.pathname}?distributor_company_id=${ABWS_DISTRIBUTOR_COMPANY_ID}&key=***`;
 
   const response = await fetchHtml(url.toString(), {
     headers: { Accept: "application/json" },
