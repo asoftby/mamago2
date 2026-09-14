@@ -10,7 +10,7 @@
 import type { NormalizedEventImport } from "../types";
 import { detectAgeBuckets, getAgeRangeFromBuckets } from "@/lib/age/ageMapping";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
-import type { ActivityFormat } from "@prisma/client";
+import type { ActivityFormat, PublicationPriceMode } from "@prisma/client";
 
 // ── ActivityType whitelist ────────────────────────────────────────────────────
 
@@ -179,6 +179,14 @@ export interface MappedActivityFields {
   priceText?: string;
   priceFrom?: number;
   priceTo?: number;
+  /**
+   * Set directly only for sources whose price comes from structured data
+   * (ABWS occurrences[]), not derived from priceText. The wizard's own save
+   * path (PATCH /api/business/events/[id]) normally computes this via
+   * normalizePublicationPrice() — import writes Activity directly via
+   * Prisma, bypassing that route, so nothing else will ever set it.
+   */
+  priceMode?: PublicationPriceMode;
   ageTags?: string[];
   ageMinMonths?: number;
   ageMaxMonths?: number;
@@ -300,6 +308,42 @@ export async function mapNormalizedToActivity(
     fields.scheduleJson = {
       _importSource: true,
       ageDetection,
+    };
+  }
+
+  // Price from occurrences[] (ABWS session prices — structured, not text).
+  // Only sources that set occurrences[] ever reach this branch (family.by
+  // never does) — nd.priceText above stays the only price source for
+  // everything else, unchanged. priceTo deliberately left unset: this is
+  // "цена от", not a range.
+  if (nd.occurrences && nd.occurrences.length > 0) {
+    const minCentsValues = nd.occurrences
+      .map((o) => o.priceMinCents)
+      .filter((c): c is number => c != null);
+    if (minCentsValues.length > 0) {
+      fields.priceFrom = Math.min(...minCentsValues) / 100;
+      // Set directly, not left for normalizePublicationPrice() — import
+      // writes Activity via Prisma, bypassing the API route that normally
+      // derives this.
+      fields.priceMode = "FROM";
+      fields.scheduleJson = {
+        ...(typeof fields.scheduleJson === "object" ? (fields.scheduleJson as Record<string, unknown>) : {}),
+        pricingMode: "from",
+      };
+    } else {
+      warnings.push("occurrences present but none has priceMinCents — priceFrom left empty");
+    }
+  }
+
+  // Whole-event purchase link (ABWS performanceBuyUrl / pid) — never set
+  // for sources without it (family.by). Raw URL only, exactly what the API
+  // returned: distributor_company_id/lang are appended at render time
+  // (buildAbwsSaleframeUrl in @/lib/abws/saleframeUrl), not baked in here.
+  if (nd.performanceBuyUrl) {
+    fields.scheduleJson = {
+      ...(typeof fields.scheduleJson === "object" ? (fields.scheduleJson as Record<string, unknown>) : {}),
+      participationMode: "external-link",
+      ticketLink: nd.performanceBuyUrl,
     };
   }
 

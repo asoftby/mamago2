@@ -397,6 +397,7 @@ async function createActivityFromImport(
   if (fields.priceText)        { createData.priceText        = fields.priceText;        appliedFields.push("priceText"); }
   if (fields.priceFrom != null){ createData.priceFrom        = fields.priceFrom;        appliedFields.push("priceFrom"); }
   if (fields.priceTo != null)  { createData.priceTo          = fields.priceTo;          appliedFields.push("priceTo"); }
+  if (fields.priceMode)        { createData.priceMode        = fields.priceMode;        appliedFields.push("priceMode"); }
   if (fields.ageTags?.length)  { createData.ageTags          = fields.ageTags;          appliedFields.push("ageTags"); }          else emptyFields.push("ageTags");
   createData.agePolicy = fields.ageTags?.length || fields.ageMinMonths != null || fields.ageMaxMonths != null
     ? "SPECIFIC"

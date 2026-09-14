@@ -19,6 +19,7 @@ import { getActivityDateDisplay } from "@/lib/event/getActivityDateDisplay";
 import { getNormalizedPhones, type NormalizedPhone } from "@/lib/phones/normalizePhones";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { resolveCanonicalCta } from "@/lib/cta-platform";
+import { decorateStoredTicketLink } from "@/lib/abws/saleframeUrl";
 
 const FALLBACK_POSTER = "/og-default.jpg";
 
@@ -196,11 +197,11 @@ function getScheduleJsonString(
   return typeof value === "string" ? value : undefined;
 }
 
-function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
+export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
   const participationMode = getScheduleJsonString(activity, "participationMode");
   if (participationMode === "external-link") {
     const ticketLink = getScheduleJsonString(activity, "ticketLink")?.trim() ?? "";
-    return ticketLink && isHttpUrl(ticketLink) ? ticketLink : undefined;
+    return ticketLink && isHttpUrl(ticketLink) ? decorateStoredTicketLink(ticketLink) : undefined;
   }
   if (participationMode === "prebook") {
     const prebookMethod = getScheduleJsonString(activity, "prebookMethod");
@@ -254,7 +255,7 @@ function resolveEventCanonicalCta(activity: ActivityForEventPageInput) {
     entity: {
       id: activity.id,
       participationMode: getScheduleJsonString(activity, "participationMode"),
-      ticketLink: getScheduleJsonString(activity, "ticketLink"),
+      ticketLink: decorateStoredTicketLink(getScheduleJsonString(activity, "ticketLink")),
       prebookMethod: getScheduleJsonString(activity, "prebookMethod"),
       prebookPhone: getScheduleJsonString(activity, "prebookPhone") ?? primaryPhone,
       prebookUrl: getScheduleJsonString(activity, "prebookUrl"),
