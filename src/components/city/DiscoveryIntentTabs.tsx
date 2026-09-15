@@ -132,7 +132,6 @@ function DiscoveryIntentTabsContent({
                 ref={(el) => {
                   tabsRef.current[index] = el;
                 }}
-                scroll={false}
                 className={cn(
                   "shrink-0 whitespace-nowrap text-sm transition-colors select-none",
                   isActive
@@ -215,7 +214,6 @@ function DiscoveryIntentTabsContent({
                 ref={(el) => {
                   tabsRef.current[index] = el;
                 }}
-                scroll={false}
                 className={cn(
                   "group flex min-w-[68px] max-w-[120px] flex-col items-center gap-0.5 border-b-2 border-transparent px-2 pb-2 pt-1 transition-colors duration-200 select-none md:min-w-[80px] md:px-3",
                   isActive
@@ -318,7 +316,6 @@ function DiscoveryIntentTabsContent({
               ref={(el) => {
                 tabsRef.current[index] = el;
               }}
-              scroll={false} // Prevent full page scroll reset
               className={cn(
                 "group flex min-w-[80px] flex-col items-center justify-center gap-0.5 px-3 transition-colors duration-200 select-none",
                 isActive ? "text-neutral-900" : "text-neutral-400 hover:text-neutral-600",
