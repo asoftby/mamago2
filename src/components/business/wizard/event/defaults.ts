@@ -37,7 +37,8 @@ export function getDefaultFormData(): EventFormData {
     // Step 1: Basics
     title: "",
     format: DEFAULT_ACTIVITY_FORMAT,
-    schedulingKind: null,
+    // Internal projection of the default single-day schedule; the editor no longer chooses this manually.
+    schedulingKind: "SLOT",
     eventFormats: [],
     categoryIds: [],
     subcategoryIdsByCategoryId: {},

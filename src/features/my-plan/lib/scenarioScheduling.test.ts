@@ -15,11 +15,36 @@ function at(date: string, time: string): Date {
   return localWallClockToUtc(date, time);
 }
 
-// Prisma nullable enum maps exactly to the domain's UNKNOWN state.
+// No persisted kind and no schedule evidence remains UNKNOWN.
 assert.equal(
   resolveScenarioScheduling({ activity: { schedulingKind: null, scheduleJson: null }, timing: timing(null) }).kind,
   "UNKNOWN",
 );
+
+// Imported/legacy schedules with enough evidence are classified read-side so
+// read-only imported events are not stuck as UNKNOWN forever.
+assert.equal(
+  resolveScenarioScheduling({
+    activity: {
+      schedulingKind: null,
+      scheduleJson: { dates: ["2026-09-01"], startTime: "12:00" },
+    },
+    timing: timing(at("2026-09-01", "12:00")),
+  }).kind,
+  "SLOT",
+);
+
+{
+  const result = resolveScenarioScheduling({
+    activity: {
+      schedulingKind: null,
+      scheduleJson: { dates: ["2026-09-01"] },
+    },
+    timing: timing(at("2026-09-01", "10:00"), true),
+  });
+  assert.equal(result.kind, "WINDOW");
+  assert.equal(result.canReschedule, true);
+}
 
 // Canonical durationMinutes proves the end without any fallback.
 {
@@ -201,7 +226,7 @@ assert.equal(
     timing: timing(at("2026-09-01", "10:00"), true),
   }).canReschedule,
   false,
-  "UNKNOWN remains conservative even when the item has an override-capable time source",
+  "UNKNOWN remains conservative when neither persisted kind nor schedule evidence exists",
 );
 
 console.log("scenarioScheduling tests: OK");
