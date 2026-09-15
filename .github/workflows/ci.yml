@@ -92,6 +92,7 @@ jobs:
         run: |
           pnpm exec tsx src/lib/event/recurringScheduleMaterialization.test.ts
           pnpm exec tsx src/lib/event/deriveSchedulingKind.test.ts
+          pnpm exec tsx src/features/my-plan/lib/scenarioScheduling.test.ts
 
       - name: Event map regressions
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
