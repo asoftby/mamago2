@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { PRIMARY_NAVIGATION_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { FooterPrimaryNavigationList } from "./FooterPrimaryNavigation";
 
-const availableItems = PRIMARY_NAVIGATION_ITEMS.filter((item) => !item.comingSoon);
+const availableItems = PRIMARY_NAVIGATION_ITEMS.filter(
+  (item) => item.navigationEnabled && !item.comingSoon,
+);
 const html = renderToStaticMarkup(
   <FooterPrimaryNavigationList items={availableItems} citySlug="minsk" />,
 );
