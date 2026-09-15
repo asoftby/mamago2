@@ -1,4 +1,5 @@
 import { Intent } from "@/lib/intent";
+import { buildPublicPath } from "@/lib/routing/surface";
 
 export interface DiscoveryIntentConfig {
   id: Intent;
@@ -70,3 +71,28 @@ export const DISCOVERY_INTENT_CONFIG: Record<Intent, DiscoveryIntentConfig> = {
 
 // Helper to get all intent configs as array (for tabs)
 export const DISCOVERY_INTENT_ITEMS = Object.values(DISCOVERY_INTENT_CONFIG);
+
+export type PrimaryNavigationId = Intent | "journal";
+
+export type PrimaryNavigationItem = Pick<
+  DiscoveryIntentConfig,
+  "label" | "href" | "image" | "navigationEnabled" | "comingSoon"
+> & {
+  id: PrimaryNavigationId;
+};
+
+/** Primary navigation order is independent from discovery/search intent order. */
+export const PRIMARY_NAVIGATION_ITEMS: PrimaryNavigationItem[] = [
+  DISCOVERY_INTENT_CONFIG.kuda,
+  {
+    id: "journal",
+    label: "Журнал",
+    href: (city) => buildPublicPath(`/${city}/blog`),
+    image: "/open_book_3d.png",
+    navigationEnabled: true,
+    comingSoon: false,
+  },
+  DISCOVERY_INTENT_CONFIG.classes,
+  DISCOVERY_INTENT_CONFIG.birthday,
+  DISCOVERY_INTENT_CONFIG.routes,
+];

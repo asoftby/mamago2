@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
 import { FooterSocialLinks } from "@/components/shell/FooterSocialLinks";
+import { FooterJournalLink } from "@/components/shell/FooterJournalLink";
 import { Container } from "@/components/ui/Container";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
               >
                 О нас
               </a>
+              <FooterJournalLink />
             </div>
           </div>
 
