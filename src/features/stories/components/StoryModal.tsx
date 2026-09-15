@@ -168,6 +168,7 @@ export function StoryModal({
             // scroll area + shrink-0 actions slot, this row just bounds them
             "max-md:flex max-md:flex-col max-md:h-full max-md:min-h-0 max-md:overflow-hidden",
           )}
+          onScroll={onPause}
         >
           {seenGroupStart === activeItemIndex && (
             <div data-testid="stories-seen-divider" className="mx-5 border-t border-neutral-200 shrink-0" />
