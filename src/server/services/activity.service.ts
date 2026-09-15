@@ -74,11 +74,37 @@ export async function updateActivity(
 ): Promise<ActivityWithSessions> {
   const { sessions, ...activityData } = input;
 
-  // If sessions are provided, replace all existing sessions
-  if (sessions !== undefined) {
-    // Delete existing sessions
-    await prisma.activitySession.deleteMany({
+  // Sessions with a non-null `source` come from an import pipeline (ABWS
+  // today), not from this route's own flat `sessions: Date[]` model — that
+  // model has no way to represent `source`/`externalId`/`buyUrl`/price, so
+  // replacing sessions here would silently discard them. Same fix as
+  // PR #298 (src/app/api/business/events/[id]/route.ts's
+  // hasImportedSessions), applied here because this older route was never
+  // covered by that fix (BACKLOG-153) — once any imported session exists,
+  // this route must not touch sessions at all.
+  //
+  // The read above and the delete below are not atomic — a concurrent ABWS
+  // upsert landing an imported session between them is possible (same race
+  // found by automated review on PR #303's shared-function equivalent of
+  // this guard). Rather than requiring a serializable transaction, the
+  // delete itself is scoped to source: null so it can never remove an
+  // imported row regardless of timing.
+  let applySessionsUpdate = sessions !== undefined;
+  if (applySessionsUpdate) {
+    const existingSessions = await prisma.activitySession.findMany({
       where: { activityId },
+      select: { source: true },
+    });
+    const hasImportedSessions = existingSessions.some((s) => s.source != null);
+    if (hasImportedSessions) {
+      applySessionsUpdate = false;
+    }
+  }
+
+  if (applySessionsUpdate) {
+    // Delete existing sessions — scoped to source: null, see comment above.
+    await prisma.activitySession.deleteMany({
+      where: { activityId, source: null },
     });
   }
 
@@ -87,9 +113,9 @@ export async function updateActivity(
     data: {
       ...activityData,
       sessions:
-        sessions !== undefined
+        applySessionsUpdate
           ? {
-              create: sessions.map((startsAt) => ({ startsAt })),
+              create: (sessions as Date[]).map((startsAt) => ({ startsAt })),
             }
           : undefined,
     },

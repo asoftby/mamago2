@@ -167,9 +167,11 @@
     "test:abws-saleframe-url": "tsx src/lib/abws/saleframeUrl.test.ts && tsx src/lib/event/buildEventPageDataFromPrisma.abwsTicketLink.test.ts && tsx src/lib/plan/resolveActivityParticipationCta.abwsTicketLink.test.ts",
     "test:abws-event-field-mapper": "tsx src/server/modules/import/publish/event-field-mapper.test.ts && tsx src/server/modules/import/services/import-publish.service.placeholderZeroPrice.test.ts",
     "test:abws-readonly-import-schedule": "tsx \"src/app/api/business/events/[id]/route.readonlyImportSchedule.test.ts\" && tsx \"src/app/api/business/events/[id]/schedule-source/route.test.ts\" && tsx src/components/business/wizard/event/steps/Step4DateTime.readOnlyImportSchedule.test.ts",
+    "test:abws-legacy-activities-route-readonly": "tsx src/server/services/activity.service.readonlyImportSessions.integration.test.ts",
+    "test:abws-legacy-activities-route-readonly-wiring": "tsx src/server/services/activity.service.readonlyImportSessions.test.ts",
     "test:abws-shared-resync-guard": "tsx src/lib/business/syncEventActivitySessions.test.ts && tsx src/lib/event/recurringScheduleMaterialization.test.ts && tsx src/lib/event/eventTimezoneContract.test.ts",
     "prepare": "husky",
-    "check:push": "tsc --noEmit && pnpm test:family-by-event-normalization && pnpm test:abws-event-matching && pnpm test:abws-quality-flags && pnpm test:abws-activity-session-publish && pnpm test:abws-performances-parser && pnpm test:abws-saleframe-url && pnpm test:abws-event-field-mapper && pnpm test:abws-readonly-import-schedule && pnpm test:abws-shared-resync-guard && pnpm build",
+    "check:push": "tsc --noEmit && pnpm test:family-by-event-normalization && pnpm test:abws-event-matching && pnpm test:abws-quality-flags && pnpm test:abws-activity-session-publish && pnpm test:abws-performances-parser && pnpm test:abws-saleframe-url && pnpm test:abws-event-field-mapper && pnpm test:abws-readonly-import-schedule && pnpm test:abws-legacy-activities-route-readonly-wiring && pnpm test:abws-shared-resync-guard && pnpm build",
     "check:no-old-social-links": "sh -c 'OLD_URL=$(printf \"%s%s\" \"https://www.tiktok.com/\" \"@mamago.by\"); if git grep -n \"$OLD_URL\" -- src prisma public .env.example; then echo \"Old TikTok URL found in tracked source/example files\"; exit 1; fi'"
   },
   "dependencies": {
