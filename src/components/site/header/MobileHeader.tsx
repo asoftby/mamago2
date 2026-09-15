@@ -8,7 +8,6 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { DiscoveryIntentTabs } from "@/components/city/DiscoveryIntentTabs";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
@@ -115,14 +114,6 @@ export function MobileHeader() {
                   <MobileFilterButton intent={searchIntent} />
                 )}
             </div>
-
-            <DiscoveryIntentTabs
-              city={displayCity}
-              currentIntent={searchIntent}
-              variant="airbnb"
-              density="compact"
-              className="-mx-4 mt-2"
-            />
           </div>
         </div>
       </header>
