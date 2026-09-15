@@ -4454,6 +4454,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Priority: P3
 - Area: Import / Integrations
 - Added: 2026-09-14
+- **Blocked by (read before implementing): [BACKLOG-152]** — if this
+  script (or any future logic) can reduce an Activity's imported
+  `ActivitySession` count to zero while the Activity itself is still
+  meant to be treated as import-sourced, `Activity.scheduleSource` from
+  BACKLOG-152 must land first. The read-only-import-schedule gate
+  (PR #298) currently detects "this is an imported card" purely from
+  `ActivitySession.source != null`; a backfill that touches sessions
+  without preserving at least one `source`-tagged row would silently flip
+  such an Activity back to looking like an ordinary manually-scheduled
+  event.
 - Reason deferred: on DEV, at the time PR #296 shipped (adds
   `priceFrom`/`priceMode`/`scheduleJson.ticketLink`/`pricingMode` mapping
   for ABWS), the review queue held at most ~100 `ImportedRecord` rows and
@@ -4504,3 +4514,61 @@ distributor_company_id=550) и хотели бы уточнить несколь
   re-normalization). Acceptance criteria's non-destructive-per-key wording
   fixed after automated review on this entry's own PR (#297) caught the
   first draft allowing a manual post-import correction to be overwritten.
+
+## [BACKLOG-152] `Activity.scheduleSource` explicit origin marker needed before any logic can zero out imported sessions
+
+- Status: OPEN
+- Priority: P3
+- Area: Import / Integrations
+- Added: 2026-09-15
+- Blocks: [BACKLOG-151] (and any future backfill/cleanup that touches
+  imported `ActivitySession` rows) — read this entry before implementing
+  that backfill script.
+- Reason deferred: found while fixing Дефект 1 (PR #298 — wizard save was
+  silently destroying imported `ActivitySession` rows on every save). The
+  fix's read-only-schedule gate (`activitySessionsNeedResync` in
+  `src/app/api/business/events/[id]/route.ts`, and the `readOnly` flag in
+  `src/app/api/business/events/[id]/schedule-source/route.ts`) detects
+  "this Activity is import-sourced" purely from `ActivitySession.source !=
+  null` on its current rows — there is no persistent, session-count-
+  independent marker on `Activity` itself. Verified at the time: nothing
+  in the codebase currently reduces an import-sourced Activity's
+  `ActivitySession` count to zero (`upsertActivitySessionsFromOccurrences`
+  only ever upserts, never deletes; the only two `deleteMany` call sites —
+  `activity.service.ts` and the wizard's own gated resync — don't apply
+  here), so the heuristic is correct for every reachable state today.
+  Deferred rather than fixed immediately because adding the marker now
+  would be scope creep on PR #298 with no concrete trigger yet.
+- Context: if any future, intentional logic ever reduces an imported
+  Activity's `ActivitySession` rows to zero — e.g. the BACKLOG-151
+  backfill script if it ever touches sessions, or a hypothetical cleanup
+  that removes past/expired sessions — that Activity would silently stop
+  being detected as import-sourced. The wizard's schedule step would
+  become editable again, and the very next save would run the ordinary
+  fingerprint-based resync and rebuild `ActivitySession` rows from
+  `scheduleJson`, discarding `source`/`externalId`/`buyUrl`/price data
+  with no warning to the editor. This is exactly the class of bug PR #298
+  fixed, reappearing through a gap the session-count heuristic can't see.
+- Current state: not started. No code path exists yet that would trigger
+  this gap — this is a condition to satisfy before one is built, not an
+  active bug.
+- Dependencies: none block other current work. Must land **before**
+  BACKLOG-151's backfill script (or any similar future logic) ships, if
+  that logic can ever bring an imported Activity's `ActivitySession` count
+  to zero.
+- Acceptance criteria: add an explicit, persistent field on `Activity`
+  (e.g. `scheduleSource: MANUAL | IMPORT`, naming TBD at implementation
+  time) set once at Apply/publish time in the import pipeline
+  (`activity-session-from-occurrences.ts` / `import-publish.service.ts`'s
+  create path), independent of the current `ActivitySession` row count or
+  content. Update `hasImportedSessions` in
+  `src/app/api/business/events/[id]/route.ts` and the `readOnly` check in
+  `schedule-source/route.ts` to consult this field (falling back to the
+  existing session-based heuristic only for Activities created before the
+  field existed, so nothing already-imported silently loses its read-only
+  status on migration day). Add a migration and a test proving an Activity
+  with the marker set but zero current `ActivitySession` rows still renders
+  read-only.
+- Source: found while answering a question about PR #298's `hasImportedSessions`
+  heuristic, 2026-09-15 — see PR #298 for the schedule-destruction defect
+  this heuristic itself fixes.
