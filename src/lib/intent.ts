@@ -37,6 +37,13 @@ export function isCityHubPath(pathname: string | null): boolean {
   return segments.length === 1 && resolveRouteCitySlug(pathname) !== null;
 }
 
+/** Journal listing, category and article pages (`/{city}/blog/...` and legacy `/blog/...`). */
+export function isJournalPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const segments = pathname.split("/").filter(Boolean);
+  return segments[0] === "blog" || segments[1] === "blog";
+}
+
 /**
  * Карточка публикации в городе: `/{city}/activity/...`, `/{city}/events/{slug|id}`, `/{city}/offers/...`.
  * (Витрина `/city/events` без slug — не деталь.)

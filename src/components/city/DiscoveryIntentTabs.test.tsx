@@ -22,6 +22,13 @@ function assertVariantMarkup(html: string, currentIntent: "classes" | null) {
   // 1. kuda остаётся ссылкой с href.
   assert.equal(findEnclosingTag(html, 'alt="Куда пойти"'), "link");
   assert.ok(html.includes('href="/minsk/events"'), "kuda must keep its href");
+  assert.equal(findEnclosingTag(html, 'alt="Журнал"'), "link");
+  assert.ok(html.includes('href="/minsk/blog"'), "journal must link to the city blog");
+  assert.ok(
+    html.indexOf('alt="Куда пойти"') < html.indexOf('alt="Журнал"') &&
+      html.indexOf('alt="Журнал"') < html.indexOf('alt="Занятия"'),
+    "journal must follow kuda and precede classes",
+  );
 
   // 2. classes/birthday/routes не имеют href и семантически отмечены disabled.
   for (const label of ["Занятия", "Праздник", "Маршруты"]) {
@@ -87,6 +94,8 @@ function assertCompactMarkup(html: string, currentIntent: "classes" | null) {
   // 1. kuda остаётся ссылкой с href.
   assert.equal(findEnclosingTagByText(html, "Куда пойти"), "link");
   assert.ok(html.includes('href="/minsk/events"'), "kuda must keep its href");
+  assert.equal(findEnclosingTagByText(html, "Журнал"), "link");
+  assert.ok(html.includes('href="/minsk/blog"'), "journal must link to the city blog");
 
   // 2. classes/birthday/routes без href, семантически disabled.
   for (const label of ["Занятия", "Праздник", "Маршруты"]) {

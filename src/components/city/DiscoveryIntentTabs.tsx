@@ -3,17 +3,19 @@
 import { useRef, useEffect, useLayoutEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
-import { Intent } from "@/lib/intent";
+import { IconBookOpen, IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
+import { Intent, isJournalPath } from "@/lib/intent";
 import { Label } from "@/components/ui/typography";
-import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
+import { PRIMARY_NAVIGATION_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { appendCityQuery } from "@/lib/city/appendCityQuery";
 import { ComingSoonBadge } from "@/components/city/ComingSoonBadge";
 
 // Map intent IDs to icons (fallback if no image)
 const TAB_ICONS = {
   kuda: IconCompass,
+  journal: IconBookOpen,
   classes: IconPalette,
   birthday: IconParty,
   routes: IconMap,
@@ -41,17 +43,19 @@ function DiscoveryIntentTabsContent({
   variant = "default",
   density = "default",
 }: DiscoveryIntentTabsProps) {
+  const pathname = usePathname();
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const tabsRef = useRef<(HTMLAnchorElement | HTMLSpanElement | null)[]>([]);
 
+  const activeNavigationId = isJournalPath(pathname) ? "journal" : currentIntent;
   const activeIndex =
-    currentIntent === null
+    activeNavigationId === null
       ? -1
-      : DISCOVERY_INTENT_ITEMS.findIndex((item) => item.id === currentIntent);
+      : PRIMARY_NAVIGATION_ITEMS.findIndex((item) => item.id === activeNavigationId);
 
   const buildIntentHref = (intentId: string) => {
     if (!city) return "#";
-    const intentConfig = DISCOVERY_INTENT_ITEMS.find((item) => item.id === intentId);
+    const intentConfig = PRIMARY_NAVIGATION_ITEMS.find((item) => item.id === intentId);
     if (!intentConfig) return "#";
     return appendCityQuery(intentConfig.href(city), city);
   };
@@ -76,7 +80,7 @@ function DiscoveryIntentTabsContent({
         inline: "center",
       });
     }
-  }, [activeIndex, currentIntent, variant]);
+  }, [activeIndex, activeNavigationId, variant]);
 
   /** Compact: без sliding-индикатора, только минимальный scroll-into-view активного пункта при первом рендере. */
   useLayoutEffect(() => {
@@ -97,7 +101,7 @@ function DiscoveryIntentTabsContent({
         aria-label="Разделы развлечений"
       >
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar px-4 py-2.5 pointer-events-auto">
-          {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
+          {PRIMARY_NAVIGATION_ITEMS.map((intentConfig, index) => {
             const isActive = activeIndex >= 0 && index === activeIndex;
 
             if (!intentConfig.navigationEnabled) {
@@ -152,7 +156,7 @@ function DiscoveryIntentTabsContent({
         aria-label="Разделы развлечений"
       >
         <div className="flex min-h-[64px] items-end justify-center gap-0 overflow-x-auto no-scrollbar pointer-events-auto md:min-h-[68px] md:gap-1">
-          {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
+          {PRIMARY_NAVIGATION_ITEMS.map((intentConfig, index) => {
             const isActive = activeIndex >= 0 && index === activeIndex;
             const Icon = TAB_ICONS[intentConfig.id];
 
@@ -259,7 +263,7 @@ function DiscoveryIntentTabsContent({
   return (
     <div className={cn("relative w-full bg-transparent z-10", className)}>
       <div className="flex w-full justify-center overflow-x-auto no-scrollbar relative pointer-events-auto">
-        {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
+        {PRIMARY_NAVIGATION_ITEMS.map((intentConfig, index) => {
           const isActive = activeIndex >= 0 && index === activeIndex;
           const Icon = TAB_ICONS[intentConfig.id];
 
