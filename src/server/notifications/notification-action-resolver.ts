@@ -82,7 +82,9 @@ export function resolveNotificationActionDefaults(input: {
   modalTitle?: string | null;
   modalBody?: string | null;
 }): ResolvedNotificationAction {
-  const actionUrl = input.actionUrl?.trim() ? input.actionUrl : null;
+  const rawActionUrl = input.actionUrl?.trim() ? input.actionUrl.trim() : null;
+  const actionUrl =
+    rawActionUrl === "/me/settings/account" ? "/me/settings/email" : rawActionUrl;
   const actionMode =
     input.actionMode ?? resolveDefaultActionMode(input.type, actionUrl);
 
