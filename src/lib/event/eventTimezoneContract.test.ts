@@ -29,13 +29,13 @@ test("event schedule 12:00 Europe/Minsk persists as 09:00Z", async () => {
     startTime: "12:00",
   };
 
-  const count = await replaceActivitySessionsFromScheduleJson({
+  const result = await replaceActivitySessionsFromScheduleJson({
     prisma: prisma as never,
     activityId: "activity-1",
     scheduleJson,
   });
 
-  assert.equal(count, 1);
+  assert.deepEqual(result, { count: 1, skipped: false });
   assert.equal(created[0]?.toISOString(), "2026-08-29T09:00:00.000Z");
 });
 

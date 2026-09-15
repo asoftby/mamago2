@@ -31,6 +31,16 @@ export interface EventScheduleResyncResult {
   activityId: string;
   sessionsWritten: number;
   nextOccurrenceAt: Date | null;
+  /**
+   * True when replaceActivitySessionsFromScheduleJson() refused to touch
+   * ActivitySession rows because the target Activity already has an
+   * imported (source != null) session — sessionsWritten is 0 in that case
+   * and nextOccurrenceAt was not resynced either. Not expected for
+   * WordPress-migrated Activities (their sessions never carry a source),
+   * but surfaced honestly rather than silently reported as a successful
+   * resync (see BACKLOG-154 / PR #303 review).
+   */
+  skipped: boolean;
 }
 
 /**
@@ -49,15 +59,28 @@ export async function resyncEventScheduleSessions(
   input: { activityId: string; scheduleDraft: NormalizedEventScheduleDraft },
 ): Promise<EventScheduleResyncResult> {
   return prisma.$transaction(async (tx) => {
-    const sessionsWritten = await replaceActivitySessionsFromScheduleJson({
+    const sessionsResult = await replaceActivitySessionsFromScheduleJson({
       prisma: tx,
       activityId: input.activityId,
       scheduleJson: input.scheduleDraft,
     });
+    if (sessionsResult.skipped) {
+      return {
+        activityId: input.activityId,
+        sessionsWritten: 0,
+        nextOccurrenceAt: null,
+        skipped: true,
+      };
+    }
     const nextOccurrenceAt = await syncActivityNextOccurrenceAt({
       prisma: tx,
       activityId: input.activityId,
     });
-    return { activityId: input.activityId, sessionsWritten, nextOccurrenceAt };
+    return {
+      activityId: input.activityId,
+      sessionsWritten: sessionsResult.count,
+      nextOccurrenceAt,
+      skipped: false,
+    };
   });
 }

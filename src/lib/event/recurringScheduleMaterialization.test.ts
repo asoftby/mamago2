@@ -144,14 +144,14 @@ async function testWriterPersistsExactOccurrences() {
     },
   };
 
-  const count = await replaceActivitySessionsFromScheduleJson({
+  const result = await replaceActivitySessionsFromScheduleJson({
     prisma: prisma as never,
     activityId: "activity-neboreka",
     scheduleJson: NEBOREKA_SCHEDULE,
   });
 
   assert.equal(deleted, true);
-  assert.equal(count, 52);
+  assert.deepEqual(result, { count: 52, skipped: false });
   assert.equal(created.length, 52);
   assert.equal(created[0]?.startsAt.toISOString(), "2026-08-29T09:00:00.000Z");
   assert.equal(created.at(-1)?.startsAt.toISOString(), "2026-11-08T09:00:00.000Z");

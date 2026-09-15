@@ -67,6 +67,30 @@ export async function activitySessionsMatchScheduleJson(
  * required for recurring schedules and for multiple schedule blocks with
  * different times. Venue-local wall-clock values are converted explicitly to
  * UTC; ambient server timezone never participates.
+ *
+ * Refuses to run at all when the target Activity already has any
+ * ActivitySession with a non-null `source` (import-created, e.g. ABWS —
+ * see ABWS_PARSER_KEY) *at the time of this initial read*. scheduleJson has
+ * no representation for source/externalId/buyUrl/price, so replacing
+ * sessions here would silently discard them — the defect fixed piecemeal at
+ * individual call sites in PR #298 and PR #302 (BACKLOG-153), and now
+ * enforced once, here, so every current and future caller is protected by
+ * construction instead of each one having to remember its own pre-call
+ * check (BACKLOG-154). Safe for every known caller: the event wizard route
+ * (PR #298) and WordPress-migration resync/create paths (which never set
+ * `source` on their own sessions, so this never fires for their legitimate
+ * resyncs) are unaffected; the previously-unguarded ops scripts
+ * (resync-event-sessions-from-schedule-json.ts,
+ * migration-event-sessions-resync.ts) are now protected too.
+ *
+ * The read above and the delete below are NOT wrapped in a serializable
+ * transaction — a concurrent ABWS upsert landing an imported session
+ * between them is possible (found by automated review on PR #303). Rather
+ * than requiring every caller to run this inside a serializable
+ * transaction, the delete itself is scoped to `source: null` so it can
+ * never remove an imported row regardless of timing — the race can at
+ * worst leave a freshly-landed imported session next to newly created bare
+ * sessions (a mixed state to clean up), never delete import data.
  */
 export async function replaceActivitySessionsFromScheduleJson(
   input: {
@@ -74,13 +98,29 @@ export async function replaceActivitySessionsFromScheduleJson(
     activityId: string;
     scheduleJson: unknown;
   },
-): Promise<number> {
+): Promise<{ count: number; skipped: boolean }> {
   const { prisma, activityId, scheduleJson } = input;
   const started = isServerSavePerfEnabled() ? performance.now() : 0;
+
+  const existingSessions = await prisma.activitySession.findMany({
+    where: { activityId },
+    select: { source: true },
+  });
+  const hasImportedSessions = existingSessions.some((s) => s.source != null);
+  if (hasImportedSessions) {
+    console.info("[event-sessions-sync] skipped — activity has imported sessions", {
+      activityId,
+      existingSessionsCount: existingSessions.length,
+    });
+    return { count: 0, skipped: true };
+  }
+
   const occurrences = extractScheduleOccurrences(scheduleJson);
 
   const deleteStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-  await prisma.activitySession.deleteMany({ where: { activityId } });
+  // Scoped to source: null — see function doc. Never deletes an imported
+  // row, even one that lands after the read above.
+  await prisma.activitySession.deleteMany({ where: { activityId, source: null } });
   const deleteMs = isServerSavePerfEnabled() ? Math.round(performance.now() - deleteStarted) : 0;
 
   if (occurrences.length === 0) {
@@ -93,7 +133,7 @@ export async function replaceActivitySessionsFromScheduleJson(
         totalMs: Math.round(performance.now() - started),
       });
     }
-    return 0;
+    return { count: 0, skipped: false };
   }
 
   const startsAtList = occurrences.map((occurrence) =>
@@ -116,5 +156,5 @@ export async function replaceActivitySessionsFromScheduleJson(
     });
   }
 
-  return startsAtList.length;
+  return { count: startsAtList.length, skipped: false };
 }

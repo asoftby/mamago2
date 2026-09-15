@@ -47,6 +47,7 @@ async function main() {
 
   let mismatched = 0;
   let repaired = 0;
+  let skippedImported = 0;
 
   for (const activity of activities) {
     if (!activity.scheduleJson) continue;
@@ -74,24 +75,39 @@ async function main() {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const sessionsWritten = await replaceActivitySessionsFromScheduleJson({
+      const sessionsResult = await replaceActivitySessionsFromScheduleJson({
         prisma: tx,
         activityId: activity.id,
         scheduleJson: activity.scheduleJson,
       });
+      if (sessionsResult.skipped) {
+        return { sessionsResult, nextOccurrenceAt: null };
+      }
       const nextOccurrenceAt = await syncActivityNextOccurrenceAt({
         prisma: tx,
         activityId: activity.id,
       });
-      return { sessionsWritten, nextOccurrenceAt };
+      return { sessionsResult, nextOccurrenceAt };
     });
+
+    if (result.sessionsResult.skipped) {
+      skippedImported += 1;
+      console.log(
+        JSON.stringify({
+          action: "SKIPPED_IMPORTED",
+          ...record,
+          reason: "activity has imported ActivitySession rows — refused to replace them",
+        }),
+      );
+      continue;
+    }
 
     repaired += 1;
     console.log(
       JSON.stringify({
         action: "REPAIRED",
         ...record,
-        sessionsWritten: result.sessionsWritten,
+        sessionsWritten: result.sessionsResult.count,
         nextOccurrenceAt: result.nextOccurrenceAt?.toISOString() ?? null,
       }),
     );
@@ -103,6 +119,7 @@ async function main() {
       scanned: activities.length,
       mismatched,
       repaired,
+      skippedImported,
       filters: { activityId, slug },
     }),
   );
