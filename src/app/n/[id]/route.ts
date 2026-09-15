@@ -74,7 +74,10 @@ export async function GET(
   const publishedPlace = isPublishedPlaceNotification
     ? await prisma.place.findUnique({
         where: { id: notification.entityId! },
-        select: { slug: true },
+        select: {
+          slug: true,
+          city: { select: { slug: true } },
+        },
       })
     : null;
 
@@ -84,6 +87,7 @@ export async function GET(
     entityId: notification.entityId,
     actionUrl: notification.actionUrl,
     placeSlug: publishedPlace?.slug ?? null,
+    citySlug: publishedPlace?.city?.slug ?? null,
   });
 
   const resolvedDestination = resolveNotificationClickthroughDestination({
