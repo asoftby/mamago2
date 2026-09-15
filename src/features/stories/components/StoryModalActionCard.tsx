@@ -111,15 +111,11 @@ export function StoryModalActionCard({
           Mobile doesn't need it: the scroll wrapper above is already flex-1. ── */}
       <div className="max-md:hidden md:flex-1 md:min-h-[16px]" />
 
-      {/* ── Actions slot — price + CTA. Mobile: shrink-0, capped, safe-area aware. ── */}
+      {/* ── Actions slot — intrinsic height; the scrollable text region yields space to it. ── */}
       {hasActionSlot && (
         <div
           className={cn(
             "max-md:shrink-0 max-md:pt-3",
-            // 18dvh = 30% of the 60dvh content row. A %-based max-height would need
-            // this element's own box to be a definite height, but it's flex-1 —
-            // some engines then treat the % as indefinite and let it overflow.
-            "max-md:max-h-[18dvh] max-md:overflow-hidden",
             "max-md:pb-[calc(env(safe-area-inset-bottom)+16px)]",
           )}
         >
