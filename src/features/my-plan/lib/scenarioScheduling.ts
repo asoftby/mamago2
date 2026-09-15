@@ -1,4 +1,5 @@
 import { addDaysLocal, getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
+import { deriveSchedulingKindFromScheduleJson } from "@/lib/event/deriveSchedulingKind";
 import { resolveScheduleItemTimeOrder } from "@/lib/event/scheduleItemTimeOrder";
 import type { ScenarioItemTiming } from "./scenarioProjection";
 
@@ -120,7 +121,10 @@ export function resolveScenarioScheduling(input: {
   activity: SchedulingActivity;
   timing: ScenarioItemTiming;
 }): ScenarioScheduling {
-  const kind: ScenarioSchedulingKind = input.activity?.schedulingKind ?? "UNKNOWN";
+  const kind: ScenarioSchedulingKind =
+    input.activity?.schedulingKind ??
+    deriveSchedulingKindFromScheduleJson(input.activity?.scheduleJson) ??
+    "UNKNOWN";
   const startsAt = input.timing.effectiveStartsAt;
   const scheduleJson = scheduleRecord(input.activity?.scheduleJson);
   const configuredDuration = validDurationMinutes(scheduleJson?.durationMinutes);
