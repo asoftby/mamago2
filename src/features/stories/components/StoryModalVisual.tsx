@@ -1,11 +1,79 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryProgress } from "./StoryProgress";
 import type { StoryCollection, StoryItem } from "../types/story";
+
+const LONG_PRESS_MS = 220;
+
+/**
+ * Mobile tap zone: a quick tap navigates (onTap), a press-and-hold pauses
+ * autoplay for as long as it's held (onPause/onResume) without navigating.
+ */
+function StoryTapZone({
+  className,
+  onTap,
+  onPause,
+  onResume,
+  label,
+}: {
+  className?: string;
+  onTap: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  label: string;
+}) {
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const engaged = useRef(false);
+
+  const clearHoldTimer = () => {
+    if (holdTimer.current !== null) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  const handlePointerDown = useCallback(() => {
+    engaged.current = false;
+    holdTimer.current = setTimeout(() => {
+      engaged.current = true;
+      onPause();
+    }, LONG_PRESS_MS);
+  }, [onPause]);
+
+  const release = useCallback(() => {
+    clearHoldTimer();
+    if (engaged.current) {
+      onResume();
+    } else {
+      onTap();
+    }
+    engaged.current = false;
+  }, [onResume, onTap]);
+
+  const cancel = useCallback(() => {
+    clearHoldTimer();
+    if (engaged.current) onResume();
+    engaged.current = false;
+  }, [onResume]);
+
+  useEffect(() => clearHoldTimer, []);
+
+  return (
+    <button
+      type="button"
+      className={cn("cursor-pointer", className)}
+      onPointerDown={handlePointerDown}
+      onPointerUp={release}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      aria-label={label}
+    />
+  );
+}
 
 interface StoryModalVisualProps {
   story: StoryCollection;
@@ -17,6 +85,8 @@ interface StoryModalVisualProps {
   paused: boolean;
   onNext: () => void;
   onPrev: () => void;
+  onPause: () => void;
+  onResume: () => void;
   onTogglePause: () => void;
   onProgressComplete: () => void;
 }
@@ -31,6 +101,8 @@ export function StoryModalVisual({
   paused,
   onNext,
   onPrev,
+  onPause,
+  onResume,
   onTogglePause,
   onProgressComplete,
 }: StoryModalVisualProps) {
@@ -51,7 +123,7 @@ export function StoryModalVisual({
     <div className="relative w-full h-full overflow-hidden bg-neutral-950 select-none">
 
       {/* ── Skeleton / placeholder while loading ── */}
-      {!imgLoaded && !imgError && (
+      {currentItem.image && !imgLoaded && !imgError && (
         <div className="absolute inset-0 z-[1] bg-neutral-900 animate-pulse" />
       )}
 
@@ -61,6 +133,11 @@ export function StoryModalVisual({
           <ImageOff className="h-8 w-8 text-neutral-600" />
           <p className="text-xs text-neutral-500">Изображение не загрузилось</p>
         </div>
+      )}
+
+      {/* ── No cover at all → gradient fallback, zone never collapses ── */}
+      {!currentItem.image && !imgError && (
+        <div className="absolute inset-0 z-[1] bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
       )}
 
       {/* ── Main image ── */}
@@ -79,6 +156,21 @@ export function StoryModalVisual({
         />
       )}
 
+      {/* ── Preload the next cover — same sizes/quality so the browser reuses
+          this fetch instead of re-requesting when it becomes current ── */}
+      {nextItem?.image && (
+        <div className="absolute h-px w-px overflow-hidden opacity-0" aria-hidden>
+          <Image
+            key={`${nextItem.id}-${nextItem.image}`}
+            src={nextItem.image}
+            alt=""
+            fill
+            sizes="(max-width: 768px) 100vw, 500px"
+            quality={90}
+          />
+        </div>
+      )}
+
       {/* ── Top gradient ── */}
       <div className="absolute inset-x-0 top-0 h-28 z-[2] bg-gradient-to-b from-black/60 via-black/15 to-transparent pointer-events-none" />
 
@@ -86,7 +178,14 @@ export function StoryModalVisual({
       <div className="absolute inset-x-0 bottom-0 h-20 z-[2] bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
 
       {/* ── Progress bar ── */}
-      <div className="absolute inset-x-0 top-0 z-[5] pt-3 px-3">
+      <div
+        className={cn(
+          "absolute inset-x-0 z-[5]",
+          "md:top-0 md:pt-3",
+          // Mobile: clear the notch/dynamic island
+          "max-md:top-[calc(env(safe-area-inset-top)+8px)]",
+        )}
+      >
         <StoryProgress
           total={story.items.length}
           current={activeItemIndex}
@@ -96,14 +195,32 @@ export function StoryModalVisual({
         />
       </div>
 
-      {/* ── Tap visual to pause / resume ── */}
+      {/* ── Desktop: click anywhere over the cover to pause / resume ── */}
       <button
         type="button"
-        className="absolute inset-x-0 bottom-0 top-[72px] z-[6] cursor-pointer"
+        className="hidden md:block absolute inset-x-0 bottom-0 top-[72px] z-[6] cursor-pointer"
         onClick={onTogglePause}
         aria-label={paused ? "Продолжить сторис" : "Поставить сторис на паузу"}
         aria-pressed={paused}
       />
+
+      {/* ── Mobile: left/right tap zones — tap navigates, long-press pauses ── */}
+      <div className="md:hidden absolute inset-x-0 bottom-0 top-[72px] z-[6] flex">
+        <StoryTapZone
+          className="h-full w-[35%]"
+          onTap={onPrev}
+          onPause={onPause}
+          onResume={onResume}
+          label="Назад"
+        />
+        <StoryTapZone
+          className="h-full flex-1"
+          onTap={onNext}
+          onPause={onPause}
+          onResume={onResume}
+          label="Вперёд"
+        />
+      </div>
 
       {/* ── Nav arrows ── */}
       <button
@@ -134,13 +251,6 @@ export function StoryModalVisual({
       >
         <ChevronRight className="h-4 w-4" />
       </button>
-
-      {/* ── Mobile: item title at bottom ── */}
-      <div className="absolute inset-x-0 bottom-0 z-[5] px-5 pb-4 md:hidden pointer-events-none">
-        <p className="text-sm font-semibold text-white leading-snug drop-shadow line-clamp-2">
-          {currentItem.title}
-        </p>
-      </div>
     </div>
   );
 }
