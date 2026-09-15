@@ -4593,7 +4593,9 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-153] Second route (`/api/business/activities/[id]`) still destroys imported ActivitySession rows — PR #298 never covered it
 
-- Status: OPEN
+- Status: DONE (2026-09-15, fixed same-day per explicit instruction —
+  "дешевле сделать, чем потом искать, почему у разобранных вручную
+  карточек пропали сеансы")
 - Priority: P1
 - Area: Import / Integrations / Business dashboard
 - Added: 2026-09-15
@@ -4637,8 +4639,17 @@ distributor_company_id=550) и хотели бы уточнить несколь
     authorized, functional route at a guessable/bookmarkable URL, not a
     deleted or disabled one, so "not linked from nav" is not the same as
     "unreachable."
-- Current state: not started — an active bug as of 2026-09-15, not a
-  future risk.
+- Current state: **Fixed.** `updateActivity()` now computes
+  `applySessionsUpdate` (mirrors `hasImportedSessions`) by checking
+  `ActivitySession.source` on the target Activity before touching
+  anything — when any imported session exists, neither the
+  `deleteMany` nor the relational `sessions: { create: ... }` recreate
+  runs; the sessions block of the PATCH is a full no-op, same contract
+  PR #298 established for the main events route. Product decision on
+  whether to delete the unlinked `/business/activities/*` page tree
+  outright (raised below) was not made — fixed in place instead, per
+  explicit instruction to ship the cheap fix now rather than decide the
+  page tree's fate first.
 - Dependencies: does not depend on BACKLOG-152 (`Activity.scheduleSource`)
   to fix — the existing `ActivitySession.source != null` check from
   PR #298 can be applied to `updateActivity()`/this route directly, same
@@ -4654,7 +4665,9 @@ distributor_company_id=550) и хотели бы уточнить несколь
   (`/business/activities/*`) should instead be deleted outright now that
   it has no navigation entry point and the full event wizard supersedes
   it — if kept, it needs this fix regardless of ABWS; if removed, this
-  entry closes by deletion instead. Add a regression test proving an
+  entry closes by deletion instead. **Still open as a separate product
+  question — the code fix above does not answer it, just makes either
+  outcome safe.** Add a regression test proving an
   Activity with an import-sourced session is untouched by a PATCH through
   this route with a non-empty `sessions` array in the body.
 - Source: found by automated review (chatgpt-codex-connector) on PR #300
@@ -4662,3 +4675,103 @@ distributor_company_id=550) и хотели бы уточнить несколь
   `canManageActivity`/`ActivityForm`/nav-link grep before filing this
   entry — see BACKLOG-152 for the related (but distinct) session-count
   heuristic gap this does not depend on.
+
+## [BACKLOG-154] Full map of ActivitySession write sites — 3 more unprotected, lower-risk paths found alongside BACKLOG-153
+
+- Status: OPEN
+- Priority: P2
+- Area: Import / Integrations / Ops tooling
+- Added: 2026-09-15
+- Reason deferred: requested explicitly ("не хочу узнавать о четвёртом
+  месте от Codex") after BACKLOG-153 turned out to be a route this
+  session had already (in BACKLOG-152) mischaracterized as safe. Full
+  `grep` sweep of every `prisma.activitySession.*`
+  (`create`/`createMany`/`update`/`updateMany`/`upsert`/`delete`/
+  `deleteMany`) call and every relational `Activity.sessions: { create /
+  deleteMany }` write across `src/` and `scripts/`, 2026-09-15. Not fixed
+  now — none of the three below are reachable from a normal business-user
+  action (all require shell/CLI access), unlike BACKLOG-153, and fixing
+  all three plus the architectural change they point to would have
+  meant not shipping BACKLOG-153 same-day as instructed.
+- Context — the complete map, one row per write site:
+
+  1. `src/server/modules/import/publish/activity-session-from-occurrences.ts`
+     — `prisma.activitySession.upsert()`. **Safe by design** — the import
+     pipeline's own writer, upsert-only (never deletes), always sets
+     `source`. Not a risk; this is the trusted writer every other entry
+     here is trying not to clobber.
+  2. `src/lib/business/syncEventActivitySessions.ts`'s
+     `replaceActivitySessionsFromScheduleJson()` — `deleteMany` +
+     `createMany`, the shared destructive core originally fixed (at its
+     one call site) by PR #298. **Not gated inside the function itself** —
+     the `hasImportedSessions` check lives at each caller, not here. Four
+     known callers:
+     - `src/app/api/business/events/[id]/route.ts` (event wizard PATCH) —
+       **protected** (PR #298).
+     - `scripts/resync-event-sessions-from-schedule-json.ts` (ops CLI) —
+       **not protected**. Highest residual risk of the three: run with
+       `--apply` and no `--activity-id`/`--slug` filter, it sweeps *every*
+       non-archived EVENT `Activity` with a `scheduleJson`, and ABWS
+       import's `buildMinimalScheduleJson()` output *always* mismatches
+       the fingerprint (same root cause as the original Defect 1) — would
+       silently wipe every ABWS-imported event's sessions in one pass.
+       Defaults to dry-run (`--apply` must be passed explicitly); requires
+       shell access to run at all.
+     - `scripts/migration-event-sessions-resync.ts` →
+       `src/lib/migration/commit/event/EventScheduleResyncWriter.ts` — not
+       protected at the code level, but scoped by construction to
+       operator-typed `--source-record-key wordpress-db:events:{id}`
+       arguments, which resolve only within the WordPress-migration id
+       namespace — cannot structurally reach an ABWS-imported Activity.
+       Low practical risk.
+     - `src/lib/migration/commit/event/EventCommitWriter.ts` (via
+       `runAtomicEventCreate.ts`, WordPress migration's Event **CREATE**
+       path) — not protected at the code level, but only ever runs against
+       an Activity it just created in the same call (zero pre-existing
+       sessions to destroy). Not a real risk in practice.
+  3. `src/server/services/activity.service.ts`'s `updateActivity()` —
+     **fixed by this entry (BACKLOG-153), see above.**
+     `createActivity()` in the same file — relational create-only, always
+     a brand-new Activity. Not a risk (nothing pre-existing to destroy).
+  4. `scripts/repair-event-session-timezones.ts` — its own raw
+     `tx.activitySession.deleteMany()` + `createMany()` inside a
+     transaction (does not go through `replaceActivitySessionsFromScheduleJson`).
+     **Not protected.** Scans all `Activity` rows with `scheduleJson` and
+     `sessions` (no `source` filter), but the destructive branch only
+     fires for rows a heuristic (`buildEventSessionTimezoneRepairPlan`)
+     classifies as a genuine timezone-drift candidate — narrower blast
+     radius than #2's ops script. Has `--preview`/`--commit` modes,
+     defaults to preview.
+  5. `scripts/update-event-date.ts` — per-session
+     `prisma.activitySession.update()` loop, sets **every** session on the
+     given Activity to the *same single* new date. **Not protected**, and
+     structurally wrong for a multi-session imported event regardless of
+     source (would collapse distinct ABWS session dates into one) — but
+     doesn't delete rows, so `source`/`externalId`/price survive even
+     though `startsAt` gets corrupted. Manual single-activity CLI debug
+     tool (`pnpm tsx scripts/update-event-date.ts <id> <date>`), requires
+     an operator to explicitly target one activity by id.
+  6. `scripts/dev/seed-demo-data.ts` — `createMany`, additive only, always
+     against a demo Activity the same script just created. Dev-tooling
+     only, no production data ever in scope. Not a risk.
+- Current state: not started. Map complete; nothing here fixed yet.
+- Dependencies: none block other current work.
+- Recommendation (not yet a decision — flagging for the project owner):
+  the cleanest fix for row #2's three unprotected callers is not three
+  separate call-site checks (that's exactly how BACKLOG-153 happened —
+  the guard lived at one caller, not the shared function, so new callers
+  silently inherited the bug) but moving the `ActivitySession.source !=
+  null` check **inside** `replaceActivitySessionsFromScheduleJson()`
+  itself, so every current and future caller is protected by
+  construction. Row #4 (`repair-event-session-timezones.ts`) would need
+  its own, separate guard since it doesn't call that shared function.
+  Row #5 (`update-event-date.ts`) is arguably better fixed by deleting the
+  per-session date-collapse behavior entirely (it looks like a
+  single-session-era tool that predates multi-session events) rather than
+  gating it.
+- Acceptance criteria: not defined yet — depends on the fix-now-vs-defer
+  and single-guard-vs-per-site decision above, which is the project
+  owner's call, not to be guessed at implementation time.
+- Source: full-repo `ActivitySession` write-site audit requested
+  explicitly after BACKLOG-153, 2026-09-15 — see BACKLOG-153 for the one
+  entry in this map that has actually been fixed.
