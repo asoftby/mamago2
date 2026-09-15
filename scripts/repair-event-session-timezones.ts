@@ -22,7 +22,7 @@ type RepairCandidate = {
   title: string;
   status: string;
   scheduleJson: unknown;
-  sessions: Array<{ id: string; startsAt: Date }>;
+  sessions: Array<{ id: string; startsAt: Date; source: string | null }>;
 };
 
 async function main(): Promise<void> {
@@ -34,6 +34,7 @@ async function main(): Promise<void> {
   let mismatched = 0;
   let timezoneCandidates = 0;
   let unrelatedMismatches = 0;
+  let skippedImported = 0;
   let repairedActivities = 0;
   let repairedPlanItems = 0;
 
@@ -50,7 +51,7 @@ async function main(): Promise<void> {
         scheduleJson: true,
         sessions: {
           orderBy: { startsAt: "asc" },
-          select: { id: true, startsAt: true },
+          select: { id: true, startsAt: true, source: true },
         },
       },
       orderBy: { id: "asc" },
@@ -79,6 +80,28 @@ async function main(): Promise<void> {
             reason: repairPlan.reason,
             desiredFingerprint,
             actualFingerprint,
+            sessions: activity.sessions.length,
+            mode,
+          }),
+        );
+        continue;
+      }
+
+      // ActivitySession rows with a non-null source are import-created
+      // (ABWS today) — their startsAt is externally sourced, and this
+      // script's timezone heuristic (legacy wizard UTC/wall-clock
+      // confusion) has nothing to do with that data. Never touch them
+      // (BACKLOG-154 row #4).
+      const hasImportedSessions = activity.sessions.some((s) => s.source != null);
+      if (hasImportedSessions) {
+        skippedImported += 1;
+        console.log(
+          JSON.stringify({
+            activityId: activity.id,
+            title: activity.title,
+            status: activity.status,
+            classification: "skip-imported",
+            reason: "activity has imported ActivitySession rows — refused to touch them",
             sessions: activity.sessions.length,
             mode,
           }),
@@ -142,7 +165,12 @@ async function main(): Promise<void> {
           });
         }
 
-        await tx.activitySession.deleteMany({ where: { activityId: activity.id } });
+        // Scoped to source: null — even though hasImportedSessions was
+        // just checked above, this delete can never remove an imported
+        // row regardless of a concurrent ABWS upsert landing between that
+        // read and this write (same race class closed in
+        // replaceActivitySessionsFromScheduleJson, see PR #303).
+        await tx.activitySession.deleteMany({ where: { activityId: activity.id, source: null } });
         await tx.activitySession.createMany({
           data: repairPlan.entries.map((entry) => ({
             activityId: activity.id,
@@ -171,6 +199,7 @@ async function main(): Promise<void> {
         mismatched,
         timezoneCandidates,
         unrelatedMismatches,
+        skippedImported,
         repairedActivities,
         repairedPlanItems,
       }),
