@@ -21,10 +21,15 @@
 
 import type { EventNormalizerInput, EventNormalizerOutput } from "./event.normalizer";
 import type { EventImportOccurrence, NormalizedEventImport } from "../types";
-import type { AbwsPerformanceRawPayload } from "../parsers/abws-performances-event.parser";
+import type { AbwsPerformanceRawPayload, AbwsPerformanceType } from "../parsers/abws-performances-event.parser";
 
 /** Dispatch key — kept local so normalizing this source doesn't require importing from parsers/. */
 export const ABWS_PARSER_KEY = "abws-performances-event";
+
+/** "Name (id)" when the source gave a name, else just the bare id. */
+function formatAbwsTypeLabel(type: AbwsPerformanceType): string {
+  return type.name ? `${type.name} (${type.id})` : String(type.id);
+}
 
 const SHORT_DESC_MAX = 200;
 
@@ -128,8 +133,27 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
   // per-session kopeck values above via a shared conversion function.
   const priceText = first ? undefined : formatRub(payload.perfPriceMinRub);
 
-  const categoryCandidates = payload.categoryTypeIds.map((id) => String(id));
+  // Human-readable "Name (id)" labels for the reviewer, not bare numeric
+  // ids — the reviewer has no reason to memorize the ABWS type-id table.
+  // recognizedTypes/unrecognizedTypes carry the source's own type.name;
+  // payload.categoryTypeIds (bare numbers, no name) is kept only as a
+  // fallback for records normalized by parser code that predates these two
+  // fields (stored rawPayload from before this change).
+  const categoryCandidates =
+    payload.recognizedTypes && payload.recognizedTypes.length > 0
+      ? payload.recognizedTypes.map(formatAbwsTypeLabel)
+      : payload.categoryTypeIds.map((id) => String(id));
   if (categoryCandidates.length === 0) warnings.push("categoryCandidates empty — will attempt AI detection");
+
+  // Everything outside the recognized-category whitelist (venue names
+  // mixed in with real signals like "Театр кукол"/"Детям", per
+  // CATEGORY_TYPE_IDS's own comment) — never auto-mapped, shown to the
+  // reviewer as-is so they can act on a signal the whitelist doesn't
+  // recognize yet (see docs/engineering/backlog.md's Театр кукол note).
+  const otherCategoryCandidates =
+    payload.unrecognizedTypes && payload.unrecognizedTypes.length > 0
+      ? payload.unrecognizedTypes.map(formatAbwsTypeLabel)
+      : undefined;
 
   const normalized: NormalizedEventImport = {
     entityType: "EVENT",
@@ -153,6 +177,7 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
     ageText: payload.ageMin != null ? `от ${payload.ageMin}` : undefined,
     priceText,
     categoryCandidates,
+    ...(otherCategoryCandidates ? { otherCategoryCandidates } : {}),
     imageUrls: payload.images,
     ...(occurrences.length > 0 ? { occurrences } : {}),
     ...(payload.perfBuyUrl ? { performanceBuyUrl: payload.perfBuyUrl } : {}),

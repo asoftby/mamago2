@@ -112,19 +112,21 @@ const CATEGORY_TYPE_IDS = new Set<number>([1, 2, 3, 15, 16, 17, 22, 29, 41]);
 
 export function filterCategoryTypeIds(
   types: AbwsPerformanceType[] | null | undefined,
-): { categoryTypeIds: number[]; unrecognizedTypes: AbwsPerformanceType[] } {
+): { categoryTypeIds: number[]; recognizedTypes: AbwsPerformanceType[]; unrecognizedTypes: AbwsPerformanceType[] } {
   const categoryTypeIds: number[] = [];
+  const recognizedTypes: AbwsPerformanceType[] = [];
   const unrecognizedTypes: AbwsPerformanceType[] = [];
 
   for (const type of types ?? []) {
     if (CATEGORY_TYPE_IDS.has(type.id)) {
       categoryTypeIds.push(type.id);
+      recognizedTypes.push(type);
     } else {
       unrecognizedTypes.push(type);
     }
   }
 
-  return { categoryTypeIds, unrecognizedTypes };
+  return { categoryTypeIds, recognizedTypes, unrecognizedTypes };
 }
 
 // ── §0 single-venue vs multi-venue split ────────────────────────────────────
@@ -245,6 +247,12 @@ export interface AbwsPerformanceRawPayload {
   perfPriceMinRub: number | null;
   perfPriceMaxRub: number | null;
   categoryTypeIds: number[];
+  /**
+   * Same ids as categoryTypeIds, but with the source's own `name` kept
+   * (categoryTypeIds alone dropped it) — for reviewer display only, not
+   * consumed by the automatic category-mapping whitelist logic above.
+   */
+  recognizedTypes: AbwsPerformanceType[];
   unrecognizedTypes: AbwsPerformanceType[];
   /** Fallback purchase link — used only if the event has no sessions. */
   perfBuyUrl: string | null;
@@ -282,7 +290,7 @@ function extractImageUrl(image: AbwsImageSizes | null | undefined): string | nul
 
 export function mapAbwsPerformanceToRawPayload(item: AbwsPerformanceItem): AbwsPerformanceRawPayload {
   const { performance, sessions } = item;
-  const { categoryTypeIds, unrecognizedTypes } = filterCategoryTypeIds(performance.types);
+  const { categoryTypeIds, recognizedTypes, unrecognizedTypes } = filterCategoryTypeIds(performance.types);
   const images = [performance.image, ...(performance.images ?? [])]
     .map(extractImageUrl)
     .filter((url): url is string => Boolean(url));
@@ -298,6 +306,7 @@ export function mapAbwsPerformanceToRawPayload(item: AbwsPerformanceItem): AbwsP
     perfPriceMinRub: parsePerformancePriceRub(performance.minPrice),
     perfPriceMaxRub: parsePerformancePriceRub(performance.maxPrice),
     categoryTypeIds,
+    recognizedTypes,
     unrecognizedTypes,
     perfBuyUrl: performance.urlSaleframe ?? null,
     isSingleVenue: isSingleVenue(sessions),
