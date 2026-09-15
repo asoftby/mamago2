@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
+import { AGE_KEYS } from "@/lib/config/ages";
 import type { EventStep1Taxonomies, PublicGenreOption } from "@/components/business/wizard/event/steps/step1Taxonomies";
 import { getGenresByCategory } from "@/lib/taxonomy/getGenresByCategory";
 
@@ -50,7 +51,10 @@ const getCachedAgeOptions = unstable_cache(
       where: { slug: "age", isActive: true },
       include: {
         options: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            value: { in: [...AGE_KEYS] },
+          },
           orderBy: [{ order: "asc" }, { value: "asc" }],
         },
       },
@@ -63,7 +67,7 @@ const getCachedAgeOptions = unstable_cache(
       active: o.isActive,
     }));
   },
-  ["admin-event-age-options-v2"],
+  ["admin-event-age-options-v3"],
   { revalidate: 3600, tags: [EVENT_STEP1_AGES_TAG] },
 );
 
