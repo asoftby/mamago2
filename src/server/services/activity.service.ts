@@ -82,6 +82,13 @@ export async function updateActivity(
   // hasImportedSessions), applied here because this older route was never
   // covered by that fix (BACKLOG-153) — once any imported session exists,
   // this route must not touch sessions at all.
+  //
+  // The read above and the delete below are not atomic — a concurrent ABWS
+  // upsert landing an imported session between them is possible (same race
+  // found by automated review on PR #303's shared-function equivalent of
+  // this guard). Rather than requiring a serializable transaction, the
+  // delete itself is scoped to source: null so it can never remove an
+  // imported row regardless of timing.
   let applySessionsUpdate = sessions !== undefined;
   if (applySessionsUpdate) {
     const existingSessions = await prisma.activitySession.findMany({
@@ -95,9 +102,9 @@ export async function updateActivity(
   }
 
   if (applySessionsUpdate) {
-    // Delete existing sessions
+    // Delete existing sessions — scoped to source: null, see comment above.
     await prisma.activitySession.deleteMany({
-      where: { activityId },
+      where: { activityId, source: null },
     });
   }
 

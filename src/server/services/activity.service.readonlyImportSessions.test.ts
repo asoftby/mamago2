@@ -35,8 +35,10 @@ assert.match(
 
 assert.match(
   source,
-  /if \(applySessionsUpdate\) \{\s*\n\s*\/\/ Delete existing sessions\s*\n\s*await prisma\.activitySession\.deleteMany\(/,
-  "the deleteMany must be gated behind applySessionsUpdate, not run unconditionally",
+  /if \(applySessionsUpdate\) \{\s*\n\s*\/\/ Delete existing sessions[^\n]*\n\s*await prisma\.activitySession\.deleteMany\(\{\s*\n\s*where: \{ activityId, source: null \},\s*\n\s*\}\);/,
+  "the deleteMany must be gated behind applySessionsUpdate AND scoped to source: null — a concurrent " +
+    "ABWS upsert landing between the read and this delete (found by automated review on PR #302/#303) " +
+    "must never be removed by it, regardless of timing",
 );
 
 assert.match(
