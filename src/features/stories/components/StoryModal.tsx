@@ -95,7 +95,7 @@ export function StoryModal({
     /* ── Backdrop ── */
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
       style={{ background: "rgba(10,10,10,0.72)", backdropFilter: "blur(10px)" }}
       onClick={handleBackdropClick}
     >
