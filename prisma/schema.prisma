@@ -4546,31 +4546,35 @@ enum ImportFieldLockMode {
 
 /// Источник импорта (сайт, фид, API и т.д.)
 model ImportSource {
-  id                  String              @id @default(cuid())
-  name                String
-  slug                String              @unique
-  type                ImportSourceType
-  status              ImportSourceStatus  @default(ACTIVE)
-  baseUrl             String?
-  parserKey           String?
-  fetchStrategy       ImportFetchStrategy @default(HTML_SCRAPE)
-  isTrusted           Boolean             @default(false)
-  isAutoUpdate        Boolean             @default(false)
-  defaultEntity       ImportEntityType?
-  rateLimitMs         Int?
-  notes               String?
-  lastRunAt           DateTime?
-  lastSuccessAt       DateTime?
-  lastErrorAt         DateTime?
-  lastErrorMessage    String?
-  cityId              String?
-  isActive            Boolean             @default(true)
-  archivedAt          DateTime?
-  crawlMaxPages       Int?
-  crawlMaxDetailLinks Int?
-  crawlMaxRecords     Int?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  id                      String              @id @default(cuid())
+  name                    String
+  slug                    String              @unique
+  type                    ImportSourceType
+  status                  ImportSourceStatus  @default(ACTIVE)
+  baseUrl                 String?
+  parserKey               String?
+  fetchStrategy           ImportFetchStrategy @default(HTML_SCRAPE)
+  isTrusted               Boolean             @default(false)
+  isAutoUpdate            Boolean             @default(false)
+  defaultEntity           ImportEntityType?
+  rateLimitMs             Int?
+  notes                   String?
+  lastRunAt               DateTime?
+  lastSuccessAt           DateTime?
+  lastErrorAt             DateTime?
+  lastErrorMessage        String?
+  cityId                  String?
+  isActive                Boolean             @default(true)
+  archivedAt              DateTime?
+  crawlMaxPages           Int?
+  crawlMaxDetailLinks     Int?
+  crawlMaxRecords         Int?
+  /// ABWS-specific category filter: parser-native numeric type ids
+  /// (e.g. performance.types[].id) allowed through. Empty array = no
+  /// filter, import everything, matching current behavior.
+  categoryTypeIdAllowlist Int[]               @default([])
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
 
   city    City?            @relation("ImportSourceCity", fields: [cityId], references: [id])
   runs    ImportRun[]

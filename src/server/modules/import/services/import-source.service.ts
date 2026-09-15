@@ -32,6 +32,7 @@ export type UpdateImportSourceDto = {
   crawlMaxPages?: number | null;
   crawlMaxDetailLinks?: number | null;
   crawlMaxRecords?: number | null;
+  categoryTypeIdAllowlist?: number[];
 };
 
 export type ImportSourceDeletionSummary = {

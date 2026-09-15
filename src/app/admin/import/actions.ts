@@ -588,6 +588,7 @@ export async function updateImportSourceAction(
     crawlMaxPages?: number | null;
     crawlMaxDetailLinks?: number | null;
     crawlMaxRecords?: number | null;
+    categoryTypeIdAllowlist?: number[];
   },
 ): Promise<{ success: boolean; error?: string }> {
   try {
