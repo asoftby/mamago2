@@ -33,9 +33,10 @@ assert.equal(
     entityId: "place-1",
     actionUrl: "/business/places/place-1/edit",
     placeSlug: "colt",
+    citySlug: "minsk",
   }),
-  "/places/colt",
-  "approved place should open public page",
+  "/minsk/places/colt",
+  "approved place should open its city-scoped canonical public page",
 );
 
 assert.equal(
@@ -45,6 +46,7 @@ assert.equal(
     entityId: "place-1",
     actionUrl: "/business/places/place-1/edit",
     placeSlug: "colt",
+    citySlug: "minsk",
   }),
   "/business/places/place-1/edit",
   "needs-changes place should stay in editor",
