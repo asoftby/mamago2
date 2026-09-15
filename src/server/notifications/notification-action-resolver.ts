@@ -99,7 +99,24 @@ export function resolveNotificationPageUrl(params: {
   entityType?: NotificationEntityType | null;
   entityId?: string | null;
   actionUrl?: string | null;
+  placeSlug?: string | null;
 }): string | null {
+  // Canonicalize onboarding links before persisted actionUrl so old notifications
+  // created with the removed /me/settings/account route keep working.
+  if (params.type === "SYSTEM" && params.entityId === "VERIFY_EMAIL") {
+    return "/me/settings/email";
+  }
+
+  // A successfully published place is user-facing content. Moderation outcomes
+  // that require action still fall through to the business editor below.
+  if (
+    (params.type === "PLACE_APPROVED" || params.type === "PLACE_UPDATE_APPROVED") &&
+    params.entityType === "PLACE" &&
+    params.placeSlug?.trim()
+  ) {
+    return `/places/${encodeURIComponent(params.placeSlug)}`;
+  }
+
   if (params.actionUrl?.trim()) {
     return params.actionUrl;
   }
@@ -188,14 +205,12 @@ export function resolveNotificationAction(notification: Pick<
   Notification,
   "type" | "title" | "body" | "actionMode" | "actionUrl" | "modalTitle" | "modalBody" | "entityType" | "entityId"
 >): ResolvedNotificationAction {
-  const actionUrl =
-    notification.actionUrl ??
-    resolveNotificationPageUrl({
-      type: notification.type,
-      entityType: notification.entityType,
-      entityId: notification.entityId,
-      actionUrl: notification.actionUrl,
-    });
+  const actionUrl = resolveNotificationPageUrl({
+    type: notification.type,
+    entityType: notification.entityType,
+    entityId: notification.entityId,
+    actionUrl: notification.actionUrl,
+  });
 
   return resolveNotificationActionDefaults({
     type: notification.type,
