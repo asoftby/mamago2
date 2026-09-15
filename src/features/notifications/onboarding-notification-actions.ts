@@ -13,7 +13,7 @@ export type OnboardingNotificationKind =
   | "VERIFY_PHONE"
   | "CONNECT_TELEGRAM";
 
-export const VERIFY_EMAIL_ACCOUNT_SETTINGS_PATH = "/me/settings/account";
+export const VERIFY_EMAIL_ACCOUNT_SETTINGS_PATH = "/me/settings/email";
 
 export function getOnboardingNotificationKind(
   notification: NotificationApiRow,
