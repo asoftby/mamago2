@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { mapNormalizedToActivity } from "./event-field-mapper";
+import {
+  mapNormalizedToActivity,
+  filterActivityNonDestructiveUpdates,
+  isPlaceholderZeroPriceFrom,
+} from "./event-field-mapper";
 import type { NormalizedEventImport } from "../types";
 
 function baseNormalized(overrides: Partial<NormalizedEventImport> = {}): NormalizedEventImport {
@@ -136,6 +140,64 @@ async function unwrap(nd: NormalizedEventImport) {
   assert.equal(sj7.pricingMode, "from");
   assert.equal(sj7.ticketLink, "https://saleframe.24afisha.by/?pid=1");
   assert.equal(sj7.participationMode, "external-link");
+
+  // ── isPlaceholderZeroPriceFrom: the pre-#299 stale-zero backfill gap (Codex review finding) ──
+  assert.equal(
+    isPlaceholderZeroPriceFrom({ priceFrom: 0, priceMode: "FROM" }),
+    true,
+    "priceFrom 0 with a non-FREE mode is the known placeholder bug",
+  );
+  assert.equal(
+    isPlaceholderZeroPriceFrom({ priceFrom: 0, priceMode: "UNKNOWN" }),
+    true,
+  );
+  assert.equal(
+    isPlaceholderZeroPriceFrom({ priceFrom: 0, priceMode: "FREE" }),
+    false,
+    "a genuinely free event legitimately has priceFrom 0 and must not be flagged",
+  );
+  assert.equal(
+    isPlaceholderZeroPriceFrom({ priceFrom: 40, priceMode: "FROM" }),
+    false,
+    "a real non-zero priceFrom is never a placeholder",
+  );
+  assert.equal(
+    isPlaceholderZeroPriceFrom({ priceFrom: null, priceMode: "UNKNOWN" }),
+    false,
+  );
+
+  // ── filterActivityNonDestructiveUpdates: a corrected non-zero priceFrom must
+  // overwrite a previously-stored placeholder-zero one, but never a real FREE 0 ──
+  const mappedWithPrice = (priceFrom: number) =>
+    ({
+      title: "T",
+      shortDesc: "S",
+      type: "EVENT" as never,
+      format: "OFFLINE" as never,
+      scheduleMode: "ONE_TIME" as never,
+      priceFrom,
+    }) as Parameters<typeof filterActivityNonDestructiveUpdates>[0];
+
+  const { updates: fixedZeroUpdates, skipped: fixedZeroSkipped } = filterActivityNonDestructiveUpdates(
+    mappedWithPrice(40),
+    { title: "T", shortDesc: "S", type: "EVENT", format: "OFFLINE", scheduleMode: "ONE_TIME", priceFrom: 0, priceMode: "FROM" },
+  );
+  assert.equal(fixedZeroUpdates.priceFrom, 40, "the corrected floor must replace the stale placeholder zero");
+  assert.ok(!fixedZeroSkipped.includes("priceFrom"));
+
+  const { updates: freeUpdates, skipped: freeSkipped } = filterActivityNonDestructiveUpdates(
+    mappedWithPrice(40),
+    { title: "T", shortDesc: "S", type: "EVENT", format: "OFFLINE", scheduleMode: "ONE_TIME", priceFrom: 0, priceMode: "FREE" },
+  );
+  assert.equal(freeUpdates.priceFrom, undefined, "a real free event's priceFrom 0 must not be overwritten");
+  assert.ok(freeSkipped.includes("priceFrom"));
+
+  const { updates: realPriceUpdates, skipped: realPriceSkipped } = filterActivityNonDestructiveUpdates(
+    mappedWithPrice(10),
+    { title: "T", shortDesc: "S", type: "EVENT", format: "OFFLINE", scheduleMode: "ONE_TIME", priceFrom: 40, priceMode: "FROM" },
+  );
+  assert.equal(realPriceUpdates.priceFrom, undefined, "an existing real, non-zero price is never overwritten by import");
+  assert.ok(realPriceSkipped.includes("priceFrom"));
 
   console.log("event-field-mapper tests: OK");
 })().catch((err) => {

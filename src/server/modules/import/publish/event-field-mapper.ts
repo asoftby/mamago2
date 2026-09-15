@@ -376,12 +376,26 @@ export async function mapNormalizedToActivity(
 
 // ── Non-destructive update filter for Activity ────────────────────────────────
 
+// Before the priceFrom-from-non-zero-occurrences fix (see PR #299), a
+// zero-priced ABWS occurrence could win Math.min() and get stored as a
+// genuine `priceFrom: 0` with a non-FREE priceMode — a placeholder, not a
+// real price. The generic "only if empty" rule below would treat that 0 as
+// "already has a value" forever and block the corrected non-zero floor from
+// ever landing on re-import. A real free event (priceMode FREE) legitimately
+// has priceFrom 0 and must not be treated as this placeholder case.
+export function isPlaceholderZeroPriceFrom(existing: Record<string, unknown>): boolean {
+  return existing.priceFrom === 0 && existing.priceMode !== "FREE";
+}
+
 /**
  * Для UPDATE/MERGE: вернуть только поля с непустым новым значением.
  *
  * title/type/scheduleMode — обновляются только если existing пустой.
  * description — обновляется если новое длиннее.
  * priceText, priceFrom, priceTo, ageMinMonths, ageMaxMonths — только если пустые в existing.
+ * priceFrom дополнительно считается пустым, если existing.priceFrom === 0 и
+ * priceMode не FREE (см. isPlaceholderZeroPriceFrom) — иначе исторический
+ * плейсхолдер-ноль никогда не заменится исправленным значением.
  * scheduleJson — только если пустой в existing (не перезаписываем расписание).
  * nextOccurrenceAt — только если пустой в existing.
  */
@@ -407,10 +421,15 @@ export function filterActivityNonDestructiveUpdates(
     const newVal = mapped[field as keyof MappedActivityFields];
     if (newVal === undefined || newVal === null) continue;
     const existingVal = existing[field];
-    if (existingVal !== null && existingVal !== undefined && String(existingVal).trim() !== "") {
-      skipped.push(field);
-    } else {
+    const existingIsEmpty =
+      existingVal === null ||
+      existingVal === undefined ||
+      String(existingVal).trim() === "" ||
+      (field === "priceFrom" && isPlaceholderZeroPriceFrom(existing));
+    if (existingIsEmpty) {
       (result as Record<string, unknown>)[field] = newVal;
+    } else {
+      skipped.push(field);
     }
   }
 
