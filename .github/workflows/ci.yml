@@ -50,6 +50,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Notification action regressions
+        run: pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts
+
       - name: Article performance analytics regressions
         run: |
           pnpm exec tsx src/lib/publications/articleMvp.test.ts
