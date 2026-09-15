@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { AGE_KEYS } from "@/lib/config/ages";
 import type { PublicAgeSignalOption } from "@/features/birthday/builder/lib/ageSignalMapper";
 import { resolveAgeBoundsFromSignalValue } from "@/features/birthday/builder/lib/ageSignalMapper";
 
@@ -7,6 +8,8 @@ export const runtime = "nodejs";
 
 /**
  * Public read-only age signal options for Birthday Builder (taxonomy source of truth).
+ * Only canonical mamaGo age buckets are exposed, even if stale/legacy SignalOption rows
+ * are still active in the database.
  */
 export async function GET() {
   try {
@@ -14,7 +17,10 @@ export async function GET() {
       where: { slug: "age", isActive: true },
       include: {
         options: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            value: { in: [...AGE_KEYS] },
+          },
           orderBy: [{ order: "asc" }, { value: "asc" }],
         },
       },
