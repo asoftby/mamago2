@@ -20,7 +20,11 @@ import type {
   PlaceApplyValidationError,
 } from "../types";
 import { mapNormalizedToPlace, filterNonDestructiveUpdates } from "../publish/place-field-mapper";
-import { mapNormalizedToActivity, filterActivityNonDestructiveUpdates } from "../publish/event-field-mapper";
+import {
+  mapNormalizedToActivity,
+  filterActivityNonDestructiveUpdates,
+  isPlaceholderZeroPriceFrom,
+} from "../publish/event-field-mapper";
 import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, isFieldAllowed } from "../publish/field-override-checker";
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
@@ -665,7 +669,15 @@ async function mergeImportedRecordIntoActivity(
   for (const [fieldName, newVal] of mergeableFields) {
     if (newVal === undefined || newVal === null) { emptyFields.push(fieldName); continue; }
     const existingVal = (existingActivity as Record<string, unknown>)[fieldName];
-    if (existingVal !== null && existingVal !== undefined && String(existingVal).trim() !== "") {
+    // priceFrom: 0 stored with a non-FREE priceMode is the pre-#299
+    // placeholder-zero bug, not a real price — see isPlaceholderZeroPriceFrom.
+    const existingIsEmpty =
+      existingVal === null ||
+      existingVal === undefined ||
+      String(existingVal).trim() === "" ||
+      (fieldName === "priceFrom" &&
+        isPlaceholderZeroPriceFrom(existingActivity as unknown as Record<string, unknown>));
+    if (!existingIsEmpty) {
       skippedNonEmpty.push(fieldName);
     } else {
       mergeFields[fieldName] = newVal;
