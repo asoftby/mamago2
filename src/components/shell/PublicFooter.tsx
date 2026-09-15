@@ -3,6 +3,10 @@ import Link from "next/link";
 import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
 import { FooterSocialLinks } from "@/components/shell/FooterSocialLinks";
 import { FooterJournalLink } from "@/components/shell/FooterJournalLink";
+import {
+  FOOTER_META_TEXT_CLASS,
+  FooterPrimaryNavigation,
+} from "@/components/shell/FooterPrimaryNavigation";
 import { Container } from "@/components/ui/Container";
 import { cn } from "@/lib/utils";
 
@@ -81,20 +85,21 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
 
         {/* Bottom: строка 1 — лого слева, соцсети справа; строка 2 — копирайт по центру */}
         <div className="flex flex-col gap-4 pt-8 border-t">
-          <div className="flex w-full items-center justify-between gap-4">
+          <div className="flex w-full flex-col items-center gap-4 min-[769px]:grid min-[769px]:grid-cols-[1fr_auto_1fr]">
             <Image
               src="/logomamago.webp"
               alt="mamaGo"
               width={176}
               height={44}
-              className="h-[1.925rem] w-auto shrink-0"
+              className="h-[1.925rem] w-auto shrink-0 min-[769px]:justify-self-start"
               priority={false}
             />
-            <div className="flex shrink-0 justify-end">
+            <FooterPrimaryNavigation />
+            <div className="flex shrink-0 justify-center min-[769px]:justify-self-end">
               <FooterSocialLinks />
             </div>
           </div>
-          <p className="w-full text-center text-sm text-muted-foreground">
+          <p className={cn("w-full text-center", FOOTER_META_TEXT_CLASS)}>
             © {currentYear} made in Belarus with 🧡
           </p>
         </div>
