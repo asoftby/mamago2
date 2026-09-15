@@ -540,6 +540,18 @@ function EventCatalogBlock({ nd }: { nd: NormalizedEventImport }) {
         value={nd.categoryCandidates.length > 0 ? nd.categoryCandidates.join(", ") : null}
       />
       <Field
+        label="Прочие метки источника"
+        value={nd.otherCategoryCandidates && nd.otherCategoryCandidates.length > 0 ? (
+          <div>
+            <span>{nd.otherCategoryCandidates.join(", ")}</span>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Не сопоставляются с категорией автоматически — площадки вперемешку с реальными сигналами
+              (например «Театр кукол», «Детям»). Используйте вручную при выборе категории/жанра.
+            </p>
+          </div>
+        ) : null}
+      />
+      <Field
         label="Изображение"
         value={importImageRows.length > 0 ? <ImportEventMediaIngest rows={importImageRows} /> : null}
       />
