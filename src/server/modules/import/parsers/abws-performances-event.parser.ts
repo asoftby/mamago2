@@ -322,6 +322,30 @@ export function dedupeKey(item: AbwsPerformanceItem): string {
   return item.performance.id.toString();
 }
 
+/**
+ * `ImportSource.categoryTypeIdAllowlist`-driven filter: keeps only
+ * performances whose raw `types[]` includes at least one id from the
+ * allowlist (matched against the *raw* type ids, before
+ * `filterCategoryTypeIds`'s category/venue-name split — a performance's
+ * kids signal, e.g. type id 18 "Детям", is not itself one of the
+ * recognized category ids in CATEGORY_TYPE_IDS above, so filtering after
+ * that split would silently drop every performance).
+ *
+ * An empty (or unset) allowlist disables the filter entirely — every
+ * performance passes through, matching current behavior for every
+ * existing source.
+ */
+export function filterItemsByCategoryTypeIdAllowlist(
+  items: AbwsPerformanceItem[],
+  allowlist: number[] | null | undefined,
+): AbwsPerformanceItem[] {
+  if (!allowlist || allowlist.length === 0) return items;
+  const allowedIds = new Set(allowlist);
+  return items.filter((item) =>
+    (item.performance.types ?? []).some((type) => allowedIds.has(type.id)),
+  );
+}
+
 // ── HTTP fetch ───────────────────────────────────────────────────────────────
 
 /**
@@ -442,7 +466,11 @@ export const abwsPerformancesEventParser: EventImportParser = {
     }
 
     const totalFound = items.length;
-    const limitedItems = limitAbwsItems(items, source.crawlMaxRecords);
+    const categoryFilteredItems = filterItemsByCategoryTypeIdAllowlist(
+      items,
+      source.categoryTypeIdAllowlist,
+    );
+    const limitedItems = limitAbwsItems(categoryFilteredItems, source.crawlMaxRecords);
 
     const records: ParsedRawRecord[] = limitedItems.map((item) => {
       const rawPayload = mapAbwsPerformanceToRawPayload(item);

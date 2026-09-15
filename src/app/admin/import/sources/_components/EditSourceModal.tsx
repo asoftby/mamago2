@@ -7,7 +7,7 @@ import { getProductionParsers } from "@/server/modules/import/parsers/parser-def
 import type { ImportSource } from "@prisma/client";
 
 interface Props {
-  source: Pick<ImportSource, "id" | "name" | "baseUrl" | "parserKey" | "defaultEntity" | "status" | "notes" | "crawlMaxPages" | "crawlMaxDetailLinks" | "crawlMaxRecords">;
+  source: Pick<ImportSource, "id" | "name" | "baseUrl" | "parserKey" | "defaultEntity" | "status" | "notes" | "crawlMaxPages" | "crawlMaxDetailLinks" | "crawlMaxRecords" | "categoryTypeIdAllowlist">;
 }
 
 export function EditSourceModal({ source }: Props) {
@@ -27,6 +27,9 @@ export function EditSourceModal({ source }: Props) {
   const [crawlMaxPages, setCrawlMaxPages] = useState(source.crawlMaxPages?.toString() ?? "");
   const [crawlMaxDetailLinks, setCrawlMaxDetailLinks] = useState(source.crawlMaxDetailLinks?.toString() ?? "");
   const [crawlMaxRecords, setCrawlMaxRecords] = useState(source.crawlMaxRecords?.toString() ?? "");
+  const [categoryTypeIdAllowlist, setCategoryTypeIdAllowlist] = useState(
+    source.categoryTypeIdAllowlist.join(", "),
+  );
 
   const parsers = getProductionParsers();
   const filteredParsers = parsers.filter((p) => p.entityType === entityType);
@@ -47,6 +50,10 @@ export function EditSourceModal({ source }: Props) {
         crawlMaxPages: crawlMaxPages ? parseInt(crawlMaxPages) : null,
         crawlMaxDetailLinks: crawlMaxDetailLinks ? parseInt(crawlMaxDetailLinks) : null,
         crawlMaxRecords: crawlMaxRecords ? parseInt(crawlMaxRecords) : null,
+        categoryTypeIdAllowlist: categoryTypeIdAllowlist
+          .split(",")
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => !Number.isNaN(n)),
       });
       if (res.success) {
         setOpen(false);
@@ -172,6 +179,20 @@ export function EditSourceModal({ source }: Props) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Category filter (ABWS-specific: parser-native type ids, e.g. 18 = "Детям") */}
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2">
+            <div>
+              <div className="text-xs font-medium text-gray-700 mb-0.5">Фильтр категорий (id через запятую)</div>
+              <div className="text-xs text-gray-400">Оставьте пустым, чтобы импортировать всё без фильтра. Числовые id категорий источника, например: 18, 53</div>
+            </div>
+            <input
+              type="text" value={categoryTypeIdAllowlist}
+              onChange={(e) => setCategoryTypeIdAllowlist(e.target.value)}
+              placeholder="например: 18, 53"
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
           </div>
 
           {error && (

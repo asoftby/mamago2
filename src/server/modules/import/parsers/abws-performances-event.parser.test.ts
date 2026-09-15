@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import {
   dedupeKey,
   filterCategoryTypeIds,
+  filterItemsByCategoryTypeIdAllowlist,
   isSingleVenue,
   limitAbwsItems,
   mapAbwsPerformanceToRawPayload,
@@ -196,4 +197,36 @@ assert.throws(() => parseAbwsResponseBody("not json"), /not valid JSON/);
     [300, 100, 200],
     "limitAbwsItems must not mutate its input",
   );
+}
+
+// ── filterItemsByCategoryTypeIdAllowlist (ImportSource.categoryTypeIdAllowlist) ──
+// Applied BEFORE limitAbwsItems/crawlMaxRecords in the parser's own parse().
+{
+  const kino = { ...singleVenueFixture, performance: { ...singleVenueFixture.performance, id: 1, types: [{ id: 1, name: "Кино" }] } };
+  const kids = { ...singleVenueFixture, performance: { ...singleVenueFixture.performance, id: 2, types: [{ id: 18, name: "Детям" }] } };
+  const puppets = { ...singleVenueFixture, performance: { ...singleVenueFixture.performance, id: 3, types: [{ id: 53, name: "Театр кукол" }] } };
+  const kidsAndPuppets = {
+    ...singleVenueFixture,
+    performance: { ...singleVenueFixture.performance, id: 4, types: [{ id: 18, name: "Детям" }, { id: 53, name: "Театр кукол" }] },
+  };
+  const all = [kino, kids, puppets, kidsAndPuppets];
+
+  // Filter disabled: empty array, null, and undefined all mean "import everything".
+  assert.deepEqual(filterItemsByCategoryTypeIdAllowlist(all, []), all, "empty allowlist must disable the filter");
+  assert.deepEqual(filterItemsByCategoryTypeIdAllowlist(all, null), all);
+  assert.deepEqual(filterItemsByCategoryTypeIdAllowlist(all, undefined), all);
+
+  // One id — keeps only performances with that id anywhere in types[].
+  const onlyKids = filterItemsByCategoryTypeIdAllowlist(all, [18]);
+  assert.deepEqual(onlyKids.map((i) => i.performance.id), [2, 4]);
+
+  // Several ids — union, not intersection: matches performances with any of them.
+  const kidsOrPuppets = filterItemsByCategoryTypeIdAllowlist(all, [18, 53]);
+  assert.deepEqual(kidsOrPuppets.map((i) => i.performance.id), [2, 3, 4]);
+
+  // An id present on no performance at all -> empty result, not an error.
+  assert.deepEqual(filterItemsByCategoryTypeIdAllowlist(all, [999]), []);
+
+  // Original array untouched.
+  assert.deepEqual(all.map((i) => i.performance.id), [1, 2, 3, 4], "must not mutate its input");
 }
