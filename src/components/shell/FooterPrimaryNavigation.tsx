@@ -42,7 +42,9 @@ export function FooterPrimaryNavigationList({
 
 export function FooterPrimaryNavigation() {
   const { citySlug } = useCity();
-  const availableItems = PRIMARY_NAVIGATION_ITEMS.filter((item) => !item.comingSoon);
+  const availableItems = PRIMARY_NAVIGATION_ITEMS.filter(
+    (item) => item.navigationEnabled && !item.comingSoon,
+  );
 
   return <FooterPrimaryNavigationList items={availableItems} citySlug={citySlug} />;
 }
