@@ -5,6 +5,7 @@ import { EventScheduleList } from "@/components/admin/event-schedule/EventSchedu
 import type { EventScheduleItem } from "@/components/admin/event-schedule/types";
 import type { EventFormData } from "../types";
 import { createDefaultScheduleItem } from "../defaults";
+import { deriveSchedulingKindFromScheduleItems } from "@/lib/event/deriveSchedulingKind";
 
 const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
 
@@ -41,6 +42,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
     });
     onChange({
       scheduleItems: nextItems,
+      schedulingKind: deriveSchedulingKindFromScheduleItems(nextItems),
       scheduleMode: nextItems.length > 1 ? "multiple" : "single",
       dates: nextItems.map((item) => item.date).filter((date): date is string => Boolean(date)),
       allDay: firstItem.allDay,
