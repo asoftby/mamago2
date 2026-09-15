@@ -48,18 +48,35 @@ async function main() {
 
   console.log(`   Новая дата: ${newDate.toLocaleDateString("ru-RU")}`);
 
+  // Проверяем сессии ДО любых записей: ActivitySession-строки с непустым
+  // source созданы импорт-пайплайном (ABWS) — их даты приходят из
+  // источника, у них есть externalId/цена/buyUrl, которые этот скрипт не
+  // восстановит. Схлопывание всех сессий в одну дату в принципе
+  // некорректно для мульти-сессионного импортного события, поэтому
+  // полностью отказываем ДО записи nextOccurrenceAt — не оставляем
+  // событие в промежуточном состоянии, где дата поменялась, а сессии нет
+  // (BACKLOG-154 row #5).
+  const sessions = await prisma.activitySession.findMany({
+    where: { activityId: eventId },
+    orderBy: { startsAt: "asc" },
+  });
+  const importedSessions = sessions.filter((s) => s.source != null);
+  if (importedSessions.length > 0) {
+    console.error(
+      `❌ У события есть импортные сессии (${importedSessions.length} из ${sessions.length}, source: ${
+        [...new Set(importedSessions.map((s) => s.source))].join(", ")
+      }) — этот скрипт их не трогает.`,
+    );
+    console.log("   Импортные даты нельзя менять через этот инструмент — они приходят из источника.");
+    process.exit(1);
+  }
+
   // Обновляем nextOccurrenceAt
   await prisma.activity.update({
     where: { id: eventId },
     data: {
       nextOccurrenceAt: newDate,
     },
-  });
-
-  // Обновляем сессии
-  const sessions = await prisma.activitySession.findMany({
-    where: { activityId: eventId },
-    orderBy: { startsAt: "asc" },
   });
 
   console.log(`\n🔄 Обновляю ${sessions.length} сессий...`);
