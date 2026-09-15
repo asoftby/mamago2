@@ -65,11 +65,25 @@ export async function GET(
     });
   }
 
+  const isPublishedPlaceNotification =
+    notification.entityType === "PLACE" &&
+    notification.entityId != null &&
+    (notification.type === "PLACE_APPROVED" ||
+      notification.type === "PLACE_UPDATE_APPROVED");
+
+  const publishedPlace = isPublishedPlaceNotification
+    ? await prisma.place.findUnique({
+        where: { id: notification.entityId! },
+        select: { slug: true },
+      })
+    : null;
+
   const destination = resolveNotificationPageUrl({
     type: notification.type,
     entityType: notification.entityType,
     entityId: notification.entityId,
     actionUrl: notification.actionUrl,
+    placeSlug: publishedPlace?.slug ?? null,
   });
 
   const resolvedDestination = resolveNotificationClickthroughDestination({
