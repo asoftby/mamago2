@@ -84,11 +84,21 @@ export function WeekCalendarStrip({
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
   const yearLabel = useMemo(() => new Date(`${visibleWeekStart}T12:00:00`).getFullYear(), [visibleWeekStart]);
   const todayIso = getLocalDateKey();
+  const todayWeekStart = getWeekStart(todayIso);
+  const canShiftToPreviousWeek = allowPastDates || visibleWeekStart > todayWeekStart;
 
   const shiftWeek = (dir: 1 | -1) => {
-    const nextStart = dir === 1 ? getNextWeekStart(visibleWeekStart) : getPrevWeekStart(visibleWeekStart);
-    setVisibleWeekStart(nextStart);
-    if (onChangeDate) onChangeDate(preserveWeekday(selectedDate, nextStart));
+    if (dir === -1 && !canShiftToPreviousWeek) return;
+
+    const nextStart = dir === 1
+      ? getNextWeekStart(visibleWeekStart)
+      : getPrevWeekStart(visibleWeekStart);
+    const preservedDate = preserveWeekday(selectedDate, nextStart);
+    const nextDate =
+      !allowPastDates && preservedDate < todayIso ? todayIso : preservedDate;
+
+    setVisibleWeekStart(getWeekStart(nextDate));
+    onChangeDate?.(nextDate);
   };
 
   return (
@@ -106,13 +116,15 @@ export function WeekCalendarStrip({
         <button
           type="button"
           onClick={() => shiftWeek(-1)}
+          disabled={!canShiftToPreviousWeek}
           aria-label="Предыдущая неделя"
           style={{
             width: 28, height: 28, borderRadius: 99,
             background: "transparent", border: "1px solid rgba(20,18,16,.18)",
-            color: "#3A332B", cursor: "pointer",
+            color: "#3A332B", cursor: canShiftToPreviousWeek ? "pointer" : "default",
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
+            opacity: canShiftToPreviousWeek ? 1 : 0.35,
           }}
         ><ChevronLeft /></button>
 

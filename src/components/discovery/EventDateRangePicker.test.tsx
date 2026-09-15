@@ -8,12 +8,27 @@ test("legacy two-click hint copy is removed", () => {
   assert.doesNotMatch(source, /Первый клик выбирает/);
 });
 
-test("desktop and mobile footers both wire a disabled-aware reset that only clears the draft", () => {
-  const resetCalls = [...source.matchAll(/<MobileOverlayResetAction disabled=\{!draft\.from\} onClick=\{\(\) => dispatch\(\{ type: "reset" \}\)\} \/>/g)];
-  assert.equal(resetCalls.length, 2, "expected one reset action in the desktop popover footer and one in the mobile sheet footer");
+test("desktop and mobile reset actions clear the applied date filter", () => {
+  assert.match(
+    source,
+    /const resetDateRange = \(\) => \{\s*dispatch\(\{ type: "reset" \}\);\s*onApply\(\{ whenPreset: null, dateFrom: null, dateTo: null \}\);\s*\};/,
+  );
+
+  const resetActions = [
+    ...source.matchAll(
+      /<MobileOverlayResetAction disabled=\{!draft\.from\} onClick=\{resetDateRange\} \/>/g,
+    ),
+  ];
+  assert.equal(
+    resetActions.length,
+    2,
+    "expected one applied-state reset action in the desktop popover footer and one in the mobile sheet footer",
+  );
 });
 
-test("apply stays wired to onApply and reset never calls onApply directly", () => {
-  assert.equal(source.match(/onApply\(\{ whenPreset: null, dateFrom: draft\.from, dateTo: draft\.to \}\)/g)?.length, 2);
-  assert.doesNotMatch(source, /type: "reset" \}\); onApply/);
+test("apply remains wired to the selected draft range", () => {
+  assert.equal(
+    source.match(/onApply\(\{ whenPreset: null, dateFrom: draft\.from, dateTo: draft\.to \}\)/g)?.length,
+    2,
+  );
 });
