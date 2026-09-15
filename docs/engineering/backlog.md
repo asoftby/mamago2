@@ -4454,6 +4454,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Priority: P3
 - Area: Import / Integrations
 - Added: 2026-09-14
+- **Blocked by (read before implementing): [BACKLOG-152]** — if this
+  script (or any future logic) can reduce an Activity's imported
+  `ActivitySession` count to zero while the Activity itself is still
+  meant to be treated as import-sourced, `Activity.scheduleSource` from
+  BACKLOG-152 must land first. The read-only-import-schedule gate
+  (PR #298) currently detects "this is an imported card" purely from
+  `ActivitySession.source != null`; a backfill that touches sessions
+  without preserving at least one `source`-tagged row would silently flip
+  such an Activity back to looking like an ordinary manually-scheduled
+  event.
 - Reason deferred: on DEV, at the time PR #296 shipped (adds
   `priceFrom`/`priceMode`/`scheduleJson.ticketLink`/`pricingMode` mapping
   for ABWS), the review queue held at most ~100 `ImportedRecord` rows and
@@ -4504,3 +4514,151 @@ distributor_company_id=550) и хотели бы уточнить несколь
   re-normalization). Acceptance criteria's non-destructive-per-key wording
   fixed after automated review on this entry's own PR (#297) caught the
   first draft allowing a manual post-import correction to be overwritten.
+
+## [BACKLOG-152] `Activity.scheduleSource` explicit origin marker needed before any logic can zero out imported sessions
+
+- Status: OPEN
+- Priority: P3
+- Area: Import / Integrations
+- Added: 2026-09-15
+- Blocks: [BACKLOG-151] (and any future backfill/cleanup that touches
+  imported `ActivitySession` rows) — read this entry before implementing
+  that backfill script.
+- Related active bug (higher severity, tracked separately): [BACKLOG-153] —
+  a *second*, already-existing route
+  (`PATCH /api/business/activities/[id]` → `activity.service.ts`'s
+  `updateActivity()`) bypasses PR #298's fix entirely today, with no
+  future trigger required. This entry (BACKLOG-152) is about a
+  *session-count* blind spot in the heuristic PR #298 introduced; #153 is
+  about a route PR #298 never touched at all. Fixing #153 does not require
+  #152, but #152's persistent marker would also make #153-style routes
+  safe to fix consistently, so implement them together if convenient.
+- Reason deferred: found while fixing Дефект 1 (PR #298 — wizard save was
+  silently destroying imported `ActivitySession` rows on every save). The
+  fix's read-only-schedule gate (`activitySessionsNeedResync` in
+  `src/app/api/business/events/[id]/route.ts`, and the `readOnly` flag in
+  `src/app/api/business/events/[id]/schedule-source/route.ts`) detects
+  "this Activity is import-sourced" purely from `ActivitySession.source !=
+  null` on its current rows — there is no persistent, session-count-
+  independent marker on `Activity` itself. At the time, the only known
+  code path that could reduce this count to zero was ruled out (see
+  BACKLOG-153 for the one that was missed). Deferred rather than fixed
+  immediately because adding the marker now would be scope creep on
+  PR #298 with no concrete trigger yet for *this specific* (session-count)
+  gap.
+- Context: if any future, intentional logic ever reduces an imported
+  Activity's `ActivitySession` rows to zero — e.g. the BACKLOG-151
+  backfill script if it ever touches sessions, or a hypothetical cleanup
+  that removes past/expired sessions — that Activity would silently stop
+  being detected as import-sourced. The wizard's schedule step would
+  become editable again, and the very next save would run the ordinary
+  fingerprint-based resync and rebuild `ActivitySession` rows from
+  `scheduleJson`, discarding `source`/`externalId`/`buyUrl`/price data
+  with no warning to the editor. This is exactly the class of bug PR #298
+  fixed, reappearing through a gap the session-count heuristic can't see.
+- Current state: not started. Corrected 2026-09-15 (automated review on
+  this entry's own PR #300 caught it): this entry originally claimed "no
+  code path exists yet that would trigger this gap" — that was wrong. A
+  code path already existed at the time of writing; it is now tracked as
+  BACKLOG-153, not folded into this entry, because it doesn't need the
+  marker to fix (it needs the existing session-based check applied to a
+  route that currently has none at all).
+- Dependencies: none block other current work. Must land **before**
+  BACKLOG-151's backfill script (or any similar future logic) ships, if
+  that logic can ever bring an imported Activity's `ActivitySession` count
+  to zero.
+- Acceptance criteria: add an explicit, persistent field on `Activity`
+  (e.g. `scheduleSource: MANUAL | IMPORT`, naming TBD at implementation
+  time) set once at Apply/publish time in the import pipeline — both the
+  CREATE path (`activity-session-from-occurrences.ts` /
+  `import-publish.service.ts`'s create path) **and** the UPDATE path
+  (`APPROVED_UPDATE` in `import-publish.service.ts`, which also calls
+  `upsertActivitySessionsFromOccurrences()` and can attach imported
+  sessions to a pre-existing Activity that never got the marker at create
+  time) — independent of the current `ActivitySession` row count or
+  content. Update `hasImportedSessions` in
+  `src/app/api/business/events/[id]/route.ts` and the `readOnly` check in
+  `schedule-source/route.ts` to consult this field (falling back to the
+  existing session-based heuristic only for Activities created before the
+  field existed, so nothing already-imported silently loses its read-only
+  status on migration day). Add a migration and a test proving an Activity
+  with the marker set but zero current `ActivitySession` rows still renders
+  read-only, and a test proving the UPDATE path sets the marker too.
+- Source: found while answering a question about PR #298's `hasImportedSessions`
+  heuristic, 2026-09-15 — see PR #298 for the schedule-destruction defect
+  this heuristic itself fixes. Acceptance criteria's update-path coverage
+  and this entry's "current state" correction both added after automated
+  review (chatgpt-codex-connector) on this entry's own PR (#300) caught
+  the original draft's gaps.
+
+## [BACKLOG-153] Second route (`/api/business/activities/[id]`) still destroys imported ActivitySession rows — PR #298 never covered it
+
+- Status: OPEN
+- Priority: P1
+- Area: Import / Integrations / Business dashboard
+- Added: 2026-09-15
+- Reason deferred: found by automated review (chatgpt-codex-connector) on
+  BACKLOG-152's own PR (#300), while that entry was being filed as a
+  hypothetical future risk — independently verified as a real, already-
+  live gap, not something PR #298 needs to guard against in the future.
+  Not fixed inline in PR #300 because that PR is docs-only and this is a
+  code change spanning a different file than anything BACKLOG-152 touches;
+  filed here instead so it gets its own branch/PR per the repo's one-task-
+  one-branch rule, and surfaced to the project owner for a fix/defer
+  decision rather than silently expanding an unrelated docs PR's scope.
+- Context: PR #298 made `PATCH /api/business/events/[id]` (the event
+  wizard's route) skip the session-fingerprint resync whenever any
+  `ActivitySession` has a non-null `source` (import-created). It did not
+  touch the **other**, older route that can also rewrite an Activity's
+  sessions: `PATCH /api/business/activities/[id]`
+  (`src/app/api/business/activities/[id]/route.ts`) forwards any `sessions`
+  array in its request body straight to `updateActivity()`
+  (`src/server/services/activity.service.ts`), which does an unconditional
+  `activitySession.deleteMany({ where: { activityId } })` followed by a
+  bare recreate with no `source`/`externalId`/`buyUrl`/price fields — the
+  exact same failure mode PR #298 fixed, with **no read-only/import check
+  at all**, old or new.
+  Reachability, verified directly (not assumed):
+  - `canManageActivity()` in `activity.service.ts` delegates to the same
+    `canManageActivityById()` used by the main events route — so any actor
+    authorized to edit an ABWS-imported event via the wizard is *also*
+    authorized to hit this route directly. No extra permission barrier.
+  - The only current caller is
+    `src/app/business/(protected)/activities/[id]/edit/page.tsx`, backed by
+    `ActivityForm` (`src/features/activity/forms/ActivityForm.tsx`), whose
+    `formData.sessions` is always present (initialized from
+    `initialData?.sessions || []`) and always included in the PATCH body —
+    so *every* save through this page triggers the destructive path,
+    unconditionally, regardless of whether the sessions being replaced are
+    import-sourced.
+  - This page/route is not linked from any current navigation
+    (`grep href="/business/activities"` across `src` returns nothing) — a
+    user cannot click into it from the current UI. It is still a live,
+    authorized, functional route at a guessable/bookmarkable URL, not a
+    deleted or disabled one, so "not linked from nav" is not the same as
+    "unreachable."
+- Current state: not started — an active bug as of 2026-09-15, not a
+  future risk.
+- Dependencies: does not depend on BACKLOG-152 (`Activity.scheduleSource`)
+  to fix — the existing `ActivitySession.source != null` check from
+  PR #298 can be applied to `updateActivity()`/this route directly, same
+  as PR #298 did for the main events route. BACKLOG-152's persistent
+  marker would make this and any future such route more robustly correct,
+  but is not required to close this specific gap.
+- Acceptance criteria: `updateActivity()` (or the route calling it) must
+  refuse to run the `sessions` deleteMany+recreate whenever the target
+  Activity has any `ActivitySession` with a non-null `source` — mirroring
+  `hasImportedSessions` in `src/app/api/business/events/[id]/route.ts`.
+  Decide and document (product/eng call, not to be guessed at
+  implementation time) whether this legacy route/page tree
+  (`/business/activities/*`) should instead be deleted outright now that
+  it has no navigation entry point and the full event wizard supersedes
+  it — if kept, it needs this fix regardless of ABWS; if removed, this
+  entry closes by deletion instead. Add a regression test proving an
+  Activity with an import-sourced session is untouched by a PATCH through
+  this route with a non-empty `sessions` array in the body.
+- Source: found by automated review (chatgpt-codex-connector) on PR #300
+  (BACKLOG-152 filing), 2026-09-15; independently verified via
+  `canManageActivity`/`ActivityForm`/nav-link grep before filing this
+  entry — see BACKLOG-152 for the related (but distinct) session-count
+  heuristic gap this does not depend on.
