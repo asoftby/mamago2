@@ -102,6 +102,7 @@ export function resolveNotificationPageUrl(params: {
   entityId?: string | null;
   actionUrl?: string | null;
   placeSlug?: string | null;
+  citySlug?: string | null;
 }): string | null {
   // Canonicalize onboarding links before persisted actionUrl so old notifications
   // created with the removed /me/settings/account route keep working.
@@ -109,14 +110,15 @@ export function resolveNotificationPageUrl(params: {
     return "/me/settings/email";
   }
 
-  // A successfully published place is user-facing content. Moderation outcomes
-  // that require action still fall through to the business editor below.
+  // Published places use the city-scoped canonical URL. Place slugs are only
+  // unique within a city, so the legacy /places/{slug} alias is unsafe here.
   if (
     (params.type === "PLACE_APPROVED" || params.type === "PLACE_UPDATE_APPROVED") &&
     params.entityType === "PLACE" &&
-    params.placeSlug?.trim()
+    params.placeSlug?.trim() &&
+    params.citySlug?.trim()
   ) {
-    return `/places/${encodeURIComponent(params.placeSlug)}`;
+    return `/${encodeURIComponent(params.citySlug)}/places/${encodeURIComponent(params.placeSlug)}`;
   }
 
   if (params.actionUrl?.trim()) {
