@@ -4678,9 +4678,8 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-154] Full map of ActivitySession write sites — 3 more unprotected, lower-risk paths found alongside BACKLOG-153
 
-- Status: PARTIALLY DONE (2026-09-15 — row #2's single-choke-point fix
-  shipped same-day, per explicit instruction not to defer it; rows #4/#5
-  still open, see below)
+- Status: DONE (2026-09-15 — all of rows #2, #4, #5 shipped same-day, per
+  explicit instruction not to defer while the topic was open; see below)
 - Priority: P2
 - Area: Import / Integrations / Ops tooling
 - Added: 2026-09-15
@@ -4747,42 +4746,49 @@ distributor_company_id=550) и хотели бы уточнить несколь
   4. `scripts/repair-event-session-timezones.ts` — its own raw
      `tx.activitySession.deleteMany()` + `createMany()` inside a
      transaction (does not go through `replaceActivitySessionsFromScheduleJson`).
-     **Not protected.** Scans all `Activity` rows with `scheduleJson` and
-     `sessions` (no `source` filter), but the destructive branch only
-     fires for rows a heuristic (`buildEventSessionTimezoneRepairPlan`)
-     classifies as a genuine timezone-drift candidate — narrower blast
-     radius than #2's ops script. Has `--preview`/`--commit` modes,
-     defaults to preview.
+     **Fixed, 2026-09-15**: an upfront check skips (and now counts,
+     `skippedImported`) any activity with an imported session before the
+     heuristic classification even runs, and the delete itself is also
+     scoped to `source: null` for the same defense-in-depth reason as
+     row #2 (a concurrent ABWS upsert landing between the read and the
+     delete still can't be removed). Previously scanned all `Activity`
+     rows with `scheduleJson` and `sessions` with no `source` filter at
+     all.
   5. `scripts/update-event-date.ts` — per-session
      `prisma.activitySession.update()` loop, sets **every** session on the
-     given Activity to the *same single* new date. **Not protected**, and
-     structurally wrong for a multi-session imported event regardless of
-     source (would collapse distinct ABWS session dates into one) — but
-     doesn't delete rows, so `source`/`externalId`/price survive even
-     though `startsAt` gets corrupted. Manual single-activity CLI debug
-     tool (`pnpm tsx scripts/update-event-date.ts <id> <date>`), requires
-     an operator to explicitly target one activity by id.
+     given Activity to the *same single* new date. **Fixed, 2026-09-15**:
+     refuses entirely, before any write (including `Activity.nextOccurrenceAt`,
+     to avoid leaving the activity in a half-updated state), whenever any
+     session has a non-null `source`. Kept as a guard rather than deleting
+     the script's per-session date-collapse behavior outright — that
+     redesign question is a separate, larger decision not made here.
+     Previously structurally wrong for a multi-session imported event
+     regardless of source (would collapse distinct ABWS session dates into
+     one); didn't delete rows, so `source`/`externalId`/price would have
+     survived even though `startsAt` got corrupted.
   6. `scripts/dev/seed-demo-data.ts` — `createMany`, additive only, always
      against a demo Activity the same script just created. Dev-tooling
      only, no production data ever in scope. Not a risk.
-- Current state: **Row #2 fixed** (single guard inside
-  `replaceActivitySessionsFromScheduleJson()`, all four callers verified
-  safe — see above). **Rows #4 and #5 still open** — explicitly kept
-  separate, per their own recommendation below, rather than folded into
-  the same fix.
+- Current state: **All of rows #2, #4, #5 fixed** — see above. Neither
+  row #4 nor row #5 had any prior test coverage (both are one-off CLI
+  tools with `main()` executing on import, no exported testable
+  functions) — verified via `tsc --noEmit` only, no new test files added
+  for either. Row #2 has full test coverage (see PR #303).
 - Dependencies: none block other current work.
-- Recommendation for rows #4/#5 (still not yet a decision — flagging for
-  the project owner): row #4 (`repair-event-session-timezones.ts`) would
-  need its own, separate guard since it doesn't call the shared function
-  fixed above — it has its own raw `deleteMany`+`createMany`. Row #5
-  (`update-event-date.ts`) is arguably better fixed by deleting the
+- Note on rows #4/#5's original recommendation (superseded — kept for
+  context): row #4 needed its own guard since it doesn't call the shared
+  function fixed in row #2 — it has its own raw `deleteMany`+`createMany`.
+  Row #5 was flagged as arguably better fixed by deleting the
   per-session date-collapse behavior entirely (it looks like a
   single-session-era tool that predates multi-session events) rather than
   gating it.
-- Acceptance criteria (rows #4/#5 only — row #2's is satisfied): not
-  defined yet — depends on the fix-now-vs-defer and
-  gate-vs-delete-the-behavior decision above, which is the project
-  owner's call, not to be guessed at implementation time.
+- Acceptance criteria: satisfied for rows #2, #4, #5 — each refuses to
+  touch an `ActivitySession` with a non-null `source`, verified against
+  every known caller. Row #5's larger gate-vs-delete-the-behavior
+  redesign question (see note above) remains genuinely open as a separate
+  future decision, not required to close this entry.
 - Source: full-repo `ActivitySession` write-site audit requested
-  explicitly after BACKLOG-153, 2026-09-15 — see BACKLOG-153 for the one
-  entry in this map that has actually been fixed.
+  explicitly after BACKLOG-153, 2026-09-15 — see BACKLOG-153 (the route
+  fix that started this audit) and PR #303 (rows #2/#4/#5, plus the
+  TOCTOU-race and honest-skip-reporting fixes an automated review on
+  #303 itself caught).
