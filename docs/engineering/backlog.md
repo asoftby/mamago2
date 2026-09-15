@@ -4678,7 +4678,9 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-154] Full map of ActivitySession write sites — 3 more unprotected, lower-risk paths found alongside BACKLOG-153
 
-- Status: OPEN
+- Status: PARTIALLY DONE (2026-09-15 — row #2's single-choke-point fix
+  shipped same-day, per explicit instruction not to defer it; rows #4/#5
+  still open, see below)
 - Priority: P2
 - Area: Import / Integrations / Ops tooling
 - Added: 2026-09-15
@@ -4703,32 +4705,41 @@ distributor_company_id=550) и хотели бы уточнить несколь
   2. `src/lib/business/syncEventActivitySessions.ts`'s
      `replaceActivitySessionsFromScheduleJson()` — `deleteMany` +
      `createMany`, the shared destructive core originally fixed (at its
-     one call site) by PR #298. **Not gated inside the function itself** —
-     the `hasImportedSessions` check lives at each caller, not here. Four
-     known callers:
+     one call site) by PR #298. **Fixed at the source, 2026-09-15**: the
+     `ActivitySession.source != null` check now lives *inside this
+     function itself*, not at each caller — every current and future
+     caller is protected by construction. All four known callers verified
+     safe after this change:
      - `src/app/api/business/events/[id]/route.ts` (event wizard PATCH) —
-       **protected** (PR #298).
+       already protected (PR #298); the function-level guard is now
+       redundant-but-harmless here (this call site already never reaches
+       the function when imported sessions exist).
      - `scripts/resync-event-sessions-from-schedule-json.ts` (ops CLI) —
-       **not protected**. Highest residual risk of the three: run with
-       `--apply` and no `--activity-id`/`--slug` filter, it sweeps *every*
-       non-archived EVENT `Activity` with a `scheduleJson`, and ABWS
-       import's `buildMinimalScheduleJson()` output *always* mismatches
-       the fingerprint (same root cause as the original Defect 1) — would
-       silently wipe every ABWS-imported event's sessions in one pass.
-       Defaults to dry-run (`--apply` must be passed explicitly); requires
-       shell access to run at all.
+       **now protected.** This was the highest residual risk of the
+       three: run with `--apply` and no `--activity-id`/`--slug` filter,
+       it sweeps *every* non-archived EVENT `Activity` with a
+       `scheduleJson`, and ABWS import's `buildMinimalScheduleJson()`
+       output *always* mismatches the fingerprint (same root cause as the
+       original Defect 1) — would have silently wiped every ABWS-imported
+       event's sessions in one pass.
      - `scripts/migration-event-sessions-resync.ts` →
-       `src/lib/migration/commit/event/EventScheduleResyncWriter.ts` — not
-       protected at the code level, but scoped by construction to
-       operator-typed `--source-record-key wordpress-db:events:{id}`
-       arguments, which resolve only within the WordPress-migration id
-       namespace — cannot structurally reach an ABWS-imported Activity.
-       Low practical risk.
+       `src/lib/migration/commit/event/EventScheduleResyncWriter.ts` —
+       **now protected**, though verified this was already low practical
+       risk (operator-typed `--source-record-key wordpress-db:events:{id}`
+       arguments resolve only within the WordPress-migration id
+       namespace, structurally cannot reach an ABWS-imported Activity).
      - `src/lib/migration/commit/event/EventCommitWriter.ts` (via
        `runAtomicEventCreate.ts`, WordPress migration's Event **CREATE**
-       path) — not protected at the code level, but only ever runs against
-       an Activity it just created in the same call (zero pre-existing
-       sessions to destroy). Not a real risk in practice.
+       path) — verified the guard cannot fire here (only ever runs
+       against an Activity it just created, zero pre-existing sessions)
+       and, separately, that WordPress-migrated sessions never set
+       `source` at all (confirmed by grep — no `source:` write to
+       `ActivitySession` anywhere in the migration commit code), so the
+       new guard never blocks a legitimate WordPress resync either.
+     - Also verified: `family-by-afisha-event.parser.ts` never touches
+       `ActivitySession` at all (family.by sessions are wizard/scheduleJson
+       -driven only, always `source: null`), so family.by is completely
+       unaffected by this change.
   3. `src/server/services/activity.service.ts`'s `updateActivity()` —
      **fixed by this entry (BACKLOG-153), see above.**
      `createActivity()` in the same file — relational create-only, always
@@ -4754,23 +4765,23 @@ distributor_company_id=550) и хотели бы уточнить несколь
   6. `scripts/dev/seed-demo-data.ts` — `createMany`, additive only, always
      against a demo Activity the same script just created. Dev-tooling
      only, no production data ever in scope. Not a risk.
-- Current state: not started. Map complete; nothing here fixed yet.
+- Current state: **Row #2 fixed** (single guard inside
+  `replaceActivitySessionsFromScheduleJson()`, all four callers verified
+  safe — see above). **Rows #4 and #5 still open** — explicitly kept
+  separate, per their own recommendation below, rather than folded into
+  the same fix.
 - Dependencies: none block other current work.
-- Recommendation (not yet a decision — flagging for the project owner):
-  the cleanest fix for row #2's three unprotected callers is not three
-  separate call-site checks (that's exactly how BACKLOG-153 happened —
-  the guard lived at one caller, not the shared function, so new callers
-  silently inherited the bug) but moving the `ActivitySession.source !=
-  null` check **inside** `replaceActivitySessionsFromScheduleJson()`
-  itself, so every current and future caller is protected by
-  construction. Row #4 (`repair-event-session-timezones.ts`) would need
-  its own, separate guard since it doesn't call that shared function.
-  Row #5 (`update-event-date.ts`) is arguably better fixed by deleting the
+- Recommendation for rows #4/#5 (still not yet a decision — flagging for
+  the project owner): row #4 (`repair-event-session-timezones.ts`) would
+  need its own, separate guard since it doesn't call the shared function
+  fixed above — it has its own raw `deleteMany`+`createMany`. Row #5
+  (`update-event-date.ts`) is arguably better fixed by deleting the
   per-session date-collapse behavior entirely (it looks like a
   single-session-era tool that predates multi-session events) rather than
   gating it.
-- Acceptance criteria: not defined yet — depends on the fix-now-vs-defer
-  and single-guard-vs-per-site decision above, which is the project
+- Acceptance criteria (rows #4/#5 only — row #2's is satisfied): not
+  defined yet — depends on the fix-now-vs-defer and
+  gate-vs-delete-the-behavior decision above, which is the project
   owner's call, not to be guessed at implementation time.
 - Source: full-repo `ActivitySession` write-site audit requested
   explicitly after BACKLOG-153, 2026-09-15 — see BACKLOG-153 for the one
