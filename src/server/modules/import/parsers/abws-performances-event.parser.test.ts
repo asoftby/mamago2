@@ -92,12 +92,20 @@ assert.equal(dedupeKey(singleVenueFixture), "5852465");
 
 // ── category whitelist (§5.1) ────────────────────────────────────────────
 {
-  const { categoryTypeIds, unrecognizedTypes } = filterCategoryTypeIds(singleVenueFixture.performance.types);
+  const { categoryTypeIds, recognizedTypes, unrecognizedTypes } = filterCategoryTypeIds(
+    singleVenueFixture.performance.types,
+  );
   assert.deepEqual(categoryTypeIds, [1]);
+  assert.deepEqual(
+    recognizedTypes,
+    [{ id: 1, name: "Кино" }],
+    "recognizedTypes must keep the source's own name — categoryTypeIds alone drops it",
+  );
   assert.equal(unrecognizedTypes.length, 1);
   assert.equal(unrecognizedTypes[0].id, 54);
+  assert.equal(unrecognizedTypes[0].name, "Брестский театр драмы");
 }
-assert.deepEqual(filterCategoryTypeIds(null), { categoryTypeIds: [], unrecognizedTypes: [] });
+assert.deepEqual(filterCategoryTypeIds(null), { categoryTypeIds: [], recognizedTypes: [], unrecognizedTypes: [] });
 
 // ── session tag normalization ─────────────────────────────────────────────
 assert.equal(normalizeSessionTagName("2 D"), "2d");
@@ -143,6 +151,7 @@ assert.equal(mapAbwsSession(singleVenueFixture.sessions[0]).citySlugMismatch, fa
   assert.equal(rawPayload.sessions.length, 2);
   assert.equal(rawPayload.sessions[0].priceMinCents, 2500, "session price NOT converted — raw source unit");
   assert.deepEqual(rawPayload.categoryTypeIds, [1]);
+  assert.deepEqual(rawPayload.recognizedTypes, [{ id: 1, name: "Кино" }]);
   assert.equal(rawPayload.unrecognizedTypes.length, 1);
   assert.equal(rawPayload.llm.category, null, "LLM normalization out of scope for this PR");
   assert.deepEqual(rawPayload.images, [

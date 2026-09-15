@@ -460,6 +460,22 @@ function EventNormalizedBlock({ nd, qualityScore }: { nd: NormalizedEventImport;
           </div>
         ) : null}
       />
+      <Field
+        label="Прочие метки источника"
+        value={nd.otherCategoryCandidates && nd.otherCategoryCandidates.length > 0 ? (
+          <div>
+            <div className="flex flex-wrap gap-1">
+              {nd.otherCategoryCandidates.map((c) => (
+                <span key={c} className="rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs text-amber-800">{c}</span>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Не сопоставляются с категорией автоматически — площадки вперемешку с реальными сигналами
+              (например «Театр кукол», «Детям»). Используйте вручную при выборе категории/жанра.
+            </p>
+          </div>
+        ) : null}
+      />
       <Field label="Главное изображение (URL)" value={nd.mainImageUrl ?? null} />
       <Field
         label="Изображения (импорт)"
@@ -522,6 +538,18 @@ function EventCatalogBlock({ nd }: { nd: NormalizedEventImport }) {
       <Field
         label="Категории"
         value={nd.categoryCandidates.length > 0 ? nd.categoryCandidates.join(", ") : null}
+      />
+      <Field
+        label="Прочие метки источника"
+        value={nd.otherCategoryCandidates && nd.otherCategoryCandidates.length > 0 ? (
+          <div>
+            <span>{nd.otherCategoryCandidates.join(", ")}</span>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Не сопоставляются с категорией автоматически — площадки вперемешку с реальными сигналами
+              (например «Театр кукол», «Детям»). Используйте вручную при выборе категории/жанра.
+            </p>
+          </div>
+        ) : null}
       />
       <Field
         label="Изображение"
