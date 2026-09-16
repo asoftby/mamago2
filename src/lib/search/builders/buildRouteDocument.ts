@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { SEARCH_BOOST } from "@/lib/search/constants";
 import { routeMetaLine } from "@/lib/search/metaLines";
 import { buildSearchText, summarizeForSearchCard } from "@/lib/search/sanitizeSearchText";
+import { resolveReadyLegacyEditorialRouteArticlePath } from "@/server/routes/legacyEditorialRouteCutover";
 import type { SearchDocUpsertFields } from "./buildActivityDocument";
 
 export async function buildRouteDocument(
@@ -16,6 +17,7 @@ export async function buildRouteDocument(
   });
 
   if (!route) return null;
+  if (await resolveReadyLegacyEditorialRouteArticlePath(db, route.slug)) return null;
 
   const searchText = buildSearchText([
     route.title,

@@ -12,6 +12,7 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolvePublicRouteCanonicalUrl } from "@/lib/seo/resolveRouteCanonicalUrl";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { mapRouteStopPublicPhotos } from "@/lib/routes/mapRouteStopPublicPhotos";
+import { resolveReadyLegacyEditorialRouteArticlePath } from "@/server/routes/legacyEditorialRouteCutover";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canViewRoute } from "@/lib/routes/routeAccess";
 
@@ -138,6 +139,10 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function RouteDetailPage({ params }: Props) {
   const { slug } = await params;
+  const legacyArticlePath = await resolveReadyLegacyEditorialRouteArticlePath(prisma, slug);
+  if (legacyArticlePath) {
+    permanentRedirect(legacyArticlePath);
+  }
 
   const resolved = await findRouteBySlug(slug);
   if (resolved) {
