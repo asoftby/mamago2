@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { ContentStatus, ScheduleMode } from "@prisma/client";
+import { LEGACY_EDITORIAL_ROUTE_SLUGS } from "@/lib/routes/legacyEditorialRouteCutover";
 import {
   activityOwnerBusinessActiveWhere,
   placeOwnerBusinessActiveWhere,
@@ -50,6 +51,7 @@ export function getPublicRouteIndexWhere(): Prisma.RouteWhereInput {
   return {
     status: "PUBLISHED",
     visibility: "PUBLIC",
+    slug: { notIn: [...LEGACY_EDITORIAL_ROUTE_SLUGS] },
   };
 }
 
