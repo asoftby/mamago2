@@ -88,7 +88,7 @@ export const PRIMARY_NAVIGATION_ITEMS: PrimaryNavigationItem[] = [
     id: "journal",
     label: "Журнал",
     href: (city) => buildPublicPath(`/${city}/blog`),
-    image: "/open_book_3d.png",
+    image: "/mag.svg",
     navigationEnabled: true,
     comingSoon: false,
   },
