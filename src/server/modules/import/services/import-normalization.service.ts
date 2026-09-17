@@ -15,6 +15,7 @@ import {
   normalizeAbwsEventPayload,
 } from "../normalizers/abws-event.normalizer";
 import type { AbwsPerformanceRawPayload } from "../parsers/abws-performances-event.parser";
+import { upsertActivitySessionsFromOccurrences } from "../publish/activity-session-from-occurrences";
 import { scorePlaceImport, scoreEventImport } from "./import-quality.service";
 
 export interface NormalizeRecordResult {
@@ -98,7 +99,15 @@ async function normalizePlaceRecord(
 // ── EVENT ─────────────────────────────────────────────────────────────────────
 
 async function normalizeEventRecord(
-  record: { id: string; sourceId: string; rawPayload: unknown; sourceUrl: string | null; externalId: string | null; sourceUpdatedAt: Date | null },
+  record: {
+    id: string;
+    sourceId: string;
+    rawPayload: unknown;
+    sourceUrl: string | null;
+    externalId: string | null;
+    sourceUpdatedAt: Date | null;
+    publishedActivityId: string | null;
+  },
 ): Promise<NormalizeRecordResult> {
   try {
     const source = await prisma.importSource.findUnique({ where: { id: record.sourceId } });
@@ -142,6 +151,40 @@ async function normalizeEventRecord(
         ...(qualityFlags !== undefined ? { qualityFlags: qualityFlags as object } : {}),
       },
     });
+
+    // A changed ABWS snapshot for an already-published event must keep its
+    // schedule current without requiring the reviewer to "publish" the same
+    // ImportedRecord again (that entrypoint intentionally refuses already-
+    // linked records). This auto-sync is deliberately narrow: sessions and
+    // nextOccurrenceAt only. Titles/descriptions/prices/etc. remain under the
+    // existing review/non-destructive rules. The session helper also respects
+    // PREFER_MANUAL/LOCKED schedule ownership.
+    if (
+      source.parserKey === ABWS_PARSER_KEY &&
+      record.publishedActivityId &&
+      Array.isArray(normalized.occurrences)
+    ) {
+      const scheduleSync = await upsertActivitySessionsFromOccurrences(
+        record.publishedActivityId,
+        normalized.occurrences,
+      );
+      if (scheduleSync.blockedByManualOverride) {
+        warnings.push("published ABWS schedule sync skipped: schedule is manually owned");
+      }
+      if (scheduleSync.skipped > 0) {
+        warnings.push(`${scheduleSync.skipped} occurrence(s) skipped: missing externalId or startAt`);
+      }
+      if (scheduleSync.withdrawnMissing > 0) {
+        warnings.push(`${scheduleSync.withdrawnMissing} disappeared source session(s) marked withdrawn`);
+      }
+
+      if (warnings.length > 0) {
+        await prisma.importedRecord.update({
+          where: { id: record.id },
+          data: { errorMessage: `warnings: ${warnings.join("; ")}` },
+        });
+      }
+    }
 
     return { recordId: record.id, success: true, entityType: "EVENT", qualityScore: score, warnings };
   } catch (err) {
