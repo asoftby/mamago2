@@ -35,6 +35,11 @@ export function PlaceMapModal({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | google.maps.Marker | null>(null);
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const cleanup = () => {
     if (clickListenerRef.current) {
@@ -155,11 +160,12 @@ export function PlaceMapModal({
     const initialPin =
       initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null;
 
+    setTempPin(initialPin);
     void initMap(initialPin);
 
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
       }
     };
     document.addEventListener("keydown", handleEsc);
@@ -168,7 +174,7 @@ export function PlaceMapModal({
       document.removeEventListener("keydown", handleEsc);
       cleanup();
     };
-  }, [isOpen, initialLat, initialLng, onClose]);
+  }, [isOpen, initialLat, initialLng]);
 
   useEffect(() => {
     if (!tempPin || !mapInstanceRef.current) return;
