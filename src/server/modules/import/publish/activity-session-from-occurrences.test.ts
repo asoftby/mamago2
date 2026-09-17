@@ -123,7 +123,7 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
 }
 
 // ── changed published ABWS snapshots auto-sync sessions after normalization;
-// other fields remain on the existing review/non-destructive path.
+// source-null rows fail closed instead of getting mixed with source-owned rows.
 {
   const normalizationSource = readFileSync(
     "src/server/modules/import/services/import-normalization.service.ts",
@@ -136,8 +136,13 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
   );
   assert.match(
     normalizationSource,
-    /upsertActivitySessionsFromOccurrences\(\s*record\.publishedActivityId,\s*normalized\.occurrences/,
-    "normalization must push a changed published ABWS schedule into ActivitySession",
+    /activitySession\.count\(\{[\s\S]*?source:\s*null/,
+    "auto-sync must detect source-null sessions before writing imported rows",
+  );
+  assert.match(
+    normalizationSource,
+    /if \(sourceNullSessions > 0\)[\s\S]*?else \{[\s\S]*?upsertActivitySessionsFromOccurrences\(/,
+    "source-null legacy/manual state must fail closed before ABWS session sync",
   );
 }
 
@@ -166,13 +171,13 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
   );
   assert.match(
     scheduleSource,
-    /where:\s*\{\s*activityId,\s*source:\s*\{\s*not:\s*null\s*\},\s*withdrawnAt:\s*null\s*\}/,
-    "wizard import schedule must show only active source sessions",
+    /const sourceOwnedSessions = await prisma\.activitySession\.findMany[\s\S]*?source:\s*\{\s*not:\s*null\s*\}[\s\S]*?filter\(\(session\) => session\.withdrawnAt == null\)/,
+    "wizard must preserve import ownership while displaying only active source sessions",
   );
   assert.match(
     manualTakeover,
-    /where:\s*\{\s*activityId,\s*source:\s*\{\s*not:\s*null\s*\},\s*withdrawnAt:\s*null\s*\}/,
-    "manual takeover must seed only active source sessions",
+    /const sourceOwnedSessions = await tx\.activitySession\.findMany[\s\S]*?source:\s*\{\s*not:\s*null\s*\}[\s\S]*?const importedSessions = sourceOwnedSessions\.filter\(\(session\) => session\.withdrawnAt == null\)/,
+    "manual takeover must recognize source ownership even when every session is withdrawn",
   );
 }
 
