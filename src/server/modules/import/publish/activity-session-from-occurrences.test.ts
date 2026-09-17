@@ -1,8 +1,38 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
-import { buildActivitySessionUpsertArgs } from "./activity-session-from-occurrences";
+import {
+  buildActivitySessionUpsertArgs,
+  shouldApplyImportedScheduleSessions,
+} from "./activity-session-from-occurrences";
 import { ABWS_PARSER_KEY } from "../normalizers/abws-event.normalizer";
 import type { EventImportOccurrence } from "../types";
+
+// ── manual schedule ownership blocks later import-session recreation
+assert.equal(shouldApplyImportedScheduleSessions(undefined), true);
+assert.equal(shouldApplyImportedScheduleSessions(null), true);
+assert.equal(shouldApplyImportedScheduleSessions("PREFER_IMPORT"), true);
+assert.equal(shouldApplyImportedScheduleSessions("PREFER_MANUAL"), false);
+assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
+
+// ── import override check + session writes must share the same transaction lock
+{
+  const source = readFileSync(
+    "src/server/modules/import/publish/activity-session-from-occurrences.ts",
+    "utf8",
+  );
+  assert.match(
+    source,
+    /prisma\.\$transaction\(async \(tx\)/,
+    "import session publish must run in one transaction",
+  );
+  const lockIndex = source.indexOf("acquireActivityScheduleLock(tx, activityId)");
+  const overrideIndex = source.indexOf("tx.importFieldOverride.findUnique");
+  const upsertIndex = source.indexOf("tx.activitySession.upsert");
+  assert.ok(lockIndex !== -1, "import session publish must acquire the schedule advisory lock");
+  assert.ok(overrideIndex > lockIndex, "manual-override state must be read after taking the lock");
+  assert.ok(upsertIndex > overrideIndex, "session upserts must happen only after the locked override check");
+}
 
 // ── happy path: full occurrence -> full upsert args, keyed on source+externalId
 {

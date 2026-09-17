@@ -69,28 +69,18 @@ export async function activitySessionsMatchScheduleJson(
  * UTC; ambient server timezone never participates.
  *
  * Refuses to run at all when the target Activity already has any
- * ActivitySession with a non-null `source` (import-created, e.g. ABWS —
- * see ABWS_PARSER_KEY) *at the time of this initial read*. scheduleJson has
- * no representation for source/externalId/buyUrl/price, so replacing
- * sessions here would silently discard them — the defect fixed piecemeal at
- * individual call sites in PR #298 and PR #302 (BACKLOG-153), and now
- * enforced once, here, so every current and future caller is protected by
- * construction instead of each one having to remember its own pre-call
- * check (BACKLOG-154). Safe for every known caller: the event wizard route
- * (PR #298) and WordPress-migration resync/create paths (which never set
- * `source` on their own sessions, so this never fires for their legitimate
- * resyncs) are unaffected; the previously-unguarded ops scripts
- * (resync-event-sessions-from-schedule-json.ts,
- * migration-event-sessions-resync.ts) are now protected too.
+ * ActivitySession with a non-null `source` (import-created, e.g. ABWS). An
+ * explicit manual-takeover action clears source/externalId first and stores a
+ * PREFER_MANUAL override, after which this normal wizard resync is allowed.
  *
- * The read above and the delete below are NOT wrapped in a serializable
- * transaction — a concurrent ABWS upsert landing an imported session
- * between them is possible (found by automated review on PR #303). Rather
- * than requiring every caller to run this inside a serializable
- * transaction, the delete itself is scoped to `source: null` so it can
- * never remove an imported row regardless of timing — the race can at
- * worst leave a freshly-landed imported session next to newly created bare
- * sessions (a mixed state to clean up), never delete import data.
+ * For source:null rows we preserve ticket metadata when the occurrence instant
+ * itself did not change. That makes manual takeover non-destructive: editing a
+ * different date does not throw away buyUrl/price/sale-state for untouched
+ * sessions. Metadata is deliberately not copied to a changed instant because
+ * an imported ticket URL may identify one exact performance.
+ *
+ * The read and delete are not serializable, but the delete itself is scoped to
+ * `source: null`; a concurrent imported row can therefore never be deleted.
  */
 export async function replaceActivitySessionsFromScheduleJson(
   input: {
@@ -104,7 +94,14 @@ export async function replaceActivitySessionsFromScheduleJson(
 
   const existingSessions = await prisma.activitySession.findMany({
     where: { activityId },
-    select: { source: true },
+    select: {
+      startsAt: true,
+      source: true,
+      buyUrl: true,
+      priceMinCents: true,
+      priceMaxCents: true,
+      isSaleOpen: true,
+    },
   });
   const hasImportedSessions = existingSessions.some((s) => s.source != null);
   if (hasImportedSessions) {
@@ -115,11 +112,23 @@ export async function replaceActivitySessionsFromScheduleJson(
     return { count: 0, skipped: true };
   }
 
+  const metadataByInstant = new Map(
+    existingSessions.map((session) => [
+      session.startsAt.toISOString(),
+      {
+        buyUrl: session.buyUrl,
+        priceMinCents: session.priceMinCents,
+        priceMaxCents: session.priceMaxCents,
+        isSaleOpen: session.isSaleOpen,
+      },
+    ]),
+  );
+
   const occurrences = extractScheduleOccurrences(scheduleJson);
 
   const deleteStarted = isServerSavePerfEnabled() ? performance.now() : 0;
-  // Scoped to source: null — see function doc. Never deletes an imported
-  // row, even one that lands after the read above.
+  // Never delete an imported row, even if one lands concurrently after the
+  // read above.
   await prisma.activitySession.deleteMany({ where: { activityId, source: null } });
   const deleteMs = isServerSavePerfEnabled() ? Math.round(performance.now() - deleteStarted) : 0;
 
@@ -142,7 +151,11 @@ export async function replaceActivitySessionsFromScheduleJson(
 
   const createStarted = isServerSavePerfEnabled() ? performance.now() : 0;
   await prisma.activitySession.createMany({
-    data: startsAtList.map((startsAt) => ({ activityId, startsAt })),
+    data: startsAtList.map((startsAt) => ({
+      activityId,
+      startsAt,
+      ...(metadataByInstant.get(startsAt.toISOString()) ?? {}),
+    })),
   });
   const createMs = isServerSavePerfEnabled() ? Math.round(performance.now() - createStarted) : 0;
 

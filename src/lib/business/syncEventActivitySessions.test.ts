@@ -1,24 +1,10 @@
 /**
- * Tests for replaceActivitySessionsFromScheduleJson()'s import-session
- * guard (BACKLOG-154): the function must refuse to touch ActivitySession
- * rows at all — no deleteMany, no createMany — whenever the target
- * Activity already has any session with a non-null `source`
- * (import-created, e.g. ABWS). This is the single choke-point fix
- * replacing the per-caller checks from PR #298 (events/[id]/route.ts) and
- * PR #302 (activity.service.ts's updateActivity()) — every current and
- * future caller of this shared function now inherits the same guard.
+ * Tests for replaceActivitySessionsFromScheduleJson().
  *
- * Also covers the two follow-up fixes from automated review on PR #303:
- * (1) the delete is scoped to `source: null` so a session that lands
- * between the read and the delete can never be destroyed by a race, and
- * (2) the return value distinguishes "skipped because imported sessions
- * exist" from "genuinely wrote 0 sessions", so callers can report a skip
- * honestly instead of as a successful resync.
- *
- * Fake prisma objects only, same style as
- * recurringScheduleMaterialization.test.ts's testWriterPersistsExactOccurrences.
- *
- * Запуск: npx tsx src/lib/business/syncEventActivitySessions.test.ts
+ * The shared writer must still refuse to touch imported sessions (`source`
+ * non-null). After an explicit manual takeover the same rows become
+ * source:null; in that state a normal wizard resync is allowed and ticket
+ * metadata is preserved only for unchanged occurrence instants.
  */
 import assert from "node:assert/strict";
 import { replaceActivitySessionsFromScheduleJson } from "./syncEventActivitySessions";
@@ -27,15 +13,34 @@ const SIMPLE_SCHEDULE = {
   scheduleItems: [{ date: "2026-10-01", startTime: "10:00" }],
 };
 
-function makeFakePrisma(existingSessions: Array<{ source: string | null }>) {
+type FakeSession = {
+  source: string | null;
+  startsAt?: Date;
+  buyUrl?: string | null;
+  priceMinCents?: number | null;
+  priceMaxCents?: number | null;
+  isSaleOpen?: boolean | null;
+};
+
+function makeFakePrisma(existingSessions: FakeSession[]) {
+  const normalizedSessions = existingSessions.map((session) => ({
+    startsAt: session.startsAt ?? new Date("2026-10-01T07:00:00.000Z"),
+    source: session.source,
+    buyUrl: session.buyUrl ?? null,
+    priceMinCents: session.priceMinCents ?? null,
+    priceMaxCents: session.priceMaxCents ?? null,
+    isSaleOpen: session.isSaleOpen ?? null,
+  }));
+
   const calls = {
     deleteManyCalled: false,
     createManyCalled: false,
     deleteManyWhere: undefined as unknown,
+    createManyData: [] as unknown[],
   };
   const prisma = {
     activitySession: {
-      findMany: async () => existingSessions,
+      findMany: async () => normalizedSessions,
       deleteMany: async (args: { where: unknown }) => {
         calls.deleteManyCalled = true;
         calls.deleteManyWhere = args.where;
@@ -43,6 +48,7 @@ function makeFakePrisma(existingSessions: Array<{ source: string | null }>) {
       },
       createMany: async (args: { data: unknown[] }) => {
         calls.createManyCalled = true;
+        calls.createManyData = args.data;
         return { count: args.data.length };
       },
     },
@@ -62,9 +68,9 @@ async function testSkipsEntirelyWhenAnyImportedSessionExists() {
     scheduleJson: SIMPLE_SCHEDULE,
   });
 
-  assert.deepEqual(result, { count: 0, skipped: true }, "must report a skip, not a successful empty write");
-  assert.equal(calls.deleteManyCalled, false, "must never call deleteMany when any session is imported");
-  assert.equal(calls.createManyCalled, false, "must never call createMany when any session is imported");
+  assert.deepEqual(result, { count: 0, skipped: true });
+  assert.equal(calls.deleteManyCalled, false);
+  assert.equal(calls.createManyCalled, false);
 }
 
 async function testProceedsNormallyWhenNoSessionHasSource() {
@@ -76,13 +82,9 @@ async function testProceedsNormallyWhenNoSessionHasSource() {
     scheduleJson: SIMPLE_SCHEDULE,
   });
 
-  assert.deepEqual(
-    result,
-    { count: 1, skipped: false },
-    "an ordinary activity's resync must still write the new occurrence",
-  );
-  assert.equal(calls.deleteManyCalled, true, "must delete the old sessions as before this fix");
-  assert.equal(calls.createManyCalled, true, "must create the new sessions as before this fix");
+  assert.deepEqual(result, { count: 1, skipped: false });
+  assert.equal(calls.deleteManyCalled, true);
+  assert.equal(calls.createManyCalled, true);
 }
 
 async function testProceedsNormallyWhenNoSessionsExistYet() {
@@ -94,21 +96,12 @@ async function testProceedsNormallyWhenNoSessionsExistYet() {
     scheduleJson: SIMPLE_SCHEDULE,
   });
 
-  assert.deepEqual(
-    result,
-    { count: 1, skipped: false },
-    "a brand-new activity with no sessions yet must still get them created",
-  );
+  assert.deepEqual(result, { count: 1, skipped: false });
   assert.equal(calls.deleteManyCalled, true);
   assert.equal(calls.createManyCalled, true);
 }
 
 async function testDeleteIsScopedToSourceNull() {
-  // Closes the TOCTOU race found on PR #303 review: even though the guard
-  // above decides "proceed" based on a read that already happened, the
-  // actual deleteMany must be scoped to source: null so a session that
-  // lands between the read and this delete (a concurrent ABWS upsert)
-  // can never be removed by it, regardless of transaction isolation.
   const { prisma, calls } = makeFakePrisma([{ source: null }]);
 
   await replaceActivitySessionsFromScheduleJson({
@@ -117,11 +110,66 @@ async function testDeleteIsScopedToSourceNull() {
     scheduleJson: SIMPLE_SCHEDULE,
   });
 
-  assert.deepEqual(
-    calls.deleteManyWhere,
-    { activityId: "activity-race", source: null },
-    "deleteMany must filter on source: null, never a bare activityId-only delete",
-  );
+  assert.deepEqual(calls.deleteManyWhere, {
+    activityId: "activity-race",
+    source: null,
+  });
+}
+
+async function testPreservesTicketMetadataForUnchangedInstant() {
+  const { prisma, calls } = makeFakePrisma([
+    {
+      source: null,
+      startsAt: new Date("2026-10-01T07:00:00.000Z"),
+      buyUrl: "https://tickets.example/session-1",
+      priceMinCents: 1200,
+      priceMaxCents: 1800,
+      isSaleOpen: true,
+    },
+  ]);
+
+  await replaceActivitySessionsFromScheduleJson({
+    prisma: prisma as never,
+    activityId: "activity-manual",
+    scheduleJson: SIMPLE_SCHEDULE,
+  });
+
+  assert.deepEqual(calls.createManyData, [
+    {
+      activityId: "activity-manual",
+      startsAt: new Date("2026-10-01T07:00:00.000Z"),
+      buyUrl: "https://tickets.example/session-1",
+      priceMinCents: 1200,
+      priceMaxCents: 1800,
+      isSaleOpen: true,
+    },
+  ]);
+}
+
+async function testDoesNotMoveTicketMetadataToChangedInstant() {
+  const { prisma, calls } = makeFakePrisma([
+    {
+      source: null,
+      startsAt: new Date("2026-10-01T08:00:00.000Z"),
+      buyUrl: "https://tickets.example/old-session",
+      priceMinCents: 1200,
+      priceMaxCents: 1800,
+      isSaleOpen: true,
+    },
+  ]);
+
+  await replaceActivitySessionsFromScheduleJson({
+    prisma: prisma as never,
+    activityId: "activity-manual-changed",
+    scheduleJson: SIMPLE_SCHEDULE,
+  });
+
+  assert.deepEqual(calls.createManyData, [
+    {
+      activityId: "activity-manual-changed",
+      startsAt: new Date("2026-10-01T07:00:00.000Z"),
+    },
+  ]);
 }
 
 async function main() {
@@ -129,6 +177,8 @@ async function main() {
   await testProceedsNormallyWhenNoSessionHasSource();
   await testProceedsNormallyWhenNoSessionsExistYet();
   await testDeleteIsScopedToSourceNull();
+  await testPreservesTicketMetadataForUnchangedInstant();
+  await testDoesNotMoveTicketMetadataToChangedInstant();
   console.log("syncEventActivitySessions tests: OK");
 }
 
