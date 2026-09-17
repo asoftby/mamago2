@@ -4,12 +4,12 @@
  * cookies() call needs a real Next.js request scope, so the handler can't be
  * invoked directly here).
  *
- * Regression target: when an activity has any ActivitySession with a
+ * Regression target: when an activity has an ACTIVE ActivitySession with a
  * non-null `source` (import-created, e.g. ABWS), this endpoint must report
  * those sessions with readOnly: true, and must not fall through to the
- * normalizedData/rawPayload-derived (editable) branch. Ordinary
- * business/family.by events (no session has a non-null source) must keep
- * getting readOnly: false from the existing branch.
+ * normalizedData/rawPayload-derived (editable) branch. Withdrawn imported
+ * sessions are lifecycle history and must not appear as current schedule.
+ * Ordinary business/family.by events keep readOnly: false.
  *
  * Запуск: npx tsx "src/app/api/business/events/[id]/schedule-source/route.test.ts"
  */
@@ -20,20 +20,20 @@ const source = readFileSync("src/app/api/business/events/[id]/schedule-source/ro
 
 assert.match(
   source,
-  /const importedSessions = await prisma\.activitySession\.findMany\(\{\s*\n\s*where:\s*{\s*activityId,\s*source:\s*{\s*not:\s*null\s*}\s*},/,
-  "must look up ActivitySession rows with a non-null source before falling back to import-record text extraction",
+  /const importedSessions = await prisma\.activitySession\.findMany\(\{\s*\n\s*where:\s*\{\s*activityId,\s*source:\s*\{\s*not:\s*null\s*\},\s*withdrawnAt:\s*null\s*\},/,
+  "must look up only active ActivitySession rows with a non-null source before falling back to import-record text extraction",
 );
 
 assert.match(
   source,
   /if \(importedSessions\.length > 0\) \{/,
-  "must branch on the presence of imported sessions",
+  "must branch on the presence of active imported sessions",
 );
 
 assert.match(
   source,
   /return NextResponse\.json\(\{ items, readOnly: true \}\);/,
-  "imported-session branch must report readOnly: true",
+  "active imported-session branch must report readOnly: true",
 );
 
 assert.match(
