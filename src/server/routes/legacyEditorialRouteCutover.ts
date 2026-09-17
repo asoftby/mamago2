@@ -12,6 +12,20 @@ export async function resolveReadyLegacyEditorialRouteArticlePath(
   const targetPath = getLegacyEditorialRouteArticlePath(slug);
   if (!targetPath || !slug) return null;
 
+  // Keep data migration and public cutover separate. A target Article can be
+  // fully ready while the legacy source is still retained as DRAFT/PUBLISHED;
+  // redirect/search retirement becomes active only after the guarded cutover
+  // archives that exact editorial Route.
+  const sourceRoute = await db.route.findFirst({
+    where: {
+      slug,
+      authorId: null,
+      status: "ARCHIVED",
+    },
+    select: { id: true },
+  });
+  if (!sourceRoute) return null;
+
   const article = await db.article.findFirst({
     where: {
       slug,

@@ -16,6 +16,8 @@ export default defineConfig({
       "scripts/resync-event-sessions-from-schedule-json.ts",
     "ops/legacy-routes-to-articles-cutover":
       "scripts/legacy-routes-to-articles-cutover.ts",
+    "ops/legacy-editorial-routes-to-articles-migration":
+      "scripts/legacy-editorial-routes-to-articles-migration.ts",
   },
   format: ["cjs"],
   platform: "node",

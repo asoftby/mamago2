@@ -8,6 +8,13 @@ import {
   LEGACY_EDITORIAL_ROUTE_EXCLUDED_SLUG,
   LEGACY_EDITORIAL_ROUTE_SLUGS,
 } from "../src/lib/routes/legacyEditorialRouteCutover";
+import {
+  assertMigrationDatabaseTarget,
+  DEV_DATABASE_NAME,
+  LOCAL_GOLDEN_DATABASE_NAME,
+  parseMigrationDatabaseUrl,
+  PROD_DATABASE_NAME,
+} from "../src/lib/migration/runtime/migrationDatabaseTarget";
 import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
 import { resolveStoredMediaPath } from "../src/server/media/media-storage";
 
@@ -16,6 +23,12 @@ const CONFIRM = process.argv.includes("--confirm-cutover");
 const CONFIRM_PRODUCTION = process.argv.includes("--confirm-production");
 const EXPECTED_COUNT = LEGACY_EDITORIAL_ROUTE_SLUGS.length;
 const EXPECTED_NOVOGODNIY_MEDIA = 9;
+
+type DatabaseTarget = {
+  kind: "LOCAL_GOLDEN" | "DEV" | "PROD";
+  urlDatabase: string;
+  currentDatabase: string;
+};
 
 function collectMediaIds(value: unknown, output = new Set<string>()): Set<string> {
   if (Array.isArray(value)) {
@@ -34,14 +47,62 @@ function collectMediaIds(value: unknown, output = new Set<string>()): Set<string
   return output;
 }
 
-function isProductionEnvironment(): boolean {
-  const values = [process.env.APP_ENV, process.env.DEPLOY_ENV, process.env.NODE_ENV]
-    .filter(Boolean)
-    .map((value) => String(value).toLowerCase());
-  return values.includes("production") || values.includes("prod");
+async function inspectDatabaseTarget(): Promise<DatabaseTarget> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL is required");
+
+  const parsed = parseMigrationDatabaseUrl(databaseUrl);
+  const rows = await prismaBase.$queryRaw<Array<{ current_database: string }>>`SELECT current_database()`;
+  const currentDatabase = rows[0]?.current_database ?? "";
+  if (!currentDatabase || currentDatabase !== parsed.database) {
+    throw new Error(
+      `DATABASE_FINGERPRINT_MISMATCH:url=${parsed.database || "<empty>"}:connected=${currentDatabase || "<empty>"}`,
+    );
+  }
+
+  if (currentDatabase === PROD_DATABASE_NAME) {
+    return { kind: "PROD", urlDatabase: parsed.database, currentDatabase };
+  }
+  if (currentDatabase === DEV_DATABASE_NAME) {
+    return { kind: "DEV", urlDatabase: parsed.database, currentDatabase };
+  }
+  if (currentDatabase === LOCAL_GOLDEN_DATABASE_NAME) {
+    assertMigrationDatabaseTarget({
+      databaseUrl,
+      currentDatabase,
+      confirmProduction: false,
+      confirmWrites: false,
+      requireProdUserAcknowledgement: false,
+    });
+    return { kind: "LOCAL_GOLDEN", urlDatabase: parsed.database, currentDatabase };
+  }
+
+  throw new Error(`DATABASE_TARGET_REFUSED:${currentDatabase}`);
+}
+
+function assertApplyDatabaseTarget(target: DatabaseTarget): void {
+  if (target.kind !== "PROD") return;
+
+  assertMigrationDatabaseTarget({
+    databaseUrl: process.env.DATABASE_URL,
+    currentDatabase: target.currentDatabase,
+    confirmProduction: CONFIRM_PRODUCTION,
+    confirmWrites: true,
+    requireProdUserAcknowledgement: false,
+  });
+}
+
+function sourceRouteStateAllowed(status: string, visibility: string): boolean {
+  return (
+    (status === "DRAFT" && visibility === "PRIVATE") ||
+    (status === "PUBLISHED" && visibility === "PUBLIC") ||
+    status === "ARCHIVED"
+  );
 }
 
 async function inspectState() {
+  const databaseTarget = await inspectDatabaseTarget();
+
   const cityCandidates = await prismaBase.city.findMany({
     where: {
       slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG,
@@ -209,10 +270,7 @@ async function inspectState() {
       continue;
     }
     if (route.authorId !== null) problems.push(`ROUTE_NOT_EDITORIAL:${slug}`);
-    const routeStateOk =
-      (route.status === "PUBLISHED" && route.visibility === "PUBLIC") ||
-      route.status === "ARCHIVED";
-    if (!routeStateOk) {
+    if (!sourceRouteStateAllowed(route.status, route.visibility)) {
       problems.push(`ROUTE_STATE:${slug}:${route.status}/${route.visibility}`);
     }
 
@@ -249,9 +307,11 @@ async function inspectState() {
   if (mediaAssets.length !== mediaIds.length) {
     problems.push(`NOVOGODNIY_MEDIA_ASSETS:${mediaAssets.length}/${mediaIds.length}`);
   }
-  const missingFiles = media.filter((asset) => !asset.fileExists);
-  if (missingFiles.length > 0) {
-    problems.push(`NOVOGODNIY_MEDIA_FILES_MISSING:${missingFiles.length}/${media.length}`);
+  const invalidMedia = media.filter(
+    (asset) => asset.status !== "ACTIVE" || asset.deletedAt || !asset.fileExists,
+  );
+  if (invalidMedia.length > 0) {
+    problems.push(`NOVOGODNIY_MEDIA_INVALID:${invalidMedia.length}/${media.length}`);
   }
 
   const targetCategory = exactNamedArticleCategories[0] ?? null;
@@ -259,6 +319,7 @@ async function inspectState() {
   return {
     result: problems.length === 0 ? "READY" : "STOP",
     mode: APPLY ? "APPLY" : "PLAN",
+    databaseTarget,
     expectedCount: EXPECTED_COUNT,
     city,
     cityCandidates,
@@ -286,9 +347,7 @@ async function applyCutover(plan: Awaited<ReturnType<typeof inspectState>>) {
   if (!CONFIRM) {
     throw new Error("Refusing APPLY: add --confirm-cutover");
   }
-  if (isProductionEnvironment() && !CONFIRM_PRODUCTION) {
-    throw new Error("Refusing production APPLY: add --confirm-production");
-  }
+  assertApplyDatabaseTarget(plan.databaseTarget);
 
   const articleIds = plan.articles.map((article) => article.id);
   const routeIds = plan.routes.map((route) => route.id);
@@ -349,7 +408,7 @@ async function applyCutover(plan: Awaited<ReturnType<typeof inspectState>>) {
       where: {
         id: { in: routeIds },
         authorId: null,
-        status: { in: ["PUBLISHED", "ARCHIVED"] },
+        status: { in: ["DRAFT", "PUBLISHED", "ARCHIVED"] },
       },
       data: { status: "ARCHIVED" },
     });
