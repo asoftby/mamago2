@@ -39,10 +39,11 @@ function readOccurrences(value: unknown): SnapshotOccurrence[] | null {
 }
 
 function nextActiveAt(occurrences: SnapshotOccurrence[], now: Date): string | null {
+  const nowMs = now.getTime();
   const next = occurrences
     .filter((occurrence) => !occurrence.withdrawnAt && occurrence.startAt)
     .map((occurrence) => new Date(occurrence.startAt!))
-    .filter((date) => !Number.isNaN(date.getTime()) && date >= now)
+    .filter((date) => !Number.isNaN(date.getTime()) && date.getTime() >= nowMs)
     .sort((a, b) => a.getTime() - b.getTime())[0];
   return next?.toISOString() ?? null;
 }
@@ -75,8 +76,7 @@ async function main() {
           title: true,
           nextOccurrenceAt: true,
           sessions: {
-            where: { source: ABWS_PARSER_KEY },
-            select: { externalId: true, startsAt: true, withdrawnAt: true },
+            select: { source: true, externalId: true, startsAt: true, withdrawnAt: true },
             orderBy: { startsAt: "asc" },
           },
         },
@@ -103,24 +103,43 @@ async function main() {
       select: { lockMode: true },
     });
 
+    const sourceSessions = record.publishedActivity.sessions.filter(
+      (session) => session.source === ABWS_PARSER_KEY,
+    );
+    const sourceNullSessions = record.publishedActivity.sessions.filter(
+      (session) => session.source == null,
+    );
     const expectedIds = new Set((occurrences ?? []).map((item) => item.externalId).filter(Boolean));
-    const dbIds = new Set(record.publishedActivity.sessions.map((item) => item.externalId).filter(Boolean));
+    const dbIds = new Set(sourceSessions.map((item) => item.externalId).filter(Boolean));
     const missingInDb = [...expectedIds].filter((id) => !dbIds.has(id));
     const missingInSnapshot = [...dbIds].filter((id) => !expectedIds.has(id));
+    const manualLockMode = override?.lockMode ?? null;
+    const hasManualOwnership = manualLockMode === "PREFER_MANUAL" || manualLockMode === "LOCKED";
+    const actionable = occurrences !== null && sourceNullSessions.length === 0 && !hasManualOwnership;
 
     plan.push({
       importedRecordId: record.id,
       performanceId: record.externalId,
       activityId,
       title: record.publishedActivity.title,
-      manualLockMode: override?.lockMode ?? null,
+      manualLockMode,
       snapshotOccurrences: occurrences?.length ?? null,
-      dbSourceSessions: record.publishedActivity.sessions.length,
+      dbSourceSessions: sourceSessions.length,
+      dbSourceNullSessions: sourceNullSessions.length,
+      sourceNullSessionStartsAt: sourceNullSessions.map((session) => session.startsAt.toISOString()),
       missingInDb,
       missingInSnapshot,
       currentNextOccurrenceAt: record.publishedActivity.nextOccurrenceAt?.toISOString() ?? null,
       expectedNextOccurrenceAt: occurrences ? nextActiveAt(occurrences, now) : null,
-      actionable: occurrences !== null,
+      actionable,
+      blockedReason:
+        occurrences === null
+          ? "NO_AUTHORITATIVE_OCCURRENCES"
+          : hasManualOwnership
+            ? "MANUAL_OWNERSHIP"
+            : sourceNullSessions.length > 0
+              ? "SOURCE_NULL_SESSIONS_PRESENT"
+              : null,
     });
   }
 
@@ -135,7 +154,12 @@ async function main() {
   const results: Array<Record<string, unknown>> = [];
   for (const row of plan) {
     if (!row.actionable || typeof row.activityId !== "string") {
-      results.push({ activityId: row.activityId, status: "SKIPPED_NO_AUTHORITATIVE_OCCURRENCES" });
+      results.push({
+        activityId: row.activityId,
+        performanceId: row.performanceId,
+        title: row.title,
+        status: `SKIPPED_${String(row.blockedReason ?? "NOT_ACTIONABLE")}`,
+      });
       continue;
     }
     const sourceRecord = records.find((record) => record.publishedActivityId === row.activityId);
