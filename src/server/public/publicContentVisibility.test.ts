@@ -85,7 +85,7 @@ assert.deepEqual(
   {
     OR: [
       { nextOccurrenceAt: { gte: now } },
-      { sessions: { some: { startsAt: { gte: now } } } },
+      { sessions: { some: { startsAt: { gte: now }, withdrawnAt: null } } },
       {
         AND: [
           { nextOccurrenceAt: null },
@@ -102,7 +102,7 @@ assert.deepEqual(
       },
     ],
   },
-  "public Activity expiry fallback must keep one future-session predicate plus the long-lived schedule fallback",
+  "public Activity expiry fallback must keep one future-active-session predicate plus the long-lived schedule fallback",
 );
 
 const serializedNotExpired = JSON.stringify(notExpired);
@@ -110,6 +110,10 @@ assert.equal(
   serializedNotExpired.match(/\"sessions\"/g)?.length ?? 0,
   1,
   "public Activity expiry predicate must not emit duplicate future-session relation checks",
+);
+assert.ok(
+  serializedNotExpired.includes('"withdrawnAt":null'),
+  "public Activity expiry fallback must not treat withdrawn source sessions as future availability",
 );
 
 console.log("✅ publicContentVisibility.test.ts — all assertions passed");
