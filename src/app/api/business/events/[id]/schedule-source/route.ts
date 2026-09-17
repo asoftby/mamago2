@@ -121,13 +121,11 @@ export async function GET(
   if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Sessions with a non-null `source` come from an import pipeline (ABWS
-  // today), not from this wizard's own scheduleItems/dates model. The PATCH
-  // route already refuses to touch them (see events/[id]/route.ts,
-  // activitySessionsNeedResync) — this flag tells the wizard to render the
-  // schedule step read-only instead of showing an editable form that would
-  // silently no-op on save.
+  // today), not from this wizard's own scheduleItems/dates model. Withdrawn
+  // source sessions are historical lifecycle rows and must not be offered as
+  // current schedule entries.
   const importedSessions = await prisma.activitySession.findMany({
-    where: { activityId, source: { not: null } },
+    where: { activityId, source: { not: null }, withdrawnAt: null },
     orderBy: { startsAt: "asc" },
     select: { startsAt: true },
   });
