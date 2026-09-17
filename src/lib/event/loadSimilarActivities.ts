@@ -62,7 +62,12 @@ const SIMILAR_SELECT = {
     orderBy: { sortOrder: "asc" as const },
     take: 1,
   },
-  sessions: { select: { id: true, startsAt: true }, orderBy: { startsAt: "asc" as const }, take: 1 },
+  sessions: {
+    where: { withdrawnAt: null },
+    select: { id: true, startsAt: true },
+    orderBy: { startsAt: "asc" as const },
+    take: 1,
+  },
   place: { select: { city: { select: { slug: true } } } },
   eventCategory: { select: { nameRu: true } },
 } satisfies Prisma.ActivitySelect;
@@ -128,7 +133,7 @@ export async function loadSimilarActivities(opts: {
     status: ContentStatus.PUBLISHED,
     cityId,
     sessions: {
-      some: { startsAt: { gte: now } },
+      some: { startsAt: { gte: now }, withdrawnAt: null },
     },
   };
 
