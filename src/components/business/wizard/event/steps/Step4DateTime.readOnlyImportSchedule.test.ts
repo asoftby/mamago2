@@ -26,19 +26,16 @@ assert.match(
   /setScheduleReadOnly\(payload\.readOnly === true\)/,
   "must derive protected state from schedule-source readOnly",
 );
-
 assert.match(
   source,
   /fetch\(`\/api\/business\/events\/\$\{eventId\}\/schedule-source\/manual`,\s*\{\s*method:\s*"POST"/,
   "manual editing must go through the explicit server takeover endpoint",
 );
-
 assert.match(
   source,
   /handleScheduleItemsChange\(nextItems\);\s*\n\s*setScheduleReadOnly\(false\);/,
   "must seed the wizard from server-returned sessions before unlocking the editor",
 );
-
 assert.match(
   source,
   /Редактировать расписание вручную/,
@@ -49,12 +46,10 @@ const readOnlyBranchStart = source.indexOf("{scheduleReadOnly ? (");
 const readOnlyBranchEnd = source.indexOf(") : (", readOnlyBranchStart);
 assert.ok(readOnlyBranchStart !== -1 && readOnlyBranchEnd !== -1, "could not locate the scheduleReadOnly ternary");
 const readOnlyBranch = source.slice(readOnlyBranchStart, readOnlyBranchEnd);
-
 assert.ok(
   !readOnlyBranch.includes("<EventScheduleList"),
   "import-owned schedule must not expose EventScheduleList before explicit takeover",
 );
-
 const eventScheduleListIndex = source.indexOf("<EventScheduleList");
 assert.ok(eventScheduleListIndex !== -1, "EventScheduleList must still be rendered after takeover/for ordinary events");
 assert.ok(
@@ -74,8 +69,29 @@ assert.match(
 );
 assert.match(
   manualRouteSource,
-  /prisma\.\$transaction\(\[/,
-  "override, schedule seeding and session identity handoff must be atomic",
+  /prisma\.\$transaction\(async \(tx\)/,
+  "takeover must run inside one transaction",
+);
+assert.match(
+  manualRouteSource,
+  /acquireActivityScheduleLock\(tx, activityId\)/,
+  "takeover must serialize against concurrent import session writes",
+);
+const lockIndex = manualRouteSource.indexOf("acquireActivityScheduleLock(tx, activityId)");
+const importedReadIndex = manualRouteSource.indexOf("tx.activitySession.findMany");
+assert.ok(
+  lockIndex !== -1 && importedReadIndex > lockIndex,
+  "imported sessions must be read only after the schedule ownership lock is held",
+);
+assert.match(
+  manualRouteSource,
+  /findDuplicateStartsAt\(importedSessions\)/,
+  "takeover must detect same-instant imported performances before clearing identity",
+);
+assert.match(
+  manualRouteSource,
+  /DUPLICATE_IMPORTED_SESSION_START/,
+  "ambiguous same-instant imports must fail closed instead of collapsing ticket identities",
 );
 assert.match(
   manualRouteSource,
@@ -99,7 +115,7 @@ assert.doesNotMatch(
 );
 assert.match(
   manualRouteSource,
-  /scheduleItems,\s*\n\s*manualOverride:\s*true/,
+  /scheduleItems:\s*takeover\.scheduleItems,\s*\n\s*manualOverride:\s*true/,
   "endpoint must return seeded editable schedule rows to the wizard",
 );
 
