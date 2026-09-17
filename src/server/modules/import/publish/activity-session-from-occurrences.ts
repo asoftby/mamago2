@@ -15,6 +15,7 @@
 
 import type { ImportFieldLockMode, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { acquireActivityScheduleLock } from "../services/activity-schedule-lock";
 import { ABWS_PARSER_KEY } from "../normalizers/abws-event.normalizer";
 import type { EventImportOccurrence } from "../types";
 
@@ -74,42 +75,52 @@ export function buildActivitySessionUpsertArgs(
   };
 }
 
+/**
+ * Import session writes and manual takeover are serialized by the same
+ * transaction-scoped PostgreSQL advisory lock. This closes the window where
+ * an importer could pass the override check and recreate an import-owned row
+ * immediately after an editor switched the schedule to manual ownership.
+ */
 export async function upsertActivitySessionsFromOccurrences(
   activityId: string,
   occurrences: EventImportOccurrence[],
 ): Promise<{ upserted: number; skipped: number; blockedByManualOverride: boolean }> {
-  const override = await prisma.importFieldOverride.findUnique({
-    where: {
-      entityType_entityId_fieldName: {
-        entityType: "EVENT",
-        entityId: activityId,
-        fieldName: "scheduleJson",
+  return prisma.$transaction(async (tx) => {
+    await acquireActivityScheduleLock(tx, activityId);
+
+    const override = await tx.importFieldOverride.findUnique({
+      where: {
+        entityType_entityId_fieldName: {
+          entityType: "EVENT",
+          entityId: activityId,
+          fieldName: "scheduleJson",
+        },
       },
-    },
-    select: { lockMode: true },
-  });
-
-  if (!shouldApplyImportedScheduleSessions(override?.lockMode)) {
-    console.info("[import-sessions] skipped — schedule is manually owned", {
-      activityId,
-      lockMode: override?.lockMode,
-      occurrencesCount: occurrences.length,
+      select: { lockMode: true },
     });
-    return { upserted: 0, skipped: 0, blockedByManualOverride: true };
-  }
 
-  let upserted = 0;
-  let skipped = 0;
-
-  for (const occurrence of occurrences) {
-    const args = buildActivitySessionUpsertArgs(activityId, occurrence);
-    if (!args) {
-      skipped++;
-      continue;
+    if (!shouldApplyImportedScheduleSessions(override?.lockMode)) {
+      console.info("[import-sessions] skipped — schedule is manually owned", {
+        activityId,
+        lockMode: override?.lockMode,
+        occurrencesCount: occurrences.length,
+      });
+      return { upserted: 0, skipped: 0, blockedByManualOverride: true };
     }
-    await prisma.activitySession.upsert(args);
-    upserted++;
-  }
 
-  return { upserted, skipped, blockedByManualOverride: false };
+    let upserted = 0;
+    let skipped = 0;
+
+    for (const occurrence of occurrences) {
+      const args = buildActivitySessionUpsertArgs(activityId, occurrence);
+      if (!args) {
+        skipped++;
+        continue;
+      }
+      await tx.activitySession.upsert(args);
+      upserted++;
+    }
+
+    return { upserted, skipped, blockedByManualOverride: false };
+  });
 }
