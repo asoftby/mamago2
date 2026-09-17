@@ -118,16 +118,17 @@ export async function POST(
     });
     if (!activity) return { kind: "not-found" };
 
-    const importedSessions = await tx.activitySession.findMany({
-      where: { activityId, source: { not: null }, withdrawnAt: null },
+    const sourceOwnedSessions = await tx.activitySession.findMany({
+      where: { activityId, source: { not: null } },
       orderBy: [{ startsAt: "asc" }, { id: "asc" }],
-      select: { id: true, startsAt: true },
+      select: { id: true, startsAt: true, withdrawnAt: true },
     });
 
-    if (importedSessions.length === 0) {
+    if (sourceOwnedSessions.length === 0) {
       return { kind: "no-imported-sessions" };
     }
 
+    const importedSessions = sourceOwnedSessions.filter((session) => session.withdrawnAt == null);
     const duplicateStartsAt = findDuplicateStartsAt(importedSessions);
     if (duplicateStartsAt.length > 0) {
       // EventScheduleList/materialization currently cannot preserve two
@@ -191,8 +192,8 @@ export async function POST(
 
     // Preserve startsAt and ticket metadata, but remove import identity. From
     // this point the ordinary wizard sync may replace source:null rows safely.
-    // Withdrawn source rows are also de-identified here; they remain hidden by
-    // withdrawnAt until the normal manual resync replaces the session set.
+    // This includes already-withdrawn source rows: once manual ownership is
+    // explicit, the source must no longer be able to reclaim any session row.
     await tx.activitySession.updateMany({
       where: { activityId, source: { not: null } },
       data: { source: null, externalId: null },
