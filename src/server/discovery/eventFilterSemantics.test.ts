@@ -49,10 +49,10 @@ test("free also detects the wizard's free priceText, case/whitespace-insensitive
   assert.equal(isStructuredFreeEvent({ priceFrom: 25, priceText: "25 руб" }), false);
 });
 
-test("resolved date range becomes an ActivitySession inclusion predicate", () => {
+test("resolved date range becomes an active ActivitySession inclusion predicate", () => {
   const dateRange = resolveEventDateRange({ from: "2026-09-12" });
   const where = buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: false });
-  assert.deepEqual(where, [{ sessions: { some: { startsAt: { gte: dateRange?.start, lt: dateRange?.end } } } }]);
+  assert.deepEqual(where, [{ sessions: { some: { startsAt: { gte: dateRange?.start, lt: dateRange?.end }, withdrawnAt: null } } }]);
 });
 
 test("manual geo assignment wins and auto is used only when manual is absent", () => {
