@@ -119,7 +119,7 @@ export async function POST(
     if (!activity) return { kind: "not-found" };
 
     const importedSessions = await tx.activitySession.findMany({
-      where: { activityId, source: { not: null } },
+      where: { activityId, source: { not: null }, withdrawnAt: null },
       orderBy: [{ startsAt: "asc" }, { id: "asc" }],
       select: { id: true, startsAt: true },
     });
@@ -191,6 +191,8 @@ export async function POST(
 
     // Preserve startsAt and ticket metadata, but remove import identity. From
     // this point the ordinary wizard sync may replace source:null rows safely.
+    // Withdrawn source rows are also de-identified here; they remain hidden by
+    // withdrawnAt until the normal manual resync replaces the session set.
     await tx.activitySession.updateMany({
       where: { activityId, source: { not: null } },
       data: { source: null, externalId: null },
