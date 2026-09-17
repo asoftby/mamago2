@@ -21,6 +21,10 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
     "src/server/modules/import/publish/activity-session-from-occurrences.ts",
     "utf8",
   );
+  const lockSource = readFileSync(
+    "src/server/modules/import/services/activity-schedule-lock.ts",
+    "utf8",
+  );
   assert.match(
     source,
     /prisma\.\$transaction\(async \(tx\)/,
@@ -36,6 +40,16 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
   assert.ok(upsertIndex > overrideIndex, "session upserts must happen only after the locked override check");
   assert.ok(reconcileIndex > upsertIndex, "missing-session reconciliation must happen after current-session upserts");
   assert.ok(nextOccurrenceIndex > reconcileIndex, "nextOccurrenceAt must be refreshed after session reconciliation");
+  assert.match(
+    lockSource,
+    /SELECT 1 AS locked FROM pg_advisory_xact_lock\(hashtextextended\(/,
+    "Prisma-safe advisory lock query must project a supported scalar instead of PostgreSQL void",
+  );
+  assert.doesNotMatch(
+    lockSource,
+    /SELECT\s+pg_advisory_xact_lock\(/,
+    "advisory lock must not expose PostgreSQL void directly to Prisma raw-query deserialization",
+  );
   assert.match(
     source,
     /source:\s*ABWS_PARSER_KEY,[\s\S]*?withdrawnAt:\s*null,[\s\S]*?externalId:\s*\{\s*notIn:\s*currentExternalIds\s*\}/,
