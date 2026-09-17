@@ -96,7 +96,7 @@ function getNextActiveOccurrenceAt(
     .map((occurrence) => occurrence as SourceOccurrence)
     .filter((occurrence) => !occurrence.withdrawnAt)
     .map((occurrence) => (occurrence.startAt ? new Date(occurrence.startAt) : null))
-    .filter((date): date is Date => Boolean(date) && !Number.isNaN(date.getTime()))
+    .filter((date): date is Date => date !== null && !Number.isNaN(date.getTime()))
     .filter((date) => date.getTime() >= nowMs)
     .sort((a, b) => a.getTime() - b.getTime());
 
