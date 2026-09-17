@@ -85,6 +85,7 @@ jobs:
           pnpm exec tsx src/lib/geo/haversineMeters.test.ts
           pnpm exec tsx src/components/business/place/placeLocationGeoOverrides.test.ts
           pnpm exec tsx src/components/business/place/PlaceLocationPicker.raceContract.test.ts
+          pnpm exec tsx src/components/business/place/PlaceMapModal.lifecycleContract.test.ts
           pnpm exec tsx src/components/business/place/placeLocationPresentation.test.ts
           pnpm exec tsx src/components/business/place/PlaceLocationPicker.presentationWiring.test.ts
 
