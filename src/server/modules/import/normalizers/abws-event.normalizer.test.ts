@@ -72,6 +72,47 @@ function basePayload(overrides: Partial<AbwsPerformanceRawPayload> = {}): AbwsPe
   assert.equal(result.normalized.occurrences?.[0]?.priceText, "2.50 BYN");
 }
 
+// ── lifecycle: withdrawnAt survives normalization, but flat compatibility
+// fields are derived from the earliest ACTIVE session, not a withdrawn row or
+// arbitrary API ordering.
+{
+  const result = normalizeAbwsEventPayload({
+    sourceSlug: "abws",
+    sourceUrl: "https://24afisha.by/event/1",
+    rawPayload: basePayload({
+      sessions: [
+        baseSession({
+          externalId: "withdrawn",
+          startsAt: "2026-09-20T10:00:00.000Z",
+          withdrawnAt: "2026-09-18T09:00:00.000Z",
+        }),
+        baseSession({ externalId: "later", startsAt: "2026-10-08T16:00:00.000Z" }),
+        baseSession({ externalId: "next", startsAt: "2026-10-01T16:00:00.000Z" }),
+      ],
+    }) as unknown as Record<string, unknown>,
+  });
+
+  const firstOccurrence = result.normalized.occurrences?.[0] as
+    | ({ withdrawnAt?: string | null } & Record<string, unknown>)
+    | undefined;
+  assert.equal(firstOccurrence?.withdrawnAt, "2026-09-18T09:00:00.000Z");
+  assert.equal(result.normalized.startAt, "2026-10-01T16:00:00.000Z");
+  assert.equal(result.normalized.scheduleModeCandidate, "MULTI_DATE");
+  assert.equal(result.normalized.occurrences?.length, 3);
+}
+
+// ── ABWS keeps an authoritative empty occurrences snapshot. This is distinct
+// from family.by, where occurrences is undefined, and lets published-session
+// reconciliation withdraw rows when the source now has zero sessions.
+{
+  const result = normalizeAbwsEventPayload({
+    sourceSlug: "abws",
+    sourceUrl: "https://24afisha.by/event/1",
+    rawPayload: basePayload({ sessions: [] }) as unknown as Record<string, unknown>,
+  });
+  assert.deepEqual(result.normalized.occurrences, []);
+}
+
 // ── categoryCandidates: human-readable "Name (id)", not bare numbers ──────
 {
   const result = normalizeAbwsEventPayload({

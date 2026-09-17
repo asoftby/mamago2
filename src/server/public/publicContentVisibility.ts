@@ -105,10 +105,11 @@ export function getActivityNotExpiredForPublicWhere(
       { nextOccurrenceAt: { gte: now } },
       /**
        * Denormalized `nextOccurrenceAt` can lag behind session rewrites during edits.
-       * Public feeds should still surface an event as soon as it has a future session.
+       * Public feeds should still surface an event as soon as it has a future ACTIVE session.
+       * Withdrawn source sessions are historical lifecycle rows, not availability.
        */
       {
-        sessions: { some: { startsAt: { gte: now } } },
+        sessions: { some: { startsAt: { gte: now }, withdrawnAt: null } },
       },
       /**
        * Long-lived schedules without a materialized next occurrence remain public.

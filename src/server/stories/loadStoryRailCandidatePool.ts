@@ -42,9 +42,12 @@ export async function loadStoryRailCandidatePool(input: {
       ? [pubOffer.AND]
       : [];
 
-  const sessionWhere = buildDateRangeWhere(unionRange, timeZone, "occurrence", {
-    occurrenceField: "startsAt",
-  }) as Prisma.ActivitySessionWhereInput;
+  const sessionWhere = {
+    ...(buildDateRangeWhere(unionRange, timeZone, "occurrence", {
+      occurrenceField: "startsAt",
+    }) as Prisma.ActivitySessionWhereInput),
+    withdrawnAt: null,
+  } satisfies Prisma.ActivitySessionWhereInput;
 
   const offerSessionWhere = buildOfferSessionOccurrenceWhere(
     unionRange,
@@ -154,6 +157,7 @@ export async function loadStoryRailCandidatePool(input: {
                     gte: unionRange.start,
                     lt: unionRange.end,
                   },
+                  withdrawnAt: null,
                 },
               },
             },
@@ -280,7 +284,7 @@ export async function loadStoryRailCandidatePool(input: {
     activityIdsForClass.length > 0
       ? await prisma.activitySession.groupBy({
           by: ["activityId"],
-          where: { activityId: { in: activityIdsForClass } },
+          where: { activityId: { in: activityIdsForClass }, withdrawnAt: null },
           _count: { _all: true },
           _min: { startsAt: true },
           _max: { startsAt: true },

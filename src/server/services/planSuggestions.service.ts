@@ -178,7 +178,7 @@ export async function rankPlanSuggestionsForCity(
     ? [
         {
           OR: [
-            { sessions: { some: { startsAt: { gte: requestedRange.start, lt: requestedRange.end } } } },
+            { sessions: { some: { startsAt: { gte: requestedRange.start, lt: requestedRange.end }, withdrawnAt: null } } },
             { nextOccurrenceAt: { gte: requestedRange.start, lt: requestedRange.end } },
             {
               AND: [

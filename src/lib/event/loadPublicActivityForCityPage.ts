@@ -72,7 +72,7 @@ export async function loadPublicActivityForCityPage(
       },
       coverImage: { select: { width: true, height: true } },
       sessions: {
-        where: { startsAt: { gte: now } },
+        where: { startsAt: { gte: now }, withdrawnAt: null },
         orderBy: { startsAt: "asc" },
       },
       // SEO fields are scalar fields on Activity, included automatically.
@@ -141,6 +141,7 @@ export async function loadPublicActivityForCityPage(
         where: {
           activityId: activity.id,
           startsAt: { lt: now },
+          withdrawnAt: null,
         },
         orderBy: { startsAt: "desc" },
         select: { startsAt: true },

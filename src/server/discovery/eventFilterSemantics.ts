@@ -134,6 +134,7 @@ export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.Act
       sessions: {
         some: {
           startsAt: { gte: filters.dateRange.start, lt: filters.dateRange.end },
+          withdrawnAt: null,
         },
       },
     });

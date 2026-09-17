@@ -25,6 +25,6 @@ export async function GET(request: NextRequest) {
       adultOnly: p.get("adultOnly") === "true",
     },
   });
-  const sessions = await prisma.activitySession.findMany({ where: { startsAt: { gte: window.start, lt: window.end }, activity: { is: where } }, select: { startsAt: true } });
+  const sessions = await prisma.activitySession.findMany({ where: { startsAt: { gte: window.start, lt: window.end }, withdrawnAt: null, activity: { is: where } }, select: { startsAt: true } });
   return NextResponse.json(countEventSessionsByDay(sessions));
 }
