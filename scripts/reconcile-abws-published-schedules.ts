@@ -1,5 +1,8 @@
 import prisma from "../src/lib/prisma";
-import { ABWS_PARSER_KEY } from "../src/server/modules/import/normalizers/abws-event.normalizer";
+import {
+  ABWS_PARSER_KEY,
+  normalizeAbwsEventPayload,
+} from "../src/server/modules/import/normalizers/abws-event.normalizer";
 import { upsertActivitySessionsFromOccurrences } from "../src/server/modules/import/publish/activity-session-from-occurrences";
 import type { EventImportOccurrence } from "../src/server/modules/import/types";
 
@@ -11,31 +14,50 @@ const PROD_DATABASE = "prodmamago";
 
 type SnapshotOccurrence = EventImportOccurrence & { withdrawnAt?: string | null };
 
-function readOccurrences(value: unknown): SnapshotOccurrence[] | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const raw = (value as Record<string, unknown>).occurrences;
-  if (!Array.isArray(raw)) return null;
+type RawRecordForNormalization = {
+  rawPayload: unknown;
+  sourceUrl: string | null;
+  externalId: string | null;
+  sourceUpdatedAt: Date | null;
+  source: { slug: string };
+};
 
-  const result: SnapshotOccurrence[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
-    const row = item as Record<string, unknown>;
-    result.push({
-      externalId: typeof row.externalId === "string" ? row.externalId : undefined,
-      startAt: typeof row.startAt === "string" ? row.startAt : undefined,
-      buyUrl: typeof row.buyUrl === "string" ? row.buyUrl : undefined,
-      priceMinCents: typeof row.priceMinCents === "number" ? row.priceMinCents : null,
-      priceMaxCents: typeof row.priceMaxCents === "number" ? row.priceMaxCents : null,
-      isSaleOpen: typeof row.isSaleOpen === "boolean" ? row.isSaleOpen : undefined,
-      withdrawnAt:
-        typeof row.withdrawnAt === "string"
-          ? row.withdrawnAt
-          : row.withdrawnAt === null
-            ? null
-            : undefined,
-    });
+/**
+ * Re-normalize the stored raw ABWS snapshot with the CURRENT code instead of
+ * trusting historical normalizedData. Older normalized snapshots predate
+ * lifecycle fields such as withdrawnAt, while rawPayload remains the source
+ * snapshot that the current normalizer knows how to interpret.
+ */
+function normalizeRawOccurrences(
+  record: RawRecordForNormalization,
+): { occurrences: SnapshotOccurrence[] | null; error: string | null } {
+  if (!record.rawPayload || typeof record.rawPayload !== "object" || Array.isArray(record.rawPayload)) {
+    return { occurrences: null, error: "INVALID_RAW_PAYLOAD" };
   }
-  return result;
+
+  try {
+    const result = normalizeAbwsEventPayload({
+      rawPayload: record.rawPayload as Record<string, unknown>,
+      sourceSlug: record.source.slug,
+      sourceUrl: record.sourceUrl ?? "",
+      externalId: record.externalId,
+      sourceUpdatedAt: record.sourceUpdatedAt ?? undefined,
+    });
+
+    if (!Array.isArray(result.normalized.occurrences)) {
+      return { occurrences: null, error: "NO_AUTHORITATIVE_OCCURRENCES" };
+    }
+
+    return {
+      occurrences: result.normalized.occurrences as SnapshotOccurrence[],
+      error: null,
+    };
+  } catch (error) {
+    return {
+      occurrences: null,
+      error: error instanceof Error ? `NORMALIZATION_FAILED:${error.message}` : "NORMALIZATION_FAILED",
+    };
+  }
 }
 
 function nextActiveAt(occurrences: SnapshotOccurrence[], now: Date): string | null {
@@ -69,8 +91,11 @@ async function main() {
     select: {
       id: true,
       externalId: true,
-      normalizedData: true,
+      rawPayload: true,
+      sourceUrl: true,
+      sourceUpdatedAt: true,
       publishedActivityId: true,
+      source: { select: { slug: true } },
       publishedActivity: {
         select: {
           title: true,
@@ -86,11 +111,16 @@ async function main() {
   });
 
   const now = new Date();
-  const plan = [] as Array<Record<string, unknown>>;
+  const plan: Array<Record<string, unknown>> = [];
+  const occurrencesByActivityId = new Map<string, SnapshotOccurrence[]>();
+
   for (const record of records) {
-    const occurrences = readOccurrences(record.normalizedData);
     const activityId = record.publishedActivityId;
     if (!activityId || !record.publishedActivity) continue;
+
+    const normalizedSnapshot = normalizeRawOccurrences(record);
+    const occurrences = normalizedSnapshot.occurrences;
+    if (occurrences) occurrencesByActivityId.set(activityId, occurrences);
 
     const override = await prisma.importFieldOverride.findUnique({
       where: {
@@ -122,9 +152,14 @@ async function main() {
       performanceId: record.externalId,
       activityId,
       title: record.publishedActivity.title,
+      snapshotSource: "rawPayload_reNormalized_with_current_code",
+      snapshotNormalizationError: normalizedSnapshot.error,
       manualLockMode,
       snapshotOccurrences: occurrences?.length ?? null,
+      snapshotWithdrawnOccurrences:
+        occurrences?.filter((occurrence) => Boolean(occurrence.withdrawnAt)).length ?? null,
       dbSourceSessions: sourceSessions.length,
+      dbActiveSourceSessions: sourceSessions.filter((session) => session.withdrawnAt == null).length,
       dbSourceNullSessions: sourceNullSessions.length,
       sourceNullSessionStartsAt: sourceNullSessions.map((session) => session.startsAt.toISOString()),
       missingInDb,
@@ -134,7 +169,7 @@ async function main() {
       actionable,
       blockedReason:
         occurrences === null
-          ? "NO_AUTHORITATIVE_OCCURRENCES"
+          ? normalizedSnapshot.error ?? "NO_AUTHORITATIVE_OCCURRENCES"
           : hasManualOwnership
             ? "MANUAL_OWNERSHIP"
             : sourceNullSessions.length > 0
@@ -162,8 +197,8 @@ async function main() {
       });
       continue;
     }
-    const sourceRecord = records.find((record) => record.publishedActivityId === row.activityId);
-    const occurrences = sourceRecord ? readOccurrences(sourceRecord.normalizedData) : null;
+
+    const occurrences = occurrencesByActivityId.get(row.activityId);
     if (!occurrences) {
       results.push({ activityId: row.activityId, status: "SKIPPED_NO_AUTHORITATIVE_OCCURRENCES" });
       continue;
