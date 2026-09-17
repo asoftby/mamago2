@@ -28,6 +28,8 @@ interface Step4DateTimeProps {
 export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4DateTimeProps) {
   const [importedScheduleItems, setImportedScheduleItems] = useState<string[]>([]);
   const [scheduleReadOnly, setScheduleReadOnly] = useState(false);
+  const [manualTakeoverPending, setManualTakeoverPending] = useState(false);
+  const [manualTakeoverError, setManualTakeoverError] = useState<string | null>(null);
   const scheduleItems =
     Array.isArray(data.scheduleItems) && data.scheduleItems.length > 0
       ? data.scheduleItems
@@ -52,6 +54,44 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
       repeatUnit: firstItem.recurrenceUnit,
       repeatUntil: firstItem.recurrenceUntil,
     });
+  };
+
+  const enableManualSchedule = async () => {
+    if (!eventId || manualTakeoverPending || !isEditable) return;
+
+    setManualTakeoverPending(true);
+    setManualTakeoverError(null);
+    try {
+      const response = await fetch(`/api/business/events/${eventId}/schedule-source/manual`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { scheduleItems?: EventScheduleItem[]; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Не удалось включить ручное редактирование расписания");
+      }
+
+      const nextItems = Array.isArray(payload?.scheduleItems) ? payload.scheduleItems : [];
+      if (nextItems.length === 0) {
+        throw new Error("Источник не вернул сеансы для редактирования");
+      }
+
+      // The server has atomically switched schedule ownership to PREFER_MANUAL
+      // and removed import identity from the current ActivitySession rows.
+      // Seed the wizard with exactly those existing occurrences; the ordinary
+      // PATCH flow can now save edits without destroying import metadata.
+      handleScheduleItemsChange(nextItems);
+      setScheduleReadOnly(false);
+    } catch (error) {
+      setManualTakeoverError(
+        error instanceof Error ? error.message : "Не удалось включить ручное редактирование расписания",
+      );
+    } finally {
+      setManualTakeoverPending(false);
+    }
   };
 
   useEffect(() => {
@@ -128,11 +168,11 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
 
       {scheduleReadOnly ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-          <h3 className="text-sm font-semibold text-amber-950">Расписание из источника — не редактируется</h3>
+          <h3 className="text-sm font-semibold text-amber-950">Расписание получено из источника</h3>
           <p className="mt-1 text-[12px] text-amber-900/80">
-            Сеансы для этого события ведёт источник импорта. Здесь их нельзя изменить —
-            правки в этой форме не сохранятся. Чтобы убрать или изменить конкретный сеанс,
-            обратитесь к администратору импорта.
+            Сейчас сеансы защищены от случайной перезаписи. Если расписание нужно исправить вручную,
+            переключите это событие в ручной режим. После переключения импорт больше не будет менять
+            расписание этого события.
           </p>
 
           <div className="mt-4 space-y-2">
@@ -163,6 +203,25 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
               </button>
             ) : null}
           </div>
+
+          {isEditable ? (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={enableManualSchedule}
+                disabled={manualTakeoverPending}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-900 px-4 text-sm font-medium text-white transition hover:bg-amber-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {manualTakeoverPending ? "Переключаем…" : "Редактировать расписание вручную"}
+              </button>
+              <p className="mt-2 text-[11px] text-amber-900/70">
+                Текущие даты и время будут перенесены в форму. Неизменённые ссылки на билеты и цены сохранятся.
+              </p>
+              {manualTakeoverError ? (
+                <p className="mt-2 text-[12px] font-medium text-red-700">{manualTakeoverError}</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : (
         <>
@@ -172,7 +231,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
                 <div>
                   <h3 className="text-sm font-semibold text-sky-950">Даты и время из источника</h3>
                   <p className="mt-1 text-[12px] text-sky-900/70">
-                    Это данные, которые парсер уже нашёл в источнике. Их можно использовать как ориентир при ручной проверке.
+                    Это исходные данные импорта. Расписание ниже уже находится под ручным управлением.
                   </p>
                 </div>
               </div>
