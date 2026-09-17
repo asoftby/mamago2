@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       },
       select: {
         sessions: {
-          where: { startsAt: { gte: now } },
+          where: { startsAt: { gte: now }, withdrawnAt: null },
           orderBy: { startsAt: "asc" },
           select: { startsAt: true },
         },
