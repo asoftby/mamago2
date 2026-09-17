@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   const windowStart = new Date(`${addDaysLocal(date, -1)}T00:00:00.000Z`);
   const windowEnd = new Date(`${addDaysLocal(date, 2)}T00:00:00.000Z`);
   const sessions = activityIds.length === 0 ? [] : await prisma.activitySession.findMany({
-    where: { activityId: { in: activityIds }, startsAt: { gte: windowStart, lt: windowEnd } },
+    where: { activityId: { in: activityIds }, startsAt: { gte: windowStart, lt: windowEnd }, withdrawnAt: null },
     select: { id: true, activityId: true, startsAt: true },
     orderBy: { startsAt: "asc" },
   });
