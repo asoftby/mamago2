@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
 
-import { buildActivitySessionUpsertArgs } from "./activity-session-from-occurrences";
+import {
+  buildActivitySessionUpsertArgs,
+  shouldApplyImportedScheduleSessions,
+} from "./activity-session-from-occurrences";
 import { ABWS_PARSER_KEY } from "../normalizers/abws-event.normalizer";
 import type { EventImportOccurrence } from "../types";
+
+// ── manual schedule ownership blocks later import-session recreation
+assert.equal(shouldApplyImportedScheduleSessions(undefined), true);
+assert.equal(shouldApplyImportedScheduleSessions(null), true);
+assert.equal(shouldApplyImportedScheduleSessions("PREFER_IMPORT"), true);
+assert.equal(shouldApplyImportedScheduleSessions("PREFER_MANUAL"), false);
+assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
 
 // ── happy path: full occurrence -> full upsert args, keyed on source+externalId
 {
