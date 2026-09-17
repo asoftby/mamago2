@@ -120,26 +120,26 @@ export async function GET(
   });
   if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Sessions with a non-null `source` come from an import pipeline (ABWS
-  // today), not from this wizard's own scheduleItems/dates model. Withdrawn
-  // source sessions are historical lifecycle rows and must not be offered as
-  // current schedule entries.
-  const importedSessions = await prisma.activitySession.findMany({
-    where: { activityId, source: { not: null }, withdrawnAt: null },
+  // A non-null `source` means the import pipeline still owns the schedule.
+  // Keep that ownership even when every current source session is withdrawn:
+  // falling through to readOnly:false would show an editable form whose normal
+  // PATCH path is still protected from touching import-owned rows.
+  const sourceOwnedSessions = await prisma.activitySession.findMany({
+    where: { activityId, source: { not: null } },
     orderBy: { startsAt: "asc" },
-    select: { startsAt: true },
+    select: { startsAt: true, withdrawnAt: true },
   });
 
-  if (importedSessions.length > 0) {
+  if (sourceOwnedSessions.length > 0) {
     const dateFormatter = new Intl.DateTimeFormat("ru-BY", {
       day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Minsk",
     });
     const timeFormatter = new Intl.DateTimeFormat("ru-BY", {
       hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Minsk",
     });
-    const items = importedSessions.map(
-      (s) => `${dateFormatter.format(s.startsAt)}, ${timeFormatter.format(s.startsAt)}`,
-    );
+    const items = sourceOwnedSessions
+      .filter((session) => session.withdrawnAt == null)
+      .map((session) => `${dateFormatter.format(session.startsAt)}, ${timeFormatter.format(session.startsAt)}`);
     return NextResponse.json({ items, readOnly: true });
   }
 
