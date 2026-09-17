@@ -8,6 +8,7 @@ import {
   LEGACY_EDITORIAL_ROUTE_EXCLUDED_SLUG,
   LEGACY_EDITORIAL_ROUTE_SLUGS,
 } from "../src/lib/routes/legacyEditorialRouteCutover";
+import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
 import { resolveStoredMediaPath } from "../src/server/media/media-storage";
 
 const APPLY = process.argv.includes("--apply");
@@ -41,10 +42,26 @@ function isProductionEnvironment(): boolean {
 }
 
 async function inspectState() {
-  const city = await prismaBase.city.findUnique({
-    where: { slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG },
-    select: { id: true, slug: true, name: true },
+  const cityCandidates = await prismaBase.city.findMany({
+    where: {
+      slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG,
+      country: { isoCode: DEFAULT_COUNTRY_ISO },
+      isLegacyNonCity: false,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      countryId: true,
+      isActive: true,
+      isLegacyNonCity: true,
+      country: { select: { isoCode: true } },
+    },
+    orderBy: { id: "asc" },
+    take: 2,
   });
+  const city = cityCandidates.length === 1 ? cityCandidates[0] : null;
 
   const routes = await prismaBase.route.findMany({
     where: { slug: { in: [...LEGACY_EDITORIAL_ROUTE_SLUGS] } },
@@ -167,7 +184,17 @@ async function inspectState() {
   const problems: string[] = [];
   const warnings: string[] = [];
 
-  if (!city) problems.push("TARGET_CITY_MISSING:minsk");
+  if (cityCandidates.length === 0) {
+    problems.push(
+      `TARGET_CITY_MISSING:${DEFAULT_COUNTRY_ISO}/${LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG}`,
+    );
+  } else if (cityCandidates.length > 1) {
+    problems.push(
+      `TARGET_CITY_AMBIGUOUS:${DEFAULT_COUNTRY_ISO}/${LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG}:${cityCandidates
+        .map((candidate) => `${candidate.id}/${candidate.country.isoCode}`)
+        .join(",")}`,
+    );
+  }
   if (routes.length !== EXPECTED_COUNT) {
     problems.push(`ROUTE_COUNT:${routes.length}/${EXPECTED_COUNT}`);
   }
@@ -234,6 +261,7 @@ async function inspectState() {
     mode: APPLY ? "APPLY" : "PLAN",
     expectedCount: EXPECTED_COUNT,
     city,
+    cityCandidates,
     routes,
     excludedRoute,
     articles: articles.map(({ contentJson: _contentJson, ...article }) => article),
