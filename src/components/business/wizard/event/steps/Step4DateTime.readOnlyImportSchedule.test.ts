@@ -5,12 +5,19 @@
  * cannot silently destroy source metadata. Editors must explicitly switch the
  * schedule to manual ownership; only after that server-side takeover succeeds
  * does the normal EventScheduleList become active.
+ *
+ * This test is part of test:abws-readonly-import-schedule, so it also checks
+ * the server takeover boundary to keep UI and write-side protection coupled.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync(
   "src/components/business/wizard/event/steps/Step4DateTime.tsx",
+  "utf8",
+);
+const manualRouteSource = readFileSync(
+  "src/app/api/business/events/[id]/schedule-source/manual/route.ts",
   "utf8",
 );
 
@@ -58,6 +65,42 @@ assert.equal(
   source.indexOf("<EventScheduleList", eventScheduleListIndex + 1),
   -1,
   "EventScheduleList must be rendered exactly once",
+);
+
+assert.match(
+  manualRouteSource,
+  /canManageActivityById\(user, activityId\)/,
+  "manual takeover must use normal event authorization",
+);
+assert.match(
+  manualRouteSource,
+  /prisma\.\$transaction\(\[/,
+  "override, schedule seeding and session identity handoff must be atomic",
+);
+assert.match(
+  manualRouteSource,
+  /fieldName:\s*"scheduleJson"[\s\S]*?lockMode:\s*"PREFER_MANUAL"/,
+  "takeover must persist manual ownership so later imports cannot overwrite schedule",
+);
+assert.match(
+  manualRouteSource,
+  /data:\s*\{\s*source:\s*null,\s*externalId:\s*null\s*}/,
+  "takeover must clear import identity from current ActivitySession rows",
+);
+assert.doesNotMatch(
+  manualRouteSource,
+  /data:\s*\{[^}]*buyUrl:\s*null/,
+  "takeover must not wipe ticket URLs",
+);
+assert.doesNotMatch(
+  manualRouteSource,
+  /data:\s*\{[^}]*priceMinCents:\s*null/,
+  "takeover must not wipe imported prices",
+);
+assert.match(
+  manualRouteSource,
+  /scheduleItems,\s*\n\s*manualOverride:\s*true/,
+  "endpoint must return seeded editable schedule rows to the wizard",
 );
 
 console.log("Step4DateTime imported schedule manual takeover wiring test: OK");
