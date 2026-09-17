@@ -4,12 +4,10 @@
  * cookies() call needs a real Next.js request scope, so the handler can't be
  * invoked directly here).
  *
- * Regression target: when an activity has an ACTIVE ActivitySession with a
- * non-null `source` (import-created, e.g. ABWS), this endpoint must report
- * those sessions with readOnly: true, and must not fall through to the
- * normalizedData/rawPayload-derived (editable) branch. Withdrawn imported
- * sessions are lifecycle history and must not appear as current schedule.
- * Ordinary business/family.by events keep readOnly: false.
+ * Regression target: any non-null `source` ActivitySession means the import
+ * pipeline still owns this schedule, even if every source row has already
+ * been withdrawn. The endpoint must keep readOnly: true while displaying only
+ * active source rows. Ordinary business/family.by events keep readOnly: false.
  *
  * Запуск: npx tsx "src/app/api/business/events/[id]/schedule-source/route.test.ts"
  */
@@ -20,20 +18,32 @@ const source = readFileSync("src/app/api/business/events/[id]/schedule-source/ro
 
 assert.match(
   source,
-  /const importedSessions = await prisma\.activitySession\.findMany\(\{\s*\n\s*where:\s*\{\s*activityId,\s*source:\s*\{\s*not:\s*null\s*\},\s*withdrawnAt:\s*null\s*\},/,
-  "must look up only active ActivitySession rows with a non-null source before falling back to import-record text extraction",
+  /const sourceOwnedSessions = await prisma\.activitySession\.findMany\(\{\s*\n\s*where:\s*\{\s*activityId,\s*source:\s*\{\s*not:\s*null\s*\}\s*\},/,
+  "must detect source ownership from all imported ActivitySession rows, including withdrawn history",
 );
 
 assert.match(
   source,
-  /if \(importedSessions\.length > 0\) \{/,
-  "must branch on the presence of active imported sessions",
+  /select:\s*\{\s*startsAt:\s*true,\s*withdrawnAt:\s*true\s*\}/,
+  "must load lifecycle state so withdrawn rows can be hidden without dropping source ownership",
+);
+
+assert.match(
+  source,
+  /if \(sourceOwnedSessions\.length > 0\) \{/,
+  "must keep the schedule protected whenever any source-owned session exists",
+);
+
+assert.match(
+  source,
+  /sourceOwnedSessions\s*\n\s*\.filter\(\(session\) => session\.withdrawnAt == null\)/,
+  "must display only active source sessions",
 );
 
 assert.match(
   source,
   /return NextResponse\.json\(\{ items, readOnly: true \}\);/,
-  "active imported-session branch must report readOnly: true",
+  "source-owned schedule branch must report readOnly: true even when items is empty",
 );
 
 assert.match(
