@@ -20,6 +20,10 @@ export default defineConfig({
       "scripts/legacy-routes-to-articles-cutover.ts",
     "ops/legacy-editorial-routes-to-articles-migration":
       "scripts/legacy-editorial-routes-to-articles-migration.ts",
+    "ops/legacy-routes-current-to-articles-migration":
+      "scripts/legacy-routes-current-to-articles-migration.ts",
+    "ops/legacy-routes-current-to-articles-cutover":
+      "scripts/legacy-routes-current-to-articles-cutover.ts",
   },
   format: ["cjs"],
   platform: "node",
