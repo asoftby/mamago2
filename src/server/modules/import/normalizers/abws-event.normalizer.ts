@@ -20,7 +20,7 @@
  */
 
 import type { EventNormalizerInput, EventNormalizerOutput } from "./event.normalizer";
-import type { EventImportOccurrence, NormalizedEventImport } from "../types";
+import type { NormalizedEventImport } from "../types";
 import type { AbwsPerformanceRawPayload, AbwsPerformanceType } from "../parsers/abws-performances-event.parser";
 
 /** Dispatch key — kept local so normalizing this source doesn't require importing from parsers/. */
@@ -102,7 +102,10 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
   const shortDescCandidate = description ? deriveShortDesc(description) : undefined;
   if (!shortDescCandidate) warnings.push("shortDescCandidate missing");
 
-  const occurrences: EventImportOccurrence[] = payload.sessions.map((session) => ({
+  // Preserve the complete source snapshot, including withdrawn sessions. The
+  // publish layer needs lifecycle state to withdraw/re-activate ActivitySession
+  // rows without deleting their source identity.
+  const occurrences = payload.sessions.map((session) => ({
     externalId: session.externalId,
     startAt: session.startsAt,
     venueName: session.venue?.name ?? undefined,
@@ -113,24 +116,29 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
     priceMaxCents: session.priceMaxCents,
     buyUrl: session.buyUrl ?? undefined,
     isSaleOpen: session.isSaleOpen ?? undefined,
+    withdrawnAt: session.withdrawnAt ?? null,
   }));
 
-  // Best-effort "first occurrence" for consumers not yet reading
-  // occurrences[] (e.g. an admin preview card). Not authoritative for
-  // multi-session events — occurrences[] is.
-  const first = payload.sessions[0];
+  // Flat fields are only a compatibility representation. They must point to
+  // the earliest ACTIVE session, not simply sessions[0]: the first session can
+  // already be in the past or withdrawn while later sessions remain valid.
+  const activeSessions = payload.sessions
+    .filter((session) => !session.withdrawnAt)
+    .slice()
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  const first = activeSessions[0];
   const venueName = first?.venue?.name ?? undefined;
   const addressText = first?.venue?.address ?? undefined;
   const cityName = first?.venue?.city?.slug ?? undefined;
-  const startAt = first?.startsAt ?? payload.showFrom ?? undefined;
+  const startAt = first?.startsAt ?? (payload.sessions.length === 0 ? payload.showFrom ?? undefined : undefined);
 
   if (!venueName && !addressText) warnings.push("venue and address both missing");
   if (!cityName) warnings.push("city missing");
   if (!startAt) warnings.push("startAt missing");
 
   // Performance-level fallback price, rubles (§2.4) — only used when there
-  // are no sessions to read a per-session price from; never mixed with the
-  // per-session kopeck values above via a shared conversion function.
+  // are no active sessions to read a per-session price from; never mixed with
+  // the per-session kopeck values above via a shared conversion function.
   const priceText = first ? undefined : formatRub(payload.perfPriceMinRub);
 
   // Human-readable "Name (id)" labels for the reviewer, not bare numeric
@@ -169,7 +177,7 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
     // possibilities the way the generic normalizer's extraction is.
     typeCandidate: "EVENT",
     formatCandidate: "OFFLINE",
-    scheduleModeCandidate: occurrences.length > 1 ? "MULTI_DATE" : "ONE_TIME",
+    scheduleModeCandidate: activeSessions.length > 1 ? "MULTI_DATE" : "ONE_TIME",
     venueName,
     addressText,
     cityName,
@@ -179,7 +187,9 @@ export function normalizeAbwsEventPayload(input: EventNormalizerInput): EventNor
     categoryCandidates,
     ...(otherCategoryCandidates ? { otherCategoryCandidates } : {}),
     imageUrls: payload.images,
-    ...(occurrences.length > 0 ? { occurrences } : {}),
+    // ABWS snapshots are authoritative even when the array is empty. Keeping
+    // [] lets the publish layer reconcile previously stored sessions away.
+    occurrences,
     ...(payload.perfBuyUrl ? { performanceBuyUrl: payload.perfBuyUrl } : {}),
   };
 
