@@ -3,7 +3,8 @@
  * raw ImportedRecord → normalizedData + qualityScore
  *
  * Поддерживает PLACE и EVENT.
- * Не делает matching, не делает publish.
+ * Не делает matching. Для уже опубликованных ABWS EVENT выполняет узкую
+ * синхронизацию расписания (ActivitySession + nextOccurrenceAt), не полный publish.
  */
 
 import prisma from "@/lib/prisma";
@@ -157,25 +158,40 @@ async function normalizeEventRecord(
     // ImportedRecord again (that entrypoint intentionally refuses already-
     // linked records). This auto-sync is deliberately narrow: sessions and
     // nextOccurrenceAt only. Titles/descriptions/prices/etc. remain under the
-    // existing review/non-destructive rules. The session helper also respects
-    // PREFER_MANUAL/LOCKED schedule ownership.
+    // existing review/non-destructive rules.
     if (
       source.parserKey === ABWS_PARSER_KEY &&
       record.publishedActivityId &&
       Array.isArray(normalized.occurrences)
     ) {
-      const scheduleSync = await upsertActivitySessionsFromOccurrences(
-        record.publishedActivityId,
-        normalized.occurrences,
-      );
-      if (scheduleSync.blockedByManualOverride) {
-        warnings.push("published ABWS schedule sync skipped: schedule is manually owned");
-      }
-      if (scheduleSync.skipped > 0) {
-        warnings.push(`${scheduleSync.skipped} occurrence(s) skipped: missing externalId or startAt`);
-      }
-      if (scheduleSync.withdrawnMissing > 0) {
-        warnings.push(`${scheduleSync.withdrawnMissing} disappeared source session(s) marked withdrawn`);
+      // Fail closed on mixed/legacy ownership. A clean imported ABWS Activity
+      // has source-owned sessions (or zero sessions during its first publish).
+      // source=NULL rows can be real manual edits or the historical #298
+      // destructive-resync artifact; blindly adding source rows on top would
+      // create a mixed duplicate schedule. The guarded reconcile operation can
+      // inspect and repair that state explicitly.
+      const sourceNullSessions = await prisma.activitySession.count({
+        where: { activityId: record.publishedActivityId, source: null },
+      });
+
+      if (sourceNullSessions > 0) {
+        warnings.push(
+          `published ABWS schedule auto-sync skipped: ${sourceNullSessions} source-null session(s) require guarded reconcile`,
+        );
+      } else {
+        const scheduleSync = await upsertActivitySessionsFromOccurrences(
+          record.publishedActivityId,
+          normalized.occurrences,
+        );
+        if (scheduleSync.blockedByManualOverride) {
+          warnings.push("published ABWS schedule sync skipped: schedule is manually owned");
+        }
+        if (scheduleSync.skipped > 0) {
+          warnings.push(`${scheduleSync.skipped} occurrence(s) skipped: missing externalId or startAt`);
+        }
+        if (scheduleSync.withdrawnMissing > 0) {
+          warnings.push(`${scheduleSync.withdrawnMissing} disappeared source session(s) marked withdrawn`);
+        }
       }
 
       if (warnings.length > 0) {
