@@ -93,7 +93,7 @@ export async function listPlanItemsByDateForScenario(
         select: {
           ...scenarioActivitySelect,
           sessions: {
-            where: { startsAt: { gte: windowStart, lt: windowEnd } },
+            where: { startsAt: { gte: windowStart, lt: windowEnd }, withdrawnAt: null },
             select: { id: true, startsAt: true },
           },
         },
@@ -145,7 +145,7 @@ export async function listActivitySessionsForPlanItems(
   const activityIds = [...new Set(pending.map((item) => item.activityId))];
 
   const sessions = await prisma.activitySession.findMany({
-    where: { activityId: { in: activityIds }, startsAt: { gte: windowStart, lt: windowEnd } },
+    where: { activityId: { in: activityIds }, startsAt: { gte: windowStart, lt: windowEnd }, withdrawnAt: null },
     select: { activityId: true, startsAt: true },
   });
 
