@@ -8,6 +8,7 @@ import {
   LEGACY_EDITORIAL_ROUTE_EXCLUDED_SLUG,
   LEGACY_EDITORIAL_ROUTE_SLUGS,
 } from "../src/lib/routes/legacyEditorialRouteCutover";
+import { DEFAULT_COUNTRY_ISO } from "../src/server/geo/geoConstants";
 import { resolveStoredMediaPath } from "../src/server/media/media-storage";
 
 const APPLY = process.argv.includes("--apply");
@@ -42,8 +43,21 @@ function isProductionEnvironment(): boolean {
 
 async function inspectState() {
   const cityCandidates = await prismaBase.city.findMany({
-    where: { slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG },
-    select: { id: true, slug: true, name: true, countryId: true },
+    where: {
+      slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG,
+      country: { isoCode: DEFAULT_COUNTRY_ISO },
+      isLegacyNonCity: false,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      countryId: true,
+      isActive: true,
+      isLegacyNonCity: true,
+      country: { select: { isoCode: true } },
+    },
     orderBy: { id: "asc" },
     take: 2,
   });
@@ -171,11 +185,13 @@ async function inspectState() {
   const warnings: string[] = [];
 
   if (cityCandidates.length === 0) {
-    problems.push(`TARGET_CITY_MISSING:${LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG}`);
+    problems.push(
+      `TARGET_CITY_MISSING:${DEFAULT_COUNTRY_ISO}/${LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG}`,
+    );
   } else if (cityCandidates.length > 1) {
     problems.push(
-      `TARGET_CITY_AMBIGUOUS:${LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG}:${cityCandidates
-        .map((candidate) => `${candidate.id}/${candidate.countryId}`)
+      `TARGET_CITY_AMBIGUOUS:${DEFAULT_COUNTRY_ISO}/${LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG}:${cityCandidates
+        .map((candidate) => `${candidate.id}/${candidate.country.isoCode}`)
         .join(",")}`,
     );
   }
