@@ -13,10 +13,21 @@
  * even imported from a code path that runs for them.
  */
 
-import type { Prisma } from "@prisma/client";
+import type { ImportFieldLockMode, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { ABWS_PARSER_KEY } from "../normalizers/abws-event.normalizer";
 import type { EventImportOccurrence } from "../types";
+
+/**
+ * Manual ownership of scheduleJson must also own ActivitySession rows.
+ * Otherwise a later re-apply of the same imported record would recreate the
+ * source sessions after an editor changed the schedule in the wizard.
+ */
+export function shouldApplyImportedScheduleSessions(
+  lockMode: ImportFieldLockMode | null | undefined,
+): boolean {
+  return lockMode !== "PREFER_MANUAL" && lockMode !== "LOCKED";
+}
 
 /**
  * Pure mapping: one occurrence -> the args for a single
@@ -66,7 +77,27 @@ export function buildActivitySessionUpsertArgs(
 export async function upsertActivitySessionsFromOccurrences(
   activityId: string,
   occurrences: EventImportOccurrence[],
-): Promise<{ upserted: number; skipped: number }> {
+): Promise<{ upserted: number; skipped: number; blockedByManualOverride: boolean }> {
+  const override = await prisma.importFieldOverride.findUnique({
+    where: {
+      entityType_entityId_fieldName: {
+        entityType: "EVENT",
+        entityId: activityId,
+        fieldName: "scheduleJson",
+      },
+    },
+    select: { lockMode: true },
+  });
+
+  if (!shouldApplyImportedScheduleSessions(override?.lockMode)) {
+    console.info("[import-sessions] skipped — schedule is manually owned", {
+      activityId,
+      lockMode: override?.lockMode,
+      occurrencesCount: occurrences.length,
+    });
+    return { upserted: 0, skipped: 0, blockedByManualOverride: true };
+  }
+
   let upserted = 0;
   let skipped = 0;
 
@@ -80,5 +111,5 @@ export async function upsertActivitySessionsFromOccurrences(
     upserted++;
   }
 
-  return { upserted, skipped };
+  return { upserted, skipped, blockedByManualOverride: false };
 }
