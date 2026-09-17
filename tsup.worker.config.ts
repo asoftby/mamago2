@@ -14,6 +14,8 @@ export default defineConfig({
     "worker/index": "src/worker/index.ts",
     "ops/resync-event-sessions-from-schedule-json":
       "scripts/resync-event-sessions-from-schedule-json.ts",
+    "ops/legacy-routes-to-articles-cutover":
+      "scripts/legacy-routes-to-articles-cutover.ts",
   },
   format: ["cjs"],
   platform: "node",
