@@ -31,6 +31,10 @@ const reviewSource = readFileSync(
   "src/components/business/wizard/event/steps/Step9Review.tsx",
   "utf8",
 );
+const editPageSource = readFileSync(
+  "src/app/(content-editor)/editor/event/[id]/edit/page.tsx",
+  "utf8",
+);
 
 assert.match(
   source,
@@ -131,9 +135,29 @@ assert.match(
 );
 
 assert.match(
+  editPageSource,
+  /where:\s*\{ activityId: event\.id, source: \{ not: null \} \}/,
+  "edit page must derive source-owned schedule state on the server",
+);
+assert.match(
+  editPageSource,
+  /initialScheduleSourceState=\{initialScheduleSourceState\}/,
+  "server-derived schedule ownership must seed EventWizard",
+);
+assert.match(
+  wizardSource,
+  /useState<ScheduleSourceState>\(\s*initialScheduleSourceState,\s*\)/,
+  "EventWizard must initialize validation from the server-derived schedule state",
+);
+assert.match(
+  wizardSource,
+  /setScheduleSourceState\(initialScheduleSourceState\)/,
+  "client preload must fall back to the server-derived schedule state instead of clearing it",
+);
+assert.match(
   wizardSource,
   /fetch\(`\/api\/business\/events\/\$\{eventId\}\/schedule-source`/,
-  "EventWizard must preload imported schedule ownership so a direct review-step load validates correctly",
+  "EventWizard must refresh imported schedule ownership on the client",
 );
 assert.match(
   wizardSource,
