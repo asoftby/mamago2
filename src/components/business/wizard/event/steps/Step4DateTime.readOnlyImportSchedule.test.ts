@@ -14,7 +14,6 @@ import { readFileSync } from "node:fs";
 
 import { getDefaultFormData } from "../defaults";
 import { validateForSubmit, validateStep } from "../validation";
-import type { EventFormData } from "../types";
 
 const source = readFileSync(
   "src/components/business/wizard/event/steps/Step4DateTime.tsx",
