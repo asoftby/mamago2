@@ -118,6 +118,8 @@ interface EventWizardProps {
   /** Pre-fetched AI enrichment (from server) — cached, no auto-fetch */
   initialAiEnrichment?: import("@/lib/ai/enrichEvent").EnrichmentResult | null;
   ctaStepEnabled?: boolean;
+  /** Server-derived source-owned schedule state for first render/review-step validation. */
+  initialScheduleSourceState?: ScheduleSourceState;
 }
 
 const LOCAL_STORAGE_KEY = "event-wizard-draft";
@@ -347,10 +349,9 @@ function EventWizardInner({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [scheduleSourceState, setScheduleSourceState] = useState<ScheduleSourceState>({
-    readOnly: false,
-    itemCount: 0,
-  });
+  const [scheduleSourceState, setScheduleSourceState] = useState<ScheduleSourceState>(
+    initialScheduleSourceState,
+  );
   const handleScheduleSourceStateChange = useCallback((state: ScheduleSourceState) => {
     setScheduleSourceState(state);
   }, []);
@@ -381,7 +382,7 @@ function EventWizardInner({
     }
 
     let cancelled = false;
-    setScheduleSourceState({ readOnly: false, itemCount: 0 });
+    setScheduleSourceState(initialScheduleSourceState);
 
     void (async () => {
       try {
@@ -398,14 +399,15 @@ function EventWizardInner({
           itemCount: items.length,
         });
       } catch {
-        // Step 5 will retry the same endpoint when opened.
+        // Keep the server-derived state. Step 5 will retry the same endpoint
+        // when opened, but direct review-step validation must remain correct.
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
+  }, [eventId, initialScheduleSourceState]);
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveDialogBusy, setLeaveDialogBusy] = useState(false);
