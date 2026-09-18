@@ -19,6 +19,10 @@ export class SearchIndexerService {
 
   constructor(private readonly db: PrismaClient) {}
 
+  async drain(): Promise<void> {
+    await this.queue.drain();
+  }
+
   private enqueue(
     entityLabel: string,
     entityId: string,

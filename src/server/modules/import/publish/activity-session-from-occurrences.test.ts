@@ -143,6 +143,10 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
     "src/server/modules/import/services/import-normalization.service.ts",
     "utf8",
   );
+  const reconcileCliSource = readFileSync(
+    "scripts/reconcile-abws-published-schedules.ts",
+    "utf8",
+  );
   assert.match(
     normalizationSource,
     /source\.parserKey === ABWS_PARSER_KEY[\s\S]*?record\.publishedActivityId[\s\S]*?Array\.isArray\(normalized\.occurrences\)/,
@@ -157,6 +161,11 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
     normalizationSource,
     /if \(sourceNullSessions > 0\)[\s\S]*?else \{[\s\S]*?upsertActivitySessionsFromOccurrences\(/,
     "source-null legacy/manual state must fail closed before ABWS session sync",
+  );
+  assert.match(
+    reconcileCliSource,
+    /APPLY_RESULT[\s\S]*?await searchIndexer\.drain\(\)/,
+    "ABWS reconciliation CLI must drain fire-and-forget search writes before Prisma disconnect",
   );
 }
 
