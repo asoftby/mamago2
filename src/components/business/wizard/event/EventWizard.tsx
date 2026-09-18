@@ -285,6 +285,7 @@ function EventWizardInner({
   importedRecordId,
   initialAiEnrichment,
   ctaStepEnabled,
+  initialScheduleSourceState = { readOnly: false, itemCount: 0 },
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
