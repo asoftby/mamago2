@@ -76,10 +76,18 @@ export default async function EditorEditEventPage({
     selectedCategoryId: eventForWizard?.eventCategoryId ?? null,
   });
 
-
   if (!event || !eventForWizard) {
     notFound();
   }
+
+  const sourceOwnedScheduleRows = await prisma.activitySession.findMany({
+    where: { activityId: event.id, source: { not: null } },
+    select: { withdrawnAt: true },
+  });
+  const initialScheduleSourceState = {
+    readOnly: sourceOwnedScheduleRows.length > 0,
+    itemCount: sourceOwnedScheduleRows.filter((row) => row.withdrawnAt == null).length,
+  };
 
   if (!(await canEditEventActivity(user, event))) {
     if (user.role === "BUSINESS_OWNER") {
@@ -229,6 +237,7 @@ export default async function EditorEditEventPage({
         initialStep1Taxonomies={initialStep1Taxonomies}
         importedRecordId={resolvedImportedRecordId}
         ctaStepEnabled={ctaStepEnabled}
+        initialScheduleSourceState={initialScheduleSourceState}
       />
     </ContentEditorChrome>
   );

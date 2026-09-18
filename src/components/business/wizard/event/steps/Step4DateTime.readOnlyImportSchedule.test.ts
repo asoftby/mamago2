@@ -12,6 +12,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+import { getDefaultFormData } from "../defaults";
+import { validateForSubmit, validateStep } from "../validation";
+
 const source = readFileSync(
   "src/components/business/wizard/event/steps/Step4DateTime.tsx",
   "utf8",
@@ -20,11 +23,23 @@ const manualRouteSource = readFileSync(
   "src/app/api/business/events/[id]/schedule-source/manual/route.ts",
   "utf8",
 );
+const wizardSource = readFileSync(
+  "src/components/business/wizard/event/EventWizard.tsx",
+  "utf8",
+);
+const reviewSource = readFileSync(
+  "src/components/business/wizard/event/steps/Step9Review.tsx",
+  "utf8",
+);
+const editPageSource = readFileSync(
+  "src/app/(content-editor)/editor/event/[id]/edit/page.tsx",
+  "utf8",
+);
 
 assert.match(
   source,
-  /setScheduleReadOnly\(payload\.readOnly === true\)/,
-  "must derive protected state from schedule-source readOnly",
+  /const readOnly = payload\.readOnly === true;[\s\S]*?setScheduleReadOnly\(readOnly\);[\s\S]*?onScheduleSourceStateChange\?\.\(\{ readOnly, itemCount: items\.length \}\);/,
+  "must report protected schedule ownership and active item count to the parent wizard",
 );
 assert.match(
   source,
@@ -33,8 +48,8 @@ assert.match(
 );
 assert.match(
   source,
-  /handleScheduleItemsChange\(nextItems\);\s*\n\s*setScheduleReadOnly\(false\);/,
-  "must seed the wizard from server-returned sessions before unlocking the editor",
+  /handleScheduleItemsChange\(nextItems\);\s*\n\s*setScheduleReadOnly\(false\);\s*\n\s*onScheduleSourceStateChange\?\.\(\{ readOnly: false, itemCount: nextItems\.length \}\);/,
+  "must seed the wizard and clear authoritative ownership after explicit manual takeover",
 );
 assert.match(
   source,
@@ -119,4 +134,85 @@ assert.match(
   "endpoint must return seeded editable schedule rows to the wizard",
 );
 
-console.log("Step4DateTime imported schedule manual takeover wiring test: OK");
+assert.match(
+  editPageSource,
+  /where:\s*\{ activityId: event\.id, source: \{ not: null \} \}/,
+  "edit page must derive source-owned schedule state on the server",
+);
+assert.match(
+  editPageSource,
+  /initialScheduleSourceState=\{initialScheduleSourceState\}/,
+  "server-derived schedule ownership must seed EventWizard",
+);
+assert.match(
+  wizardSource,
+  /useState<ScheduleSourceState>\(\s*initialScheduleSourceState,\s*\)/,
+  "EventWizard must initialize validation from the server-derived schedule state",
+);
+assert.match(
+  wizardSource,
+  /setScheduleSourceState\(initialScheduleSourceState\)/,
+  "client preload must fall back to the server-derived schedule state instead of clearing it",
+);
+assert.match(
+  wizardSource,
+  /fetch\(`\/api\/business\/events\/\$\{eventId\}\/schedule-source`/,
+  "EventWizard must refresh imported schedule ownership on the client",
+);
+assert.match(
+  wizardSource,
+  /onScheduleSourceStateChange=\{handleScheduleSourceStateChange\}/,
+  "EventWizard must also receive ownership changes from Step4DateTime/manual takeover",
+);
+assert.match(
+  wizardSource,
+  /validateStep\(currentStep, formData, validationContext\)/,
+  "continue-button validation must use imported schedule context",
+);
+assert.match(
+  wizardSource,
+  /validateForSubmit\(formData, validationContext\)/,
+  "final submit validation must use imported schedule context",
+);
+assert.match(
+  reviewSource,
+  /validateForSubmit\(data, validationContext\)/,
+  "review-step validation must use imported schedule context",
+);
+
+{
+  const data = getDefaultFormData();
+  const manual = validateStep(5, data);
+  assert.equal(manual.isComplete, false, "empty manual schedule must remain incomplete");
+
+  const imported = validateStep(5, data, { hasAuthoritativeSchedule: true });
+  assert.equal(imported.isComplete, true, "active source-owned schedule must satisfy the schedule step");
+  assert.equal(imported.isValid, true, "active source-owned schedule must not emit manual schedule errors");
+}
+
+{
+  const data = getDefaultFormData();
+  data.title = "Импортное событие";
+  data.eventFormats = ["calm_relaxed"];
+  data.categoryId = "category";
+  data.primaryRootHasChildren = false;
+  data.ageRangeIds = ["3-5"];
+  data.fullDescription = "Достаточно длинное описание импортного события для проверки.";
+  data.coverImage = "media-id";
+  data.venueKind = "TBD";
+  data.pricingMode = "free";
+  data.participationMode = "walk-in";
+
+  assert.equal(
+    validateForSubmit(data).isValid,
+    false,
+    "without source ownership the same empty manual schedule must block submit",
+  );
+  assert.equal(
+    validateForSubmit(data, { hasAuthoritativeSchedule: true }).isValid,
+    true,
+    "authoritative imported schedule must allow final submit when every other required step is complete",
+  );
+}
+
+console.log("Step4DateTime imported schedule manual takeover + validation wiring test: OK");

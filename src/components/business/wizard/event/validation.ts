@@ -15,6 +15,15 @@ export interface ValidationResult {
   warnings: string[];
 }
 
+export interface EventValidationContext {
+  /**
+   * True when the event has at least one active source-owned ActivitySession.
+   * Those sessions are authoritative and intentionally are not mirrored into
+   * the wizard's manual dates/scheduleItems fields.
+   */
+  hasAuthoritativeSchedule?: boolean;
+}
+
 /**
  * Validate for draft save (soft validation)
  */
@@ -42,7 +51,11 @@ export function validateForDraft(data: EventFormData): ValidationResult {
 /**
  * Validate a specific step
  */
-export function validateStep(step: number, data: EventFormData): ValidationResult {
+export function validateStep(
+  step: number,
+  data: EventFormData,
+  context: EventValidationContext = {},
+): ValidationResult {
   switch (step) {
     case 1:
       return validateStep1(data);
@@ -53,7 +66,7 @@ export function validateStep(step: number, data: EventFormData): ValidationResul
     case 4:
       return validateStep4(data);
     case 5:
-      return validateStep5(data);
+      return validateStep5(data, context);
     case 6:
       return validateStep6(data);
     case 7:
@@ -63,7 +76,7 @@ export function validateStep(step: number, data: EventFormData): ValidationResul
     case 9:
       return validateStep9(data);
     case 10:
-      return validateForSubmit(data);
+      return validateForSubmit(data, context);
     default:
       return { isValid: true, isComplete: true, errors: [], warnings: [] };
   }
@@ -246,7 +259,14 @@ function validateStep4(data: EventFormData): ValidationResult {
  * Step 5: Schedule
  * MVP: all dates use common time
  */
-function validateStep5(data: EventFormData): ValidationResult {
+function validateStep5(
+  data: EventFormData,
+  context: EventValidationContext = {},
+): ValidationResult {
+  if (context.hasAuthoritativeSchedule) {
+    return { isValid: true, isComplete: true, errors: [], warnings: [] };
+  }
+
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -476,13 +496,16 @@ function validateStep8(data: EventFormData): ValidationResult {
 /**
  * Final validation for submit (strict)
  */
-export function validateForSubmit(data: EventFormData): ValidationResult {
+export function validateForSubmit(
+  data: EventFormData,
+  context: EventValidationContext = {},
+): ValidationResult {
   const allErrors: string[] = [];
   const allWarnings: string[] = [];
 
   // Validate all required steps
   for (let step = 1; step <= 9; step++) {
-    const result = validateStep(step, data);
+    const result = validateStep(step, data, context);
     if (!result.isComplete) {
       allErrors.push(`Шаг ${step}: не заполнены обязательные поля`);
     }
