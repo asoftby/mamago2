@@ -15,4 +15,15 @@ export class SearchIndexQueue {
     this.tails.set(key, settled);
     return settled;
   }
+
+  /**
+   * Wait until every currently queued write — including writes enqueued while
+   * draining — has settled. CLI processes must call this before disconnecting
+   * Prisma when model extensions dispatch indexing in fire-and-forget mode.
+   */
+  async drain(): Promise<void> {
+    while (this.tails.size > 0) {
+      await Promise.allSettled([...this.tails.values()]);
+    }
+  }
 }
