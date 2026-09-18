@@ -18,14 +18,26 @@ function debugScheduleStepLog(message: string, payload?: Record<string, unknown>
   console.debug(`[EventEditorScheduleStep] ${message}`);
 }
 
+export interface ScheduleSourceState {
+  readOnly: boolean;
+  itemCount: number;
+}
+
 interface Step4DateTimeProps {
   data: EventFormData;
   onChange: (updates: Partial<EventFormData>) => void;
   isEditable: boolean;
   eventId?: string;
+  onScheduleSourceStateChange?: (state: ScheduleSourceState) => void;
 }
 
-export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4DateTimeProps) {
+export function Step4DateTime({
+  data,
+  onChange,
+  isEditable,
+  eventId,
+  onScheduleSourceStateChange,
+}: Step4DateTimeProps) {
   const [importedScheduleItems, setImportedScheduleItems] = useState<string[]>([]);
   const [scheduleReadOnly, setScheduleReadOnly] = useState(false);
   const [manualTakeoverPending, setManualTakeoverPending] = useState(false);
@@ -85,6 +97,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
       // PATCH flow can now save edits without destroying import metadata.
       handleScheduleItemsChange(nextItems);
       setScheduleReadOnly(false);
+      onScheduleSourceStateChange?.({ readOnly: false, itemCount: nextItems.length });
     } catch (error) {
       setManualTakeoverError(
         error instanceof Error ? error.message : "Не удалось включить ручное редактирование расписания",
@@ -99,6 +112,7 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
       queueMicrotask(() => {
         setImportedScheduleItems([]);
         setScheduleReadOnly(false);
+        onScheduleSourceStateChange?.({ readOnly: false, itemCount: 0 });
       });
       return;
     }
@@ -108,18 +122,26 @@ export function Step4DateTime({ data, onChange, isEditable, eventId }: Step4Date
       const response = await fetch(`/api/business/events/${eventId}/schedule-source`, {
         credentials: "include",
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        if (!cancelled) {
+          onScheduleSourceStateChange?.({ readOnly: false, itemCount: 0 });
+        }
+        return;
+      }
       const payload = (await response.json()) as { items?: string[]; readOnly?: boolean };
       if (!cancelled) {
-        setImportedScheduleItems(Array.isArray(payload.items) ? payload.items : []);
-        setScheduleReadOnly(payload.readOnly === true);
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        const readOnly = payload.readOnly === true;
+        setImportedScheduleItems(items);
+        setScheduleReadOnly(readOnly);
+        onScheduleSourceStateChange?.({ readOnly, itemCount: items.length });
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
+  }, [eventId, onScheduleSourceStateChange]);
 
   const normalizedImportedItems = useMemo(() => {
     const hasTime = (value: string) => /\b\d{1,2}:\d{2}\b/.test(value);
