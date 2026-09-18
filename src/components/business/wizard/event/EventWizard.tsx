@@ -375,7 +375,36 @@ function EventWizardInner({
   const isDirty = formSnapshot !== baselineJsonRef.current;
   const shouldInterceptLeave = unpublishedFlow && isDirty && !isSaving && !isSubmitting;
   useEffect(() => {
+    if (!eventId) {
+      setScheduleSourceState({ readOnly: false, itemCount: 0 });
+      return;
+    }
+
+    let cancelled = false;
     setScheduleSourceState({ readOnly: false, itemCount: 0 });
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/business/events/${eventId}/schedule-source`, {
+          credentials: "include",
+        });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { items?: string[]; readOnly?: boolean };
+        if (cancelled) return;
+
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        setScheduleSourceState({
+          readOnly: payload.readOnly === true,
+          itemCount: items.length,
+        });
+      } catch {
+        // Step 5 will retry the same endpoint when opened.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [eventId]);
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
