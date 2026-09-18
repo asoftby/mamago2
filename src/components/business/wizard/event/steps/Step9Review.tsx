@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
-import { validateForSubmit, validateStep } from "../validation";
+import { validateForSubmit, validateStep, type EventValidationContext } from "../validation";
 import { EVENT_WIZARD_STEPS, buildReviewSections } from "../eventWizardSteps.config";
 import type { EventFormData } from "../types";
 
@@ -10,16 +10,42 @@ interface Step9ReviewProps {
   isSubmitting: boolean;
   submitStatus?: "idle" | "validating" | "submitting" | "success" | "error";
   onGoToStep?: (step: number) => void;
+  validationContext?: EventValidationContext;
+  authoritativeScheduleItemCount?: number;
 }
 
-export function Step9Review({ data, isSubmitting, submitStatus = "idle", onGoToStep }: Step9ReviewProps) {
-  const submitValidation = validateForSubmit(data);
+export function Step9Review({
+  data,
+  isSubmitting,
+  submitStatus = "idle",
+  onGoToStep,
+  validationContext,
+  authoritativeScheduleItemCount = 0,
+}: Step9ReviewProps) {
+  const submitValidation = validateForSubmit(data, validationContext);
   
   // Don't show validation errors after successful submit
   const showValidationErrors = submitStatus !== "success";
   
   // Build review sections from config
-  const reviewSections = buildReviewSections(EVENT_WIZARD_STEPS, data, validateStep);
+  const reviewSections = buildReviewSections(
+    EVENT_WIZARD_STEPS,
+    data,
+    (stepId, stepData) => validateStep(stepId, stepData, validationContext),
+  ).map((section) =>
+    section.stepKey === "schedule" && validationContext?.hasAuthoritativeSchedule
+      ? {
+          ...section,
+          summary: [
+            {
+              label: "Расписание",
+              value: `${authoritativeScheduleItemCount} сеанс(ов) из источника`,
+            },
+          ],
+          missingFields: [],
+        }
+      : section,
+  );
 
   return (
     <div className="space-y-6">
