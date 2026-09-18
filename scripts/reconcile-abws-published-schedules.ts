@@ -1,4 +1,4 @@
-import prisma from "../src/lib/prisma";
+import prisma, { searchIndexer } from "../src/lib/prisma";
 import {
   ABWS_PARSER_KEY,
   normalizeAbwsEventPayload,
@@ -215,6 +215,11 @@ async function main() {
   }
 
   console.log(JSON.stringify({ mode: "APPLY_RESULT", database, results }, null, 2));
+
+  // Activity updates dispatch search indexing in fire-and-forget mode. A CLI
+  // must wait for those queued writes before disconnecting Prisma, otherwise
+  // the engine can be closed while SearchDocument upserts are still running.
+  await searchIndexer.drain();
 }
 
 main()
