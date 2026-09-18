@@ -170,7 +170,7 @@ assert.match(
 {
   const data = getDefaultFormData();
   data.title = "Импортное событие";
-  data.eventFormats = ["INDOOR"] as EventFormData["eventFormats"];
+  data.eventFormats = ["calm_relaxed"];
   data.categoryId = "category";
   data.primaryRootHasChildren = false;
   data.ageRangeIds = ["3-5"];
