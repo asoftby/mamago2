@@ -40,7 +40,12 @@ import {
   type ActivityWithRelations,
   buildEventPayload,
 } from "./mappers";
-import { validateStep, validateForSubmit, validateForDraft } from "./validation";
+import {
+  validateStep,
+  validateForSubmit,
+  validateForDraft,
+  type EventValidationContext,
+} from "./validation";
 import {
   EVENT_WIZARD_STEPS,
   getStepLabel,
@@ -49,6 +54,10 @@ import {
 import { useEventEditorDraft } from "./useEventEditorDraft";
 
 import { Step9Review } from "./steps/Step9Review";
+import {
+  Step4DateTime,
+  type ScheduleSourceState,
+} from "./steps/Step4DateTime";
 import {
   publicActivityPath,
   toAbsolutePublicUrl,
@@ -338,6 +347,20 @@ function EventWizardInner({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scheduleSourceState, setScheduleSourceState] = useState<ScheduleSourceState>({
+    readOnly: false,
+    itemCount: 0,
+  });
+  const handleScheduleSourceStateChange = useCallback((state: ScheduleSourceState) => {
+    setScheduleSourceState(state);
+  }, []);
+  const validationContext = useMemo<EventValidationContext>(
+    () => ({
+      hasAuthoritativeSchedule:
+        scheduleSourceState.readOnly && scheduleSourceState.itemCount > 0,
+    }),
+    [scheduleSourceState.itemCount, scheduleSourceState.readOnly],
+  );
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const baselineJsonRef = useRef(eventFormBaselineJson(mode, event));
   const baselineFormDataRef = useRef<EventFormData>(
@@ -351,6 +374,10 @@ function EventWizardInner({
     (event != null && !EVENT_SUBMITTED_OR_LIVE_STATUSES.has(event.status));
   const isDirty = formSnapshot !== baselineJsonRef.current;
   const shouldInterceptLeave = unpublishedFlow && isDirty && !isSaving && !isSubmitting;
+  useEffect(() => {
+    setScheduleSourceState({ readOnly: false, itemCount: 0 });
+  }, [eventId]);
+
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveDialogBusy, setLeaveDialogBusy] = useState(false);
   const pendingLeaveHrefRef = useRef<string | null>(null);
@@ -786,7 +813,7 @@ function EventWizardInner({
     }
 
     // Block forward navigation if current step isn't complete
-    const validation = validateStep(currentStep, formData);
+    const validation = validateStep(currentStep, formData, validationContext);
     if (!validation.isComplete) {
       toast.error("Заполните обязательные поля перед переходом дальше");
       console.timeEnd("[EventWizard] navigate next step");
@@ -831,7 +858,7 @@ function EventWizardInner({
 
     // For any forward jump, ensure all intermediate steps are complete
     for (let s = currentStep; s < step; s += 1) {
-      const validation = validateStep(s, formData);
+      const validation = validateStep(s, formData, validationContext);
       if (!validation.isComplete) {
         toast.error("Заполните обязательные поля перед переходом дальше");
         return;
@@ -911,7 +938,7 @@ function EventWizardInner({
     if (isSubmitting) return;
     debugEditorLog("published review save started", { eventId, currentStep });
     setSubmitStatus("validating");
-    const validation = validateForSubmit(formData);
+    const validation = validateForSubmit(formData, validationContext);
     if (!validation.isValid) {
       setSubmitStatus("error");
       toast.error("Заполните все обязательные поля");
@@ -1003,7 +1030,7 @@ function EventWizardInner({
 
     // Validate before submit
     setSubmitStatus("validating");
-    const validation = validateForSubmit(formData);
+    const validation = validateForSubmit(formData, validationContext);
 
     if (!validation.isValid) {
       setSubmitStatus("error");
@@ -1221,7 +1248,7 @@ function EventWizardInner({
   );
 
   // Check if form is valid for submission (only on review step)
-  const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData) : { isValid: true };
+  const submitValidation = currentStep === TOTAL_STEPS ? validateForSubmit(formData, validationContext) : { isValid: true };
 
   // Render current step (config-driven)
   const renderStep = () => {
@@ -1233,6 +1260,8 @@ function EventWizardInner({
           isSubmitting={isSubmitting}
           submitStatus={submitStatus}
           onGoToStep={handleGoToStep}
+          validationContext={validationContext}
+          authoritativeScheduleItemCount={scheduleSourceState.itemCount}
         />
       );
     }
@@ -1250,11 +1279,22 @@ function EventWizardInner({
       ctaStepEnabled,
     };
 
+    if (stepConfig.key === "schedule") {
+      return (
+        <Step4DateTime
+          data={formData}
+          onChange={handleChange}
+          isEditable={isEditable}
+          eventId={eventId ?? event?.id}
+          onScheduleSourceStateChange={handleScheduleSourceStateChange}
+        />
+      );
+    }
+
     // Add import-aware context for steps that depend on the current event entity
     if (
       stepConfig.key === "location" ||
       stepConfig.key === "media" ||
-      stepConfig.key === "schedule" ||
       stepConfig.key === "pricing" ||
       stepConfig.key === "contacts" ||
       stepConfig.key === "organizer"
@@ -1298,7 +1338,7 @@ function EventWizardInner({
 
   const canNext =
     currentStep < TOTAL_STEPS &&
-    validateStep(currentStep, formData).isComplete &&
+    validateStep(currentStep, formData, validationContext).isComplete &&
     !isLoadingGenres;
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === TOTAL_STEPS;
@@ -1312,7 +1352,9 @@ function EventWizardInner({
         id: s.id,
         label: s.shortLabel ?? s.title,
         isComplete: s.isComplete
-          ? s.isComplete(formData) && s.id <= maxVisitedStep
+          ? (s.id === 5
+              ? validateStep(5, formData, validationContext).isComplete
+              : s.isComplete(formData)) && s.id <= maxVisitedStep
           : false,
         isOptional: s.isOptional ?? false,
         // Фактическая заполненность (для презентации степпера), отдельно от isComplete.
@@ -1320,7 +1362,7 @@ function EventWizardInner({
       })),
       { id: TOTAL_STEPS, label: "Проверка", isComplete: false },
     ],
-    [formData, maxVisitedStep]
+    [formData, maxVisitedStep, validationContext]
   );
 
   const actionLabels = useMemo(() => {
