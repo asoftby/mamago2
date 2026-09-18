@@ -133,8 +133,13 @@ assert.match(
 
 assert.match(
   wizardSource,
+  /fetch\(`\/api\/business\/events\/\$\{eventId\}\/schedule-source`/,
+  "EventWizard must preload imported schedule ownership so a direct review-step load validates correctly",
+);
+assert.match(
+  wizardSource,
   /onScheduleSourceStateChange=\{handleScheduleSourceStateChange\}/,
-  "EventWizard must receive imported schedule ownership from Step4DateTime",
+  "EventWizard must also receive ownership changes from Step4DateTime/manual takeover",
 );
 assert.match(
   wizardSource,
