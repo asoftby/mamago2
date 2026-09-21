@@ -5,8 +5,7 @@ import {
   getFamilyByIntermediateCertificates,
   resolveSourceSpecificTlsCa,
 } from "./familyByTls";
-import { describeFetchError, fetchBinary, fetchHtml } from "./fetchHtml";
-import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
+import { describeFetchError, fetchHtml } from "./fetchHtml";
 
 // The exact URL that exposed the family.by incomplete-chain bug for
 // POST /api/media/from-url (release blocker). Kept literal so a regression
@@ -29,10 +28,6 @@ function createUndiciStyleFetchError() {
   const error = new TypeError("fetch failed") as TypeError & { cause?: unknown };
   error.cause = cause;
   return error;
-}
-
-function jsonHeaders(extra: Record<string, string> = {}): Headers {
-  return new Headers(extra);
 }
 
 function testDescribeFetchError() {
@@ -114,228 +109,10 @@ async function testFetchHtmlNetworkErrorClassification() {
   assert.equal(calls, 1);
 }
 
-async function testFetchBinaryValidatesRedirectHops() {
-  // fetchBinary must validate every redirect hop, not just the initial URL —
-  // otherwise a safe initial URL could redirect to a private/internal host
-  // (SSRF). The unsafe target must never be requested.
-  const originalFetch = globalThis.fetch;
-  const requestedUrls: string[] = [];
-
-  globalThis.fetch = (async (input: RequestInfo | URL) => {
-    const url = String(input);
-    requestedUrls.push(url);
-    return new Response(null, {
-      status: 302,
-      headers: jsonHeaders({ location: "http://127.0.0.1/secret" }),
-    });
-  }) as typeof fetch;
-
-  try {
-    await assert.rejects(
-      () =>
-        fetchBinary("https://example.com/redirect-to-private", {
-          nodeHttpFallback: false,
-          validateUrl: (candidate) => {
-            assertSafeRemoteImageUrl(candidate.toString());
-          },
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 400);
-        assert.match(error.message, /недоступен/);
-        return true;
-      },
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-
-  assert.deepEqual(
-    requestedUrls,
-    ["https://example.com/redirect-to-private"],
-    "the private redirect target must never be requested",
-  );
-}
-
-async function testFetchBinaryBoundsRedirectLoop() {
-  // A malicious or misconfigured upstream that redirects forever must not
-  // hang the request indefinitely — it must be bounded and rejected.
-  const originalFetch = globalThis.fetch;
-  let calls = 0;
-
-  globalThis.fetch = (async () => {
-    calls += 1;
-    return new Response(null, {
-      status: 302,
-      headers: jsonHeaders({ location: "https://example.com/next" }),
-    });
-  }) as typeof fetch;
-
-  try {
-    await assert.rejects(
-      () =>
-        fetchBinary("https://example.com/loop", {
-          nodeHttpFallback: false,
-          maxRedirects: 2,
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 400);
-        assert.match(error.message, /перенаправлени/);
-        return true;
-      },
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-
-  assert.ok(calls <= 4, `redirect loop must be bounded, got ${calls} requests`);
-}
-
-async function testFetchBinaryRejectsDeclaredOversize() {
-  // A declared Content-Length above the cap must be rejected without ever
-  // entering our own read loop. Note: the JS engine may eagerly pull one
-  // chunk into a freshly-constructed ReadableStream's internal queue ahead
-  // of any demand (queuingStrategy highWaterMark), independent of whether
-  // application code calls `.getReader().read()` — that single engine-level
-  // prefetch is bounded and not a read loop, so the assertion below allows
-  // for it and instead proves fetchBinary never advances past one chunk.
-  const originalFetch = globalThis.fetch;
-  let pullCount = 0;
-
-  globalThis.fetch = (async () =>
-    new Response(
-      new ReadableStream({
-        pull(controller) {
-          pullCount += 1;
-          controller.enqueue(new Uint8Array([1, 2, 3]));
-          controller.close();
-        },
-      }),
-      { status: 200, headers: jsonHeaders({ "content-length": "99999999" }) },
-    )) as typeof fetch;
-
-  try {
-    await assert.rejects(
-      () => fetchBinary("https://example.com/huge.jpg", { nodeHttpFallback: false, maxBytes: 1_000 }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 400);
-        assert.match(error.message, /большой/);
-        return true;
-      },
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-
-  assert.ok(
-    pullCount <= 1,
-    `fetchBinary must never enter a read loop once Content-Length exceeds the cap, saw ${pullCount} pulls`,
-  );
-}
-
-async function testFetchBinaryCapsStreamedOversize() {
-  // Without a (trustworthy) Content-Length header, the cap must still be
-  // enforced by aborting the stream early instead of buffering everything.
-  const originalFetch = globalThis.fetch;
-  let chunksProduced = 0;
-
-  globalThis.fetch = (async () =>
-    new Response(
-      new ReadableStream({
-        pull(controller) {
-          chunksProduced += 1;
-          if (chunksProduced > 20) {
-            controller.close();
-            return;
-          }
-          controller.enqueue(new Uint8Array(1_000));
-        },
-      }),
-      { status: 200 },
-    )) as typeof fetch;
-
-  try {
-    await assert.rejects(
-      () => fetchBinary("https://example.com/streamed.jpg", { nodeHttpFallback: false, maxBytes: 5_000 }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 400);
-        assert.match(error.message, /большой/);
-        return true;
-      },
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-
-  assert.ok(
-    chunksProduced <= 10,
-    `oversized stream must be cancelled well before it finishes, produced ${chunksProduced} chunks`,
-  );
-}
-
-async function testFetchBinaryClassifiesTransportFailureAs502() {
-  // A TLS/transport failure (the family.by-shaped error) must classify as a
-  // controlled 502 when the Node http fallback is disabled/exhausted — never
-  // a generic unclassified error.
-  const originalFetch = globalThis.fetch;
-
-  globalThis.fetch = (async () => {
-    throw createUndiciStyleFetchError();
-  }) as typeof fetch;
-
-  try {
-    await assert.rejects(
-      () => fetchBinary("https://family.by/some-missing-chain.jpg", { nodeHttpFallback: false }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 502);
-        return true;
-      },
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-}
-
-async function testFetchBinaryClassifiesTimeoutAs504() {
-  // Our own timeout firing (AbortController) must classify as 504, not a
-  // generic/opaque failure.
-  const originalFetch = globalThis.fetch;
-
-  globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) =>
-    new Promise((_resolve, reject) => {
-      init?.signal?.addEventListener("abort", () => {
-        reject(new DOMException("This operation was aborted", "AbortError"));
-      });
-    })) as typeof fetch;
-
-  try {
-    await assert.rejects(
-      () => fetchBinary("https://example.com/slow.jpg", { nodeHttpFallback: false, timeoutMs: 20 }),
-      (error: unknown) => {
-        assert.ok(error instanceof Error);
-        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 504);
-        return true;
-      },
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-}
-
 async function main() {
   testDescribeFetchError();
   testFamilyByCaBundle();
   await testFetchHtmlNetworkErrorClassification();
-  await testFetchBinaryValidatesRedirectHops();
-  await testFetchBinaryBoundsRedirectLoop();
-  await testFetchBinaryRejectsDeclaredOversize();
-  await testFetchBinaryCapsStreamedOversize();
-  await testFetchBinaryClassifiesTransportFailureAs502();
-  await testFetchBinaryClassifiesTimeoutAs504();
 
   console.log("fetchHtml tests: OK");
 }

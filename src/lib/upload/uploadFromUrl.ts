@@ -9,6 +9,7 @@ import { buildMasterFilename, buildMediaStem } from "@/server/media/mediaNaming"
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
 import { contentHashOf, findOwnedMediaByContentHash } from "@/lib/media/dedup";
+import { fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 
 export interface UploadFromUrlOptions {
   maxWidthOrHeight?: number;
@@ -40,69 +41,27 @@ export async function uploadImageFromUrl(
 ): Promise<UploadedImageResult> {
   console.log("[uploadFromUrl] Downloading image from:", imageUrl);
 
-  // SSRF protection: validate URL before fetching
-  assertSafeRemoteUrl(imageUrl);
-
-  // Download image with timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
-
   let buffer: Buffer;
   let contentType: string;
 
   try {
-    const response = await fetch(imageUrl, {
-      signal: controller.signal,
-      // Never follow redirects — the redirect target would bypass the SSRF allowlist check
-      redirect: "manual",
+    const remote = await fetchBinary(imageUrl, {
+      timeoutMs: DEFAULT_TIMEOUT_MS,
+      maxBytes: MAX_RESPONSE_BYTES,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
+      validateUrl: (candidate) => {
+        assertSafeRemoteUrl(candidate.toString());
+      },
     });
-
-    clearTimeout(timeoutId);
-
-    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-      throw new Error(`Image URL redirected (status ${response.status}); redirects are not followed for security`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.status}`);
-    }
-
-    contentType = response.headers.get("content-type") || "image/jpeg";
+    buffer = remote.buffer;
+    contentType = remote.headers["content-type"] || "image/jpeg";
     if (!contentType.startsWith("image/")) {
       throw new Error(`Invalid content type: ${contentType}`);
     }
-
-    // Reject oversized responses before reading the body
-    const contentLength = response.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_BYTES) {
-      throw new Error(`Image too large: ${contentLength} bytes (max ${MAX_RESPONSE_BYTES})`);
-    }
-
-    // Stream body with hard size cap to prevent memory exhaustion
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body");
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > MAX_RESPONSE_BYTES) {
-        await reader.cancel();
-        throw new Error(`Image too large: exceeds ${MAX_RESPONSE_BYTES} bytes`);
-      }
-      chunks.push(value);
-    }
-    buffer = Buffer.concat(chunks.map((c) => Buffer.from(c)));
     console.log("[uploadFromUrl] Downloaded image, size:", buffer.length, "bytes");
   } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Image download timeout");
-    }
     throw error;
   }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { assertSafeRemoteImageUrl } from "./safeRemoteImageUrl";
+import { assertSafeRemoteImageUrl, isPublicIpAddress } from "./safeRemoteImageUrl";
 
 function expectRejected(raw: string, messagePattern: RegExp) {
   assert.throws(
@@ -37,6 +37,23 @@ expectRejected("http://10.0.0.5/x.jpg", /недоступен/);
 expectRejected("http://192.168.1.5/x.jpg", /недоступен/);
 expectRejected("http://172.16.0.5/x.jpg", /недоступен/);
 expectRejected("http://[::1]/x.jpg", /недоступен/);
+expectRejected("http://[::ffff:127.0.0.1]/x.jpg", /недоступен/);
+expectRejected("http://localhost./x.jpg", /недоступен/);
+expectRejected("http://2130706433/x.jpg", /недоступен/);
+expectRejected("http://0x7f000001/x.jpg", /недоступен/);
+expectRejected("http://0177.0.0.1/x.jpg", /недоступен/);
+expectRejected("http://user:password@example.com/x.jpg", /not allowed/);
+
+assert.equal(isPublicIpAddress("8.8.8.8"), true);
+assert.equal(isPublicIpAddress("100.64.0.1"), false);
+assert.equal(isPublicIpAddress("169.254.169.254"), false);
+assert.equal(isPublicIpAddress("224.0.0.1"), false);
+assert.equal(isPublicIpAddress("240.0.0.1"), false);
+assert.equal(isPublicIpAddress("::1"), false);
+assert.equal(isPublicIpAddress("fe80::1"), false);
+assert.equal(isPublicIpAddress("fc00::1"), false);
+assert.equal(isPublicIpAddress("::ffff:127.0.0.1"), false);
+assert.equal(isPublicIpAddress("2606:4700:4700::1111"), true);
 
 {
   const url = assertSafeRemoteImageUrl("https://family.by/uploads/posts/2026-08/thumbs/1787118815_ebru.jpg");

@@ -4,7 +4,7 @@
  * Unified, SSR-safe renderer for rich text HTML produced by RichDescriptionEditor / Tiptap.
  *
  * Features:
- * - Allowlist-based HTML sanitization (no jsdom / DOMPurify dependency)
+ * - Parser-based allowlist HTML sanitization
  * - Consistent editorial typography via Tailwind prose
  * - Works in Server Components and Client Components
  * - Handles plain-text fallback (whitespace-pre-wrap)

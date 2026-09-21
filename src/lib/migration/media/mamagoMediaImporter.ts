@@ -7,13 +7,15 @@ import {
 } from "@/lib/media/imageProcessor";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
+import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
+import { fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 
 import type { ImportedMediaResult, ImportMediaFromUrlInput, MediaImporterLike } from "./types";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 25_000;
 
-function mimeFromContentType(header: string | null): string {
+function mimeFromContentType(header: string | null | undefined): string {
   if (!header) {
     return "application/octet-stream";
   }
@@ -61,32 +63,20 @@ export function createMamagoMediaImporter(deps: CreateMamagoMediaImporterDeps): 
     async importFromUrl(input: ImportMediaFromUrlInput): Promise<ImportedMediaResult> {
       const url = new URL(input.sourceUrl);
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-      let remote: Response;
-      try {
-        remote = await fetch(url.toString(), {
-          signal: controller.signal,
-          redirect: "follow",
-          headers: {
-            Accept: "image/*,*/*;q=0.8",
-            "User-Agent": "MamaGoMediaImporter/1.0",
-          },
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+      const remote = await fetchBinary(url.toString(), {
+        timeoutMs: FETCH_TIMEOUT_MS,
+        maxBytes: MAX_BYTES,
+        headers: {
+          Accept: "image/*,*/*;q=0.8",
+          "User-Agent": "MamaGoMediaImporter/1.0",
+        },
+        validateUrl: (candidate) => {
+          assertSafeRemoteImageUrl(candidate.toString());
+        },
+      });
+      const buf = remote.buffer;
 
-      if (!remote.ok) {
-        throw new Error(`Failed to download media from ${url.toString()}: HTTP ${remote.status}`);
-      }
-
-      const buf = Buffer.from(await remote.arrayBuffer());
-      if (buf.length > MAX_BYTES) {
-        throw new Error(`Media at ${url.toString()} exceeds the maximum allowed size.`);
-      }
-
-      const mime = sniffImageMime(buf, mimeFromContentType(remote.headers.get("content-type")));
+      const mime = sniffImageMime(buf, mimeFromContentType(remote.headers["content-type"]));
       if (!mime.startsWith("image/")) {
         throw new Error(`Media at ${url.toString()} is not an image (${mime}).`);
       }

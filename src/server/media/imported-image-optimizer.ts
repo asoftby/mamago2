@@ -14,6 +14,7 @@ import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/clien
 import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
 import { contentHashOf, findOwnedMediaByContentHash } from "@/lib/media/dedup";
+import { fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -78,13 +79,6 @@ export async function optimizeImportedImage(
     return { ok: false, error: "Empty URL", originalUrl };
   }
 
-  // SSRF protection: validate URL before fetching
-  try {
-    assertSafeRemoteUrl(originalUrl);
-  } catch {
-    return { ok: false, error: "Unsafe remote URL", originalUrl };
-  }
-
   const filename = buildFilename(importedRecordId, originalUrl);
   const upload = {
     filename,
@@ -110,62 +104,32 @@ export async function optimizeImportedImage(
   }
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
-  let response: Response;
+  let buffer: Buffer;
+  let contentType: string;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-    response = await fetch(originalUrl, {
-      signal: controller.signal,
+    const remote = await fetchBinary(originalUrl, {
+      timeoutMs: 15_000,
+      maxBytes: MAX_SOURCE_BYTES,
       headers: { "User-Agent": "mamaGo-importer/1.0" },
+      validateUrl: (candidate) => {
+        assertSafeRemoteUrl(candidate.toString());
+      },
     });
-    clearTimeout(timeout);
-  } catch (err) {
+    buffer = remote.buffer;
+    contentType = remote.headers["content-type"]?.split(";")[0]?.trim() ?? "";
+  } catch {
     return {
       ok: false,
-      error: `Fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+      error: "Fetch failed",
       originalUrl,
     };
   }
 
-  if (!response.ok) {
-    return { ok: false, error: `HTTP ${response.status}`, originalUrl };
-  }
-
   // ── Validate content-type ──────────────────────────────────────────────────
-  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
   if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
     return {
       ok: false,
       error: `Unsupported content-type: ${contentType || "unknown"}`,
-      originalUrl,
-    };
-  }
-
-  // ── Validate size ──────────────────────────────────────────────────────────
-  const contentLength = Number(response.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_SOURCE_BYTES) {
-    return {
-      ok: false,
-      error: `Source too large: ${contentLength} bytes (max ${MAX_SOURCE_BYTES})`,
-      originalUrl,
-    };
-  }
-
-  let buffer: Buffer;
-  try {
-    const arrayBuffer = await response.arrayBuffer();
-    buffer = Buffer.from(arrayBuffer);
-    if (buffer.byteLength > MAX_SOURCE_BYTES) {
-      return {
-        ok: false,
-        error: `Downloaded size too large: ${buffer.byteLength} bytes`,
-        originalUrl,
-      };
-    }
-  } catch (err) {
-    return {
-      ok: false,
-      error: `Read body failed: ${err instanceof Error ? err.message : String(err)}`,
       originalUrl,
     };
   }

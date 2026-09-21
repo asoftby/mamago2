@@ -1,11 +1,12 @@
 /**
  * Санитизация HTML блоков статьи.
  *
- * Использует легковесный allowlist-санитайзер без зависимостей
- * (jsdom / DOMPurify), что гарантирует 100 % SSR-безопасность.
+ * Использует parser-based allowlist-санитайзер, одинаковый на сервере и клиенте.
  * Поддерживает фильтрацию тегов/атрибутов по белому списку
  * и блокировку опасных протоколов (javascript:, data:, vbscript:).
  */
+
+import sanitizeHtml from "sanitize-html";
 
 export type ArticleBlockHtmlVariant = "intro" | "text" | "quote";
 
@@ -55,11 +56,12 @@ export function legacyPlainTextToEditorHtml(text: string): string {
 }
 
 /**
- * Allowlist-санитизация через простой парсинг тегов (без DOMPurify / jsdom).
+ * Allowlist-санитизация через полноценный HTML parser.
  * Удаляет все теги кроме разрешённых, фильтрует атрибуты,
- * блокирует опасные протоколы (javascript:, data:, vbscript:).
+ * декодирует HTML entities до проверки URL-схем и пропускает только
+ * http:, https:, mailto:, tel: и безопасные относительные URL.
  *
- * 100 % SSR-safe — не требует jsdom / DOMPurify.
+ * SSR-safe — не требует DOM и даёт тот же результат в client preview.
  * Сохраняет текстовое содержимое удалённых тегов.
  *
  * Экспортируется для использования в articleEmbedSanitize.ts.
@@ -71,108 +73,38 @@ export function sanitizeHtmlAllowlist(
 ): string {
   if (!html) return "";
 
-  const allowedTagSet = new Set(allowedTags.map((t) => t.toLowerCase()));
-  const allowedAttrSet = new Set(allowedAttrs.map((a) => a.toLowerCase()));
-
-  /**
-   * Проверяет, разрешён ли атрибут.
-   * data-* атрибуты всегда разрешены (backward compat с DOMPurify ALLOW_DATA_ATTR).
-   */
-  function isAttrAllowed(name: string): boolean {
-    const lower = name.toLowerCase();
-    return allowedAttrSet.has(lower) || lower.startsWith("data-");
-  }
-
-  /**
-   * Проверяет, что протокол в значении атрибута безопасен.
-   * Блокирует javascript:, data:, vbscript:, file:
-   * Пропускает http(s):, mailto:, tel:, ftp: и схемо-безадресные значения.
-   */
-  function isDangerousProtocol(value: string): boolean {
-    const trimmed = value.trim();
-    // Только если похоже на URI-схему (буквы, цифры, +, -, . и :)
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return false;
-    return /^(javascript|data|vbscript|file):/i.test(trimmed);
-  }
-
-  // ─── Pre-process: полностью удаляем опасные элементы вместе с содержимым ────
-  // DOMPurify удаляет script, style, template и noscript целиком,
-  // а не только открывающие/закрывающие теги. Повторяем это поведение.
-  const DANGEROUS_TAGS = ["script", "style", "template", "noscript"];
-  let result = html;
-  for (const tag of DANGEROUS_TAGS) {
-    // Удаляем <tag ...>...</tag> целиком
-    result = result.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), "");
-    // Удаляем самозакрывающиеся варианты <tag ... />
-    result = result.replace(new RegExp(`<${tag}\\b[^>]*\\/>`, "gi"), "");
-  }
-
-  // 1. Блокируем опасные протоколы в href, src, action и formaction
-  result = result.replace(
-    /(\s)(href|src|action|formaction|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
-    (_, space, attrName, dq, sq, uq) => {
-      const val = (dq ?? sq ?? uq ?? "").trim();
-      if (isDangerousProtocol(val)) {
-        return `${space}${attrName}=""`;
-      }
-      return _;
+  const sanitized = sanitizeHtml(html, {
+    allowedTags: allowedTags.map((tag) => tag.toLowerCase()),
+    allowedAttributes: {
+      "*": [...new Set([...allowedAttrs.map((attr) => attr.toLowerCase()), "data-*"])],
     },
-  );
-
-  // 2. Фильтруем теги: удаляем запрещённые, фильтруем атрибуты у разрешённых
-  result = result.replace(/<\/?([a-z][a-z0-9]*)\b([^>]*)>/gi, (full, tagName, rest) => {
-    const tag = tagName.toLowerCase();
-    if (!allowedTagSet.has(tag)) {
-      // Удаляем только тег, но не его содержимое
-      return "";
-    }
-    // Закрывающий тег — просто нормализуем
-    if (full.startsWith("</")) {
-      return `</${tag}>`;
-    }
-    // Самозакрывающийся тег (br, hr и т.д. или с />)
-    const isVoid = ["br", "hr", "img", "input", "meta", "link"].includes(tag);
-    const isSelfClose = isVoid || /\s\/>$/.test(full);
-
-    // Извлекаем и фильтруем атрибуты
-    const rawAttrs: string[] = [];
-    const attrRe = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
-    let attrMatch;
-    while ((attrMatch = attrRe.exec(rest)) !== null) {
-      rawAttrs.push(attrMatch[0]);
-    }
-    // Также захватываем булевы атрибуты (без значения)
-    const boolRe = /\s+([a-z][a-z0-9-]*)\b(?=\s|>|$)/gi;
-    while ((attrMatch = boolRe.exec(rest)) !== null) {
-      const bName = attrMatch[1].trim();
-      if (bName && !bName.includes("=")) {
-        rawAttrs.push(bName);
-      }
-    }
-
-    const kept = rawAttrs.filter((a) => {
-      const eqIdx = a.indexOf("=");
-      const name = eqIdx > 0 ? a.slice(0, eqIdx).trim() : a.trim();
-      return isAttrAllowed(name);
-    });
-
-    const attrStr = kept.length ? ` ${kept.join(" ")}` : "";
-    return isSelfClose ? `<${tag}${attrStr}>` : `<${tag}${attrStr}>`;
+    allowedSchemes: ["http", "https", "mailto", "tel"],
+    allowedSchemesAppliedToAttributes: [
+      "href",
+      "src",
+      "action",
+      "formaction",
+      "xlink:href",
+    ],
+    allowProtocolRelative: false,
+    disallowedTagsMode: "discard",
+    nonTextTags: ["script", "style", "textarea", "option", "template", "noscript"],
+    parser: {
+      decodeEntities: true,
+    },
+    transformTags: {
+      a: (tagName, attribs) => ({
+        tagName,
+        attribs: attribs.target?.toLowerCase() === "_blank"
+          ? { ...attribs, rel: "noopener noreferrer" }
+          : attribs,
+      }),
+    },
   });
 
-  // 3. Гарантируем rel="noopener noreferrer" для target="_blank"
-  result = result.replace(
-    /<a\b([^>]*?)target="_blank"([^>]*)>/gi,
-    (match) => {
-      const withoutRel = match.replace(
-        /\s+rel\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
-        "",
-      );
-      return withoutRel.replace(/\s*>$/, ' rel="noopener noreferrer">');
-    },
-  );
-
-  return result;
+  // Keep the historical serialization used by stored/editor HTML. This is
+  // output formatting only; parsing and URL validation have already completed.
+  return sanitized.replace(/<(br|hr) \/>/g, "<$1>");
 }
 
 /** Safe HTML for editor initial content and for public render. */

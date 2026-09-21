@@ -1,6 +1,10 @@
 import * as http from "node:http";
 import * as https from "node:https";
+import type { LookupAddress } from "node:dns";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { isIP, type LookupFunction } from "node:net";
 
+import { isPublicIpAddress } from "@/lib/media/safeRemoteImageUrl";
 import { resolveSourceSpecificTlsCa } from "./familyByTls";
 
 export interface FetchHtmlOptions {
@@ -311,9 +315,9 @@ async function fetchHtmlViaNodeHttp(
 // Binary transport (image/asset downloads)
 //
 // Shares the same source-specific TLS CA resolution (`resolveSourceSpecificTlsCa`)
-// and native-fetch → Node http/https fallback heuristic as `fetchHtml` above,
-// so upstreams with an incomplete chain (currently family.by) only need to be
-// fixed in one place. Unlike `fetchHtml`, redirects are followed manually so
+// and low-level Node http/https transport. Unlike `fetchHtml`, DNS is resolved
+// and classified before each request, then the socket is pinned to that exact
+// approved address. Redirects are followed manually so
 // every hop can be validated by the caller (SSRF protection for
 // user-supplied URLs) and the response body is capped in-flight instead of
 // being buffered fully before a size check.
@@ -330,8 +334,18 @@ export interface FetchBinaryOptions {
    * unsafe target. Required for any endpoint that accepts a user-supplied URL.
    */
   validateUrl?: (url: URL) => void;
-  nodeHttpFallback?: boolean;
+  /** @internal Injected only by deterministic transport security tests. */
+  resolveHostname?: (hostname: string) => Promise<LookupAddress[]>;
+  /** @internal Injected only by deterministic transport security tests. */
+  request?: BinaryRequestFactory;
 }
+
+type BinaryRequest = Pick<http.ClientRequest, "setTimeout" | "on" | "end" | "destroy">;
+type BinaryRequestFactory = (
+  url: URL,
+  options: https.RequestOptions,
+  onResponse: (response: http.IncomingMessage) => void,
+) => BinaryRequest;
 
 export interface FetchBinaryResult {
   buffer: Buffer;
@@ -355,98 +369,49 @@ function tooManyRedirectsError(): Error {
   return Object.assign(new Error(TOO_MANY_REDIRECTS_MESSAGE), { httpStatus: 400 });
 }
 
+function unsafeRemoteUrlError(): Error {
+  return Object.assign(new Error("Remote URL is not allowed"), { httpStatus: 400 });
+}
+
+function unbracketHostname(hostname: string): string {
+  return hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
+}
+
+/**
+ * Resolve every A/AAAA answer, reject the whole hostname if any destination
+ * is non-public, and return one already-approved address for connection
+ * pinning. DNS errors and empty answers fail closed.
+ */
+export async function resolveSafeRemoteAddress(
+  url: URL,
+  resolveHostname: (hostname: string) => Promise<LookupAddress[]> = (hostname) =>
+    dnsLookup(hostname, { all: true, verbatim: true }),
+): Promise<LookupAddress> {
+  const hostname = unbracketHostname(url.hostname).replace(/\.$/, "");
+  const literalFamily = isIP(hostname);
+
+  let addresses: LookupAddress[];
+  try {
+    addresses = literalFamily
+      ? [{ address: hostname, family: literalFamily }]
+      : await resolveHostname(hostname);
+  } catch {
+    throw unsafeRemoteUrlError();
+  }
+
+  if (addresses.length === 0 || addresses.some(({ address }) => !isPublicIpAddress(address))) {
+    throw unsafeRemoteUrlError();
+  }
+
+  return addresses[0]!;
+}
+
 function exceedsDeclaredLength(headerValue: string | undefined | null, maxBytes: number): boolean {
   if (!headerValue) return false;
   const declared = Number.parseInt(headerValue, 10);
   return Number.isFinite(declared) && declared > maxBytes;
-}
-
-async function readBodyWithLimit(response: Response, maxBytes: number): Promise<Buffer> {
-  const reader = response.body?.getReader();
-
-  if (!reader) {
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > maxBytes) throw sizeLimitError();
-    return buffer;
-  }
-
-  const chunks: Buffer[] = [];
-  let total = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => {});
-      throw sizeLimitError();
-    }
-
-    chunks.push(Buffer.from(value));
-  }
-
-  return Buffer.concat(chunks);
-}
-
-async function fetchBinaryViaNativeFetch(
-  initialUrl: string,
-  options: {
-    signal: AbortSignal;
-    headers: Record<string, string>;
-    maxRedirects: number;
-    maxBytes: number;
-    validateUrl: (url: URL) => void;
-  },
-): Promise<FetchBinaryResult> {
-  let currentUrl = new URL(initialUrl);
-  options.validateUrl(currentUrl);
-
-  for (let redirectCount = 0; ; redirectCount++) {
-    const response = await fetch(currentUrl, {
-      signal: options.signal,
-      redirect: "manual",
-      headers: options.headers,
-    });
-
-    const location = response.headers.get("location");
-    const isRedirect = response.status >= 300 && response.status < 400 && !!location;
-
-    if (isRedirect) {
-      await response.body?.cancel().catch(() => {});
-
-      if (redirectCount >= options.maxRedirects) {
-        throw tooManyRedirectsError();
-      }
-
-      currentUrl = new URL(location!, currentUrl);
-      options.validateUrl(currentUrl);
-      continue;
-    }
-
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => {});
-      throw Object.assign(
-        new Error(buildStatusErrorMessage(currentUrl.toString(), response.status, response.statusText)),
-        { status: response.status, statusText: response.statusText, httpStatus: 502 },
-      );
-    }
-
-    if (exceedsDeclaredLength(response.headers.get("content-length"), options.maxBytes)) {
-      await response.body?.cancel().catch(() => {});
-      throw sizeLimitError();
-    }
-
-    const buffer = await readBodyWithLimit(response, options.maxBytes);
-
-    return {
-      buffer,
-      finalUrl: currentUrl.toString(),
-      status: response.status,
-      headers: headersToRecord(response.headers),
-    };
-  }
 }
 
 async function fetchBinaryViaNodeHttp(
@@ -457,6 +422,9 @@ async function fetchBinaryViaNodeHttp(
     maxRedirects: number;
     maxBytes: number;
     validateUrl: (url: URL) => void;
+    resolveHostname: (hostname: string) => Promise<LookupAddress[]>;
+    request?: BinaryRequestFactory;
+    deadline: number;
   },
   redirectCount = 0,
 ): Promise<FetchBinaryResult> {
@@ -474,6 +442,12 @@ async function fetchBinaryViaNodeHttp(
     throw tooManyRedirectsError();
   }
 
+  const pinnedAddress = await resolveSafeRemoteAddress(parsedUrl, options.resolveHostname);
+  const remainingMs = options.deadline - Date.now();
+  if (remainingMs <= 0) {
+    throw Object.assign(new Error("Remote request timed out"), { httpStatus: 504 });
+  }
+
   const transport = parsedUrl.protocol === "https:" ? https : http;
   // Source-specific CA bundles only extend the normal trusted roots for known
   // upstreams with incomplete chains (see familyByTls.ts). Verification is
@@ -481,18 +455,27 @@ async function fetchBinaryViaNodeHttp(
   const sourceSpecificTlsCa = resolveSourceSpecificTlsCa(parsedUrl);
 
   return new Promise<FetchBinaryResult>((resolve, reject) => {
-    const request = transport.request(
-      parsedUrl,
-      {
+    const requestOptions: https.RequestOptions = {
         method: "GET",
         headers: options.headers,
         ca: sourceSpecificTlsCa,
-        // Only reached after native fetch has already failed; IPv4 avoids
-        // broken IPv6 routes on legacy upstream infrastructure without
-        // weakening TLS verification.
-        family: 4,
-      },
-      (response) => {
+        // Bind the socket to the exact address approved above. The URL keeps
+        // the original hostname, so Host, TLS SNI and certificate validation
+        // retain their normal semantics while no uncontrolled second DNS
+        // lookup can change the destination.
+        lookup: ((_hostname, lookupOptions, callback) => {
+          if (typeof lookupOptions === "object" && lookupOptions.all) {
+            (callback as (error: null, addresses: LookupAddress[]) => void)(null, [pinnedAddress]);
+            return;
+          }
+          (callback as (error: null, address: string, family: number) => void)(
+            null,
+            pinnedAddress.address,
+            pinnedAddress.family,
+          );
+        }) as LookupFunction,
+      };
+    const onResponse = (response: http.IncomingMessage) => {
         const status = response.statusCode ?? 0;
         const statusText = response.statusMessage ?? "";
         const responseHeaders = nodeHeadersToRecord(response.headers);
@@ -573,12 +556,14 @@ async function fetchBinaryViaNodeHttp(
             headers: responseHeaders,
           });
         });
-      },
-    );
+      };
+    const request = options.request
+      ? options.request(parsedUrl, requestOptions, onResponse)
+      : transport.request(parsedUrl, requestOptions, onResponse);
 
-    request.setTimeout(options.timeoutMs, () => {
+    request.setTimeout(remainingMs, () => {
       request.destroy(
-        Object.assign(new Error(`request timed out after ${options.timeoutMs}ms`), {
+        Object.assign(new Error("Remote request timed out"), {
           code: "ETIMEDOUT",
           httpStatus: 504,
         }),
@@ -593,13 +578,11 @@ async function fetchBinaryViaNodeHttp(
 /**
  * Download an arbitrary binary resource (e.g. a remote image) with TLS
  * verification always enabled. Reuses the same source-specific CA workaround
- * and transport-fallback heuristic as `fetchHtml`; the only workaround for an
- * upstream's incomplete chain lives in `familyByTls.ts`.
+ * and source-specific CA workaround as `fetchHtml`; the only workaround for
+ * an upstream's incomplete chain lives in `familyByTls.ts`.
  *
- * Redirects are followed manually (native fetch and the Node http fallback
- * both call `options.validateUrl` on every hop) so callers handling
- * user-supplied URLs can reject unsafe redirect targets (SSRF) before the
- * next request is made.
+ * Redirects are followed manually; every hop is URL-validated, fully resolved
+ * and IP-classified before a pinned connection is made.
  */
 export async function fetchBinary(
   url: string,
@@ -609,62 +592,38 @@ export async function fetchBinary(
   const maxRedirects = options.maxRedirects ?? MAX_REDIRECTS;
   const maxBytes = options.maxBytes ?? Number.POSITIVE_INFINITY;
   const headers = { ...options.headers };
-  const nodeHttpFallback = options.nodeHttpFallback ?? DEFAULT_NODE_HTTP_FALLBACK;
   const validateUrl = options.validateUrl ?? (() => {});
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const resolveHostname = options.resolveHostname ?? ((hostname: string) =>
+    dnsLookup(hostname, { all: true, verbatim: true }));
+  const deadline = Date.now() + timeoutMs;
+  let timer: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    try {
-      return await fetchBinaryViaNativeFetch(url, {
-        signal: controller.signal,
+    return await Promise.race([
+      fetchBinaryViaNodeHttp(url, {
+        timeoutMs,
         headers,
         maxRedirects,
         maxBytes,
         validateUrl,
-      });
-    } catch (nativeError) {
-      if (hasHttpStatus(nativeError)) {
-        // Already a controlled classification (SSRF/redirect/size limit) —
-        // surface it as-is instead of masking it behind a transport retry.
-        throw nativeError;
-      }
-
-      if (nativeError instanceof Error && nativeError.name === "AbortError") {
-        throw Object.assign(new Error(`Timed out after ${timeoutMs}ms loading ${url}`), {
-          httpStatus: 504,
-          cause: nativeError,
-        });
-      }
-
-      if (!nodeHttpFallback || !shouldUseNodeHttpFallback(nativeError)) {
-        throw Object.assign(new Error(buildNetworkErrorMessage(url, nativeError)), {
-          httpStatus: 502,
-          cause: nativeError,
-        });
-      }
-
-      console.warn("[import.fetchBinary] native fetch transport failed; trying node http fallback", {
-        url,
-        error: describeFetchError(nativeError),
-      });
-
-      try {
-        return await fetchBinaryViaNodeHttp(url, {
-          timeoutMs,
-          headers,
-          maxRedirects,
-          maxBytes,
-          validateUrl,
-        });
-      } catch (fallbackError) {
-        if (hasHttpStatus(fallbackError)) throw fallbackError;
-        throw createNodeTransportError(nativeError, fallbackError, 502);
-      }
-    }
+        resolveHostname,
+        request: options.request,
+        deadline,
+      }),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(Object.assign(new Error("Remote request timed out"), { httpStatus: 504 }));
+        }, timeoutMs);
+      }),
+    ]);
+  } catch (error) {
+    if (hasHttpStatus(error)) throw error;
+    throw Object.assign(new Error(buildNetworkErrorMessage(url, error)), {
+      httpStatus: 502,
+      cause: error,
+    });
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
 
