@@ -81,6 +81,7 @@ type CityHubDesktopSearchControlProps = Omit<DesktopSearchControlProps, "variant
 function CityHubDesktopSearchControl({
   citySlug = "minsk",
   className,
+  currentIntent,
   compactIconIntent = null,
   mode,
   activePanel,
@@ -90,6 +91,7 @@ function CityHubDesktopSearchControl({
   renderPanels = true,
   embeddedInHeader = false,
 }: CityHubDesktopSearchControlProps) {
+  const router = useRouter();
   const locationRef = useRef<HTMLButtonElement>(null);
   const { applied, actions } = useDiscoveryFilters();
   const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
@@ -108,26 +110,7 @@ function CityHubDesktopSearchControl({
     mode === "expanded" && activePanel === "where",
   );
 
-  const getLocationText = () => {
-    const cityPhrase = getCityLocativePhrase(citySlug);
-    const nearbyPart = formDisplayFilters.nearby ? "Поблизости" : null;
-    
-    let metroOrDistrictPart: string | null = null;
-    if (formDisplayFilters.metro) {
-      const metro = safeApiOptions.metros.find(
-        (m) => m.value === formDisplayFilters.metro,
-      );
-      metroOrDistrictPart = metro?.label || formDisplayFilters.metro;
-    } else if (formDisplayFilters.district) {
-      const district = safeApiOptions.districts.find(
-        (d) => d.value === formDisplayFilters.district,
-      );
-      metroOrDistrictPart = district?.label || formDisplayFilters.district;
-    }
-    
-    const parts = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
-    return parts.join(" • ");
-  };
+  const getLocationText = () => getCityLocativePhrase(citySlug);
 
   const handleSegmentClick = (panel: HeaderPanel) => {
     if (activePanel === panel) {
@@ -188,11 +171,7 @@ function CityHubDesktopSearchControl({
       document.removeEventListener("mousedown", handleClickOutside, true);
   }, [activePanel, mode, onPanelClose, actions]);
 
-  const hasLocationFilter = !!(
-    formDisplayFilters.nearby ||
-    formDisplayFilters.metro ||
-    formDisplayFilters.district
-  );
+  const hasLocationFilter = false;
 
   return (
     <div className={cn("relative flex w-full min-h-0 items-stretch gap-3", className)}>
@@ -293,6 +272,16 @@ function CityHubDesktopSearchControl({
             <LocationPanel
               variant="cityHub"
               citySlug={citySlug}
+              selectedCitySlug={citySlug}
+              onCityPick={(slug) => {
+                if (slug === citySlug) return;
+                actions.setDraft({ nearby: false, metro: null, district: null });
+                const target =
+                  currentIntent === "journal" ? `/${slug}/blog` : `/${slug}`;
+                router.push(target, { scroll: false });
+                onPanelClose();
+                actions.close();
+              }}
               searchText=""
               onSearchTextChange={() => {}}
               onClose={() => {
@@ -338,23 +327,7 @@ function CompactLocationSummary({
   };
 
   const cityPhrase = getCityLocativePhrase(citySlug);
-  const nearbyPart = applied.nearby ? "Поблизости" : null;
-  
-  let metroOrDistrictPart: string | null = null;
-  if (applied.metro) {
-    const metro = safeApiOptions.metros.find(
-      (m) => m.value === applied.metro,
-    );
-    metroOrDistrictPart = metro?.label || applied.metro;
-  } else if (applied.district) {
-    const district = safeApiOptions.districts.find(
-      (d) => d.value === applied.district,
-    );
-    metroOrDistrictPart = district?.label || applied.district;
-  }
-
-  const parts = [cityPhrase, nearbyPart, metroOrDistrictPart].filter((p): p is string => p != null);
-  const summaryText = parts.length > 0 ? parts.join(" • ") : "Поиск";
+  const summaryText = cityPhrase || "Поиск";
 
   const intentKey = iconIntent ?? null;
   const intentConfig =
