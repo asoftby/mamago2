@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
       genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
       dateRange: resolveEventDateRange({ preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null, from: p.get("from"), to: p.get("to") }),
       free: p.get("free") === "true",
+      priceMin: p.get("free") === "true" || p.get("priceMin") == null ? null : (() => { const value = Number(p.get("priceMin")); return Number.isFinite(value) && value > 0 ? value : null; })(),
       priceMax: p.get("free") === "true" || p.get("priceMax") == null ? null : (() => { const value = Number(p.get("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),
       districtId: p.get("district"), metroId: p.get("metro"), adultOnly: p.get("adultOnly") === "true",
     },

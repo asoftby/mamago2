@@ -23,6 +23,7 @@ function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
       filters.genreSlugs?.length ||
       filters.dateRange ||
       filters.free ||
+      filters.priceMin !== null && filters.priceMin !== undefined ||
       filters.priceMax !== null && filters.priceMax !== undefined ||
       filters.districtId ||
       filters.metroId ||
@@ -68,6 +69,7 @@ export async function getKudaDiscoveryFeed(
         genreSlugs: [],
         dateRange: null,
         free: false,
+        priceMin: null,
         priceMax: null,
         districtId: null,
         metroId: null,

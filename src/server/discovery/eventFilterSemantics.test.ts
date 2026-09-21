@@ -104,6 +104,26 @@ test("numeric max uses canonical starting price and excludes NONE and UNKNOWN", 
   );
 });
 
+test("numeric range applies both minimum and maximum to canonical starting price", () => {
+  assert.deepEqual(
+    buildEventRuntimeWhere({
+      categorySlugs: [],
+      genreSlugs: [],
+      dateRange: null,
+      free: false,
+      priceMin: 20,
+      priceMax: 50,
+      districtId: null,
+      metroId: null,
+      adultOnly: false,
+    }),
+    [{
+      priceMode: { in: ["FREE", "EXACT", "FROM", "RANGE"] },
+      priceFrom: { gte: 20, lte: 50 },
+    }],
+  );
+});
+
 test("numeric max matches canonical modes by priceFrom while no max keeps every mode", () => {
   assert.equal(matchesCanonicalStartingPrice({ priceMode: "EXACT", priceFrom: 40 }, 50), true);
   assert.equal(matchesCanonicalStartingPrice({ priceMode: "EXACT", priceFrom: 60 }, 50), false);

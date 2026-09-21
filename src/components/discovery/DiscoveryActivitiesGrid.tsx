@@ -45,6 +45,7 @@ function filtersSignature(f: DiscoveryFilters): string {
     district: f.district,
     nearby: f.nearby,
     free: f.free,
+    priceMin: f.priceMin,
     priceMax: f.priceMax,
     adultOnly: f.adultOnly,
   });

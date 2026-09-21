@@ -342,6 +342,7 @@ export function DiscoveryFilters({
              whenPreset: applied.whenPreset,
              format: applied.format,
              free: applied.free,
+             priceMin: applied.priceMin,
              priceMax: applied.priceMax,
           }}
           draft={applied}
