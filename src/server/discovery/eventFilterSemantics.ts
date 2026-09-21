@@ -51,6 +51,7 @@ export type EventRuntimeFilters = {
   genreSlugs?: string[];
   dateRange: DateRange | null;
   free: boolean;
+  priceMin?: number | null;
   priceMax?: number | null;
   districtId: string | null;
   metroId: string | null;
@@ -140,8 +141,14 @@ export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.Act
     });
   }
   if (filters.free) parts.push(buildFreeEventWhere());
-  else if (filters.priceMax != null) {
-    parts.push({ priceMode: { in: [...NUMERIC_PRICE_MODES] }, priceFrom: { lte: filters.priceMax } });
+  else if (filters.priceMin != null || filters.priceMax != null) {
+    parts.push({
+      priceMode: { in: [...NUMERIC_PRICE_MODES] },
+      priceFrom: {
+        ...(filters.priceMin != null ? { gte: filters.priceMin } : {}),
+        ...(filters.priceMax != null ? { lte: filters.priceMax } : {}),
+      },
+    });
   }
   if (filters.districtId) {
     parts.push({ place: { is: buildEffectivePlaceDistrictWhere(filters.districtId) } });
