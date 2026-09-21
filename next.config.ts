@@ -125,6 +125,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Inlines per-page critical CSS as <style> instead of render-blocking
+    // <link rel="stylesheet">. Cuts the render-blocking CSS requests on first
+    // load (e.g. /minsk); client navigations still use normal stylesheets.
+    inlineCss: false,
   },
 
   /** Доступ к dev с localhost / кастомного local-domain / LAN без поломанной загрузки `/_next/*`. */

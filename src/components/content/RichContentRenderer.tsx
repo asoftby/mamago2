@@ -15,6 +15,7 @@
  *   <RichContentRenderer html={offer.description} collapsible />
  */
 
+import "@/styles/rich-content.css";
 import { cn } from "@/lib/utils";
 import {
   legacyPlainTextToEditorHtml,

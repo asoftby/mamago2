@@ -1,5 +1,6 @@
 "use client";
 
+import "@/styles/event-page.css";
 import { useEffect, useRef, useState } from "react";
 import { Heart, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
