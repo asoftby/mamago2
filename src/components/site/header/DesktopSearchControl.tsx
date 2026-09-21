@@ -103,8 +103,6 @@ function CityHubDesktopSearchControl({
     metros: [],
     categories: [],
   };
-  const formDisplayFilters = applied;
-
   const locationPosition = useDropdownPosition(
     locationRef as RefObject<HTMLElement | null>,
     mode === "expanded" && activePanel === "where",
