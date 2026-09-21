@@ -7,6 +7,7 @@ const LISTING_SECTIONS = new Set([
   "offers",
   "routes",
   "birthday",
+  "blog",
 ]);
 
 const EXCLUDED_ROOT_SEGMENTS = new Set([
@@ -35,6 +36,7 @@ const LISTING_SUBPAGE_ALLOWLIST: Record<string, Set<string>> = {
   offers: new Set(),
   routes: new Set(),
   birthday: new Set(),
+  blog: new Set(),
 };
 
 function normalizePathname(pathname: string): string {
