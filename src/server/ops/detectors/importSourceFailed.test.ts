@@ -85,6 +85,7 @@ async function main() {
       assert.equal(result.signals[0].severity, "WARNING");
       assert.equal(result.signals[0].fingerprint, importSourceFailedFingerprint(failedSourceId));
       assert.equal(result.signals[0].entityId, failedSourceId);
+      assert.equal(result.signals[0].detailsUrl, `/admin/import/sources#source-${failedSourceId}`);
     }
 
     // 4. Multiple active failed sources -> one signal each, distinct fingerprints.
