@@ -761,6 +761,7 @@ export function useDiscoveryFilters() {
       !!filters.district ||
       filters.nearby ||
       filters.free ||
+      filters.priceMin != null ||
       filters.priceMax != null ||
       filters.adultOnly;
 
