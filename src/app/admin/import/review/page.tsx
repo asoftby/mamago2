@@ -34,6 +34,8 @@ export const revalidate = 0;
 type QueueStageFilter = "PENDING" | "IN_PROGRESS" | "COMPLETED";
 type QueueStageParam = QueueStageFilter | "ALL";
 
+export const QUEUE_PAGE_SIZE = 50;
+
 const importReviewImportedRecordSelect = {
   id: true,
   createdAt: true,
@@ -100,6 +102,11 @@ function parseStage(raw: string | undefined): QueueStageFilter | undefined {
     : undefined;
 }
 
+export function parsePage(raw: string | undefined): number {
+  const parsed = Number.parseInt(raw ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
 function buildStageWhere(stage?: QueueStageFilter) {
   if (stage === "PENDING") {
     return { reviewStatus: "PENDING" as ImportReviewStatus };
@@ -138,10 +145,11 @@ function buildStageWhere(stage?: QueueStageFilter) {
   return undefined;
 }
 
-function buildReviewHref(next: {
+export function buildReviewHref(next: {
   stage?: QueueStageParam;
   sourceId?: string;
   entityType?: string;
+  page?: number;
 }) {
   const params = new URLSearchParams();
   const stage = next.stage;
@@ -152,33 +160,50 @@ function buildReviewHref(next: {
   if (stage === "ALL") params.set("status", "ALL");
   if (sourceId) params.set("source", sourceId);
   if (entityType) params.set("entity", entityType);
+  if (next.page && next.page > 1) params.set("page", String(next.page));
 
   const query = params.toString();
   return query ? `/admin/import/review?${query}` : "/admin/import/review";
+}
+
+function buildImportedObjectsWhere(filters: {
+  stage?: QueueStageFilter;
+  sourceId?: string;
+  entityType?: ImportEntityType;
+}) {
+  return {
+    ...(buildStageWhere(filters.stage) ?? {}),
+    ...(filters.sourceId ? { sourceId: filters.sourceId } : {}),
+    ...(filters.entityType ? { entityTypeHint: filters.entityType } : {}),
+  };
 }
 
 async function getImportedObjects(filters: {
   stage?: QueueStageFilter;
   sourceId?: string;
   entityType?: ImportEntityType;
+  page: number;
 }) {
   const db = getImportAdminDb();
   if (!db.importedRecord) {
-    return [];
+    return { records: [] as Awaited<ReturnType<typeof reconcileImportedRecordLinks<ImportReviewImportedRecordPrismaRow>>>, totalCount: 0 };
   }
 
-  const records = (await db.importedRecord.findMany({
-    where: {
-      ...(buildStageWhere(filters.stage) ?? {}),
-      ...(filters.sourceId ? { sourceId: filters.sourceId } : {}),
-      ...(filters.entityType ? { entityTypeHint: filters.entityType } : {}),
-    },
-    orderBy: [{ createdAt: "desc" }],
-    take: 100,
-    select: importReviewImportedRecordSelect,
-  })) as ImportReviewImportedRecordPrismaRow[];
+  const where = buildImportedObjectsWhere(filters);
 
-  return reconcileImportedRecordLinks(records, prismaBase);
+  const [rows, totalCount] = await Promise.all([
+    db.importedRecord.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }],
+      skip: (filters.page - 1) * QUEUE_PAGE_SIZE,
+      take: QUEUE_PAGE_SIZE,
+      select: importReviewImportedRecordSelect,
+    }) as Promise<ImportReviewImportedRecordPrismaRow[]>,
+    db.importedRecord.count({ where }),
+  ]);
+
+  const records = await reconcileImportedRecordLinks(rows, prismaBase);
+  return { records, totalCount };
 }
 
 async function getQueueStats() {
@@ -254,20 +279,24 @@ export default async function ImportReviewPage({
     sp.entity === "PLACE" || sp.entity === "EVENT" || sp.entity === "OFFER"
       ? (sp.entity as ImportEntityType)
       : undefined;
+  const requestedPage = parsePage(sp.page);
 
   const stats = await getQueueStats();
   const hasAnyImportedObjects = stats.total > 0;
   const effectiveStage =
     requestedStage ?? (sp.status === "ALL" ? undefined : hasAnyImportedObjects ? "PENDING" : undefined);
 
-  const [records, sources] = await Promise.all([
+  const [{ records, totalCount }, sources] = await Promise.all([
     getImportedObjects({
       stage: effectiveStage,
       sourceId: requestedSourceId,
       entityType: requestedEntityType,
+      page: requestedPage,
     }),
     getSources(),
   ]);
+  const totalPages = Math.max(1, Math.ceil(totalCount / QUEUE_PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
 
   const preparedRecords = records.map((record) => {
     const normalizedData = record.normalizedData as Record<string, unknown> | null;
@@ -500,7 +529,9 @@ export default async function ImportReviewPage({
                 </h2>
                 <p className="mt-1 text-sm text-stone-600">
                   {preparedRecords.length > 0
-                    ? `Показано ${preparedRecords.length} объектов для текущего среза.`
+                    ? totalPages > 1
+                      ? `Показано ${preparedRecords.length} из ${totalCount} объектов — страница ${currentPage} из ${totalPages}.`
+                      : `Показано ${preparedRecords.length} объектов для текущего среза.`
                     : "Для текущего среза объектов нет — попробуйте сменить фильтр или открыть весь список."}
                 </p>
               </div>
@@ -535,6 +566,15 @@ export default async function ImportReviewPage({
                 </Link>
               </div>
               <ReviewQueueTableClient records={preparedRecords} />
+              {totalPages > 1 ? (
+                <QueuePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  stage={effectiveStage ?? (sp.status === "ALL" ? "ALL" : "PENDING")}
+                  sourceId={requestedSourceId}
+                  entityType={requestedEntityType}
+                />
+              ) : null}
             </section>
           )}
         </>
@@ -542,6 +582,90 @@ export default async function ImportReviewPage({
         <StartEmptyState sourceCount={sources.length} />
       )}
     </div>
+  );
+}
+
+function QueuePagination({
+  currentPage,
+  totalPages,
+  stage,
+  sourceId,
+  entityType,
+}: {
+  currentPage: number;
+  totalPages: number;
+  stage: QueueStageParam;
+  sourceId?: string;
+  entityType?: string;
+}) {
+  const href = (page: number) =>
+    buildReviewHref({ stage, sourceId, entityType, page });
+
+  // Small window around the current page, plus first/last — avoids
+  // rendering all N page links when the queue is large.
+  const windowStart = Math.max(1, currentPage - 2);
+  const windowEnd = Math.min(totalPages, currentPage + 2);
+  const pageNumbers: number[] = [];
+  for (let p = windowStart; p <= windowEnd; p += 1) pageNumbers.push(p);
+
+  return (
+    <nav
+      aria-label="Страницы очереди"
+      className="flex flex-wrap items-center justify-center gap-2 pt-2"
+    >
+      <Link
+        href={href(Math.max(1, currentPage - 1))}
+        aria-disabled={currentPage <= 1}
+        className={`rounded-xl border px-3 py-1.5 text-sm font-medium transition ${
+          currentPage <= 1
+            ? "pointer-events-none border-stone-100 text-stone-300"
+            : "border-stone-200 text-stone-700 hover:bg-stone-50"
+        }`}
+      >
+        Назад
+      </Link>
+
+      {windowStart > 1 ? (
+        <>
+          <Link href={href(1)} className="rounded-xl border border-stone-200 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50">1</Link>
+          {windowStart > 2 ? <span className="px-1 text-stone-400">…</span> : null}
+        </>
+      ) : null}
+
+      {pageNumbers.map((p) => (
+        <Link
+          key={p}
+          href={href(p)}
+          aria-current={p === currentPage ? "page" : undefined}
+          className={`rounded-xl border px-3 py-1.5 text-sm font-medium transition ${
+            p === currentPage
+              ? "border-stone-900 bg-stone-950 text-white"
+              : "border-stone-200 text-stone-700 hover:bg-stone-50"
+          }`}
+        >
+          {p}
+        </Link>
+      ))}
+
+      {windowEnd < totalPages ? (
+        <>
+          {windowEnd < totalPages - 1 ? <span className="px-1 text-stone-400">…</span> : null}
+          <Link href={href(totalPages)} className="rounded-xl border border-stone-200 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50">{totalPages}</Link>
+        </>
+      ) : null}
+
+      <Link
+        href={href(Math.min(totalPages, currentPage + 1))}
+        aria-disabled={currentPage >= totalPages}
+        className={`rounded-xl border px-3 py-1.5 text-sm font-medium transition ${
+          currentPage >= totalPages
+            ? "pointer-events-none border-stone-100 text-stone-300"
+            : "border-stone-200 text-stone-700 hover:bg-stone-50"
+        }`}
+      >
+        Вперёд
+      </Link>
+    </nav>
   );
 }
 
