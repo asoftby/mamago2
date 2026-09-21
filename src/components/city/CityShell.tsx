@@ -98,6 +98,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
             to: scalar("to") ?? scalar("dateTo") ?? null,
           }),
           free: scalar("free") === "true",
+          priceMin: scalar("free") === "true" || scalar("priceMin") == null ? null : (() => { const value = Number(scalar("priceMin")); return Number.isFinite(value) && value > 0 ? value : null; })(),
           priceMax: scalar("free") === "true" || scalar("priceMax") == null ? null : (() => { const value = Number(scalar("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),
           districtId: scalar("district") ?? null,
           metroId: scalar("metro") ?? null,
@@ -114,11 +115,11 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       // The slider domain must come from the same candidate pool without its own
       // ceiling, otherwise choosing 50 would collapse max to 50 and make it
       // impossible to increase the budget again.
-      if (intent === "kuda" && eventFilters?.priceMax != null) {
+      if (intent === "kuda" && (eventFilters?.priceMin != null || eventFilters?.priceMax != null)) {
         budgetActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
           format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
           nearby: false,
-          eventFilters: { ...eventFilters, priceMax: null },
+          eventFilters: { ...eventFilters, priceMin: null, priceMax: null },
         });
       }
       const max = computeMaxBudget(budgetActivities);
