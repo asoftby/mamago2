@@ -97,11 +97,7 @@ function isStrongImportPlaceMatch(
     return false;
   }
 
-  return (
-    placeAddress === hintAddress ||
-    placeAddress.includes(hintAddress) ||
-    hintAddress.includes(placeAddress)
-  );
+  return placeAddress === hintAddress;
 }
 
 export function Step2Location({ data, onChange, isEditable, eventId }: Step2LocationProps) {
