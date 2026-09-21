@@ -122,6 +122,10 @@ export async function openCookiePreferencesFromShell(): Promise<void> {
   if (typeof window === "undefined") return;
 
   await initCookieConsent();
+  // Library CSS + mamaGo overrides are not in the initial page bundle (see
+  // cookie-consent-provider.tsx); load them now so the Preferences modal
+  // never renders unstyled.
+  await import("@/components/providers/cookie-consent-preferences-styles");
   const { showPreferences } = await import("vanilla-cookieconsent");
   showPreferences();
 

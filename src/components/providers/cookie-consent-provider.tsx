@@ -2,7 +2,13 @@
 
 /**
  * Инициализация CookieConsent один раз на клиенте (без SSR).
- * Подключает стили библиотеки + mamaGo overrides.
+ *
+ * Стили библиотеки + mamaGo overrides НЕ импортируются здесь статически:
+ * первый экран (первый визит и «известное» согласие) полностью покрывается
+ * первопейнт-шеллом (CookieConsentShell, Tailwind-классы из globals.css) и
+ * критичным no-flash правилом в src/app/layout.tsx. Тяжёлые стили самой
+ * библиотеки нужны только когда открывается Preferences — см.
+ * cookie-consent-preferences-styles.ts и openCookiePreferencesFromShell().
  *
  * Скрипты аналитики/маркетинга: см. AnalyticsLoader / MarketingLoader.
  */
@@ -12,9 +18,6 @@ import { AnalyticsLoader } from "@/components/analytics/analytics-loader";
 import { MarketingLoader } from "@/components/analytics/marketing-loader";
 import { CookieConsentShell } from "./CookieConsentShell";
 import type { ExternalAnalyticsConfig } from "@/lib/analytics/externalAnalyticsTypes";
-
-import "vanilla-cookieconsent/dist/cookieconsent.css";
-import "@/styles/cookie-consent-mamago.css";
 
 const TEMP_DISABLE_COOKIE_CONSENT = false;
 

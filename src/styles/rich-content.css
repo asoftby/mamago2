@@ -1,0 +1,40 @@
+/**
+ * Sanitized rich HTML rendered on site (preflight resets list markers like in ProseMirror).
+ * Moved out of globals.css so it ships only where RichContentRenderer is used
+ * (offer/place/event/legal detail pages) instead of every public route.
+ */
+.rich-rendered-html ul,
+.rich-rendered-html ol {
+  padding-left: 1.5rem !important;
+  list-style-position: outside !important;
+}
+
+.rich-rendered-html ul {
+  list-style-type: disc !important;
+}
+
+.rich-rendered-html ol {
+  list-style-type: decimal !important;
+}
+
+.rich-rendered-html ul li::marker {
+  color: var(--primary);
+}
+
+.rich-rendered-html ol li::marker {
+  color: var(--muted-foreground);
+}
+
+.rich-rendered-html li {
+  display: list-item !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.rich-rendered-html li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.rich-rendered-html li > p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}

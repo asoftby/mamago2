@@ -4792,3 +4792,46 @@ distributor_company_id=550) и хотели бы уточнить несколь
   fix that started this audit) and PR #303 (rows #2/#4/#5, plus the
   TOCTOU-race and honest-skip-reporting fixes an automated review on
   #303 itself caught).
+
+## [BACKLOG-155] Sentry client SDK is initial-load-blocking and dominates a top-3 JS chunk
+
+- Status: OPEN
+- Priority: P2
+- Area: Performance / Observability
+- Added: 2026-09-21
+- Reason deferred: out of scope for `fix/perf-public-critical-css-20260921`
+  (CSS-only per that task's brief); fixing it needs its own
+  measurement/rollback plan since it touches error/session-replay
+  observability, not just performance.
+- Context: PROD mobile PageSpeed flagged two long tasks (~427ms, ~121ms)
+  attributed to `chunks/41177-*.js`. Locally that chunk id is stable
+  across builds (content hash changes, numeric id doesn't) and is
+  consistently one of the 3 largest JS chunks shipped (~470-480KB
+  uncompressed in a local build). `grep -o -i sentry chunks/41177-*.js`
+  hits 204 times; no other checked library (mapbox/maplibre/leaflet/
+  tiptap/prosemirror/framer-motion/embla/swiper/dnd-kit/…) appears in it
+  at all. `sentry.client.config.ts` calls `Sentry.init()` eagerly with
+  `tracesSampleRate: 1` (100% perf trace sampling) and
+  `Sentry.replayIntegration()` (session replay — one of the heaviest
+  Sentry browser integrations, does DOM mutation recording). This runs
+  on every page load via Next's standard `sentry.client.config.ts`
+  auto-instrumentation, not deferred to idle/interaction.
+- Current state: not fixed, not touched by `fix/perf-public-critical-css-20260921`.
+  `next build` also warns that `sentry.client.config.ts` /
+  `sentry.server.config.ts` / `sentry.edge.config.ts` are deprecated in
+  favor of `instrumentation-client.ts` + the `register()`/`onRequestError`
+  instrumentation hooks (separate concern from the perf issue, but likely
+  the same file touched by any fix here).
+- Dependencies: none blocking other work.
+- Acceptance criteria: `Sentry.init()` (or at least
+  `replayIntegration`/tracing) no longer executes as part of the
+  initial-page-load JS bundle/task queue — e.g. deferred via
+  `requestIdleCallback`/after-hydration init, or `replaysSessionSampleRate`
+  dropped so replay only initializes `onError`, or `tracesSampleRate`
+  lowered from 100%. Any change must be validated against Sentry's actual
+  error/replay capture rate in DEV before shipping to PROD (a naive defer
+  can silently drop early-navigation errors).
+- Source: secondary JS audit requested alongside
+  `fix/perf-public-critical-css-20260921` (2026-09-21 recovery of
+  `fix/perf-public-critical-css-20260914`); not fixed in that PR per its
+  own instructions ("не исправляй, только owner + next-task").
