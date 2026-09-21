@@ -6,7 +6,7 @@ import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { BYN_SYMBOL, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
 import { formatHHMM } from "@/lib/formatters/date";
 import type { EventPageData } from "./eventPageTypes";
 import {
@@ -152,13 +152,33 @@ function priceTextWithCurrencyIfNeeded(text: string): string {
   return `${text} ${BYN_SYMBOL}`;
 }
 
-function priceLabel(activity: Pick<ActivityForEventPageInput, "priceText" | "priceFrom" | "currency">): string {
+function priceLabel(
+  activity: Pick<ActivityForEventPageInput, "priceText" | "priceFrom" | "currency" | "scheduleJson">,
+): string {
+  const pricingMode = getScheduleJsonString(activity, "pricingMode")?.trim().toLowerCase();
+  const explicitFrom = pricingMode === "from";
   const t = activity.priceText?.trim();
-  if (t) return priceTextWithCurrencyIfNeeded(t);
+
+  if (t) {
+    const label = priceTextWithCurrencyIfNeeded(t);
+    if (
+      explicitFrom &&
+      !/^от\b/i.test(label) &&
+      !/бесплатно|уточняйте/i.test(label)
+    ) {
+      return `от ${label}`;
+    }
+    return label;
+  }
+
   if (activity.priceFrom === 0) return "Бесплатно";
   if (activity.priceFrom != null) {
+    if (explicitFrom) return formatPriceFrom(activity.priceFrom);
+    if (pricingMode === "fixed") return formatPrice(activity.priceFrom);
+    // Legacy records without pricingMode historically represented priceFrom as "от".
     return formatPriceFrom(activity.priceFrom);
   }
+
   return "Уточняйте цену";
 }
 
@@ -309,7 +329,7 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
     rows.push({
       id: "time",
       label: "Время начала",
-      value: uniqueTimes.join(", "),
+      value: `начало в ${uniqueTimes.join(", ")}`,
     });
   }
 
