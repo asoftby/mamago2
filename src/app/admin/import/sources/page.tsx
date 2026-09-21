@@ -186,7 +186,7 @@ export default async function ImportSourcesPage({
                   : "В рабочем списке";
 
                 return (
-                  <tr key={source.id} className={isArchived ? "bg-gray-50/60" : "hover:bg-gray-50"}>
+                  <tr id={`source-${source.id}`} key={source.id} className={isArchived ? "bg-gray-50/60" : "hover:bg-gray-50"}>
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="font-medium text-gray-900">{source.name}</div>
