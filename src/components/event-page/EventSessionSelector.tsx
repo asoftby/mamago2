@@ -92,10 +92,11 @@ export function EventSessionSelector({
         const isFirst = idx === 0;
         // Строим subtitle как ReactNode: время · цена (с SVG-символом рубля)
         const timeLabel = getTimeLabel(s.startsAt);
+        const startTimeLabel = timeLabel ? `начало в ${timeLabel}` : "";
         const priceNode = priceLabel ? renderPriceWithIcon(priceLabel, { iconSize: "sm" }) : null;
         const subtitle = priceNode
-          ? <>{timeLabel} · {priceNode}</>
-          : timeLabel || undefined;
+          ? <>{startTimeLabel} · {priceNode}</>
+          : startTimeLabel || undefined;
 
         const hasAction = !!purchaseUrl || !!onBook;
         return (
