@@ -236,7 +236,7 @@ export function EventDecisionPanel({
                   </div>
                   {timePart && (
                     <div className="mt-1.5 text-[13px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                      {timePart}
+                      начало в {timePart}
                     </div>
                   )}
                 </div>
