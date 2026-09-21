@@ -321,14 +321,14 @@ export function MobileSearchSheet({
   });
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || (selectedIntent ?? currentIntent) === "journal") return;
     setSheetDraft((prev) => {
       const pa = [...(prev.age ?? [])].sort().join(",");
       const aa = [...(applied.age ?? [])].sort().join(",");
       if (pa === aa) return prev;
       return mergeDiscoveryPatch(prev, { age: [...(applied.age ?? [])] });
     });
-  }, [isOpen, applied.age]);
+  }, [isOpen, applied.age, selectedIntent, currentIntent]);
 
   /**
    * Toggle persona selection - same logic as in My Plan
