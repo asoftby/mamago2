@@ -34,6 +34,7 @@ export type DiscoveryFilters = {
   district: string | null;
   nearby: boolean;
   free: boolean;
+  priceMin: number | null;
   priceMax: number | null;
   adultOnly: boolean;
 };
@@ -50,6 +51,7 @@ export const defaultFilters: DiscoveryFilters = {
   district: null,
   nearby: false,
   free: false,
+  priceMin: null,
   priceMax: null,
   adultOnly: false,
 };
@@ -67,8 +69,9 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.district &&
     !f.nearby &&
     !f.free &&
-    f.priceMax == null
-    && !f.adultOnly
+    f.priceMin == null &&
+    f.priceMax == null &&
+    !f.adultOnly
   );
 }
 
@@ -82,6 +85,7 @@ export function discoveryFiltersEqual(a: DiscoveryFilters, b: DiscoveryFilters):
     a.district !== b.district ||
     a.nearby !== b.nearby ||
     a.free !== b.free ||
+    a.priceMin !== b.priceMin ||
     a.priceMax !== b.priceMax ||
     a.adultOnly !== b.adultOnly ||
     a.age.length !== b.age.length ||
@@ -212,6 +216,7 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("district") ||
     searchParams.get("nearby") === "true" ||
     searchParams.get("free") === "true" ||
+    searchParams.get("priceMin") ||
     searchParams.get("priceMax") ||
     searchParams.get("adultOnly") === "true"
   );
@@ -324,8 +329,11 @@ export function parseAppliedFromUrl(
 
   const nearby = searchParams.get("nearby") === "true";
   const free = searchParams.get("free") === "true";
+  const priceMinRaw = searchParams.get("priceMin");
+  const parsedPriceMin = priceMinRaw == null ? NaN : Number(priceMinRaw);
   const priceMaxRaw = searchParams.get("priceMax");
   const parsedPriceMax = priceMaxRaw == null ? NaN : Number(priceMaxRaw);
+  const priceMin = !free && Number.isFinite(parsedPriceMin) && parsedPriceMin > 0 ? parsedPriceMin : null;
   const priceMax = !free && Number.isFinite(parsedPriceMax) && parsedPriceMax >= 0 ? parsedPriceMax : null;
   const adultOnly = searchParams.get("adultOnly") === "true";
 
@@ -351,6 +359,7 @@ export function parseAppliedFromUrl(
     district,
     nearby,
     free,
+    priceMin,
     priceMax,
     adultOnly,
   };
@@ -412,6 +421,8 @@ export function serializeAppliedToSearchParams(
 
   if (next.free) params.set("free", "true");
   else params.delete("free");
+  if (!next.free && next.priceMin != null) params.set("priceMin", String(next.priceMin));
+  else params.delete("priceMin");
   if (!next.free && next.priceMax != null) params.set("priceMax", String(next.priceMax));
   else params.delete("priceMax");
   if (next.adultOnly) params.set("adultOnly", "true");
@@ -430,7 +441,7 @@ export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number
     (filters.metro ? 1 : 0) +
     (filters.district ? 1 : 0) +
     (filters.nearby ? 1 : 0) +
-    (filters.free || filters.priceMax != null ? 1 : 0)
+    (filters.free || filters.priceMin != null || filters.priceMax != null ? 1 : 0)
     + (filters.adultOnly ? 1 : 0)
   );
 }
@@ -448,7 +459,7 @@ export function getModalFilterCount(filters: DiscoveryFilters): number {
     (filters.age.length > 0 || filters.adultOnly ? 1 : 0) +
     (filters.format ? 1 : 0) +
     (filters.metro || filters.district ? 1 : 0) +
-    (filters.free || filters.priceMax != null ? 1 : 0)
+    (filters.free || filters.priceMin != null || filters.priceMax != null ? 1 : 0)
   );
 }
 
