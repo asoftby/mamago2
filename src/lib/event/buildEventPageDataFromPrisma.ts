@@ -163,7 +163,7 @@ function priceLabel(
     const label = priceTextWithCurrencyIfNeeded(t);
     if (
       explicitFrom &&
-      !/^от\b/i.test(label) &&
+      !/^от(?:\s|$)/i.test(label) &&
       !/бесплатно|уточняйте/i.test(label)
     ) {
       return `от ${label}`;
