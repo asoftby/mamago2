@@ -1,5 +1,5 @@
 import type { PriceItem } from "@/lib/priceItems";
-import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPriceAmount, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon, renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { extractPlainTextLinesFromHtml } from "@/lib/richtext/utils";
 
@@ -60,7 +60,8 @@ function renderNote(text: string): React.ReactNode {
 }
 
 function priceAmountText(raw: string): string {
-  return normalizeUiCurrencyText(raw).replaceAll(BYN_SYMBOL, "").trim();
+  const normalized = normalizeUiCurrencyText(raw).replaceAll(BYN_SYMBOL, "").trim();
+  return formatPriceAmount(normalized) || normalized;
 }
 
 export function PriceListBlock({
