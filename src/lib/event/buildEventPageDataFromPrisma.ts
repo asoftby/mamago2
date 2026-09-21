@@ -329,7 +329,7 @@ function importantFactsFromActivity(activity: ActivityForEventPageInput): EventP
     rows.push({
       id: "time",
       label: "Время начала",
-      value: `начало в ${uniqueTimes.join(", ")}`,
+      value: uniqueTimes.join(", "),
     });
   }
 
