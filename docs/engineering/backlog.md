@@ -4792,3 +4792,44 @@ distributor_company_id=550) и хотели бы уточнить несколь
   fix that started this audit) and PR #303 (rows #2/#4/#5, plus the
   TOCTOU-race and honest-skip-reporting fixes an automated review on
   #303 itself caught).
+
+## [BACKLOG-155] Review-queue row click: modal instead of a full page navigation
+
+- Status: OPEN
+- Priority: P3
+- Area: Import / Integrations / Admin UX
+- Added: 2026-09-21
+- Reason deferred: raised while working through the first `categoryTypeIdAllowlist=18`
+  import run (144 ABWS records) — clicking a queue row today navigates to
+  `/admin/import/review/[id]`, a full page reload, instead of opening
+  detail in-place. Explicitly scoped as an estimate-only question, not a
+  bug: the project owner asked for a size estimate before deciding
+  whether to build it, and confirmed medium-to-large is the right call
+  to defer rather than build now.
+- Context: `/admin/import/review/[id]/page.tsx` is 664 lines — several
+  distinct data blocks (`EventCatalogBlock`, `PlaceCandidatesBlock`,
+  normalized-data sections, image ingest, Apply/Reject actions), not a
+  small detail panel. Converting it to a modal is not a styling change:
+  it means re-hosting a full page's worth of server data-fetching and
+  action handlers inside an overlay, and deciding what happens to
+  deep-linking — today `/admin/import/review/[id]` is a real,
+  bookmarkable/shareable URL; a modal either needs shallow-routing to
+  preserve that (`?record=<id>` over the list route, synced to
+  open/close state) or gives up direct linking to one record entirely.
+- Current state: not started — estimate only, no design decision made.
+- Dependencies: none. Independent of the review-queue pagination fix
+  shipped the same day — that changes the list `page.tsx`'s query
+  patterns; this item is about `[id]/page.tsx`'s presentation, unrelated
+  code.
+- Acceptance criteria: not defined — needs a product decision first on
+  the deep-linking question above (shallow-route the modal vs. accept
+  losing direct links to a single queue record), which is the project
+  owner's call, not to be guessed at implementation time. Once decided:
+  clicking a queue row opens record detail without a full page
+  navigation, existing Apply/Reject/Open-card actions all still work
+  from within it, and whatever URL behavior was chosen is implemented
+  consistently (either the modal is deep-linkable via a query param, or
+  it's explicitly documented as session-only with no direct link).
+- Source: raised by the project owner while reviewing the first
+  `categoryTypeIdAllowlist=18` import run, 2026-09-21 — sized as
+  medium-to-large and deferred, not built.

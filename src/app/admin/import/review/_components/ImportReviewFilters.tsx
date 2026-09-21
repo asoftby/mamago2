@@ -59,6 +59,10 @@ export function ImportReviewFilters({
       params.delete("entity");
     }
 
+    // Any filter change reallocates which records match — a page number
+    // carried over from before would no longer point at the same slice.
+    params.delete("page");
+
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
