@@ -43,6 +43,7 @@ import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
 import { MobileSearch } from "@/components/mobile/MobileSearch";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import type { SearchResultItem } from "@/lib/search/types";
+import { buildPublicPath } from "@/lib/routing/surface";
 
 /** Единый для всех разделов: пользователь хотя бы раз открыл и закрыл поиск в этой вкладке браузера */
 const SEARCH_FLOW_USED_KEY = "mmg.discovery.searchFlowUsed";
@@ -579,6 +580,11 @@ export function MobileSearchSheet({
 
   const handleIntentSelect = useCallback(
     (intentId: string) => {
+      if (intentId === "journal") {
+        router.push(buildPublicPath(`/${pendingCitySlug}/blog`));
+        handleSheetClose();
+        return;
+      }
       if (selectedIntent === intentId) return;
       setSelectedIntent(intentId);
       const cleared = cloneFilters(defaultFilters);
@@ -604,7 +610,16 @@ export function MobileSearchSheet({
         setActiveSection(mode === "wizard" ? "location" : null);
       }
     },
-    [selectedIntent, cityHubOnly, currentIntent, citySlug, flowUsedGlobal],
+    [
+      selectedIntent,
+      cityHubOnly,
+      currentIntent,
+      citySlug,
+      flowUsedGlobal,
+      router,
+      pendingCitySlug,
+      handleSheetClose,
+    ],
   );
 
   const goNextGuided = useCallback(() => {
