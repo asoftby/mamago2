@@ -80,24 +80,37 @@ function normalizePlaceMatchValue(value?: string | null) {
 }
 
 function isStrongImportPlaceMatch(
-  place: { title: string; address?: string | null },
+  place: {
+    title: string;
+    address?: string | null;
+    cityName?: string | null;
+  },
   hint: ImportLocationHint,
 ) {
   const hintTitle = normalizePlaceMatchValue(hint.venueName);
   const placeTitle = normalizePlaceMatchValue(place.title);
-
-  if (hintTitle && placeTitle && hintTitle === placeTitle) {
-    return true;
-  }
+  const titleMatches = Boolean(
+    hintTitle && placeTitle && hintTitle === placeTitle,
+  );
 
   const hintAddress = normalizePlaceMatchValue(hint.addressText);
   const placeAddress = normalizePlaceMatchValue(place.address);
+  const hasUsableHintAddress = hintAddress.length >= 8;
 
-  if (hintAddress.length < 8 || !placeAddress) {
-    return false;
+  const hintCity = normalizePlaceMatchValue(hint.cityName);
+  const placeCity = normalizePlaceMatchValue(place.cityName);
+  const hasComparableCity = Boolean(hintCity && placeCity);
+  const cityMatches = !hasComparableCity || hintCity === placeCity;
+
+  if (hasUsableHintAddress) {
+    return Boolean(placeAddress && placeAddress === hintAddress && cityMatches);
   }
 
-  return placeAddress === hintAddress;
+  if (hasComparableCity) {
+    return titleMatches && cityMatches;
+  }
+
+  return titleMatches;
 }
 
 export function Step2Location({ data, onChange, isEditable, eventId }: Step2LocationProps) {
@@ -473,19 +486,30 @@ export function Step2Location({ data, onChange, isEditable, eventId }: Step2Loca
             {
               title: place.title,
               address: place.fullAddress || place.displayAddress || place.address,
+              cityName: place.cityName,
             },
             importHint,
           ),
         ) ?? null
       : null;
 
+  const selectedUserPlace = data.placeId
+    ? userPlaces.find((place) => place.id === data.placeId) ?? null
+    : null;
+
   const selectedMatchesImportHint = Boolean(
     data.placeId &&
       importHint &&
       isStrongImportPlaceMatch(
         {
-          title: data.venueName || "",
-          address: data.address || "",
+          title: data.venueName || selectedUserPlace?.title || "",
+          address:
+            data.address ||
+            selectedUserPlace?.fullAddress ||
+            selectedUserPlace?.displayAddress ||
+            selectedUserPlace?.address ||
+            "",
+          cityName: selectedUserPlace?.cityName ?? null,
         },
         importHint,
       ),
