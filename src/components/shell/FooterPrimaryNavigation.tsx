@@ -29,6 +29,8 @@ export function FooterPrimaryNavigationList({
             ) : null}
             <Link
               href={buildPublicPath(item.href(citySlug))}
+              scroll
+              onClick={() => window.scrollTo({ top: 0, left: 0, behavior: "auto" })}
               className="whitespace-nowrap lowercase transition-colors hover:text-primary"
             >
               {item.label}
