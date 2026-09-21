@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
       dateRange: resolveEventDateRange({ preset: preset === "TODAY" || preset === "TOMORROW" || preset === "WEEKEND" ? preset : null, from: p.get("from"), to: p.get("to") }),
       free: p.get("free") === "true",
+      priceMin: null,
       priceMax: null,
       districtId: p.get("district"),
       metroId: p.get("metro"),
