@@ -55,30 +55,35 @@ test("adultOnly round-trips and contributes to unified active count", () => {
   assert.equal(getDiscoveryFilterActiveCount(filters), 1);
 });
 
-test("priceMax round-trips, preserves tracking params, and resets canonically", () => {
-  const base = new URLSearchParams("utm_source=instagram&gclid=click&priceMax=90");
-  const constrained = { ...defaultFilters, priceMax: 50 };
+test("price range round-trips, preserves tracking params, and resets canonically", () => {
+  const base = new URLSearchParams("utm_source=instagram&gclid=click&priceMin=10&priceMax=90");
+  const constrained = { ...defaultFilters, priceMin: 20, priceMax: 50 };
   const params = serializeAppliedToSearchParams(base, constrained);
+  assert.equal(params.get("priceMin"), "20");
   assert.equal(params.get("priceMax"), "50");
   assert.equal(params.get("utm_source"), "instagram");
   assert.equal(params.get("gclid"), "click");
   assert.deepEqual(parseAppliedFromUrl(params as never), constrained);
 
   const reset = serializeAppliedToSearchParams(params, defaultFilters);
+  assert.equal(reset.get("priceMin"), null);
   assert.equal(reset.get("priceMax"), null);
   assert.equal(reset.get("utm_source"), "instagram");
 });
 
-test("free normalizes numeric price off and price remains one badge group", () => {
+test("free normalizes numeric range off and price remains one badge group", () => {
   const params = serializeAppliedToSearchParams(
     new URLSearchParams(),
-    { ...defaultFilters, free: true, priceMax: 50 },
+    { ...defaultFilters, free: true, priceMin: 20, priceMax: 50 },
   );
   assert.equal(params.get("free"), "true");
+  assert.equal(params.get("priceMin"), null);
   assert.equal(params.get("priceMax"), null);
-  assert.equal(parseAppliedFromUrl(new URLSearchParams("free=true&priceMax=50") as never).priceMax, null);
-  assert.equal(getModalFilterCount({ ...defaultFilters, priceMax: 50 }), 1);
-  assert.equal(getModalFilterCount({ ...defaultFilters, free: true, priceMax: 50 }), 1);
+  const parsed = parseAppliedFromUrl(new URLSearchParams("free=true&priceMin=20&priceMax=50") as never);
+  assert.equal(parsed.priceMin, null);
+  assert.equal(parsed.priceMax, null);
+  assert.equal(getModalFilterCount({ ...defaultFilters, priceMin: 20, priceMax: 50 }), 1);
+  assert.equal(getModalFilterCount({ ...defaultFilters, free: true, priceMin: 20, priceMax: 50 }), 1);
 });
 
 // --- C3: localStorage hydration gate must ignore tracking params ---
