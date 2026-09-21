@@ -45,7 +45,7 @@ export function evaluateImportSourceFailed(probe: ImportSourceFailedProbe): Dete
         : `Latest run (${outcome.finishedAt.toISOString()}) failed`,
       entityType: "import_source",
       entityId: outcome.sourceId,
-      detailsUrl: `/admin/import/sources/${outcome.sourceId}`,
+      detailsUrl: `/admin/import/sources#source-${outcome.sourceId}`,
     });
   }
 
