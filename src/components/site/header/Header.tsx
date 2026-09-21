@@ -18,6 +18,7 @@ import {
   isPublicationDetailPath,
   isNonStickyHeaderPath,
   isPlaceDetailPath,
+  isJournalPath,
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { shouldShowDesktopHeaderSearch } from "@/lib/site/shouldShowDesktopHeaderSearch";
@@ -96,6 +97,8 @@ export function SiteHeaderShell() {
     getDiscoveryIntentForPublicationPath(pathname) ??
     getDiscoveryIntentForMePath(pathname) ??
     null;
+  const isJournalRoute = isJournalPath(pathname);
+  const headerSearchIntent = isJournalRoute ? "journal" : searchIntent;
   const tabsIntent = isPublicationPage ? null : routeIntent ?? null;
   const { citySlug } = useCity();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -145,14 +148,14 @@ export function SiteHeaderShell() {
         <div className={HEADER_SEARCH_BAR_WRAP_CLASS}>
           <DesktopSearchControl
             citySlug={citySlug}
-            currentIntent={searchIntent}
+            currentIntent={headerSearchIntent}
             compactIconIntent={isPublicationPage ? searchIntent : null}
             mode="expanded"
             activePanel={hb.activePanel}
             onPanelChange={hb.actions.openPanel}
             onPanelClose={hb.actions.closePanel}
             renderPanels={true}
-            variant={expandedSearchVariant}
+            variant={isJournalRoute ? "cityHub" : expandedSearchVariant}
             embeddedInHeader={!hb.showSearchSurface}
           />
         </div>
@@ -260,7 +263,7 @@ export function SiteHeaderShell() {
                     <DesktopSearchControl
                       className="min-h-11 w-full"
                       citySlug={citySlug}
-                      currentIntent={searchIntent}
+                      currentIntent={headerSearchIntent}
                       compactIconIntent={
                         isPublicationPage ? searchIntent : null
                       }
@@ -269,7 +272,7 @@ export function SiteHeaderShell() {
                       onPanelChange={() => {}}
                       onPanelClose={() => {}}
                       onExpand={hb.actions.toggleSearchSurface}
-                      variant={compactSearchVariant}
+                      variant={isJournalRoute ? "cityHub" : compactSearchVariant}
                       renderPanels={false}
                     />
                   </motion.div>

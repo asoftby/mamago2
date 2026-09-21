@@ -321,14 +321,14 @@ export function MobileSearchSheet({
   });
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || (selectedIntent ?? currentIntent) === "journal") return;
     setSheetDraft((prev) => {
       const pa = [...(prev.age ?? [])].sort().join(",");
       const aa = [...(applied.age ?? [])].sort().join(",");
       if (pa === aa) return prev;
       return mergeDiscoveryPatch(prev, { age: [...(applied.age ?? [])] });
     });
-  }, [isOpen, applied.age]);
+  }, [isOpen, applied.age, selectedIntent, currentIntent]);
 
   /**
    * Toggle persona selection - same logic as in My Plan
@@ -426,8 +426,11 @@ export function MobileSearchSheet({
 
   useLayoutEffect(() => {
     if (isOpen && !prevIsOpenRef.current) {
-      const baselineFilters = cloneFilters(applied);
-      const nextDraft = cloneFilters(applied);
+      const isJournalOpen = currentIntent === "journal";
+      const baselineFilters = isJournalOpen
+        ? cloneFilters(defaultFilters)
+        : cloneFilters(applied);
+      const nextDraft = cloneFilters(baselineFilters);
       const flowUsed = readFlowUsedGlobal();
       setFlowUsedGlobal(flowUsed);
       /** Пустой снимок: снова ведём по шагам (Далее…), даже если поиск уже закрывали ранее */
@@ -453,6 +456,8 @@ export function MobileSearchSheet({
 
       if (cityHubOnly && currentIntent == null) {
         setActiveSection(null);
+      } else if (currentIntent === "journal") {
+        setActiveSection("location");
       } else {
         const effectiveIntent = currentIntent || "kuda";
         const mode = deriveSearchFlowMode(
@@ -507,6 +512,7 @@ export function MobileSearchSheet({
   const searchFlowMode = useMemo((): "wizard" | "refine" => {
     const intent = selectedIntent ?? currentIntent ?? null;
     if (!intent) return "refine";
+    if (intent === "journal") return "refine";
     return deriveSearchFlowMode(
       intent,
       sheetBaseline,
@@ -542,6 +548,10 @@ export function MobileSearchSheet({
 
     prevIntentForAccordionRef.current = selectedIntent;
     setBypassFlowUsed(true);
+    if (selectedIntent === "journal") {
+      setActiveSection("location");
+      return;
+    }
     const mode = deriveSearchFlowMode(
       selectedIntent,
       sheetBaseline,
@@ -580,12 +590,22 @@ export function MobileSearchSheet({
 
   const handleIntentSelect = useCallback(
     (intentId: string) => {
+      if (selectedIntent === intentId) return;
       if (intentId === "journal") {
-        router.push(buildPublicPath(`/${pendingCitySlug}/blog`));
-        handleSheetClose();
+        const cleared = cloneFilters(defaultFilters);
+        setSelectedIntent("journal");
+        setSheetDraft(cleared);
+        setPendingCitySlug(citySlug);
+        setSearchText("");
+        setSheetBaseline({
+          filters: cloneFilters(defaultFilters),
+          city: citySlug,
+          intent: "journal",
+        });
+        setBypassFlowUsed(true);
+        setActiveSection("location");
         return;
       }
-      if (selectedIntent === intentId) return;
       setSelectedIntent(intentId);
       const cleared = cloneFilters(defaultFilters);
       setSheetDraft(cleared);
@@ -616,9 +636,6 @@ export function MobileSearchSheet({
       currentIntent,
       citySlug,
       flowUsedGlobal,
-      router,
-      pendingCitySlug,
-      handleSheetClose,
     ],
   );
 
@@ -753,6 +770,11 @@ export function MobileSearchSheet({
       : "Показать";
 
   const handleBottomPrimaryClick = useCallback(() => {
+    if (selectedIntent === "journal") {
+      router.push(buildPublicPath(`/${pendingCitySlug}/blog`));
+      handleSheetClose();
+      return;
+    }
     if (searchFlowMode === "wizard") {
       if (wizardLocationLike && !dirty) {
         if (selectedIntent == null) {
@@ -783,6 +805,7 @@ export function MobileSearchSheet({
   }, [
     searchFlowMode,
     activeSection,
+    router,
     wizardLocationLike,
     goNextGuided,
     dirty,
@@ -939,7 +962,11 @@ export function MobileSearchSheet({
                 getLocationText(),
                 <div className="p-0">
                   <MobileLocationPanel
-                    variant={selectedIntent === "kuda" ? "cityHub" : "default"}
+                    variant={
+                      selectedIntent === "kuda" || selectedIntent === "journal"
+                        ? "cityHub"
+                        : "default"
+                    }
                     citySlug={pendingCitySlug}
                     selectedCitySlug={pendingCitySlug}
                     onCityPick={(slug) => setPendingCitySlug(slug)}
@@ -953,64 +980,62 @@ export function MobileSearchSheet({
                   />
                 </div>,
               )}
-              {renderAccordion(
-                "date",
-                "Когда",
-                getDateText(),
-                <div className="p-0">
-                  <DatePanel
-                    embedded
-                    onClose={() => {}}
-                    applied={sheetDraft}
-                    actions={sheetActions}
-                  />
-                </div>,
-              )}
-              {renderAccordion(
-                "age",
-                "С кем",
-                whoPrimaryLine,
-                <div className="p-0">
-                  <AgePanel
-                    embedded
-                    onClose={() => {}}
-                    applied={sheetDraft}
-                    actions={ageSheetActions}
-                    selectedChildIds={childrenScope.selectedChildrenIds}
-                    selectedPersonaIds={family?.selectedPersonaIds ?? []}
-                    availableChildren={showChildrenPreset ? profileChildren : []}
-                    onToggleChild={showChildrenPreset ? toggleChild : undefined}
-                    primaryAdult={
-                      family?.personas?.[0]?.kind === "adult"
-                        ? {
-                            id: family.personas[0].id,
-                            displayName: family.personas[0].displayName,
-                            birthDate: family.personas[0].birthDate ?? undefined,
-                            isProfileComplete: family.personas[0].isProfileComplete,
-                          }
-                        : null
-                    }
-                    adultSelected={adultSelected}
-                    onToggleAdult={
-                      family
-                        ? toggleAdult
-                        : undefined
-                    }
-                    ageMode={ageMode}
-                    autoAgeValues={childrenScope.autoAgeValues}
-                    personaPickAtLimit={
-                      !!family &&
-                      family.selectedPersonaIds.length >= MAX_ACTIVE_FAMILY_PERSONAS
-                    }
-                    whoFreeMode={ageMode === "free"}
-                    onSelectEveryone={
-                      family
-                        ? handleSelectFreeMode
-                        : undefined
-                    }
-                  />
-                </div>,
-              )}
+              {selectedIntent !== "journal"
+                ? renderAccordion(
+                    "date",
+                    "Когда",
+                    getDateText(),
+                    <div className="p-0">
+                      <DatePanel
+                        embedded
+                        onClose={() => {}}
+                        applied={sheetDraft}
+                        actions={sheetActions}
+                      />
+                    </div>,
+                  )
+                : null}
+              {selectedIntent !== "journal"
+                ? renderAccordion(
+                    "age",
+                    "С кем",
+                    whoPrimaryLine,
+                    <div className="p-0">
+                      <AgePanel
+                        embedded
+                        onClose={() => {}}
+                        applied={sheetDraft}
+                        actions={ageSheetActions}
+                        selectedChildIds={childrenScope.selectedChildrenIds}
+                        selectedPersonaIds={family?.selectedPersonaIds ?? []}
+                        availableChildren={showChildrenPreset ? profileChildren : []}
+                        onToggleChild={showChildrenPreset ? toggleChild : undefined}
+                        primaryAdult={
+                          family?.personas?.[0]?.kind === "adult"
+                            ? {
+                                id: family.personas[0].id,
+                                displayName: family.personas[0].displayName,
+                                birthDate: family.personas[0].birthDate ?? undefined,
+                                isProfileComplete: family.personas[0].isProfileComplete,
+                              }
+                            : null
+                        }
+                        adultSelected={adultSelected}
+                        onToggleAdult={family ? toggleAdult : undefined}
+                        ageMode={ageMode}
+                        autoAgeValues={childrenScope.autoAgeValues}
+                        personaPickAtLimit={
+                          !!family &&
+                          family.selectedPersonaIds.length >= MAX_ACTIVE_FAMILY_PERSONAS
+                        }
+                        whoFreeMode={ageMode === "free"}
+                        onSelectEveryone={
+                          family ? handleSelectFreeMode : undefined
+                        }
+                      />
+                    </div>,
+                  )
+                : null}
             </>
           }
         />

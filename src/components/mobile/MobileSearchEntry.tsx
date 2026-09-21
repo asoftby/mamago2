@@ -8,9 +8,11 @@ import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store"
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useDiscoveryFilterOptions } from "@/features/filters/discovery/filters.api";
 import { useOptionalHeaderDiscoveryFilters } from "@/features/filters/discovery/headerDiscoveryFiltersContext";
-import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
-import { Intent } from "@/lib/intent";
-import { IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
+import {
+  PRIMARY_NAVIGATION_ITEMS,
+  type PrimaryNavigationId,
+} from "@/lib/discovery/discoveryIntentConfig";
+import { IconBookOpen, IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
@@ -27,6 +29,7 @@ import {
 // Map intent IDs to fallback icons
 const INTENT_ICONS = {
   kuda: IconCompass,
+  journal: IconBookOpen,
   classes: IconPalette,
   birthday: IconParty,
   routes: IconMap,
@@ -37,7 +40,7 @@ interface MobileSearchEntryProps {
   className?: string;
   citySlug?: string;
   /** `undefined` на главной хаба — без активного раздела (иконка MapPin). */
-  currentIntent?: Intent | null;
+  currentIntent?: PrimaryNavigationId | null;
   /** Хаб города: как в разделах, но только «Куда» и иконка MapPin */
   cityHubOnly?: boolean;
   /**
@@ -93,11 +96,11 @@ export function MobileSearchEntry({
     loadHeaderGeoFilters,
   ]);
 
-  const resolvedIntent: Intent | null =
+  const resolvedIntent: PrimaryNavigationId | null =
     currentIntent ?? (cityHubOnly ? null : "kuda");
 
   const intentConfig = resolvedIntent
-    ? DISCOVERY_INTENT_CONFIG[resolvedIntent]
+    ? PRIMARY_NAVIGATION_ITEMS.find((item) => item.id === resolvedIntent)
     : undefined;
   const FallbackIcon = resolvedIntent
     ? INTENT_ICONS[resolvedIntent]
@@ -106,6 +109,7 @@ export function MobileSearchEntry({
   // Build location text
   const getLocationText = () => {
     const cityPhrase = locationLabelOverride ?? getCityLocativePhrase(citySlug);
+    if (cityHubOnly) return cityPhrase;
     const nearbyPart = applied.nearby ? "Поблизости" : null;
     
     let metroOrDistrictPart: string | null = null;

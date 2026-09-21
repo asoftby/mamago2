@@ -19,6 +19,7 @@ import {
   isCityHubPath,
   isPublicationDetailPath,
   isNonStickyHeaderPath,
+  isJournalPath,
 } from "@/lib/intent";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
@@ -49,6 +50,7 @@ export function MobileHeader() {
     intentFromMe ??
     null;
   const currentCity = getCityFromPath(pathname);
+  const isJournalRoute = isJournalPath(pathname);
   const { citySlug } = useCity();
   const isCityHubRoute = isCityHubPath(pathname);
   /** REGION/COUNTRY статья на /blog/{slug} — там нет городского сегмента, citySlug ниже — не настоящая геопривязка. */
@@ -56,14 +58,16 @@ export function MobileHeader() {
 
   const displayCity = citySlug;
   /** На главной города (`/minsk`) в URL нет раздела — не подсвечиваем «Куда пойти». */
-  const displayIntent = searchIntent ?? (isCityHubRoute ? undefined : "kuda");
+  const displayIntent = isJournalRoute
+    ? "journal"
+    : searchIntent ?? (isCityHubRoute ? undefined : "kuda");
 
   const isDiscoveryPage = searchIntent !== null && currentCity !== null;
   const intentConfig = searchIntent
     ? DISCOVERY_INTENT_CONFIG[searchIntent]
     : null;
 
-  const cityHubOnly = isPublicationPage;
+  const cityHubOnly = isPublicationPage || isJournalRoute;
 
   useEffect(() => {
     const open = () => setIsSearchSheetOpen(true);

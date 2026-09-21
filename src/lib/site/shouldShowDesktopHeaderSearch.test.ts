@@ -5,6 +5,8 @@ import { shouldShowDesktopHeaderSearch } from "./shouldShowDesktopHeaderSearch";
 assert.equal(shouldShowDesktopHeaderSearch("/minsk"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/events"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/classes"), true);
+assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog"), true);
+assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog/some-article"), false);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/events/today"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/events/some-event-slug"), false);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/places"), true);
