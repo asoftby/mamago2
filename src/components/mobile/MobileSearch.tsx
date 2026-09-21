@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { MobileSearchHeroRow } from "@/components/mobile/MobileSearchHeroRow";
 import { ComingSoonBadge } from "@/components/city/ComingSoonBadge";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { DISCOVERY_INTENT_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
+import { PRIMARY_NAVIGATION_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { SearchResults } from "@/components/search/SearchResults";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import {
@@ -69,7 +69,7 @@ export function MobileSearch({
   /** Фильтры показываем только при выбранном разделе и без длинного запроса (чтобы не дублировать с автодополнением). */
   const showFiltersSection =
     selectedIntent != null && queryTrim.length < 2;
-  const selectedIntentEnabled = DISCOVERY_INTENT_ITEMS.some(
+  const selectedIntentEnabled = PRIMARY_NAVIGATION_ITEMS.some(
     (item) => item.id === selectedIntent && item.navigationEnabled,
   );
 
@@ -78,7 +78,7 @@ export function MobileSearch({
       setIndicatorStyle({ left: 0, width: 0 });
       return;
     }
-    const intentTabIndex = DISCOVERY_INTENT_ITEMS.findIndex(
+    const intentTabIndex = PRIMARY_NAVIGATION_ITEMS.findIndex(
       (item) => item.id === selectedIntent,
     );
     const currentTab = tabsRef.current[intentTabIndex];
@@ -93,7 +93,7 @@ export function MobileSearch({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (selectedIntent == null) return;
-      const intentTabIndex = DISCOVERY_INTENT_ITEMS.findIndex(
+      const intentTabIndex = PRIMARY_NAVIGATION_ITEMS.findIndex(
         (item) => item.id === selectedIntent,
       );
       const currentTab = tabsRef.current[intentTabIndex];
@@ -236,9 +236,9 @@ export function MobileSearch({
             <div className="border-b border-gray-100 py-4">
               <div
                 ref={containerRef}
-                className="relative grid grid-cols-4 px-2"
+                className="relative grid grid-cols-5 px-2"
               >
-                {DISCOVERY_INTENT_ITEMS.map((intentConfig, index) => {
+                {PRIMARY_NAVIGATION_ITEMS.map((intentConfig, index) => {
                   const isActive =
                     intentConfig.navigationEnabled &&
                     selectedIntent != null &&
