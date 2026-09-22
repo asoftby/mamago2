@@ -18,7 +18,7 @@ jobs:
       packages: write
     steps:
       - name: Delete old Prod images
-        uses: quartx-analytics/ghcr-cleaner@v1
+        uses: quartx-analytics/ghcr-cleaner@c5bc55c485430d975158aa4b4c46a14228644be8 # v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository-owner: ${{ github.repository_owner }}
@@ -39,7 +39,7 @@ jobs:
       packages: write
     steps:
       - name: Delete old Dev images
-        uses: quartx-analytics/ghcr-cleaner@v1
+        uses: quartx-analytics/ghcr-cleaner@c5bc55c485430d975158aa4b4c46a14228644be8 # v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository-owner: ${{ github.repository_owner }}
