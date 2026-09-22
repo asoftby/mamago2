@@ -123,5 +123,110 @@ assert.ok(!introCodeStripped.includes("<code>"), "code tag stripped from intro")
 assert.ok(introCodeStripped.includes("сноска"), "inner text kept even though the tag is stripped");
 console.log("OK 18: code mark stripped from intro (dek) HTML");
 
+// 19. Browser-decoded and normalized executable URL schemes are removed.
+const maliciousHrefPayloads = [
+  "javascript:alert(1)",
+  "JaVaScRiPt:alert(1)",
+  "jav&#x61;script:alert(1)",
+  "jav&#97;script:alert(1)",
+  "&#106avascript:alert(1)",
+  "java&colon;script:alert(1)",
+  "j&#x61;v&#x61;script&#x3a;alert(1)",
+  "javasc&#114;ipt&#58;alert(1)",
+  "java\nscript:alert(1)",
+  "java\rscript:alert(1)",
+  "java\tscript:alert(1)",
+  "java\fscript:alert(1)",
+  "java&#x0a;script:alert(1)",
+  "j&#x09;avascript:alert(1)",
+  "java&#x0c;script:alert(1)",
+  "java&#13;script:alert(1)",
+  " \u0000javascript:alert(1)",
+  "\u0001javascript:alert(1)",
+  "data:text/html,<script>alert(1)</script>",
+  "vbscript:msgbox(1)",
+  "file:///etc/passwd",
+];
+
+for (const payload of maliciousHrefPayloads) {
+  const sanitized = sanitizeHtmlAllowlist(
+    `<a href="${payload}">payload</a>`,
+    TEXT_TAGS,
+    TEXT_ATTRS,
+  );
+  assert.strictEqual(sanitized, "<a>payload</a>", `dangerous href removed: ${payload}`);
+}
+console.log("OK 19: encoded, mixed-case and control-character URL schemes stripped");
+
+// 20. Every supported URL-bearing attribute goes through the same scheme check.
+const urlAttributeCases = [
+  { tag: "a", attr: "href" },
+  { tag: "img", attr: "src" },
+  { tag: "form", attr: "action" },
+  { tag: "button", attr: "formaction" },
+  { tag: "a", attr: "xlink:href" },
+];
+for (const { tag, attr } of urlAttributeCases) {
+  const sanitized = sanitizeHtmlAllowlist(
+    `<${tag} ${attr}="jav&#x61;script:alert(1)">payload</${tag}>`,
+    [tag],
+    [attr],
+  );
+  assert.ok(!sanitized.includes(`${attr}=`), `${attr} dangerous scheme removed`);
+}
+console.log("OK 20: all URL-bearing attributes use canonical scheme validation");
+
+// 21. Product-supported schemes and internal relative links remain intact.
+const safeHrefs = [
+  "https://mamago.by/minsk/events",
+  "https://example.com/path?q=1",
+  "http://example.com/path",
+  "mailto:test@example.com",
+  "tel:+375291112233",
+  "/minsk/kuda",
+  "#section",
+];
+for (const href of safeHrefs) {
+  const sanitized = sanitizeHtmlAllowlist(
+    `<a href="${href}">safe</a>`,
+    TEXT_TAGS,
+    TEXT_ATTRS,
+  );
+  assert.ok(sanitized.includes(`href="${href}"`), `safe href preserved: ${href}`);
+}
+console.log("OK 21: safe absolute and relative links preserved");
+
+// 22. Protocol-relative URLs are intentionally rejected instead of silently
+// inheriting http/https and leaving the allowlist ambiguous.
+const protocolRelative = sanitizeHtmlAllowlist(
+  '<a href="//evil.example/payload">payload</a>',
+  TEXT_TAGS,
+  TEXT_ATTRS,
+);
+assert.strictEqual(protocolRelative, "<a>payload</a>", "protocol-relative href removed");
+console.log("OK 22: protocol-relative href stripped");
+
+// 23. A doubly encoded entity is not recursively decoded by an HTML parser and
+// therefore cannot become an executable scheme during this single render.
+const doubleEncoded = sanitizeHtmlAllowlist(
+  '<a href="&amp;#x6a;avascript:alert(1)">payload</a>',
+  TEXT_TAGS,
+  TEXT_ATTRS,
+);
+assert.ok(!doubleEncoded.includes('href="javascript:'), "double encoding never emitted as executable href");
+assert.ok(doubleEncoded.includes("&amp;#x6a;avascript"), "non-recursive entity stays inert text");
+console.log("OK 23: double-encoded entity remains non-executable");
+
+// 24. Malformed quoting is parsed as HTML before validation; it cannot smuggle
+// an event handler or a second executable URL attribute into the result.
+const malformed = sanitizeHtmlAllowlist(
+  '<a href="https://mamago.by/"onclick="alert(1)" href="javascript:alert(2)">payload</a>',
+  TEXT_TAGS,
+  TEXT_ATTRS,
+);
+assert.ok(!malformed.includes("onclick"), "malformed event handler stripped");
+assert.ok(!malformed.toLowerCase().includes("javascript:"), "duplicate dangerous href stripped");
+console.log("OK 24: malformed and duplicate attributes cannot bypass parsing");
+
 console.log("");
 console.log("All articleBlockHtml sanitizer tests passed!");
