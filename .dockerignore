@@ -1,0 +1,72 @@
+# Version-control and CI metadata are not part of the application image.
+.git
+.github
+
+# Local dependencies and build outputs.
+node_modules
+.pnpm-store
+.next
+out
+dist
+build
+coverage
+.turbo
+.cache
+*.tsbuildinfo
+
+# Local environment/secrets. Keep only the public template available to the build context.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*-firebase-adminsdk-*.json
+mamago-2-0-*.json
+
+# Logs, editor/OS state and local assistant metadata.
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+.cursor
+.ai
+.kiro
+.claude
+.react-email
+.graphify
+graphify-out
+
+# Local databases, backups, scratch data and research snapshots.
+*.db
+*.sqlite
+*.sqlite3
+*.backup
+*.bak
+*.sql
+*.sql.gz
+!prisma/migrations/**/migration.sql
+backups
+.local-db-backups
+notes
+tmp
+scripts/tmp
+scripts/temp
+datasets/abws
+
+# Runtime uploads are provided by persistent storage, never by the build context.
+public/uploads
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# Local diagnostic artifacts.
+lint-errors*.txt
+lint-errors*.json
+build-errors.txt
+ts-errors.txt
