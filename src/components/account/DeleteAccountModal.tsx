@@ -31,16 +31,18 @@ function DeleteAccountBody({ onClose }: { onClose: () => void }) {
         method: "POST",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("failed");
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(payload?.error ?? "Не получилось выполнить действие. Попробуйте снова");
 
       notifyAuthStateChanged();
-      router.push("/");
+      router.replace("/");
+      router.refresh();
       // Toast after navigation
       window.setTimeout(() => {
         toast.success("Ваш профиль удалён");
       }, 300);
-    } catch {
-      toast.error("Не получилось выполнить действие. Попробуйте снова");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Не получилось выполнить действие. Попробуйте снова");
       setLoading(false);
     }
   };
