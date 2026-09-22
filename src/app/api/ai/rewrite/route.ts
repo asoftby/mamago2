@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 import {
   normalizeAiDescriptionContext,
   type AiDescriptionAction,
   type AiDescriptionEntityType,
 } from "@/lib/ai/descriptionAssistant";
+import {
+  AiBudgetExceededError,
+  resolveAiBudgetPrincipal,
+  withAiBudget,
+} from "@/server/ai/aiBudget";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -14,12 +18,15 @@ export const maxDuration = 30;
 const MAX_SOURCE_LENGTH = 8000;
 const MAX_TITLE_LENGTH = 200;
 
-const contextValueSchema = z.union([
-  z.string(),
+const contextScalarSchema = z.union([
+  z.string().max(1_000),
   z.number(),
   z.boolean(),
   z.null(),
-  z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+]);
+const contextValueSchema = z.union([
+  contextScalarSchema,
+  z.array(contextScalarSchema).max(50),
 ]);
 
 const rewriteRequestSchema = z
@@ -28,7 +35,10 @@ const rewriteRequestSchema = z
     sourceText: z.string().trim().max(MAX_SOURCE_LENGTH).optional().default(""),
     title: z.string().trim().max(MAX_TITLE_LENGTH).optional(),
     entityType: z.enum(["event", "place", "offer"]),
-    context: z.record(z.string(), contextValueSchema).optional(),
+    context: z
+      .record(z.string().max(100), contextValueSchema)
+      .refine((value) => Object.keys(value).length <= 50)
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.action !== "generate" && data.sourceText.trim().length < 20) {
@@ -180,7 +190,8 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    if (!(await checkBusinessToolPermission(user, "content.create"))) {
+    const principal = await resolveAiBudgetPrincipal(user, "content.create");
+    if (!principal) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -203,10 +214,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    return await withAiBudget({
+      principal,
+      endpoint: "rewrite",
+      logSecurityEvent: (event) => console.warn(`[security] ${event}`),
+      operation: async () => {
     const endpoint = "https://openrouter.ai/api/v1/chat/completions";
     const model = process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o-mini";
     const temperature = Number(process.env.OPENROUTER_TEMPERATURE ?? 0.4);
-    const maxTokens = Number(process.env.OPENROUTER_MAX_TOKENS ?? 900);
+    const configuredMaxTokens = Number(process.env.OPENROUTER_MAX_TOKENS ?? 900);
+    const maxTokens = Number.isFinite(configuredMaxTokens) && configuredMaxTokens > 0
+      ? Math.min(Math.floor(configuredMaxTokens), 900)
+      : 900;
     const siteUrl = process.env.OPENROUTER_SITE_URL || "http://mamago.local:3000";
     const appName = process.env.OPENROUTER_APP_NAME || "mamaGo 2.0";
 
@@ -328,7 +347,15 @@ export async function POST(request: NextRequest) {
       provider: "openrouter",
       model,
     });
+      },
+    });
   } catch (error) {
+    if (error instanceof AiBudgetExceededError) {
+      return NextResponse.json(
+        { error: "Слишком много AI-запросов. Попробуйте позже." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
     console.error("[AI Rewrite] unexpected error", {
       error: error instanceof Error ? error.message : String(error),
     });
