@@ -97,8 +97,9 @@ export function ChangePasswordForm() {
     });
 
     if (response.ok) {
-      toast.success("Пароль изменён");
+      toast.success("Пароль изменён. Войдите снова.");
       reset();
+      window.location.assign("/login?passwordChanged=1");
       return;
     }
 
@@ -143,7 +144,7 @@ export function ChangePasswordForm() {
 
       <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-neutral-500">
-          После смены пароля вход останется активным на этом устройстве.
+          После смены пароля все активные сеансы завершатся. Потребуется войти снова.
         </p>
         <Button
           type="submit"

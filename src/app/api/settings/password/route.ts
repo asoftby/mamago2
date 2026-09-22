@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import prisma from "@/lib/prisma";
-import { hashPassword, verifyPassword, isVerifiablePasswordHash } from "@/lib/auth/crypto";
-import { passwordSchema } from "@/lib/auth/passwordPolicy";
-
-const bodySchema = z.object({
-  currentPassword: z.string().min(1, "Введите текущий пароль"),
-  newPassword: passwordSchema.regex(/\d/u, "Пароль должен содержать хотя бы одну цифру"),
-});
+import { deleteSessionCookie } from "@/lib/auth/session";
+import {
+  changePassword,
+  changePasswordSchema,
+} from "@/server/auth/changePassword.service";
 
 export async function PATCH(request: NextRequest) {
   const user = await getCurrentUser();
@@ -23,7 +19,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = bodySchema.safeParse(body);
+  const parsed = changePasswordSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
@@ -31,38 +27,28 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { id: true, passwordHash: true },
+  const result = await changePassword({
+    userId: user.id,
+    currentPassword: parsed.data.currentPassword,
+    newPassword: parsed.data.newPassword,
   });
 
-  // Phone stubs (passwordHash === "") and service accounts (disabled sentinel)
-  // have no real password — reject before verifyPassword ever sees the hash.
-  if (!dbUser?.passwordHash || !isVerifiablePasswordHash(dbUser.passwordHash)) {
+  if (!result.changed && result.reason === "PASSWORD_UNAVAILABLE") {
     return NextResponse.json(
       { error: "Для этого аккаунта пароль не задан — смена пароля недоступна" },
       { status: 400 },
     );
   }
 
-  const isValidCurrentPassword = await verifyPassword(
-    parsed.data.currentPassword,
-    dbUser.passwordHash,
-  );
-
-  if (!isValidCurrentPassword) {
+  if (!result.changed) {
     return NextResponse.json(
       { error: "Wrong current password" },
       { status: 401 },
     );
   }
 
-  const passwordHash = await hashPassword(parsed.data.newPassword);
-
-  await prisma.user.update({
-    where: { id: dbUser.id },
-    data: { passwordHash },
-  });
-
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true, reauthRequired: true });
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  deleteSessionCookie(response, host ?? undefined);
+  return response;
 }
