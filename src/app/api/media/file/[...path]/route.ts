@@ -25,6 +25,7 @@ import {
   findMediaAssetByStorageRelativePath,
   findMediaUrlAliasByStorageRelativePath,
 } from "@/server/media/mediaPublicAccess";
+import { decideMediaResponsePolicy } from "@/server/media/mediaResponsePolicy";
 
 export const runtime = "nodejs";
 
@@ -134,9 +135,14 @@ export async function GET(
     }
 
     const user = await getCurrentUser();
-    const isPubliclyServable = await canLoadMediaAnonymously(media);
-    const canServe = isPubliclyServable || (await canServeMediaResponse(media, user));
-    if (!canServe) {
+    const publiclyServable = await canLoadMediaAnonymously(media);
+    const authorizedToServe =
+      publiclyServable || (await canServeMediaResponse(media, user));
+    const responsePolicy = decideMediaResponsePolicy({
+      publiclyServable,
+      authorizedToServe,
+    });
+    if (!responsePolicy.canServe) {
       await devLogDeny({
         media,
         denyReason: "CAN_SERVE_MEDIA_DENIED",
@@ -160,15 +166,11 @@ export async function GET(
     // previewing a PENDING Place) must never be marked `public` — a shared
     // cache serving those bytes to a later, unauthorized requester would
     // silently bypass the access check entirely.
-    const cacheControl = isPubliclyServable
-      ? "public, max-age=31536000, immutable"
-      : "private, no-store";
-
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": mimeTypeFromFilename(filename),
         "Content-Length": fileStat.size.toString(),
-        "Cache-Control": cacheControl,
+        "Cache-Control": responsePolicy.cacheControl,
         "X-Content-Type-Options": "nosniff",
       },
     });

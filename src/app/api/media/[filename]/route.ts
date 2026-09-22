@@ -14,7 +14,11 @@ import {
   resolveLegacyPublicUploadPath,
   resolveStoredMediaPath,
 } from "@/server/media/media-storage";
-import { canServeMediaResponse } from "@/server/media/mediaPublicAccess";
+import {
+  canLoadMediaAnonymously,
+  canServeMediaResponse,
+} from "@/server/media/mediaPublicAccess";
+import { decideMediaResponsePolicy } from "@/server/media/mediaResponsePolicy";
 
 export async function GET(
   _request: NextRequest,
@@ -45,7 +49,14 @@ export async function GET(
     }
 
     const user = await getCurrentUser();
-    if (!(await canServeMediaResponse(media, user))) {
+    const publiclyServable = await canLoadMediaAnonymously(media);
+    const authorizedToServe =
+      publiclyServable || (await canServeMediaResponse(media, user));
+    const responsePolicy = decideMediaResponsePolicy({
+      publiclyServable,
+      authorizedToServe,
+    });
+    if (!responsePolicy.canServe) {
       return new NextResponse(
         JSON.stringify({ error: "access denied" }),
         { status: 404, headers: { "Content-Type": "application/json" } },
@@ -74,7 +85,7 @@ export async function GET(
       headers: {
         "Content-Type": media.mimeType || "application/octet-stream",
         "Content-Length": fileBuffer.length.toString(),
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": responsePolicy.cacheControl,
         "X-Content-Type-Options": "nosniff",
       },
     });
