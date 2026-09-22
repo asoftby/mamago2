@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
-import { checkBusinessToolPermission } from "@/server/permissions/business-permissions";
 import { enrichEvent } from "@/lib/ai/enrichEvent";
+import {
+  AiBudgetExceededError,
+  resolveAiBudgetPrincipal,
+  withAiBudget,
+} from "@/server/ai/aiBudget";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const enrichEventRequestSchema = z.object({
-  importedRecordId: z.string().trim().min(1).optional(),
-  activityId: z.string().trim().min(1).optional(),
+  importedRecordId: z.string().trim().min(1).max(200).optional(),
+  activityId: z.string().trim().min(1).max(200).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -18,7 +22,8 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
-    if (!(await checkBusinessToolPermission(user, "content.update"))) {
+    const principal = await resolveAiBudgetPrincipal(user, "content.update");
+    if (!principal) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -38,13 +43,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await enrichEvent({
-      importedRecordId: parsed.data.importedRecordId ?? null,
-      activityId: parsed.data.activityId ?? null,
+    const result = await withAiBudget({
+      principal,
+      endpoint: "enrich-event",
+      logSecurityEvent: (event) => console.warn(`[security] ${event}`),
+      operation: () => enrichEvent({
+        importedRecordId: parsed.data.importedRecordId ?? null,
+        activityId: parsed.data.activityId ?? null,
+      }),
     });
 
     return NextResponse.json({ result });
   } catch (error) {
+    if (error instanceof AiBudgetExceededError) {
+      return NextResponse.json(
+        { error: "Слишком много AI-запросов. Попробуйте позже." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json({ error: "AI request timed out" }, { status: 504 });
     }

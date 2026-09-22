@@ -550,11 +550,16 @@ async function requestOpenRouterEnrichment(prompt: string): Promise<z.infer<type
   const siteUrl = process.env.OPENROUTER_SITE_URL || "http://mamago.local:3000";
   const appName = process.env.OPENROUTER_APP_NAME || "mamaGo 2.0";
 
+  const configuredMaxTokens = Number(process.env.OPENROUTER_MAX_TOKENS ?? 900);
+  const maxTokens = Number.isFinite(configuredMaxTokens) && configuredMaxTokens > 0
+    ? Math.min(Math.floor(configuredMaxTokens), 1100)
+    : 900;
+
   const requestBody = {
     model,
     response_format: { type: "json_object" as const },
     temperature: Math.min(Number(process.env.OPENROUTER_TEMPERATURE ?? 0.2), 0.3),
-    max_tokens: Math.min(Number(process.env.OPENROUTER_MAX_TOKENS ?? 900), 1100),
+    max_tokens: maxTokens,
     messages: [
       {
         role: "system" as const,
