@@ -188,7 +188,7 @@ function normalizeBlock(block: string): string {
     return onlyLine;
   }
 
-  if (onlyLine.length < 420) {
+  if (onlyLine.length < 650) {
     return onlyLine;
   }
 
