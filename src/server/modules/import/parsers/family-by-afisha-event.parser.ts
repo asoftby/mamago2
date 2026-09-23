@@ -36,6 +36,7 @@ import type { ParserResult, ParsedRawRecord } from "../types";
 import { errorParserResult } from "./base.parser";
 import { getParserDefinition } from "./parser-definitions";
 import { fetchHtml } from "./fetchHtml";
+import { assertSafeFamilyByImportUrl } from "./familyByUrlPolicy";
 import { parseRussianDayMonthTimeToIsoMinsk } from "@/lib/dates/parseRussianDayMonthTimeMinsk";
 
 export { parseRussianDayMonthTimeToIsoMinsk };
@@ -649,12 +650,18 @@ export const familyByAfishaEventParser: EventImportParser = {
   entityType: "EVENT",
 
   async parse(source: ImportSource): Promise<ParserResult & { debug?: AfishaEventParserDebug }> {
-    const listingUrl = source.baseUrl?.trim() || DEFAULT_LISTING_URL;
+    const rawListingUrl = source.baseUrl?.trim() || DEFAULT_LISTING_URL;
     const MAX_DETAIL_PAGES = source.crawlMaxDetailLinks ?? source.crawlMaxRecords ?? DEFAULT_MAX_DETAIL_PAGES;
     const maxDatePages = resolveMaxDatePages(source);
 
-    if (!listingUrl.includes("family.by")) {
-      return errorParserResult(PARSER_KEY, `Invalid baseUrl: "${listingUrl}". Expected a family.by URL.`);
+    let listingUrl: string;
+    try {
+      listingUrl = assertSafeFamilyByImportUrl(rawListingUrl, { pathPrefix: "/afisha/" }).toString();
+    } catch (error) {
+      return errorParserResult(
+        PARSER_KEY,
+        error instanceof Error ? error.message : "Invalid family.by import URL",
+      );
     }
 
     const debug: AfishaEventParserDebug = {
@@ -674,7 +681,14 @@ export const familyByAfishaEventParser: EventImportParser = {
     // ── Step 1: Load listing page ────────────────────────────────────────
     let listingHtml: string;
     try {
-      const response = await fetchHtml(listingUrl, { encoding: "windows-1251", timeoutMs: 12_000, retries: 2 });
+      const response = await fetchHtml(listingUrl, {
+        encoding: "windows-1251",
+        timeoutMs: 12_000,
+        retries: 2,
+        validateUrl: (candidate) => {
+          assertSafeFamilyByImportUrl(candidate, { pathPrefix: "/afisha/" });
+        },
+      });
       listingHtml = response.html;
       debug.htmlLength = listingHtml.length;
     } catch (err) {
@@ -709,7 +723,14 @@ export const familyByAfishaEventParser: EventImportParser = {
 
     for (const datePage of datePages) {
       try {
-        const { html } = await fetchHtml(datePage, { encoding: "windows-1251", timeoutMs: 12_000, retries: 2 });
+        const { html } = await fetchHtml(datePage, {
+        encoding: "windows-1251",
+        timeoutMs: 12_000,
+        retries: 2,
+        validateUrl: (candidate) => {
+          assertSafeFamilyByImportUrl(candidate, { pathPrefix: "/afisha/" });
+        },
+      });
         debug.datePagesVisited++;
         for (const link of extractEventDetailLinks(html, datePage)) {
           allDetailLinks.add(link);
@@ -744,7 +765,14 @@ export const familyByAfishaEventParser: EventImportParser = {
 
       let html: string;
       try {
-        const response = await fetchHtml(detailUrl, { encoding: "windows-1251", timeoutMs: 12_000, retries: 2 });
+        const response = await fetchHtml(detailUrl, {
+        encoding: "windows-1251",
+        timeoutMs: 12_000,
+        retries: 2,
+        validateUrl: (candidate) => {
+          assertSafeFamilyByImportUrl(candidate, { pathPrefix: "/afisha/" });
+        },
+      });
         html = response.html;
         debug.detailPagesVisited++;
       } catch (err) {
