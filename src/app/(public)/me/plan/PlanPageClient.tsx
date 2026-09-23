@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
+import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
@@ -31,6 +32,9 @@ export type SerializedPlanItem = {
     coverImageUrl: string | null;
     ageLabel: string | null;
     categoryLabel: string | null;
+    priceLabel: string | null;
+    venueName: string | null;
+    venueAddress: string | null;
   } | null;
 };
 
@@ -242,6 +246,7 @@ export function PlanPageClient({
     dateParam && DATE_PATTERN.test(dateParam) ? dateParam : todayISO,
   );
   const [items, setItems] = useState(initialItems);
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const itemsByDate = useMemo(() => {
     return items.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
@@ -329,17 +334,35 @@ export function PlanPageClient({
           </div>
 
           <div className="flex flex-col items-end">
-            <div style={{
-              padding: "14px 16px",
-              background: "#FAF7F1",
-              border: "1px solid rgba(20,18,16,.10)",
-              borderRadius: 14,
-              minWidth: 220,
-              textAlign: "right",
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-            }}>
+            <button
+              type="button"
+              onClick={() => totalItems > 0 && setOverviewOpen(true)}
+              disabled={totalItems === 0}
+              aria-label={totalItems > 0 ? "Посмотреть весь план" : "План пока пуст"}
+              style={{
+                padding: "14px 16px",
+                background: "#FAF7F1",
+                border: "1px solid rgba(20,18,16,.10)",
+                borderRadius: 14,
+                minWidth: 220,
+                textAlign: "right",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                cursor: totalItems > 0 ? "pointer" : "default",
+                transition: "border-color .18s, transform .18s",
+              }}
+              onMouseEnter={(event) => {
+                if (totalItems > 0) {
+                  event.currentTarget.style.borderColor = "rgba(20,18,16,.32)";
+                  event.currentTarget.style.transform = "translateY(-2px)";
+                }
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.borderColor = "rgba(20,18,16,.10)";
+                event.currentTarget.style.transform = "none";
+              }}
+            >
               <span
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".14em", color: "var(--primary)" }}
@@ -359,7 +382,19 @@ export function PlanPageClient({
                 на {totalDays} {pluralizeDays(totalDays)}
                 {ideaActivityIds.length > 0 ? ` · ${ideaActivityIds.length} идей` : ""}
               </div>
-            </div>
+              {totalItems > 0 && (
+                <span
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#C24E22",
+                  }}
+                >
+                  Посмотреть все →
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </Container>
@@ -393,6 +428,19 @@ export function PlanPageClient({
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
         </div>
       </Container>
+
+      <PlanOverviewDialog
+        open={overviewOpen}
+        onOpenChange={setOverviewOpen}
+        itemsByDate={itemsByDate}
+        totalItems={totalItems}
+        totalDays={totalDays}
+        onRemove={handleRemoveItem}
+        onOpenDay={(date) => {
+          setSelectedDate(date);
+          setOverviewOpen(false);
+        }}
+      />
 
       <style>{`
         @media (max-width: 900px) {
