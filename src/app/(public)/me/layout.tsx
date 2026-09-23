@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Личный кабинет /me: шрифт наследуется от root layout через <html className={ntSomic.variable}>.
+ * Личный кабинет /me наследует primary sans от root layout.
  */
 export default async function MeLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

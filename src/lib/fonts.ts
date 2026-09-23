@@ -1,33 +1,15 @@
 import localFont from "next/font/local";
 
 /**
- * Единый источник правды для шрифта NTSomic.
- * Подключается только в root layout и используется как глобальный `--font-sans`
- * для public, admin, business и остальных поверхностей.
- *
- * preload выключен, чтобы Next.js не создавал лишние font preload hints
- * для весов, которые могут не понадобиться на первом экране.
+ * Site-wide primary sans for public, admin, business and application UI.
+ * The official Google Sans v14.000 variable build covers every used weight
+ * (400–700) without runtime requests to Google Fonts.
  */
-export const ntSomic = localFont({
+export const primarySans = localFont({
   src: [
     {
-      path: "../../public/fonts/NTSomic/NTSomic-Regular.woff2",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/NTSomic/NTSomic-Medium.woff2",
-      weight: "500",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/NTSomic/NTSomic-Semibold.woff2",
-      weight: "600",
-      style: "normal",
-    },
-    {
-      path: "../../public/fonts/NTSomic/NTSomic-Bold.woff2",
-      weight: "700",
+      path: "../../public/fonts/GoogleSans/GoogleSans-Variable.woff2",
+      weight: "400 700",
       style: "normal",
     },
   ],

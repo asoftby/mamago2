@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Suspense, type CSSProperties } from "react";
+import { Suspense } from "react";
 import "./globals.css";
-import { ntSomic, ptSerif } from "@/lib/fonts";
+import { primarySans, ptSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
@@ -41,37 +41,16 @@ export default async function RootLayout({
     getBrandingConfig(),
   ]);
   const faviconHref = getBrandingFaviconRouteHref(branding);
-  const useGoogleSansTrial = process.env.APP_ENV?.trim().toLowerCase() === "dev";
-
   return (
     <html
       lang="ru"
-      className={`${ntSomic.variable} ${ptSerif.variable}`}
-      style={
-        useGoogleSansTrial
-          ? ({ "--font-sans": '"Google Sans"' } as CSSProperties)
-          : undefined
-      }
+      className={`${primarySans.variable} ${ptSerif.variable}`}
       suppressHydrationWarning
     >
       <head>
         <script
           dangerouslySetInnerHTML={{ __html: buildNoFlashCookieShellScript() }}
         />
-        {useGoogleSansTrial ? (
-          <>
-            <link rel="preconnect" href="https://fonts.googleapis.com" />
-            <link
-              rel="preconnect"
-              href="https://fonts.gstatic.com"
-              crossOrigin="anonymous"
-            />
-            <link
-              rel="stylesheet"
-              href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap"
-            />
-          </>
-        ) : null}
         <style>{`
           :root {
             --color-primary: ${branding.colorPrimary};

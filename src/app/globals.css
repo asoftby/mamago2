@@ -110,8 +110,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
-     DEV Google Sans trial переопределяет переменную inline из root layout. */
+  /* --font-sans не переопределяем здесь: next/font/local задаёт
+     семантический primary sans contract на <html>. */
   --font-mono: Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
   

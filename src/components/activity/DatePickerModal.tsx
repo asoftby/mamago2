@@ -238,7 +238,7 @@ export function DatePickerModal({
       maxWidth: 480,
       position: "relative",
       boxSizing: "border-box",
-      fontFamily: "'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', sans-serif",
+      fontFamily: "var(--font-sans), ui-sans-serif, system-ui, sans-serif",
       WebkitFontSmoothing: "antialiased",
     }}>
 
