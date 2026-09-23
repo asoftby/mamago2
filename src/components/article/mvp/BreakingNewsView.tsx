@@ -5,7 +5,7 @@
  *
  * Design: mamaGo 2.0 / News page.html (exported from Claude Design).
  * Palette: cream #F6F2EA · paper #FAF7F1 · ink #141210 · accent #E86A3A · breaking #D6342B
- * Fonts: NTSomic for UI and display · project body font · system mono
+ * Fonts: project primary sans for UI and display · editorial serif · system mono
  */
 
 import { useCallback, useEffect, useState } from "react";
