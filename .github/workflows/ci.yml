@@ -76,6 +76,7 @@ jobs:
           pnpm exec tsx src/features/stories/components/StoryProgress.test.tsx
           pnpm exec tsx src/features/stories/lib/storyPrice.test.ts
           pnpm exec tsx src/features/stories/components/StoryModalActionCard.contract.test.ts
+          pnpm exec tsx src/features/stories/components/StoryModal.mobile-interaction.test.ts
 
       - name: Place wizard regressions
         run: |

@@ -38,8 +38,6 @@ export function StoryModal({
   onItemShown,
 }: StoryModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef<number | null>(null);
-  const touchStartX = useRef<number | null>(null);
 
   const currentItem = activeStory.items[activeItemIndex];
   const prevItem = activeItemIndex > 0 ? activeStory.items[activeItemIndex - 1] : null;
@@ -80,24 +78,6 @@ export function StoryModal({
     else onPause();
   }, [onPause, onResume, paused]);
 
-  // ── mobile: swipe down → close ───────────────────────────────────────────
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  }, []);
-
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
-      if (touchStartY.current === null || touchStartX.current === null) return;
-      const dy = e.changedTouches[0].clientY - touchStartY.current;
-      const dx = e.changedTouches[0].clientX - touchStartX.current;
-      if (dy > 72 && Math.abs(dy) > Math.abs(dx)) onClose();
-      touchStartX.current = null;
-      touchStartY.current = null;
-    },
-    [onClose],
-  );
-
   if (!currentItem) return null;
 
   return (
@@ -129,8 +109,6 @@ export function StoryModal({
           "max-md:fixed max-md:inset-0 max-md:grid max-md:grid-rows-[40fr_60fr] max-md:h-[100dvh]",
         )}
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
         {/* ══ LEFT / TOP: Visual panel (mobile: fixed 40% row) ═══════════════ */}
         <div
