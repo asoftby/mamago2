@@ -69,7 +69,7 @@ export type PlanItemWithActivity = {
     type: string;
     coverImageUrl: string | null;
     ageLabel: string | null;
-    ageMinMonths: number | null;
+    ageMinMonths?: number | null;
     eventCategory: { nameRu: string } | null;
     priceFrom: number | null;
     priceText: string | null;
@@ -79,18 +79,18 @@ export type PlanItemWithActivity = {
       business: { operationalStatus: string } | null;
     } | null;
     place: {
-      title: string;
+      title?: string | null;
       shortAddress: string | null;
       formattedAddr: string | null;
       customAddress: string | null;
       city: { name: string } | null;
     } | null;
     venue: {
-      title: string | null;
+      title?: string | null;
       addressLine: string | null;
       kind: string;
       place: {
-        title: string;
+        title?: string | null;
         shortAddress: string | null;
         formattedAddr: string | null;
         customAddress: string | null;
