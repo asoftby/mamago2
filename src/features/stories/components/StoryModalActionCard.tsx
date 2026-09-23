@@ -100,8 +100,19 @@ export function StoryModalActionCard({
         </div>
 
         {item.description ? (
-          // Truncation is CSS-only (scroll on mobile, desktop card grows) — never clip mid-word via line-clamp.
-          <p className="mt-2 mb-5 whitespace-pre-line text-[15px] leading-[1.6] text-neutral-600">
+          <p
+            className="mt-2 mb-5 whitespace-pre-line text-[15px] leading-[1.6] text-neutral-600"
+            style={
+              item.type === "breaking-news"
+                ? {
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 10,
+                    overflow: "hidden",
+                  }
+                : undefined
+            }
+          >
             {item.description}
           </p>
         ) : null}
@@ -125,7 +136,7 @@ export function StoryModalActionCard({
                 Стоимость
               </p>
               <p className="text-[17px] font-semibold text-neutral-900">
-                {renderCurrencyText(item.price, { iconSize: "sm" })}
+                {renderCurrencyText(item.price, { iconSize: "storyPrice" })}
               </p>
             </div>
           )}

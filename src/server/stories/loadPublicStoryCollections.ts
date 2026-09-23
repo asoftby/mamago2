@@ -8,7 +8,7 @@ import { stripHtml } from "@/lib/search/sanitizeSearchText";
 import { buildActivityPublicPath } from "@/lib/public/publicVerticalResolver";
 import { activityAddressLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
 import { formatAgeTagsCompact } from "@/lib/config/ages";
-import { formatPrice } from "@/lib/formatters/format-price";
+import { formatStoryPrice } from "@/features/stories/lib/storyPrice";
 import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import type { StoryCollection, StoryIntent, StoryItem } from "@/features/stories/types/story";
 import { listBreakingNewsArticles } from "@/features/stories/lib/listBreakingNews";
@@ -34,21 +34,6 @@ function formatPeriod(input: { start: Date; end: Date; timeZone: string }): stri
   const start = input.start.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: input.timeZone });
   const end = input.end.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: input.timeZone });
   return start === end ? start : `${start} — ${end}`;
-}
-
-/** Canonical price label: routes both `priceFrom` and free-text `priceText` through the shared BYN formatter. */
-function resolvePriceLabel(priceFrom: number | null | undefined, priceText: string | null | undefined): string | undefined {
-  if (priceFrom === 0) return "Бесплатно";
-  const text = plain(priceText);
-  if (text) {
-    const formatted = formatPrice(text, { hideZero: true });
-    if (formatted) return formatted;
-  }
-  if (priceFrom != null) {
-    const formatted = formatPrice(priceFrom, { hideZero: true });
-    if (formatted) return formatted;
-  }
-  return undefined;
 }
 
 function formatTimeHM(date: Date, timeZone: string): string {
@@ -197,8 +182,8 @@ export async function loadPublicStoryCollections(input: {
   const placeIds = [...new Set(allItems.map((row) => row.placeId).filter((id): id is string => Boolean(id)))];
   const mediaIds = [...new Set(allItems.map((row) => row.coverMediaAssetId).filter((id): id is string => Boolean(id)))];
   const [activities, offers, places, media, activitySessions] = await Promise.all([
-    activityIds.length ? prisma.activity.findMany({ where: { id: { in: activityIds }, status: "PUBLISHED" }, select: { id: true, slug: true, type: true, title: true, description: true, shortDesc: true, coverImageUrl: true, priceFrom: true, priceText: true, currency: true, agePolicy: true, ageLabel: true, ageTags: true, ageMinMonths: true, ageMaxMonths: true, schedulingKind: true, scheduleJson: true, venue: { select: { title: true, addressLine: true } } } }) : [],
-    offerIds.length ? prisma.offer.findMany({ where: { id: { in: offerIds }, status: "PUBLISHED" }, select: { id: true, slug: true, title: true, description: true, coverImage: true, priceFrom: true, priceText: true, dateFrom: true, dateTo: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true } }) : [],
+    activityIds.length ? prisma.activity.findMany({ where: { id: { in: activityIds }, status: "PUBLISHED" }, select: { id: true, slug: true, type: true, title: true, description: true, shortDesc: true, coverImageUrl: true, priceMode: true, priceFrom: true, priceTo: true, priceText: true, currency: true, agePolicy: true, ageLabel: true, ageTags: true, ageMinMonths: true, ageMaxMonths: true, schedulingKind: true, scheduleJson: true, venue: { select: { title: true, addressLine: true } } } }) : [],
+    offerIds.length ? prisma.offer.findMany({ where: { id: { in: offerIds }, status: "PUBLISHED" }, select: { id: true, slug: true, title: true, description: true, coverImage: true, priceMode: true, priceFrom: true, priceTo: true, priceText: true, dateFrom: true, dateTo: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true } }) : [],
     placeIds.length ? prisma.place.findMany({ where: { id: { in: placeIds } }, select: { id: true, title: true, displayAddress: true, formattedAddr: true, customAddress: true } }) : [],
     mediaIds.length ? prisma.mediaAsset.findMany({ where: { id: { in: mediaIds } }, select: { id: true, publicUrl: true } }) : [],
     activityIds.length ? prisma.activitySession.findMany({ where: { activityId: { in: activityIds } }, select: { activityId: true, startsAt: true }, orderBy: { startsAt: "asc" } }) : [],
@@ -228,7 +213,7 @@ export async function loadPublicStoryCollections(input: {
       const age = entity.agePolicy === "ADULT_ONLY"
         ? "18+"
         : formatAgeTagsCompact(entity.ageTags) ?? resolveActivityAgeLabel(entity) ?? undefined;
-      const price = resolvePriceLabel(entity.priceFrom, entity.priceText);
+      const price = formatStoryPrice({ priceMode: entity.priceMode, priceFrom: entity.priceFrom, priceTo: entity.priceTo, priceText: entity.priceText });
       const eyebrow = intent === "free"
         ? "бесплатно"
         : intent === "running"
@@ -251,7 +236,7 @@ export async function loadPublicStoryCollections(input: {
       ? formatPeriod({ start: entity.dateFrom ?? entity.dateTo!, end: entity.dateTo ?? entity.dateFrom!, timeZone: rail.timeZone })
       : datetime;
     const age = resolveActivityAgeLabel({ agePolicy: entity.agePolicy, ageMinMonths: entity.ageMinMonths, ageMaxMonths: entity.ageMaxMonths }) ?? undefined;
-    const price = resolvePriceLabel(entity.priceFrom, entity.priceText);
+    const price = formatStoryPrice({ priceMode: entity.priceMode, priceFrom: entity.priceFrom, priceTo: entity.priceTo, priceText: entity.priceText });
     const location = activityAddressLine({
       placeTitle: place?.title,
       placeFormattedAddr: place?.formattedAddr,
